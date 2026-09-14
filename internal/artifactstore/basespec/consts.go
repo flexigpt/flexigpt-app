@@ -17,19 +17,23 @@ const (
 	MaxSourceGenerationBytes = 1024
 	MaxLocatorBytes          = 4096
 
-	MaxLabels                 = 64
-	MaxLabelValueBytes        = 256
-	MaxConfigBytes            = 1 << 20
-	MaxLocalDataBytes         = 1 << 20
-	MaxDefinitionBodyBytes    = 4 << 20
-	MaxDefinitionBytes        = 16 << 20
+	MaxLabels              = 64
+	MaxLabelValueBytes     = 256
+	MaxConfigBytes         = 1 << 20
+	MaxLocalDataBytes      = 1 << 20
+	MaxDefinitionBodyBytes = 4 << 20
+	MaxDefinitionBytes     = 16 << 20
+
 	MaxDefinitionDependencies = 4096
 	MaxCandidateBytes         = 4 << 20
 	MaxScanBytes              = int64(512 << 20)
+	MaxPathPatterns           = 4096
+	MaxDecoderHints           = 4096
 
-	DefaultMaxCandidates   = 10_000
-	DefaultMaxEntries      = 100_000
-	DefaultMaxDepth        = 64
+	DefaultMaxCandidates = 10_000
+	DefaultMaxEntries    = 100_000
+	DefaultMaxDepth      = 64
+
 	MaxDiscoveryCandidates = 100_000
 	MaxDiscoveryEntries    = 1_000_000
 	MaxDiscoveryDepth      = 256

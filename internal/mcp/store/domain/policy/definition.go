@@ -1,77 +1,95 @@
 package policy
 
 import (
+	"encoding/json"
 	"fmt"
-	"maps"
-	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
-
-func PolicySubresource(
-	name basespec.LogicalName,
-) basespec.SubresourceLocator {
-	return basespec.SubresourceLocator(
-		path.Join("policies", string(name)),
-	)
-}
 
 func BodyFromDefinition(
 	input definition.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
-	value := input
-	if value.Kind != mcppolicyv1.MCPPolicyKind ||
-		value.SchemaID != mcppolicyv1.MCPPolicySchemaID ||
-		value.SchemaVersion != mcppolicyv1.MCPPolicySchemaVersion {
+	if err := input.Validate(); err != nil {
+		return mcpPolicy.MCPPolicy{}, err
+	}
+	if input.Kind != mcpDomain.MCPPolicyArtifactKind ||
+		input.SchemaID != mcppolicyv1.MCPPolicySchemaKey.SchemaID ||
+		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {
 		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
 			basespec.ErrInvalid,
 		)
 	}
-	body, err := definition.DecodeBody[mcpPolicy.MCPPolicy](
-		value.Body,
-	)
+
+	document, err := mcppolicyv1.DecodeMCPPolicyJSON(input.Body)
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
 
+	raw, err := jsonutil.MarshalCanonicalObject(
+		document.Body,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return mcpPolicy.MCPPolicy{}, err
+	}
+	var body mcpPolicy.MCPPolicy
+	if err := json.Unmarshal(raw, &body); err != nil {
+		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+			"%w: decode MCP Policy body: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
 	if err := body.Validate(); err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
 	return body, nil
 }
 
-// DefinitionForCanonicalPolicy converts an MCP policy projected from an
-// Artifact Store-canonicalized MCP Bundle into an immutable Definition.
-func DefinitionForCanonicalPolicy(
-	input PolicyDocument,
+func DefinitionForDocument(
+	input mcppolicyv1.MCPPolicyDocument,
 ) (definition.Definition, error) {
-	if input.Kind != mcppolicyv1.MCPPolicyKind ||
-		input.SchemaID != mcppolicyv1.MCPPolicySchemaID ||
-		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaVersion {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: canonical MCP policy input has another schema identity",
-			basespec.ErrInvalid,
-		)
+	if err := input.Validate(); err != nil {
+		return definition.Definition{}, err
 	}
-	body, err := definition.EncodeBody(input.Body)
+	body, err := input.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	return definition.Canonicalize(
-		definition.Definition{
-			Kind:           mcppolicyv1.MCPPolicyKind,
-			SchemaID:       mcppolicyv1.MCPPolicySchemaID,
-			SchemaVersion:  mcppolicyv1.MCPPolicySchemaVersion,
-			LogicalName:    input.LogicalName,
-			LogicalVersion: input.LogicalVersion,
-			DisplayName:    input.DisplayName,
-			Description:    input.Description,
-			Labels:         maps.Clone(input.Labels),
-			Body:           body,
-		},
-	)
+	value := definition.Definition{
+		Kind:          mcpDomain.MCPPolicyArtifactKind,
+		SchemaID:      mcppolicyv1.MCPPolicySchemaKey.SchemaID,
+		SchemaVersion: mcppolicyv1.MCPPolicySchemaKey.SchemaVersion,
+		LogicalName:   basespec.LogicalName(input.Name),
+		DisplayName:   input.Name,
+		Description:   input.Description,
+		Body:          body,
+		Dependencies:  nil,
+	}
+	return definition.Canonicalize(value)
+}
+
+func DocumentFromLegacyBody(
+	name basespec.LogicalName,
+	description string,
+	body mcppolicyv1.MCPPolicyBody,
+) (mcppolicyv1.MCPPolicyDocument, error) {
+	value := mcppolicyv1.MCPPolicyDocument{
+		APIVersion:  mcppolicyv1.MCPPolicySchemaVersion,
+		Type:        mcppolicyv1.MCPPolicyType,
+		Name:        string(name),
+		Description: description,
+		Body:        body,
+	}
+	if err := value.Validate(); err != nil {
+		return mcppolicyv1.MCPPolicyDocument{}, err
+	}
+	return value, nil
 }

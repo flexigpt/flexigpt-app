@@ -20,10 +20,9 @@ func (v StorageKey) Validate() error {
 type LogicalName string
 
 func (v LogicalName) Validate() error {
-	return ValidateRequiredText(
+	return ValidatePortableName(
 		"logical name",
 		string(v),
-		MaxLogicalNameBytes,
 	)
 }
 

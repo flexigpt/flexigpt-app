@@ -1,0 +1,769 @@
+package artifactresolve
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/loopv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workflowv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+)
+
+type resolutionState struct {
+	nodes       int
+	collections map[artifact.ArtifactRef]struct{}
+}
+
+func (r *Resolver) ResolveArtifact(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (Graph, error) {
+	if r == nil || r.artifacts == nil {
+		return Graph{}, basespec.ErrClosed
+	}
+	if err := ref.Validate(); err != nil {
+		return Graph{}, err
+	}
+
+	state := resolutionState{
+		collections: make(map[artifact.ArtifactRef]struct{}),
+	}
+	entry, err := r.resolveArtifact(
+		ctx,
+		&state,
+		ref,
+		"",
+		0,
+	)
+	if err != nil {
+		return Graph{}, err
+	}
+	return Graph{Root: entry}, nil
+}
+
+func (r *Resolver) resolveInlineGraph(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	entry artifactcontract.Entry,
+) (Graph, error) {
+	if r == nil || r.artifacts == nil {
+		return Graph{}, basespec.ErrClosed
+	}
+	if err := entry.Validate(); err != nil {
+		return Graph{}, err
+	}
+	value, err := r.resolveEntry(
+		ctx,
+		state,
+		rootID,
+		entry,
+		nil,
+		0,
+		nil,
+	)
+	if err != nil {
+		return Graph{}, err
+	}
+	return Graph{Root: value}, nil
+}
+
+func (r *Resolver) ResolveReference(
+	ctx context.Context,
+	rootID root.RootID,
+	declarationType artifactcontract.Type,
+	name basespec.LogicalName,
+) (Graph, error) {
+	if r == nil || r.artifacts == nil {
+		return Graph{}, basespec.ErrClosed
+	}
+	if err := rootID.Validate(); err != nil {
+		return Graph{}, err
+	}
+	if err := declarationType.Validate(); err != nil {
+		return Graph{}, err
+	}
+	if err := name.Validate(); err != nil {
+		return Graph{}, err
+	}
+
+	state := resolutionState{
+		collections: make(map[artifact.ArtifactRef]struct{}),
+	}
+	entry, err := r.resolveSymbolic(
+		ctx,
+		&state,
+		rootID,
+		declarationType,
+		name,
+		0,
+	)
+	if err != nil {
+		return Graph{}, err
+	}
+	return Graph{Root: entry}, nil
+}
+
+func (r *Resolver) ResolveWorkspace(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (*ResolvedWorkspace, error) {
+	graph, err := r.ResolveArtifact(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if graph.Root == nil ||
+		graph.Root.Type != artifactcontract.TypeWorkspace ||
+		graph.Root.Workspace == nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact %q is not a Workspace",
+			basespec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+	return graph.Root.Workspace, nil
+}
+
+func (r *Resolver) resolveArtifact(
+	ctx context.Context,
+	state *resolutionState,
+	ref artifact.ArtifactRef,
+	expected artifactcontract.Type,
+	depth int,
+) (*ResolvedEntry, error) {
+	if err := r.reserve(state, depth); err != nil {
+		return nil, err
+	}
+
+	record, err := r.artifacts.Get(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if record.State != artifact.StateAvailable {
+		return nil, fmt.Errorf(
+			"%w: Artifact %q is not available",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+	if !r.options.IncludeDisabled && !record.Enabled {
+		return nil, fmt.Errorf(
+			"%w: Artifact %q is disabled",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	declarationType := artifactcontract.Type(record.Kind)
+	if err := declarationType.Validate(); err != nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact %q has unsupported declaration type: %w",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+			err,
+		)
+	}
+	if expected != "" && declarationType != expected {
+		return nil, fmt.Errorf(
+			"%w: Artifact %q has type %q, expected %q",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+			declarationType,
+			expected,
+		)
+	}
+
+	definitionValue, err := r.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	if definitionValue.Kind != record.Kind {
+		return nil, fmt.Errorf(
+			"%w: Artifact Definition kind does not match Artifact kind",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	if definitionValue.LogicalName != record.LogicalName ||
+		definitionValue.LogicalVersion != record.LogicalVersion {
+		return nil, fmt.Errorf(
+			"%w: Artifact Definition identity does not match Artifact state",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	entry, err := artifactcontract.DecodeEntryJSON(definitionValue.Body)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact Definition body is not a canonical declaration: %w",
+			basespec.ErrReferenceUnresolved,
+			err,
+		)
+	}
+	if entry.Header().Type != declarationType {
+		return nil, fmt.Errorf(
+			"%w: Artifact Definition declaration type differs from Artifact kind",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	if entry.Header().Name != string(definitionValue.LogicalName) {
+		return nil, fmt.Errorf(
+			"%w: Artifact Definition declaration name differs from logical name",
+			basespec.ErrDigestMismatch,
+		)
+	}
+
+	node := &ResolvedEntry{
+		Type:        declarationType,
+		scopeRootID: record.RootID,
+		Artifact:    pointerArtifact(record),
+		Definition:  pointerDefinition(definitionValue),
+	}
+
+	if declarationType == artifactcontract.TypeCollection {
+		if _, cycle := state.collections[ref]; cycle {
+			return nil, fmt.Errorf(
+				"%w: Collection inclusion cycle at Artifact %q",
+				basespec.ErrReferenceUnresolved,
+				record.ID,
+			)
+		}
+		state.collections[ref] = struct{}{}
+		defer delete(state.collections, ref)
+	}
+
+	if err := r.resolveStructure(
+		ctx,
+		state,
+		node,
+		entry,
+		depth,
+		nil,
+	); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func (r *Resolver) resolveSymbolic(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	declarationType artifactcontract.Type,
+	name basespec.LogicalName,
+	depth int,
+) (*ResolvedEntry, error) {
+	records, err := r.artifacts.FindByIdentity(
+		ctx,
+		rootID,
+		artifact.ArtifactKind(declarationType),
+		name,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	candidates := make([]artifact.Artifact, 0, len(records))
+	for _, record := range records {
+		if record.State != artifact.StateAvailable {
+			continue
+		}
+		if !r.options.IncludeDisabled && !record.Enabled {
+			continue
+		}
+		candidates = append(candidates, record)
+	}
+	switch len(candidates) {
+	case 0:
+		return nil, fmt.Errorf(
+			"%w: %s/%s",
+			basespec.ErrReferenceUnresolved,
+			declarationType,
+			name,
+		)
+	case 1:
+		return r.resolveArtifact(
+			ctx,
+			state,
+			candidates[0].Ref(),
+			declarationType,
+			depth,
+		)
+	default:
+		return nil, fmt.Errorf(
+			"%w: %s/%s has %d available Artifacts in Root %q",
+			basespec.ErrIdentityConflict,
+			declarationType,
+			name,
+			len(candidates),
+			rootID,
+		)
+	}
+}
+
+func (r *Resolver) resolveEntry(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	entry artifactcontract.Entry,
+	from *artifact.Artifact,
+	depth int,
+	implicitLoopOwner *ResolvedEntry,
+) (*ResolvedEntry, error) {
+	if err := entry.Validate(); err != nil {
+		return nil, err
+	}
+
+	header := entry.Header()
+	if entry.IsSymbolic() {
+		return r.resolveSymbolic(
+			ctx,
+			state,
+			rootID,
+			header.Type,
+			basespec.LogicalName(header.Name),
+			depth,
+		)
+	}
+	if shouldResolveLocator(entry, header.Locator) {
+		if r.locators == nil {
+			return nil, fmt.Errorf(
+				"%w: declaration locator requires a locator resolver",
+				basespec.ErrLocatorUnresolved,
+			)
+		}
+		ref, err := r.locators.ResolveArtifactLocator(
+			ctx,
+			LocatorRequest{
+				RootID:       rootID,
+				From:         cloneArtifactPointer(from),
+				Locator:      header.Locator.Clone(),
+				ExpectedType: header.Type,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if ref.RootID != rootID {
+			return nil, fmt.Errorf(
+				"%w: locator resolver returned Artifact from another Root",
+				basespec.ErrInvalid,
+			)
+		}
+		return r.resolveArtifact(
+			ctx,
+			state,
+			ref,
+			header.Type,
+			depth,
+		)
+	}
+
+	if err := r.reserve(state, depth); err != nil {
+		return nil, err
+	}
+	node := &ResolvedEntry{
+		Type:        header.Type,
+		scopeRootID: rootID,
+		Inline:      pointerEntry(entry),
+	}
+	if err := r.resolveStructure(
+		ctx,
+		state,
+		node,
+		entry,
+		depth,
+		implicitLoopOwner,
+	); err != nil {
+		return nil, err
+	}
+	return node, nil
+}
+
+func (r *Resolver) resolveStructure(
+	ctx context.Context,
+	state *resolutionState,
+	node *ResolvedEntry,
+	entry artifactcontract.Entry,
+	depth int,
+	implicitLoopOwner *ResolvedEntry,
+) error {
+	rootID, _ := node.RootID()
+	if rootID == "" {
+		return fmt.Errorf(
+			"%w: inline declaration requires a Root resolution scope",
+			basespec.ErrInvalid,
+		)
+	}
+
+	var from *artifact.Artifact
+	if node.Artifact != nil {
+		from = node.Artifact
+	}
+
+	switch node.Type {
+	case artifactcontract.TypeInstruction:
+		_, err := instructionv1.DecodeInstructionEntry(entry)
+		return err
+
+	case artifactcontract.TypeContext:
+		_, err := contextv1.DecodeContextEntry(entry)
+		return err
+
+	case artifactcontract.TypeTool:
+		_, err := toolv1.DecodeToolEntry(entry)
+		return err
+
+	case artifactcontract.TypeModel:
+		_, err := modelv1.DecodeModelEntry(entry)
+		return err
+
+	case artifactcontract.TypeSkill:
+		value, err := skillv1.DecodeSkillEntry(entry)
+		if err != nil {
+			return err
+		}
+		node.AllowedTools, err = r.resolveEntries(
+			ctx,
+			state,
+			rootID,
+			value.AllowedTools,
+			from,
+			depth+1,
+			nil,
+		)
+		return err
+
+	case artifactcontract.TypeMCP:
+		_, err := mcpv1.DecodeMCPEntry(entry)
+		return err
+
+	case artifactcontract.TypeMCPPolicy:
+		_, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
+		return err
+
+	case artifactcontract.TypeCollection:
+		value, err := collectionv1.DecodeCollectionEntry(entry)
+		if err != nil {
+			return err
+		}
+		node.Members, err = r.resolveEntries(
+			ctx,
+			state,
+			rootID,
+			value.Members,
+			from,
+			depth+1,
+			nil,
+		)
+		return err
+
+	case artifactcontract.TypeAgent:
+		value, err := agentv1.DecodeAgentEntry(entry)
+		if err != nil {
+			return err
+		}
+		node.Members, err = r.resolveEntries(
+			ctx,
+			state,
+			rootID,
+			value.Members,
+			from,
+			depth+1,
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+		if value.Program != nil {
+			node.Program, err = r.resolveEntry(
+				ctx,
+				state,
+				rootID,
+				*value.Program,
+				from,
+				depth+1,
+				node,
+			)
+		}
+		return err
+
+	case artifactcontract.TypeTeam:
+		value, err := teamv1.DecodeTeamEntry(entry)
+		if err != nil {
+			return err
+		}
+		node.Members, err = r.resolveEntries(
+			ctx,
+			state,
+			rootID,
+			value.Members,
+			from,
+			depth+1,
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+		if value.Program != nil {
+			node.Program, err = r.resolveEntry(
+				ctx,
+				state,
+				rootID,
+				*value.Program,
+				from,
+				depth+1,
+				node,
+			)
+		}
+		return err
+
+	case artifactcontract.TypeLoop:
+		value, err := loopv1.DecodeLoopEntry(
+			entry,
+			implicitLoopOwner != nil,
+		)
+		if err != nil {
+			return err
+		}
+		loop := &ResolvedLoop{
+			MaxIterations: value.MaxIterations,
+		}
+		if value.Until != nil {
+			copyValue := value.Until.Clone()
+			loop.Until = &copyValue
+		}
+		node.Loop = loop
+		if value.Body != nil {
+			loop.Body, err = r.resolveEntry(
+				ctx,
+				state,
+				rootID,
+				*value.Body,
+				from,
+				depth+1,
+				nil,
+			)
+			return err
+		}
+		loop.Body = implicitLoopOwner
+		return nil
+
+	case artifactcontract.TypeWorkflow:
+		value, err := workflowv1.DecodeWorkflowEntry(entry)
+		if err != nil {
+			return err
+		}
+		workflow := &ResolvedWorkflow{
+			Start: append([]string(nil), value.Start...),
+			Nodes: make(
+				[]ResolvedWorkflowNode,
+				0,
+				len(value.Nodes),
+			),
+			Edges: make(
+				[]ResolvedWorkflowEdge,
+				0,
+				len(value.Edges),
+			),
+		}
+		node.Workflow = workflow
+		for _, workflowNode := range value.Nodes {
+			target, err := r.resolveEntry(
+				ctx,
+				state,
+				rootID,
+				workflowNode.Target,
+				from,
+				depth+1,
+				nil,
+			)
+			if err != nil {
+				return err
+			}
+			join := workflowNode.Join
+			if join == "" {
+				join = workflowv1.JoinAll
+			}
+			workflow.Nodes = append(
+				workflow.Nodes,
+				ResolvedWorkflowNode{
+					ID:     workflowNode.ID,
+					Join:   string(join),
+					Target: target,
+				},
+			)
+		}
+		for _, edge := range value.Edges {
+			output := ResolvedWorkflowEdge{
+				From: edge.From,
+				To:   edge.To,
+			}
+			if edge.Match != nil {
+				copyValue := edge.Match.Clone()
+				output.Match = &copyValue
+			}
+			workflow.Edges = append(workflow.Edges, output)
+		}
+		return nil
+
+	case artifactcontract.TypeWorkspace:
+		value, err := workspacev1.DecodeWorkspaceEntry(entry)
+		if err != nil {
+			return err
+		}
+		workspace := &ResolvedWorkspace{
+			Roots: make([]*ResolvedEntry, 0, len(value.Roots)),
+		}
+		node.Workspace = workspace
+		for _, rootEntry := range value.Roots {
+			resolved, err := r.resolveEntry(
+				ctx,
+				state,
+				rootID,
+				rootEntry,
+				from,
+				depth+1,
+				nil,
+			)
+			if err != nil {
+				return err
+			}
+			workspace.Roots = append(workspace.Roots, resolved)
+		}
+		return nil
+
+	default:
+		return fmt.Errorf(
+			"%w: unsupported declaration type %q",
+			basespec.ErrUnsupported,
+			node.Type,
+		)
+	}
+}
+
+func (r *Resolver) resolveEntries(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	values []artifactcontract.Entry,
+	from *artifact.Artifact,
+	depth int,
+	implicitLoopOwner *ResolvedEntry,
+) ([]*ResolvedEntry, error) {
+	output := make([]*ResolvedEntry, 0, len(values))
+	for _, value := range values {
+		resolved, err := r.resolveEntry(
+			ctx,
+			state,
+			rootID,
+			value,
+			from,
+			depth,
+			implicitLoopOwner,
+		)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, resolved)
+	}
+	return output, nil
+}
+
+func (r *Resolver) reserve(
+	state *resolutionState,
+	depth int,
+) error {
+	if depth > r.limits.MaxDepth {
+		return fmt.Errorf(
+			"%w: Artifact resolution exceeds depth %d",
+			basespec.ErrLocatorLimitExceeded,
+			r.limits.MaxDepth,
+		)
+	}
+	state.nodes++
+	if state.nodes > r.limits.MaxNodes {
+		return fmt.Errorf(
+			"%w: Artifact resolution exceeds %d nodes",
+			basespec.ErrLocatorLimitExceeded,
+			r.limits.MaxNodes,
+		)
+	}
+	return nil
+}
+
+func shouldResolveLocator(
+	entry artifactcontract.Entry,
+	locator *artifactcontract.Locator,
+) bool {
+	if locator == nil ||
+		locator.Kind == artifactcontract.LocatorKindCommand {
+		return false
+	}
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return false
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return false
+	}
+	for key := range fields {
+		switch key {
+		case "$schema",
+			"apiVersion",
+			"type",
+			"name",
+			"description",
+			"locator",
+			"metadata":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+func pointerArtifact(
+	value artifact.Artifact,
+) *artifact.Artifact {
+	copyValue := value.Clone()
+	return &copyValue
+}
+
+func cloneArtifactPointer(
+	value *artifact.Artifact,
+) *artifact.Artifact {
+	if value == nil {
+		return nil
+	}
+	return pointerArtifact(*value)
+}
+
+func pointerDefinition(
+	value definition.Definition,
+) *definition.Definition {
+	copyValue := value.Clone()
+	return &copyValue
+}
+
+func pointerEntry(
+	value artifactcontract.Entry,
+) *artifactcontract.Entry {
+	copyValue := value.Clone()
+	return &copyValue
+}

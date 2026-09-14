@@ -9,7 +9,6 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
@@ -40,8 +39,8 @@ func NewWorkspaceInferenceBridge(
 }
 
 // validateArtifactSkillRefsForSelection validates only durable Artifact
-// identities. Artifact membership and owning Collection kind are resolved by
-// the internal Artifact Skill bridge, never inferred from reference shape.
+// identities. Artifact type and Root scope are resolved by the internal Skill
+// bridge, never inferred from reference shape.
 func validateArtifactSkillRefsForSelection(
 	sel *workspaceConversation.ConversationSelection,
 	refs []artifact.ArtifactRef,
@@ -111,7 +110,6 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 		"workspace":         sel.Workspace,
 		"resolvedWorkspace": usage.Workspace,
 		"workspaceRevision": usage.WorkspaceRevision,
-		"catalogRevision":   usage.CatalogRevision,
 		"status":            usage.Status,
 		"contexts":          usage.Contexts,
 		"skills":            usage.Skills,
@@ -129,7 +127,7 @@ func (b *WorkspaceInferenceBridge) HydrateCompletion(
 }
 
 func buildWorkspaceContextInput(
-	workspaceRef collection.CollectionRef,
+	workspaceRef artifact.ArtifactRef,
 	prompt string,
 ) inferenceSpec.InputUnion {
 	return inferenceSpec.InputUnion{
@@ -155,11 +153,11 @@ func buildWorkspaceContextInput(
 }
 
 func workspaceContextInputID(
-	workspaceRef collection.CollectionRef,
+	workspaceRef artifact.ArtifactRef,
 ) string {
 	return workspaceContextInputIDPrefix +
 		string(workspaceRef.RootID) + ":" +
-		string(workspaceRef.CollectionID)
+		string(workspaceRef.ArtifactID)
 }
 
 func stripGeneratedCurrentContextInputs(
@@ -220,7 +218,7 @@ func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 // was selected in persisted or externally supplied client state from reaching
 // inference unless the authoritative Workspace resolver marked it available
 // for this turn. ArtifactRefs not owned by this Workspace selection remain in
-// the caller's explicit runtime allow-list and are resolved by ArtifactRouter.
+// the caller's explicit runtime allow-list and are resolved by the Skill bridge.
 func filterWorkspaceSkillRefsToResolvedSelection(
 	refs []artifact.ArtifactRef,
 	usage *workspaceConversation.ConversationUsage,

@@ -48,10 +48,6 @@ func (r Resolved) MaterializeForInspection(
 	)
 }
 
-// MaterializeTrusted is the resolver-to-runtime fast path. Resolver output has
-// already passed full Artifact, Catalog, Definition, policy, and installation
-// validation. This method validates only values that do not exist until profile
-// application and local substitution occur.
 func (r Resolved) MaterializeTrusted(
 	ctx context.Context,
 	secrets SecretResolver,
@@ -59,27 +55,27 @@ func (r Resolved) MaterializeTrusted(
 ) (MaterializedServer, error) {
 	if !r.RuntimeEnabled {
 		return MaterializedServer{}, fmt.Errorf(
-			"%w: MCP Server is not enabled for this installation",
+			"%w: MCP Server is not enabled for runtime use",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	return materializeValidated(ctx, r.Server, r.Document, r.Installation, secrets, environment, true)
+	return materializeValidated(
+		ctx,
+		r.Server,
+		r.Document,
+		r.Installation,
+		secrets,
+		environment,
+		true,
+	)
 }
 
 func (r Resolved) Validate() error {
 	if err := r.Server.Validate(); err != nil {
 		return err
 	}
-	if err := r.Collection.Validate(); err != nil {
-		return err
-	}
-	if r.Server.RootID != r.Collection.RootID {
-		return fmt.Errorf(
-			"%w: MCP Server and Collection belong to different Roots",
-			basespec.ErrInvalid,
-		)
-	}
-	if r.ArtifactRevision == 0 || r.CatalogRevision == 0 {
+	if r.ArtifactRevision == 0 ||
+		r.InstallationRevision == 0 {
 		return fmt.Errorf(
 			"%w: resolved MCP revisions are required",
 			basespec.ErrInvalid,

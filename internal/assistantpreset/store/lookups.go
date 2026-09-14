@@ -46,7 +46,7 @@ type ToolSelectionLookup interface {
 }
 
 // SkillLookup validates/loads skill selections without coupling this package
-// to a concrete Artifact Store feature adapter.
+// to a concrete Root-scoped Artifact Store feature adapter.
 type SkillLookup interface {
 	GetSkillSummaryForSelection(
 		ctx context.Context,

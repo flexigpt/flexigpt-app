@@ -4,42 +4,31 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
-// Registry is Artifact Store's immutable provider capability registry.
-//
-// It owns global uniqueness enforcement for provider names, collection kinds,
-// schema keys, and decoder IDs. Providers receive no access to this registry.
 type Registry struct {
-	providers []providerapi.Descriptor
-	schemas   []providerapi.SchemaCodec
-	decoders  []providerapi.Decoder
-
-	byCollectionKind    map[collection.CollectionKind]providerapi.Descriptor
-	collectionBehaviors map[collection.CollectionKind]providerapi.CollectionBehavior
+	providers        []providerapi.Descriptor
+	schemas          []providerapi.SchemaCodec
+	decoders         []providerapi.Decoder
+	locatorResolvers []providerapi.LocatorResolver
 }
 
 func New(
 	providers ...providerapi.Provider,
 ) (*Registry, error) {
 	output := &Registry{
-		providers: make([]providerapi.Descriptor, 0, len(providers)),
-		schemas:   make([]providerapi.SchemaCodec, 0),
-		decoders:  make([]providerapi.Decoder, 0),
-		byCollectionKind: make(
-			map[collection.CollectionKind]providerapi.Descriptor,
-		),
-		collectionBehaviors: make(
-			map[collection.CollectionKind]providerapi.CollectionBehavior,
-		),
+		providers:        make([]providerapi.Descriptor, 0, len(providers)),
+		schemas:          make([]providerapi.SchemaCodec, 0),
+		decoders:         make([]providerapi.Decoder, 0),
+		locatorResolvers: make([]providerapi.LocatorResolver, 0),
 	}
 
 	seenProviderNames := make(map[string]struct{}, len(providers))
 	schemaOwners := make(map[schema.Key]string)
 	decoderOwners := make(map[basespec.DecoderID]string)
+	locatorResolverOwners := make(map[string]string)
 
 	for index, provider := range providers {
 		if provider == nil {
@@ -63,21 +52,6 @@ func New(
 			)
 		}
 		seenProviderNames[descriptor.Name] = struct{}{}
-
-		for _, behavior := range descriptor.CollectionBehaviors {
-			kind := behavior.CollectionKind()
-			if owner, exists := output.byCollectionKind[kind]; exists {
-				return nil, fmt.Errorf(
-					"%w: collection kind %q is owned by both providers %q and %q",
-					basespec.ErrConflict,
-					kind,
-					owner.Name,
-					descriptor.Name,
-				)
-			}
-			output.byCollectionKind[kind] = descriptor.Clone()
-			output.collectionBehaviors[kind] = behavior
-		}
 
 		for _, codec := range descriptor.Schemas {
 			key := codec.Key()
@@ -108,6 +82,19 @@ func New(
 			}
 			decoderOwners[id] = descriptor.Name
 		}
+		for _, resolver := range descriptor.LocatorResolvers {
+			kind := resolver.LocatorKind()
+			if owner, exists := locatorResolverOwners[kind]; exists {
+				return nil, fmt.Errorf(
+					"%w: locator resolver %q is owned by both providers %q and %q",
+					basespec.ErrConflict,
+					kind,
+					owner,
+					descriptor.Name,
+				)
+			}
+			locatorResolverOwners[kind] = descriptor.Name
+		}
 
 		output.providers = append(
 			output.providers,
@@ -120,6 +107,10 @@ func New(
 		output.decoders = append(
 			output.decoders,
 			descriptor.Decoders...,
+		)
+		output.locatorResolvers = append(
+			output.locatorResolvers,
+			descriptor.LocatorResolvers...,
 		)
 	}
 
@@ -152,30 +143,12 @@ func (r *Registry) Decoders() []providerapi.Decoder {
 	return append([]providerapi.Decoder(nil), r.decoders...)
 }
 
-func (r *Registry) ProviderForCollectionKind(
-	kind collection.CollectionKind,
-) (providerapi.Descriptor, bool) {
+func (r *Registry) LocatorResolvers() []providerapi.LocatorResolver {
 	if r == nil {
-		return providerapi.Descriptor{}, false
+		return nil
 	}
-
-	value, found := r.byCollectionKind[kind]
-	if !found {
-		return providerapi.Descriptor{}, false
-	}
-	return value.Clone(), true
-}
-
-func (r *Registry) CollectionBehavior(
-	kind collection.CollectionKind,
-) (providerapi.CollectionBehavior, bool) {
-	if r == nil {
-		return nil, false
-	}
-
-	behavior, found := r.collectionBehaviors[kind]
-	if !found {
-		return nil, false
-	}
-	return behavior, true
+	return append(
+		[]providerapi.LocatorResolver(nil),
+		r.locatorResolvers...,
+	)
 }

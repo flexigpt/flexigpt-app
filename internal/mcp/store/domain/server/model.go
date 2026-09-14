@@ -8,10 +8,10 @@ import (
 	"io"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
 
@@ -30,7 +30,7 @@ type ServerData struct {
 
 func DefaultServerData() ServerData {
 	return ServerData{
-		SchemaVersion: artifactbuiltin.MCPSchemaVersion,
+		SchemaVersion: mcpDomain.InstallationDataSchemaVersion,
 		Inputs:        map[string]InputBinding{},
 	}
 }
@@ -71,9 +71,12 @@ func DecodeServerData(
 	if err != nil {
 		return ServerData{}, err
 	}
+	if bytes.Equal(canonical, []byte(jsonutil.EmptyObject)) {
+		return DefaultServerData(), nil
+	}
+
 	decoder := json.NewDecoder(bytes.NewReader(canonical))
 	decoder.DisallowUnknownFields()
-
 	var value ServerData
 	if err := decoder.Decode(&value); err != nil {
 		return ServerData{}, fmt.Errorf(
@@ -87,7 +90,11 @@ func DecodeServerData(
 		if err == nil {
 			err = errors.New("MCP installation data has trailing JSON")
 		}
-		return ServerData{}, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
+		return ServerData{}, fmt.Errorf(
+			"%w: %w",
+			basespec.ErrInvalid,
+			err,
+		)
 	}
 	if err := value.Validate(); err != nil {
 		return ServerData{}, err
@@ -101,7 +108,7 @@ func DecodeServerData(
 }
 
 func (value ServerData) Validate() error {
-	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP installation schema %q",
 			basespec.ErrInvalid,
@@ -115,22 +122,13 @@ func (value ServerData) Validate() error {
 	); err != nil {
 		return err
 	}
-	if len(value.Inputs) > basespec.MaxDefinitionDependencies {
+	if len(value.Inputs) > basespec.MaxDefinitionDependencies ||
+		len(value.AdditionalPolicies) > basespec.MaxDefinitionDependencies {
 		return fmt.Errorf(
-			"%w: MCP installation inputs exceed %d entries",
+			"%w: MCP installation data exceeds entry limits",
 			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
 		)
 	}
-	if len(value.AdditionalPolicies) >
-		basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: additional MCP policies exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
-		)
-	}
-
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for name, binding := range value.Inputs {
 		if !installationInputNamePattern.MatchString(name) {
@@ -154,21 +152,9 @@ func (value ServerData) Validate() error {
 				name,
 			)
 		}
-		if binding.Value != nil {
-			if err := basespec.ValidateOptionalText(
-				"MCP installation input value",
-				*binding.Value,
-				basespec.MaxDescriptionBytes,
-			); err != nil {
-				return fmt.Errorf("MCP input %q: %w", name, err)
-			}
-		}
 		if binding.SecretRef != "" {
 			if _, err := mcpDomainSecret.ParseMCPSecretRef(binding.SecretRef); err != nil {
 				return fmt.Errorf("MCP input %q: %w", name, err)
-			}
-			if len(binding.SecretRef) > basespec.MaxURIBytes {
-				return fmt.Errorf("large size MCP ref:  %q", name)
 			}
 		}
 	}
@@ -178,7 +164,7 @@ func (value ServerData) Validate() error {
 		}
 		if _, duplicate := seen[ref]; duplicate {
 			return fmt.Errorf(
-				"%w: duplicate additional MCP policy",
+				"%w: duplicate additional MCP Policy",
 				basespec.ErrInvalid,
 			)
 		}

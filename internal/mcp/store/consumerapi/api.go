@@ -2,43 +2,34 @@ package consumerapi
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"maps"
-	"slices"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpDomainBundle "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/bundle"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
+	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
 type API struct {
 	sources          compositionapi.SourceAPI
-	collections      compositionapi.CollectionAPI
+	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
-	catalogs         compositionapi.CatalogAPI
 	resources        compositionapi.ResourceAPI
-	schemas          compositionapi.SchemaAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
 
-	userRootID     root.RootID
 	overlays       mcpOverlay.OverlayRepository
 	secretCleaner  mcpDomainServer.SecretCleaner
 	baselinePolicy mcpPolicy.MCPPolicy
@@ -46,24 +37,19 @@ type API struct {
 
 func New(
 	sources compositionapi.SourceAPI,
-	collections compositionapi.CollectionAPI,
+	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
-	catalogs compositionapi.CatalogAPI,
 	resources compositionapi.ResourceAPI,
-	schemas compositionapi.SchemaAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
-	userRootID root.RootID,
 	overlays mcpOverlay.OverlayRepository,
 	secretCleaner mcpDomainServer.SecretCleaner,
 	baselinePolicy mcpPolicy.MCPPolicy,
 ) (*API, error) {
 	if sources == nil ||
-		collections == nil ||
+		discovery == nil ||
 		artifacts == nil ||
-		catalogs == nil ||
 		resources == nil ||
-		schemas == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
 		secretCleaner == nil {
@@ -72,954 +58,755 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
-	if userRootID != "" {
-		if err := userRootID.Validate(); err != nil {
-			return nil, err
-		}
+	if err := baselinePolicy.Validate(); err != nil {
+		return nil, err
 	}
-
 	return &API{
 		sources:          sources,
-		collections:      collections,
+		discovery:        discovery,
 		artifacts:        artifacts,
-		catalogs:         catalogs,
 		resources:        resources,
-		schemas:          schemas,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
-		userRootID:       userRootID,
 		overlays:         overlays,
 		secretCleaner:    secretCleaner,
 		baselinePolicy:   baselinePolicy,
 	}, nil
 }
 
-type Bundle struct {
-	Collection      collection.Collection          `json:"collection"`
-	Data            mcpDomainBundle.CollectionData `json:"data"`
-	Attachment      collection.Attachment          `json:"attachment"`
-	Source          source.Summary                 `json:"source"`
-	PackageAddress  source.ManagedPackageAddress   `json:"packageAddress"`
-	DocumentLocator basespec.Locator               `json:"documentLocator"`
-}
-
-type Registration struct {
-	ArtifactID  artifact.ArtifactID
-	Subresource basespec.SubresourceLocator
-	Kind        artifact.ArtifactKind
-	Enabled     bool
-	Data        json.RawMessage
-}
-
-func (a *API) Create(
-	ctx context.Context,
-	request CreateMCPBundleBody,
-) (Bundle, error) {
-	if a == nil {
-		return Bundle{}, basespec.ErrClosed
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return Bundle{}, err
-	}
-	if a.userRootID != "" &&
-		request.RootID != a.userRootID {
-		return Bundle{}, fmt.Errorf(
-			"%w: user MCP Bundles must be created in Root %q",
-			basespec.ErrInvalid,
-			a.userRootID,
-		)
-	}
-	if err := a.requireBundleMutation(
-		ctx,
-		request.RootID,
-		false,
-	); err != nil {
-		return Bundle{}, err
-	}
-	if err := request.CollectionID.Validate(); err != nil {
-		return Bundle{}, err
-	}
-	if err := request.SourceID.Validate(); err != nil {
-		return Bundle{}, err
-	}
-
-	document, parsedDocument, err := a.canonicalizeBundleBytes(ctx, request.Document)
-	if err != nil {
-		return Bundle{}, err
-	}
-	if err := validateCreateRegistrations(
-		request.RootID,
-		document,
-		request.Registrations,
-	); err != nil {
-		return Bundle{}, err
-	}
-
-	packageAddress, err := mcpDomainBundle.PackageAddressForBundle(
-		document.LogicalName,
-		document.LogicalVersion,
-	)
-	if err != nil {
-		return Bundle{}, err
-	}
-	sourceValue, createdSource, err := a.sources.CreateWithStatus(
-		ctx,
-		request.RootID,
-		source.Draft{
-			ID:          request.SourceID,
-			StorageKey:  request.SourceStorageKey,
-			Kind:        source.SourceKindManagedDirectory,
-			DisplayName: displayName(document),
-			Enabled:     true,
-			Config:      json.RawMessage(jsonutil.EmptyObject),
-		},
-	)
-	if err != nil {
-		return Bundle{}, err
-	}
-	cleanupSource := func(cause error) error {
-		if !createdSource {
-			return cause
-		}
-		return errors.Join(
-			cause,
-			a.sources.Discard(
-				context.WithoutCancel(ctx),
-				request.RootID,
-				request.SourceID,
-				sourceValue.Revision,
-			),
-		)
-	}
-
-	collectionData, err := mcpDomainBundle.EncodeCollectionData(mcpDomainBundle.CollectionData{
-		SchemaVersion:           artifactbuiltin.MCPSchemaVersion,
-		DiscoveryPolicyRevision: artifactbuiltin.DecoderRevision,
-		LogicalName:             document.LogicalName,
-		LogicalVersion:          document.LogicalVersion,
-		Labels:                  maps.Clone(document.Labels),
-		ManagedSourceID:         request.SourceID,
-	})
-	if err != nil {
-		return Bundle{}, cleanupSource(err)
-	}
-	attachmentData, err := mcpDomainBundle.EncodeAttachmentData(mcpDomainBundle.AttachmentData{
-		SchemaVersion:  artifactbuiltin.MCPSchemaVersion,
-		PackageAddress: packageAddress,
-	})
-	if err != nil {
-		return Bundle{}, cleanupSource(err)
-	}
-
-	created, _, err := a.collections.Create(
-		ctx,
-		request.RootID,
-		collection.Draft{
-			ID:          request.CollectionID,
-			Kind:        mcpbundlev1.MCPBundleKind,
-			DisplayName: displayName(document),
-			Description: document.Description,
-			Enabled:     true,
-			Data:        collectionData,
-		},
-		[]collection.AttachmentDraft{{
-			SourceID: request.SourceID,
-			Role:     artifactbuiltin.ManagedAttachmentRole,
-			Enabled:  true,
-			Data:     attachmentData,
-		}},
-	)
-	if err != nil {
-		return Bundle{}, cleanupSource(err)
-	}
-
-	bundle, err := a.Get(ctx, created.Ref())
-	if err != nil {
-		return Bundle{}, err
-	}
-	if err := validateCreateBundleIntent(
-		bundle,
-		request,
-		document,
-		packageAddress,
-	); err != nil {
-		return Bundle{}, cleanupSource(err)
-	}
-	if _, err := a.replaceCanonicalDocument(
-		ctx,
-		ReplaceDocumentRequest{
-			Bundle:                     bundle.Collection.Ref(),
-			ExpectedCollectionRevision: bundle.Collection.Revision,
-			Document:                   parsedDocument.Raw,
-			Registrations:              request.Registrations,
-			AllowProtected:             false,
-		},
-		document,
-		parsedDocument.Raw,
-		nil,
-	); err != nil {
-		return Bundle{}, err
-	}
-	return a.Get(ctx, created.Ref())
-}
-
-func (a *API) List(
+func (a *API) ListServers(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]Bundle, error) {
-	values, err := a.collections.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]Bundle, 0)
-	for _, value := range values {
-		if value.Kind != mcpbundlev1.MCPBundleKind {
-			continue
-		}
-		bundle, err := a.Get(ctx, value.Ref())
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, bundle)
-	}
-	sort.Slice(output, func(left, right int) bool {
-		return output[left].Collection.ID <
-			output[right].Collection.ID
-	})
-	return output, nil
+) ([]artifact.Artifact, error) {
+	return a.listArtifacts(ctx, rootID, mcpDomain.MCPArtifactKind)
 }
 
-// Refresh performs an explicit MCP configuration refresh. The runtime session
-// is invalidated before publication so a live client cannot continue using
-// configuration that the caller explicitly asked to re-evaluate.
-func (a *API) Refresh(
+func (a *API) ListPolicies(
 	ctx context.Context,
-	ref collection.CollectionRef,
-	allowProtected bool,
-) (Bundle, error) {
-	commit, err := a.PrepareRefresh(ctx, ref, allowProtected)
-	if err != nil {
-		return Bundle{}, err
-	}
-	return commit(ctx)
+	rootID root.RootID,
+) ([]artifact.Artifact, error) {
+	return a.listArtifacts(ctx, rootID, mcpDomain.MCPPolicyArtifactKind)
 }
 
-func (a *API) PrepareRefresh(
+func (a *API) GetServerInstallation(
 	ctx context.Context,
-	ref collection.CollectionRef,
-	allowProtected bool,
-) (BundleMutationCommit, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return nil, err
-	}
-	if err := a.requireBundleMutation(
-		ctx,
-		ref.RootID,
-		allowProtected,
-	); err != nil {
-		return nil, err
-	}
-
-	bundle, err := a.Get(ctx, ref)
+	ref artifact.ArtifactRef,
+) (ServerInstallationView, error) {
+	material, err := a.resolveServerMaterial(ctx, ref, false)
 	if err != nil {
-		return nil, err
+		return ServerInstallationView{}, err
 	}
-	if !bundle.Collection.Enabled {
-		return nil, fmt.Errorf(
-			"%w: MCP Bundle %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-
-	return func(commitCtx context.Context) (Bundle, error) {
-		if _, err := a.catalogs.RefreshCollection(
-			commitCtx,
-			ref,
-		); err != nil {
-			return Bundle{}, err
-		}
-		return a.Get(commitCtx, ref)
+	return ServerInstallationView{
+		Artifact:             material.Resource.Artifact.Clone(),
+		Definition:           material.Resource.Definition.Clone(),
+		Document:             material.Document,
+		Installation:         material.Installation,
+		InstallationRevision: material.InstallationRevision,
+		InstallationEnabled:  material.InstallationEnabled,
+		RuntimeEnabled:       material.RuntimeEnabled,
+		BuiltIn:              material.BuiltIn,
 	}, nil
 }
 
-// EnsureBuiltInCurrent avoids managed package republishing for a current
-// protected Bundle, but repairs a missing or stale Catalog after startup,
-// decoder changes, or interrupted prior work.
-func (a *API) EnsureBuiltInCurrent(
+func (a *API) InspectMCPPolicyForRuntime(
 	ctx context.Context,
-	ref collection.CollectionRef,
+	ref artifact.ArtifactRef,
+) (PolicyView, error) {
+	if a == nil {
+		return PolicyView{}, basespec.ErrClosed
+	}
+	resolved, err := a.resources.ResolveArtifact(
+		ctx,
+		ref,
+		resource.ResolveOptions{},
+	)
+	if err != nil {
+		return PolicyView{}, err
+	}
+	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
+		return PolicyView{}, fmt.Errorf(
+			"%w: Artifact is not an MCP Policy",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	body, err := mcpDomainPolicy.BodyFromDefinition(
+		resolved.Definition,
+	)
+	if err != nil {
+		return PolicyView{}, err
+	}
+	return PolicyView{
+		Artifact:         resolved.Artifact.Clone(),
+		Definition:       resolved.Definition.Clone(),
+		Body:             body,
+		EffectiveEnabled: resolved.Artifact.Enabled,
+		BuiltIn: a.protection.IsProtectedRoot(
+			resolved.Artifact.RootID,
+		),
+	}, nil
+}
+
+func (a *API) ResolveMCPServer(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (mcpDomainServer.Resolved, error) {
+	return a.resolveMCPServer(ctx, ref, true)
+}
+
+func (a *API) InspectMCPServerForRuntime(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (mcpDomainServer.Resolved, error) {
+	return a.resolveMCPServer(ctx, ref, false)
+}
+
+func (a *API) UpdateServerInstallation(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedArtifactRevision uint64,
+	data mcpDomainServer.ServerData,
+) (artifact.Artifact, error) {
+	if expectedArtifactRevision == 0 {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: expected MCP Server Artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	material, err := a.resolveServerMaterial(ctx, ref, false)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if material.BuiltIn {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: protected MCP Server installation belongs in an overlay",
+			basespec.ErrProtected,
+		)
+	}
+	if material.Resource.Artifact.Revision != expectedArtifactRevision {
+		return artifact.Artifact{}, basespec.ErrConflict
+	}
+	if err := data.ValidateFor(ref, material.Document); err != nil {
+		return artifact.Artifact{}, err
+	}
+	encoded, err := mcpDomainServer.EncodeServerData(data)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if jsonutil.Equal(material.Resource.Artifact.Data, encoded) {
+		return material.Resource.Artifact, nil
+	}
+	updated, err := a.artifacts.UpdateData(
+		ctx,
+		ref,
+		expectedArtifactRevision,
+		encoded,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := mcpDomainServer.CleanupUnboundServerSecrets(
+		ctx,
+		updated.Ref(),
+		material.Document,
+		data,
+		a.secretCleaner,
+	); err != nil {
+		return updated, fmt.Errorf(
+			"MCP server secret cleanup remains pending: %w",
+			err,
+		)
+	}
+	return updated, nil
+}
+
+func (a *API) UpdateProtectedServerInstallation(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedOverlayRevision uint64,
+	runtimeEnabled bool,
+	data mcpDomainServer.ServerData,
 ) error {
 	if a == nil {
 		return basespec.ErrClosed
 	}
+	if !a.protection.IsProtectedRoot(ref.RootID) {
+		return fmt.Errorf(
+			"%w: MCP Server is not in a protected Root",
+			basespec.ErrProtected,
+		)
+	}
+	if a.overlays == nil {
+		return fmt.Errorf(
+			"%w: MCP overlay store is unavailable",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	material, err := a.resolveServerMaterial(ctx, ref, false)
+	if err != nil {
+		return err
+	}
+	if !material.BuiltIn {
+		return fmt.Errorf(
+			"%w: MCP Server is not a protected Artifact",
+			basespec.ErrProtected,
+		)
+	}
+	if err := data.ValidateFor(ref, material.Document); err != nil {
+		return err
+	}
+
+	current, found, err := a.overlays.GetServerOverlay(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if found && current.Revision != expectedOverlayRevision {
+		return basespec.ErrConflict
+	}
+	if !found && expectedOverlayRevision != 0 {
+		return basespec.ErrConflict
+	}
+	nextRevision := uint64(1)
+	if found {
+		nextRevision = current.Revision + 1
+	}
+	next := mcpOverlay.ServerOverlay{
+		SchemaVersion:  mcpDomain.InstallationDataSchemaVersion,
+		Revision:       nextRevision,
+		RuntimeEnabled: runtimeEnabled,
+		ServerData:     data,
+	}
+	if err := a.overlays.PutServerOverlay(
+		ctx,
+		ref,
+		expectedOverlayRevision,
+		next,
+	); err != nil {
+		return err
+	}
+	return mcpDomainServer.CleanupUnboundServerSecrets(
+		ctx,
+		ref,
+		material.Document,
+		data,
+		a.secretCleaner,
+	)
+}
+
+func (a *API) EnsureBuiltInSourceCurrent(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) error {
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if err := ref.Validate(); err != nil {
+	inspection, err := a.discovery.InspectSource(ctx, rootID, sourceID)
+	if errors.Is(err, basespec.ErrRefreshStateNotFound) {
+		_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
 		return err
 	}
-	if !a.protection.IsProtectedRoot(ref.RootID) {
-		return fmt.Errorf(
-			"%w: MCP Bundle %q is not protected",
-			basespec.ErrProtected,
-			ref.CollectionID,
-		)
-	}
-
-	bundle, err := a.Get(ctx, ref)
 	if err != nil {
 		return err
 	}
-	if _, err := a.currentCatalog(ctx, bundle); err == nil {
+	if inspection.IsCurrent() {
 		return nil
-	} else if !errors.Is(err, basespec.ErrCatalogUnavailable) &&
-		!errors.Is(err, basespec.ErrCatalogStale) {
-		return err
 	}
-
-	_, err = a.Refresh(ctx, ref, true)
+	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
 	return err
 }
 
-func (a *API) Get(
+func (a *API) InstallBuiltInPackage(
 	ctx context.Context,
-	ref collection.CollectionRef,
-) (Bundle, error) {
+	request BuiltInPackageInstallRequest,
+) ([]artifact.Artifact, error) {
 	if a == nil {
-		return Bundle{}, basespec.ErrClosed
+		return nil, basespec.ErrClosed
 	}
-	value, err := a.collections.Get(ctx, ref)
-	if err != nil {
-		return Bundle{}, err
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return nil, err
 	}
-	if value.Kind != mcpbundlev1.MCPBundleKind {
-		return Bundle{}, fmt.Errorf(
-			"%w: Collection %q is not an MCP Bundle",
-			basespec.ErrCollectionNotFound,
-			ref.CollectionID,
+	if err := request.RootID.Validate(); err != nil {
+		return nil, err
+	}
+	if err := request.SourceID.Validate(); err != nil {
+		return nil, err
+	}
+	if err := request.PackageAddress.Validate(); err != nil {
+		return nil, err
+	}
+	if err := request.DocumentFile.ValidatePortable(false); err != nil {
+		return nil, err
+	}
+	if len(request.Expectations) == 0 {
+		return nil, fmt.Errorf(
+			"%w: built-in MCP package has no expected Artifacts",
+			basespec.ErrInvalid,
+		)
+	}
+	if !a.protection.IsProtectedRoot(request.RootID) {
+		return nil, fmt.Errorf(
+			"%w: MCP built-in Root is not protected",
+			basespec.ErrProtected,
 		)
 	}
 
-	data, err := mcpDomainBundle.DecodeCollectionData(value.Data)
-	if err != nil {
-		return Bundle{}, err
-	}
-	attachments, err := a.collections.ListAttachments(
+	sourceValue, err := a.sources.Get(
 		ctx,
-		ref,
+		request.RootID,
+		request.SourceID,
 	)
 	if err != nil {
-		return Bundle{}, err
+		return nil, err
 	}
-	topology := mcpDomainBundle.StoreTopology{
-		Collection:  value.Ref(),
-		Data:        data,
-		Attachments: make([]mcpDomainBundle.StoreAttachment, 0, len(attachments)),
-		Sources:     make([]mcpDomainBundle.StoreSource, 0, len(attachments)),
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return nil, fmt.Errorf(
+			"%w: MCP built-in Source must be managed",
+			basespec.ErrInvalid,
+		)
 	}
-	sourceValues := make([]source.Summary, 0, len(attachments))
-	for _, attachment := range attachments {
-		sourceValue, err := a.sources.Get(
+	documentLocator, err := request.PackageAddress.FileLocator(
+		request.DocumentFile,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	expectations := append(
+		[]BuiltInArtifactExpectation(nil),
+		request.Expectations...,
+	)
+	sort.Slice(expectations, func(left, right int) bool {
+		if expectations[left].Subresource != expectations[right].Subresource {
+			return expectations[left].Subresource <
+				expectations[right].Subresource
+		}
+		return expectations[left].Kind < expectations[right].Kind
+	})
+	first := expectations[0]
+	if err := first.Kind.Validate(); err != nil {
+		return nil, err
+	}
+	if err := first.LogicalName.Validate(); err != nil {
+		return nil, err
+	}
+	if err := cryptoutil.ValidateDigest(first.DefinitionDigest); err != nil {
+		return nil, err
+	}
+
+	_, err = a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: request.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID:           request.SourceID,
+				Locator:            documentLocator,
+				SubresourceLocator: first.Subresource,
+			},
+			ExpectedKind:        first.Kind,
+			ExpectedLogicalName: first.LogicalName,
+			ExpectedDefinition:  first.DefinitionDigest,
+			Package: source.ManagedPackagePublication{
+				Address: request.PackageAddress,
+				Files:   request.PackageFiles,
+			},
+			AllowProtected: true,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]artifact.Artifact, 0, len(expectations))
+	for _, expected := range expectations {
+		if err := expected.Subresource.Validate(); err != nil {
+			return nil, err
+		}
+		if err := expected.Kind.Validate(); err != nil {
+			return nil, err
+		}
+		if err := expected.LogicalName.Validate(); err != nil {
+			return nil, err
+		}
+		if err := cryptoutil.ValidateDigest(
+			expected.DefinitionDigest,
+		); err != nil {
+			return nil, err
+		}
+
+		value, err := a.artifacts.FindByOrigin(
 			ctx,
-			ref.RootID,
-			attachment.SourceID,
+			request.RootID,
+			artifact.SourceBinding{
+				SourceID:           request.SourceID,
+				Locator:            documentLocator,
+				SubresourceLocator: expected.Subresource,
+			},
+			expected.Kind,
 		)
 		if err != nil {
-			return Bundle{}, err
+			return nil, err
 		}
-		topology.Attachments = append(
-			topology.Attachments,
-			mcpDomainBundle.StoreAttachment{
-				RootID:       attachment.RootID,
-				CollectionID: attachment.CollectionID,
-				SourceID:     attachment.SourceID,
-				Role:         attachment.Role,
-			},
-		)
-		topology.Sources = append(
-			topology.Sources,
-			mcpDomainBundle.StoreSource{
-				ID:     sourceValue.ID,
-				RootID: sourceValue.RootID,
-				Kind:   sourceValue.Kind,
-			},
-		)
-		sourceValues = append(sourceValues, sourceValue)
+		if value.State != artifact.StateAvailable ||
+			value.LogicalName != expected.LogicalName ||
+			value.ResolvedDefinition == nil ||
+			*value.ResolvedDefinition != expected.DefinitionDigest {
+			return nil, fmt.Errorf(
+				"%w: built-in MCP Artifact %q does not match package expectation",
+				basespec.ErrReferenceUnresolved,
+				value.ID,
+			)
+		}
+		if value.Enabled != expected.Enabled {
+			value, err = a.artifacts.SetEnabled(
+				ctx,
+				value.Ref(),
+				value.Revision,
+				expected.Enabled,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+		output = append(output, value)
 	}
-
-	if err := mcpDomainBundle.ValidateStoreTopology(topology); err != nil {
-		return Bundle{}, err
-	}
-
-	attachment := attachments[0]
-	sourceValue := sourceValues[0]
-	attachmentData, err := mcpDomainBundle.DecodeAttachmentData(
-		attachment.Data,
-	)
-	if err != nil {
-		return Bundle{}, err
-	}
-	documentLocator, err := mcpDomainBundle.DocumentLocatorForPackage(
-		attachmentData.PackageAddress,
-	)
-	if err != nil {
-		return Bundle{}, err
-	}
-
-	return Bundle{
-		Collection: value,
-		Data:       data,
-		Attachment: attachment,
-		Source:     sourceValue,
-
-		PackageAddress:  attachmentData.PackageAddress,
-		DocumentLocator: documentLocator,
-	}, nil
+	return output, nil
 }
 
-func (a *API) CreateMCPBundle(
+func (a *API) listArtifacts(
 	ctx context.Context,
-	request *CreateMCPBundleRequest,
-) (*CreateMCPBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"MCP Bundle creation",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.Create(ctx, *request.Body)
-	if err != nil {
-		return nil, wrapStoreError("create Bundle", err)
-	}
-	return &CreateMCPBundleResponse{Body: &value}, nil
-}
-
-func (a *API) GetMCPBundle(
-	ctx context.Context,
-	request *GetMCPBundleRequest,
-) (*GetMCPBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.Get(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("get Bundle", err)
-	}
-	return &GetMCPBundleResponse{Body: &value}, nil
-}
-
-func (a *API) ListMCPBundles(
-	ctx context.Context,
-	request *ListMCPBundlesRequest,
-) (*ListMCPBundlesResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle list",
-	); err != nil {
-		return nil, err
-	}
-
-	values, err := a.List(ctx, request.RootID)
-	if err != nil {
-		return nil, wrapStoreError("list Bundles", err)
-	}
-	return &ListMCPBundlesResponse{
-		Body: &ListMCPBundlesResponseBody{
-			Bundles: values,
-		},
-	}, nil
-}
-
-func (a *API) GetMCPBundleDocument(
-	ctx context.Context,
-	request *GetMCPBundleDocumentRequest,
-) (*GetMCPBundleDocumentResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle document get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.GetDocument(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("get Bundle document", err)
-	}
-	return &GetMCPBundleDocumentResponse{Body: &value}, nil
-}
-
-func (a *API) ListMCPBundleServers(
-	ctx context.Context,
-	request *ListMCPBundleServersRequest,
-) (*ListMCPBundleServersResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle Server list",
-	); err != nil {
-		return nil, err
-	}
-
-	values, err := a.ListServers(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("list Bundle Servers", err)
-	}
-	return &ListMCPBundleServersResponse{
-		Body: &ListMCPBundleServersResponseBody{
-			Servers: values,
-		},
-	}, nil
-}
-
-func (a *API) ListMCPBundlePolicies(
-	ctx context.Context,
-	request *ListMCPBundlePoliciesRequest,
-) (*ListMCPBundlePoliciesResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle Policy list",
-	); err != nil {
-		return nil, err
-	}
-
-	values, err := a.ListPolicies(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("list Bundle Policies", err)
-	}
-	return &ListMCPBundlePoliciesResponse{
-		Body: &ListMCPBundlePoliciesResponseBody{
-			Policies: values,
-		},
-	}, nil
-}
-
-func (a *API) GetMCPServerInstallation(
-	ctx context.Context,
-	request *GetMCPServerInstallationRequest,
-) (*GetMCPServerInstallationResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Server installation get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.GetServerInstallation(ctx, request.Server)
-	if err != nil {
-		return nil, wrapStoreError("get Server installation", err)
-	}
-	return &GetMCPServerInstallationResponse{Body: &value}, nil
-}
-
-func (a *API) InspectMCPServer(
-	ctx context.Context,
-	request *InspectMCPServerRequest,
-) (*InspectMCPServerResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Server inspection",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.InspectMCPServerForRuntime(ctx, request.Server)
-	if err != nil {
-		return nil, wrapStoreError("inspect Server", err)
-	}
-	return &InspectMCPServerResponse{Body: &value}, nil
-}
-
-func (a *API) InspectMCPPolicy(
-	ctx context.Context,
-	request *InspectMCPPolicyRequest,
-) (*InspectMCPPolicyResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Policy inspection",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.InspectMCPPolicyForRuntime(ctx, request.Policy)
-	if err != nil {
-		return nil, wrapStoreError("inspect Policy", err)
-	}
-	return &InspectMCPPolicyResponse{Body: &value}, nil
-}
-
-func (a *API) GetMCPBundleInstallation(
-	ctx context.Context,
-	request *GetMCPBundleInstallationRequest,
-) (*GetMCPBundleInstallationResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"MCP Bundle installation get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.GetBundleInstallation(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("get Bundle installation", err)
-	}
-	return &GetMCPBundleInstallationResponse{Body: &value}, nil
-}
-
-func (a *API) GetMCPServerSchemaIdentity(
-	ctx context.Context,
-) (MCPServerSchemaIdentity, error) {
+	rootID root.RootID,
+	kind artifact.ArtifactKind,
+) ([]artifact.Artifact, error) {
 	if a == nil {
-		return MCPServerSchemaIdentity{}, basespec.ErrClosed
+		return nil, basespec.ErrClosed
 	}
-	if ctx == nil {
-		return MCPServerSchemaIdentity{}, fmt.Errorf(
-			"%w: MCP schema identity context is nil",
-			basespec.ErrInvalid,
+	if err := rootID.Validate(); err != nil {
+		return nil, err
+	}
+	values, err := a.artifacts.ListByRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]artifact.Artifact, 0, len(values))
+	for _, value := range values {
+		if value.Kind == kind {
+			output = append(output, value.Clone())
+		}
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].LogicalName != output[right].LogicalName {
+			return output[left].LogicalName <
+				output[right].LogicalName
+		}
+		return output[left].ID < output[right].ID
+	})
+	return output, nil
+}
+
+type serverResolutionMaterial struct {
+	Resource             resource.ResolvedArtifact
+	Document             mcpDomainServer.ServerDocument
+	Installation         mcpDomainServer.ServerData
+	InstallationRevision uint64
+	InstallationEnabled  bool
+	RuntimeEnabled       bool
+	BuiltIn              bool
+}
+
+func (a *API) resolveMCPServer(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	verifySource bool,
+) (mcpDomainServer.Resolved, error) {
+	material, err := a.resolveServerMaterial(ctx, ref, verifySource)
+	if err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+	if material.Resource.Artifact.SourceContentDigest == nil {
+		return mcpDomainServer.Resolved{}, fmt.Errorf(
+			"%w: MCP Server has no source content digest",
+			basespec.ErrDigestMismatch,
 		)
 	}
-	if err := ctx.Err(); err != nil {
-		return MCPServerSchemaIdentity{}, err
-	}
 
-	server, err := mcpDocumentSchemaIdentity(
-		mcpserverv1.MCPServerSchemaKey,
+	policyValue, err := a.effectivePolicy(
+		ctx,
+		material.Resource.Artifact.RootID,
+		material.Document,
+		material.Installation.AdditionalPolicies,
 	)
 	if err != nil {
-		return MCPServerSchemaIdentity{}, err
-	}
-	policy, err := mcpDocumentSchemaIdentity(
-		mcppolicyv1.MCPPolicySchemaKey,
-	)
-	if err != nil {
-		return MCPServerSchemaIdentity{}, err
+		return mcpDomainServer.Resolved{}, err
 	}
 
-	return MCPServerSchemaIdentity{
-		Server: server,
-		Policy: policy,
+	version, err := cryptoutil.CanonicalDigest(struct {
+		Server               artifact.ArtifactRef `json:"server"`
+		ArtifactRevision     uint64               `json:"artifactRevision"`
+		DefinitionDigest     cryptoutil.Digest    `json:"definitionDigest"`
+		SourceContentDigest  cryptoutil.Digest    `json:"sourceContentDigest"`
+		SourceGeneration     string               `json:"sourceGeneration"`
+		InstallationRevision uint64               `json:"installationRevision"`
+		PolicyDigest         cryptoutil.Digest    `json:"policyDigest"`
+	}{
+		Server:               material.Resource.Artifact.Ref(),
+		ArtifactRevision:     material.Resource.Artifact.Revision,
+		DefinitionDigest:     material.Resource.Definition.Digest,
+		SourceContentDigest:  *material.Resource.Artifact.SourceContentDigest,
+		SourceGeneration:     material.Resource.RefreshState.SourceGeneration,
+		InstallationRevision: material.InstallationRevision,
+		PolicyDigest:         policyValue.Digest,
+	})
+	if err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+
+	output := mcpDomainServer.Resolved{
+		Server:               material.Resource.Artifact.Ref(),
+		ArtifactRevision:     material.Resource.Artifact.Revision,
+		DefinitionDigest:     material.Resource.Definition.Digest,
+		SourceContentDigest:  *material.Resource.Artifact.SourceContentDigest,
+		SourceGeneration:     material.Resource.RefreshState.SourceGeneration,
+		Document:             material.Document,
+		Installation:         material.Installation,
+		Policy:               policyValue,
+		InstallationRevision: material.InstallationRevision,
+		RuntimeEnabled:       material.RuntimeEnabled,
+		BuiltIn:              material.BuiltIn,
+		Version:              version,
+	}
+	if err := output.Validate(); err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+	return output, nil
+}
+
+func (a *API) resolveServerMaterial(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	verifySource bool,
+) (serverResolutionMaterial, error) {
+	if a == nil {
+		return serverResolutionMaterial{}, basespec.ErrClosed
+	}
+	resolved, err := a.resources.ResolveArtifact(
+		ctx,
+		ref,
+		resource.ResolveOptions{
+			VerifySourceContent: verifySource,
+		},
+	)
+	if err != nil {
+		return serverResolutionMaterial{}, err
+	}
+	if resolved.Artifact.Kind != mcpDomain.MCPArtifactKind {
+		return serverResolutionMaterial{}, fmt.Errorf(
+			"%w: Artifact is not an MCP Server",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	document, err := mcpDomainServer.ServerDocumentFromDefinition(
+		resolved.Definition,
+	)
+	if err != nil {
+		return serverResolutionMaterial{}, err
+	}
+
+	installation, revision, enabled, runtimeEnabled, builtIn, err := a.effectiveInstallation(
+		ctx,
+		resolved.Artifact,
+		document,
+	)
+	if err != nil {
+		return serverResolutionMaterial{}, err
+	}
+	return serverResolutionMaterial{
+		Resource:             resolved.Clone(),
+		Document:             document,
+		Installation:         installation,
+		InstallationRevision: revision,
+		InstallationEnabled:  enabled,
+		RuntimeEnabled:       runtimeEnabled,
+		BuiltIn:              builtIn,
 	}, nil
 }
 
-func mcpDocumentSchemaIdentity(
-	key schema.Key,
-) (MCPDocumentSchemaIdentity, error) {
-	if err := key.Validate(); err != nil {
-		return MCPDocumentSchemaIdentity{}, err
-	}
-	if key.Entity != schema.EntityArtifact {
-		return MCPDocumentSchemaIdentity{}, fmt.Errorf(
-			"%w: MCP schema identity must describe an Artifact schema",
-			basespec.ErrInvalid,
-		)
-	}
-
-	value := MCPDocumentSchemaIdentity{
-		Kind:          artifact.ArtifactKind(key.Kind),
-		SchemaID:      key.SchemaID,
-		SchemaVersion: key.SchemaVersion,
-	}
-	if err := value.Kind.Validate(); err != nil {
-		return MCPDocumentSchemaIdentity{}, err
-	}
-	if err := value.SchemaID.Validate(); err != nil {
-		return MCPDocumentSchemaIdentity{}, err
-	}
-	if err := basespec.ValidateRequiredText(
-		"MCP schema version",
-		value.SchemaVersion,
-		basespec.MaxVersionBytes,
-	); err != nil {
-		return MCPDocumentSchemaIdentity{}, err
-	}
-	return value, nil
-}
-
-func (a *API) canonicalizeBundleBytes(
-	ctx context.Context,
-	raw []byte,
-) (mcpDomainBundle.BundleDocument, schema.ParsedDocument, error) {
-	if len(raw) == 0 {
-		return mcpDomainBundle.BundleDocument{}, schema.ParsedDocument{}, fmt.Errorf(
-			"%w: MCP Bundle document is required",
-			basespec.ErrInvalid,
-		)
-	}
-	parsed, err := a.schemas.CanonicalizeExpected(
-		ctx,
-		mcpbundlev1.MCPBundleSchemaKey,
-		raw,
-	)
-	if err != nil {
-		return mcpDomainBundle.BundleDocument{}, schema.ParsedDocument{}, fmt.Errorf(
-			"canonicalize MCP Bundle through Artifact Store schema registry: %w",
-			err,
-		)
-	}
-	document, err := mcpDomainBundle.BundleFromParsedDocument(parsed)
-	if err != nil {
-		return mcpDomainBundle.BundleDocument{}, schema.ParsedDocument{}, err
-	}
-	return document, parsed.Clone(), nil
-}
-
-type ServerStore interface {
-	ResolveMCPServer(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (mcpDomainServer.Resolved, error)
-	InspectMCPServerForRuntime(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (mcpDomainServer.Resolved, error)
-}
-
-type BundleMutationCommit func(context.Context) (Bundle, error)
-
-type CollectionMutationCommit func(
-	context.Context,
-) (collection.Collection, error)
-
-type ArtifactMutationCommit func(context.Context) (artifact.Artifact, error)
-
-type MutationCommit func(context.Context) error
-
-type BundleMutator interface {
-	PrepareReplaceDocument(
-		ctx context.Context,
-		request ReplaceDocumentRequest,
-	) (BundleMutationCommit, error)
-
-	PrepareRefresh(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-		allowProtected bool,
-	) (BundleMutationCommit, error)
-
-	PrepareUpdateBundleEnabled(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-		bundleID uint64,
-		enabled bool,
-	) (BundleMutationCommit, error)
-
-	PrepareRetire(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-		bundleID uint64,
-	) (CollectionMutationCommit, error)
-
-	PreparePurge(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-		bundleID uint64,
-	) (MutationCommit, error)
-
-	PrepareUpdateProtectedBundleInstallation(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-		bundleID uint64,
-		protected bool,
-	) (MutationCommit, error)
-
-	PrepareUpdateServerInstallation(
-		ctx context.Context,
-		artifactRef artifact.ArtifactRef,
-		installationID uint64,
-		serverData mcpDomainServer.ServerData,
-	) (ArtifactMutationCommit, error)
-
-	PrepareUpdateProtectedServerInstallation(
-		ctx context.Context,
-		artifactRef artifact.ArtifactRef,
-		installationID uint64,
-		protected bool,
-		serverData mcpDomainServer.ServerData,
-	) (MutationCommit, error)
-}
-
-type BundleServerStore interface {
-	ListServers(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-	) ([]artifact.Artifact, error)
-
-	GetServerInstallation(
-		ctx context.Context,
-		artifactRef artifact.ArtifactRef,
-	) (ServerInstallationView, error)
-}
-
-type BuiltinStore interface {
-	EnsureBuiltIn(
-		ctx context.Context,
-		request EnsureBuiltInRequest,
-	) (Bundle, error)
-
-	EnsureBuiltInCurrent(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-	) error
-
-	Get(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-	) (Bundle, error)
-
-	ListServers(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-	) ([]artifact.Artifact, error)
-
-	ListPolicies(
-		ctx context.Context,
-		collectionRef collection.CollectionRef,
-	) ([]artifact.Artifact, error)
-}
-
-func (a *API) cleanupChangedServerInstallation(
+func (a *API) effectiveInstallation(
 	ctx context.Context,
 	record artifact.Artifact,
 	document mcpDomainServer.ServerDocument,
-	after mcpDomainServer.ServerData,
-) error {
-	if record.Kind != mcpserverv1.MCPServerKind {
-		return nil
+) (
+	installation mcpDomainServer.ServerData,
+	revision uint64,
+	enabled bool,
+	runtimeEnabled bool,
+	builtIn bool,
+	err error,
+) {
+	builtIn = a.protection.IsProtectedRoot(record.RootID)
+	if !builtIn {
+		data, err := mcpDomainServer.DecodeServerData(record.Data)
+		if err != nil {
+			return mcpDomainServer.ServerData{}, 0, false, false, false, err
+		}
+		if err := data.ValidateFor(record.Ref(), document); err != nil {
+			return mcpDomainServer.ServerData{}, 0, false, false, false, err
+		}
+		return data,
+			record.Revision,
+			record.Enabled,
+			record.Enabled,
+			false,
+			nil
 	}
-	if err := mcpDomainServer.CleanupUnboundServerSecrets(
-		ctx,
+
+	if a.overlays == nil {
+		return mcpDomainServer.ServerData{},
+			0,
+			false,
+			false,
+			true,
+			fmt.Errorf(
+				"%w: protected MCP installation overlay store is unavailable",
+				basespec.ErrReferenceUnresolved,
+			)
+	}
+	overlay, found, err := a.overlays.GetServerOverlay(ctx, record.Ref())
+	if err != nil {
+		return mcpDomainServer.ServerData{}, 0, false, false, true, err
+	}
+	if !found {
+		return mcpDomainServer.DefaultServerData(),
+			1,
+			false,
+			false,
+			true,
+			nil
+	}
+	if err := overlay.ServerData.ValidateFor(
 		record.Ref(),
 		document,
-		after,
-		a.secretCleaner,
 	); err != nil {
-		return fmt.Errorf(
-			"MCP server installation secret cleanup remains pending: %w",
-			err,
-		)
+		return mcpDomainServer.ServerData{}, 0, false, false, true, err
 	}
-	return nil
+	return overlay.ServerData,
+		overlay.Revision,
+		overlay.RuntimeEnabled,
+		record.Enabled && overlay.RuntimeEnabled,
+		true,
+		nil
 }
 
-func (a *API) cleanupRemovedServerInstallation(
+func (a *API) effectivePolicy(
 	ctx context.Context,
-	record artifact.Artifact,
-) error {
-	if record.Kind != mcpserverv1.MCPServerKind {
-		return nil
+	rootID root.RootID,
+	server mcpDomainServer.ServerDocument,
+	additional []artifact.ArtifactRef,
+) (mcpPolicy.Effective, error) {
+	values := make([]mcpPolicy.MCPPolicy, 0, 1+len(additional))
+	if reference := server.Extension.Policy; reference != nil {
+		matches, err := a.policyBodiesByLogicalName(
+			ctx,
+			rootID,
+			reference.Ref,
+		)
+		if err != nil {
+			return mcpPolicy.Effective{}, err
+		}
+		switch len(matches) {
+		case 0:
+			if reference.Required {
+				return mcpPolicy.Effective{}, fmt.Errorf(
+					"%w: required MCP Policy %q is unavailable",
+					basespec.ErrReferenceUnresolved,
+					reference.Ref,
+				)
+			}
+		case 1:
+			values = append(values, matches[0])
+		default:
+			return mcpPolicy.Effective{}, fmt.Errorf(
+				"%w: MCP Policy %q is ambiguous in Root",
+				basespec.ErrIdentityConflict,
+				reference.Ref,
+			)
+		}
 	}
 
-	return nil
+	for _, ref := range additional {
+		if ref.RootID != rootID {
+			return mcpPolicy.Effective{}, fmt.Errorf(
+				"%w: additional MCP Policy belongs to another Root",
+				basespec.ErrInvalid,
+			)
+		}
+		resolved, err := a.resources.ResolveArtifact(
+			ctx,
+			ref,
+			resource.ResolveOptions{},
+		)
+		if err != nil {
+			return mcpPolicy.Effective{}, err
+		}
+		if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind ||
+			!resolved.Artifact.Enabled {
+			return mcpPolicy.Effective{}, fmt.Errorf(
+				"%w: additional MCP Policy %q is unavailable",
+				basespec.ErrReferenceUnresolved,
+				ref.ArtifactID,
+			)
+		}
+		body, err := mcpDomainPolicy.BodyFromDefinition(
+			resolved.Definition,
+		)
+		if err != nil {
+			return mcpPolicy.Effective{}, err
+		}
+		values = append(values, body)
+	}
+
+	baseline := a.baselinePolicy
+	if len(values) != 0 {
+		baseline = values[0]
+		values = values[1:]
+	}
+	return mcpPolicy.Compose(baseline, values...)
 }
 
-// validateCreateRegistrations establishes all request-derived valid state
-// before source or Collection mutation begins.
-func validateCreateRegistrations(
+func (a *API) policyBodiesByLogicalName(
+	ctx context.Context,
 	rootID root.RootID,
-	document mcpDomainBundle.BundleDocument,
-	registrations []Registration,
-) error {
-	definitions, err := mcpDomainBundle.DefinitionsForDocument(document)
+	name basespec.LogicalName,
+) ([]mcpPolicy.MCPPolicy, error) {
+	records, err := a.artifacts.FindByIdentity(
+		ctx,
+		rootID,
+		mcpDomain.MCPPolicyArtifactKind,
+		name,
+	)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	values, err := registrationMap(registrations, definitions)
-	if err != nil {
-		return err
-	}
-
-	subresources := make([]basespec.SubresourceLocator, 0, len(values))
-	for subresource := range values {
-		subresources = append(subresources, subresource)
-	}
-	slices.Sort(subresources)
-
-	for _, subresource := range subresources {
-		registration := values[subresource]
-		if registration.Kind != mcpserverv1.MCPServerKind {
+	output := make([]mcpPolicy.MCPPolicy, 0, len(records))
+	for _, record := range records {
+		if !record.Enabled ||
+			record.State != artifact.StateAvailable {
 			continue
 		}
-
-		data, err := registrationData(registration)
-		if err != nil {
-			return err
-		}
-		serverDefinition, err := mcpDomainServer.ServerDocumentFromDefinition(
-			definitions[subresource],
+		resolved, err := a.resources.ResolveArtifact(
+			ctx,
+			record.Ref(),
+			resource.ResolveOptions{},
 		)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		serverData, err := mcpDomainServer.DecodeServerData(data)
-		if err != nil {
-			return err
-		}
-		if err := serverData.ValidateFor(
-			artifact.ArtifactRef{
-				RootID:     rootID,
-				ArtifactID: registration.ArtifactID,
-			},
-			serverDefinition,
-		); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateCreateBundleIntent(
-	value Bundle,
-	request CreateMCPBundleBody,
-	document mcpDomainBundle.BundleDocument,
-	packageAddress source.ManagedPackageAddress,
-) error {
-	if value.Collection.RootID != request.RootID ||
-		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != mcpbundlev1.MCPBundleKind ||
-		value.Source.ID != request.SourceID ||
-		value.PackageAddress != packageAddress ||
-		value.Data.ManagedSourceID != request.SourceID ||
-		value.Data.LogicalName != document.LogicalName ||
-		value.Data.LogicalVersion != document.LogicalVersion ||
-		!maps.Equal(value.Data.Labels, document.Labels) {
-		return fmt.Errorf(
-			"%w: MCP Bundle creation intent differs from existing state",
-			basespec.ErrConflict,
+		body, err := mcpDomainPolicy.BodyFromDefinition(
+			resolved.Definition,
 		)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, body)
 	}
-	return nil
-}
-
-func displayName(document mcpDomainBundle.BundleDocument) string {
-	if document.DisplayName != "" {
-		return document.DisplayName
-	}
-	return string(document.LogicalName)
+	return output, nil
 }

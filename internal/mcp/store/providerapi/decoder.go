@@ -2,19 +2,19 @@ package providerapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"slices"
-	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	mcpDomainBundle "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/bundle"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
 
 type Decoder struct {
@@ -26,152 +26,179 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return artifactbuiltin.DecoderID
+	return mcpDomain.CanonicalDecoderID
 }
 
 func (*Decoder) Revision() string {
-	return artifactbuiltin.DecoderRevision
+	return "mcp-source-decoder-v2"
 }
 
 func (*Decoder) RequiredSchemaKeys() []schema.Key {
 	return []schema.Key{
-		mcpbundlev1.MCPBundleSchemaKey,
+		mcpv1.MCPSchemaKey,
+		mcppolicyv1.MCPPolicySchemaKey,
 	}
 }
 
 func (d *Decoder) BindExpectedCanonicalizer(
-	schemas providerapi.SchemaCatalog,
+	documents providerapi.SchemaCatalog,
 ) error {
-	if d == nil || schemas == nil {
+	if d == nil || documents == nil {
 		return fmt.Errorf(
-			"%w: MCP decoder requires a shareable schema registry",
+			"%w: MCP decoder schema catalog is nil",
 			basespec.ErrInvalid,
 		)
 	}
-
-	registered := schemas.Keys()
-	for _, expected := range d.RequiredSchemaKeys() {
-		if slices.Contains(registered, expected) {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: MCP Bundle shareable schema is not registered",
-			basespec.ErrInvalid,
-		)
-	}
-	d.documents = schemas
+	d.documents = documents
 	return nil
 }
 
-func (d *Decoder) Recognize(
+func (*Decoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
-	if candidate.RequestsDecoder(artifactbuiltin.DecoderID) &&
-		mcpDomainBundle.IsBundleDocumentLocator(candidate.Locator) {
-		return providerapi.RecognitionPreferred
+	var header struct {
+		Type artifactcontract.Type `json:"type"`
+		Kind string                `json:"kind"`
 	}
-	return providerapi.RecognitionNone
+	if err := json.Unmarshal(candidate.Content, &header); err != nil {
+		return providerapi.RecognitionNone
+	}
+
+	switch {
+	case header.Type == artifactcontract.TypeMCP,
+		header.Type == artifactcontract.TypeMCPPolicy:
+		return providerapi.RecognitionPreferred
+	case header.Kind == "mcp.bundle":
+		return providerapi.RecognitionPreferred
+	case sourceformat.IsMCPConfig(candidate.Content):
+		return providerapi.RecognitionPossible
+	default:
+		return providerapi.RecognitionNone
+	}
 }
 
 func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(artifactbuiltin.DecoderID) {
-		return nil, nil
-	}
 	if d == nil || d.documents == nil {
 		return nil, decoderError(
 			candidate.Locator,
-			"bundle",
-			fmt.Errorf("%w: MCP decoder has no bound schema registry", basespec.ErrClosed),
+			"",
+			fmt.Errorf(
+				"%w: MCP decoder has no bound schema catalog",
+				basespec.ErrClosed,
+			),
 		)
 	}
 
-	parsed, err := d.documents.CanonicalizeExpected(
-		ctx,
-		mcpbundlev1.MCPBundleSchemaKey,
-		candidate.Content,
-	)
-	if err != nil {
-		return nil, decoderError(candidate.Locator, "bundle", err)
+	var header struct {
+		Type artifactcontract.Type `json:"type"`
+		Kind string                `json:"kind"`
 	}
-	b, err := mcpDomainBundle.BundleFromParsedDocument(parsed)
-	if err != nil {
-		return nil, decoderError(candidate.Locator, "bundle", err)
+	if err := json.Unmarshal(candidate.Content, &header); err != nil {
+		return nil, nil
 	}
 
-	serverNames := make([]string, 0, len(b.MCPServers))
-	for name := range b.MCPServers {
-		serverNames = append(serverNames, name)
-	}
-	sort.Strings(serverNames)
-
-	policyNames := make(
-		[]string,
-		0,
-		len(b.BundleExtension.Policies),
-	)
-	for name := range b.BundleExtension.Policies {
-		policyNames = append(policyNames, name)
-	}
-	sort.Strings(policyNames)
-
-	output := make(
-		[]providerapi.Decoded,
-		0,
-		len(serverNames)+len(policyNames),
-	)
-
-	for _, name := range serverNames {
-		serverDocument, err := mcpDomainBundle.ServerFromCanonicalBundle(b, name)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, name, err)
-		}
-		definition, err := mcpDomainServer.DefinitionForCanonicalServer(serverDocument)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, name, err)
-		}
-		output = append(output, providerapi.Decoded{
-			SubresourceLocator: mcpDomainServer.ServerSubresource(
-				basespec.LogicalName(name),
-			),
-			Definition: definition,
-		})
-	}
-
-	for _, name := range policyNames {
-		definition, err := mcpDomainPolicy.DefinitionForCanonicalPolicy(
-			b.BundleExtension.Policies[name],
+	switch {
+	case header.Type == artifactcontract.TypeMCP:
+		parsed, err := d.documents.CanonicalizeExpected(
+			ctx,
+			mcpv1.MCPSchemaKey,
+			candidate.Content,
 		)
 		if err != nil {
-			return nil, decoderError(candidate.Locator, name, err)
+			return nil, decoderError(candidate.Locator, "", err)
 		}
+		document, err := mcpv1.DecodeMCPJSON(parsed.Raw)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		definitionValue, err := sourceformat.MCPDocumentFromCanonical(
+			document,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		return []providerapi.Decoded{{
+			Definition: definitionValue,
+		}}, nil
+
+	case header.Type == artifactcontract.TypeMCPPolicy:
+		parsed, err := d.documents.CanonicalizeExpected(
+			ctx,
+			mcppolicyv1.MCPPolicySchemaKey,
+			candidate.Content,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		document, err := mcppolicyv1.DecodeMCPPolicyJSON(parsed.Raw)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		definitionValue, err := mcpDomainPolicy.DefinitionForDocument(
+			document,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		return []providerapi.Decoded{{
+			Definition: definitionValue,
+		}}, nil
+
+	case header.Kind == "mcp.bundle":
+		values, err := sourceformat.DecodeLegacyBundle(
+			candidate.Content,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		return decodedValues(values), nil
+
+	case sourceformat.IsMCPConfig(candidate.Content):
+		values, err := sourceformat.DecodeMCPConfig(
+			candidate.Content,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		return decodedValues(values), nil
+
+	default:
+		return nil, nil
+	}
+}
+
+func decodedValues(
+	values []sourceformat.Decoded,
+) []providerapi.Decoded {
+	output := make([]providerapi.Decoded, 0, len(values))
+	for _, value := range values {
 		output = append(output, providerapi.Decoded{
-			SubresourceLocator: mcpDomainPolicy.PolicySubresource(
-				basespec.LogicalName(name),
-			),
-			Definition: definition,
+			SubresourceLocator: value.SubresourceLocator,
+			Definition:         value.Definition,
 		})
 	}
-
-	return output, nil
+	return output
 }
 
 func decoderError(
 	locator basespec.Locator,
-	subresource string,
+	subresource basespec.SubresourceLocator,
 	err error,
 ) []diagnostic.Diagnostic {
+	location := &diagnostic.Location{
+		Locator: locator,
+	}
+	if subresource != "" {
+		location.SubresourceLocator = subresource
+	}
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.SeverityError,
-		Code:     "mcp.mcpStore.subresource-invalid",
-		Message: diagnostic.BoundedMessage(
-			fmt.Sprintf("%s: %v", subresource, err),
-		),
-		Location: &diagnostic.Location{
-			Locator: locator,
-		},
+		Code:     "mcp.source-invalid",
+		Message:  diagnostic.BoundedMessage(err.Error()),
+		Location: location,
 	}}
 }

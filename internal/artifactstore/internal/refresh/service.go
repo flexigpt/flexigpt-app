@@ -4,422 +4,418 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
-	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/providerregistry"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Service struct {
-	collections CollectionReader
-	catalogs    catalogimpl.Reader
-	sources     sourceimpl.Runtime
-	artifacts   ArtifactReader
-	discovery   *discovery.Engine
-	reconciler  *artifactimpl.Reconciler
-	publisher   Publisher
-	providers   *providerregistry.Registry
-	documents   providerapi.ExpectedCanonicalizer
-	artifactIDs artifactid.Provider
-	clock       clockutil.Clock
-	policy      root.RootPolicy
+	sources      sourceimpl.Runtime
+	artifacts    ArtifactReader
+	states       RefreshStateReader
+	discovery    *discovery.Engine
+	synchronizer *artifactimpl.Synchronizer
+	publisher    Publisher
+	clock        clockutil.Clock
+	policy       root.RootPolicy
 }
 
 func NewService(
-	collections CollectionReader,
-	catalogs catalogimpl.Reader,
 	sources sourceimpl.Runtime,
 	artifacts ArtifactReader,
+	states RefreshStateReader,
 	discoveryEngine *discovery.Engine,
-	reconciler *artifactimpl.Reconciler,
+	synchronizer *artifactimpl.Synchronizer,
 	publisher Publisher,
-	providers *providerregistry.Registry,
-	documents providerapi.ExpectedCanonicalizer,
-	artifactIDs artifactid.Provider,
 	timeClock clockutil.Clock,
 	policy root.RootPolicy,
 ) (*Service, error) {
-	if collections == nil ||
-		catalogs == nil ||
-		sources == nil ||
+	if sources == nil ||
 		artifacts == nil ||
+		states == nil ||
 		discoveryEngine == nil ||
-		reconciler == nil ||
+		synchronizer == nil ||
 		publisher == nil ||
-		providers == nil ||
-		documents == nil ||
-		artifactIDs == nil ||
 		timeClock == nil {
 		return nil, fmt.Errorf(
-			"%w: refresh service dependencies are incomplete",
+			"%w: Source refresh service dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
-		collections: collections,
-		catalogs:    catalogs,
-		sources:     sources,
-		artifacts:   artifacts,
-		discovery:   discoveryEngine,
-		reconciler:  reconciler,
-		publisher:   publisher,
-		providers:   providers,
-		documents:   documents,
-		artifactIDs: artifactIDs,
-		clock:       timeClock,
-		policy:      policy,
+		sources:      sources,
+		artifacts:    artifacts,
+		states:       states,
+		discovery:    discoveryEngine,
+		synchronizer: synchronizer,
+		publisher:    publisher,
+		clock:        timeClock,
+		policy:       policy,
 	}, nil
 }
 
-// refresh is Artifact Store's internal execution path. Provider-facing and
-// consumer-facing callers enter through RefreshCollection, which resolves the
-// registered behavior before this method is reached.
-func (s *Service) refresh(
+func (s *Service) RefreshRoot(
 	ctx context.Context,
-	ref collection.CollectionRef,
-	plan providerapi.Plan,
-	policy artifactimpl.Policy,
-) (catalog.RefreshCollectionResult, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return catalog.RefreshCollectionResult{}, err
+	rootID root.RootID,
+) (refresh.RefreshRootResult, error) {
+	if s == nil {
+		return refresh.RefreshRootResult{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf("%w: refresh context is nil", basespec.ErrInvalid)
+		return refresh.RefreshRootResult{}, fmt.Errorf(
+			"%w: Root refresh context is nil",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := ctx.Err(); err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		return refresh.RefreshRootResult{}, err
 	}
-	if policy == nil {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: artifact adoption policy is required",
-			basespec.ErrInvalid,
-		)
+	if err := rootID.Validate(); err != nil {
+		return refresh.RefreshRootResult{}, err
 	}
-	if err := ref.Validate(); err != nil {
-		return catalog.RefreshCollectionResult{}, err
+	if err := rootimpl.RequireMutableRoot(
+		ctx,
+		s.policy,
+		rootID,
+	); err != nil {
+		return refresh.RefreshRootResult{}, err
 	}
-	collectionValue, err := s.collections.Get(ctx, ref)
+
+	values, err := s.sources.List(ctx, rootID)
 	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		return refresh.RefreshRootResult{}, err
 	}
-	if err := collectionValue.Validate(); err != nil {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: collection reader returned an invalid collection: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if collectionValue.Ref() != ref {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: collection reader returned another collection",
-			basespec.ErrInvalid,
-		)
-	}
-	if !collectionValue.Enabled {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: collection %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-
-	attachments, err := s.collections.ListAttachments(ctx, ref)
-	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
-	}
-
-	plansBySource := plan.BySource()
-
-	var previous catalog.Snapshot
-	previous, err = catalogimpl.ReadCurrent(ctx, s.catalogs, ref)
-	hasPrevious := err == nil || errors.Is(err, basespec.ErrCatalogStale)
-	if !hasPrevious &&
-		!errors.Is(err, basespec.ErrCatalogUnavailable) {
-		return catalog.RefreshCollectionResult{}, err
-	}
-
-	previousBySource := make(
-		map[source.SourceID][]catalog.Occurrence,
-	)
-	for _, occurrence := range previous.Occurrences {
-		previousBySource[occurrence.Key.SourceID] = append(
-			previousBySource[occurrence.Key.SourceID],
-			occurrence,
-		)
-	}
-
-	expectedAttachmentRevisions := make(map[source.SourceID]uint64)
-	expectedSourceRevisions := make(map[source.SourceID]uint64)
-	sourceGenerations := make(map[source.SourceID]string)
-	finalOccurrences := make([]catalog.Occurrence, 0)
-	allDiagnostics := make([]diagnostic.Diagnostic, 0)
-	snapshots := make([]sourceimpl.Snapshot, 0)
-	candidates := 0
-
-	defer func() {
-		// Early-return cleanup must not obscure the operation failure.
-		_ = closeRefreshSnapshots(snapshots)
-	}()
-
-	sort.Slice(attachments, func(left, right int) bool {
-		return attachments[left].SourceID < attachments[right].SourceID
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].ID < values[right].ID
 	})
 
-	for _, attachment := range attachments {
-		if err := attachment.Validate(); err != nil {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: collection reader returned an invalid attachment: %w",
-				basespec.ErrInvalid,
-				err,
-			)
-		}
-		if attachment.RootID != ref.RootID ||
-			attachment.CollectionID != ref.CollectionID {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: attachment belongs to another collection",
-				basespec.ErrInvalid,
-			)
-		}
-
-		if _, duplicate := expectedAttachmentRevisions[attachment.SourceID]; duplicate {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: collection reader returned duplicate attachment source %q",
-				basespec.ErrInvalid,
-				attachment.SourceID,
-			)
-		}
-		expectedAttachmentRevisions[attachment.SourceID] = attachment.Revision
-
-		sourceValue, err := s.sources.Get(ctx, ref.RootID, attachment.SourceID)
-		if err != nil {
-			return catalog.RefreshCollectionResult{}, err
-		}
-		if sourceValue.ID != attachment.SourceID ||
-			sourceValue.RootID != ref.RootID {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: source runtime returned a source that does not match attachment %q",
-				basespec.ErrInvalid,
-				attachment.SourceID,
-			)
-		}
-		if err := sourceValue.Validate(); err != nil {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: source runtime returned an invalid source: %w",
-				basespec.ErrInvalid,
-				err,
-			)
-		}
-		if _, planned := plansBySource[sourceValue.ID]; planned &&
-
-			(!attachment.Enabled || !sourceValue.Enabled) {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: discovery plan includes disabled source %q",
-				basespec.ErrInvalid,
-				sourceValue.ID,
-			)
-		}
-
-		expectedSourceRevisions[sourceValue.ID] = sourceValue.Revision
-
-		if !attachment.Enabled || !sourceValue.Enabled {
+	result := refresh.RefreshRootResult{
+		RootID:  rootID,
+		Sources: make([]refresh.RefreshSourceResult, 0),
+	}
+	for _, value := range values {
+		if !value.Enabled || value.Discovery.Empty() {
 			continue
 		}
-		sourcePlan, exists := plansBySource[sourceValue.ID]
-		if !exists {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: enabled source %q has no discovery plan",
-				basespec.ErrInvalid,
-				sourceValue.ID,
-			)
-		}
-
-		snapshot, err := s.sources.Open(ctx, sourceValue)
-		if err != nil {
-			return catalog.RefreshCollectionResult{}, err
-		}
-		snapshots = append(snapshots, snapshot)
-		sourceGenerations[sourceValue.ID] = snapshot.Generation()
-
-		discovered, err := s.discovery.Discover(
+		refreshed, err := s.RefreshSource(
 			ctx,
-			ref.RootID,
-			ref.CollectionID,
-			sourceValue.ID,
-			sourceValue.Kind,
-			snapshot,
-			sourcePlan,
-			previousBySource[sourceValue.ID],
+			rootID,
+			value.ID,
 		)
 		if err != nil {
-			return catalog.RefreshCollectionResult{}, err
+			return refresh.RefreshRootResult{}, err
 		}
+		result.Sources = append(result.Sources, refreshed)
+	}
+	if err := result.Validate(); err != nil {
+		return refresh.RefreshRootResult{}, err
+	}
+	return result.Clone(), nil
+}
 
-		finalOccurrences = append(
-			finalOccurrences,
-			discovered.Occurrences...,
+func (s *Service) RefreshSource(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) (refresh.RefreshSourceResult, error) {
+	if s == nil {
+		return refresh.RefreshSourceResult{}, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return refresh.RefreshSourceResult{}, fmt.Errorf(
+			"%w: Source refresh context is nil",
+			basespec.ErrInvalid,
 		)
-		allDiagnostics = diagnostic.Append(
-			allDiagnostics,
-			discovered.Diagnostics...,
-		)
-		candidates += discovered.Candidates
 	}
-
-	for sourceID := range plansBySource {
-		if _, exists := expectedSourceRevisions[sourceID]; !exists {
-			return catalog.RefreshCollectionResult{}, fmt.Errorf(
-				"%w: discovery plan includes unattached source %q",
-				basespec.ErrInvalid,
-				sourceID,
-			)
-		}
+	if err := ctx.Err(); err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
-
-	catalog.SortOccurrences(finalOccurrences)
-
-	existingArtifacts, err := s.artifacts.ListByCollection(ctx, ref)
-	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+	if err := rootID.Validate(); err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
-	suppressions, err := s.artifacts.ListSuppressions(ctx, ref)
-	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+	if err := sourceID.Validate(); err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
-
-	reconciliation, err := s.reconciler.Reconcile(
+	if err := rootimpl.RequireMutableRoot(
 		ctx,
-		collectionValue,
-		finalOccurrences,
-		existingArtifacts,
-		suppressions,
-		policy,
-	)
-	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		s.policy,
+		rootID,
+	); err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
 
-	allDiagnostics = diagnostic.Append(
-		allDiagnostics,
-		reconciliation.Diagnostics...,
-	)
+	value, err := s.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	if !value.Enabled {
+		return refresh.RefreshSourceResult{}, fmt.Errorf(
+			"%w: Source %q is disabled",
+			basespec.ErrConflict,
+			sourceID,
+		)
+	}
+	if value.Discovery.Empty() {
+		return refresh.RefreshSourceResult{}, fmt.Errorf(
+			"%w: Source %q has no declaration discovery configuration",
+			basespec.ErrRefreshRequired,
+			sourceID,
+		)
+	}
 
-	// Confirm immediately before publication, after all potentially slow
-	// definition and policy work. A final instant of external change remains
-	// unavoidable, but this closes the current large confirmation gap.
-	for _, snapshot := range snapshots {
-		if err := snapshot.Confirm(ctx); err != nil {
-			return catalog.RefreshCollectionResult{}, err
+	var expectedRefreshRevision uint64
+	previous, stateErr := s.states.GetRefreshState(
+		ctx,
+		rootID,
+		sourceID,
+	)
+	switch {
+	case stateErr == nil:
+		expectedRefreshRevision = previous.Revision
+	case errors.Is(stateErr, basespec.ErrRefreshStateNotFound):
+	default:
+		return refresh.RefreshSourceResult{}, stateErr
+	}
+
+	snapshot, err := s.sources.Open(ctx, value)
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	snapshotOpen := true
+	defer func() {
+		if snapshotOpen {
+			_ = snapshot.Close()
 		}
-	}
+	}()
+	sourceGeneration := snapshot.Generation()
 
-	closeErr := closeRefreshSnapshots(snapshots)
-	snapshots = nil
-	if closeErr != nil {
-		return catalog.RefreshCollectionResult{}, closeErr
-	}
-
-	planFingerprint, err := plan.FingerprintNormalized()
+	discovered, err := s.discovery.Discover(
+		ctx,
+		value,
+		snapshot,
+	)
 	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		return refresh.RefreshSourceResult{}, err
+	}
+	existing, err := s.artifacts.ListBySource(
+		ctx,
+		rootID,
+		sourceID,
+	)
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	synchronization, err := s.synchronizer.Synchronize(
+		ctx,
+		rootID,
+		value,
+		discovered.Observations,
+		discovered.SeenLocators,
+		existing,
+	)
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	if err := snapshot.Confirm(ctx); err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	if err := snapshot.Close(); err != nil {
+		return refresh.RefreshSourceResult{}, err
+	}
+	snapshotOpen = false
+
+	discoveryFingerprint, err := value.Discovery.Fingerprint()
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		return refresh.RefreshSourceResult{}, err
+	}
+	definitions, err := definitionsFromObservations(
+		discovered.Observations,
+	)
+	if err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
 
 	publication := Publication{
-		Ref:                         ref,
-		ExpectedCatalogRevision:     previous.Revision,
-		ExpectedCollectionRevision:  collectionValue.Revision,
-		ExpectedAttachmentRevisions: expectedAttachmentRevisions,
-		ExpectedSourceRevisions:     expectedSourceRevisions,
-		SourceGenerations:           sourceGenerations,
-		PlanFingerprint:             planFingerprint,
-		DecoderFingerprint:          decoderFingerprint,
-		Occurrences:                 finalOccurrences,
-		ArtifactCreates:             reconciliation.Creates,
-		ArtifactUpdates:             reconciliation.Updates,
-		Diagnostics:                 allDiagnostics,
-		PublishedAt:                 clockutil.NowUTC(s.clock),
+		RootID:                  rootID,
+		SourceID:                sourceID,
+		ExpectedSourceRevision:  value.Revision,
+		ExpectedRefreshRevision: expectedRefreshRevision,
+		SourceGeneration:        sourceGeneration,
+		DiscoveryFingerprint:    discoveryFingerprint,
+		DecoderFingerprint:      decoderFingerprint,
+		Definitions:             definitions,
+		ArtifactCreates:         synchronization.Creates,
+		ArtifactUpdates:         synchronization.Updates,
+		Diagnostics: diagnostic.Append(
+			discovered.Diagnostics,
+			synchronization.Diagnostics...,
+		),
+		RefreshedAt: clockutil.NowUTC(s.clock),
 	}
 	published, err := s.publisher.Publish(ctx, publication)
 	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
+		return refresh.RefreshSourceResult{}, err
 	}
 	if err := published.Validate(); err != nil {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: publisher returned an invalid catalog: %w",
+		return refresh.RefreshSourceResult{}, fmt.Errorf(
+			"%w: refresh publisher returned invalid state: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
 
-	expected := catalog.Snapshot{
-		RootID:              ref.RootID,
-		CollectionID:        ref.CollectionID,
-		Revision:            previous.Revision + 1,
-		CollectionRevision:  collectionValue.Revision,
-		AttachmentRevisions: maps.Clone(expectedAttachmentRevisions),
-		SourceRevisions:     maps.Clone(expectedSourceRevisions),
-		SourceGenerations:   maps.Clone(sourceGenerations),
-		PlanFingerprint:     planFingerprint,
-		DecoderFingerprint:  decoderFingerprint,
-		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         diagnostic.Clone(allDiagnostics),
-		Occurrences:         make([]catalog.Occurrence, len(finalOccurrences)),
+	result := refresh.RefreshSourceResult{
+		State:       published,
+		Diagnostics: append([]diagnostic.Diagnostic(nil), publication.Diagnostics...),
+		Candidates:  discovered.Candidates,
 	}
-	for index, occurrence := range finalOccurrences {
-		expected.Occurrences[index] = occurrence.Clone()
-	}
-	if err := expected.Validate(); err != nil {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: refresh service produced an invalid expected catalog: %w",
-			basespec.ErrInvalid,
-			err,
+	for _, value := range synchronization.Creates {
+		result.CreatedArtifacts = append(
+			result.CreatedArtifacts,
+			value.ID,
 		)
 	}
-	if !catalog.EqualSnapshot(published, expected) {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: publisher returned a catalog that does not exactly match the publication",
-			basespec.ErrInvalid,
+	for _, value := range synchronization.Updates {
+		result.UpdatedArtifacts = append(
+			result.UpdatedArtifacts,
+			value.ArtifactID,
 		)
+		switch value.State {
+		case artifact.StateMissing:
+			result.MissingArtifacts = append(
+				result.MissingArtifacts,
+				value.ArtifactID,
+			)
+		case artifact.StateInvalid:
+			result.InvalidArtifacts = append(
+				result.InvalidArtifacts,
+				value.ArtifactID,
+			)
+		case artifact.StateIncompatible:
+			result.IncompatibleArtifacts = append(
+				result.IncompatibleArtifacts,
+				value.ArtifactID,
+			)
+		default:
+		}
 	}
-
-	result := catalog.RefreshCollectionResult{
-		Catalog:     published.Clone(),
-		Diagnostics: diagnostic.Clone(allDiagnostics),
-		Candidates:  candidates,
+	if err := result.Validate(); err != nil {
+		return refresh.RefreshSourceResult{}, err
 	}
-	for _, value := range reconciliation.Creates {
-		result.CreatedArtifacts = append(result.CreatedArtifacts, value.ID)
-	}
-	for _, value := range reconciliation.Updates {
-		result.UpdatedArtifacts = append(result.UpdatedArtifacts, value.ArtifactID)
-	}
-	return result, nil
+	return result.Clone(), nil
 }
 
-func closeRefreshSnapshots(values []sourceimpl.Snapshot) error {
-	var closeErr error
-	for _, snapshot := range values {
-		if snapshot == nil {
+func (s *Service) InspectSource(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) (source.RefreshInspection, error) {
+	if s == nil {
+		return source.RefreshInspection{}, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return source.RefreshInspection{}, fmt.Errorf(
+			"%w: Source refresh inspection context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return source.RefreshInspection{}, err
+	}
+	if err := rootID.Validate(); err != nil {
+		return source.RefreshInspection{}, err
+	}
+	if err := sourceID.Validate(); err != nil {
+		return source.RefreshInspection{}, err
+	}
+
+	state, err := s.states.GetRefreshState(
+		ctx,
+		rootID,
+		sourceID,
+	)
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+	value, err := s.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+	discoveryFingerprint, err := value.Discovery.Fingerprint()
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+	decoderFingerprint, err := s.discovery.DecoderFingerprint()
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+
+	snapshot, err := s.sources.Open(ctx, value)
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+	generation := snapshot.Generation()
+	confirmErr := snapshot.Confirm(ctx)
+	closeErr := snapshot.Close()
+	if err := errors.Join(confirmErr, closeErr); err != nil {
+		return source.RefreshInspection{}, err
+	}
+
+	result := source.RefreshInspection{
+		State:                   state,
+		SourceRevisionChanged:   state.SourceRevision != value.Revision,
+		DiscoveryChanged:        state.DiscoveryFingerprint != discoveryFingerprint,
+		DecoderChanged:          state.DecoderFingerprint != decoderFingerprint,
+		SourceGenerationChanged: state.SourceGeneration != generation,
+	}
+	if err := result.Validate(); err != nil {
+		return source.RefreshInspection{}, err
+	}
+	return result.Clone(), nil
+}
+
+func definitionsFromObservations(
+	observations []discovery.Observation,
+) ([]definition.Definition, error) {
+	seen := make(map[cryptoutil.Digest]struct{})
+	output := make([]definition.Definition, 0)
+	for _, observation := range observations {
+		if observation.State != discovery.ObservationValid {
 			continue
 		}
-		closeErr = errors.Join(closeErr, snapshot.Close())
+		if observation.Definition == nil {
+			return nil, fmt.Errorf(
+				"%w: valid Source observation has no Definition",
+				basespec.ErrInvalid,
+			)
+		}
+		if _, duplicate := seen[observation.Definition.Digest]; duplicate {
+			continue
+		}
+		seen[observation.Definition.Digest] = struct{}{}
+		output = append(
+			output,
+			observation.Definition.Clone(),
+		)
 	}
-	return closeErr
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Digest < output[right].Digest
+	})
+	return output, nil
 }

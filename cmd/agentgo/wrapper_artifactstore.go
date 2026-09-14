@@ -19,9 +19,7 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	workspaceProvider, err := workspaceProviderAPI.NewProvider(
-		workspaceProviderAPI.DefaultProviderConfig(),
-	)
+	workspaceProvider, err := workspaceProviderAPI.NewProvider()
 	if err != nil {
 		return nil, err
 	}

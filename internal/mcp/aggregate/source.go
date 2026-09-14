@@ -105,7 +105,7 @@ func runtimeConfig(
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}
-	catalogID, err := RuntimeCatalogIDForCollection(resolved.Collection)
+	catalogID, err := RuntimeCatalogIDForRoot(resolved.Server.RootID)
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}

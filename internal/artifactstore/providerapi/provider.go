@@ -4,38 +4,33 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 )
 
-// Provider is one Artifact Store inbound artifact-family registration.
+// Provider is one Artifact Store inbound format registration.
 //
-// It registers schemas, decoders, and collection-kind behavior without
-// requiring Artifact Store to import the concrete provider package.
+// Providers register schema codecs, source decoders, and optional portable
+// locator resolver metadata. They do not own Store lifecycle behavior.
 type Provider interface {
 	Descriptor() Descriptor
 }
 
-// Descriptor is immutable provider registration metadata.
-//
-// CollectionKinds establishes exclusive ownership of persisted collection
-// kinds through executable CollectionBehavior implementations.
 type Descriptor struct {
 	Name string
 
-	CollectionBehaviors []CollectionBehavior
-	Schemas             []SchemaCodec
-	Decoders            []Decoder
+	Schemas          []SchemaCodec
+	Decoders         []Decoder
+	LocatorResolvers []LocatorResolver
 }
 
 func (d Descriptor) Clone() Descriptor {
 	output := d
-	output.CollectionBehaviors = append(
-		[]CollectionBehavior(nil),
-		d.CollectionBehaviors...,
-	)
 	output.Schemas = append([]SchemaCodec(nil), d.Schemas...)
 	output.Decoders = append([]Decoder(nil), d.Decoders...)
+	output.LocatorResolvers = append(
+		[]LocatorResolver(nil),
+		d.LocatorResolvers...,
+	)
 	return output
 }
 
@@ -47,40 +42,14 @@ func (d Descriptor) Validate() error {
 	); err != nil {
 		return err
 	}
-
-	if len(d.CollectionBehaviors) == 0 &&
-		len(d.Schemas) == 0 &&
-		len(d.Decoders) == 0 {
+	if len(d.Schemas) == 0 &&
+		len(d.Decoders) == 0 &&
+		len(d.LocatorResolvers) == 0 {
 		return fmt.Errorf(
 			"%w: artifact provider %q has no registered capabilities",
 			basespec.ErrInvalid,
 			d.Name,
 		)
-	}
-
-	seenCollectionBehaviors := make(
-		map[collection.CollectionKind]struct{},
-		len(d.CollectionBehaviors),
-	)
-	for index, behavior := range d.CollectionBehaviors {
-		if err := ValidateCollectionBehavior(behavior); err != nil {
-			return fmt.Errorf(
-				"artifact provider %q collection behavior %d: %w",
-				d.Name,
-				index,
-				err,
-			)
-		}
-		kind := behavior.CollectionKind()
-		if _, duplicate := seenCollectionBehaviors[kind]; duplicate {
-			return fmt.Errorf(
-				"%w: artifact provider %q repeats collection behavior %q",
-				basespec.ErrConflict,
-				d.Name,
-				kind,
-			)
-		}
-		seenCollectionBehaviors[kind] = struct{}{}
 	}
 
 	seenSchemas := make(map[schema.Key]struct{}, len(d.Schemas))
@@ -122,44 +91,47 @@ func (d Descriptor) Validate() error {
 	for index, decoder := range d.Decoders {
 		if decoder == nil {
 			return fmt.Errorf(
-				"%w: artifact provider %q decoder %d is nil",
+				"%w: Artifact provider %q decoder %d is nil",
 				basespec.ErrInvalid,
 				d.Name,
 				index,
 			)
 		}
-
-		id := decoder.ID()
-		if err := id.Validate(); err != nil {
-			return fmt.Errorf(
-				"artifact provider %q decoder %d: %w",
-				d.Name,
-				index,
-				err,
-			)
+		if err := decoder.ID().Validate(); err != nil {
+			return err
 		}
 		if err := basespec.ValidateRequiredText(
-			"artifact provider decoder revision",
+			"Artifact provider decoder revision",
 			decoder.Revision(),
 			basespec.MaxVersionBytes,
 		); err != nil {
-			return fmt.Errorf(
-				"artifact provider %q decoder %q: %w",
-				d.Name,
-				id,
-				err,
-			)
+			return err
 		}
-		if _, duplicate := seenDecoders[id]; duplicate {
+		if _, duplicate := seenDecoders[decoder.ID()]; duplicate {
 			return fmt.Errorf(
-				"%w: artifact provider %q repeats decoder %q",
+				"%w: Artifact provider %q repeats decoder %q",
 				basespec.ErrConflict,
 				d.Name,
-				id,
+				decoder.ID(),
 			)
 		}
-		seenDecoders[id] = struct{}{}
+		seenDecoders[decoder.ID()] = struct{}{}
 	}
 
+	seenResolvers := make(map[string]struct{}, len(d.LocatorResolvers))
+	for _, resolver := range d.LocatorResolvers {
+		if err := ValidateLocatorResolver(resolver); err != nil {
+			return err
+		}
+		if _, duplicate := seenResolvers[resolver.LocatorKind()]; duplicate {
+			return fmt.Errorf(
+				"%w: Artifact provider %q repeats locator resolver %q",
+				basespec.ErrConflict,
+				d.Name,
+				resolver.LocatorKind(),
+			)
+		}
+		seenResolvers[resolver.LocatorKind()] = struct{}{}
+	}
 	return nil
 }

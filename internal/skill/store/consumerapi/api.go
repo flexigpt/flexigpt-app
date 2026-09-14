@@ -1,39 +1,30 @@
 package consumerapi
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"maps"
+	"slices"
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/agentskills-go/document"
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 type API struct {
 	sources          compositionapi.SourceAPI
-	collections      compositionapi.CollectionAPI
+	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
-	catalogs         compositionapi.CatalogAPI
 	resources        compositionapi.ResourceAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
@@ -41,1182 +32,192 @@ type API struct {
 
 func New(
 	sources compositionapi.SourceAPI,
-	collections compositionapi.CollectionAPI,
+	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
-	catalogs compositionapi.CatalogAPI,
 	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 ) (*API, error) {
 	if sources == nil ||
-		collections == nil ||
+		discovery == nil ||
 		artifacts == nil ||
-		catalogs == nil ||
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil {
 		return nil, fmt.Errorf(
-			"%w: skill bundle Store dependencies are incomplete",
+			"%w: Skill Store dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-
 	return &API{
 		sources:          sources,
-		collections:      collections,
+		discovery:        discovery,
 		artifacts:        artifacts,
-		catalogs:         catalogs,
 		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
 	}, nil
 }
 
-func (a *API) CreateSkillBundle(
-	ctx context.Context,
-	request *CreateSkillBundleRequest,
-) (*CreateSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill Bundle creation",
-	); err != nil {
-		return nil, err
+func SkillDiscoverySpec(
+	r basespec.Locator,
+) (source.DiscoverySpec, error) {
+	if r == "" {
+		r = "."
 	}
-
-	value, err := a.CreateBundle(ctx, *request.Body)
-	if err != nil {
-		return nil, wrapStoreError("create", err)
+	if err := r.Validate(true); err != nil {
+		return source.DiscoverySpec{}, err
 	}
-	return &CreateSkillBundleResponse{Body: &value}, nil
-}
-
-func (a *API) GetSkillBundle(
-	ctx context.Context,
-	request *GetSkillBundleRequest,
-) (*GetSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.GetBundle(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("get", err)
-	}
-	return &GetSkillBundleResponse{Body: &value}, nil
-}
-
-func (a *API) ListSkillBundles(
-	ctx context.Context,
-	request *ListSkillBundlesRequest,
-) (*ListSkillBundlesResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle list",
-	); err != nil {
-		return nil, err
-	}
-
-	values, err := a.ListBundles(ctx, request.RootID)
-	if err != nil {
-		return nil, wrapStoreError("list", err)
-	}
-	return &ListSkillBundlesResponse{
-		Body: &ListSkillBundlesResponseBody{
-			Bundles: values,
+	value := source.DiscoverySpec{
+		DirectoryRoots: []source.DirectoryRoot{{
+			Root:      r,
+			Recursive: true,
+			IncludePatterns: []string{
+				"**/" + string(skillDomain.SkillDefinitionFileName),
+			},
+		}},
+		DecoderHints: []source.DecoderHint{{
+			Locator:   r,
+			Recursive: true,
+			DecoderIDs: []basespec.DecoderID{
+				skillDomain.MarkdownDecoderID,
+			},
+		}},
+		AllowedDecoderIDs: []basespec.DecoderID{
+			skillDomain.MarkdownDecoderID,
 		},
-	}, nil
+		Authoritative: true,
+	}
+	value = value.Normalized()
+	if err := value.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	return value, nil
 }
 
-func (a *API) UpdateSkillBundle(
+func (a *API) RegisterSkillDirectory(
 	ctx context.Context,
-	request *UpdateSkillBundleRequest,
-) (*UpdateSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill Bundle update",
-	); err != nil {
-		return nil, err
+	request SkillDirectoryRegistration,
+) (source.Summary, error) {
+	if err := request.RootID.Validate(); err != nil {
+		return source.Summary{}, err
 	}
-
-	value, err := a.UpdateBundle(ctx, *request.Body)
-	if err != nil {
-		return nil, wrapStoreError("update", err)
-	}
-	return &UpdateSkillBundleResponse{Body: &value}, nil
-}
-
-func (a *API) RetireSkillBundle(
-	ctx context.Context,
-	request *RetireSkillBundleRequest,
-) (*RetireSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle retirement",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.RetireBundle(
-		ctx,
-		request.Bundle,
-		request.ExpectedRevision,
-	)
-	if err != nil {
-		return nil, wrapStoreError("retire", err)
-	}
-	return &RetireSkillBundleResponse{Body: &value}, nil
-}
-
-func (a *API) PurgeSkillBundle(
-	ctx context.Context,
-	request *PurgeSkillBundleRequest,
-) (*PurgeSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle purge",
-	); err != nil {
-		return nil, err
-	}
-
-	if err := a.PurgeBundle(
-		ctx,
-		request.Bundle,
-		request.ExpectedRevision,
-	); err != nil {
-		return nil, wrapStoreError("purge", err)
-	}
-	return &PurgeSkillBundleResponse{
-		Bundle: request.Bundle,
-	}, nil
-}
-
-func (a *API) AttachSkillBundleSource(
-	ctx context.Context,
-	request *AttachSkillBundleSourceRequest,
-) (*AttachSkillBundleSourceResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill Bundle Source attachment",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.AttachSource(
-		ctx,
-		request.Body.Bundle,
-		request.Body.ExpectedCollectionRevision,
-		request.Body.Attachment,
-	)
-	if err != nil {
-		return nil, wrapStoreError("attach Source", err)
-	}
-	return &AttachSkillBundleSourceResponse{Body: &value}, nil
-}
-
-func (a *API) RegisterSkillBundleDirectory(
-	ctx context.Context,
-	request *RegisterSkillBundleDirectoryRequest,
-) (*RegisterSkillBundleDirectoryResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle directory registration",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.RegisterBundleDirectory(
-		ctx,
-		request.Bundle,
-		request.ExpectedCollectionRevision,
-		request.RootPath,
+	if err := basespec.ValidateRequiredText(
+		"Skill Source display name",
 		request.SourceDisplayName,
-	)
-	if err != nil {
-		return nil, wrapStoreError("register directory", err)
-	}
-	return &RegisterSkillBundleDirectoryResponse{Body: &value}, nil
-}
-
-func (a *API) RefreshSkillBundle(
-	ctx context.Context,
-	request *RefreshSkillBundleRequest,
-) (*RefreshSkillBundleResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill Bundle refresh",
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
-		return nil, err
+		return source.Summary{}, err
 	}
 
-	value, err := a.RefreshBundle(ctx, request.Bundle)
+	discovery, err := SkillDiscoverySpec(".")
 	if err != nil {
-		return nil, wrapStoreError("refresh", err)
+		return source.Summary{}, err
 	}
-	return &RefreshSkillBundleResponse{Body: &value}, nil
-}
-
-func (a *API) CreateManagedSkill(
-	ctx context.Context,
-	request *CreateManagedSkillRequest,
-) (*CreateManagedSkillStoreResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"managed Skill creation",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.createManagedSkill(
-		ctx,
-		*request.Body,
-		false,
-	)
-	if err != nil {
-		return nil, wrapStoreError("create managed Skill", err)
-	}
-	return &CreateManagedSkillStoreResponse{Body: &value}, nil
-}
-
-func (a *API) GetManagedSkillDocument(
-	ctx context.Context,
-	request *GetManagedSkillDocumentRequest,
-) (*GetManagedSkillDocumentResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"managed Skill document get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.getManagedSkillDocument(ctx, request.Artifact)
-	if err != nil {
-		return nil, wrapStoreError("get managed Skill document", err)
-	}
-	return &GetManagedSkillDocumentResponse{Body: &value}, nil
-}
-
-func (a *API) AdoptSkill(
-	ctx context.Context,
-	request *AdoptSkillRequest,
-) (*AdoptSkillResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill adoption",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.adoptSkill(ctx, *request.Body)
-	if err != nil {
-		return nil, wrapStoreError("adopt Skill", err)
-	}
-	return &AdoptSkillResponse{Body: &value}, nil
-}
-
-func (a *API) PinSkill(
-	ctx context.Context,
-	request *PinSkillRequest,
-) (*PinSkillResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill pin",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.pinSkill(ctx, *request.Body)
-	if err != nil {
-		return nil, wrapStoreError("pin Skill", err)
-	}
-	return &PinSkillResponse{Body: &value}, nil
-}
-
-func (a *API) GetSkill(
-	ctx context.Context,
-	request *GetSkillRequest,
-) (*GetSkillResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill get",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.getSkill(ctx, request.Artifact)
-	if err != nil {
-		return nil, wrapStoreError("get Skill", err)
-	}
-	return &GetSkillResponse{Body: &value}, nil
-}
-
-func (a *API) ListBundleSkills(
-	ctx context.Context,
-	request *ListBundleSkillsRequest,
-) (*ListBundleSkillsResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill list",
-	); err != nil {
-		return nil, err
-	}
-
-	values, err := a.ListSkills(ctx, request.Bundle)
-	if err != nil {
-		return nil, wrapStoreError("list Skills", err)
-	}
-	return &ListBundleSkillsResponse{
-		Body: &ListBundleSkillsResponseBody{
-			Skills: values,
-		},
-	}, nil
-}
-
-func (a *API) SetSkillEnabled(
-	ctx context.Context,
-	request *SetSkillEnabledRequest,
-) (*SetSkillEnabledResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		true,
-		request != nil && request.Body != nil,
-		"Skill enabled update",
-	); err != nil {
-		return nil, err
-	}
-
-	value, err := a.setSkillEnabled(
-		ctx,
-		request.Body.Artifact,
-		request.Body.ExpectedRevision,
-		request.Body.Enabled,
-	)
-	if err != nil {
-		return nil, wrapStoreError("set Skill enabled", err)
-	}
-	return &SetSkillEnabledResponse{Body: &value}, nil
-}
-
-func (a *API) UnadoptSkill(
-	ctx context.Context,
-	request *UnadoptSkillRequest,
-) (*UnadoptSkillResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill unadopt",
-	); err != nil {
-		return nil, err
-	}
-
-	if err := a.unadoptSkill(
-		ctx,
-		request.Artifact,
-		request.ExpectedRevision,
-		request.Suppress,
-	); err != nil {
-		return nil, wrapStoreError("unadopt Skill", err)
-	}
-	return &UnadoptSkillResponse{
-		Artifact: request.Artifact,
-	}, nil
-}
-
-func (a *API) PurgeSkill(
-	ctx context.Context,
-	request *PurgeSkillRequest,
-) (*PurgeSkillResponse, error) {
-	if err := requireStoreRequest(
-		request,
-		false,
-		false,
-		"Skill purge",
-	); err != nil {
-		return nil, err
-	}
-
-	if err := a.purgeSkill(
-		ctx,
-		request.Artifact,
-		request.ExpectedRevision,
-	); err != nil {
-		return nil, wrapStoreError("purge Skill", err)
-	}
-	return &PurgeSkillResponse{
-		Artifact: request.Artifact,
-	}, nil
-}
-
-func (a *API) CreateBundle(
-	ctx context.Context,
-	request CreateSkillBundleBody,
-) (skillDomain.SkillBundle, error) {
-	return a.createBundle(ctx, request, false)
-}
-
-func (a *API) ListBundles(
-	ctx context.Context,
-	rootID root.RootID,
-) ([]skillDomain.SkillBundle, error) {
-	values, err := a.collections.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]skillDomain.SkillBundle, 0)
-	for _, value := range values {
-		if value.Kind != skillcollectionv1.SkillCollectionKind {
-			continue
-		}
-		bundle, err := a.GetBundle(ctx, value.Ref())
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, bundle)
-	}
-	return output, nil
-}
-
-func (a *API) UpdateBundle(
-	ctx context.Context,
-	request UpdateSkillBundleBody,
-) (skillDomain.SkillBundle, error) {
-	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	current, err := a.GetBundle(ctx, request.Bundle)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if request.ExpectedRevision == 0 ||
-		current.Collection.Revision != request.ExpectedRevision {
-		return skillDomain.SkillBundle{}, basespec.ErrConflict
-	}
-
-	data, err := skillDomain.EncodeCollectionData(current.Data)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	updated, err := a.collections.Update(
-		ctx,
-		request.Bundle,
-		collection.Update{
-			ExpectedRevision: request.ExpectedRevision,
-			DisplayName:      request.DisplayName,
-			Description:      request.Description,
-			Enabled:          request.Enabled,
-			Data:             data,
-		},
-	)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	value, err := a.GetBundle(ctx, updated.Ref())
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if updated.Revision == current.Collection.Revision ||
-		!value.Collection.Enabled {
-		return value, nil
-	}
-	if _, err := a.refreshBundle(ctx, value.Collection.Ref(), false); err != nil {
-		return value, fmt.Errorf(
-			"skill bundle update completed but catalog refresh remains pending: %w",
-			err,
-		)
-	}
-	return value, nil
-}
-
-func (a *API) RetireBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) (collection.Collection, error) {
-	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
-		return collection.Collection{}, err
-	}
-	if _, err := a.GetBundle(ctx, ref); err != nil {
-		return collection.Collection{}, err
-	}
-	skills, err := a.ListSkills(ctx, ref)
-	if err != nil {
-		return collection.Collection{}, err
-	}
-	if len(skills) != 0 {
-		return collection.Collection{}, fmt.Errorf(
-			"%w: remove all Skills before retiring the bundle",
-			basespec.ErrConflict,
-		)
-	}
-	return a.collections.Retire(ctx, ref, expectedRevision)
-}
-
-func (a *API) PurgeBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) error {
-	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
-		return err
-	}
-	value, err := a.collections.GetRetired(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if value.Kind != skillcollectionv1.SkillCollectionKind {
-		return fmt.Errorf(
-			"%w: collection %q is not a retired skill bundle",
-			basespec.ErrNotFound,
-			ref.CollectionID,
-		)
-	}
-	data, err := skillDomain.DecodeCollectionData(value.Data)
-	if err != nil {
-		return err
-	}
-
-	var ownedSource source.Summary
-	if data.ManagedSourceID != "" {
-		ownedSource, err = a.sources.Get(
-			ctx,
-			ref.RootID,
-			data.ManagedSourceID,
-		)
-		if err != nil {
-			return err
-		}
-		if ownedSource.Kind != source.SourceKindManagedDirectory {
-			return fmt.Errorf(
-				"%w: bundle-owned managed Source %q has kind %q, not %q",
-				basespec.ErrInvalid,
-				data.ManagedSourceID,
-				ownedSource.Kind,
-				source.SourceKindManagedDirectory,
-			)
-		}
-	}
-	if err := a.collections.Purge(ctx, ref, expectedRevision); err != nil {
-		return err
-	}
-	if data.ManagedSourceID != "" {
-		if err := a.sources.Discard(
-			ctx,
-			ref.RootID,
-			data.ManagedSourceID,
-			ownedSource.Revision,
-		); err != nil {
-			return fmt.Errorf(
-				"bundle was purged but its owned managed Source remains pending cleanup: %w",
-				err,
-			)
-		}
-	}
-	return nil
-}
-
-func (a *API) AttachSource(
-	ctx context.Context,
-	bundle collection.CollectionRef,
-	expectedCollectionRevision uint64,
-	draft skillDomain.AttachmentDraft,
-) (skillDomain.SkillBundle, error) {
-	if err := a.requireBundleMutation(ctx, bundle.RootID, false); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if draft.Role == artifactbuiltin.BuiltInAttachmentRole {
-		return skillDomain.SkillBundle{}, fmt.Errorf(
-			"%w: skill bundle built-in attachment role is reserved for bootstrap",
-			basespec.ErrInvalid,
-		)
-	}
-	if draft.Role == artifactbuiltin.ManagedAttachmentRole {
-		return skillDomain.SkillBundle{}, fmt.Errorf(
-			"%w: managed attachments must be provisioned through managedSourceID when the bundle is created",
-			basespec.ErrInvalid,
-		)
-	}
-	if _, err := a.GetBundle(ctx, bundle); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if err := a.validateAttachmentDraft(ctx, bundle.RootID, draft); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	attachmentData, err := skillDomain.NewAttachmentData(
-		draft.DiscoveryRoot,
-		draft.ExpectedMemberDigests,
-	)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	encodedAttachmentData, err := skillDomain.EncodeAttachmentData(attachmentData)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-
-	_, _, err = a.collections.Attach(
-		ctx,
-		bundle,
-		expectedCollectionRevision,
-		collection.AttachmentDraft{
-			SourceID: draft.SourceID,
-			Role:     draft.Role,
-			Enabled:  draft.Enabled,
-			Data:     encodedAttachmentData,
-		},
-	)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	value, err := a.GetBundle(ctx, bundle)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if !value.Collection.Enabled {
-		return value, nil
-	}
-	if _, err := a.refreshBundle(ctx, value.Collection.Ref(), false); err != nil {
-		return value, fmt.Errorf(
-			"skill source attachment completed but catalog refresh remains pending: %w",
-			err,
-		)
-	}
-	return value, nil
-}
-
-// RegisterBundleDirectory owns filesystem Source creation, Bundle attachment,
-// and failed-attachment compensation. The frontend never receives source
-// configuration, source IDs, or source storage keys for this operation.
-func (a *API) RegisterBundleDirectory(
-	ctx context.Context,
-	bundle collection.CollectionRef,
-	expectedCollectionRevision uint64,
-	rootPath string,
-	sourceDisplayName string,
-) (skillDomain.SkillBundle, error) {
-	if err := a.requireBundleMutation(ctx, bundle.RootID, false); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if _, err := a.GetBundle(ctx, bundle); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if expectedCollectionRevision == 0 {
-		return skillDomain.SkillBundle{}, fmt.Errorf(
-			"%w: expected Skill Bundle revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-
 	config, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
 	}{
-		RootPath: rootPath,
+		RootPath: request.RootPath,
 	})
 	if err != nil {
-		return skillDomain.SkillBundle{}, err
+		return source.Summary{}, err
 	}
 
 	sourceID := source.SourceID(uuidutil.NewUUIDv7())
-	created, createdNew, err := a.sources.CreateWithStatus(
+	value, err := a.sources.Create(
 		ctx,
-		bundle.RootID,
+		request.RootID,
 		source.Draft{
 			ID:          sourceID,
-			StorageKey:  skillDirectoryStorageKey(),
+			StorageKey:  generatedSkillSourceStorageKey(),
 			Kind:        source.SourceKindFilesystemDirectory,
-			DisplayName: sourceDisplayName,
+			DisplayName: request.SourceDisplayName,
 			Enabled:     true,
 			Config:      config,
+			Discovery:   discovery,
 		},
 	)
 	if err != nil {
-		return skillDomain.SkillBundle{}, err
+		return source.Summary{}, err
 	}
-
-	attached, attachErr := a.AttachSource(
+	if _, err := a.discovery.RefreshSource(
 		ctx,
-		bundle,
-		expectedCollectionRevision,
-		skillDomain.AttachmentDraft{
-			SourceID:      created.ID,
-			Role:          skillDomain.RoleExternal,
-			Enabled:       true,
-			DiscoveryRoot: ".",
-		},
-	)
-	if attachErr == nil {
-		return attached, nil
+		request.RootID,
+		value.ID,
+	); err != nil {
+		return source.Summary{}, err
 	}
-
-	latest, readErr := a.GetBundle(ctx, bundle)
-	if readErr == nil {
-		for _, attachment := range latest.Attachments {
-			if attachment.SourceID == created.ID {
-				return latest, nil
-			}
-		}
-	}
-
-	if !createdNew {
-		return skillDomain.SkillBundle{}, attachErr
-	}
-
-	cleanupErr := a.sources.Discard(
-		context.WithoutCancel(ctx),
-		bundle.RootID,
-		created.ID,
-		created.Revision,
-	)
-	return skillDomain.SkillBundle{}, errors.Join(attachErr, cleanupErr)
+	return value, nil
 }
 
-func (a *API) RefreshBundle(
+func (a *API) RefreshSkillSource(
 	ctx context.Context,
-	ref collection.CollectionRef,
-) (catalog.RefreshCollectionResult, error) {
-	return a.refreshBundle(ctx, ref, false)
-}
-
-// EnsureBuiltInBundleCurrent preserves startup convergence without publishing
-// a new catalog when the protected bundle is already current. It is reserved
-// for the trusted built-in installer and explicit built-in update paths.
-func (a *API) EnsureBuiltInBundleCurrent(
-	ctx context.Context,
-	ref collection.CollectionRef,
+	rootID root.RootID,
+	sourceID source.SourceID,
 ) error {
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := rootID.Validate(); err != nil {
 		return err
 	}
-	bundle, err := a.GetBundle(ctx, ref)
-	if err != nil {
+	if err := sourceID.Validate(); err != nil {
 		return err
 	}
-
-	if _, err := a.currentBundleCatalog(ctx, bundle); err == nil {
-		return nil
-	} else if !errors.Is(err, basespec.ErrCatalogUnavailable) &&
-		!errors.Is(err, basespec.ErrCatalogStale) {
-		return err
-	}
-
-	_, err = a.refreshBundle(ctx, ref, true)
+	_, err := a.discovery.RefreshSource(ctx, rootID, sourceID)
 	return err
-}
-
-func (a *API) EnsureBuiltInBundleTopology(
-	ctx context.Context,
-	request skillDomain.BuiltInBundleTopology,
-) (skillDomain.SkillBundle, error) {
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	bundle, err := a.createBundle(ctx, CreateSkillBundleBody{
-		RootID:         request.RootID,
-		CollectionID:   request.CollectionID,
-		LogicalName:    request.LogicalName,
-		LogicalVersion: request.LogicalVersion,
-		DisplayName:    request.DisplayName,
-		Description:    request.Description,
-		Labels:         request.Labels,
-		Enabled:        request.Enabled,
-		Attachments: []skillDomain.AttachmentDraft{{
-			SourceID:              request.SourceID,
-			Role:                  artifactbuiltin.BuiltInAttachmentRole,
-			Enabled:               true,
-			DiscoveryRoot:         request.DiscoveryRoot,
-			ExpectedMemberDigests: request.ExpectedMemberDigests,
-		}},
-	}, true)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if !builtInBundleTopologyMatches(bundle, request) {
-		data, err := skillDomain.EncodeCollectionData(skillDomain.CollectionData{
-			SchemaVersion:           skillcollectionv1.SkillCollectionSchemaVersion,
-			DiscoveryPolicyRevision: skillDomain.DiscoveryPolicyRevision,
-			LogicalName:             request.LogicalName,
-			LogicalVersion:          request.LogicalVersion,
-			Labels:                  request.Labels,
-		})
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-
-		if bundle.Collection.DisplayName != request.DisplayName ||
-			bundle.Collection.Description != request.Description ||
-			bundle.Collection.Enabled != request.Enabled ||
-			!bytes.Equal(bundle.Collection.Data, data) {
-			if _, err := a.collections.Update(
-				ctx,
-				bundle.Collection.Ref(),
-				collection.Update{
-					ExpectedRevision: bundle.Collection.Revision,
-					DisplayName:      request.DisplayName,
-					Description:      request.Description,
-					Enabled:          request.Enabled,
-					Data:             data,
-				},
-			); err != nil {
-				return skillDomain.SkillBundle{}, err
-			}
-		}
-
-		if len(bundle.Attachments) == 1 {
-			attachment := bundle.Attachments[0]
-			attachmentData, err := skillDomain.NewAttachmentData(
-				request.DiscoveryRoot,
-				request.ExpectedMemberDigests,
-			)
-			if err != nil {
-				return skillDomain.SkillBundle{}, err
-			}
-			encodedAttachmentData, err := skillDomain.EncodeAttachmentData(attachmentData)
-			if err != nil {
-				return skillDomain.SkillBundle{}, err
-			}
-			if attachment.Role != artifactbuiltin.BuiltInAttachmentRole || !attachment.Enabled ||
-				!bytes.Equal(attachment.Data, encodedAttachmentData) {
-				currentColl, err := a.collections.Get(ctx, bundle.Collection.Ref())
-				if err != nil {
-					return skillDomain.SkillBundle{}, err
-				}
-				if _, _, err := a.collections.UpdateAttachment(
-					ctx,
-					bundle.Collection.Ref(),
-					request.SourceID,
-					collection.AttachmentUpdate{
-						ExpectedCollectionRevision: currentColl.Revision,
-						ExpectedAttachmentRevision: attachment.Revision,
-						Role:                       artifactbuiltin.BuiltInAttachmentRole,
-						Enabled:                    true,
-						Data:                       encodedAttachmentData,
-					},
-				); err != nil {
-					return skillDomain.SkillBundle{}, err
-				}
-			}
-		}
-
-		bundle, err = a.GetBundle(ctx, bundle.Collection.Ref())
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		if !builtInBundleTopologyMatches(bundle, request) {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: built-in bundle %q differs from the protected registry declaration",
-				basespec.ErrConflict,
-				request.LogicalName,
-			)
-		}
-	}
-
-	return bundle, nil
-}
-
-func (a *API) GetBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (skillDomain.SkillBundle, error) {
-	if err := ref.Validate(); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-
-	value, err := a.collections.Get(ctx, ref)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if value.Kind != skillcollectionv1.SkillCollectionKind {
-		return skillDomain.SkillBundle{}, fmt.Errorf(
-			"%w: collection %q is not a skill bundle",
-			basespec.ErrNotFound,
-			ref.CollectionID,
-		)
-	}
-
-	data, err := skillDomain.DecodeCollectionData(value.Data)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	attachments, err := a.collections.ListAttachments(ctx, ref)
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-
-	sources := make([]source.Summary, 0, len(attachments))
-	for _, attachment := range attachments {
-		if err := a.validateAttachment(ctx, ref.RootID, attachment); err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		value, err := a.sources.Get(
-			ctx,
-			ref.RootID,
-			attachment.SourceID,
-		)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		sources = append(sources, value)
-	}
-	if err := validateBundleAttachmentTopology(data, attachments); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	sort.Slice(attachments, func(left, right int) bool {
-		return attachments[left].SourceID < attachments[right].SourceID
-	})
-	sort.Slice(sources, func(left, right int) bool {
-		return sources[left].ID < sources[right].ID
-	})
-
-	return skillDomain.SkillBundle{
-		Collection:  value,
-		Data:        data,
-		Attachments: attachments,
-		Sources:     sources,
-	}, nil
 }
 
 func (a *API) ListSkills(
 	ctx context.Context,
-	bundle collection.CollectionRef,
+	rootID root.RootID,
 ) ([]artifact.Artifact, error) {
-	if _, err := a.GetBundle(ctx, bundle); err != nil {
+	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-	values, err := a.artifacts.ListByCollection(ctx, bundle)
+	values, err := a.artifacts.ListByRoot(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}
 	output := make([]artifact.Artifact, 0, len(values))
 	for _, value := range values {
-		if value.Kind == artifactbuiltin.AgentSkillArtifactKind {
-			output = append(output, value)
+		if !skillDomain.IsSkillKind(value.Kind) {
+			continue
 		}
+		output = append(output, value.Clone())
 	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].LogicalName != output[right].LogicalName {
+			return output[left].LogicalName <
+				output[right].LogicalName
+		}
+		return output[left].ID < output[right].ID
+	})
 	return output, nil
 }
 
-// GetManagedSkillDocument reads the canonical definition for a managed Skill
-// package. External and discovered Skills remain source-owned and intentionally
-// do not expose an editable document through this API.
-func (a *API) getManagedSkillDocument(
+func (a *API) GetSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (skillDomain.ManagedSkillDocument, error) {
-	value, err := a.getSkill(ctx, ref)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if value.Adoption != artifact.AdoptionPinned {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: only managed Skills can be edited",
-			basespec.ErrUnsupported,
-		)
-	}
-
-	bundleRef := collection.CollectionRef{
-		RootID:       value.RootID,
-		CollectionID: value.CollectionID,
-	}
-	bundle, err := a.GetBundle(ctx, bundleRef)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	attachment, _, err := managedAttachmentForRole(bundle, artifactbuiltin.ManagedAttachmentRole)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if err := requireBundleOwnedManagedSource(bundle, attachment.SourceID); err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if attachment.SourceID != value.Binding.SourceID {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: Skill is not stored in this bundle's managed source",
-			basespec.ErrUnsupported,
-		)
-	}
-	if _, err := managedSkillPackageAddressOf(value.Binding); err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if value.ResolvedDefinition == nil {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: managed Skill has no current definition",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	definitionValue, err := a.currentDefinitionForArtifact(ctx, value)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	doc, err := skillDomain.DocumentFromDefinition(definitionValue)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	return skillDomain.ManagedSkillDocument{Artifact: value.Clone(), Document: doc}, nil
-}
-
-func (a *API) adoptSkill(
-	ctx context.Context,
-	request AdoptSkillBody,
 ) (artifact.Artifact, error) {
-	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
-		return artifact.Artifact{}, err
-	}
-	bundle, err := a.GetBundle(ctx, request.Bundle)
+	value, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if request.Occurrence.CollectionID != request.Bundle.CollectionID {
+	if !skillDomain.IsSkillKind(value.Kind) {
 		return artifact.Artifact{}, fmt.Errorf(
-			"%w: skill occurrence belongs to another bundle",
-			basespec.ErrInvalid,
+			"%w: Artifact %q is not a Skill",
+			basespec.ErrNotFound,
+			ref.ArtifactID,
 		)
 	}
-	role, err := bundleAttachmentRole(bundle, request.Occurrence.SourceID)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if role == artifactbuiltin.ManagedAttachmentRole || role == artifactbuiltin.BuiltInAttachmentRole {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: managed and built-in Skill occurrences require their dedicated installation flow",
-			basespec.ErrUnsupported,
-		)
-	}
-	if request.ExpectedCatalogRevision == 0 {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: expected skill bundle catalog revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-
-	snapshot, err := a.currentBundleCatalog(ctx, bundle)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if snapshot.Revision != request.ExpectedCatalogRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-	found := false
-	for _, occurrence := range snapshot.Occurrences {
-		if occurrence.Key != request.Occurrence {
-			continue
-		}
-		if occurrence.Kind != artifactbuiltin.AgentSkillArtifactKind ||
-			occurrence.State != catalog.OccurrenceValid ||
-			occurrence.DefinitionDigest == nil {
-			return artifact.Artifact{}, fmt.Errorf(
-				"%w: requested occurrence is not an adoptable %q Skill",
-				basespec.ErrReferenceUnresolved,
-				artifactbuiltin.AgentSkillArtifactKind,
-			)
-		}
-		found = true
-		break
-	}
-	if !found {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: requested Skill occurrence is not in the current bundle catalog",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	if err := request.ArtifactID.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return a.artifacts.Adopt(ctx, catalog.AdoptRequest{
-		ArtifactID:              request.ArtifactID,
-		Collection:              request.Bundle,
-		Occurrence:              request.Occurrence,
-		ExpectedCatalogRevision: request.ExpectedCatalogRevision,
-		Name:                    request.Name,
-		Enabled:                 request.Enabled,
-		Data:                    emptyArtifactData(),
-	})
+	return value, nil
 }
 
-func (a *API) pinSkill(
-	ctx context.Context,
-	request PinSkillBody,
-) (artifact.Artifact, error) {
-	if err := a.requireBundleMutation(ctx, request.Bundle.RootID, false); err != nil {
-		return artifact.Artifact{}, err
-	}
-	bundle, err := a.GetBundle(ctx, request.Bundle)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if request.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: skill bundle pins only support %q",
-			basespec.ErrInvalid,
-			artifactbuiltin.AgentSkillArtifactKind,
-		)
-	}
-	role, err := bundleAttachmentRole(bundle, request.Binding.SourceID)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if role == artifactbuiltin.ManagedAttachmentRole ||
-		role == artifactbuiltin.BuiltInAttachmentRole {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: managed and built-in attachments require their dedicated pinning flow",
-			basespec.ErrUnsupported,
-		)
-	}
-	return a.artifacts.Pin(ctx, catalog.PinRequest{
-		ArtifactID:                 request.ArtifactID,
-		Collection:                 request.Bundle,
-		ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-		Binding:                    request.Binding,
-		Name:                       request.Name,
-		Enabled:                    request.Enabled,
-		Data:                       emptyArtifactData(),
-	})
-}
-
-func (a *API) setSkillEnabled(
+func (a *API) SetSkillEnabled(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (artifact.Artifact, error) {
-	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if _, err := a.getSkill(ctx, ref); err != nil {
+	if _, err := a.GetSkill(ctx, ref); err != nil {
 		return artifact.Artifact{}, err
 	}
 	return a.artifacts.SetEnabled(
@@ -1227,27 +228,190 @@ func (a *API) setSkillEnabled(
 	)
 }
 
-func (a *API) unadoptSkill(
+func (a *API) CreateManagedSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	suppress bool,
-) error {
-	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
-		return err
+	request ManagedSkillCreateRequest,
+) (ManagedSkillCreateResult, error) {
+	if err := request.RootID.Validate(); err != nil {
+		return ManagedSkillCreateResult{}, err
 	}
-	if _, err := a.getSkill(ctx, ref); err != nil {
-		return err
+	if err := request.SourceID.Validate(); err != nil {
+		return ManagedSkillCreateResult{}, err
 	}
-	return a.artifacts.Unadopt(
+	if err := basespec.LogicalName(request.SkillName).Validate(); err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	if err := a.requireMutable(ctx, request.RootID, false); err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+
+	sourceValue, err := a.sources.Get(
 		ctx,
-		ref,
-		expectedRevision,
-		suppress,
+		request.RootID,
+		request.SourceID,
 	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return ManagedSkillCreateResult{}, fmt.Errorf(
+			"%w: managed Skill Source must have kind %q",
+			basespec.ErrInvalid,
+			source.SourceKindManagedDirectory,
+		)
+	}
+	if !sourceValue.Enabled {
+		return ManagedSkillCreateResult{}, fmt.Errorf(
+			"%w: managed Skill Source is disabled",
+			basespec.ErrConflict,
+		)
+	}
+
+	files, skillMD, err := skillDomain.NormalizeManagedSkillFiles(
+		request.SKILLMD,
+		request.Files,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	definitionValue, _, err := skillDomain.DecodeSkillDocument(
+		skillMD,
+		request.SkillName,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	if definitionValue.LogicalName != basespec.LogicalName(request.SkillName) {
+		return ManagedSkillCreateResult{}, fmt.Errorf(
+			"%w: SKILL.md name does not match requested Skill name",
+			basespec.ErrInvalid,
+		)
+	}
+
+	packageAddress, err := skillDomain.ManagedPackageAddressForSkill(
+		definitionValue.LogicalName,
+		definitionValue.LogicalVersion,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	locator, err := skillDomain.ManagedPackageLocatorForSkill(
+		packageAddress,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	if err := validateSkillSourceDiscovery(
+		sourceValue.Discovery,
+		locator,
+	); err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+
+	published, err := a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: request.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID: request.SourceID,
+				Locator:  locator,
+			},
+			ExpectedKind:        skillDomain.SkillArtifactKind,
+			ExpectedLogicalName: definitionValue.LogicalName,
+			ExpectedDefinition:  definitionValue.Digest,
+			Package: source.ManagedPackagePublication{
+				Address: packageAddress,
+				Files:   files,
+			},
+		},
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+
+	value := published.Artifact
+	if value.Enabled != request.Enabled {
+		value, err = a.artifacts.SetEnabled(
+			ctx,
+			value.Ref(),
+			value.Revision,
+			request.Enabled,
+		)
+		if err != nil {
+			return ManagedSkillCreateResult{}, err
+		}
+	}
+	return ManagedSkillCreateResult{
+		Artifact: value,
+		Address:  value.Address(),
+	}, nil
 }
 
-func (a *API) purgeSkill(
+func (a *API) GetManagedSkillDocument(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (skillDomain.ManagedSkillDocument, error) {
+	value, err := a.GetSkill(ctx, ref)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	sourceValue, err := a.sources.Get(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: only managed Skills expose editable Skill documents",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	resolved, err := a.resources.ResolveArtifact(
+		ctx,
+		ref,
+		resource.ResolveOptions{
+			VerifySourceContent: true,
+		},
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	entry, err := a.resources.ReadSourceEntry(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+		value.Binding.Locator,
+		basespec.MaxCandidateBytes,
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	if value.SourceContentDigest == nil ||
+		entry.Digest != *value.SourceContentDigest ||
+		entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: Skill Source changed while reading managed document",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	doc, _, err := skillDomain.ParseSkillDocument(
+		entry.Content,
+		string(value.LogicalName),
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	return skillDomain.ManagedSkillDocument{
+		Artifact: value,
+		Document: doc,
+	}, nil
+}
+
+func (a *API) PurgeSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
@@ -1258,814 +422,174 @@ func (a *API) purgeSkill(
 			basespec.ErrInvalid,
 		)
 	}
-	if err := a.requireBundleMutation(ctx, ref.RootID, false); err != nil {
-		return err
-	}
-	value, err := a.getSkill(ctx, ref)
+	value, err := a.GetSkill(ctx, ref)
 	if err != nil {
 		return err
 	}
 	if value.Revision != expectedRevision {
 		return basespec.ErrConflict
 	}
+	if err := a.requireMutable(ctx, value.RootID, false); err != nil {
+		return err
+	}
 
-	bundle, err := a.GetBundle(ctx, collection.CollectionRef{
-		RootID:       value.RootID,
-		CollectionID: value.CollectionID,
-	})
+	sourceValue, err := a.sources.Get(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+	)
 	if err != nil {
 		return err
 	}
-	var role collection.AttachmentRole
-	for _, attachment := range bundle.Attachments {
-		if attachment.SourceID == value.Binding.SourceID {
-			role = attachment.Role
-			break
-		}
-	}
-	switch role {
-	case artifactbuiltin.BuiltInAttachmentRole:
-		return fmt.Errorf(
-			"%w: built-in Skill packages are protected and read-only",
-			basespec.ErrProtected,
-		)
-	case artifactbuiltin.ManagedAttachmentRole:
-		if value.Adoption != artifact.AdoptionPinned {
-			return fmt.Errorf(
-				"%w: managed Skill Artifact must remain pinned until purged",
-				basespec.ErrConflict,
-			)
-		}
-		if err := requireBundleOwnedManagedSource(bundle, value.Binding.SourceID); err != nil {
-			return err
-		}
-	default:
-		if value.Adoption == artifact.AdoptionObserved {
-			return a.artifacts.Unadopt(
-				ctx,
-				ref,
-				expectedRevision,
-				true,
-			)
-		}
-		return a.artifacts.PurgeAndSuppress(ctx, ref, expectedRevision)
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return a.artifacts.Purge(ctx, ref, expectedRevision)
 	}
 
-	packageAddress, err := managedSkillPackageAddressOf(value.Binding)
+	packageAddress, err := skillDomain.ManagedPackageAddressFromSkillLocator(
+		value.Binding.Locator,
+	)
 	if err != nil {
 		return err
 	}
-	if err := a.managedArtifacts.Remove(
+	return a.managedArtifacts.Remove(
 		ctx,
 		artifact.RemoveArtifactRequest{
-			Artifact:       value,
-			Package:        packageAddress,
-			AllowProtected: false,
+			RootID:           value.RootID,
+			SourceID:         value.Binding.SourceID,
+			Package:          packageAddress,
+			ExpectedArtifact: &ref,
 		},
-	); err != nil {
-		return pendingManagedSkillPurgeError(value.Ref(), err)
-	}
-	return nil
+	)
 }
 
-func (a *API) getSkill(
+func (a *API) InstallBuiltInSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	request BuiltInSkillInstallRequest,
 ) (artifact.Artifact, error) {
-	value, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return artifact.Artifact{}, err
-	}
-	if value.Kind != artifactbuiltin.AgentSkillArtifactKind {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: artifact %q is not an agent skill",
-			basespec.ErrNotFound,
-			ref.ArtifactID,
-		)
-	}
-	if _, err := a.GetBundle(ctx, collection.CollectionRef{
-		RootID:       value.RootID,
-		CollectionID: value.CollectionID,
-	}); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return value, nil
-}
-
-func (a *API) currentBundleCatalog(
-	ctx context.Context,
-	bundle skillDomain.SkillBundle,
-) (catalog.Snapshot, error) {
-	return a.catalogs.CurrentCatalog(
-
-		ctx,
-
-		bundle.Collection.Ref(),
-	)
-}
-
-func (a *API) currentDefinitionForArtifact(
-	ctx context.Context,
-	record artifact.Artifact,
-) (definition.Definition, error) {
-	if record.ResolvedDefinition == nil {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: Skill Artifact %q has no current definition",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
-
-	snapshot, err := a.catalogs.CurrentCatalog(
-		ctx,
-
-		collection.CollectionRef{
-			RootID:       record.RootID,
-			CollectionID: record.CollectionID,
-		},
-	)
-	if err != nil {
-		return definition.Definition{}, err
-	}
-
-	return skillDomain.DefinitionForArtifact(snapshot, record)
-}
-
-// createBundle keeps the built-in attachment role inside trusted bootstrap
-// composition. Public bundle creation must not mint built-in provenance.
-func (a *API) createBundle(
-	ctx context.Context,
-	request CreateSkillBundleBody,
-	allowBuiltInAttachment bool,
-) (skillDomain.SkillBundle, error) {
-	if err := request.CollectionID.Validate(); err != nil {
-		return skillDomain.SkillBundle{}, err
 	}
 	if err := request.RootID.Validate(); err != nil {
-		return skillDomain.SkillBundle{}, err
+		return artifact.Artifact{}, err
 	}
-	if err := a.requireBundleMutation(
+	if err := request.SourceID.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := request.ExpectedLogicalName.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := cryptoutil.ValidateDigest(request.ExpectedDefinition); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := request.PackageAddress.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if request.PackageAddress.Kind != skillDomain.ManagedSkillPackageKind {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill package kind must be %q",
+			basespec.ErrInvalid,
+			skillDomain.ManagedSkillPackageKind,
+		)
+	}
+	if err := a.requireMutable(ctx, request.RootID, true); err != nil {
+		return artifact.Artifact{}, err
+	}
+
+	locator, err := skillDomain.ManagedPackageLocatorForSkill(
+		request.PackageAddress,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	sourceValue, err := a.sources.Get(
 		ctx,
 		request.RootID,
-		allowBuiltInAttachment,
-	); err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-
-	if request.ManagedSourceID != "" {
-		if err := request.ManagedSourceStorageKey.Validate(); err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-	}
-
-	data, err := skillDomain.EncodeCollectionData(skillDomain.CollectionData{
-		SchemaVersion:           skillcollectionv1.SkillCollectionSchemaVersion,
-		DiscoveryPolicyRevision: skillDomain.DiscoveryPolicyRevision,
-		LogicalName:             request.LogicalName,
-		LogicalVersion:          request.LogicalVersion,
-		Labels:                  request.Labels,
-		ManagedSourceID:         request.ManagedSourceID,
-	})
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-
-	attachments := make([]collection.AttachmentDraft, 0, len(request.Attachments))
-	roleCounts := make(map[collection.AttachmentRole]int)
-	for _, draft := range request.Attachments {
-		if draft.Role == artifactbuiltin.BuiltInAttachmentRole &&
-			!allowBuiltInAttachment {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: skill bundle built-in attachment role is reserved for bootstrap",
-				basespec.ErrInvalid,
-			)
-		}
-		if draft.Role == artifactbuiltin.ManagedAttachmentRole {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: managed attachments must be provisioned through managedSourceID",
-				basespec.ErrInvalid,
-			)
-		}
-		if request.ManagedSourceID != "" &&
-			draft.SourceID == request.ManagedSourceID {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: managedSourceID is provisioned and attached by bundle creation and must not also be an explicit attachment",
-				basespec.ErrInvalid,
-			)
-		}
-		roleCounts[draft.Role]++
-		if (draft.Role == artifactbuiltin.ManagedAttachmentRole ||
-			draft.Role == artifactbuiltin.BuiltInAttachmentRole) &&
-			roleCounts[draft.Role] > 1 {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: skill bundle can have only one %q attachment",
-				basespec.ErrInvalid,
-				draft.Role,
-			)
-		}
-		if err := a.validateAttachmentDraft(ctx, request.RootID, draft); err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		attachmentData, err := skillDomain.NewAttachmentData(
-			draft.DiscoveryRoot,
-			draft.ExpectedMemberDigests,
-		)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		encodedAttachmentData, err := skillDomain.EncodeAttachmentData(attachmentData)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		attachments = append(attachments, collection.AttachmentDraft{
-			SourceID: draft.SourceID,
-			Role:     draft.Role,
-			Enabled:  draft.Enabled,
-			Data:     encodedAttachmentData,
-		})
-	}
-
-	var provisionedSource *source.Summary
-	if request.ManagedSourceID != "" {
-		if allowBuiltInAttachment {
-			return skillDomain.SkillBundle{}, fmt.Errorf(
-				"%w: protected bundle topology must declare its attachment explicitly",
-				basespec.ErrInvalid,
-			)
-		}
-
-		value, createdNew, err := a.sources.CreateWithStatus(
-			ctx,
-			request.RootID,
-			source.Draft{
-				ID:          request.ManagedSourceID,
-				StorageKey:  request.ManagedSourceStorageKey,
-				Kind:        source.SourceKindManagedDirectory,
-				DisplayName: request.DisplayName,
-				Enabled:     true,
-				Config:      json.RawMessage(jsonutil.EmptyObject),
-			},
-		)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		if createdNew {
-			provisionedSource = &value
-		}
-
-		attachmentData, err := skillDomain.NewAttachmentData(".", nil)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		encodedAttachmentData, err := skillDomain.EncodeAttachmentData(attachmentData)
-		if err != nil {
-			return skillDomain.SkillBundle{}, err
-		}
-		attachments = append(attachments, collection.AttachmentDraft{
-			SourceID: request.ManagedSourceID,
-			Role:     artifactbuiltin.ManagedAttachmentRole,
-			Enabled:  true,
-			Data:     encodedAttachmentData,
-		})
-	}
-
-	cleanupProvisionedSource := func(cause error) error {
-		if provisionedSource == nil {
-			return cause
-		}
-		cleanupErr := a.sources.Discard(
-			context.WithoutCancel(ctx),
-			request.RootID,
-			provisionedSource.ID,
-			provisionedSource.Revision,
-		)
-		return errors.Join(cause, cleanupErr)
-	}
-
-	created, _, err := a.collections.Create(
-		ctx,
-		request.RootID,
-		collection.Draft{
-			ID:          request.CollectionID,
-			Kind:        skillcollectionv1.SkillCollectionKind,
-			DisplayName: request.DisplayName,
-			Description: request.Description,
-			Enabled:     request.Enabled,
-			Data:        data,
-		},
-		attachments,
+		request.SourceID,
 	)
 	if err != nil {
-		return skillDomain.SkillBundle{}, cleanupProvisionedSource(err)
+		return artifact.Artifact{}, err
 	}
-	bundle, err := a.GetBundle(ctx, created.Ref())
-	if err != nil {
-		return skillDomain.SkillBundle{}, err
-	}
-	if provisionedSource != nil {
-		attached := false
-		for _, attachment := range bundle.Attachments {
-			if attachment.SourceID == provisionedSource.ID &&
-				attachment.Role == artifactbuiltin.ManagedAttachmentRole {
-				attached = true
-				break
-			}
-		}
-		if !attached {
-			return skillDomain.SkillBundle{}, cleanupProvisionedSource(fmt.Errorf(
-				"%w: provisioned managed Source was not attached to the bundle",
-				basespec.ErrConflict,
-			))
-		}
-	}
-	if !bundleCreationIntentMatches(bundle, request) {
-		return skillDomain.SkillBundle{}, cleanupProvisionedSource(fmt.Errorf(
-			"%w: skill bundle %q creation intent differs",
-			basespec.ErrConflict,
-			request.CollectionID,
-		))
-	}
-	if !allowBuiltInAttachment && bundle.Collection.Enabled {
-		if _, err := a.refreshBundle(
-			ctx,
-			bundle.Collection.Ref(),
-			false,
-		); err != nil {
-			return bundle, fmt.Errorf(
-				"skill bundle creation completed but initial catalog refresh remains pending: %w",
-				err,
-			)
-		}
-	}
-	return bundle, nil
-}
-
-func bundleCreationIntentMatches(
-	value skillDomain.SkillBundle,
-	request CreateSkillBundleBody,
-) bool {
-	if value.Collection.RootID != request.RootID ||
-		value.Collection.ID != request.CollectionID ||
-		value.Collection.Kind != skillcollectionv1.SkillCollectionKind {
-		return false
-	}
-	if value.Collection.ID != request.CollectionID ||
-		value.Collection.DisplayName != request.DisplayName ||
-		value.Collection.Description != request.Description ||
-		value.Collection.Enabled != request.Enabled ||
-		value.Data.LogicalName != request.LogicalName ||
-		value.Data.LogicalVersion != request.LogicalVersion ||
-		value.Data.ManagedSourceID != request.ManagedSourceID ||
-		!maps.Equal(value.Data.Labels, request.Labels) {
-		return false
-	}
-
-	expected := make(map[source.SourceID]skillDomain.AttachmentDraft)
-	for _, draft := range request.Attachments {
-		if _, duplicate := expected[draft.SourceID]; duplicate {
-			return false
-		}
-		expected[draft.SourceID] = draft
-	}
-	if request.ManagedSourceID != "" {
-		if _, duplicate := expected[request.ManagedSourceID]; duplicate {
-			return false
-		}
-		expected[request.ManagedSourceID] = skillDomain.AttachmentDraft{
-			SourceID:      request.ManagedSourceID,
-			Role:          artifactbuiltin.ManagedAttachmentRole,
-			Enabled:       true,
-			DiscoveryRoot: ".",
-		}
-	}
-	if len(expected) != len(value.Attachments) {
-		return false
-	}
-
-	for _, attachment := range value.Attachments {
-		draft, found := expected[attachment.SourceID]
-		if !found ||
-			attachment.Role != draft.Role ||
-			attachment.Enabled != draft.Enabled {
-			return false
-		}
-		actualData, err := skillDomain.DecodeAttachmentData(attachment.Data)
-		if err != nil {
-			return false
-		}
-		expectedData, err := skillDomain.NewAttachmentData(
-			draft.DiscoveryRoot,
-			draft.ExpectedMemberDigests,
-		)
-		if err != nil ||
-			actualData.DiscoveryRoot != expectedData.DiscoveryRoot ||
-			!maps.Equal(
-				actualData.ExpectedMemberDigests,
-				expectedData.ExpectedMemberDigests,
-			) {
-			return false
-		}
-	}
-
-	if request.ManagedSourceID != "" {
-		found := false
-		for _, sourceValue := range value.Sources {
-			if sourceValue.ID != request.ManagedSourceID {
-				continue
-			}
-			found = sourceValue.RootID == request.RootID &&
-				sourceValue.Kind == source.SourceKindManagedDirectory &&
-				sourceValue.DisplayName == request.DisplayName &&
-				sourceValue.Enabled
-			break
-		}
-		if !found {
-			return false
-		}
-	}
-	return true
-}
-
-func builtInBundleTopologyMatches(
-	value skillDomain.SkillBundle,
-	request skillDomain.BuiltInBundleTopology,
-) bool {
-	if value.Collection.RootID != request.RootID ||
-		value.Collection.ID != request.CollectionID ||
-		value.Collection.DisplayName != request.DisplayName ||
-		value.Collection.Description != request.Description ||
-		value.Collection.Enabled != request.Enabled ||
-		value.Data.LogicalName != request.LogicalName ||
-		value.Data.LogicalVersion != request.LogicalVersion ||
-		value.Data.ManagedSourceID != "" ||
-		!maps.Equal(value.Data.Labels, request.Labels) ||
-		len(value.Attachments) != 1 {
-		return false
-	}
-
-	attachment := value.Attachments[0]
-	expectedAttachment, err := skillDomain.NewAttachmentData(
-		request.DiscoveryRoot,
-		request.ExpectedMemberDigests,
-	)
-	if err != nil {
-		return false
-	}
-	actualAttachment, err := skillDomain.DecodeAttachmentData(attachment.Data)
-	if err != nil {
-		return false
-	}
-	return attachment.RootID == request.RootID &&
-		attachment.CollectionID == request.CollectionID &&
-		attachment.SourceID == request.SourceID &&
-		attachment.Role == artifactbuiltin.BuiltInAttachmentRole &&
-		attachment.Enabled &&
-		actualAttachment.DiscoveryRoot ==
-			expectedAttachment.DiscoveryRoot &&
-		maps.Equal(
-			actualAttachment.ExpectedMemberDigests,
-			expectedAttachment.ExpectedMemberDigests,
-		)
-}
-
-func (a *API) refreshBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	allowProtected bool,
-) (catalog.RefreshCollectionResult, error) {
-	if err := a.requireBundleMutation(
-		ctx,
-		ref.RootID,
-		allowProtected,
-	); err != nil {
-		return catalog.RefreshCollectionResult{}, err
-	}
-	bundle, err := a.GetBundle(ctx, ref)
-	if err != nil {
-		return catalog.RefreshCollectionResult{}, err
-	}
-	if !bundle.Collection.Enabled {
-		return catalog.RefreshCollectionResult{}, fmt.Errorf(
-			"%w: skill bundle %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-	return a.catalogs.RefreshCollection(ctx, ref)
-}
-
-// createManagedSkill performs the managed package publication workflow.
-//
-// Built-in package bootstrap is the only caller permitted to publish through
-// a RoleBuiltIn attachment. User-facing creation always uses RoleManaged.
-func (a *API) createManagedSkill(
-	ctx context.Context,
-	request CreateManagedSkillBody,
-	allowBuiltInAttachment bool,
-) (CreateManagedSkillResponse, error) {
-	if err := request.Bundle.Validate(); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if err := a.requireBundleMutation(
-		ctx,
-		request.Bundle.RootID,
-		allowBuiltInAttachment,
-	); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if err := request.ArtifactID.Validate(); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if err := basespec.LogicalName(request.SkillName).Validate(); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-
-	skillMDInput := append([]byte(nil), request.SKILLMD...)
-	if request.Document != nil {
-		if len(skillMDInput) != 0 {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: exactly one of SKILLMD or Document may be supplied",
-				basespec.ErrInvalid,
-			)
-		}
-		doc := *request.Document
-		if doc.Name == "" {
-			doc.Name = request.SkillName
-		}
-		if doc.Name != request.SkillName {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: structured Skill name does not match requested skill name",
-				basespec.ErrInvalid,
-			)
-		}
-		encoded, err := document.MarshalSkillDocument(doc)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-		skillMDInput = append([]byte(nil), encoded...)
-	}
-	files, skillMD, err := normalizeManagedSkillFiles(
-		skillMDInput,
-		request.Files,
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	definitionValue, _, err := skillDomain.DecodeSkillDocument(skillMD,
-		request.SkillName,
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	packageSHA256, err := managedSkillPackageDigest(files)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	pending := func(cause error) error {
-		return pendingManagedSkillCreateError(request.ArtifactID, cause)
-	}
-
-	if definitionValue.LogicalName != basespec.LogicalName(request.SkillName) {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: SKILL.md name does not match requested skill name",
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill Source must be managed",
 			basespec.ErrInvalid,
 		)
 	}
-
-	bundle, err := a.GetBundle(ctx, request.Bundle)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if request.ExpectedCollectionRevision == 0 {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: expected Skill Bundle revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	if bundle.Collection.Revision != request.ExpectedCollectionRevision {
-		return CreateManagedSkillResponse{}, basespec.ErrConflict
-	}
-	if !bundle.Collection.Enabled {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: Skill Bundle %q is disabled",
-			basespec.ErrConflict,
-			request.Bundle.CollectionID,
-		)
-	}
-
-	targetRole := artifactbuiltin.ManagedAttachmentRole
-	if allowBuiltInAttachment {
-		targetRole = artifactbuiltin.BuiltInAttachmentRole
-	}
-	attachment, sourceValue, err := managedAttachmentForRole(
-		bundle,
-		targetRole,
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if targetRole == artifactbuiltin.ManagedAttachmentRole {
-		if err := requireBundleOwnedManagedSource(bundle, sourceValue.ID); err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-	}
-	if !attachment.Enabled || !sourceValue.Enabled {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: managed Skill source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-	packageAddress, err := skillDomain.ManagedPackageAddressForSkill(
-		definitionValue.LogicalName,
-		definitionValue.LogicalVersion,
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	skillLocator, err := skillDomain.ManagedPackageLocatorForSkill(packageAddress)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-
-	artifactName := definitionValue.DisplayName
-	if artifactName == "" {
-		artifactName = request.SkillName
-	}
-	packageData, err := encodeManagedSkillArtifactData(
-		newManagedSkillArtifactData(packageSHA256, request.Enabled),
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-
-	pinned, err := a.managedSkillByID(
-		ctx,
-		request.Bundle.RootID,
-		request.ArtifactID,
-	)
-	if err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if pinned == nil {
-		if request.ExpectedArtifactRevision != 0 {
-			return CreateManagedSkillResponse{}, basespec.ErrConflict
-		}
-
-		value, pinErr := a.artifacts.Pin(ctx, catalog.PinRequest{
-			ArtifactID:                 request.ArtifactID,
-			Collection:                 request.Bundle,
-			ExpectedCollectionRevision: request.ExpectedCollectionRevision,
-			Binding: artifact.SourceBinding{
-				SourceID:     sourceValue.ID,
-				Locator:      skillLocator,
-				ExpectedKind: artifactbuiltin.AgentSkillArtifactKind,
-			},
-			Name:    artifactName,
-			Enabled: request.Enabled,
-			Data:    packageData,
-		})
-		switch {
-		case pinErr == nil:
-			pinned = &value
-
-		case errors.Is(pinErr, basespec.ErrConflict):
-			// Another caller may have created the same caller-supplied Artifact
-			// ID between the read and the pin attempt.
-			pinned, err = a.managedSkillByID(
-				ctx,
-				request.Bundle.RootID,
-				request.ArtifactID,
-			)
-			if err != nil {
-				return CreateManagedSkillResponse{}, err
-			}
-			if pinned == nil {
-				return CreateManagedSkillResponse{}, pinErr
-			}
-
-		default:
-			return CreateManagedSkillResponse{}, pinErr
-		}
-	}
-
-	if err := validateManagedSkillOperationIntent(
-		*pinned,
-		request.Bundle,
-		request.ArtifactID,
-		sourceValue.ID,
-		skillLocator,
+	if err := validateSkillSourceDiscovery(
+		sourceValue.Discovery,
+		locator,
 	); err != nil {
-		return CreateManagedSkillResponse{}, err
-	}
-	if request.ExpectedArtifactRevision != 0 &&
-		pinned.Revision != request.ExpectedArtifactRevision {
-		return CreateManagedSkillResponse{}, fmt.Errorf(
-			"%w: managed Skill Artifact %q changed since it was read",
-			basespec.ErrConflict,
-			request.ArtifactID,
-		)
-	}
-
-	intent, intentErr := decodeManagedSkillArtifactData(pinned.Data)
-	samePackageIntent := intentErr == nil &&
-		intent.PackageSHA256 == packageSHA256 &&
-		*intent.Enabled == request.Enabled
-
-	if request.ExpectedArtifactRevision == 0 {
-		// Zero is the initial-create token and an idempotent replay token.
-		// The persisted package data is the durable operation marker.
-		if !samePackageIntent ||
-			pinned.Name != artifactName {
-			return CreateManagedSkillResponse{}, fmt.Errorf(
-				"%w: managed Skill Artifact %q already exists with different creation intent",
-				basespec.ErrConflict,
-				request.ArtifactID,
-			)
-		}
-	} else if !samePackageIntent {
-
-		// Persist full package intent before touching source-side storage.
-		// If publication or refresh later fails, this marker permits a retry
-		// using the original Artifact revision.
-		updated, err := a.artifacts.UpdateData(
-			ctx,
-			pinned.Ref(),
-			pinned.Revision,
-			packageData,
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-		pinned = &updated
-	}
-
-	if pinned.Name != artifactName {
-		updated, err := a.artifacts.SetName(
-			ctx,
-			pinned.Ref(),
-			pinned.Revision,
-			artifactName,
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-		pinned = &updated
-	}
-
-	if pinned.Enabled != request.Enabled {
-		updated, err := a.artifacts.SetEnabled(
-			ctx,
-			pinned.Ref(),
-			pinned.Revision,
-			request.Enabled,
-		)
-		if err != nil {
-			return CreateManagedSkillResponse{}, err
-		}
-		pinned = &updated
+		return artifact.Artifact{}, err
 	}
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
 		artifact.PublishArtifactRequest{
-			Artifact:           *pinned,
-			ExpectedDefinition: definitionValue.Digest,
-			Package: source.ManagedPackagePublication{
-				Address: packageAddress,
-				Files:   files,
+			RootID: request.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID: request.SourceID,
+				Locator:  locator,
 			},
-
-			AllowProtected: allowBuiltInAttachment,
+			ExpectedKind:        skillDomain.SkillArtifactKind,
+			ExpectedLogicalName: request.ExpectedLogicalName,
+			ExpectedDefinition:  request.ExpectedDefinition,
+			Package: source.ManagedPackagePublication{
+				Address: request.PackageAddress,
+				Files:   request.PackageFiles,
+			},
+			AllowProtected: true,
 		},
 	)
 	if err != nil {
-		return CreateManagedSkillResponse{}, pending(err)
+		return artifact.Artifact{}, err
 	}
-	if result, complete := managedSkillCreateResult(
-		published.Artifact,
-		sourceValue.ID,
-		skillLocator,
-		definitionValue.Digest,
-		packageSHA256,
-	); complete {
-		if published.Artifact.Name != artifactName ||
-			published.Artifact.Enabled != request.Enabled {
-			return CreateManagedSkillResponse{}, pending(fmt.Errorf(
-				"%w: managed Skill Artifact changed during package publication",
-				basespec.ErrConflict,
-			))
+	value := published.Artifact
+	if value.Enabled != request.Enabled {
+		value, err = a.artifacts.SetEnabled(
+			ctx,
+			value.Ref(),
+			value.Revision,
+			request.Enabled,
+		)
+		if err != nil {
+			return artifact.Artifact{}, err
 		}
-		return result, nil
 	}
-	return CreateManagedSkillResponse{}, pending(
-		fmt.Errorf(
-			"%w: managed package did not resolve to its pinned Artifact",
-			basespec.ErrReferenceUnresolved,
-		),
-	)
+	return value, nil
 }
 
-func (a *API) requireBundleMutation(
+func (a *API) EnsureBuiltInSkillSourceCurrent(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) error {
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return err
+	}
+	if err := a.requireMutable(ctx, rootID, true); err != nil {
+		return err
+	}
+
+	inspection, err := a.discovery.InspectSource(
+		ctx,
+		rootID,
+		sourceID,
+	)
+	if errors.Is(err, basespec.ErrRefreshStateNotFound) {
+		_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if inspection.IsCurrent() {
+		return nil
+	}
+	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
+	return err
+}
+
+func (a *API) requireMutable(
 	ctx context.Context,
 	rootID root.RootID,
 	allowProtected bool,
@@ -2078,7 +602,7 @@ func (a *API) requireBundleMutation(
 	}
 	if !allowProtected {
 		return fmt.Errorf(
-			"%w: protected Root %q may only be changed through a trusted built-in installer or update path",
+			"%w: protected Root %q requires trusted installer access",
 			basespec.ErrProtected,
 			rootID,
 		)
@@ -2086,404 +610,49 @@ func (a *API) requireBundleMutation(
 	return a.protection.RequirePrivilegedInstaller(ctx)
 }
 
-func managedSkillCreateResult(
-	value artifact.Artifact,
-	sourceID source.SourceID,
-	skillLocator basespec.Locator,
-	expectedDefinition cryptoutil.Digest,
-	expectedPackageSHA256 cryptoutil.Digest,
-) (CreateManagedSkillResponse, bool) {
-	intent, err := decodeManagedSkillArtifactData(value.Data)
-	if err != nil ||
-		intent.PackageSHA256 != expectedPackageSHA256 ||
-		value.Adoption != artifact.AdoptionPinned ||
-		value.Binding.SourceID != sourceID ||
-		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind ||
-		value.State != artifact.StateAvailable ||
-		value.ResolvedDefinition == nil ||
-		*value.ResolvedDefinition != expectedDefinition {
-		return CreateManagedSkillResponse{}, false
-	}
-	return CreateManagedSkillResponse{
-		Artifact: value,
-		Address:  value.Address(),
-	}, true
-}
-
-func validateBundleAttachmentTopology(
-	data skillDomain.CollectionData,
-	attachments []collection.Attachment,
+func validateSkillSourceDiscovery(
+	discovery source.DiscoverySpec,
+	locator basespec.Locator,
 ) error {
-	entries := make(
-		[]skillDomain.AttachmentTopologyEntry,
-		0,
-		len(attachments),
-	)
-	for _, attachment := range attachments {
-		entries = append(entries, skillDomain.AttachmentTopologyEntry{
-			SourceID: attachment.SourceID,
-			Role:     attachment.Role,
-		})
-	}
-	return skillDomain.ValidateAttachmentTopology(data, entries)
-}
-
-func requireBundleOwnedManagedSource(
-	bundle skillDomain.SkillBundle,
-	sourceID source.SourceID,
-) error {
-	if bundle.Data.ManagedSourceID == "" ||
-		bundle.Data.ManagedSourceID != sourceID {
+	discovery = discovery.Effective()
+	if discovery.Empty() {
 		return fmt.Errorf(
-			"%w: managed Source %q is not owned by Skill Bundle %q",
-			basespec.ErrConflict,
-			sourceID,
-			bundle.Collection.ID,
+			"%w: Skill Source has no declaration discovery configuration",
+			basespec.ErrRefreshRequired,
 		)
 	}
-	return nil
-}
-
-func (a *API) validateAttachmentDraft(
-	ctx context.Context,
-	rootID root.RootID,
-	draft skillDomain.AttachmentDraft,
-) error {
-	if err := draft.SourceID.Validate(); err != nil {
-		return err
-	}
-	if err := skillDomain.ValidateAttachmentRole(draft.Role); err != nil {
-		return err
-	}
-	if _, err := skillDomain.NewAttachmentData(
-		draft.DiscoveryRoot,
-		draft.ExpectedMemberDigests,
-	); err != nil {
-		return err
-	}
-	value, err := a.sources.Get(ctx, rootID, draft.SourceID)
+	inScope, err := discovery.InScope(locator)
 	if err != nil {
 		return err
 	}
-	return skillDomain.ValidateAttachmentRoleSourceKind(draft.Role, value.Kind)
-}
-
-func (a *API) validateAttachment(
-	ctx context.Context,
-	rootID root.RootID,
-	value collection.Attachment,
-) error {
-	if err := skillDomain.ValidateAttachmentRole(value.Role); err != nil {
-		return err
-	}
-	if _, err := skillDomain.DecodeAttachmentData(value.Data); err != nil {
-		return err
-	}
-	sourceValue, err := a.sources.Get(
-		ctx,
-		rootID,
-		value.SourceID,
-	)
-	if err != nil {
-		return err
-	}
-	return skillDomain.ValidateAttachmentRoleSourceKind(value.Role, sourceValue.Kind)
-}
-
-func managedAttachmentForRole(
-	value skillDomain.SkillBundle,
-	role collection.AttachmentRole,
-) (collection.Attachment, source.Summary, error) {
-	sources := make(map[source.SourceID]source.Summary, len(value.Sources))
-	for _, sourceValue := range value.Sources {
-		sources[sourceValue.ID] = sourceValue
-	}
-
-	var (
-		attachment  collection.Attachment
-		sourceValue source.Summary
-		found       bool
-	)
-	switch role {
-	case artifactbuiltin.ManagedAttachmentRole, artifactbuiltin.BuiltInAttachmentRole:
-	default:
-		return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-			"%w: unsupported managed Skill attachment role %q",
-			basespec.ErrInvalid,
-			role,
-		)
-	}
-	for _, candidate := range value.Attachments {
-		if candidate.Role != role {
-			continue
-		}
-		currentSource, exists := sources[candidate.SourceID]
-		if !exists {
-			return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-				"%w: managed attachment source is unavailable",
-				basespec.ErrAttachmentNotFound,
-			)
-		}
-		if found {
-			return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-				"%w: skill bundle has multiple %q attachments",
-				basespec.ErrConflict,
-				role,
-			)
-		}
-		attachment = candidate
-		sourceValue = currentSource
-		found = true
-	}
-	if !found {
-		return collection.Attachment{}, source.Summary{}, fmt.Errorf(
-			"%w: skill bundle has no %q attachment",
-			basespec.ErrAttachmentNotFound,
-			role,
-		)
-	}
-	return attachment, sourceValue, nil
-}
-
-func bundleAttachmentRole(
-	value skillDomain.SkillBundle,
-	sourceID source.SourceID,
-) (collection.AttachmentRole, error) {
-	for _, attachment := range value.Attachments {
-		if attachment.SourceID == sourceID {
-			return attachment.Role, nil
-		}
-	}
-	return "", fmt.Errorf(
-		"%w: source %q is not attached to bundle %q",
-		basespec.ErrAttachmentNotFound,
-		sourceID,
-		value.Collection.ID,
-	)
-}
-
-func managedSkillPackageAddressOf(
-	binding artifact.SourceBinding,
-) (source.ManagedPackageAddress, error) {
-	if binding.SubresourceLocator != "" {
-		return source.ManagedPackageAddress{}, fmt.Errorf(
-			"%w: managed Skill cannot target a subresource",
-			basespec.ErrInvalid,
-		)
-	}
-	return skillDomain.ManagedPackageAddressFromSkillLocator(binding.Locator)
-}
-
-func normalizeManagedSkillFiles(
-	skillMD []byte,
-	input []source.ManagedPackageFile,
-) ([]source.ManagedPackageFile, []byte, error) {
-	if len(input) == 0 {
-		if len(skillMD) == 0 {
-			return nil, nil, fmt.Errorf(
-				"%w: SKILL.md content is required",
-				basespec.ErrInvalid,
-			)
-		}
-		return []source.ManagedPackageFile{{
-			Locator: artifactbuiltin.AgentSkillDefinitionFileName,
-			Content: append([]byte(nil), skillMD...),
-		}}, append([]byte(nil), skillMD...), nil
-	}
-
-	normalized, err := source.NormalizeManagedPackageFiles(input)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	var found []byte
-	for _, file := range normalized {
-		if file.Locator != artifactbuiltin.AgentSkillDefinitionFileName {
-			continue
-		}
-		found = append([]byte(nil), file.Content...)
-		break
-	}
-	if len(found) == 0 {
-		return nil, nil, fmt.Errorf(
-			"%w: managed skill package must contain %q",
-			basespec.ErrInvalid,
-			artifactbuiltin.AgentSkillDefinitionFileName,
-		)
-	}
-	if len(skillMD) != 0 && !bytes.Equal(skillMD, found) {
-		return nil, nil, fmt.Errorf(
-			"%w: request SKILL.md differs from package SKILL.md",
-			basespec.ErrInvalid,
-		)
-	}
-	return normalized, found, nil
-}
-
-type managedSkillArtifactData struct {
-	PackageSHA256 cryptoutil.Digest `json:"packageSHA256"`
-
-	// Enabled is required durable operation intent. The pointer exists only to
-	// detect a missing JSON field during strict decoding.
-	Enabled *bool `json:"enabled,omitempty"`
-}
-
-func newManagedSkillArtifactData(
-	packageSHA256 cryptoutil.Digest,
-	enabled bool,
-) managedSkillArtifactData {
-	requestedEnabled := enabled
-	return managedSkillArtifactData{
-		PackageSHA256: packageSHA256,
-		Enabled:       &requestedEnabled,
-	}
-}
-
-func encodeManagedSkillArtifactData(
-	value managedSkillArtifactData,
-) (json.RawMessage, error) {
-	if err := validateManagedSkillArtifactData(value); err != nil {
-		return nil, err
-	}
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return nil, err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return json.RawMessage(canonical), nil
-}
-
-func decodeManagedSkillArtifactData(
-	raw json.RawMessage,
-) (managedSkillArtifactData, error) {
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return managedSkillArtifactData{}, err
-	}
-	var value managedSkillArtifactData
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&value); err != nil {
-		return managedSkillArtifactData{}, err
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("managed Skill Artifact data has trailing JSON")
-		}
-		return managedSkillArtifactData{}, err
-	}
-	if err := validateManagedSkillArtifactData(value); err != nil {
-		return managedSkillArtifactData{}, err
-	}
-	return value, nil
-}
-
-func validateManagedSkillArtifactData(
-	value managedSkillArtifactData,
-) error {
-	if err := cryptoutil.ValidateDigest(value.PackageSHA256); err != nil {
-		return err
-	}
-	if value.Enabled == nil {
+	if !inScope {
 		return fmt.Errorf(
-			"%w: managed Skill Artifact data requires enabled",
+			"%w: Skill declaration locator %q is outside Source discovery",
 			basespec.ErrInvalid,
+			locator,
 		)
 	}
-	return nil
-}
-
-func validateManagedSkillOperationIntent(
-	value artifact.Artifact,
-	bundle collection.CollectionRef,
-	artifactID artifact.ArtifactID,
-	sourceID source.SourceID,
-	skillLocator basespec.Locator,
-) error {
-	if value.ID != artifactID ||
-		value.RootID != bundle.RootID ||
-		value.CollectionID != bundle.CollectionID ||
-		value.Kind != artifactbuiltin.AgentSkillArtifactKind ||
-		value.Adoption != artifact.AdoptionPinned ||
-		value.Binding.SourceID != sourceID ||
-		value.Binding.Locator != skillLocator ||
-		value.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind {
-		return fmt.Errorf(
-			"%w: managed Skill Artifact %q conflicts with its existing creation intent",
-			basespec.ErrConflict,
-			artifactID,
-		)
+	if len(discovery.AllowedDecoderIDs) == 0 {
+		return nil
 	}
-
-	return nil
-}
-
-func managedSkillPackageDigest(
-	files []source.ManagedPackageFile,
-) (cryptoutil.Digest, error) {
-	raw, err := json.Marshal(files)
-	if err != nil {
-		return "", err
+	if slices.Contains(discovery.AllowedDecoderIDs, skillDomain.MarkdownDecoderID) {
+		return nil
 	}
-	return cryptoutil.DigestBytes(raw), nil
+	return fmt.Errorf(
+		"%w: Skill Source does not allow decoder %q",
+		basespec.ErrInvalid,
+		skillDomain.MarkdownDecoderID,
+	)
 }
 
-func skillDirectoryStorageKey() basespec.StorageKey {
+func generatedSkillSourceStorageKey() basespec.StorageKey {
 	return basespec.StorageKey(
-		"s" + strings.ReplaceAll(uuidutil.NewUUIDv7(), "-", ""),
+		"skill-" + strings.ReplaceAll(
+			uuidutil.NewUUIDv7(),
+			"-",
+			"",
+		),
 	)
 }
 
-func (a *API) managedSkillByID(
-	ctx context.Context,
-	rootID root.RootID,
-	artifactID artifact.ArtifactID,
-) (*artifact.Artifact, error) {
-	value, err := a.artifacts.Get(ctx, artifact.ArtifactRef{
-		RootID:     rootID,
-		ArtifactID: artifactID,
-	})
-	if errors.Is(err, basespec.ErrArtifactNotFound) {
-		//nolint:nilnil // Explicit.
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-	output := value.Clone()
-	return &output, nil
-}
-
-func pendingManagedSkillCreateError(
-	artifactID artifact.ArtifactID,
-	cause error,
-) error {
-	return fmt.Errorf(
-		"managed Skill create for Artifact %q remains pending; retry with the same artifactID: %w",
-		artifactID,
-		cause,
-	)
-}
-
-func pendingManagedSkillPurgeError(ref artifact.ArtifactRef, cause error) error {
-	return fmt.Errorf(
-		"managed Skill purge for Artifact %q remains pending; reload its current revision before retrying with the same artifactID: %w",
-		ref.ArtifactID,
-		cause,
-	)
-}
-
-func emptyArtifactData() json.RawMessage {
-	return json.RawMessage(jsonutil.EmptyObject)
-}
+var _ BuiltinStore = (*API)(nil)

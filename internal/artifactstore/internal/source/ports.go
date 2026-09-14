@@ -16,6 +16,11 @@ type Reader interface {
 		rootID root.RootID,
 		id source.SourceID,
 	) (source.Source, error)
+
+	List(
+		ctx context.Context,
+		rootID root.RootID,
+	) ([]source.Source, error)
 }
 
 type Repository interface {

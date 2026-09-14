@@ -13,8 +13,8 @@ func TestEngineComposeTruncatesAtUTF8Boundary(t *testing.T) {
 		},
 		[]ContextContribution{{
 			ID:      "context-1",
+			Kind:    "context",
 			Name:    "README.md",
-			Role:    "project-readme",
 			Locator: "README.md",
 			Content: "éé",
 		}},

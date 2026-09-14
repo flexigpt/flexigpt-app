@@ -18,35 +18,58 @@ const (
 
 func (s State) Validate(
 	resolvedDefinition *cryptoutil.Digest,
+	sourceContentDigest *cryptoutil.Digest,
 ) error {
 	if resolvedDefinition != nil {
 		if err := cryptoutil.ValidateDigest(*resolvedDefinition); err != nil {
 			return err
 		}
 	}
+	if sourceContentDigest != nil {
+		if err := cryptoutil.ValidateDigest(*sourceContentDigest); err != nil {
+			return err
+		}
+	}
 
 	switch s {
-	case StateAvailable, StateIncompatible:
-		if resolvedDefinition == nil {
+	case StateAvailable:
+		if resolvedDefinition == nil ||
+			sourceContentDigest == nil {
 			return fmt.Errorf(
-				"%w: artifact state %q requires a resolved definition",
+				"%w: available Artifact requires Definition and source content digests",
 				basespec.ErrInvalid,
-				s,
 			)
 		}
 
-	case StateMissing, StateInvalid:
+	case StateIncompatible:
+		if resolvedDefinition == nil ||
+			sourceContentDigest == nil {
+			return fmt.Errorf(
+				"%w: incompatible Artifact requires observed Definition and source content digests",
+				basespec.ErrInvalid,
+			)
+		}
+
+	case StateMissing:
+		if resolvedDefinition != nil ||
+			sourceContentDigest != nil {
+			return fmt.Errorf(
+				"%w: missing Artifact cannot retain current source state",
+				basespec.ErrInvalid,
+			)
+		}
+
+	case StateInvalid:
 		if resolvedDefinition != nil {
 			return fmt.Errorf(
-				"%w: artifact state %q cannot retain a resolved definition",
+				"%w: invalid Artifact cannot retain a resolved Definition",
 				basespec.ErrInvalid,
-				s,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
-			"%w: invalid artifact state %q",
+			"%w: invalid Artifact state %q",
 			basespec.ErrInvalid,
 			s,
 		)

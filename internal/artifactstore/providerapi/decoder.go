@@ -47,9 +47,9 @@ type Decoded struct {
 
 // Decoder is an Artifact Store inbound content-decoding plugin.
 //
-// Artifact Store owns decoder selection, read limits, content hashing,
-// occurrence state transitions, definition persistence, and catalog
-// publication. The decoder owns format recognition and semantic projection.
+// Artifact Store owns decoder selection, bounded reads, content hashing,
+// source refresh synchronization, Definition persistence, and Artifact
+// lifecycle publication. The decoder owns format recognition and projection.
 type Decoder interface {
 	ID() basespec.DecoderID
 	Revision() string

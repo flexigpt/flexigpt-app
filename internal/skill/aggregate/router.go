@@ -3,127 +3,64 @@ package aggregate
 import (
 	"context"
 	"fmt"
-	"sync"
+	"sort"
+	"strconv"
 
 	"github.com/flexigpt/agentskills-go/provider"
+	"github.com/flexigpt/agentskills-go/provider/fs"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
-type ArtifactReader interface {
-	Get(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (artifact.Artifact, error)
-}
-
-type CollectionReader interface {
-	Get(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (collection.Collection, error)
-}
-
-type ResolvedArtifactSkill struct {
-	Artifact   artifact.ArtifactRef     `json:"artifact"`
-	Collection collection.CollectionRef `json:"collection"`
-	Definition provider.SkillDef        `json:"definition"`
-	Version    string                   `json:"version"`
-}
-
-// ArtifactSkillLoader is implemented by feature adapters. It does not decide
-// ownership from a durable reference shape. ArtifactRouter resolves ownership
-// from the Artifact Record and its current Collection membership first.
-type ArtifactSkillLoader interface {
-	ResolveArtifactSkill(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (ResolvedArtifactSkill, error)
-
-	ListCollectionSkills(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]ResolvedArtifactSkill, error)
-}
-
+// ArtifactRouter is the flat Root-scoped Skill Artifact resolver.
+//
+// It intentionally does not infer Skill ownership from Collection membership.
 type ArtifactRouter struct {
-	artifacts   ArtifactReader
-	collections CollectionReader
-	mu          sync.RWMutex
-	loaders     map[collection.CollectionKind]ArtifactSkillLoader
+	artifacts compositionapi.ArtifactAPI
+	resources compositionapi.ResourceAPI
 }
 
 func NewArtifactRouter(
-	artifacts ArtifactReader,
-	collections CollectionReader,
+	artifacts compositionapi.ArtifactAPI,
+	resources compositionapi.ResourceAPI,
 ) (*ArtifactRouter, error) {
-	if artifacts == nil || collections == nil {
+	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill router dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-
 	return &ArtifactRouter{
-		artifacts:   artifacts,
-		collections: collections,
-		loaders:     map[collection.CollectionKind]ArtifactSkillLoader{},
+		artifacts: artifacts,
+		resources: resources,
 	}, nil
 }
 
-func (r *ArtifactRouter) Register(
-	kind collection.CollectionKind,
-	loader ArtifactSkillLoader,
-) error {
-	if err := kind.Validate(); err != nil {
-		return err
-	}
-	if loader == nil {
-		return fmt.Errorf("%w: Artifact Skill loader is nil", basespec.ErrInvalid)
-	}
-
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.loaders[kind]; exists {
-		return fmt.Errorf(
-			"%w: Artifact Skill loader already registered for collection kind %q",
-			basespec.ErrConflict,
-			kind,
-		)
-	}
-	r.loaders[kind] = loader
-	return nil
-}
-
-// CollectionForArtifact resolves durable ownership without projecting or
-// opening the Skill source. Batch reconciliation can then load the owning
-// Collection once rather than first performing an expensive single-Skill
-// projection.
-func (r *ArtifactRouter) CollectionForArtifact(
+func (r *ArtifactRouter) RootForArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (collection.CollectionRef, error) {
+) (root.RootID, error) {
 	if err := ref.Validate(); err != nil {
-		return collection.CollectionRef{}, err
+		return "", err
 	}
-
-	record, err := r.artifacts.Get(ctx, ref)
+	value, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
-		return collection.CollectionRef{}, err
+		return "", err
 	}
-	collectionRef := collection.CollectionRef{
-		RootID:       record.RootID,
-		CollectionID: record.CollectionID,
+	if !skillDomain.IsSkillKind(value.Kind) {
+		return "", fmt.Errorf(
+			"%w: Artifact %q is not a Skill",
+			basespec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
 	}
-	collectionValue, err := r.collections.Get(ctx, collectionRef)
-	if err != nil {
-		return collection.CollectionRef{}, err
-	}
-	if _, err := r.loader(collectionValue.Kind); err != nil {
-		return collection.CollectionRef{}, err
-	}
-	return collectionRef, nil
+	return value.RootID, nil
 }
 
 func (r *ArtifactRouter) ResolveArtifactSkill(
@@ -133,109 +70,125 @@ func (r *ArtifactRouter) ResolveArtifactSkill(
 	if err := ref.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-
 	record, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	collectionRef := collection.CollectionRef{
-		RootID:       record.RootID,
-		CollectionID: record.CollectionID,
+	return r.resolveRecord(ctx, record)
+}
+
+func (r *ArtifactRouter) ListRootSkills(
+	ctx context.Context,
+	rootID root.RootID,
+) ([]ResolvedArtifactSkill, error) {
+	if err := rootID.Validate(); err != nil {
+		return nil, err
 	}
-	collectionValue, err := r.collections.Get(ctx, collectionRef)
+	records, err := r.artifacts.ListByRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]ResolvedArtifactSkill, 0, len(records))
+	for _, record := range records {
+		if !skillDomain.IsSkillKind(record.Kind) ||
+			!record.Enabled ||
+			record.State != artifact.StateAvailable {
+			continue
+		}
+		value, err := r.resolveRecord(ctx, record)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Definition.Name != output[right].Definition.Name {
+			return output[left].Definition.Name <
+				output[right].Definition.Name
+		}
+		return output[left].Artifact.ArtifactID <
+			output[right].Artifact.ArtifactID
+	})
+	return output, nil
+}
+
+func (r *ArtifactRouter) resolveRecord(
+	ctx context.Context,
+	record artifact.Artifact,
+) (ResolvedArtifactSkill, error) {
+	if !skillDomain.IsSkillKind(record.Kind) ||
+		!record.Enabled ||
+		record.State != artifact.StateAvailable ||
+		record.ResolvedDefinition == nil ||
+		record.SourceContentDigest == nil {
+		return ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: Skill Artifact %q is not enabled and available",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	resolved, err := r.resources.ResolveArtifact(
+		ctx,
+		record.Ref(),
+		resource.ResolveOptions{},
+	)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	loader, err := r.loader(collectionValue.Kind)
+	if resolved.Artifact.Revision != record.Revision ||
+		resolved.Artifact.Binding != record.Binding ||
+		resolved.Definition.Digest != *record.ResolvedDefinition {
+		return ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: Skill Artifact changed during resource resolution",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	if err := skillDomain.ValidateDefinition(resolved.Definition); err != nil {
+		return ResolvedArtifactSkill{}, err
+	}
+
+	packageLocator, err := skillDomain.RuntimePackageLocator(
+		record.Binding.Locator,
+		record.Binding.SubresourceLocator,
+	)
+	if err != nil {
+		return ResolvedArtifactSkill{}, err
+	}
+	location, err := r.resources.ResolveVerifiedLocalPath(
+		ctx,
+		resolved,
+		packageLocator,
+	)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
 
-	value, err := loader.ResolveArtifactSkill(ctx, ref)
-	if err != nil {
-		return ResolvedArtifactSkill{}, err
+	versionInput := string(resolved.Definition.Digest) + "\x00" +
+		string(*record.SourceContentDigest) + "\x00" +
+		resolved.RefreshState.SourceGeneration + "\x00" +
+		strconv.FormatUint(record.Revision, 10)
+	value := ResolvedArtifactSkill{
+		Artifact: record.Ref(),
+		Definition: provider.SkillDef{
+			Type:     fs.Type,
+			Name:     string(resolved.Definition.LogicalName),
+			Location: location,
+		},
+		Version: "artifact-skill:" + string(
+			cryptoutil.DigestBytes([]byte(versionInput)),
+		),
 	}
 	if err := value.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	if value.Artifact != ref || value.Collection != collectionRef {
-		return ResolvedArtifactSkill{}, fmt.Errorf(
-			"%w: feature loader returned a runtime Skill for another Artifact or Collection",
-			basespec.ErrInvalid,
-		)
-	}
 	return value, nil
-}
-
-func (r *ArtifactRouter) ListCollectionSkills(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) ([]ResolvedArtifactSkill, error) {
-	if err := ref.Validate(); err != nil {
-		return nil, err
-	}
-	collectionValue, err := r.collections.Get(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	loader, err := r.loader(collectionValue.Kind)
-	if err != nil {
-		return nil, err
-	}
-
-	values, err := loader.ListCollectionSkills(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[artifact.ArtifactRef]struct{}, len(values))
-	for index, value := range values {
-		if err := value.Validate(); err != nil {
-			return nil, fmt.Errorf("runtime Skill %d: %w", index, err)
-		}
-		if value.Collection != ref {
-			return nil, fmt.Errorf(
-				"%w: feature loader returned a runtime Skill from another Collection",
-				basespec.ErrInvalid,
-			)
-		}
-		record, err := r.artifacts.Get(ctx, value.Artifact)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"read runtime Skill %d Artifact: %w",
-				index,
-				err,
-			)
-		}
-		if record.RootID != ref.RootID || record.CollectionID != ref.CollectionID {
-			return nil, fmt.Errorf(
-				"%w: feature loader returned an Artifact outside the requested Collection",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, duplicate := seen[value.Artifact]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: feature loader returned duplicate runtime Artifact %q",
-				basespec.ErrInvalid,
-				value.Artifact.ArtifactID,
-			)
-		}
-		seen[value.Artifact] = struct{}{}
-	}
-	return values, nil
 }
 
 func (s ResolvedArtifactSkill) Validate() error {
 	if err := s.Artifact.Validate(); err != nil {
 		return err
-	}
-	if err := s.Collection.Validate(); err != nil {
-		return err
-	}
-	if s.Artifact.RootID != s.Collection.RootID {
-		return fmt.Errorf(
-			"%w: skill Artifact and Collection belong to different roots",
-			basespec.ErrInvalid,
-		)
 	}
 	if s.Definition.Type == "" ||
 		s.Definition.Name == "" ||
@@ -252,20 +205,4 @@ func (s ResolvedArtifactSkill) Validate() error {
 		)
 	}
 	return nil
-}
-
-func (r *ArtifactRouter) loader(
-	kind collection.CollectionKind,
-) (ArtifactSkillLoader, error) {
-	r.mu.RLock()
-	loader, exists := r.loaders[kind]
-	r.mu.RUnlock()
-	if !exists {
-		return nil, fmt.Errorf(
-			"%w: no Skill runtime feature adapter owns collection kind %q",
-			basespec.ErrReferenceUnresolved,
-			kind,
-		)
-	}
-	return loader, nil
 }

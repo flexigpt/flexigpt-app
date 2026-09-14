@@ -28,6 +28,11 @@ type Runtime interface {
 		ctx context.Context,
 		value source.Source,
 	) (Snapshot, error)
+
+	List(
+		ctx context.Context,
+		rootID root.RootID,
+	) ([]source.Source, error)
 }
 
 // LocalPathRuntime is an optional extension implemented by the trusted source
@@ -242,7 +247,7 @@ func ReadVerifiedSnapshotEntry(
 }
 
 // VerifySnapshotContentDigest confirms both the Source generation and the
-// exact bytes of one catalogued Source entry through the Source runtime.
+// exact bytes of one refreshed Source entry through the Source runtime.
 //
 // This is intentionally generic Source behavior. It does not parse Skill
 // content, resolve native paths, or apply runtime sandbox policy.
@@ -278,7 +283,7 @@ func VerifySnapshotContentDigest(
 	}
 	if actualDigest != expectedDigest {
 		return fmt.Errorf(
-			"%w: source content for %q changed since catalog publication",
+			"%w: Source content for %q changed since refresh",
 			basespec.ErrConflict,
 			locator,
 		)
@@ -333,6 +338,47 @@ func (r *runtime) Get(
 		return source.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
 	}
 	return value.Clone(), nil
+}
+
+func (r *runtime) List(
+	ctx context.Context,
+	rootID root.RootID,
+) ([]source.Source, error) {
+	if r == nil || r.reader == nil {
+		return nil, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: source runtime context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := rootID.Validate(); err != nil {
+		return nil, err
+	}
+
+	values, err := r.reader.List(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]source.Source, len(values))
+	for index, value := range values {
+		if value.RootID != rootID {
+			return nil, fmt.Errorf(
+				"%w: source reader returned Source %q for another Root",
+				basespec.ErrInvalid,
+				value.ID,
+			)
+		}
+		if err := value.Validate(); err != nil {
+			return nil, err
+		}
+		output[index] = value.Clone()
+	}
+	return output, nil
 }
 
 func (r *runtime) Open(

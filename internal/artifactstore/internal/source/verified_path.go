@@ -24,7 +24,7 @@ type verificationSessionKey struct {
 }
 
 // VerificationSession reuses verified Source snapshots while one caller
-// resolves multiple local paths from the same catalogued Source generation.
+// resolves multiple local paths from the same refreshed Source generation.
 //
 // Snapshot operations are intentionally serialized because Snapshot adapters
 // are not required to support concurrent use.
@@ -303,7 +303,7 @@ func verifySnapshotEntry(
 	}
 	if cryptoutil.DigestBytes(content) != expectedDigest {
 		return fmt.Errorf(
-			"%w: source content for %q changed since catalog publication",
+			"%w: Source content for %q changed since refresh",
 			basespec.ErrConflict,
 			locator,
 		)

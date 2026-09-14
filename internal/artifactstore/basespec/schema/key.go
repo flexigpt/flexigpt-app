@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 )
 
 type (
@@ -24,8 +23,7 @@ func (v SchemaID) Validate() error {
 }
 
 const (
-	EntityCollection EntityType = "collection"
-	EntityArtifact   EntityType = "artifact"
+	EntityArtifact EntityType = "artifact"
 )
 
 type Key struct {
@@ -37,11 +35,6 @@ type Key struct {
 
 func (k Key) Validate() error {
 	switch k.Entity {
-	case EntityCollection:
-		if err := collection.CollectionKind(k.Kind).Validate(); err != nil {
-			return err
-		}
-
 	case EntityArtifact:
 		if err := artifact.ArtifactKind(k.Kind).Validate(); err != nil {
 			return err
@@ -63,19 +56,6 @@ func (k Key) Validate() error {
 		k.SchemaVersion,
 		basespec.MaxVersionBytes,
 	)
-}
-
-func CollectionKey(
-	kind collection.CollectionKind,
-	schemaID SchemaID,
-	schemaVersion string,
-) Key {
-	return Key{
-		Entity:        EntityCollection,
-		Kind:          Kind(kind),
-		SchemaID:      schemaID,
-		SchemaVersion: schemaVersion,
-	}
 }
 
 func ArtifactKey(

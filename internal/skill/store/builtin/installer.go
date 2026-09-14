@@ -7,97 +7,80 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillcollectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
 type InstallerDependencies struct {
-	Skills                 skillConsumerAPI.BuiltinStore
-	SkillRegistry          Registry
-	Packages               fs.FS
-	ShareableCanonicalizer providerapi.ExpectedCanonicalizer
+	Skills        skillConsumerAPI.BuiltinStore
+	SkillRegistry Registry
+	Packages      fs.FS
 }
 
 type Installer struct {
 	skills          skillConsumerAPI.BuiltinStore
 	builtInTopology topology.Declaration
 	hydrated        HydratedRegistry
-	packages        fs.FS
 	packageScopes   []basespec.Locator
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.Skills == nil ||
-		dependencies.Packages == nil ||
-		dependencies.ShareableCanonicalizer == nil {
-		return nil, fmt.Errorf("%w: built-in installer dependencies are incomplete", basespec.ErrInvalid)
-	}
-	builtInTopology := artifactbuiltin.BuiltinTopologyDeclaration()
-	if err := builtInTopology.Validate(); err != nil {
-		return nil, err
+	if dependencies.Skills == nil || dependencies.Packages == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in Skill installer dependencies are incomplete",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := dependencies.SkillRegistry.Validate(); err != nil {
 		return nil, err
 	}
-	if len(builtInTopology.Sources) != 1 ||
-		builtInTopology.Sources[0].Kind != source.SourceKindManagedDirectory {
+
+	topologyValue := artifactbuiltin.BuiltinTopologyDeclaration()
+	if err := topologyValue.Validate(); err != nil {
+		return nil, err
+	}
+	if len(topologyValue.Sources) != 1 ||
+		topologyValue.Sources[0].Kind != source.SourceKindManagedDirectory {
 		return nil, fmt.Errorf(
-			"%w: built-in Source kind must be %q",
+			"%w: built-in Skill Source must be managed",
 			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
 		)
 	}
 	hydrated, err := dependencies.SkillRegistry.Hydrate(
 		context.Background(),
-		dependencies.ShareableCanonicalizer,
 		dependencies.Packages,
 	)
 	if err != nil {
 		return nil, err
 	}
-	packageScopes, err := builtInPackageScopes(hydrated)
+	scopes, err := builtInPackageScopes(hydrated)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Installer{
 		skills:          dependencies.Skills,
-		builtInTopology: builtInTopology,
+		builtInTopology: topologyValue,
 		hydrated:        hydrated,
-		packages:        dependencies.Packages,
-		packageScopes:   packageScopes,
+		packageScopes:   scopes,
 	}, nil
 }
 
 func (*Installer) BuiltInName() string {
-	return artifactbuiltin.AgentSkillBuiltInInstallerName
+	return skillDomain.BuiltInInstallerName
 }
 
-func (i *Installer) BuiltInIDs() []string {
-	if i == nil {
-		return nil
-	}
-	count := 0
-	for _, value := range i.hydrated.Collections {
-		count += 1 + len(value.Artifacts)
-	}
-	output := make([]string, 0, count)
-	for _, value := range i.hydrated.OrderedCollections() {
-		output = append(output, string(value.Registration.ID))
-		for _, artifact := range value.Artifacts {
-			output = append(output, string(artifact.Registration.ID))
-		}
-	}
-	return output
+// BuiltInIDs - Artifact IDs are Store-owned source synchronization identities. The Skill
+// installer has no static Artifact IDs to reserve in BootstrapRegistry.
+func (*Installer) BuiltInIDs() []string {
+	return nil
 }
 
 func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
@@ -107,34 +90,7 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	return append([]basespec.Locator(nil), i.packageScopes...)
 }
 
-// builtInPackageScopes returns managed-source package roots, not embedded
-// source-tree locations. Bootstrap collision checks must use the locations
-// that installers actually publish into the shared managed Source.
-func builtInPackageScopes(
-	registry HydratedRegistry,
-) ([]basespec.Locator, error) {
-	output := make([]basespec.Locator, 0, len(registry.Collections))
-	for _, value := range registry.OrderedCollections() {
-		address, err := BuiltInCollectionPackageAddress(
-			basespec.LogicalName(value.Definition.LogicalName),
-			basespec.LogicalVersion(value.Definition.LogicalVersion),
-		)
-		if err != nil {
-			return nil, err
-		}
-		scope, err := address.Directory()
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, scope)
-	}
-	slices.Sort(output)
-	return output, nil
-}
-
-func (i *Installer) Ensure(
-	ctx context.Context,
-) error {
+func (i *Installer) Ensure(ctx context.Context) error {
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
@@ -144,432 +100,71 @@ func (i *Installer) Ensure(
 func (i *Installer) EnsureBuiltInArtifacts(
 	ctx context.Context,
 ) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	bundles, err := i.EnsureBuiltInBundles(ctx)
-	if err != nil {
-		return err
-	}
-	byCollectionID := make(map[collection.CollectionID]skillDomain.SkillBundle, len(bundles))
-	for _, bundle := range bundles {
-		byCollectionID[bundle.Collection.ID] = bundle
-	}
 
-	for _, value := range i.hydrated.OrderedCollections() {
-		current, exists := byCollectionID[value.Registration.ID]
-		if !exists {
-			return fmt.Errorf(
-				"%w: built-in Collection %q was not created",
-				basespec.ErrInvalid,
-				value.Definition.LogicalName,
-			)
-		}
-		if err := i.rejectDynamicBuiltInArtifacts(ctx, current, value); err != nil {
-			return err
-		}
-		if !current.Collection.Enabled {
-			continue
-		}
-		packageAddress, err := BuiltInCollectionPackageAddress(
-			basespec.LogicalName(value.Definition.LogicalName),
-			basespec.LogicalVersion(value.Definition.LogicalVersion),
-		)
-		if err != nil {
-			return err
-		}
-		files, err := i.packageFiles(
+	for _, value := range i.hydrated.OrderedSkills() {
+		record, err := i.skills.InstallBuiltInSkill(
 			ctx,
-			value.EmbeddedPackageRoot,
-			value.Definition,
-			packageAddress,
-		)
-		if err != nil {
-			return err
-		}
-
-		request := skillConsumerAPI.BuiltInCollectionInstallRequest{
-			Bundle:                     current.Collection.Ref(),
-			ExpectedCollectionRevision: current.Collection.Revision,
-			PackageAddress:             packageAddress,
-			PackageFiles:               files,
-			Skills: make(
-				[]skillDomain.BuiltInCollectionSkill,
-				0,
-				len(value.Artifacts),
-			),
-		}
-		for _, skill := range value.Artifacts {
-			request.Skills = append(request.Skills, skillDomain.BuiltInCollectionSkill{
-				ArtifactID: skill.Registration.ID,
-				Member:     basespec.Locator(skill.Member.Locator),
-				Enabled:    skill.Registration.Enabled,
-			})
-		}
-		installed, err := i.skills.InstallBuiltInCollection(ctx, request)
-		if err != nil {
-			return err
-		}
-		if len(installed) != len(value.Artifacts) {
-			return fmt.Errorf(
-				"%w: built-in Collection %q returned %d Artifacts, expected %d",
-				basespec.ErrInvalid,
-				value.Definition.LogicalName,
-				len(installed),
-				len(value.Artifacts),
-			)
-		}
-		for _, skill := range value.Artifacts {
-			found := false
-			for _, result := range installed {
-				if result.Artifact.ID != skill.Registration.ID {
-					continue
-				}
-				found = result.Artifact.RootID == i.builtInTopology.Root.ID &&
-					result.Artifact.CollectionID == value.Registration.ID
-				break
-			}
-			if !found {
-				return fmt.Errorf(
-					"%w: built-in Skill %q was installed with non-registry identity",
-					basespec.ErrInvalid,
-					skill.SkillDefinition.LogicalName,
-				)
-			}
-		}
-	}
-
-	// Every Collection package publication advances the one shared Source.
-	// Refresh every Collection only after all package writes have completed.
-	for _, value := range i.hydrated.OrderedCollections() {
-		current := byCollectionID[value.Registration.ID]
-		if !current.Collection.Enabled {
-			continue
-		}
-		if err := i.skills.EnsureBuiltInBundleCurrent(
-			ctx,
-			current.Collection.Ref(),
-		); err != nil {
-			return err
-		}
-	}
-
-	return i.ensureBuiltInStateCurrent(ctx)
-}
-
-func (i *Installer) EnsureBuiltInBundles(
-	ctx context.Context,
-) ([]skillDomain.SkillBundle, error) {
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return nil, err
-	}
-	if err := i.rejectDynamicBuiltInBundles(ctx); err != nil {
-		return nil, err
-	}
-
-	output := make([]skillDomain.SkillBundle, 0, len(i.hydrated.Collections))
-	for _, value := range i.hydrated.OrderedCollections() {
-		if value.Definition.Digest == nil {
-			return nil, fmt.Errorf(
-				"%w: hydrated built-in collection has no digest",
-				basespec.ErrInvalid,
-			)
-		}
-		packageAddress, err := BuiltInCollectionPackageAddress(
-			basespec.LogicalName(value.Definition.LogicalName),
-			basespec.LogicalVersion(value.Definition.LogicalVersion),
-		)
-		if err != nil {
-			return nil, err
-		}
-		discoveryRoot, err := packageAddress.Directory()
-		if err != nil {
-			return nil, err
-		}
-		b, err := i.skills.EnsureBuiltInBundleTopology(
-			ctx,
-			skillDomain.BuiltInBundleTopology{
-				RootID:                i.builtInTopology.Root.ID,
-				CollectionID:          value.Registration.ID,
-				SourceID:              i.builtInTopology.Sources[0].ID,
-				LogicalName:           basespec.LogicalName(value.Definition.LogicalName),
-				LogicalVersion:        basespec.LogicalVersion(value.Definition.LogicalVersion),
-				DisplayName:           value.Definition.DisplayName,
-				Description:           value.Definition.Description,
-				Labels:                value.Definition.Labels,
-				Enabled:               value.Registration.Enabled,
-				DiscoveryRoot:         discoveryRoot,
-				ExpectedMemberDigests: value.ExpectedMemberDigests,
+			skillConsumerAPI.BuiltInSkillInstallRequest{
+				RootID:              i.builtInTopology.Root.ID,
+				SourceID:            i.builtInTopology.Sources[0].ID,
+				PackageAddress:      value.PackageAddress,
+				PackageFiles:        value.PackageFiles,
+				ExpectedLogicalName: value.Definition.LogicalName,
+				ExpectedDefinition:  value.Definition.Digest,
+				Enabled:             value.Registration.Enabled,
 			},
 		)
 		if err != nil {
-			return nil, err
-		}
-		output = append(output, b)
-	}
-	return output, nil
-}
-
-func (i *Installer) ensureBuiltInCatalogsCurrent(
-	ctx context.Context,
-) error {
-	for _, value := range i.hydrated.OrderedCollections() {
-		if !value.Registration.Enabled {
-			continue
-		}
-		ref := collection.CollectionRef{
-			RootID:       i.builtInTopology.Root.ID,
-			CollectionID: value.Registration.ID,
-		}
-		if err := i.skills.EnsureBuiltInBundleCurrent(
-			ctx,
-			ref,
-		); err != nil {
 			return fmt.Errorf(
-				"ensure current built-in Collection %q: %w",
-				value.Registration.ID,
+				"install built-in Skill %q: %w",
+				value.Definition.LogicalName,
 				err,
 			)
 		}
-	}
-	return nil
-}
-
-// ensureBuiltInStateCurrent verifies both catalog freshness and the static
-// Artifact records required by the built-in registry. A hydration marker alone
-// cannot prove that a prior interrupted install, manual metadata repair, or
-// older buggy build retained every pinned Artifact.
-func (i *Installer) ensureBuiltInStateCurrent(
-	ctx context.Context,
-) error {
-	if err := i.ensureBuiltInCatalogsCurrent(ctx); err != nil {
-		return err
-	}
-	for _, declared := range i.hydrated.OrderedCollections() {
-		if !declared.Registration.Enabled {
-			continue
-		}
-		if err := i.verifyBuiltInCollectionArtifacts(ctx, declared); err != nil {
+		if err := verifyBuiltInArtifact(record, value); err != nil {
 			return err
 		}
 	}
-	return nil
+
+	return i.FinalizeHydration(ctx)
 }
 
-func (i *Installer) verifyBuiltInCollectionArtifacts(
-	ctx context.Context,
-	declared HydratedCollection,
+func verifyBuiltInArtifact(
+	record artifact.Artifact,
+	expected HydratedSkill,
 ) error {
-	ref := collection.CollectionRef{
-		RootID:       i.builtInTopology.Root.ID,
-		CollectionID: declared.Registration.ID,
-	}
-	records, err := i.skills.ListSkills(ctx, ref)
-	if err != nil {
-		return err
-	}
-
-	address, err := BuiltInCollectionPackageAddress(
-		basespec.LogicalName(declared.Definition.LogicalName),
-		basespec.LogicalVersion(declared.Definition.LogicalVersion),
-	)
-	if err != nil {
-		return err
-	}
-
-	expectedByID := make(
-		map[artifact.ArtifactID]HydratedArtifact,
-		len(declared.Artifacts),
-	)
-	for _, expected := range declared.Artifacts {
-		expectedByID[expected.Registration.ID] = expected
-	}
-	if len(records) != len(expectedByID) {
+	if record.Kind != skillDomain.SkillArtifactKind ||
+		record.LogicalName != expected.Definition.LogicalName ||
+		record.State != artifact.StateAvailable ||
+		record.ResolvedDefinition == nil ||
+		*record.ResolvedDefinition != expected.Definition.Digest ||
+		record.Enabled != expected.Registration.Enabled {
 		return fmt.Errorf(
-			"%w: built-in Collection %q has %d Skill Artifacts, expected %d",
-			basespec.ErrConflict,
-			declared.Definition.LogicalName,
-			len(records),
-			len(expectedByID),
-		)
-	}
-
-	seen := make(map[artifact.ArtifactID]struct{}, len(records))
-	for _, record := range records {
-		expected, found := expectedByID[record.ID]
-		if !found {
-			return fmt.Errorf(
-				"%w: built-in Collection %q contains undeclared Skill Artifact %q",
-				basespec.ErrConflict,
-				declared.Definition.LogicalName,
-				record.ID,
-			)
-		}
-		seen[record.ID] = struct{}{}
-
-		locator, err := address.FileLocator(expected.Registration.Member)
-		if err != nil {
-			return err
-		}
-		expectedName := expected.SkillDefinition.DisplayName
-		if expectedName == "" {
-			expectedName = string(expected.SkillDefinition.LogicalName)
-		}
-
-		if record.RootID != ref.RootID ||
-			record.CollectionID != ref.CollectionID ||
-			record.Kind != artifactbuiltin.AgentSkillArtifactKind ||
-			record.Adoption != artifact.AdoptionPinned ||
-			record.Name != expectedName ||
-			record.Enabled != expected.Registration.Enabled ||
-			record.Binding.SourceID != i.builtInTopology.Sources[0].ID ||
-			record.Binding.Locator != locator ||
-			record.Binding.SubresourceLocator != "" ||
-			record.Binding.ExpectedKind != artifactbuiltin.AgentSkillArtifactKind ||
-			record.State != artifact.StateAvailable ||
-			record.ResolvedDefinition == nil ||
-			*record.ResolvedDefinition != expected.SkillDefinition.Digest {
-			return fmt.Errorf(
-				"%w: built-in Skill Artifact %q does not match its static registry",
-				basespec.ErrReferenceUnresolved,
-				record.ID,
-			)
-		}
-	}
-
-	for artifactID := range expectedByID {
-		if _, found := seen[artifactID]; found {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: built-in Collection %q is missing Skill Artifact %q",
+			"%w: built-in Skill Artifact %q does not match embedded registry",
 			basespec.ErrReferenceUnresolved,
-			declared.Definition.LogicalName,
-			artifactID,
+			record.ID,
 		)
 	}
 	return nil
 }
 
-func (i *Installer) rejectDynamicBuiltInBundles(
-	ctx context.Context,
-) error {
-	bundles, err := i.skills.ListBundles(ctx, i.builtInTopology.Root.ID)
-	if err != nil {
-		return err
-	}
-
-	declared := make(
-		map[basespec.LogicalName]collection.CollectionID,
-		len(i.hydrated.Collections),
-	)
-	for _, value := range i.hydrated.Collections {
-		declared[basespec.LogicalName(value.Definition.LogicalName)] = value.Registration.ID
-	}
-
-	for _, bundle := range bundles {
-		expectedID, builtIn := declared[bundle.Data.LogicalName]
-		if !builtIn {
-			return fmt.Errorf(
-				"%w: undeclared built-in Skill Bundle %q remains installed",
-				basespec.ErrConflict,
-				bundle.Data.LogicalName,
-			)
+func builtInPackageScopes(
+	registry HydratedRegistry,
+) ([]basespec.Locator, error) {
+	output := make([]basespec.Locator, 0, len(registry.Skills))
+	for _, value := range registry.OrderedSkills() {
+		directory, err := value.PackageAddress.Directory()
+		if err != nil {
+			return nil, err
 		}
-		if bundle.Collection.ID == expectedID {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: dynamic Skill Bundle %q conflicts with canonical built-in bundle ID %q",
-			basespec.ErrConflict,
-			bundle.Data.LogicalName,
-			expectedID,
-		)
+		output = append(output, directory)
 	}
-	return nil
-}
-
-func (i *Installer) rejectDynamicBuiltInArtifacts(
-	ctx context.Context,
-	current skillDomain.SkillBundle,
-	declaredCollection HydratedCollection,
-) error {
-	artifacts, err := i.skills.ListSkills(ctx, current.Collection.Ref())
-	if err != nil {
-		return err
-	}
-
-	declared := make(
-		map[artifact.ArtifactID]struct{},
-		len(declaredCollection.Artifacts),
-	)
-	for _, skill := range declaredCollection.Artifacts {
-		declared[skill.Registration.ID] = struct{}{}
-	}
-
-	for _, value := range artifacts {
-		if _, exists := declared[value.ID]; exists {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: dynamic Skill Artifact %q is mixed into canonical built-in bundle %q",
-			basespec.ErrConflict,
-			value.ID,
-			declaredCollection.Definition.LogicalName,
-		)
-	}
-	return nil
-}
-
-func (i *Installer) packageFiles(
-	ctx context.Context,
-	packageRoot basespec.Locator,
-	document skillcollectionv1.SkillCollectionDocument,
-	address source.ManagedPackageAddress,
-) ([]source.ManagedPackageFile, error) {
-	embeddedFiles, err := topology.ReadPackageFiles(
-		ctx,
-		i.packages,
-		packageRoot,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	canonicalDocument, err := document.CanonicalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	files := make([]source.ManagedPackageFile, 0, len(embeddedFiles))
-	foundDocument := false
-	for _, file := range embeddedFiles {
-		content := append([]byte(nil), file.Content...)
-		if file.Locator == artifactbuiltin.SkillCollectionFileName {
-			content = append([]byte(nil), canonicalDocument...)
-			foundDocument = true
-		}
-		files = append(files, source.ManagedPackageFile{
-			Locator: file.Locator,
-			Content: content,
-		})
-	}
-	if !foundDocument {
-		return nil, fmt.Errorf(
-			"%w: built-in package lacks %q",
-			basespec.ErrInvalid,
-			artifactbuiltin.SkillCollectionFileName,
-		)
-	}
-
-	publication, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Address: address,
-			Files:   files,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-	return publication.Files, nil
+	slices.Sort(output)
+	return output, nil
 }

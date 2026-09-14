@@ -4,11 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
@@ -43,7 +41,7 @@ type Dependencies struct {
 	Lifecycle *Lifecycle
 	Servers   *ArtifactServerResolver
 	Source    *RuntimeServerSource
-	Bundles   mcpConsumerAPI.BundleServerStore
+	Store     mcpConsumerAPI.ServerStore
 	Auth      AuthState
 	Secrets   SecretStore
 }
@@ -52,7 +50,7 @@ type Service struct {
 	lifecycle *Lifecycle
 	servers   *ArtifactServerResolver
 	source    *RuntimeServerSource
-	bundles   mcpConsumerAPI.BundleServerStore
+	store     mcpConsumerAPI.ServerStore
 	auth      AuthState
 	secrets   SecretStore
 }
@@ -67,7 +65,7 @@ func NewService(dependencies Dependencies) (*Service, error) {
 	if dependencies.Lifecycle == nil ||
 		dependencies.Servers == nil ||
 		dependencies.Source == nil ||
-		dependencies.Bundles == nil ||
+		dependencies.Store == nil ||
 		dependencies.Auth == nil ||
 		dependencies.Secrets == nil {
 		return nil, errors.New("MCP aggregate dependencies are incomplete")
@@ -77,7 +75,7 @@ func NewService(dependencies Dependencies) (*Service, error) {
 		lifecycle: dependencies.Lifecycle,
 		servers:   dependencies.Servers,
 		source:    dependencies.Source,
-		bundles:   dependencies.Bundles,
+		store:     dependencies.Store,
 		auth:      dependencies.Auth,
 		secrets:   dependencies.Secrets,
 	}, nil
@@ -91,107 +89,6 @@ func (s *Service) InspectRuntimeConfig(
 		return mcpServer.RuntimeConfig{}, mcpDomainServer.Resolved{}, err
 	}
 	return s.source.InspectRuntimeConfig(ctx, ref)
-}
-
-func (s *Service) ReplaceDocument(
-	ctx context.Context,
-	request mcpConsumerAPI.ReplaceDocumentRequest,
-) (mcpConsumerAPI.Bundle, error) {
-	ids, err := s.serverIDsForBundle(ctx, request.Bundle)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	value, err := s.lifecycle.ReplaceDocument(ctx, request)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	s.clearAuthStatuses(ids)
-	return value, nil
-}
-
-func (s *Service) RefreshBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	allowProtected bool,
-) (mcpConsumerAPI.Bundle, error) {
-	ids, err := s.serverIDsForBundle(ctx, ref)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	value, err := s.lifecycle.RefreshBundle(ctx, ref, allowProtected)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	s.clearAuthStatuses(ids)
-	return value, nil
-}
-
-func (s *Service) UpdateBundleEnabled(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-	enabled bool,
-) (mcpConsumerAPI.Bundle, error) {
-	ids, err := s.serverIDsForBundle(ctx, ref)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	value, err := s.lifecycle.UpdateBundleEnabled(ctx, ref, expectedRevision, enabled)
-	if err != nil {
-		return mcpConsumerAPI.Bundle{}, err
-	}
-	s.clearAuthStatuses(ids)
-	return value, nil
-}
-
-func (s *Service) RetireBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) (collection.Collection, error) {
-	ids, err := s.serverIDsForBundle(ctx, ref)
-	if err != nil {
-		return collection.Collection{}, err
-	}
-	value, err := s.lifecycle.RetireBundle(ctx, ref, expectedRevision)
-	if err != nil {
-		return collection.Collection{}, err
-	}
-	s.clearAuthStatuses(ids)
-	return value, nil
-}
-
-func (s *Service) PurgeBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) error {
-	if err := s.ready(); err != nil {
-		return err
-	}
-	return s.lifecycle.PurgeBundle(ctx, ref, expectedRevision)
-}
-
-func (s *Service) UpdateProtectedBundleInstallation(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
-) error {
-	ids, err := s.serverIDsForBundle(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if err := s.lifecycle.UpdateProtectedBundleInstallation(
-		ctx,
-		ref,
-		expectedOverlayRevision,
-		runtimeEnabled,
-	); err != nil {
-		return err
-	}
-	s.clearAuthStatuses(ids)
-	return nil
 }
 
 func (s *Service) UpdateServerInstallation(
@@ -256,7 +153,7 @@ func (s *Service) PutServerSecret(
 		)
 	}
 
-	installation, err := s.bundles.GetServerInstallation(ctx, ref)
+	installation, err := s.store.GetServerInstallation(ctx, ref)
 	if err != nil {
 		return SecretWriteResult{}, err
 	}
@@ -326,7 +223,7 @@ func (s *Service) DeleteServerSecret(
 			mcpAuth.ErrMCPInvalidAuthRequest,
 		)
 	}
-	installation, err := s.bundles.GetServerInstallation(ctx, ref)
+	installation, err := s.store.GetServerInstallation(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -376,40 +273,6 @@ func (s *Service) GetServerAuthHealth(
 	}, nil
 }
 
-func (s *Service) serverIDsForBundle(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) ([]mcpServer.ServerID, error) {
-	if err := s.ready(); err != nil {
-		return nil, err
-	}
-	records, err := s.bundles.ListServers(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	seen := make(map[mcpServer.ServerID]struct{}, len(records))
-	for _, record := range records {
-		serverID, err := RuntimeServerIDForArtifact(record.Ref())
-		if err != nil {
-			return nil, err
-		}
-		seen[serverID] = struct{}{}
-	}
-
-	output := make([]mcpServer.ServerID, 0, len(seen))
-	for serverID := range seen {
-		output = append(output, serverID)
-	}
-	slices.Sort(output)
-	return output, nil
-}
-
-func (s *Service) clearAuthStatuses(ids []mcpServer.ServerID) {
-	for _, id := range ids {
-		s.auth.ClearAuthStatus(id)
-	}
-}
-
 func (s *Service) clearServerAuthStatus(ref artifact.ArtifactRef) {
 	serverID, err := RuntimeServerIDForArtifact(ref)
 	if err == nil {
@@ -422,7 +285,7 @@ func (s *Service) ready() error {
 		s.lifecycle == nil ||
 		s.servers == nil ||
 		s.source == nil ||
-		s.bundles == nil ||
+		s.store == nil ||
 		s.auth == nil ||
 		s.secrets == nil {
 		return mcpServer.ErrClosed

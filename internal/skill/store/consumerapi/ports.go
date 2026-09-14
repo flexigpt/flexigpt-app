@@ -4,42 +4,21 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
-type BundleReader interface {
-	GetBundle(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (skillDomain.SkillBundle, error)
-}
-
+// BuiltinStore is the narrow Skill capability required by the protected
+// built-in installer. It does not expose generic Store mutation internals.
 type BuiltinStore interface {
-	ListBundles(
+	InstallBuiltInSkill(
+		ctx context.Context,
+		request BuiltInSkillInstallRequest,
+	) (artifact.Artifact, error)
+
+	EnsureBuiltInSkillSourceCurrent(
 		ctx context.Context,
 		rootID root.RootID,
-	) ([]skillDomain.SkillBundle, error)
-
-	ListSkills(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]artifact.Artifact, error)
-
-	EnsureBuiltInBundleTopology(
-		ctx context.Context,
-		request skillDomain.BuiltInBundleTopology,
-	) (skillDomain.SkillBundle, error)
-
-	InstallBuiltInCollection(
-		ctx context.Context,
-		request BuiltInCollectionInstallRequest,
-	) ([]CreateManagedSkillResponse, error)
-
-	EnsureBuiltInBundleCurrent(
-		ctx context.Context,
-		ref collection.CollectionRef,
+		sourceID source.SourceID,
 	) error
 }

@@ -42,8 +42,8 @@ func IsSupportedSchemaVersion(version string) bool {
 }
 
 // ArtifactSkillSelection is a durable Agent Skill selection. Ownership is
-// derived from the selected Artifact's current Collection membership by the
-// Artifact-backed runtime router.
+// resolved from the selected Root-scoped Artifact by the Artifact-backed
+// runtime router.
 type ArtifactSkillSelection struct {
 	Artifact          artifact.ArtifactRef `json:"artifact"`
 	PreLoadAsActive   bool                 `json:"preLoadAsActive"`

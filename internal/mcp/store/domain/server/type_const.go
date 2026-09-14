@@ -5,8 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -19,6 +17,9 @@ var placeholderPattern = regexp.MustCompile(
 const (
 	DefaultConnectionTimeoutMS = 30_000
 	MaxConnectionTimeoutMS     = 10 * 60 * 1_000
+
+	TransportLabelKey = "mcp.transport"
+	AuthModeLabelKey  = "mcp.auth-mode"
 )
 
 type ServerType string
@@ -54,7 +55,7 @@ const (
 	InputText   InputKind = "text"
 	InputSecret InputKind = "secret"
 	InputPath   InputKind = "path"
-	//nolint:gosec // Cred enum.
+	//nolint:gosec // Enum.
 	InputOAuthClientCredentials InputKind = "oauthClientCredentials"
 )
 
@@ -106,6 +107,9 @@ type PolicyReference struct {
 	Required bool                 `json:"required"`
 }
 
+// ServerExtension is consumer-specific MCP runtime metadata. It is encoded
+// under the namespaced canonical mcpv1 metadata extension key rather than
+// becoming Artifact Store state.
 type ServerExtension struct {
 	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	DisplayName    string                  `json:"displayName,omitempty"`
@@ -119,12 +123,9 @@ type ServerExtension struct {
 	Policy             *PolicyReference             `json:"policy,omitempty"`
 }
 
+// ServerDocument is the MCP consumer projection of one canonical mcpv1
+// declaration. It is not itself a portable document format.
 type ServerDocument struct {
-	Kind          artifact.ArtifactKind `json:"kind"`
-	SchemaID      schema.SchemaID       `json:"schemaID"`
-	SchemaVersion string                `json:"schemaVersion"`
-	Digest        cryptoutil.Digest     `json:"digest,omitempty"`
-
 	LogicalName    basespec.LogicalName    `json:"logicalName"`
 	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
 	DisplayName    string                  `json:"displayName,omitempty"`
@@ -135,9 +136,6 @@ type ServerDocument struct {
 	Extension ServerExtension `json:"extension"`
 }
 
-// OAuthClientSecretRequired reports whether the declared OAuth client input
-// must contain a confidential-client secret. Client-credentials flow always
-// requires a secret even if a document omitted the explicit declaration flag.
 func (d ServerDocument) OAuthClientSecretRequired() bool {
 	if d.Extension.Auth.Mode == MCPHTTPAuthClientCredentials {
 		return true
@@ -147,14 +145,6 @@ func (d ServerDocument) OAuthClientSecretRequired() bool {
 		d.Extension.Install.Inputs[input].ClientSecretRequired
 }
 
-type ServerDefinitionBody struct {
-	MCPServer CoreServer      `json:"mcpServer"`
-	Extension ServerExtension `json:"extension"`
-}
-
-// MaterializedServer contains only materialized Store document state. It is
-// intentionally not a RuntimeConfig. Aggregate converts this model to the
-// runtime-owned configuration contract.
 type MaterializedServer struct {
 	Core                           CoreServer
 	Auth                           AuthenticationDeclaration
@@ -165,18 +155,16 @@ type MaterializedServer struct {
 }
 
 type Resolved struct {
-	Server               artifact.ArtifactRef     `json:"server"`
-	Collection           collection.CollectionRef `json:"collection"`
-	ArtifactRevision     uint64                   `json:"artifactRevision"`
-	CatalogRevision      uint64                   `json:"catalogRevision"`
-	DefinitionDigest     cryptoutil.Digest        `json:"definitionDigest"`
-	SourceContentDigest  cryptoutil.Digest        `json:"sourceContentDigest"`
-	SourceGeneration     string                   `json:"sourceGeneration"`
-	Document             ServerDocument           `json:"document"`
-	Installation         ServerData               `json:"installation"`
-	Policy               mcpPolicy.Effective      `json:"policy"`
-	InstallationRevision uint64                   `json:"installationRevision"`
-	RuntimeEnabled       bool                     `json:"runtimeEnabled"`
-	BuiltIn              bool                     `json:"builtIn"`
-	Version              cryptoutil.Digest        `json:"version"`
+	Server               artifact.ArtifactRef `json:"server"`
+	ArtifactRevision     uint64               `json:"artifactRevision"`
+	DefinitionDigest     cryptoutil.Digest    `json:"definitionDigest"`
+	SourceContentDigest  cryptoutil.Digest    `json:"sourceContentDigest"`
+	SourceGeneration     string               `json:"sourceGeneration"`
+	Document             ServerDocument       `json:"document"`
+	Installation         ServerData           `json:"installation"`
+	Policy               mcpPolicy.Effective  `json:"policy"`
+	InstallationRevision uint64               `json:"installationRevision"`
+	RuntimeEnabled       bool                 `json:"runtimeEnabled"`
+	BuiltIn              bool                 `json:"builtIn"`
+	Version              cryptoutil.Digest    `json:"version"`
 }

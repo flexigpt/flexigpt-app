@@ -4,13 +4,14 @@ import (
 	"context"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
+// Decoder adapts Agent Skills SKILL.md source packages to generic Skill
+// Artifact Store Definitions.
 type Decoder struct{}
 
 func NewDecoder() *Decoder {
@@ -18,43 +19,48 @@ func NewDecoder() *Decoder {
 }
 
 func (*Decoder) ID() basespec.DecoderID {
-	return artifactbuiltin.AgentSkillDecoderID
+	return skillDomain.MarkdownDecoderID
 }
 
 func (*Decoder) Revision() string {
-	return artifactbuiltin.AgentSkillSchemaVersion
+	return skillDomain.SkillSchemaVersion
 }
 
 func (*Decoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
-	if candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) &&
-		basespec.Locator(path.Base(string(candidate.Locator))) ==
-			artifactbuiltin.AgentSkillDefinitionFileName {
+	if basespec.Locator(path.Base(string(candidate.Locator))) !=
+		skillDomain.SkillDefinitionFileName {
+		return providerapi.RecognitionNone
+	}
+	if candidate.RequestsDecoder(skillDomain.MarkdownDecoderID) {
 		return providerapi.RecognitionPreferred
 	}
-	return providerapi.RecognitionNone
+	return providerapi.RecognitionPossible
 }
 
 func (*Decoder) Decode(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	if !candidate.RequestsDecoder(artifactbuiltin.AgentSkillDecoderID) ||
-		basespec.Locator(path.Base(string(candidate.Locator))) !=
-			artifactbuiltin.AgentSkillDefinitionFileName {
+	if basespec.Locator(path.Base(string(candidate.Locator))) !=
+		skillDomain.SkillDefinitionFileName {
 		return nil, nil
 	}
 
 	parent := path.Dir(string(candidate.Locator))
-	if parent == "." || parent == "/" || parent == "" {
+	if parent == "/" || parent == "" {
 		return nil, nil
+	}
+	expectedName := ""
+	if parent != "." {
+		expectedName = path.Base(parent)
 	}
 
 	value, warnings, err := skillDomain.DecodeSkillDocument(
 		candidate.Content,
-		path.Base(parent),
+		expectedName,
 	)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{
@@ -73,5 +79,7 @@ func (*Decoder) Decode(
 		}
 	}
 
-	return []providerapi.Decoded{{Definition: value}}, warnings
+	return []providerapi.Decoded{{
+		Definition: value,
+	}}, warnings
 }

@@ -6,8 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
@@ -43,55 +42,32 @@ type RemovePackageFunc func(
 	expectedGeneration string,
 ) (SourceState, error)
 
-// ArtifactCommands is the Store-owned Artifact capability required by managed
-// package publication and removal orchestration.
-//
-// The managed-artifact package does not receive repository access or refresh
-// publication access. It can only read the target Artifact and purge it after
-// source-side package removal has been reconciled.
 type ArtifactCommands interface {
 	Get(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (artifact.Artifact, error)
 
-	Purge(
+	FindByOrigin(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-	) error
+		rootID root.RootID,
+		binding artifact.SourceBinding,
+		kind artifact.ArtifactKind,
+	) (artifact.Artifact, error)
 }
 
-// CollectionReader is the Store-owned Collection query capability required by
-// managed package publication and removal orchestration.
-//
-// It permits validation of the target Collection and source attachment. It
-// does not expose repository mutation or catalog-publication capabilities.
-type CollectionReader interface {
-	Get(
+type SourceRunner interface {
+	RefreshSource(
 		ctx context.Context,
-		ref collection.CollectionRef,
-	) (collection.Collection, error)
-
-	GetAttachment(
-		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 		sourceID source.SourceID,
-	) (collection.Attachment, error)
-}
-
-type CollectionRunner interface {
-	RefreshCollection(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (catalog.RefreshCollectionResult, error)
+	) (refresh.RefreshSourceResult, error)
 }
 
 type Dependencies struct {
-	Artifacts   ArtifactCommands
-	Collections CollectionReader
-	Refresh     CollectionRunner
-	Policy      root.RootPolicy
+	Artifacts ArtifactCommands
+	Refresh   SourceRunner
+	Policy    root.RootPolicy
 
 	GetSourceState          GetSourceStateFunc
 	PublishPackage          PublishPackageFunc
@@ -104,9 +80,10 @@ type Service struct {
 	dependencies Dependencies
 }
 
-func NewService(dependencies Dependencies) (*Service, error) {
+func NewService(
+	dependencies Dependencies,
+) (*Service, error) {
 	if dependencies.Artifacts == nil ||
-		dependencies.Collections == nil ||
 		dependencies.Refresh == nil ||
 		dependencies.GetSourceState == nil ||
 		dependencies.PublishPackage == nil ||
@@ -114,129 +91,12 @@ func NewService(dependencies Dependencies) (*Service, error) {
 		dependencies.RemovePackage == nil ||
 		dependencies.RemoveProtectedPackage == nil {
 		return nil, fmt.Errorf(
-			"%w: managed artifact service dependencies are incomplete",
+			"%w: managed Artifact service dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-	return &Service{dependencies: dependencies}, nil
-}
-
-// PublishCollection publishes one complete managed Source package and,
-// when required, refreshes the owning Collection. It does not interpret
-// package content or Artifact kind semantics.
-func (s *Service) PublishCollection(
-	ctx context.Context,
-	request collection.PublishCollectionRequest,
-) (collection.PublishCollectionResult, error) {
-	if s == nil {
-		return collection.PublishCollectionResult{}, basespec.ErrClosed
-	}
-	if err := request.Collection.Validate(); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	if err := request.SourceID.Validate(); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-
-	if err := s.requireMutable(
-		ctx,
-		request.Collection.RootID,
-		request.AllowProtected,
-	); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	if err := s.requireCollectionSource(
-		ctx,
-		request.Collection,
-		request.SourceID,
-		true,
-	); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-
-	publication, err := source.NormalizeManagedPackagePublication(
-		request.Package,
-	)
-	if err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	state, err := s.dependencies.GetSourceState(
-		ctx,
-		request.Collection.RootID,
-		request.SourceID,
-	)
-	if err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	if err := validateManagedSourceState(
-		state,
-		request.Collection.RootID,
-		request.SourceID,
-		true,
-	); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	if state.Source.ID != request.SourceID ||
-		state.Source.RootID != request.Collection.RootID {
-		return collection.PublishCollectionResult{}, fmt.Errorf(
-			"%w: managed source state does not match collection publication",
-			basespec.ErrInvalid,
-		)
-	}
-	if !state.Source.Enabled {
-		return collection.PublishCollectionResult{}, fmt.Errorf(
-			"%w: managed collection source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-	if publication.ExpectedGeneration == "" {
-		publication.ExpectedGeneration = state.Generation
-	}
-
-	publish := s.dependencies.PublishPackage
-	if request.AllowProtected {
-		publish = s.dependencies.PublishProtectedPackage
-	}
-	published, err := publish(
-		ctx,
-		request.Collection.RootID,
-		request.SourceID,
-		state.Source.Revision,
-		publication,
-	)
-	if err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-	if published.Source.ID != request.SourceID ||
-		published.Source.RootID != request.Collection.RootID {
-		return collection.PublishCollectionResult{}, fmt.Errorf(
-			"%w: managed collection publication returned another source",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := validateManagedSourceState(
-		published,
-		request.Collection.RootID,
-		request.SourceID,
-		true,
-	); err != nil {
-		return collection.PublishCollectionResult{}, err
-	}
-
-	changed := published.Source.Revision != state.Source.Revision ||
-		published.Generation != state.Generation
-	if request.ForceRefresh || changed {
-		if _, err := s.dependencies.Refresh.RefreshCollection(
-			ctx,
-			request.Collection,
-		); err != nil {
-			return collection.PublishCollectionResult{}, err
-		}
-	}
-	return collection.PublishCollectionResult{
-		Source:     published.Source,
-		Generation: published.Generation,
-		Refreshed:  request.ForceRefresh || changed,
+	return &Service{
+		dependencies: dependencies,
 	}, nil
 }
 
@@ -244,132 +104,105 @@ func (s *Service) Publish(
 	ctx context.Context,
 	request artifact.PublishArtifactRequest,
 ) (artifact.PublishArtifactResult, error) {
-	if err := s.validatePublishRequest(ctx, request); err != nil {
+	if s == nil {
+		return artifact.PublishArtifactResult{}, basespec.ErrClosed
+	}
+	if err := request.RootID.Validate(); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	normalized, err := source.NormalizeManagedPackagePublication(request.Package)
-	if err != nil {
+	if err := request.Binding.Validate(); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	request.Package = normalized
-
-	current, err := s.dependencies.Artifacts.Get(ctx, request.Artifact.Ref())
-	if err != nil {
+	if err := request.ExpectedKind.Validate(); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	if current.Revision != request.Artifact.Revision ||
-		current.RootID != request.Artifact.RootID ||
-		current.CollectionID != request.Artifact.CollectionID ||
-		current.Binding != request.Artifact.Binding ||
-		current.Adoption != artifact.AdoptionPinned {
-		return artifact.PublishArtifactResult{}, fmt.Errorf(
-			"%w: managed artifact changed before package publication",
-			basespec.ErrConflict,
-		)
+	if err := request.ExpectedLogicalName.Validate(); err != nil {
+		return artifact.PublishArtifactResult{}, err
 	}
-	collectionRef := collection.CollectionRef{
-		RootID:       current.RootID,
-		CollectionID: current.CollectionID,
+	if err := cryptoutil.ValidateDigest(
+		request.ExpectedDefinition,
+	); err != nil {
+		return artifact.PublishArtifactResult{}, err
 	}
-	if err := s.requireCollectionSource(
+	if err := s.requireMutable(
 		ctx,
-		collectionRef,
-		current.Binding.SourceID,
-		true,
+		request.RootID,
+		request.AllowProtected,
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
 
+	publication, err := source.NormalizeManagedPackagePublication(
+		request.Package,
+	)
+	if err != nil {
+		return artifact.PublishArtifactResult{}, err
+	}
 	state, err := s.dependencies.GetSourceState(
 		ctx,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.Binding.SourceID,
 	)
 	if err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
 	if err := validateManagedSourceState(
 		state,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.Binding.SourceID,
 		true,
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	if state.Source.ID != current.Binding.SourceID ||
-		state.Source.RootID != current.RootID {
-		return artifact.PublishArtifactResult{}, fmt.Errorf(
-			"%w: managed source state does not match artifact binding",
-			basespec.ErrInvalid,
-		)
-	}
-
-	publication := request.Package
 	if publication.ExpectedGeneration == "" {
 		publication.ExpectedGeneration = state.Generation
 	}
+
 	publish := s.dependencies.PublishPackage
 	if request.AllowProtected {
 		publish = s.dependencies.PublishProtectedPackage
 	}
 	published, err := publish(
 		ctx,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.Binding.SourceID,
 		state.Source.Revision,
 		publication,
 	)
 	if err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	if published.Source.ID != current.Binding.SourceID ||
-		published.Source.RootID != current.RootID {
-		return artifact.PublishArtifactResult{}, fmt.Errorf(
-			"%w: managed package publication returned another source",
-			basespec.ErrInvalid,
-		)
-	}
 	if err := validateManagedSourceState(
 		published,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.Binding.SourceID,
 		true,
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
 
-	if published.Source.Revision == state.Source.Revision &&
-		published.Generation == state.Generation {
-		resolved, err := s.dependencies.Artifacts.Get(ctx, current.Ref())
-		if err != nil {
-			return artifact.PublishArtifactResult{}, err
-		}
-		if artifactMatchesDefinition(resolved, request.ExpectedDefinition) {
-			return artifact.PublishArtifactResult{
-				Artifact:   resolved,
-				Source:     published.Source,
-				Generation: published.Generation,
-				Refreshed:  false,
-			}, nil
-		}
-	}
-
-	if _, err := s.dependencies.Refresh.RefreshCollection(
+	if _, err := s.dependencies.Refresh.RefreshSource(
 		ctx,
-		collection.CollectionRef{
-			RootID:       current.RootID,
-			CollectionID: current.CollectionID,
-		},
+		request.RootID,
+		request.Binding.SourceID,
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	resolved, err := s.dependencies.Artifacts.Get(ctx, current.Ref())
+	resolved, err := s.dependencies.Artifacts.FindByOrigin(
+		ctx,
+		request.RootID,
+		request.Binding,
+		request.ExpectedKind,
+	)
 	if err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	if !artifactMatchesDefinition(resolved, request.ExpectedDefinition) {
+	if resolved.State != artifact.StateAvailable ||
+		resolved.LogicalName != request.ExpectedLogicalName ||
+		resolved.ResolvedDefinition == nil ||
+		*resolved.ResolvedDefinition != request.ExpectedDefinition {
 		return artifact.PublishArtifactResult{}, fmt.Errorf(
-			"%w: managed package did not resolve to its pinned artifact",
+			"%w: managed package did not resolve to its expected Artifact",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
@@ -385,57 +218,52 @@ func (s *Service) Remove(
 	ctx context.Context,
 	request artifact.RemoveArtifactRequest,
 ) error {
-	if err := s.validateRemoveRequest(ctx, request); err != nil {
+	if s == nil {
+		return basespec.ErrClosed
+	}
+	if err := request.RootID.Validate(); err != nil {
 		return err
 	}
-
-	current, err := s.dependencies.Artifacts.Get(ctx, request.Artifact.Ref())
-	if err != nil {
+	if err := request.SourceID.Validate(); err != nil {
 		return err
 	}
-	if current.Revision != request.Artifact.Revision ||
-		current.Binding != request.Artifact.Binding ||
-		current.Adoption != artifact.AdoptionPinned {
-		return fmt.Errorf(
-			"%w: managed artifact changed before package removal",
-			basespec.ErrConflict,
-		)
+	if err := request.Package.Validate(); err != nil {
+		return err
 	}
-	collectionRef := collection.CollectionRef{
-		RootID:       current.RootID,
-		CollectionID: current.CollectionID,
+	if request.ExpectedArtifact != nil {
+		if err := request.ExpectedArtifact.Validate(); err != nil {
+			return err
+		}
+		if request.ExpectedArtifact.RootID != request.RootID {
+			return fmt.Errorf(
+				"%w: expected Artifact belongs to another Root",
+				basespec.ErrInvalid,
+			)
+		}
 	}
-	if err := s.requireCollectionSource(
+	if err := s.requireMutable(
 		ctx,
-		collectionRef,
-		current.Binding.SourceID,
-		true,
+		request.RootID,
+		request.AllowProtected,
 	); err != nil {
 		return err
 	}
 
 	state, err := s.dependencies.GetSourceState(
 		ctx,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.SourceID,
 	)
 	if err != nil {
 		return err
 	}
 	if err := validateManagedSourceState(
 		state,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.SourceID,
 		false,
 	); err != nil {
 		return err
-	}
-	if state.Source.ID != current.Binding.SourceID ||
-		state.Source.RootID != current.RootID {
-		return fmt.Errorf(
-			"%w: managed source state does not match artifact binding",
-			basespec.ErrInvalid,
-		)
 	}
 	remove := s.dependencies.RemovePackage
 	if request.AllowProtected {
@@ -443,8 +271,8 @@ func (s *Service) Remove(
 	}
 	if _, err := remove(
 		ctx,
-		current.RootID,
-		current.Binding.SourceID,
+		request.RootID,
+		request.SourceID,
 		state.Source.Revision,
 		request.Package,
 		state.Generation,
@@ -452,86 +280,31 @@ func (s *Service) Remove(
 		return err
 	}
 
-	if _, err := s.dependencies.Refresh.RefreshCollection(
+	if _, err := s.dependencies.Refresh.RefreshSource(
 		ctx,
-		collection.CollectionRef{
-			RootID:       current.RootID,
-			CollectionID: current.CollectionID,
-		},
+		request.RootID,
+		request.SourceID,
 	); err != nil {
 		return err
 	}
-
-	resolved, err := s.dependencies.Artifacts.Get(ctx, current.Ref())
+	if request.ExpectedArtifact == nil {
+		return nil
+	}
+	value, err := s.dependencies.Artifacts.Get(
+		ctx,
+		*request.ExpectedArtifact,
+	)
 	if err != nil {
 		return err
 	}
-	if resolved.Binding != current.Binding ||
-		resolved.Adoption != artifact.AdoptionPinned ||
-		resolved.State != artifact.StateMissing {
+	if value.Binding.SourceID != request.SourceID ||
+		value.State != artifact.StateMissing {
 		return fmt.Errorf(
-			"%w: managed package removal did not make Artifact %q missing",
-			basespec.ErrConflict,
-			current.ID,
-		)
-	}
-
-	expectedRevision := current.Revision
-	if current.State != artifact.StateMissing {
-		if expectedRevision == ^uint64(0) {
-			return fmt.Errorf(
-				"%w: managed Artifact revision is exhausted",
-				basespec.ErrInvalid,
-			)
-		}
-		expectedRevision++
-	}
-	if resolved.Revision != expectedRevision {
-		return fmt.Errorf(
-			"%w: managed Artifact changed during package removal",
+			"%w: managed package removal did not make expected Artifact missing",
 			basespec.ErrConflict,
 		)
 	}
-
-	return s.dependencies.Artifacts.Purge(
-		ctx,
-		resolved.Ref(),
-		resolved.Revision,
-	)
-}
-
-func (s *Service) validatePublishRequest(
-	ctx context.Context,
-	request artifact.PublishArtifactRequest,
-) error {
-	if s == nil {
-		return basespec.ErrClosed
-	}
-	if err := request.Artifact.Validate(); err != nil {
-		return err
-	}
-	if err := cryptoutil.ValidateDigest(request.ExpectedDefinition); err != nil {
-		return err
-	}
-
-	return s.requireMutable(ctx, request.Artifact.RootID, request.AllowProtected)
-}
-
-func (s *Service) validateRemoveRequest(
-	ctx context.Context,
-	request artifact.RemoveArtifactRequest,
-) error {
-	if s == nil {
-		return basespec.ErrClosed
-	}
-	if err := request.Artifact.Validate(); err != nil {
-		return err
-	}
-	if err := request.Package.Validate(); err != nil {
-		return err
-	}
-
-	return s.requireMutable(ctx, request.Artifact.RootID, request.AllowProtected)
+	return nil
 }
 
 func (s *Service) requireMutable(
@@ -541,7 +314,7 @@ func (s *Service) requireMutable(
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
-			"%w: managed artifact context is nil",
+			"%w: managed Artifact context is nil",
 			basespec.ErrInvalid,
 		)
 	}
@@ -555,61 +328,17 @@ func (s *Service) requireMutable(
 		if s.dependencies.Policy == nil ||
 			!s.dependencies.Policy.IsProtectedRoot(rootID) {
 			return fmt.Errorf(
-				"%w: managed protected operation requires a protected root",
+				"%w: managed protected operation requires a protected Root",
 				basespec.ErrProtected,
 			)
 		}
 		return installerapi.RequirePrivileged(ctx)
 	}
-	return rootimpl.RequireMutableRoot(ctx, s.dependencies.Policy, rootID)
-}
-
-func (s *Service) requireCollectionSource(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	sourceID source.SourceID,
-	requireEnabled bool,
-) error {
-	value, err := s.dependencies.Collections.Get(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if err := value.Validate(); err != nil {
-		return fmt.Errorf(
-			"%w: collection reader returned an invalid collection: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if requireEnabled && !value.Enabled {
-		return fmt.Errorf(
-			"%w: managed artifact collection %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-	attachment, err := s.dependencies.Collections.GetAttachment(
+	return rootimpl.RequireMutableRoot(
 		ctx,
-		ref,
-		sourceID,
+		s.dependencies.Policy,
+		rootID,
 	)
-	if err != nil {
-		return err
-	}
-	if err := attachment.Validate(); err != nil {
-		return fmt.Errorf(
-			"%w: collection reader returned an invalid attachment: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if requireEnabled && !attachment.Enabled {
-		return fmt.Errorf(
-			"%w: managed artifact source attachment is disabled",
-			basespec.ErrConflict,
-		)
-	}
-	return nil
 }
 
 func validateManagedSourceState(
@@ -619,28 +348,29 @@ func validateManagedSourceState(
 	requireEnabled bool,
 ) error {
 	if err := state.Source.Validate(); err != nil {
-		return fmt.Errorf("%w: managed source state: %w", basespec.ErrInvalid, err)
-	}
-	if state.Source.RootID != rootID || state.Source.ID != sourceID {
 		return fmt.Errorf(
-			"%w: managed source state does not match its requested source",
+			"%w: managed Source state: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if state.Source.RootID != rootID ||
+		state.Source.ID != sourceID {
+		return fmt.Errorf(
+			"%w: managed Source state does not match request",
 			basespec.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateSourceGeneration(state.Generation); err != nil {
+	if err := basespec.ValidateSourceGeneration(
+		state.Generation,
+	); err != nil {
 		return err
 	}
 	if requireEnabled && !state.Source.Enabled {
-		return fmt.Errorf("%w: managed source is disabled", basespec.ErrConflict)
+		return fmt.Errorf(
+			"%w: managed Source is disabled",
+			basespec.ErrConflict,
+		)
 	}
 	return nil
-}
-
-func artifactMatchesDefinition(
-	value artifact.Artifact,
-	expected cryptoutil.Digest,
-) bool {
-	return value.State == artifact.StateAvailable &&
-		value.ResolvedDefinition != nil &&
-		*value.ResolvedDefinition == expected
 }

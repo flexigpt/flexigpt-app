@@ -5,43 +5,42 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strings"
 
-	"github.com/flexigpt/agentskills-go/document"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/skill/store/workspaceadapter"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/artifactadapter"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain/attachmentdata"
+	workspaceProviderAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/providerapi"
 )
 
 type StoreAPI struct {
-	sources     compositionapi.SourceAPI
-	collections compositionapi.CollectionAPI
-	artifacts   compositionapi.ArtifactAPI
-	catalogs    compositionapi.CatalogAPI
-	resources   compositionapi.ResourceAPI
-	workspace   *components
+	sources   compositionapi.SourceAPI
+	discovery compositionapi.DiscoveryAPI
+	artifacts compositionapi.ArtifactAPI
+	resources compositionapi.ResourceAPI
+
+	config         Config
+	contextAdapter *prompt.Adapter
+	skillAdapter   *skill.Adapter
 }
 
 func NewStoreAPI(
 	sources compositionapi.SourceAPI,
-	collections compositionapi.CollectionAPI,
+	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
-	catalogs compositionapi.CatalogAPI,
 	resources compositionapi.ResourceAPI,
 	config Config,
 ) (*StoreAPI, error) {
 	if sources == nil ||
-		collections == nil ||
+		discovery == nil ||
 		artifacts == nil ||
-		catalogs == nil ||
 		resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Store dependencies are incomplete",
@@ -49,747 +48,389 @@ func NewStoreAPI(
 		)
 	}
 	config = config.normalized()
+	if err := config.ContextComposition.Validate(); err != nil {
+		return nil, err
+	}
 
-	workspaceComponents, err := newComponents(
-		sources,
-		collections,
+	contextAdapter, err := prompt.New(
 		artifacts,
 		resources,
-		config,
+		config.ContextComposition,
 	)
+	if err != nil {
+		return nil, err
+	}
+	skillAdapter, err := skill.New(artifacts, resources)
 	if err != nil {
 		return nil, err
 	}
 
 	return &StoreAPI{
-		sources:     sources,
-		collections: collections,
-		artifacts:   artifacts,
-		catalogs:    catalogs,
-		resources:   resources,
-		workspace:   workspaceComponents,
+		sources:        sources,
+		discovery:      discovery,
+		artifacts:      artifacts,
+		resources:      resources,
+		config:         config,
+		contextAdapter: contextAdapter,
+		skillAdapter:   skillAdapter,
 	}, nil
 }
 
-func (a *StoreAPI) GetWorkspace(
+func (a *StoreAPI) RegisterFilesystemSource(
 	ctx context.Context,
-	request *GetWorkspaceRequest,
-) (*GetWorkspaceResponse, error) {
-	if err := RequireRequestBody(
-		request,
-		false,
-		false,
-		"Workspace get",
+	request FilesystemSourceRegistration,
+) (source.Summary, error) {
+	if err := request.RootID.Validate(); err != nil {
+		return source.Summary{}, err
+	}
+	if err := basespec.ValidateRequiredText(
+		"Workspace Source display name",
+		request.SourceDisplayName,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
-		return nil, err
-	}
-	value, err := a.workspace.service.Get(ctx, request.Workspace)
-	if err != nil {
-		return nil, err
-	}
-	view, err := a.workspaceViewForAPI(ctx, value)
-	if err != nil {
-		return nil, err
-	}
-	return &GetWorkspaceResponse{Body: &view}, nil
-}
-
-func (a *StoreAPI) ListWorkspaces(
-	ctx context.Context,
-	request *ListWorkspacesRequest,
-) (*ListWorkspacesResponse, error) {
-	if err := RequireRequestBody(
-		request,
-		false,
-		false,
-		"Workspace list",
-	); err != nil {
-		return nil, err
+		return source.Summary{}, err
 	}
 
-	// Listing follows the same single-Root contract as creation. In
-	// particular, a stale UI cannot enumerate the protected built-in Root.
-	values, err := a.workspace.service.List(ctx, a.workspace.workspaceRootID)
+	discovery, err := a.defaultDiscovery()
 	if err != nil {
-		return nil, err
+		return source.Summary{}, err
 	}
-	output := make([]WorkspaceView, 0, len(values))
-	for _, value := range values {
-		view, err := a.workspaceViewForAPI(ctx, value)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, view)
-	}
-	return &ListWorkspacesResponse{
-		Body: &ListWorkspacesResponseBody{Workspaces: output},
-	}, nil
-}
-
-func (a *StoreAPI) GetWorkspaceCatalog(
-	ctx context.Context,
-	request *GetWorkspaceCatalogRequest,
-) (*GetWorkspaceCatalogResponse, error) {
-	if err := RequireRequestBody(
-		request,
-		false,
-		false,
-		"Workspace catalog get",
-	); err != nil {
-		return nil, err
-	}
-	value, err := a.workspace.query.Catalog(ctx, request.Workspace)
-	if err != nil {
-		return nil, err
-	}
-	output, err := a.workspaceCatalogViewForAPI(ctx, value)
-	if err != nil {
-		return nil, err
-	}
-	return &GetWorkspaceCatalogResponse{Body: &output}, nil
-}
-
-func (a *StoreAPI) GetWorkspaceArtifact(
-	ctx context.Context,
-	request *GetWorkspaceArtifactRequest,
-) (*GetWorkspaceArtifactResponse, error) {
-	if err := RequireRequestBody(
-		request,
-		false,
-		false,
-		"Workspace Artifact get",
-	); err != nil {
-		return nil, err
-	}
-	value, err := a.workspaceArtifact(
-		ctx,
-		request.Workspace,
-		request.Artifact,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := workspaceArtifactViewOf(value)
-	return &GetWorkspaceArtifactResponse{Body: &output}, nil
-}
-
-func (a *StoreAPI) ListWorkspaceArtifacts(
-	ctx context.Context,
-	request *ListWorkspaceArtifactsRequest,
-) (*ListWorkspaceArtifactsResponse, error) {
-	if err := RequireRequestBody(
-		request,
-		false,
-		false,
-		"Workspace Artifact list",
-	); err != nil {
-		return nil, err
-	}
-	if _, err := a.workspace.service.Get(ctx, request.Workspace); err != nil {
-		return nil, err
-	}
-	values, err := a.artifacts.ListByCollection(
-		ctx,
-		request.Workspace,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]WorkspaceArtifactView, 0, len(values))
-	for _, value := range values {
-		output = append(output, workspaceArtifactViewOf(value))
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Name != output[right].Name {
-			return output[left].Name < output[right].Name
-		}
-		return output[left].Artifact.ArtifactID < output[right].Artifact.ArtifactID
+	config, err := json.Marshal(struct {
+		RootPath string `json:"rootPath"`
+	}{
+		RootPath: request.RootPath,
 	})
-	return &ListWorkspaceArtifactsResponse{
-		Body: &ListWorkspaceArtifactsResponseBody{Artifacts: output},
-	}, nil
-}
-
-func (a *StoreAPI) ContextService() ContextService {
-	if a == nil || a.workspace == nil {
-		return nil
-	}
-	return a.workspace.contextService
-}
-
-func (a *StoreAPI) SkillAdapter() *workspaceadapter.Adapter {
-	return a.workspace.skillAdapter
-}
-
-func (a *StoreAPI) SetArtifactRuntimeDisabled(
-	ctx context.Context,
-	workspace workspaceDomain.WorkspaceRef,
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	runtimeDisabled bool,
-) (WorkspaceArtifactView, error) {
-	current, err := a.workspaceArtifact(ctx, workspace, ref)
 	if err != nil {
-		return WorkspaceArtifactView{}, err
+		return source.Summary{}, err
 	}
 
-	artifactData, err := artifactadapter.DecodeArtifactData(current.Data)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	artifactData.RuntimeDisabled = runtimeDisabled
-
-	data, err := artifactadapter.EncodeArtifactData(artifactData)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-
-	value, err := a.artifacts.UpdateData(
+	value, err := a.sources.Create(
 		ctx,
-		ref,
-		expectedRevision,
-		data,
+		request.RootID,
+		source.Draft{
+			ID:          source.SourceID(uuidutil.NewUUIDv7()),
+			StorageKey:  workspaceSourceStorageKey(),
+			Kind:        source.SourceKindFilesystemDirectory,
+			DisplayName: request.SourceDisplayName,
+			Enabled:     true,
+			Config:      config,
+			Discovery:   discovery,
+		},
 	)
 	if err != nil {
-		return WorkspaceArtifactView{}, err
+		return source.Summary{}, err
 	}
-
-	return workspaceArtifactViewOf(value), nil
-}
-
-func (a *StoreAPI) workspaceArtifact(
-	ctx context.Context,
-	workspace collection.CollectionRef,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
-	if _, err := a.workspace.service.Get(ctx, workspace); err != nil {
-		return artifact.Artifact{}, err
-	}
-	value, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if value.RootID != workspace.RootID ||
-		value.CollectionID != workspace.CollectionID {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: Artifact %q does not belong to Workspace %q",
-			workspaceDomain.ErrReferenceUnresolved,
-			ref.ArtifactID,
-			workspace.CollectionID,
-		)
+	if _, err := a.discovery.RefreshSource(
+		ctx,
+		request.RootID,
+		value.ID,
+	); err != nil {
+		return source.Summary{}, err
 	}
 	return value, nil
 }
 
-func (a *StoreAPI) workspaceViewForAPI(
+func (a *StoreAPI) GetWorkspace(
 	ctx context.Context,
-	value workspaceDomain.Workspace,
-) (WorkspaceView, error) {
-	output, err := workspaceViewOf(value)
+	ref WorkspaceRef,
+) (workspaceDomain.Workspace, error) {
+	if err := ref.Validate(); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return WorkspaceView{}, err
+		return workspaceDomain.Workspace{}, err
 	}
-	if err := a.enrichWorkspaceSourcePresentation(ctx, &output, value); err != nil {
-		return WorkspaceView{}, err
+	if record.Kind != workspaceDomain.WorkspaceArtifactKind {
+		return workspaceDomain.Workspace{}, fmt.Errorf(
+			"%w: Artifact %q has kind %q",
+			workspaceDomain.ErrNotWorkspace,
+			record.ID,
+			record.Kind,
+		)
 	}
-	return output, nil
+	value, err := a.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return workspaceDomain.NewWorkspace(record, value)
 }
 
-func (a *StoreAPI) workspaceCatalogViewForAPI(
+func (a *StoreAPI) ListWorkspaces(
 	ctx context.Context,
-	value workspaceDomain.CatalogView,
-) (WorkspaceCatalogView, error) {
-	output, err := workspaceCatalogViewOf(value)
+	rootID root.RootID,
+) ([]workspaceDomain.Workspace, error) {
+	if err := rootID.Validate(); err != nil {
+		return nil, err
+	}
+	values, err := a.artifacts.ListByRoot(ctx, rootID)
 	if err != nil {
-		return WorkspaceCatalogView{}, err
+		return nil, err
 	}
-	if err := a.enrichWorkspaceSourcePresentation(
-		ctx,
-		&output.Workspace,
-		value.Workspace,
-	); err != nil {
-		return WorkspaceCatalogView{}, err
-	}
-	return output, nil
-}
-
-func (a *StoreAPI) enrichWorkspaceSourcePresentation(
-	ctx context.Context,
-	output *WorkspaceView,
-	value workspaceDomain.Workspace,
-) error {
-	for index := range output.Attachments {
-		attachment := &output.Attachments[index]
-		var summaryFound bool
-
-		for _, summary := range value.Sources {
-			if summary.ID != attachment.SourceID {
-				continue
-			}
-			attachment.SourceDisplayName = summary.DisplayName
-			attachment.SourceKind = string(summary.Kind)
-			summaryFound = true
-			break
-		}
-		if !summaryFound {
-			return fmt.Errorf(
-				"%w: Workspace attachment source %q is unavailable",
-				workspaceDomain.ErrInvalidWorkspace,
-				attachment.SourceID,
-			)
-		}
-		sourceKind := source.SourceKind(attachment.SourceKind)
-		if !a.resources.SupportsLocalPath(sourceKind) {
+	output := make([]workspaceDomain.Workspace, 0)
+	for _, value := range values {
+		if value.Kind != workspaceDomain.WorkspaceArtifactKind {
 			continue
 		}
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		pathValue, err := a.resources.ResolveSourceLocalPath(
-			ctx,
-			value.Collection.RootID,
-			attachment.SourceID,
-			".",
-		)
+		workspace, err := a.GetWorkspace(ctx, value.Ref())
 		if err != nil {
-			attachment.Diagnostics = diagnostic.Append(
-				attachment.Diagnostics,
-				workspaceSourcePresentationDiagnostic(
-					"workspace.source.path-unavailable",
-					"the filesystem Source path is currently unavailable",
-				),
-			)
-			continue
+			return nil, err
 		}
-		attachment.Path = pathValue
-		if attachment.SourceID == output.PrimarySourceID {
-			output.PrimaryPath = attachment.Path
+		output = append(output, workspace)
+	}
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Definition.LogicalName !=
+			output[right].Definition.LogicalName {
+			return output[left].Definition.LogicalName <
+				output[right].Definition.LogicalName
 		}
-	}
-	return nil
-}
-
-func workspaceSourcePresentationDiagnostic(
-	code string,
-	message string,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.SeverityWarning,
-		Code:     code,
-		Message:  message,
-	}
-}
-
-func workspaceCatalogViewOf(
-	value workspaceDomain.CatalogView,
-) (WorkspaceCatalogView, error) {
-	workspaceValue, err := workspaceViewOf(value.Workspace)
-	if err != nil {
-		return WorkspaceCatalogView{}, err
-	}
-	output := WorkspaceCatalogView{
-		Workspace:       workspaceValue,
-		CatalogRevision: value.Catalog.Revision,
-		CatalogCurrent:  value.CatalogCurrent,
-		Diagnostics: diagnostic.Append(
-			value.Catalog.Diagnostics,
-			value.FreshnessDiagnostics...,
-		),
-		Resources:             make([]WorkspaceResourceView, 0, len(value.Resources)),
-		Groups:                make([]WorkspaceResourceGroupView, 0, len(value.Groups)),
-		Occurrences:           make([]WorkspaceOccurrenceView, 0, len(value.Catalog.Occurrences)),
-		ValidOccurrences:      make([]WorkspaceOccurrenceView, 0),
-		InvalidOccurrences:    make([]WorkspaceOccurrenceView, 0),
-		MissingOccurrences:    make([]WorkspaceOccurrenceView, 0),
-		UnrecordedOccurrences: make([]WorkspaceOccurrenceView, 0),
-		UnresolvedArtifacts:   make([]WorkspaceArtifactView, 0, len(value.UnresolvedArtifacts)),
-
-		UnrecordedCount:         len(value.Unrecorded),
-		UnresolvedArtifactCount: len(value.UnresolvedArtifacts),
-	}
-	artifactsByOccurrence := make(map[string]artifact.Artifact, len(value.Resources))
-	for _, resourceValue := range value.Resources {
-		artifactView := workspaceArtifactViewOfResource(resourceValue)
-		projected := WorkspaceResourceView{
-			Artifact:         artifactView,
-			DefinitionDigest: resourceValue.Definition.Digest,
-			SourceID:         resourceValue.Source.ID,
-			Locator:          resourceValue.Artifact.Binding.Locator,
-			CatalogCurrent:   resourceValue.CatalogCurrent,
-			ProjectionValid:  resourceValue.ProjectionValid,
-			Diagnostics: diagnostic.Append(
-				artifactView.Diagnostics,
-				resourceValue.Diagnostics...,
-			),
-		}
-		output.Resources = append(output.Resources, projected)
-		artifactsByOccurrence[occurrenceViewKey(
-			resourceValue.Artifact.Binding.SourceID,
-			resourceValue.Artifact.Binding.Locator,
-			resourceValue.Artifact.Binding.SubresourceLocator,
-			resourceValue.Artifact.Kind,
-		)] = resourceValue.Artifact
-	}
-	for _, localArtifact := range value.UnresolvedArtifacts {
-		output.UnresolvedArtifacts = append(
-			output.UnresolvedArtifacts,
-			workspaceArtifactViewOf(localArtifact),
-		)
-		artifactsByOccurrence[occurrenceViewKey(
-			localArtifact.Binding.SourceID,
-			localArtifact.Binding.Locator,
-			localArtifact.Binding.SubresourceLocator,
-			localArtifact.Kind,
-		)] = localArtifact
-	}
-	for _, occurrence := range value.Catalog.Occurrences {
-		projected := workspaceOccurrenceViewOf(
-			occurrence,
-			artifactsByOccurrence,
-		)
-		output.Occurrences = append(output.Occurrences, projected)
-		switch occurrence.State {
-		case catalog.OccurrenceValid:
-			output.ValidOccurrences = append(output.ValidOccurrences, projected)
-		case catalog.OccurrenceInvalid:
-			output.InvalidOccurrences = append(output.InvalidOccurrences, projected)
-		case catalog.OccurrenceMissing:
-			output.MissingOccurrences = append(output.MissingOccurrences, projected)
-		default:
-		}
-		if !projected.Recorded {
-			output.UnrecordedOccurrences = append(
-				output.UnrecordedOccurrences,
-				projected,
-			)
-		}
-	}
-	for _, group := range value.Groups {
-		projected := WorkspaceResourceGroupView{
-			Kind:       group.Kind,
-			Resources:  make([]WorkspaceResourceView, 0, len(group.Resources)),
-			Unrecorded: make([]WorkspaceOccurrenceView, 0, len(group.Unrecorded)),
-		}
-		for _, resourceValue := range group.Resources {
-			artifactView := workspaceArtifactViewOfResource(resourceValue)
-			projected.Resources = append(
-				projected.Resources,
-				WorkspaceResourceView{
-					Artifact:         artifactView,
-					DefinitionDigest: resourceValue.Definition.Digest,
-					SourceID:         resourceValue.Source.ID,
-					Locator:          resourceValue.Artifact.Binding.Locator,
-					CatalogCurrent:   resourceValue.CatalogCurrent,
-					ProjectionValid:  resourceValue.ProjectionValid,
-					Diagnostics: diagnostic.Append(
-						artifactView.Diagnostics,
-						resourceValue.Diagnostics...,
-					),
-				},
-			)
-		}
-		for _, occurrence := range group.Unrecorded {
-			projected.Unrecorded = append(
-				projected.Unrecorded,
-				workspaceOccurrenceViewOf(occurrence, artifactsByOccurrence),
-			)
-		}
-		output.Groups = append(output.Groups, projected)
-	}
+		return output[left].Artifact.ID < output[right].Artifact.ID
+	})
 	return output, nil
 }
 
-func workspaceViewOf(value workspaceDomain.Workspace) (WorkspaceView, error) {
-	output := WorkspaceView{
-		Workspace:       value.Collection.Ref(),
-		Revision:        value.Collection.Revision,
-		DisplayName:     value.Collection.DisplayName,
-		Description:     value.Collection.Description,
-		Enabled:         value.Collection.Enabled,
-		Mode:            value.Mode,
-		PrimarySourceID: value.PrimarySourceID,
-		Discovery:       workspaceDiscoveryOf(value.Data.Discovery),
-		Attachments:     make([]WorkspaceAttachmentView, 0, len(value.Attachments)),
-	}
-
-	for _, attachment := range value.Attachments {
-		settings, err := workspaceAttachmentSettingsOf(attachment.Data)
-		if err != nil {
-			return WorkspaceView{}, err
-		}
-		output.Attachments = append(output.Attachments, WorkspaceAttachmentView{
-			SourceID: attachment.SourceID,
-			Revision: attachment.Revision,
-			Role:     attachment.Role,
-			Enabled:  attachment.Enabled,
-			Settings: settings,
-		})
-	}
-	return output, nil
-}
-
-func workspaceAttachmentSettingsOf(
-	raw json.RawMessage,
-) (WorkspaceAttachmentSettings, error) {
-	value, err := attachmentdata.DecodeAttachmentData(raw)
+func (a *StoreAPI) LoadWorkspace(
+	ctx context.Context,
+	ref WorkspaceRef,
+) (WorkspaceLoad, error) {
+	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
 	if err != nil {
-		return WorkspaceAttachmentSettings{}, fmt.Errorf(
-			"%w: decode workspace attachment settings: %w",
-			workspaceDomain.ErrInvalidWorkspace,
-			err,
-		)
+		return WorkspaceLoad{}, err
 	}
 
-	return WorkspaceAttachmentSettings{
-		Recursive:     cloneBool(value.Recursive),
-		Authoritative: cloneBool(value.Authoritative),
+	roots := make(
+		[]artifactcontract.Entry,
+		len(workspace.Document.Roots),
+	)
+	for index, value := range workspace.Document.Roots {
+		roots[index] = value.Clone()
+	}
+	return WorkspaceLoad{
+		Workspace: workspace,
+		Roots:     roots,
 	}, nil
 }
 
-func workspaceDiscoveryOf(value workspaceDomain.DiscoveryPreferences) WorkspaceDiscovery {
-	output := WorkspaceDiscovery{
-		AdditionalLocators: append(
-			[]basespec.Locator(nil),
-			value.AdditionalLocators...,
-		),
-		IncludeReadme: value.IncludeReadme,
+func (a *StoreAPI) RefreshWorkspace(
+	ctx context.Context,
+	ref WorkspaceRef,
+) (WorkspaceRefresh, error) {
+	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
+	if err != nil {
+		return WorkspaceRefresh{}, err
 	}
-	for _, root := range value.AdditionalRoots {
-		output.AdditionalRoots = append(output.AdditionalRoots, WorkspaceDiscoveryRoot{
-			Root:            root.Root,
-			Recursive:       root.Recursive,
-			IncludePatterns: append([]string(nil), root.IncludePatterns...),
-		})
+	result, err := a.discovery.RefreshRoot(
+		ctx,
+		workspace.Artifact.RootID,
+	)
+	if err != nil {
+		return WorkspaceRefresh{}, err
 	}
-	return output
+	return WorkspaceRefresh{
+		Workspace: ref,
+		Result:    result,
+	}, nil
 }
 
-func workspaceOccurrenceViewOf(
-	value catalog.Occurrence,
-	artifacts map[string]artifact.Artifact,
-) WorkspaceOccurrenceView {
-	output := WorkspaceOccurrenceView{
-		SourceID:            value.Key.SourceID,
-		Locator:             value.Key.Locator,
-		SubresourceLocator:  value.Key.SubresourceLocator,
-		Kind:                value.Kind,
-		LogicalName:         value.LogicalName,
-		LogicalVersion:      value.LogicalVersion,
-		DefinitionDigest:    cryptoutil.CloneDigest(value.DefinitionDigest),
-		SourceContentDigest: cryptoutil.CloneDigest(value.SourceContentDigest),
-		State:               string(value.State),
-		Diagnostics:         diagnostic.Clone(value.Diagnostics),
+func (a *StoreAPI) ListWorkspaceArtifacts(
+	ctx context.Context,
+	workspace WorkspaceRef,
+) ([]artifact.Artifact, error) {
+	value, err := a.GetWorkspace(ctx, workspace)
+	if err != nil {
+		return nil, err
 	}
-	if localArtifact, found := artifacts[occurrenceViewKey(
-		value.Key.SourceID,
-		value.Key.Locator,
-		value.Key.SubresourceLocator,
-		value.Kind,
-	)]; found {
-		artifactRef := localArtifact.Ref()
-		output.Recorded = true
-		output.Artifact = &artifactRef
+	artifacts, err := a.artifacts.ListByRoot(
+		ctx,
+		value.Artifact.RootID,
+	)
+	if err != nil {
+		return nil, err
 	}
-	return output
+	output := make([]artifact.Artifact, len(artifacts))
+	for index, value := range artifacts {
+		output[index] = value.Clone()
+	}
+	return output, nil
 }
 
-func ContextLoadPlanViewOf(
-	value ContextLoadPlan,
-) WorkspaceContextLoadPlan {
-	output := WorkspaceContextLoadPlan{
-		Workspace:       value.Workspace,
-		CatalogRevision: value.CatalogRevision,
-		Prompt:          value.Prompt,
-		Diagnostics:     diagnostic.Clone(value.Diagnostics),
-		Contributions:   make([]WorkspaceContextContribution, 0, len(value.Contributions)),
-		Decisions:       make([]WorkspaceContextDecision, 0, len(value.Decisions)),
-		PromptBytes:     value.PromptBytes,
+func (a *StoreAPI) SetWorkspaceArtifactEnabled(
+	ctx context.Context,
+	workspace WorkspaceRef,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (WorkspaceArtifactView, error) {
+	value, err := a.GetWorkspace(ctx, workspace)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
 	}
-	for _, contribution := range value.Contributions {
-		output.Contributions = append(
-			output.Contributions,
-			ContextContributionViewOf(contribution),
+	if ref.RootID != value.Artifact.RootID {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: Artifact belongs to another Root",
+			workspaceDomain.ErrReferenceUnresolved,
 		)
 	}
-	for _, decision := range value.Decisions {
-		output.Decisions = append(output.Decisions, WorkspaceContextDecision(decision))
+
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
 	}
-	return output
+	if record.Revision != expectedRevision {
+		return WorkspaceArtifactView{}, basespec.ErrConflict
+	}
+
+	updated, err := a.artifacts.SetEnabled(
+		ctx,
+		ref,
+		expectedRevision,
+		enabled,
+	)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	return workspaceArtifactViewOf(updated)
 }
 
-func ContextContributionViewOf(
-	value ContextContribution,
-) WorkspaceContextContribution {
-	return WorkspaceContextContribution{
-		Artifact:         value.Artifact,
-		RecordRevision:   value.ArtifactRevision,
-		DefinitionDigest: value.DefinitionDigest,
-		SourceID:         value.SourceID,
-		Locator:          value.Locator,
-		Name:             value.Name,
-		Role:             value.Role,
-		MediaType:        value.MediaType,
-		Content:          value.Content,
-		ConventionOrder:  value.ConventionOrder,
-		OriginalBytes:    value.OriginalBytes,
-		IncludedBytes:    value.IncludedBytes,
-		Truncated:        value.Truncated,
+func (a *StoreAPI) SetArtifactRuntimeDisabled(
+	ctx context.Context,
+	workspace WorkspaceRef,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	runtimeDisabled bool,
+) (WorkspaceArtifactView, error) {
+	value, err := a.GetWorkspace(ctx, workspace)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
 	}
+	if ref.RootID != value.Artifact.RootID {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: Artifact belongs to another Root",
+			workspaceDomain.ErrReferenceUnresolved,
+		)
+	}
+
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if record.Revision != expectedRevision {
+		return WorkspaceArtifactView{}, basespec.ErrConflict
+	}
+
+	data, err := workspaceDomain.DecodeArtifactData(record.Data)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	data.RuntimeDisabled = runtimeDisabled
+	raw, err := workspaceDomain.EncodeArtifactData(data)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	updated, err := a.artifacts.UpdateData(
+		ctx,
+		ref,
+		expectedRevision,
+		raw,
+	)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	return workspaceArtifactViewOf(updated)
 }
 
-func ContextViewOf(value ContextDocument) WorkspaceContextView {
-	return WorkspaceContextView{
-		Artifact:         value.Artifact,
-		RecordRevision:   value.ArtifactRevision,
-		DefinitionDigest: value.DefinitionDigest,
-		SourceID:         value.SourceID,
-		Locator:          value.Locator,
-		Name:             value.Name,
-		Role:             value.Role,
-		MediaType:        value.MediaType,
-		Enabled:          value.Enabled,
-		State:            value.State,
-		CatalogCurrent:   value.CatalogCurrent,
-		ProjectionValid:  value.ProjectionValid,
-		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      diagnostic.Clone(value.Diagnostics),
+func (a *StoreAPI) ContextAdapter() *prompt.Adapter {
+	if a == nil {
+		return nil
 	}
+	return a.contextAdapter
 }
 
-func WorkspaceSkillLoadViewOf(
-	value workspaceadapter.SkillLoadPlan,
-) WorkspaceSkillLoadView {
-	output := WorkspaceSkillLoadView{
-		Workspace:       value.Workspace,
-		CatalogRevision: value.CatalogRevision,
-		Diagnostics:     diagnostic.Clone(value.Diagnostics),
-		Skills:          make([]WorkspaceSkillView, 0, len(value.Skills)),
+func (a *StoreAPI) SkillAdapter() *skill.Adapter {
+	if a == nil {
+		return nil
 	}
-	for _, skill := range value.Skills {
-		output.Skills = append(output.Skills, WorkspaceSkillViewOf(skill))
-	}
-	return output
+	return a.skillAdapter
 }
 
-func WorkspaceSkillViewOf(value workspaceadapter.WorkspaceSkill) WorkspaceSkillView {
-	summary := WorkspaceSkillSummary{
-		SchemaVersion: value.Skill.SchemaVersion,
-		ID:            value.Skill.ID,
-		Slug:          value.Skill.Slug,
-		Name:          value.Skill.Name,
-		DisplayName:   value.Skill.DisplayName,
-		Description:   value.Skill.Description,
-		Tags:          append([]string(nil), value.Skill.Tags...),
-		Insert:        document.SkillInsert(value.Skill.Insert),
-		IsEnabled:     value.Skill.IsEnabled,
-		CreatedAt:     value.Skill.CreatedAt,
-		ModifiedAt:    value.Skill.ModifiedAt,
-		Arguments:     make([]WorkspaceSkillArgument, 0, len(value.Skill.Arguments)),
+func (a *StoreAPI) defaultDiscovery() (
+	source.DiscoverySpec,
+	error,
+) {
+	value := source.DiscoverySpec{
+		ExplicitLocators: []basespec.Locator{
+			"AGENTS.md",
+			"CLAUDE.md",
+			"README.md",
+			".mcp.json",
+		},
+		DirectoryRoots: []source.DirectoryRoot{
+			{
+				Root:      ".",
+				Recursive: true,
+				IncludePatterns: []string{
+					"**/*.json",
+					"**/*.yaml",
+					"**/*.yml",
+					"**/SKILL.md",
+				},
+			},
+			{
+				Root:      "docs",
+				Recursive: true,
+				IncludePatterns: []string{
+					"**/*.md",
+				},
+			},
+		},
+		DecoderHints: []source.DecoderHint{{
+			Locator:   "docs",
+			Recursive: true,
+			DecoderIDs: []basespec.DecoderID{
+				workspaceProviderAPI.ContextMarkdownDecoderID,
+			},
+		}},
+		Authoritative: true,
 	}
-	for _, argument := range value.Skill.Arguments {
-		summary.Arguments = append(summary.Arguments, WorkspaceSkillArgument{
-			Name:        argument.Name,
-			Description: argument.Description,
-			Default:     argument.Default,
-		})
+	for _, hint := range a.config.AdditionalDecoderHints {
+		value.DecoderHints = append(value.DecoderHints, hint.Clone())
 	}
-	return WorkspaceSkillView{
-		Workspace:        value.Workspace,
-		Artifact:         value.Artifact,
-		DefinitionDigest: value.DefinitionDigest,
-		SourceID:         value.SourceID,
-		Locator:          value.Locator,
-		Skill:            summary,
-		MarkdownBody:     value.MarkdownBody,
-		RecordRevision:   value.ArtifactRevision,
-		State:            value.State,
-		ProjectionValid:  value.ProjectionValid,
-		CatalogCurrent:   value.CatalogCurrent,
-		RuntimeDisabled:  value.RuntimeDisabled,
-		Diagnostics:      diagnostic.Clone(value.Diagnostics),
+	value = value.Normalized()
+	if err := value.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
 	}
+	return value, nil
 }
 
 func workspaceArtifactViewOf(
 	value artifact.Artifact,
-) WorkspaceArtifactView {
-	runtimeDisabled, dataErr := artifactadapter.ArtifactRuntimeDisabled(value)
-	output := workspaceArtifactView(value, runtimeDisabled)
-	if dataErr != nil {
-		output.Diagnostics = diagnostic.Append(
-			output.Diagnostics,
-			workspaceArtifactDataDiagnostic(value),
-		)
-	}
-	return output
-}
-
-func workspaceArtifactViewOfResource(
-	value workspaceDomain.Resource,
-) WorkspaceArtifactView {
-	return workspaceArtifactView(
-		value.Artifact,
-		value.ArtifactData.RuntimeDisabled,
-	)
-}
-
-func workspaceArtifactView(
-	value artifact.Artifact,
-	runtimeDisabled bool,
-) WorkspaceArtifactView {
-	var digest *cryptoutil.Digest
-	if value.ResolvedDefinition != nil {
-		copyValue := *value.ResolvedDefinition
-		digest = &copyValue
+) (WorkspaceArtifactView, error) {
+	data, err := workspaceDomain.DecodeArtifactData(value.Data)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
 	}
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),
 		Revision:           value.Revision,
-		Name:               value.Name,
+		DisplayName:        value.DisplayName,
 		Kind:               value.Kind,
+		LogicalName:        value.LogicalName,
+		LogicalVersion:     value.LogicalVersion,
 		Enabled:            value.Enabled,
 		State:              value.State,
-		Adoption:           value.Adoption,
-		ResolvedDefinition: digest,
 		SourceID:           value.Binding.SourceID,
 		Locator:            value.Binding.Locator,
 		SubresourceLocator: value.Binding.SubresourceLocator,
-		RuntimeDisabled:    runtimeDisabled,
-		Diagnostics:        diagnostic.Clone(value.Diagnostics),
-	}
+		RuntimeDisabled:    data.RuntimeDisabled,
+	}, nil
 }
 
-func workspaceArtifactDataDiagnostic(
-	value artifact.Artifact,
-) diagnostic.Diagnostic {
-	return diagnostic.Diagnostic{
-		Severity: diagnostic.SeverityError,
-		Code:     workspaceDomain.DiagnosticCodeProjectionInvalid,
-		Message:  "the Workspace Artifact has invalid local runtime settings",
-		Location: &diagnostic.Location{
-			Locator:            value.Binding.Locator,
-			SubresourceLocator: value.Binding.SubresourceLocator,
-		},
-	}
-}
-
-func occurrenceViewKey(
-	sourceID source.SourceID,
-	locator basespec.Locator,
-	subresource basespec.SubresourceLocator,
-	kind artifact.ArtifactKind,
-) string {
-	return string(sourceID) + "\x00" +
-		string(locator) + "\x00" +
-		string(subresource) + "\x00" +
-		string(kind)
-}
-
-func cloneBool(value *bool) *bool {
-	if value == nil {
-		return nil
-	}
-	copyValue := *value
-	return &copyValue
+func workspaceSourceStorageKey() basespec.StorageKey {
+	return basespec.StorageKey(
+		"workspace-" + strings.ReplaceAll(
+			uuidutil.NewUUIDv7(),
+			"-",
+			"",
+		),
+	)
 }

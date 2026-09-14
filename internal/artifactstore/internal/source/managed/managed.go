@@ -269,19 +269,7 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if exists && equivalent {
-		return a.confirmedGeneration(ctx, value)
-	}
-
-	if exists && publication.ExpectedGeneration == "" {
-		return "", fmt.Errorf(
-			"%w: replacing managed package %v requires an expected generation",
-			basespec.ErrConflict,
-			publication.Address,
-		)
-	}
-
-	if publication.ExpectedGeneration != "" || exists {
+	if publication.ExpectedGeneration != "" {
 		if err := basespec.ValidateSourceGeneration(
 			publication.ExpectedGeneration,
 		); err != nil {
@@ -293,10 +281,21 @@ func (a *Adapter) PublishPackage(
 		}
 		if current != publication.ExpectedGeneration {
 			return "", fmt.Errorf(
-				"%w: managed Source changed before package publication or replacement",
+				"%w: managed Source changed before package publication",
 				basespec.ErrConflict,
 			)
 		}
+	}
+	if exists && equivalent {
+		return a.confirmedGeneration(ctx, value)
+	}
+
+	if exists && publication.ExpectedGeneration == "" {
+		return "", fmt.Errorf(
+			"%w: replacing managed package %v requires an expected generation",
+			basespec.ErrConflict,
+			publication.Address,
+		)
 	}
 	target, err = managedPackagePath(
 		root,

@@ -14,16 +14,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
-// Store owns the composed Artifact Store and its lifecycle.
-//
-// The entity fields are direct, request-shape-free contracts. Application
-// domains receive only the fields they need.
 type Store struct {
 	Roots            RootAPI
 	Sources          SourceAPI
-	Collections      CollectionAPI
+	Discovery        DiscoveryAPI
 	Artifacts        ArtifactAPI
-	Catalogs         CatalogAPI
 	Resources        ResourceAPI
 	Schemas          SchemaAPI
 	ManagedArtifacts ManagedArtifactAPI
@@ -39,11 +34,16 @@ type protectionAPI struct {
 	policy root.RootPolicy
 }
 
-func (p protectionAPI) IsProtectedRoot(rootID root.RootID) bool {
-	return p.policy != nil && p.policy.IsProtectedRoot(rootID)
+func (p protectionAPI) IsProtectedRoot(
+	rootID root.RootID,
+) bool {
+	return p.policy != nil &&
+		p.policy.IsProtectedRoot(rootID)
 }
 
-func (p protectionAPI) RequirePrivilegedInstaller(ctx context.Context) error {
+func (p protectionAPI) RequirePrivilegedInstaller(
+	ctx context.Context,
+) error {
 	return installerapi.RequirePrivileged(ctx)
 }
 
@@ -76,9 +76,11 @@ func Open(
 		}
 		retainedRootIDs = append(retainedRootIDs, draft.ID)
 	}
-
 	rootPolicy, err := rootimpl.NewSetRootPolicy(
-		append([]root.RootID(nil), config.ProtectedRootIDs...),
+		append(
+			[]root.RootID(nil),
+			config.ProtectedRootIDs...,
+		),
 		retainedRootIDs,
 	)
 	if err != nil {
@@ -103,9 +105,8 @@ func Open(
 	output := &Store{
 		Roots:            components.Roots,
 		Sources:          components.Sources,
-		Collections:      components.Collections,
+		Discovery:        components.Refresh,
 		Artifacts:        components.Artifacts,
-		Catalogs:         components.Refresh,
 		Resources:        components.Resources,
 		Schemas:          components.ShareableSchemas,
 		ManagedArtifacts: components.ManagedArtifacts,
@@ -114,9 +115,6 @@ func Open(
 		},
 		components: components,
 	}
-
-	// Topology is intentionally exposed as the narrow privileged installer
-	// contract instead of requiring callers to retain the complete Store.
 	output.Topology = output
 
 	for _, draft := range config.RetainedRoots {
@@ -129,7 +127,6 @@ func Open(
 			)
 		}
 	}
-
 	return output, nil
 }
 
@@ -167,13 +164,11 @@ func (s *Store) Close() error {
 	if s == nil {
 		return nil
 	}
-
 	s.closeOnce.Do(func() {
 		if s.components != nil {
 			s.closeErr = s.components.Close()
 		}
 		s.components = nil
 	})
-
 	return s.closeErr
 }

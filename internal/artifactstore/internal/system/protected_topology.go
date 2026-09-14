@@ -12,8 +12,8 @@ import (
 )
 
 // EnsureProtectedTopology creates or verifies a declared protected Root and
-// its generic Sources. Feature installers remain responsible for feature
-// Collections, Artifacts, package validation, and package publication.
+// its generic Sources. Feature installers remain responsible for declaration
+// contracts, package validation, package publication, and Source refresh.
 func (c *Components) EnsureProtectedTopology(
 	ctx context.Context,
 	declaration topology.Declaration,
@@ -72,5 +72,6 @@ func protectedSourceIntentMatches(
 		value.StorageKey == draft.StorageKey &&
 		value.Kind == draft.Kind &&
 		value.DisplayName == draft.DisplayName &&
-		value.Enabled == draft.Enabled
+		value.Enabled == draft.Enabled &&
+		value.Discovery.Equal(draft.Discovery)
 }

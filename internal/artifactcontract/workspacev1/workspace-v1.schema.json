@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.flexigpt.dev/artifact/workspace/v1.json",
+  "title": "FlexiGPT Workspace v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type"],
+  "properties": {
+    "$schema": {"type": "string", "minLength": 1, "maxLength": 16384},
+    "apiVersion": {"type": "string", "minLength": 1, "maxLength": 256},
+    "type": {"const": "workspace"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 256},
+    "description": {"type": "string", "maxLength": 16384},
+    "locator": {"$ref": "#/$defs/locator"},
+    "metadata": {
+      "type": "object",
+      "maxProperties": 64,
+      "additionalProperties": true
+    },
+    "declarations": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/declarationSource"}
+    },
+    "roots": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {"$ref": "#/$defs/entry"}
+    }
+  },
+  "$defs": {
+    "locator": {
+      "oneOf": [
+        {"type": "string", "minLength": 1, "maxLength": 16384},
+        {
+          "type": "object",
+          "required": ["kind"],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "entry": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "scan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base", "include"],
+      "properties": {
+        "base": {"$ref": "#/$defs/locator"},
+        "include": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4096,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        },
+        "exclude": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "declarationSource": {
+      "oneOf": [
+        {"$ref": "#/$defs/locator"},
+        {"$ref": "#/$defs/entry"},
+        {"$ref": "#/$defs/scan"}
+      ]
+    }
+  }
+}

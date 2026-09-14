@@ -2,13 +2,13 @@ package artifactimpl
 
 import (
 	"context"
-	"encoding/json"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Reader interface {
@@ -17,65 +17,49 @@ type Reader interface {
 		ref artifact.ArtifactRef,
 	) (artifact.Artifact, error)
 
-	ListByCollection(
+	ListByRoot(
 		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 	) ([]artifact.Artifact, error)
 
-	ListSuppressions(
+	ListBySource(
 		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]artifact.Suppression, error)
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) ([]artifact.Artifact, error)
+
+	FindByIdentity(
+		ctx context.Context,
+		rootID root.RootID,
+		kind artifact.ArtifactKind,
+		logicalName basespec.LogicalName,
+	) ([]artifact.Artifact, error)
+
+	FindByOrigin(
+		ctx context.Context,
+		rootID root.RootID,
+		binding artifact.SourceBinding,
+		kind artifact.ArtifactKind,
+	) (artifact.Artifact, error)
 }
 
 type Repository interface {
 	Reader
 
-	CreateAdopted(
+	Create(
 		ctx context.Context,
 		value artifact.Artifact,
-		expectedCollectionRevision uint64,
-		expectedCatalogRevision uint64,
 	) error
 
-	CreatePinned(
-		ctx context.Context,
-		value artifact.Artifact,
-		expectedCollectionRevision uint64,
-		expectedCatalogRevision uint64,
-	) error
-
-	Update(
+	UpdateLocal(
 		ctx context.Context,
 		value artifact.Artifact,
 		expectedRevision uint64,
 	) error
 
-	Unadopt(
+	UpdateSourceState(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-		suppression *artifact.Suppression,
-	) error
-
-	Suppress(
-		ctx context.Context,
-		value artifact.Suppression,
-		expectedCollectionRevision uint64,
-	) error
-
-	Unsuppress(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		binding artifact.SourceBinding,
-		expectedRevision uint64,
-	) error
-
-	PurgeAndSuppress(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-		suppression artifact.Suppression,
+		value SourceStateUpdate,
 	) error
 
 	Purge(
@@ -85,24 +69,10 @@ type Repository interface {
 	) error
 }
 
-type Draft struct {
-	ID      artifact.ArtifactID
-	Name    string
-	Enabled bool
-	Data    json.RawMessage
-}
-
-type Policy interface {
-	Derive(
+type DefinitionReader interface {
+	GetDefinition(
 		ctx context.Context,
-		value collection.Collection,
-		occurrence catalog.Occurrence,
-		def definition.Definition,
-	) (Draft, bool, []diagnostic.Diagnostic, error)
-}
-
-type Reconciliation struct {
-	Creates     []artifact.Artifact
-	Updates     []SourceStateUpdate
-	Diagnostics []diagnostic.Diagnostic
+		rootID root.RootID,
+		digest cryptoutil.Digest,
+	) (definition.Definition, error)
 }

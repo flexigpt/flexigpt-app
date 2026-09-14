@@ -5,16 +5,12 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-const settingsOverlayPrefix = "mcp.installation.v1/"
+const settingsOverlayPrefix = "mcp.installation.v2/"
 
-// SettingsValueStore is the narrow application-settings port required by MCP
-// installation overlays. The application adapter must persist values through
-// the existing Setting Store and implement compare-and-swap atomically.
 type SettingsValueStore interface {
 	GetMCPInstallationValue(
 		ctx context.Context,
@@ -35,8 +31,6 @@ type SettingsValueStore interface {
 	) error
 }
 
-// SettingsPrefixValueStore is optional. It is used by protected hydration to
-// remove stale installation overlays for a reset protected Root.
 type SettingsPrefixValueStore interface {
 	SettingsValueStore
 
@@ -46,20 +40,11 @@ type SettingsPrefixValueStore interface {
 	) error
 }
 
-// ServerOverlay intentionally stores ServerData as a named nested value.
-// Anonymous embedding would produce two schemaVersion fields at JSON encoding
-// time and causes the embedded ServerData schemaVersion to decode as empty.
 type ServerOverlay struct {
 	SchemaVersion  string                     `json:"schemaVersion"`
 	Revision       uint64                     `json:"revision"`
 	RuntimeEnabled bool                       `json:"runtimeEnabled"`
 	ServerData     mcpDomainServer.ServerData `json:"serverData"`
-}
-
-type BundleOverlay struct {
-	SchemaVersion  string `json:"schemaVersion"`
-	Revision       uint64 `json:"revision"`
-	RuntimeEnabled bool   `json:"runtimeEnabled"`
 }
 
 type OverlayRepository interface {
@@ -68,12 +53,6 @@ type OverlayRepository interface {
 		ref artifact.ArtifactRef,
 	) (ServerOverlay, bool, error)
 
-	GetBundleOverlay(
-		ctx context.Context,
-		rootID root.RootID,
-		collectionID collection.CollectionID,
-	) (BundleOverlay, bool, error)
-
 	PutServerOverlay(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
@@ -81,24 +60,16 @@ type OverlayRepository interface {
 		value ServerOverlay,
 	) error
 
-	PutBundleOverlay(
-		ctx context.Context,
-		rootID root.RootID,
-		collectionID collection.CollectionID,
-		expectedRevision uint64,
-		value BundleOverlay,
-	) error
-
 	DeleteServerOverlay(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 		expectedRevision uint64,
 	) error
+}
 
-	DeleteBundleOverlay(
+type RootPurger interface {
+	PurgeRoot(
 		ctx context.Context,
 		rootID root.RootID,
-		collectionID collection.CollectionID,
-		expectedRevision uint64,
 	) error
 }

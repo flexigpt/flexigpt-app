@@ -3,23 +3,35 @@ package main
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	workspaceAggregate "github.com/flexigpt/flexigpt-app/internal/workspace/aggregate"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
 
 type WorkspaceAggregateWrapper struct {
-	api *workspaceAggregate.AggregateAPI
+	api *workspaceConsumerAPI.StoreAPI
 }
 
 func (w *WorkspaceAggregateWrapper) SetWorkspaceArtifactRuntimeDisabled(
-	request *workspaceConsumerAPI.SetWorkspaceArtifactRuntimeDisabledRequest,
-) (*workspaceConsumerAPI.SetWorkspaceArtifactRuntimeDisabledResponse, error) {
-	ctx := context.Background()
-
+	workspace workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	runtimeDisabled bool,
+) (workspaceConsumerAPI.WorkspaceArtifactView, error) {
 	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.SetWorkspaceArtifactRuntimeDisabledResponse, error) {
-			return w.api.SetWorkspaceArtifactRuntimeDisabled(ctx, request)
+		func() (workspaceConsumerAPI.WorkspaceArtifactView, error) {
+			if w == nil || w.api == nil {
+				return workspaceConsumerAPI.WorkspaceArtifactView{},
+					basespec.ErrClosed
+			}
+			return w.api.SetArtifactRuntimeDisabled(
+				context.Background(),
+				workspace,
+				ref,
+				expectedRevision,
+				runtimeDisabled,
+			)
 		},
 	)
 }

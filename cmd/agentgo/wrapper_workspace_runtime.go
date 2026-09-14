@@ -3,73 +3,63 @@ package main
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	workspaceAggregate "github.com/flexigpt/flexigpt-app/internal/workspace/aggregate"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
 
 type WorkspaceRuntimeWrapper struct {
-	api *workspaceAggregate.RuntimeAPI
+	api *workspaceConsumerAPI.StoreAPI
 }
 
-func (w *WorkspaceRuntimeWrapper) ListWorkspaceContexts(
-	request *workspaceConsumerAPI.ListWorkspaceContextsRequest,
-) (*workspaceConsumerAPI.ListWorkspaceContextsResponse, error) {
-	ctx := context.Background()
-
-	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.ListWorkspaceContextsResponse, error) {
-			return w.api.ListWorkspaceContexts(ctx, request)
-		},
-	)
+func withWorkspaceRuntime[T any](
+	w *WorkspaceRuntimeWrapper,
+	fn func(*workspaceConsumerAPI.StoreAPI) (T, error),
+) (T, error) {
+	return middleware.WithRecoveryResp(func() (T, error) {
+		var zero T
+		if w == nil || w.api == nil {
+			return zero, basespec.ErrClosed
+		}
+		return fn(w.api)
+	})
 }
 
-func (w *WorkspaceRuntimeWrapper) LoadWorkspaceContexts(
-	request *workspaceConsumerAPI.LoadWorkspaceContextsRequest,
-) (*workspaceConsumerAPI.LoadWorkspaceContextsResponse, error) {
-	ctx := context.Background()
-
-	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.LoadWorkspaceContextsResponse, error) {
-			return w.api.LoadWorkspaceContexts(ctx, request)
-		},
-	)
-}
-
-func (w *WorkspaceRuntimeWrapper) ComposeWorkspaceContext(
-	request *workspaceConsumerAPI.ComposeWorkspaceContextRequest,
-) (*workspaceConsumerAPI.ComposeWorkspaceContextResponse, error) {
-	ctx := context.Background()
-
-	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.ComposeWorkspaceContextResponse, error) {
-			return w.api.ComposeWorkspaceContext(ctx, request)
-		},
-	)
+func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
+	workspace workspaceConsumerAPI.WorkspaceRef,
+	artifacts []artifact.ArtifactRef,
+) (prompt.Plan, error) {
+	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (prompt.Plan, error) {
+		return api.ComposeWorkspacePrompt(
+			context.Background(),
+			workspace,
+			artifacts,
+		)
+	})
 }
 
 func (w *WorkspaceRuntimeWrapper) ListWorkspaceSkills(
-	request *workspaceConsumerAPI.ListWorkspaceSkillsRequest,
-) (*workspaceConsumerAPI.ListWorkspaceSkillsResponse, error) {
-	ctx := context.Background()
-
-	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.ListWorkspaceSkillsResponse, error) {
-			return w.api.ListWorkspaceSkills(ctx, request)
-		},
-	)
+	workspace workspaceConsumerAPI.WorkspaceRef,
+) ([]skill.WorkspaceSkill, error) {
+	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) ([]skill.WorkspaceSkill, error) {
+		return api.ListWorkspaceSkills(context.Background(), workspace)
+	})
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
-	request *workspaceConsumerAPI.LoadWorkspaceSkillsRequest,
-) (*workspaceConsumerAPI.LoadWorkspaceSkillsResponse, error) {
-	ctx := context.Background()
-
-	return middleware.WithRecoveryResp(
-		func() (*workspaceConsumerAPI.LoadWorkspaceSkillsResponse, error) {
-			return w.api.LoadWorkspaceSkills(ctx, request)
-		},
-	)
+	workspace workspaceConsumerAPI.WorkspaceRef,
+	artifacts []artifact.ArtifactRef,
+) (skill.LoadPlan, error) {
+	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (skill.LoadPlan, error) {
+		return api.LoadWorkspaceSkills(
+			context.Background(),
+			workspace,
+			artifacts,
+		)
+	})
 }
 
 func (w *WorkspaceRuntimeWrapper) close() {

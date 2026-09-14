@@ -1,167 +1,175 @@
 package builtin
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+	"io/fs"
 	"path"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainBundle "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/bundle"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
 
+// ArtifactRegistration is retained only as application-owned physical package
+// metadata. ID is deliberately ignored. Artifact IDs are Store-owned.
 type ArtifactRegistration struct {
-	ID          artifact.ArtifactID         `json:"id"`
+	ID          string                      `json:"id,omitempty"`
 	Subresource basespec.SubresourceLocator `json:"subresource"`
 	Kind        artifact.ArtifactKind       `json:"kind"`
 	Enabled     bool                        `json:"enabled"`
 }
 
-type BundleRegistration struct {
-	CollectionID            collection.CollectionID `json:"collectionID"`
-	EmbeddedPackageRoot     basespec.Locator        `json:"embeddedPackageRoot"`
-	EmbeddedDocumentLocator basespec.Locator        `json:"embeddedDocumentLocator"`
-	Artifacts               []ArtifactRegistration  `json:"artifacts"`
+// PackageRegistration describes one physical embedded package. The JSON field
+// remains `bundles` so existing embedded package indexes remain readable, but
+// this no longer represents a Store Collection or an mcp.bundle Artifact.
+type PackageRegistration struct {
+	EmbeddedPackageRoot     basespec.Locator       `json:"embeddedPackageRoot"`
+	EmbeddedDocumentLocator basespec.Locator       `json:"embeddedDocumentLocator"`
+	Artifacts               []ArtifactRegistration `json:"artifacts"`
 }
 
 type Registry struct {
-	SchemaVersion string               `json:"schemaVersion"`
-	Bundles       []BundleRegistration `json:"bundles"`
+	SchemaVersion string                `json:"schemaVersion"`
+	Packages      []PackageRegistration `json:"bundles"`
+}
+
+type PreparedPackage struct {
+	Registration   PackageRegistration
+	PackageAddress source.ManagedPackageAddress
+	DocumentFile   basespec.Locator
+	PackageFiles   []source.ManagedPackageFile
+	Expectations   []mcpConsumerAPI.BuiltInArtifactExpectation
+}
+
+func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
+	packages, err := artifactbuiltin.EmbeddedMCPPackages()
+	if err != nil {
+		return Registry{}, nil, err
+	}
+	raw, err := artifactbuiltin.ReadEmbeddedMCPRegistry()
+	if err != nil {
+		return Registry{}, nil, err
+	}
+
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	var registry Registry
+	if err := decoder.Decode(&registry); err != nil {
+		return Registry{}, nil, fmt.Errorf(
+			"decode embedded MCP registry: %w",
+			err,
+		)
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			err = errors.New("embedded MCP registry contains trailing JSON")
+		}
+		return Registry{}, nil, err
+	}
+	if err := registry.Validate(); err != nil {
+		return Registry{}, nil, err
+	}
+	return registry, packages, nil
 }
 
 func (r Registry) Validate() error {
-	if r.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if r.SchemaVersion != "v1" {
 		return fmt.Errorf(
-			"%w: unsupported MCP built-in registry schema %q",
+			"%w: unsupported embedded MCP registry schema %q",
 			basespec.ErrInvalid,
 			r.SchemaVersion,
 		)
 	}
-	if len(r.Bundles) == 0 {
+	if len(r.Packages) == 0 {
 		return fmt.Errorf(
-			"%w: MCP built-in registry has no Bundle registrations",
+			"%w: embedded MCP registry has no package registrations",
 			basespec.ErrInvalid,
 		)
 	}
 
-	collections := make(map[collection.CollectionID]struct{}, len(r.Bundles))
-	artifacts := make(map[artifact.ArtifactID]struct{})
-
-	for index, registered := range r.Bundles {
-		if err := registered.CollectionID.Validate(); err != nil {
-			return fmt.Errorf("bundles[%d]: %w", index, err)
+	roots := make(map[basespec.Locator]struct{}, len(r.Packages))
+	for index, value := range r.Packages {
+		if err := value.EmbeddedPackageRoot.ValidatePortable(false); err != nil {
+			return fmt.Errorf("packages[%d]: %w", index, err)
 		}
-		if err := registered.EmbeddedPackageRoot.ValidatePortable(false); err != nil {
-			return fmt.Errorf("bundles[%d]: %w", index, err)
+		if err := value.EmbeddedDocumentLocator.ValidatePortable(false); err != nil {
+			return fmt.Errorf("packages[%d]: %w", index, err)
 		}
-		if !mcpDomainBundle.IsBundleDocumentLocator(registered.EmbeddedDocumentLocator) {
-			return fmt.Errorf("%w: invalid MCP built-in document locator", basespec.ErrInvalid)
-		}
-		if path.Dir(string(registered.EmbeddedDocumentLocator)) !=
-			string(registered.EmbeddedPackageRoot) {
+		if path.Dir(string(value.EmbeddedDocumentLocator)) !=
+			string(value.EmbeddedPackageRoot) {
 			return fmt.Errorf(
-				"%w: MCP built-in document locator must belong to its package directory",
+				"%w: embedded MCP document must belong to package root",
 				basespec.ErrInvalid,
 			)
 		}
-		if _, duplicate := collections[registered.CollectionID]; duplicate {
+		if _, duplicate := roots[value.EmbeddedPackageRoot]; duplicate {
 			return fmt.Errorf(
-				"%w: duplicate MCP built-in Collection ID %q",
+				"%w: duplicate embedded MCP package root %q",
 				basespec.ErrConflict,
-				registered.CollectionID,
+				value.EmbeddedPackageRoot,
 			)
 		}
-		collections[registered.CollectionID] = struct{}{}
-
-		if len(registered.Artifacts) == 0 {
+		roots[value.EmbeddedPackageRoot] = struct{}{}
+		if len(value.Artifacts) == 0 {
 			return fmt.Errorf(
-				"%w: MCP built-in Bundle %q has no static Artifacts",
+				"%w: MCP package %q has no Artifact registrations",
 				basespec.ErrInvalid,
-				registered.CollectionID,
+				value.EmbeddedPackageRoot,
 			)
 		}
 
 		subresources := make(
 			map[basespec.SubresourceLocator]struct{},
-			len(registered.Artifacts),
+			len(value.Artifacts),
 		)
-		for artifactIndex, value := range registered.Artifacts {
-			if err := value.ID.Validate(); err != nil {
+		for artifactIndex, registration := range value.Artifacts {
+			if err := registration.Subresource.Validate(); err != nil {
 				return fmt.Errorf(
-					"bundles[%d].artifacts[%d]: %w",
+					"packages[%d].artifacts[%d]: %w",
 					index,
 					artifactIndex,
 					err,
 				)
 			}
-			if err := value.Subresource.Validate(); err != nil {
-				return fmt.Errorf(
-					"bundles[%d].artifacts[%d]: %w",
-					index,
-					artifactIndex,
-					err,
-				)
-			}
-			var expectedParent string
-			switch value.Kind {
-			case mcpserverv1.MCPServerKind:
-				expectedParent = string(artifactbuiltin.MCPServerSubresourceDirectory)
-			case mcppolicyv1.MCPPolicyKind:
-				expectedParent = string(artifactbuiltin.MCPPolicySubresourceDirectory)
+			switch registration.Kind {
+			case mcpDomain.MCPArtifactKind,
+				mcpDomain.MCPPolicyArtifactKind:
 			default:
 				return fmt.Errorf(
-					"%w: unsupported MCP built-in Artifact kind %q",
+					"%w: unsupported built-in MCP Artifact kind %q",
 					basespec.ErrInvalid,
-					value.Kind,
+					registration.Kind,
 				)
 			}
-			if path.Dir(string(value.Subresource)) != expectedParent {
+			if _, duplicate := subresources[registration.Subresource]; duplicate {
 				return fmt.Errorf(
-					"%w: MCP built-in subresource %q must be directly below %q",
-					basespec.ErrInvalid,
-					value.Subresource,
-					expectedParent,
-				)
-			}
-			if err := basespec.ValidatePortableName(
-				"MCP built-in subresource name",
-				path.Base(string(value.Subresource)),
-			); err != nil {
-				return fmt.Errorf(
-					"bundles[%d].artifacts[%d]: %w",
-					index,
-					artifactIndex,
-					err,
-				)
-			}
-			if _, duplicate := artifacts[value.ID]; duplicate {
-				return fmt.Errorf(
-					"%w: duplicate MCP built-in Artifact ID %q",
+					"%w: duplicate built-in MCP subresource %q",
 					basespec.ErrConflict,
-					value.ID,
+					registration.Subresource,
 				)
 			}
-			if _, duplicate := subresources[value.Subresource]; duplicate {
-				return fmt.Errorf(
-					"%w: duplicate MCP built-in subresource %q",
-					basespec.ErrConflict,
-					value.Subresource,
-				)
-			}
-			artifacts[value.ID] = struct{}{}
-			subresources[value.Subresource] = struct{}{}
+			subresources[registration.Subresource] = struct{}{}
 		}
 	}
 	return nil
 }
 
-func (r Registry) OrderedBundles() []BundleRegistration {
-	output := append([]BundleRegistration(nil), r.Bundles...)
+func (r Registry) OrderedPackages() []PackageRegistration {
+	output := append([]PackageRegistration(nil), r.Packages...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].EmbeddedPackageRoot <
 			output[right].EmbeddedPackageRoot
@@ -169,15 +177,173 @@ func (r Registry) OrderedBundles() []BundleRegistration {
 	return output
 }
 
-func (r BundleRegistration) ToBundleRegistrations() []mcpConsumerAPI.Registration {
-	output := make([]mcpConsumerAPI.Registration, 0, len(r.Artifacts))
-	for _, value := range r.Artifacts {
-		output = append(output, mcpConsumerAPI.Registration{
-			ArtifactID:  value.ID,
-			Subresource: value.Subresource,
-			Kind:        value.Kind,
-			Enabled:     value.Enabled,
+func PreparePackages(
+	ctx context.Context,
+	registry Registry,
+	packages fs.FS,
+) ([]PreparedPackage, error) {
+	if err := registry.Validate(); err != nil {
+		return nil, err
+	}
+	if packages == nil {
+		return nil, fmt.Errorf(
+			"%w: embedded MCP package filesystem is nil",
+			basespec.ErrInvalid,
+		)
+	}
+
+	output := make([]PreparedPackage, 0, len(registry.Packages))
+	for _, registration := range registry.OrderedPackages() {
+		files, err := topology.ReadPackageFiles(
+			ctx,
+			packages,
+			registration.EmbeddedPackageRoot,
+		)
+		if err != nil {
+			return nil, err
+		}
+		documentFile := basespec.Locator(
+			path.Base(string(registration.EmbeddedDocumentLocator)),
+		)
+		var document []byte
+		for _, file := range files {
+			if file.Locator == documentFile {
+				document = append([]byte(nil), file.Content...)
+				break
+			}
+		}
+		if len(document) == 0 {
+			return nil, fmt.Errorf(
+				"%w: MCP package %q lacks document %q",
+				basespec.ErrInvalid,
+				registration.EmbeddedPackageRoot,
+				documentFile,
+			)
+		}
+
+		decoded, err := sourceformat.DecodeLegacyBundle(document)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode embedded MCP package %q: %w",
+				registration.EmbeddedPackageRoot,
+				err,
+			)
+		}
+		expectations, err := expectedArtifacts(
+			registration,
+			decoded,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		packageName := basespec.LogicalName(
+			path.Base(string(registration.EmbeddedPackageRoot)),
+		)
+		if err := packageName.Validate(); err != nil {
+			return nil, err
+		}
+		address, err := source.NewManagedPackageAddress(
+			mcpDomain.LegacyMCPPackageKind,
+			packageName,
+			artifactbuiltin.UnversionedPackageVersion,
+		)
+		if err != nil {
+			return nil, err
+		}
+		normalized, err := source.NormalizeManagedPackageFiles(files)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, PreparedPackage{
+			Registration:   registration,
+			PackageAddress: address,
+			DocumentFile:   documentFile,
+			PackageFiles:   normalized,
+			Expectations:   expectations,
 		})
 	}
-	return output
+	return output, nil
+}
+
+func expectedArtifacts(
+	registration PackageRegistration,
+	decoded []sourceformat.Decoded,
+) ([]mcpConsumerAPI.BuiltInArtifactExpectation, error) {
+	bySubresource := make(
+		map[basespec.SubresourceLocator]definition.Definition,
+		len(decoded),
+	)
+	for _, value := range decoded {
+		if _, duplicate := bySubresource[value.SubresourceLocator]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate decoded MCP subresource %q",
+				basespec.ErrInvalid,
+				value.SubresourceLocator,
+			)
+		}
+		bySubresource[value.SubresourceLocator] = value.Definition
+	}
+	if len(bySubresource) != len(registration.Artifacts) {
+		return nil, fmt.Errorf(
+			"%w: MCP package registration does not cover decoded Artifacts",
+			basespec.ErrInvalid,
+		)
+	}
+
+	output := make(
+		[]mcpConsumerAPI.BuiltInArtifactExpectation,
+		0,
+		len(registration.Artifacts),
+	)
+	for _, registered := range registration.Artifacts {
+		value, found := bySubresource[registered.Subresource]
+		if !found || value.Kind != registered.Kind {
+			return nil, fmt.Errorf(
+				"%w: MCP package registration does not match %q",
+				basespec.ErrInvalid,
+				registered.Subresource,
+			)
+		}
+		output = append(output, mcpConsumerAPI.BuiltInArtifactExpectation{
+			Subresource:      registered.Subresource,
+			Kind:             registered.Kind,
+			LogicalName:      value.LogicalName,
+			DefinitionDigest: value.Digest,
+			Enabled:          registered.Enabled,
+		})
+	}
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Subresource < output[right].Subresource
+	})
+	return output, nil
+}
+
+func PackageFingerprint(
+	value PreparedPackage,
+) (cryptoutil.Digest, error) {
+	type file struct {
+		Locator basespec.Locator  `json:"locator"`
+		Digest  cryptoutil.Digest `json:"digest"`
+		Size    int64             `json:"size"`
+	}
+	files := make([]file, 0, len(value.PackageFiles))
+	for _, item := range value.PackageFiles {
+		files = append(files, file{
+			Locator: item.Locator,
+			Digest:  cryptoutil.DigestBytes(item.Content),
+			Size:    int64(len(item.Content)),
+		})
+	}
+	return cryptoutil.CanonicalDigest(struct {
+		Address      source.ManagedPackageAddress                `json:"address"`
+		DocumentFile basespec.Locator                            `json:"documentFile"`
+		Expectations []mcpConsumerAPI.BuiltInArtifactExpectation `json:"expectations"`
+		Files        []file                                      `json:"files"`
+	}{
+		Address:      value.PackageAddress,
+		DocumentFile: value.DocumentFile,
+		Expectations: value.Expectations,
+		Files:        files,
+	})
 }

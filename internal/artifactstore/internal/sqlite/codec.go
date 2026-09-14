@@ -84,30 +84,23 @@ func sqliteError(err error) error {
 		return fmt.Errorf("%w: metadata already exists", basespec.ErrConflict)
 	case strings.Contains(
 		message,
-		"artifact attachment requires active source and collection",
+		"artifact record requires active source",
 	):
-		return fmt.Errorf("%w: source or collection is no longer active", basespec.ErrConflict)
-	case strings.Contains(
-		message,
-		"artifact enabled attachment requires enabled source",
-	):
-		return fmt.Errorf("%w: enabled attachment requires an enabled source", basespec.ErrConflict)
-	case strings.Contains(
-		message,
-		"artifact source disable requires disabled attachments",
-	):
-		return fmt.Errorf("%w: source still has enabled attachments", basespec.ErrConflict)
-	case strings.Contains(message, "artifact source retirement requires no active attachments"):
-		return fmt.Errorf("%w: source is still attached to an active collection", basespec.ErrConflict)
+		return fmt.Errorf(
+			"%w: Artifact Source is no longer active",
+			basespec.ErrConflict,
+		)
 	case strings.Contains(message, "artifact root retirement requires no active children"),
 		strings.Contains(message, "artifact root purge requires no active children"):
-		return fmt.Errorf("%w: root still owns active sources or collections", basespec.ErrConflict)
-	case strings.Contains(message, "artifact record requires attached source"),
-		strings.Contains(message, "artifact suppression requires attached source"),
-		strings.Contains(message, "artifact occurrence requires attached source"):
-		return fmt.Errorf("%w: source is no longer attached to the collection", basespec.ErrConflict)
+		return fmt.Errorf(
+			"%w: Root still owns Sources or Artifact records",
+			basespec.ErrConflict,
+		)
 	case strings.Contains(message, "foreign key constraint failed"):
-		return fmt.Errorf("%w: related metadata is missing or still referenced", basespec.ErrConflict)
+		return fmt.Errorf(
+			"%w: related metadata is missing or still referenced",
+			basespec.ErrConflict,
+		)
 	case strings.Contains(message, "database is locked"),
 		strings.Contains(message, "database is busy"),
 		strings.Contains(message, "sqlite_busy"),

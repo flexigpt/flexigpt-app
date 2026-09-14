@@ -5,15 +5,18 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
 const sourceColumns = `
 	id, root_id, root_storage_key, storage_key,
-	kind, display_name, enabled, config_json,
+	kind, display_name, enabled, config_json, discovery_json,
 	revision, created_at, modified_at, retired_at`
 
 func (s *Store) createSource(
@@ -23,6 +26,11 @@ func (s *Store) createSource(
 	if err := value.Validate(); err != nil {
 		return err
 	}
+	discoveryRaw, err := encodeJSON(value.Discovery.Normalized())
+	if err != nil {
+		return err
+	}
+
 	tx, err := s.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -35,17 +43,18 @@ func (s *Store) createSource(
 	}
 	if rootValue.StorageKey != value.RootStorageKey {
 		return fmt.Errorf(
-			"%w: source root storage key does not match root metadata",
+			"%w: Source Root storage key does not match Root metadata",
 			basespec.ErrInvalid,
 		)
 	}
+
 	_, err = tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_sources (
 			id, root_id, root_storage_key, storage_key,
-			kind, display_name, enabled, config_json,
+			kind, display_name, enabled, config_json, discovery_json,
 			revision, created_at, modified_at, retired_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		string(value.ID),
 		string(value.RootID),
 		string(value.RootStorageKey),
@@ -54,6 +63,7 @@ func (s *Store) createSource(
 		value.DisplayName,
 		boolInt(value.Enabled),
 		[]byte(value.Config),
+		discoveryRaw,
 		value.Revision,
 		timeValue(value.CreatedAt),
 		timeValue(value.ModifiedAt),
@@ -62,7 +72,7 @@ func (s *Store) createSource(
 	if err != nil {
 		return sqliteError(err)
 	}
-	return sqliteError(tx.Commit())
+	return tx.Commit()
 }
 
 func (s *Store) getSource(
@@ -73,18 +83,19 @@ func (s *Store) getSource(
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return source.Source{}, err
 	}
-
 	value, err := scanSource(s.db.QueryRowContext(
 		ctx,
 		`SELECT `+sourceColumns+`
 		 FROM artifact_sources
-		 WHERE id = ? AND root_id = ? AND retired_at IS NULL`,
-		string(id),
+		 WHERE root_id = ?
+		   AND id = ?
+		   AND retired_at IS NULL`,
 		string(rootID),
+		string(id),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.Source{}, fmt.Errorf(
-			"%w: source %q in root %q",
+			"%w: Source %q in Root %q",
 			basespec.ErrSourceNotFound,
 			id,
 			rootID,
@@ -104,7 +115,8 @@ func (s *Store) listSources(
 		ctx,
 		`SELECT `+sourceColumns+`
 		 FROM artifact_sources
-		 WHERE root_id = ? AND retired_at IS NULL
+		 WHERE root_id = ?
+		   AND retired_at IS NULL
 		 ORDER BY modified_at DESC, id ASC`,
 		string(rootID),
 	)
@@ -119,7 +131,7 @@ func (s *Store) listSources(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, value)
+		output = append(output, value.Clone())
 	}
 	return output, rows.Err()
 }
@@ -132,57 +144,97 @@ func (s *Store) updateSource(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if err := s.requireActiveRoot(ctx, value.RootID); err != nil {
-		return err
-	}
-
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid source update", basespec.ErrInvalid)
+		return fmt.Errorf(
+			"%w: invalid Source update",
+			basespec.ErrInvalid,
+		)
 	}
-	result, err := s.db.ExecContext(
+	discoveryRaw, err := encodeJSON(value.Discovery.Normalized())
+	if err != nil {
+		return err
+	}
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if _, err := getActiveRootTx(ctx, tx, value.RootID); err != nil {
+		return err
+	}
+	current, err := getActiveSourceTx(
+		ctx,
+		tx,
+		value.RootID,
+		value.ID,
+	)
+	if err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+
+	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE artifact_sources
 		 SET display_name = ?,
 		     enabled = ?,
 		     config_json = ?,
+		     discovery_json = ?,
 		     revision = ?,
 		     modified_at = ?
-		 WHERE id = ?
-		   AND root_id = ?
+		 WHERE root_id = ?
+		   AND id = ?
 		   AND revision = ?
-		   AND retired_at IS NULL
-		   AND (
-			? = 1 OR NOT EXISTS (
-				SELECT 1
-				FROM artifact_collection_attachments a
-				JOIN artifact_collections c
-				  ON c.root_id = a.root_id
-				 AND c.id = a.collection_id
-				WHERE a.root_id = artifact_sources.root_id
-				  AND a.source_id = artifact_sources.id
-				  AND a.enabled = 1
-				  AND c.retired_at IS NULL
-			)
-		   )`,
+		   AND retired_at IS NULL`,
 		value.DisplayName,
 		boolInt(value.Enabled),
 		[]byte(value.Config),
+		discoveryRaw,
 		value.Revision,
 		timeValue(value.ModifiedAt),
-		string(value.ID),
 		string(value.RootID),
+		string(value.ID),
 		expectedRevision,
-		boolInt(value.Enabled),
 	)
 	if err != nil {
 		return sqliteError(err)
 	}
-	return requireOneChanged(
+	if err := requireOneChanged(
 		result,
-		"source changed, no longer exists, or still has enabled attachments",
-	)
+		"Source changed during update",
+	); err != nil {
+		return err
+	}
+	if current.Enabled && !value.Enabled {
+		_, err := tx.ExecContext(
+			ctx,
+			`DELETE FROM artifact_source_refresh_state
+			 WHERE root_id = ? AND source_id = ?`,
+			string(value.RootID),
+			string(value.ID),
+		)
+		if err != nil {
+			return sqliteError(err)
+		}
+		if err := markSourceArtifactsMissingTx(
+			ctx,
+			tx,
+			value.RootID,
+			value.ID,
+			value.ModifiedAt,
+			"artifact.source-disabled",
+			"the Artifact Source was disabled",
+		); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 func (s *Store) retireSource(
@@ -193,14 +245,14 @@ func (s *Store) retireSource(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if err := s.requireActiveRoot(ctx, value.RootID); err != nil {
-		return err
-	}
-
 	if value.RetiredAt == nil ||
 		value.Enabled ||
+		expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid source retirement", basespec.ErrInvalid)
+		return fmt.Errorf(
+			"%w: invalid Source retirement",
+			basespec.ErrInvalid,
+		)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -209,26 +261,28 @@ func (s *Store) retireSource(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var attached int
-	if err := tx.QueryRowContext(
-		ctx,
-		`SELECT EXISTS(
-			SELECT 1
-			FROM artifact_collection_attachments a
-			JOIN artifact_collections c
-			  ON c.root_id = a.root_id
-			 AND c.id = a.collection_id
-			WHERE a.root_id = ?
-			  AND a.source_id = ?
-			  AND c.retired_at IS NULL
-		)`,
-		string(value.RootID),
-		string(value.ID),
-	).Scan(&attached); err != nil {
+	if _, err := getActiveRootTx(ctx, tx, value.RootID); err != nil {
 		return err
 	}
-	if attached != 0 {
-		return fmt.Errorf("%w: source is still attached to a collection", basespec.ErrConflict)
+	current, err := getActiveSourceTx(
+		ctx,
+		tx,
+		value.RootID,
+		value.ID,
+	)
+	if err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+	if current.RootStorageKey != value.RootStorageKey ||
+		current.StorageKey != value.StorageKey ||
+		current.Kind != value.Kind {
+		return fmt.Errorf(
+			"%w: Source retirement changed Source identity",
+			basespec.ErrInvalid,
+		)
 	}
 
 	result, err := tx.ExecContext(
@@ -238,19 +292,46 @@ func (s *Store) retireSource(
 		     revision = ?,
 		     modified_at = ?,
 		     retired_at = ?
-		 WHERE id = ? AND root_id = ? AND revision = ? AND retired_at IS NULL`,
+		 WHERE root_id = ?
+		   AND id = ?
+		   AND revision = ?
+		   AND retired_at IS NULL`,
 		value.Revision,
 		timeValue(value.ModifiedAt),
 		timeValue(*value.RetiredAt),
-		string(value.ID),
 		string(value.RootID),
+		string(value.ID),
 		expectedRevision,
 	)
 	if err != nil {
 		return sqliteError(err)
 	}
-	if err := requireOneChanged(result, "source changed during retirement"); err != nil {
+	if err := requireOneChanged(
+		result,
+		"Source changed during retirement",
+	); err != nil {
 		return err
+	}
+	if err := markSourceArtifactsMissingTx(
+		ctx,
+		tx,
+		value.RootID,
+		value.ID,
+		value.ModifiedAt,
+		"artifact.source-retired",
+		"the Artifact Source was retired",
+	); err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(
+		ctx,
+		`DELETE FROM artifact_source_refresh_state
+		 WHERE root_id = ? AND source_id = ?`,
+		string(value.RootID),
+		string(value.ID),
+	)
+	if err != nil {
+		return sqliteError(err)
 	}
 	return tx.Commit()
 }
@@ -269,7 +350,7 @@ func (s *Store) discardSource(
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
-			"%w: expected source revision is required",
+			"%w: expected Source revision is required",
 			basespec.ErrInvalid,
 		)
 	}
@@ -279,25 +360,31 @@ func (s *Store) discardSource(
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-
 	if _, err := getActiveRootTx(ctx, tx, rootID); err != nil {
 		return err
 	}
 	result, err := tx.ExecContext(
 		ctx,
 		`DELETE FROM artifact_sources
-		 WHERE id = ?
-		   AND root_id = ?
+		 WHERE root_id = ?
+		   AND id = ?
 		   AND revision = ?
 		   AND retired_at IS NULL
 		   AND NOT EXISTS (
 			SELECT 1
-			FROM artifact_collection_attachments
+			FROM artifact_artifacts
+			WHERE root_id = ? AND source_id = ?
+		   )
+		   AND NOT EXISTS (
+			SELECT 1
+			FROM artifact_source_refresh_state
 			WHERE root_id = ? AND source_id = ?
 		   )`,
-		string(id),
 		string(rootID),
+		string(id),
 		expectedRevision,
+		string(rootID),
+		string(id),
 		string(rootID),
 		string(id),
 	)
@@ -306,11 +393,11 @@ func (s *Store) discardSource(
 	}
 	if err := requireOneChanged(
 		result,
-		"source changed or was attached before discard",
+		"Source changed or has synchronized Artifacts before discard",
 	); err != nil {
 		return err
 	}
-	return sqliteError(tx.Commit())
+	return tx.Commit()
 }
 
 func (s *Store) purgeSource(
@@ -327,53 +414,138 @@ func (s *Store) purgeSource(
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
-			"%w: expected source revision is required",
+			"%w: expected Source revision is required",
 			basespec.ErrInvalid,
 		)
 	}
-
-	tx, err := s.db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	if _, err := getActiveRootTx(ctx, tx, rootID); err != nil {
-		return err
-	}
-	result, err := tx.ExecContext(
+	result, err := s.db.ExecContext(
 		ctx,
 		`DELETE FROM artifact_sources
-		 WHERE id = ? AND root_id = ? AND revision = ? AND retired_at IS NOT NULL`,
-		string(id),
+		 WHERE root_id = ?
+		   AND id = ?
+		   AND revision = ?
+		   AND retired_at IS NOT NULL`,
 		string(rootID),
+		string(id),
 		expectedRevision,
 	)
 	if err != nil {
 		return sqliteError(err)
 	}
-	if err := requireOneChanged(
+	return requireOneChanged(
 		result,
-		"source changed or was not retired before purge",
-	); err != nil {
+		"Source changed, is not retired, or still owns Artifacts",
+	)
+}
+
+func requireActiveSourceTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) error {
+	_, err := getActiveSourceTx(ctx, tx, rootID, sourceID)
+	return err
+}
+
+func getActiveSourceTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) (source.Source, error) {
+	value, err := scanSource(tx.QueryRowContext(
+		ctx,
+		`SELECT `+sourceColumns+`
+		 FROM artifact_sources
+		 WHERE root_id = ?
+		   AND id = ?
+		   AND retired_at IS NULL`,
+		string(rootID),
+		string(sourceID),
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return source.Source{}, fmt.Errorf(
+			"%w: Source %q in Root %q",
+			basespec.ErrSourceNotFound,
+			sourceID,
+			rootID,
+		)
+	}
+	return value, err
+}
+
+func markSourceArtifactsMissingTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	modifiedAt time.Time,
+	code string,
+	message string,
+) error {
+	if err := rootID.Validate(); err != nil {
 		return err
 	}
-	return sqliteError(tx.Commit())
+	diagnostics, err := encodeJSON([]diagnostic.Diagnostic{{
+		Severity: diagnostic.SeverityWarning,
+		Code:     code,
+		Message:  message,
+	}})
+	if err != nil {
+		return err
+	}
+	_, err = tx.ExecContext(
+		ctx,
+		`UPDATE artifact_artifacts
+		 SET resolved_definition_digest = NULL,
+		     source_content_digest = NULL,
+		     state = ?,
+		     diagnostics_json = ?,
+		     revision = revision + 1,
+		     modified_at = CASE
+			WHEN modified_at >= ? THEN modified_at + 1
+			ELSE ?
+		     END
+		 WHERE root_id = ?
+		   AND source_id = ?
+		   AND (
+			state != ?
+			OR resolved_definition_digest IS NOT NULL
+			OR source_content_digest IS NOT NULL
+		   )`,
+		string(artifact.StateMissing),
+		diagnostics,
+		timeValue(modifiedAt),
+		timeValue(modifiedAt),
+		string(rootID),
+		string(sourceID),
+		string(artifact.StateMissing),
+	)
+	return sqliteError(err)
 }
 
 type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanSource(row scanner) (source.Source, error) {
+func scanSource(
+	row scanner,
+) (source.Source, error) {
 	var (
 		id, rootID, rootStorageKey, storageKey, kind, displayName string
 		enabled                                                   int
-		config                                                    []byte
+		config, discoveryRaw                                      []byte
 		revision                                                  uint64
 		createdAt, modifiedAt                                     int64
 		retiredAt                                                 sql.NullInt64
 	)
+	if row == nil {
+		return source.Source{}, fmt.Errorf(
+			"%w: Source row is nil",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := row.Scan(
 		&id,
 		&rootID,
@@ -383,11 +555,16 @@ func scanSource(row scanner) (source.Source, error) {
 		&displayName,
 		&enabled,
 		&config,
+		&discoveryRaw,
 		&revision,
 		&createdAt,
 		&modifiedAt,
 		&retiredAt,
 	); err != nil {
+		return source.Source{}, err
+	}
+	var discovery source.DiscoverySpec
+	if err := decodeJSON(discoveryRaw, &discovery); err != nil {
 		return source.Source{}, err
 	}
 	value := source.Source{
@@ -399,6 +576,7 @@ func scanSource(row scanner) (source.Source, error) {
 		DisplayName:    displayName,
 		Enabled:        enabled != 0,
 		Config:         append([]byte(nil), config...),
+		Discovery:      discovery,
 		Revision:       revision,
 		CreatedAt:      parseTime(createdAt),
 		ModifiedAt:     parseTime(modifiedAt),
@@ -406,7 +584,7 @@ func scanSource(row scanner) (source.Source, error) {
 	}
 	if err := value.Validate(); err != nil {
 		return source.Source{}, fmt.Errorf(
-			"invalid persisted source %q: %w",
+			"invalid persisted Source %q: %w",
 			id,
 			err,
 		)

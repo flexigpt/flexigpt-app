@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"path"
 	"regexp"
 	"strings"
 	"unicode"
@@ -14,7 +13,7 @@ import (
 )
 
 var portableNamePattern = regexp.MustCompile(
-	`^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$`,
+	`^[A-Za-z0-9][A-Za-z0-9._-]*$`,
 )
 
 func ValidatePortableMetadata(
@@ -122,7 +121,10 @@ func validateContentReferenceURI(value string) error {
 }
 
 func ValidatePortableName(label, value string) error {
-	if !portableNamePattern.MatchString(value) {
+	if value == "" ||
+		len(value) > MaxLogicalNameBytes ||
+		!utf8.ValidString(value) ||
+		!portableNamePattern.MatchString(value) {
 		return fmt.Errorf(
 			"%w: %s %q is not a portable name",
 			ErrInvalid,
@@ -188,41 +190,11 @@ func ValidateOptionalText(label, value string, maximum int) error {
 	return ValidateRequiredText(label, value, maximum)
 }
 
-// ValidateIncludePattern validates a source-relative glob. It deliberately
-// rejects path traversal and host-path syntax before passing the pattern to
-// path.Match.
+// ValidateIncludePattern is retained as the common compatibility entrypoint.
+// New code should use ValidatePathPattern when the pattern is not specifically
+// an inclusion pattern.
 func ValidateIncludePattern(pattern string) error {
-	if err := ValidateRequiredText(
-		"discovery pattern",
-		pattern,
-		MaxLocatorBytes,
-	); err != nil {
-		return err
-	}
-	if strings.HasPrefix(pattern, "/") ||
-		strings.ContainsAny(pattern, `\:`) {
-		return fmt.Errorf(
-			"%w: discovery pattern contains a disallowed path character",
-			ErrInvalid,
-		)
-	}
-	for segment := range strings.SplitSeq(pattern, "/") {
-		if segment == "" || segment == "." || segment == ".." {
-			return fmt.Errorf(
-				"%w: discovery pattern contains an invalid path segment",
-				ErrInvalid,
-			)
-		}
-	}
-	if _, err := path.Match(pattern, "candidate"); err != nil {
-		return fmt.Errorf(
-			"%w: invalid discovery pattern %q: %w",
-			ErrInvalid,
-			pattern,
-			err,
-		)
-	}
-	return nil
+	return ValidatePathPattern(pattern)
 }
 
 func ValidateRequiredText(label, value string, maximum int) error {

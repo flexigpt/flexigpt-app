@@ -127,6 +127,14 @@ func (s *Service) CreateWithStatus(
 		return source.Summary{}, false, fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
 
+	discovery := draft.Discovery.Normalized()
+	if err := discovery.Validate(); err != nil {
+		return source.Summary{}, false, fmt.Errorf(
+			"source discovery: %w",
+			err,
+		)
+	}
+
 	now := clockutil.NowUTC(s.clock)
 	value := source.Source{
 		ID:             draft.ID,
@@ -137,6 +145,7 @@ func (s *Service) CreateWithStatus(
 		DisplayName:    draft.DisplayName,
 		Enabled:        draft.Enabled,
 		Config:         config,
+		Discovery:      discovery,
 		Revision:       1,
 		CreatedAt:      now,
 		ModifiedAt:     now,
@@ -238,7 +247,8 @@ func sourceCreationIntentMatches(
 		existing.Kind == requested.Kind &&
 		existing.DisplayName == requested.DisplayName &&
 		existing.Enabled == requested.Enabled &&
-		bytes.Equal(existing.Config, requested.Config)
+		bytes.Equal(existing.Config, requested.Config) &&
+		existing.Discovery.Equal(requested.Discovery)
 }
 
 func (s *Service) Get(
@@ -338,14 +348,27 @@ func (s *Service) Update(
 		config = normalized
 	}
 
+	discovery := current.Discovery.Clone()
+	if update.Discovery != nil {
+		discovery = update.Discovery.Normalized()
+		if err := discovery.Validate(); err != nil {
+			return source.Summary{}, fmt.Errorf(
+				"source discovery: %w",
+				err,
+			)
+		}
+	}
+
 	next := current
 	next.DisplayName = update.DisplayName
 	next.Enabled = update.Enabled
 	next.Config = config
+	next.Discovery = discovery
 
 	unchanged := current.DisplayName == next.DisplayName &&
 		current.Enabled == next.Enabled &&
-		bytes.Equal(current.Config, next.Config)
+		bytes.Equal(current.Config, next.Config) &&
+		current.Discovery.Equal(next.Discovery)
 	if unchanged {
 		return current.Summary(), nil
 	}
@@ -414,9 +437,9 @@ func (s *Service) Retire(
 	return next.Summary(), nil
 }
 
-// Discard removes a newly created, unattached Source after a higher-level
-// workflow failed before it could publish a Collection attachment. Unlike
-// Purge, it is intentionally limited to active Sources with no attachments.
+// Discard removes a newly created Source after a higher-level workflow failed
+// before it could synchronize source-backed Artifacts. Unlike Purge, it is
+// limited to active Sources with no Artifact or refresh-state records.
 func (s *Service) Discard(
 	ctx context.Context,
 	rootID root.RootID,

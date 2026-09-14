@@ -5,19 +5,15 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
-// MCPAggregateWrapper is the only Wails surface allowed to translate durable
-// artifact identities into opaque runtime identities or coordinate Store
-// mutation with Runtime invalidation.
 type MCPAggregateWrapper struct {
 	service        *mcpAggregate.Service
 	serverResolver *mcpAggregate.ArtifactServerResolver
@@ -64,56 +60,19 @@ func (w *MCPAggregateWrapper) ArtifactRefForRuntimeServerID(
 	})
 }
 
-func (w *MCPAggregateWrapper) RuntimeCatalogIDForCollection(
-	ref collection.CollectionRef,
+func (w *MCPAggregateWrapper) RuntimeCatalogIDForRoot(
+	rootID root.RootID,
 ) (mcpServer.CatalogID, error) {
 	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpServer.CatalogID, error) {
-		return mcpAggregate.RuntimeCatalogIDForCollection(ref)
+		return mcpAggregate.RuntimeCatalogIDForRoot(rootID)
 	})
 }
 
-func (w *MCPAggregateWrapper) CollectionRefForRuntimeCatalogID(
+func (w *MCPAggregateWrapper) RootIDForRuntimeCatalogID(
 	id mcpServer.CatalogID,
-) (collection.CollectionRef, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (collection.CollectionRef, error) {
-		return mcpAggregate.CollectionRefForRuntimeCatalogID(id)
-	})
-}
-
-func (w *MCPAggregateWrapper) RefreshMCPBundle(
-	ref collection.CollectionRef,
-) (mcpConsumerAPI.Bundle, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.Bundle, error) {
-		return service.RefreshBundle(context.Background(), ref, false)
-	})
-}
-
-func (w *MCPAggregateWrapper) RetireMCPBundle(
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) (collection.Collection, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (collection.Collection, error) {
-		return service.RetireBundle(context.Background(), ref, expectedRevision)
-	})
-}
-
-func (w *MCPAggregateWrapper) PurgeMCPBundle(
-	ref collection.CollectionRef,
-	expectedRevision uint64,
-) error {
-	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.PurgeBundle(context.Background(), ref, expectedRevision)
-	})
-}
-
-func (w *MCPAggregateWrapper) ReplaceMCPBundleDocument(
-	request *mcpConsumerAPI.ReplaceDocumentRequest,
-) (mcpConsumerAPI.Bundle, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.Bundle, error) {
-		if request == nil {
-			return mcpConsumerAPI.Bundle{}, basespec.ErrInvalid
-		}
-		return service.ReplaceDocument(context.Background(), *request)
+) (root.RootID, error) {
+	return withMCPAggregate(w, func(*mcpAggregate.Service) (root.RootID, error) {
+		return mcpAggregate.RootIDForRuntimeCatalogID(id)
 	})
 }
 
@@ -149,21 +108,6 @@ func (w *MCPAggregateWrapper) UpdateProtectedMCPServerInstallation(
 	})
 }
 
-func (w *MCPAggregateWrapper) UpdateProtectedMCPBundleInstallation(
-	ref collection.CollectionRef,
-	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
-) error {
-	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.UpdateProtectedBundleInstallation(
-			context.Background(),
-			ref,
-			expectedOverlayRevision,
-			runtimeEnabled,
-		)
-	})
-}
-
 func (w *MCPAggregateWrapper) PutMCPServerSecret(
 	ref artifact.ArtifactRef,
 	kind mcpDomainSecret.MCPSecretKind,
@@ -171,7 +115,13 @@ func (w *MCPAggregateWrapper) PutMCPServerSecret(
 	value string,
 ) (mcpAggregate.SecretWriteResult, error) {
 	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpAggregate.SecretWriteResult, error) {
-		return service.PutServerSecret(context.Background(), ref, kind, slot, value)
+		return service.PutServerSecret(
+			context.Background(),
+			ref,
+			kind,
+			slot,
+			value,
+		)
 	})
 }
 
@@ -181,7 +131,12 @@ func (w *MCPAggregateWrapper) DeleteMCPServerSecret(
 	slot string,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.DeleteServerSecret(context.Background(), ref, kind, slot)
+		return service.DeleteServerSecret(
+			context.Background(),
+			ref,
+			kind,
+			slot,
+		)
 	})
 }
 

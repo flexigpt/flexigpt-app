@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
-	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
 	managedartifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/managedartifact"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
@@ -36,8 +35,8 @@ type Config struct {
 	AdditionalSources []sourceimpl.Adapter
 
 	ArtifactProviders []providerapi.Provider
-	// ArtifactIDProvider is used only for Store-owned automatic adoption.
-	// It is Store composition input and never reaches a provider or consumer.
+	// ArtifactIDProvider creates IDs for deterministic source synchronization.
+	// It never reaches a provider or consumer.
 	ArtifactIDProvider        artifactid.Provider
 	Clock                     clockutil.Clock
 	RootMutationPolicy        root.RootPolicy
@@ -52,7 +51,6 @@ type ManagedPackageResult struct {
 type Components struct {
 	Roots            *rootimpl.Service
 	Sources          *sourceimpl.Service
-	Collections      *collectionimpl.Service
 	Artifacts        *artifactimpl.Service
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
@@ -176,9 +174,8 @@ func Open(
 
 	sourceRepository := metadata.Sources()
 	rootRepository := metadata.Roots()
-	collectionRepository := metadata.Collections()
-	catalogRepository := metadata.Catalogs()
 	artifactRepository := metadata.Artifacts()
+	definitionRepository := metadata.Definitions()
 	sourceRuntime, err := sourceimpl.NewRuntime(
 		sourceRepository,
 		sourceRegistry,
@@ -211,26 +208,13 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	collectionService, err := collectionimpl.NewService(
-		collectionRepository,
-		sourceService,
-		config.Clock,
-		config.RootMutationPolicy,
-	)
-	if err != nil {
-
-		_ = metadata.Close()
-		return nil, err
-	}
 	artifactService, err := artifactimpl.NewService(
 		artifactRepository,
-		collectionRepository,
-		catalogRepository,
+		definitionRepository,
 		config.Clock,
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -243,38 +227,33 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	reconciler, err := artifactimpl.NewReconciler(
+	synchronizer, err := artifactimpl.NewSynchronizer(
 		config.Clock,
+		config.ArtifactIDProvider,
 	)
 	if err != nil {
-
 		_ = metadata.Close()
 		return nil, err
 	}
 
 	refreshService, err := refreshimpl.NewService(
-		collectionRepository,
-		catalogRepository,
 		sourceRuntime,
 		artifactRepository,
+		metadata.RefreshStates(),
 		discoveryEngine,
-		reconciler,
+		synchronizer,
 		metadata.Publisher(),
-		providerRegistry,
-		shareableRegistry,
-		config.ArtifactIDProvider,
 		config.Clock,
 		config.RootMutationPolicy,
 	)
 	if err != nil {
-
 		_ = metadata.Close()
 		return nil, err
 	}
 
 	resourceService, err := resourceimpl.NewService(
 		artifactRepository,
-		collectionRepository,
+		definitionRepository,
 		refreshService,
 		sourceRuntime,
 	)
@@ -286,7 +265,6 @@ func Open(
 	components := &Components{
 		Roots:              rootService,
 		Sources:            sourceService,
-		Collections:        collectionService,
 		Artifacts:          artifactService,
 		Refresh:            refreshService,
 		Resources:          resourceService,
@@ -298,10 +276,9 @@ func Open(
 	}
 	managedArtifacts, err := managedartifactimpl.NewService(
 		managedartifactimpl.Dependencies{
-			Artifacts:   artifactService,
-			Collections: collectionRepository,
-			Refresh:     refreshService,
-			Policy:      config.RootMutationPolicy,
+			Artifacts: artifactService,
+			Refresh:   refreshService,
+			Policy:    config.RootMutationPolicy,
 			GetSourceState: func(
 				ctx context.Context,
 				rootID root.RootID,
@@ -439,7 +416,7 @@ func (c *Components) getManagedSourceState(
 
 // PublishManagedPackage publishes a package and advances the Source revision
 // only when the resulting snapshot generation changed. The revision advance
-// invalidates catalogs that observed the prior generation.
+// makes prior Source refresh state stale.
 //
 // Source-side publication and SQLite metadata publication intentionally remain
 // separate operations. If the package write succeeds but the revision advance
@@ -565,7 +542,7 @@ func (c *Components) publishManagedPackage(
 	if err := rootimpl.RequireMutableRoot(ctx, c.rootMutationPolicy, rootID); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	requestedGeneration := publication.ExpectedGeneration
+
 	value, err := c.managedSource(
 		ctx,
 		rootID,
@@ -601,9 +578,7 @@ func (c *Components) publishManagedPackage(
 		Source:     value.Summary(),
 		Generation: generation,
 	}
-	contentChanged := generation != beforeGeneration ||
-		(requestedGeneration != "" &&
-			requestedGeneration != beforeGeneration)
+	contentChanged := generation != beforeGeneration
 	if !contentChanged {
 		return result, nil
 	}

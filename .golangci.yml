@@ -491,6 +491,8 @@ linters:
           alias: ${1}StoreServer
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/bundle
           alias: ${1}Bundle
+        - pkg: github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/context
+          alias: contextAdapter
 
     nakedret:
       # No naked returns, ever.

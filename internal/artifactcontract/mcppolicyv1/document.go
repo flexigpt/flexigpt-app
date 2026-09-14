@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -12,39 +13,26 @@ import (
 )
 
 const (
-	MCPPolicyKind          = "mcp.policy"
-	MCPPolicySchemaID      = "mcp.policy.v1"
-	MCPPolicySchemaVersion = "v1"
+	MCPPolicyType          = artifactcontract.TypeMCPPolicy
+	MCPPolicySchemaID      = "artifact.mcp-policy.v1"
+	MCPPolicySchemaVersion = artifactcontract.APIVersionV1
 )
 
 //go:embed mcp-policy-v1.schema.json
 var schemaJSON []byte
 
-var compiledMCPPolicySchema = jsonutil.MustCompileJSONSchema(
-	schemaJSON,
-)
+var compiledMCPPolicySchema = jsonutil.MustCompileJSONSchema(schemaJSON)
 
 var MCPPolicySchemaKey = schema.ArtifactKey(
-	artifact.ArtifactKind(MCPPolicyKind),
+	artifact.ArtifactKind(MCPPolicyType),
 	schema.SchemaID(MCPPolicySchemaID),
 	MCPPolicySchemaVersion,
 )
 
-func MCPPolicyJSONSchema() []byte {
-	return append([]byte(nil), schemaJSON...)
-}
-
 type MCPPolicyDocument struct {
-	Digest         *string           `json:"digest,omitempty"`
-	Kind           string            `json:"kind"`
-	SchemaID       string            `json:"schemaID"`
-	SchemaVersion  string            `json:"schemaVersion"`
-	LogicalName    string            `json:"logicalName"`
-	LogicalVersion string            `json:"logicalVersion,omitempty"`
-	DisplayName    string            `json:"displayName,omitempty"`
-	Description    string            `json:"description,omitempty"`
-	Labels         map[string]string `json:"labels,omitempty"`
-	Body           MCPPolicyBody     `json:"body"`
+	artifactcontract.Header
+
+	Body MCPPolicyBody `json:"body"`
 }
 
 type MCPPolicyBody struct {
@@ -77,48 +65,196 @@ type MCPPolicyAppsPolicy struct {
 	RequireApprovalForContextUpdates *bool `json:"requireApprovalForContextUpdates,omitempty"`
 }
 
+func MCPPolicyJSONSchema() []byte {
+	return append([]byte(nil), schemaJSON...)
+}
+
 func DecodeMCPPolicyJSON(raw []byte) (MCPPolicyDocument, error) {
-	return jsonutil.DecodeCanonicalObject[MCPPolicyDocument](
+	return decodeMCPPolicy(raw, true)
+}
+
+func DecodeMCPPolicyEntry(
+	entry artifactcontract.Entry,
+) (MCPPolicyDocument, error) {
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	return decodeMCPPolicy(raw, false)
+}
+
+func decodeMCPPolicy(
+	raw []byte,
+	requireName bool,
+) (MCPPolicyDocument, error) {
+	var value MCPPolicyDocument
+	if err := artifactcontract.DecodeDocumentInto(
 		raw,
-		basespec.MaxDefinitionBytes,
-	)
+		compiledMCPPolicySchema,
+		&value,
+	); err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	if err := value.validate(requireName); err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	return value, nil
 }
 
-func (v MCPPolicyDocument) Clone() (MCPPolicyDocument, error) {
+func (v MCPPolicyDocument) Clone() (
+	MCPPolicyDocument,
+	error,
+) {
 	return jsonutil.CloneJSON(v)
 }
 
-func (v MCPPolicyDocument) Canonicalize() (MCPPolicyDocument, error) {
-	return jsonutil.CloneJSON(v)
+func (v MCPPolicyDocument) Canonicalize() (
+	MCPPolicyDocument,
+	error,
+) {
+	return v.Clone()
 }
 
 func (v MCPPolicyDocument) CanonicalJSON() ([]byte, error) {
-	return jsonutil.MarshalCanonicalObject(v, basespec.MaxDefinitionBytes)
+	if err := v.Validate(); err != nil {
+		return nil, err
+	}
+	return artifactcontract.CanonicalDocumentJSON(v)
 }
 
 func (v MCPPolicyDocument) CalculatedDigest() (
 	cryptoutil.Digest,
 	error,
 ) {
-	payload := v
-	payload.Digest = nil
-	return cryptoutil.CanonicalDigest(payload)
+	return artifactcontract.DocumentDigest(v)
 }
 
 func (v MCPPolicyDocument) Validate() error {
-	if err := jsonutil.ValidateJSONSchema(
+	return v.validate(true)
+}
+
+func (v MCPPolicyDocument) ValidateEntry() error {
+	return v.validate(false)
+}
+
+func (v MCPPolicyDocument) validate(requireName bool) error {
+	if err := artifactcontract.ValidateDocument(
 		compiledMCPPolicySchema,
 		v,
-		basespec.MaxDefinitionBytes,
 	); err != nil {
 		return fmt.Errorf("MCP Policy schema: %w", err)
 	}
-	return basespec.ValidatePortableMetadata(
-		basespec.LogicalName(v.LogicalName),
-		basespec.LogicalVersion(v.LogicalVersion),
-		v.DisplayName,
-		v.Description,
-		v.Labels,
-		v.Digest,
-	)
+	if err := v.Header.Validate(artifactcontract.HeaderValidation{
+		ExpectedType: MCPPolicyType,
+		APIVersion:   MCPPolicySchemaVersion,
+		RequireName:  requireName,
+	}); err != nil {
+		return err
+	}
+	return v.Body.Validate()
+}
+
+func (v MCPPolicyBody) Validate() error {
+	switch v.TrustLevel {
+	case "", "trusted", "untrusted":
+	default:
+		return fmt.Errorf(
+			"%w: invalid MCP policy trustLevel %q",
+			basespec.ErrInvalid,
+			v.TrustLevel,
+		)
+	}
+	if len(v.ToolPolicies) > basespec.MaxDefinitionDependencies {
+		return fmt.Errorf(
+			"%w: MCP policy toolPolicies exceed %d entries",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionDependencies,
+		)
+	}
+	for name, policy := range v.ToolPolicies {
+		if err := basespec.ValidateRequiredText(
+			"MCP policy tool name",
+			name,
+			basespec.MaxLogicalNameBytes,
+		); err != nil {
+			return err
+		}
+		if policy.ToolName != "" &&
+			policy.ToolName != name {
+			return fmt.Errorf(
+				"%w: MCP policy tool key %q differs from toolName %q",
+				basespec.ErrInvalid,
+				name,
+				policy.ToolName,
+			)
+		}
+		if err := validateApprovalRule(
+			"MCP policy approval rule",
+			policy.ApprovalRule,
+		); err != nil {
+			return err
+		}
+		if err := validateExecutionMode(
+			"MCP policy execution mode",
+			policy.ExecutionMode,
+		); err != nil {
+			return err
+		}
+		if policy.ExpectedDigest != "" {
+			if err := cryptoutil.ValidateDigest(
+				cryptoutil.Digest(policy.ExpectedDigest),
+			); err != nil {
+				return err
+			}
+		}
+	}
+	if v.DefaultPolicy != nil {
+		if err := validateApprovalRule(
+			"MCP policy default approval rule",
+			v.DefaultPolicy.DefaultApprovalRule,
+		); err != nil {
+			return err
+		}
+		if err := validateExecutionMode(
+			"MCP policy default execution mode",
+			v.DefaultPolicy.DefaultExecutionMode,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateApprovalRule(
+	label string,
+	value string,
+) error {
+	switch value {
+	case "", "allow", "ask", "deny":
+		return nil
+	default:
+		return fmt.Errorf(
+			"%w: %s %q is invalid",
+			basespec.ErrInvalid,
+			label,
+			value,
+		)
+	}
+}
+
+func validateExecutionMode(
+	label string,
+	value string,
+) error {
+	switch value {
+	case "", "auto", "manual":
+		return nil
+	default:
+		return fmt.Errorf(
+			"%w: %s %q is invalid",
+			basespec.ErrInvalid,
+			label,
+			value,
+		)
+	}
 }

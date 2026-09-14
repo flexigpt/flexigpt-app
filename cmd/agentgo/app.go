@@ -272,9 +272,8 @@ func (a *App) initManagers() {
 		a.workspaceRuntimeAPI,
 		a.workspaceAggregateAPI,
 		artifactComposition.Sources,
-		artifactComposition.Collections,
+		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
-		artifactComposition.Catalogs,
 		artifactComposition.Resources,
 	)
 	if err != nil {
@@ -291,9 +290,8 @@ func (a *App) initManagers() {
 		a.skillStoreAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
-		artifactComposition.Collections,
+		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
-		artifactComposition.Catalogs,
 		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
@@ -309,7 +307,6 @@ func (a *App) initManagers() {
 
 	a.skillBuiltInInstaller, err = NewSkillBuiltInInstaller(
 		a.skillStoreAPI.api,
-		artifactComposition.Schemas,
 	)
 	if err != nil {
 		slog.Error(
@@ -322,12 +319,8 @@ func (a *App) initManagers() {
 
 	err = InitSkillAggregateWrapper(
 		a.skillAggregateAPI,
-		a.skillStoreAPI.api,
 		artifactComposition.Artifacts,
-		artifactComposition.Collections,
-		artifactComposition.Catalogs,
 		artifactComposition.Resources,
-		a.workspaceRuntimeAPI.api.SkillAdapter(),
 		a.skillRuntimeAPI,
 	)
 	if err != nil {
@@ -360,14 +353,11 @@ func (a *App) initManagers() {
 		a.mcpAggregateAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
-		artifactComposition.Collections,
+		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
-		artifactComposition.Catalogs,
 		artifactComposition.Resources,
-		artifactComposition.Schemas,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
-		artifactbuiltin.MCPUserRootID,
 		a.settingStoreAPI.store,
 	)
 	if err != nil {
@@ -442,7 +432,7 @@ func (a *App) initManagers() {
 		a.toolStoreAPI.store,
 		a.skillAggregateAPI.service,
 		a.mcpRuntimeAPI.runtime,
-		a.workspaceAggregateAPI.api,
+		a.workspaceStoreAPI.api,
 	)
 	if err != nil {
 		slog.Error(

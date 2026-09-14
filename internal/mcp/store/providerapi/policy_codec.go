@@ -2,19 +2,23 @@ package providerapi
 
 import (
 	"context"
-	"encoding/json"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type PolicyCodec struct{}
 
 func NewPolicyCodec() providerapi.SchemaCodec {
 	return PolicyCodec{}
+}
+
+func (PolicyCodec) Key() schema.Key {
+	return mcppolicyv1.MCPPolicySchemaKey
 }
 
 func (PolicyCodec) JSONSchema() []byte {
@@ -25,27 +29,26 @@ func (PolicyCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schema.ParsedDocument, error) {
-	value, canonical, err := parsePolicy(raw)
+	if ctx == nil {
+		return schema.ParsedDocument{}, fmt.Errorf(
+			"%w: MCP Policy schema codec context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return schema.ParsedDocument{}, err
+	}
+	value, err := mcppolicyv1.DecodeMCPPolicyJSON(raw)
+	if err != nil {
+		return schema.ParsedDocument{}, err
+	}
+	canonical, err := value.CanonicalJSON()
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
 	return schema.ParsedDocument{
-		Key:    PolicyCodec{}.Key(),
-		Digest: value.Digest,
+		Key:    mcppolicyv1.MCPPolicySchemaKey,
+		Digest: cryptoutil.DigestBytes(canonical),
 		Raw:    canonical,
 	}, nil
-}
-
-func (PolicyCodec) Key() schema.Key {
-	return mcppolicyv1.MCPPolicySchemaKey
-}
-
-func parsePolicy(
-	raw []byte,
-) (mcpDomainPolicy.PolicyDocument, json.RawMessage, error) {
-	value, err := jsonutil.DecodeJSONRaw[mcpDomainPolicy.PolicyDocument](json.RawMessage(raw))
-	if err != nil {
-		return mcpDomainPolicy.PolicyDocument{}, nil, err
-	}
-	return mcpDomainPolicy.CanonicalizePolicy(value)
 }

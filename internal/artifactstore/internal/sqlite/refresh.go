@@ -5,16 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -23,417 +18,285 @@ type Publisher struct {
 	store *Store
 }
 
-func (s *Store) Publisher() *Publisher {
-	return &Publisher{store: s}
+func (s *Store) getRefreshState(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) (source.RefreshState, error) {
+	if err := rootID.Validate(); err != nil {
+		return source.RefreshState{}, err
+	}
+	if err := sourceID.Validate(); err != nil {
+		return source.RefreshState{}, err
+	}
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return source.RefreshState{}, err
+	}
+	value, err := scanRefreshState(s.db.QueryRowContext(
+		ctx,
+		`SELECT root_id, source_id, source_revision, source_generation,
+		        discovery_fingerprint, decoder_fingerprint, revision,
+		        refreshed_at, diagnostics_json
+		 FROM artifact_source_refresh_state
+		 WHERE root_id = ? AND source_id = ?`,
+		string(rootID),
+		string(sourceID),
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source %q in Root %q",
+			basespec.ErrRefreshStateNotFound,
+			sourceID,
+			rootID,
+		)
+	}
+	if err != nil {
+		return source.RefreshState{}, err
+	}
+	return value.Clone(), nil
 }
 
 func (p *Publisher) Publish(
 	ctx context.Context,
 	publication refreshimpl.Publication,
-) (catalog.Snapshot, error) {
-	if err := publication.Validate(); err != nil {
-		return catalog.Snapshot{}, err
+) (source.RefreshState, error) {
+	if p == nil || p.store == nil {
+		return source.RefreshState{}, basespec.ErrClosed
 	}
-
-	occurrencesByKey := make(
-		map[catalog.OccurrenceKey]catalog.Occurrence,
-		len(publication.Occurrences),
-	)
-	for _, occurrence := range publication.Occurrences {
-		occurrencesByKey[occurrence.Key] = occurrence
+	if err := publication.Validate(); err != nil {
+		return source.RefreshState{}, err
 	}
 
 	tx, err := p.store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return catalog.Snapshot{}, err
+		return source.RefreshState{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	currentCollection, err := getActiveCollectionTx(ctx, tx, publication.Ref)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	if !currentCollection.Enabled ||
-		currentCollection.Revision != publication.ExpectedCollectionRevision {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: collection changed or was disabled during refresh",
-			basespec.ErrConflict,
-		)
-	}
-
-	currentAttachments, currentSources, err := currentAttachmentSourceRevisionsTx(
+	if _, err := getActiveRootTx(
 		ctx,
 		tx,
-		publication.Ref,
-	)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	if !maps.Equal(
-		currentAttachments,
-		publication.ExpectedAttachmentRevisions,
-	) || !maps.Equal(
-		currentSources,
-		publication.ExpectedSourceRevisions,
-	) {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: collection attachments or sources changed during refresh",
-			basespec.ErrConflict,
-		)
-	}
-	if err := requirePublishedSourceGenerationsTx(
-		ctx,
-		tx,
-		publication.Ref.RootID,
-		publication.Ref.CollectionID,
-		publication.SourceGenerations,
+		publication.RootID,
 	); err != nil {
-		return catalog.Snapshot{}, err
+		return source.RefreshState{}, err
 	}
-
-	attachmentRevisionsRaw, err := encodeJSON(
-		publication.ExpectedAttachmentRevisions,
+	currentSource, err := getActiveSourceTx(
+		ctx,
+		tx,
+		publication.RootID,
+		publication.SourceID,
 	)
 	if err != nil {
-		return catalog.Snapshot{}, err
+		return source.RefreshState{}, err
 	}
-	sourceRevisionsRaw, err := encodeJSON(publication.ExpectedSourceRevisions)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	sourceGenerationsRaw, err := encodeJSON(publication.SourceGenerations)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	diagnosticsRaw, err := encodeJSON(publication.Diagnostics)
-	if err != nil {
-		return catalog.Snapshot{}, err
-	}
-
-	var currentCatalogRevision uint64
-	err = tx.QueryRowContext(
-		ctx,
-		`SELECT revision
-		 FROM artifact_current_catalogs
-		 WHERE root_id = ? AND collection_id = ?`,
-		string(publication.Ref.RootID),
-		string(publication.Ref.CollectionID),
-	).Scan(&currentCatalogRevision)
-	if errors.Is(err, sql.ErrNoRows) {
-		currentCatalogRevision = 0
-	} else if err != nil {
-		return catalog.Snapshot{}, err
-	}
-	if currentCatalogRevision != publication.ExpectedCatalogRevision {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: catalog changed during refresh",
+	if !currentSource.Enabled ||
+		currentSource.Revision != publication.ExpectedSourceRevision {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source changed or was disabled during refresh",
 			basespec.ErrConflict,
 		)
 	}
-	if currentCatalogRevision == ^uint64(0) {
-		return catalog.Snapshot{}, fmt.Errorf(
-			"%w: catalog revision is exhausted",
+	if currentSource.RootID != publication.RootID ||
+		currentSource.ID != publication.SourceID {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source refresh publisher loaded another Source",
 			basespec.ErrInvalid,
 		)
 	}
-	nextCatalogRevision := currentCatalogRevision + 1
-
-	_, err = tx.ExecContext(
+	if currentSource.Discovery.Empty() {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source has no declaration discovery configuration",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	var currentRefreshRevision uint64
+	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO artifact_current_catalogs (
-			root_id, collection_id, revision, collection_revision,
-			attachment_revisions_json, source_revisions_json,
-			source_generations_json, plan_fingerprint, decoder_fingerprint,
-			published_at, diagnostics_json
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(root_id, collection_id) DO UPDATE SET
-			revision = excluded.revision,
-			collection_revision = excluded.collection_revision,
-			attachment_revisions_json = excluded.attachment_revisions_json,
-			source_revisions_json = excluded.source_revisions_json,
-			source_generations_json = excluded.source_generations_json,
-			plan_fingerprint = excluded.plan_fingerprint,
-			decoder_fingerprint = excluded.decoder_fingerprint,
-			published_at = excluded.published_at,
-			diagnostics_json = excluded.diagnostics_json`,
-		string(publication.Ref.RootID),
-		string(publication.Ref.CollectionID),
-		nextCatalogRevision,
-		publication.ExpectedCollectionRevision,
-		attachmentRevisionsRaw,
-		sourceRevisionsRaw,
-		sourceGenerationsRaw,
-		string(publication.PlanFingerprint),
-		string(publication.DecoderFingerprint),
-		timeValue(publication.PublishedAt),
-		diagnosticsRaw,
-	)
-	if err != nil {
-		return catalog.Snapshot{}, sqliteError(err)
+		`SELECT revision
+		 FROM artifact_source_refresh_state
+		 WHERE root_id = ? AND source_id = ?`,
+		string(publication.RootID),
+		string(publication.SourceID),
+	).Scan(&currentRefreshRevision)
+	if errors.Is(err, sql.ErrNoRows) {
+		currentRefreshRevision = 0
+	} else if err != nil {
+		return source.RefreshState{}, err
+	}
+	if currentRefreshRevision != publication.ExpectedRefreshRevision {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source refresh state changed during refresh",
+			basespec.ErrConflict,
+		)
+	}
+	if currentRefreshRevision == ^uint64(0) {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source refresh revision is exhausted",
+			basespec.ErrInvalid,
+		)
 	}
 
-	if _, err := tx.ExecContext(
-		ctx,
-		`DELETE FROM artifact_current_occurrences
-		 WHERE root_id = ? AND collection_id = ?`,
-		string(publication.Ref.RootID),
-		string(publication.Ref.CollectionID),
-	); err != nil {
-		return catalog.Snapshot{}, err
-	}
-
-	for _, occurrence := range publication.Occurrences {
-		diagnostics, err := encodeJSON(occurrence.Diagnostics)
-		if err != nil {
-			return catalog.Snapshot{}, err
-		}
-		var definitionRaw any
-		if occurrence.Definition != nil {
-			definitionRaw, err = encodeJSON(occurrence.Definition)
-			if err != nil {
-				return catalog.Snapshot{}, err
-			}
-		}
-		if _, err := tx.ExecContext(
-			ctx,
-			`INSERT INTO artifact_current_occurrences (
-				root_id, collection_id, source_id, locator, subresource_locator,
-				kind, logical_name, logical_version,
-				definition_digest, definition_json, source_content_digest, decoder_id,
-				state, diagnostics_json, observed_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-			string(publication.Ref.RootID),
-			string(publication.Ref.CollectionID),
-			string(occurrence.Key.SourceID),
-			string(occurrence.Key.Locator),
-			string(occurrence.Key.SubresourceLocator),
-			string(occurrence.Kind),
-			string(occurrence.LogicalName),
-			string(occurrence.LogicalVersion),
-			nullableDigest(occurrence.DefinitionDigest),
-			definitionRaw,
-			nullableDigest(occurrence.SourceContentDigest),
-			string(occurrence.DecoderID),
-			string(occurrence.State),
-			diagnostics,
-			timeValue(occurrence.ObservedAt),
-		); err != nil {
-			return catalog.Snapshot{}, sqliteError(err)
-		}
-	}
-
-	for _, value := range publication.ArtifactCreates {
-		if err := requireAttachedSourceTx(
+	for _, value := range publication.Definitions {
+		if err := putDefinitionTx(
 			ctx,
 			tx,
-			publication.Ref,
-			value.Binding.SourceID,
+			publication.RootID,
+			value,
+			publication.RefreshedAt,
 		); err != nil {
-			return catalog.Snapshot{}, err
-		}
-		if err := insertArtifactTx(ctx, tx, value); err != nil {
-			return catalog.Snapshot{}, err
+			return source.RefreshState{}, err
 		}
 	}
-	// Artifact updates are source-derived state transitions. Validate them
-	// against both the persisted Artifact binding and this publication's
-	// occurrences before mutating metadata.
+	for _, value := range publication.ArtifactCreates {
+		if value.ResolvedDefinition == nil {
+			return source.RefreshState{}, fmt.Errorf(
+				"%w: source-created Artifact has no Definition",
+				basespec.ErrInvalid,
+			)
+		}
+		if _, err := getDefinitionTx(ctx, tx, publication.RootID, *value.ResolvedDefinition); err != nil {
+			return source.RefreshState{}, err
+		}
+	}
+	for _, value := range publication.ArtifactCreates {
+		if err := requireActiveSourceTx(
+			ctx,
+			tx,
+			publication.RootID,
+			value.Binding.SourceID,
+		); err != nil {
+			return source.RefreshState{}, err
+		}
+		if err := insertArtifactTx(ctx, tx, value); err != nil {
+			return source.RefreshState{}, err
+		}
+	}
+	for _, update := range publication.ArtifactUpdates {
+		if update.ResolvedDefinition == nil {
+			continue
+		}
+		if _, err := getDefinitionTx(
+			ctx,
+			tx,
+			publication.RootID,
+			*update.ResolvedDefinition,
+		); err != nil {
+			return source.RefreshState{}, err
+		}
+	}
 	for _, update := range publication.ArtifactUpdates {
 		if err := updateArtifactSourceStateTx(
 			ctx,
 			tx,
 			update,
-			occurrencesByKey,
 		); err != nil {
-			return catalog.Snapshot{}, err
+			return source.RefreshState{}, err
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return catalog.Snapshot{}, err
+	diagnostics, err := encodeJSON(publication.Diagnostics)
+	if err != nil {
+		return source.RefreshState{}, err
 	}
-
-	occurrences := make([]catalog.Occurrence, len(publication.Occurrences))
-	for index, occurrence := range publication.Occurrences {
-		occurrences[index] = occurrence.Clone()
-	}
-
-	snapshot := catalog.Snapshot{
-		RootID:              publication.Ref.RootID,
-		CollectionID:        publication.Ref.CollectionID,
-		Revision:            nextCatalogRevision,
-		CollectionRevision:  publication.ExpectedCollectionRevision,
-		AttachmentRevisions: maps.Clone(publication.ExpectedAttachmentRevisions),
-		SourceRevisions:     maps.Clone(publication.ExpectedSourceRevisions),
-		SourceGenerations:   maps.Clone(publication.SourceGenerations),
-		PlanFingerprint:     publication.PlanFingerprint,
-		DecoderFingerprint:  publication.DecoderFingerprint,
-		PublishedAt:         publication.PublishedAt,
-		Diagnostics:         diagnostic.Clone(publication.Diagnostics),
-		Occurrences:         occurrences,
-	}
-	if err := snapshot.Validate(); err != nil {
-		return catalog.Snapshot{}, err
-	}
-	return snapshot.Clone(), nil
-}
-
-func requirePublishedSourceGenerationsTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	rootID root.RootID,
-	collectionID collection.CollectionID,
-	generations map[source.SourceID]string,
-) error {
-	rows, err := tx.QueryContext(
+	nextRevision := currentRefreshRevision + 1
+	_, err = tx.ExecContext(
 		ctx,
-		`SELECT a.source_id
-		 FROM artifact_collection_attachments a
-		 JOIN artifact_sources s
-		   ON s.root_id = a.root_id
-		  AND s.id = a.source_id
-		 WHERE a.root_id = ?
-		   AND a.collection_id = ?
-		   AND a.enabled = 1
-		   AND s.enabled = 1
-		   AND s.retired_at IS NULL
-		 ORDER BY a.source_id`,
-		string(rootID),
-		string(collectionID),
-	)
-	if err != nil {
-		return err
-	}
-	defer rows.Close()
-
-	expected := make(map[source.SourceID]struct{})
-	for rows.Next() {
-		var sourceID string
-		if err := rows.Scan(&sourceID); err != nil {
-			return err
-		}
-		expected[source.SourceID(sourceID)] = struct{}{}
-	}
-	if err := rows.Err(); err != nil {
-		return err
-	}
-	if len(expected) != len(generations) {
-		return fmt.Errorf(
-			"%w: publication source generations do not match enabled collection sources",
-			basespec.ErrInvalid,
-		)
-	}
-	for sourceID := range expected {
-		if _, exists := generations[sourceID]; !exists {
-			return fmt.Errorf(
-				"%w: publication source generations do not match enabled collection sources",
-				basespec.ErrInvalid,
-			)
-		}
-	}
-	return nil
-}
-
-func updateArtifactSourceStateTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	value artifactimpl.SourceStateUpdate,
-	occurrences map[catalog.OccurrenceKey]catalog.Occurrence,
-) error {
-	current, err := getArtifactTx(ctx, tx, artifact.ArtifactRef{
-		RootID:     value.RootID,
-		ArtifactID: value.ArtifactID,
-	})
-	if err != nil {
-		return err
-	}
-	if current.CollectionID != value.CollectionID {
-		return fmt.Errorf(
-			"%w: source-derived artifact update belongs to another collection",
-			basespec.ErrInvalid,
-		)
-	}
-	if current.Revision != value.ExpectedRevision {
-		return fmt.Errorf(
-			"%w: artifact %q changed during refresh",
-			basespec.ErrConflict,
-			value.ArtifactID,
-		)
-	}
-	if value.Revision != current.Revision+1 {
-		return fmt.Errorf(
-			"%w: source-derived artifact update revision does not advance current state",
-			basespec.ErrInvalid,
-		)
-	}
-	if !value.ModifiedAt.After(current.ModifiedAt) {
-		return fmt.Errorf(
-			"%w: source-derived artifact update time must advance current state",
-			basespec.ErrInvalid,
-		)
-	}
-
-	key := catalog.OccurrenceKey{
-		CollectionID:       current.CollectionID,
-		SourceID:           current.Binding.SourceID,
-		Locator:            current.Binding.Locator,
-		SubresourceLocator: current.Binding.SubresourceLocator,
-	}
-	observed, found := occurrences[key]
-	var occurrence *catalog.Occurrence
-	if found {
-		occurrence = &observed
-	}
-
-	expectedDigest, expectedState, expectedDiagnostics, err := artifactimpl.DeriveSourceState(current, occurrence)
-	if err != nil {
-		return err
-	}
-	if value.State != expectedState ||
-		!cryptoutil.IsDigestEqual(value.ResolvedDefinition, expectedDigest) ||
-		!diagnostic.Equal(value.Diagnostics, expectedDiagnostics) {
-		return fmt.Errorf(
-			"%w: source-derived artifact update does not match current occurrence",
-			basespec.ErrInvalid,
-		)
-	}
-
-	diagnostics, err := encodeJSON(value.Diagnostics)
-	if err != nil {
-		return err
-	}
-	result, err := tx.ExecContext(
-		ctx,
-		`UPDATE artifact_artifacts
-		 SET resolved_definition_digest = ?,
-		     state = ?,
-		     diagnostics_json = ?,
-		     revision = ?,
-		     modified_at = ?
-		 WHERE id = ? AND root_id = ? AND collection_id = ? AND revision = ?`,
-		nullableDigest(value.ResolvedDefinition),
-		string(value.State),
+		`INSERT INTO artifact_source_refresh_state (
+			root_id, source_id, source_revision, source_generation,
+			discovery_fingerprint, decoder_fingerprint, revision,
+			refreshed_at, diagnostics_json
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(root_id, source_id) DO UPDATE SET
+			source_revision = excluded.source_revision,
+			source_generation = excluded.source_generation,
+			discovery_fingerprint = excluded.discovery_fingerprint,
+			decoder_fingerprint = excluded.decoder_fingerprint,
+			revision = excluded.revision,
+			refreshed_at = excluded.refreshed_at,
+			diagnostics_json = excluded.diagnostics_json`,
+		string(publication.RootID),
+		string(publication.SourceID),
+		publication.ExpectedSourceRevision,
+		publication.SourceGeneration,
+		string(publication.DiscoveryFingerprint),
+		string(publication.DecoderFingerprint),
+		nextRevision,
+		timeValue(publication.RefreshedAt),
 		diagnostics,
-		value.Revision,
-		timeValue(value.ModifiedAt),
-		string(value.ArtifactID),
-		string(value.RootID),
-		string(value.CollectionID),
-		value.ExpectedRevision,
 	)
 	if err != nil {
-		return sqliteError(err)
+		return source.RefreshState{}, sqliteError(err)
 	}
-	changed, err := result.RowsAffected()
-	if err != nil {
-		return err
+	if err := tx.Commit(); err != nil {
+		return source.RefreshState{}, err
 	}
-	if changed != 1 {
-		return fmt.Errorf(
-			"%w: artifact %q changed during refresh",
-			basespec.ErrConflict,
-			value.ArtifactID,
+
+	output := source.RefreshState{
+		RootID:               publication.RootID,
+		SourceID:             publication.SourceID,
+		SourceRevision:       publication.ExpectedSourceRevision,
+		SourceGeneration:     publication.SourceGeneration,
+		DiscoveryFingerprint: publication.DiscoveryFingerprint,
+		DecoderFingerprint:   publication.DecoderFingerprint,
+		Revision:             nextRevision,
+		RefreshedAt:          publication.RefreshedAt,
+		Diagnostics:          publication.Diagnostics,
+	}
+	if err := output.Validate(); err != nil {
+		return source.RefreshState{}, err
+	}
+	return output.Clone(), nil
+}
+
+func scanRefreshState(
+	row scanner,
+) (source.RefreshState, error) {
+	var (
+		rootID, sourceID, generation             string
+		discoveryFingerprint, decoderFingerprint string
+		sourceRevision, revision                 uint64
+		refreshedAt                              int64
+		diagnosticsRaw                           []byte
+	)
+	if row == nil {
+		return source.RefreshState{}, fmt.Errorf(
+			"%w: Source refresh state row is nil",
+			basespec.ErrInvalid,
 		)
 	}
-	return nil
+	if err := row.Scan(
+		&rootID,
+		&sourceID,
+		&sourceRevision,
+		&generation,
+		&discoveryFingerprint,
+		&decoderFingerprint,
+		&revision,
+		&refreshedAt,
+		&diagnosticsRaw,
+	); err != nil {
+		return source.RefreshState{}, err
+	}
+	var diagnostics []diagnostic.Diagnostic
+	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
+		return source.RefreshState{}, err
+	}
+	value := source.RefreshState{
+		RootID:               root.RootID(rootID),
+		SourceID:             source.SourceID(sourceID),
+		SourceRevision:       sourceRevision,
+		SourceGeneration:     generation,
+		DiscoveryFingerprint: cryptoutil.Digest(discoveryFingerprint),
+		DecoderFingerprint:   cryptoutil.Digest(decoderFingerprint),
+		Revision:             revision,
+		RefreshedAt:          parseTime(refreshedAt),
+		Diagnostics:          diagnostics,
+	}
+	if err := value.Validate(); err != nil {
+		return source.RefreshState{}, fmt.Errorf(
+			"invalid persisted Source refresh state: %w",
+			err,
+		)
+	}
+	return value, nil
 }

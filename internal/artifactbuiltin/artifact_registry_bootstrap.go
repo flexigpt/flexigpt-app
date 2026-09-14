@@ -35,9 +35,9 @@ type HydrationInstaller interface {
 	// topology and package state. It may publish managed Source content.
 	EnsureHydration(ctx context.Context, current bool) error
 
-	// FinalizeHydration runs after every hydration installer has completed its
-	// package publication. It must reconcile source-derived state, such as
-	// catalogs, against the final shared Source generation. It must not mutate
+	// FinalizeHydration runs after every hydration installer has completed
+	// package publication. It must refresh source-backed Artifact state against
+	// the final shared Source generation. It must not mutate
 	// managed package content or topology.
 	FinalizeHydration(ctx context.Context) error
 }
@@ -294,7 +294,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 
 	// Installers can share a protected managed Source. A later installer may
 	// advance the shared Source revision after an earlier installer refreshed
-	// its own catalog. Reconcile every hydration-aware installer only after
+	// its Artifact state. Refresh every hydration-aware installer only after
 	// all package publication has completed.
 	for _, entry := range entries {
 		hydrated, supported := entry.installer.(HydrationInstaller)

@@ -9,17 +9,14 @@ import (
 	"io"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-// SettingsOverlayRepository implements OverlayRepository over application
-// settings. It contains only installation metadata and opaque secret refs.
 type SettingsOverlayRepository struct {
 	values SettingsValueStore
 }
@@ -44,7 +41,6 @@ func (r *SettingsOverlayRepository) GetServerOverlay(
 	if err != nil {
 		return ServerOverlay{}, false, err
 	}
-
 	raw, found, err := r.values.GetMCPInstallationValue(ctx, key)
 	if err != nil || !found {
 		return ServerOverlay{}, found, err
@@ -58,31 +54,6 @@ func (r *SettingsOverlayRepository) GetServerOverlay(
 		return ServerOverlay{}, false, err
 	}
 	return cloneServerOverlay(value), true, nil
-}
-
-func (r *SettingsOverlayRepository) GetBundleOverlay(
-	ctx context.Context,
-	rootID root.RootID,
-	collectionID collection.CollectionID,
-) (BundleOverlay, bool, error) {
-	key, err := bundleOverlayStorageKey(rootID, collectionID)
-	if err != nil {
-		return BundleOverlay{}, false, err
-	}
-
-	raw, found, err := r.values.GetMCPInstallationValue(ctx, key)
-	if err != nil || !found {
-		return BundleOverlay{}, found, err
-	}
-
-	var value BundleOverlay
-	if err := decodeOverlay(raw, &value); err != nil {
-		return BundleOverlay{}, false, err
-	}
-	if err := value.Validate(); err != nil {
-		return BundleOverlay{}, false, err
-	}
-	return value, true, nil
 }
 
 func (r *SettingsOverlayRepository) PutServerOverlay(
@@ -104,40 +75,6 @@ func (r *SettingsOverlayRepository) PutServerOverlay(
 	if err := value.Validate(); err != nil {
 		return err
 	}
-
-	raw, err := encodeOverlay(value)
-	if err != nil {
-		return err
-	}
-	return r.values.PutMCPInstallationValue(
-		ctx,
-		key,
-		expectedRevision,
-		raw,
-	)
-}
-
-func (r *SettingsOverlayRepository) PutBundleOverlay(
-	ctx context.Context,
-	rootID root.RootID,
-	collectionID collection.CollectionID,
-	expectedRevision uint64,
-	value BundleOverlay,
-) error {
-	key, err := bundleOverlayStorageKey(rootID, collectionID)
-	if err != nil {
-		return err
-	}
-	if err := validateExpectedOverlayRevision(
-		expectedRevision,
-		value.Revision,
-	); err != nil {
-		return err
-	}
-	if err := value.Validate(); err != nil {
-		return err
-	}
-
 	raw, err := encodeOverlay(value)
 	if err != nil {
 		return err
@@ -172,32 +109,6 @@ func (r *SettingsOverlayRepository) DeleteServerOverlay(
 	)
 }
 
-func (r *SettingsOverlayRepository) DeleteBundleOverlay(
-	ctx context.Context,
-	rootID root.RootID,
-	collectionID collection.CollectionID,
-	expectedRevision uint64,
-) error {
-	key, err := bundleOverlayStorageKey(rootID, collectionID)
-	if err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf(
-			"%w: expected MCP bundle overlay revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	return r.values.DeleteMCPInstallationValue(
-		ctx,
-		key,
-		expectedRevision,
-	)
-}
-
-// PurgeRoot is intentionally available only through trusted protected
-// hydration. It removes local overlays before a stale protected topology is
-// rebuilt with a new static registration set.
 func (r *SettingsOverlayRepository) PurgeRoot(
 	ctx context.Context,
 	rootID root.RootID,
@@ -205,11 +116,10 @@ func (r *SettingsOverlayRepository) PurgeRoot(
 	if err := rootID.Validate(); err != nil {
 		return err
 	}
-
 	store, supported := r.values.(SettingsPrefixValueStore)
 	if !supported {
 		return fmt.Errorf(
-			"%w: MCP installation settings store cannot purge a protected Root",
+			"%w: MCP installation settings store cannot purge protected Root",
 			basespec.ErrUnsupported,
 		)
 	}
@@ -220,7 +130,7 @@ func (r *SettingsOverlayRepository) PurgeRoot(
 }
 
 func (value ServerOverlay) Validate() error {
-	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
+	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP server overlay schema %q",
 			basespec.ErrInvalid,
@@ -236,23 +146,6 @@ func (value ServerOverlay) Validate() error {
 	return value.ServerData.Validate()
 }
 
-func (value BundleOverlay) Validate() error {
-	if value.SchemaVersion != artifactbuiltin.MCPSchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported MCP bundle overlay schema %q",
-			basespec.ErrInvalid,
-			value.SchemaVersion,
-		)
-	}
-	if value.Revision == 0 {
-		return fmt.Errorf(
-			"%w: MCP bundle overlay revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
-}
-
 func serverOverlayStorageKey(
 	ref artifact.ArtifactRef,
 ) (string, error) {
@@ -263,22 +156,6 @@ func serverOverlayStorageKey(
 		string(ref.RootID) +
 		"/servers/" +
 		string(ref.ArtifactID), nil
-}
-
-func bundleOverlayStorageKey(
-	rootID root.RootID,
-	collectionID collection.CollectionID,
-) (string, error) {
-	if err := rootID.Validate(); err != nil {
-		return "", err
-	}
-	if err := collectionID.Validate(); err != nil {
-		return "", err
-	}
-	return settingsOverlayPrefix +
-		string(rootID) +
-		"/bundles/" +
-		string(collectionID), nil
 }
 
 func validateExpectedOverlayRevision(
@@ -342,7 +219,6 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 
 func cloneServerOverlay(input ServerOverlay) ServerOverlay {
 	output := input
-	output.ServerData = input.ServerData
 	output.ServerData.Inputs = make(
 		map[string]mcpDomainServer.InputBinding,
 		len(input.ServerData.Inputs),

@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
-// RuntimePackageLocator applies only Agent Skill binding rules. Artifact Store
-// owns source generation verification, digest verification, snapshot lifecycle,
-// and native path resolution.
+// RuntimePackageLocator derives the Skill package directory from a verified
+// SKILL.md Artifact binding. Artifact Store verifies source generation and the
+// source content digest before exposing the returned local path.
 func RuntimePackageLocator(
 	locator basespec.Locator,
 	subresource basespec.SubresourceLocator,
@@ -20,26 +19,25 @@ func RuntimePackageLocator(
 	}
 	if subresource != "" {
 		return "", fmt.Errorf(
-			"%w: Agent Skill bindings cannot target a subresource",
+			"%w: Skill bindings cannot target a subresource",
 			basespec.ErrUnsupported,
 		)
 	}
-	if basespec.Locator(path.Base(string(locator))) != artifactbuiltin.AgentSkillDefinitionFileName {
+	if path.Base(string(locator)) != string(SkillDefinitionFileName) {
 		return "", fmt.Errorf(
-			"%w: Agent Skill locator %q is not %q",
+			"%w: Skill locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			artifactbuiltin.AgentSkillDefinitionFileName,
+			SkillDefinitionFileName,
 		)
 	}
 
-	packageLocator := basespec.Locator(path.Dir(string(locator)))
-	if packageLocator == "." {
-		return "", fmt.Errorf(
-			"%w: Agent Skill package cannot be the Source root",
-			basespec.ErrInvalid,
-		)
+	directory := basespec.Locator(path.Dir(string(locator)))
+	if directory == "." {
+		return directory, nil
 	}
-
-	return packageLocator, nil
+	if err := directory.ValidatePortable(false); err != nil {
+		return "", err
+	}
+	return directory, nil
 }

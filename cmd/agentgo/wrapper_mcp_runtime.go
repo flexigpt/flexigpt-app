@@ -26,8 +26,9 @@ type MCPGlobalSettingsView struct {
 	OAuthLoopbackError      string                  `json:"oauthLoopbackError,omitempty"`
 }
 
-// MCPRuntimeWrapper exposes pure Runtime operations. Every server argument is
-// an opaque runtime ServerID. ArtifactRef translation is deliberately absent.
+// MCPRuntimeWrapper exposes pure Runtime operations. Every server argument
+// remains an opaque runtime ServerID. ArtifactRef translation stays in the
+// MCP aggregate wrapper.
 type MCPRuntimeWrapper struct {
 	runtime    *mcpConnection.MCPRuntimeManager
 	toolBridge *invocation.ToolBridge

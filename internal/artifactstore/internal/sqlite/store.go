@@ -17,18 +17,18 @@ type Store struct {
 	db *sql.DB
 }
 
-const schemaMarkerTable = "artifact_store_v2"
+const (
+	schemaMarkerTable   = "artifact_store_v3"
+	legacyMarkerTableV2 = "artifact_store_v2"
+)
 
-var schemaV2RequiredTables = []string{
+var schemaV3RequiredTables = []string{
 	"artifact_roots",
 	"artifact_topology_hydrations",
 	"artifact_sources",
-	"artifact_collections",
-	"artifact_collection_attachments",
-	"artifact_current_catalogs",
-	"artifact_current_occurrences",
+	"artifact_source_refresh_state",
+	"artifact_definitions",
 	"artifact_artifacts",
-	"artifact_suppressions",
 }
 
 func Open(
@@ -42,23 +42,33 @@ func Open(
 		)
 	}
 	if strings.TrimSpace(path) == "" {
-		return nil, fmt.Errorf("%w: SQLite path is empty", basespec.ErrInvalid)
+		return nil, fmt.Errorf(
+			"%w: SQLite path is empty",
+			basespec.ErrInvalid,
+		)
 	}
 	absolute, err := filepath.Abs(path)
 	if err != nil {
 		return nil, err
 	}
-	path = filepath.Clean(absolute)
 
-	db, err := sql.Open("sqlite", dataSourceName(path))
+	db, err := sql.Open(
+		"sqlite",
+		dataSourceName(filepath.Clean(absolute)),
+	)
 	if err != nil {
-		return nil, fmt.Errorf("open artifact metadata database: %w", err)
+		return nil, fmt.Errorf(
+			"open Artifact Store metadata database: %w",
+			err,
+		)
 	}
 	db.SetMaxOpenConns(4)
-
 	if err := db.PingContext(ctx); err != nil {
 		_ = db.Close()
-		return nil, fmt.Errorf("ping artifact metadata database: %w", err)
+		return nil, fmt.Errorf(
+			"ping Artifact Store metadata database: %w",
+			err,
+		)
 	}
 	if err := initializeSchema(ctx, db); err != nil {
 		_ = db.Close()
@@ -84,40 +94,53 @@ func initializeSchema(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	markerExists, err := tableExistsTx(ctx, tx, schemaMarkerTable)
+	v3Exists, err := tableExistsTx(ctx, tx, schemaMarkerTable)
 	if err != nil {
 		return err
 	}
-
-	if markerExists {
-		if err := verifySchemaV2Tx(ctx, tx); err != nil {
+	if v3Exists {
+		if err := verifySchemaV3Tx(ctx, tx); err != nil {
 			return err
 		}
 		return tx.Commit()
 	}
 
-	if _, err := tx.ExecContext(ctx, schema); err != nil {
-		return fmt.Errorf("initialize Artifact Store schema: %w", err)
+	v2Exists, err := tableExistsTx(
+		ctx,
+		tx,
+		legacyMarkerTableV2,
+	)
+	if err != nil {
+		return err
+	}
+	if v2Exists {
+		return fmt.Errorf(
+			"%w: Artifact Store metadata is v2; use the v3 Artifact Store directory",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	if _, err := tx.ExecContext(ctx, sqliteSchema); err != nil {
+		return fmt.Errorf(
+			"initialize Artifact Store v3 schema: %w",
+			err,
+		)
 	}
 	return tx.Commit()
 }
 
-func verifySchemaV2Tx(
+func verifySchemaV3Tx(
 	ctx context.Context,
 	tx *sql.Tx,
 ) error {
-	for _, table := range schemaV2RequiredTables {
+	for _, table := range schemaV3RequiredTables {
 		exists, err := tableExistsTx(ctx, tx, table)
 		if err != nil {
-			return fmt.Errorf(
-				"inspect Artifact Store schema table %q: %w",
-				table,
-				err,
-			)
+			return err
 		}
 		if !exists {
 			return fmt.Errorf(
-				"%w: Artifact Store database does not match schema v2; use a fresh Artifact Store base directory",
+				"%w: Artifact Store database does not match v3 schema",
 				basespec.ErrUnsupported,
 			)
 		}

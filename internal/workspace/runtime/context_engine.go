@@ -13,7 +13,7 @@ const (
 	maxContextPromptBytes          = 2 << 20
 
 	contextPromptSeparator   = "\n\n"
-	contextPromptStartFormat = "<<<WORKSPACE_CONTEXT name=%q role=%q source=%q>>>\n"
+	contextPromptStartFormat = "<<<WORKSPACE_ARTIFACT type=%q name=%q source=%q>>>\n"
 	contextPromptEndMarker   = "\n<<<END_WORKSPACE_CONTEXT>>>"
 )
 
@@ -94,7 +94,7 @@ const (
 type ContextContribution struct {
 	ID      string
 	Name    string
-	Role    string
+	Kind    string
 	Locator string
 	Content string
 
@@ -334,8 +334,8 @@ func renderContextContribution(
 	fmt.Fprintf(
 		&output,
 		contextPromptStartFormat,
+		value.Kind,
 		value.Name,
-		value.Role,
 		value.Locator,
 	)
 	output.WriteString(content)

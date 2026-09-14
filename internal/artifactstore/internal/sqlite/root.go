@@ -145,7 +145,7 @@ func (s *Store) retireRoot(
 	}
 	if activeChildren {
 		return fmt.Errorf(
-			"%w: root %q still owns active sources or collections",
+			"%w: Root %q still owns Sources or Artifact records",
 			basespec.ErrConflict,
 			value.ID,
 		)
@@ -192,7 +192,7 @@ func (s *Store) purgeRoot(
 	}
 	if activeChildren {
 		return fmt.Errorf(
-			"%w: root %q still owns active sources or collections",
+			"%w: Root %q still owns Sources or Artifact records",
 			basespec.ErrConflict,
 			id,
 		)
@@ -267,8 +267,8 @@ func rootHasActiveChildrenTx(
 			WHERE root_id = ? AND retired_at IS NULL
 			UNION ALL
 			SELECT 1
-			FROM artifact_collections
-			WHERE root_id = ? AND retired_at IS NULL
+			FROM artifact_artifacts
+			WHERE root_id = ?
 		)`,
 		string(id),
 		string(id),
@@ -286,6 +286,12 @@ func scanRoot(row scanner) (root.Root, error) {
 		createdAt, modifiedAt                    int64
 		retiredAt                                sql.NullInt64
 	)
+	if row == nil {
+		return root.Root{}, fmt.Errorf(
+			"%w: Root row is nil",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := row.Scan(
 		&id,
 		&storageKey,

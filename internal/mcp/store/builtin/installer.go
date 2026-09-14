@@ -1,159 +1,93 @@
 package builtin
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"io/fs"
-	"path"
 	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpbundlev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainBundle "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/bundle"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
-// LoadEmbeddedRegistry loads only the source-controlled converted MCP
-// registry. It intentionally does not inspect or convert legacy runtime data,
-// overlays, secrets, or user state.
-func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
-	packages, err := artifactbuiltin.EmbeddedMCPPackages()
-	if err != nil {
-		return Registry{}, nil, err
-	}
-	raw, err := artifactbuiltin.ReadEmbeddedMCPRegistry()
-	if err != nil {
-		return Registry{}, nil, err
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	var registry Registry
-	if err := decoder.Decode(&registry); err != nil {
-		return Registry{}, nil, fmt.Errorf(
-			"decode embedded built-in MCP registry: %w",
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("embedded built-in MCP registry has trailing JSON")
-		}
-		return Registry{}, nil, err
-	}
-	if err := registry.Validate(); err != nil {
-		return Registry{}, nil, err
-	}
-
-	return registry, packages, nil
-}
-
-type rootOverlayPurger interface {
-	PurgeRoot(
-		ctx context.Context,
-		rootID root.RootID,
-	) error
-}
-
 type InstallerDependencies struct {
-	Bundles            mcpConsumerAPI.BuiltinStore
-	Registry           Registry
-	Packages           fs.FS
-	Overlays           mcpOverlay.OverlayRepository
-	ShareableDocuments providerapi.ExpectedCanonicalizer
+	MCP      mcpConsumerAPI.BuiltinStore
+	Registry Registry
+	Packages fs.FS
+	Overlays mcpOverlay.RootPurger
 }
 
 type Installer struct {
-	bundles         mcpConsumerAPI.BuiltinStore
-	registry        Registry
+	mcp             mcpConsumerAPI.BuiltinStore
 	builtInTopology topology.Declaration
-	packages        fs.FS
-	overlays        mcpOverlay.OverlayRepository
-	documents       providerapi.ExpectedCanonicalizer
-	packageScopes   []basespec.Locator
-	prepared        []preparedBundle
+	overlays        mcpOverlay.RootPurger
+	prepared        []PreparedPackage
 	fingerprint     cryptoutil.Digest
-}
-
-type preparedBundle struct {
-	registration   BundleRegistration
-	document       mcpDomainBundle.BundleDocument
-	parsed         schema.ParsedDocument
-	packageAddress source.ManagedPackageAddress
-	packageFiles   []source.ManagedPackageFile
-	packageDigest  cryptoutil.Digest
+	packageScopes   []basespec.Locator
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.Bundles == nil ||
-		dependencies.Packages == nil {
+	if dependencies.MCP == nil || dependencies.Packages == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP built-in installer dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-	if dependencies.ShareableDocuments == nil {
-		return nil, fmt.Errorf(
-			"%w: MCP built-in Artifact Store document canonicalizer is required",
-			basespec.ErrInvalid,
-		)
+	topologyValue := artifactbuiltin.BuiltinTopologyDeclaration()
+	if err := topologyValue.Validate(); err != nil {
+		return nil, err
 	}
 	if err := dependencies.Registry.Validate(); err != nil {
 		return nil, err
 	}
-	builtInTopology := artifactbuiltin.BuiltinTopologyDeclaration()
-	if err := builtInTopology.Validate(); err != nil {
+	prepared, err := PreparePackages(
+		context.Background(),
+		dependencies.Registry,
+		dependencies.Packages,
+	)
+	if err != nil {
 		return nil, err
 	}
-	inst := &Installer{
-		bundles:         dependencies.Bundles,
-		registry:        dependencies.Registry,
-		builtInTopology: builtInTopology,
-		packages:        dependencies.Packages,
+	fingerprint, err := hydrationFingerprint(topologyValue, prepared)
+	if err != nil {
+		return nil, err
+	}
+	scopes, err := packageScopes(prepared)
+	if err != nil {
+		return nil, err
+	}
+	return &Installer{
+		mcp:             dependencies.MCP,
+		builtInTopology: topologyValue,
 		overlays:        dependencies.Overlays,
-		documents:       dependencies.ShareableDocuments,
-	}
+		prepared:        prepared,
+		fingerprint:     fingerprint,
+		packageScopes:   scopes,
+	}, nil
+}
 
-	// Validate every embedded document and package path before exposing the
-	// installer to bootstrap. This catches stale registry paths and filenames
-	// before protected topology mutation starts.
-	prepared, err := inst.prepareBundles(context.Background())
-	if err != nil {
-		return nil, err
+func (*Installer) BuiltInName() string {
+	return mcpDomain.BuiltInInstallerName
+}
+
+func (*Installer) BuiltInIDs() []string {
+	return nil
+}
+
+func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
+	if i == nil {
+		return nil
 	}
-	fingerprint, err := inst.hydrationFingerprint(prepared)
-	if err != nil {
-		return nil, err
-	}
-	scopes, err := builtInPackageScopes(prepared)
-	if err != nil {
-		return nil, err
-	}
-	inst.prepared = append([]preparedBundle(nil), prepared...)
-	inst.fingerprint = fingerprint
-	inst.packageScopes = scopes
-	return inst, nil
+	return append([]basespec.Locator(nil), i.packageScopes...)
 }
 
 func (i *Installer) DesiredHydration(
@@ -168,13 +102,6 @@ func (i *Installer) DesiredHydration(
 	if err := ctx.Err(); err != nil {
 		return topology.Hydration{}, err
 	}
-	if i.fingerprint == "" {
-		return topology.Hydration{}, fmt.Errorf(
-			"%w: MCP hydration fingerprint is unavailable",
-			basespec.ErrClosed,
-		)
-	}
-
 	return topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.builtInTopology.Root.ID,
@@ -183,10 +110,6 @@ func (i *Installer) DesiredHydration(
 	}, nil
 }
 
-// EnsureHydration is called after generic topology hydration preparation.
-// A stale fingerprint causes generic topology reset before this method is
-// entered. MCP then removes local protected overlays for the reset Root and
-// installs only source-controlled static registrations.
 func (i *Installer) EnsureHydration(
 	ctx context.Context,
 	current bool,
@@ -197,58 +120,51 @@ func (i *Installer) EnsureHydration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if current {
-		return nil
-	}
-
-	if !current {
-		if purger, supported := i.overlays.(rootOverlayPurger); supported {
-			if err := purger.PurgeRoot(
-				ctx,
-				i.builtInTopology.Root.ID,
-			); err != nil {
-				return fmt.Errorf(
-					"purge stale MCP protected installation overlays: %w",
-					err,
-				)
-			}
+	if !current && i.overlays != nil {
+		if err := i.overlays.PurgeRoot(
+			ctx,
+			i.builtInTopology.Root.ID,
+		); err != nil {
+			return err
 		}
 	}
+	if current {
+		return i.FinalizeHydration(ctx)
+	}
+	return i.Ensure(ctx)
+}
 
-	prepared, err := i.preparedBundles(ctx)
-	if err != nil {
+func (i *Installer) Ensure(
+	ctx context.Context,
+) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	for _, value := range prepared {
-		if _, err := i.bundles.EnsureBuiltIn(
+	for _, value := range i.prepared {
+		if _, err := i.mcp.InstallBuiltInPackage(
 			ctx,
-			mcpConsumerAPI.EnsureBuiltInRequest{
+			mcpConsumerAPI.BuiltInPackageInstallRequest{
 				RootID:         i.builtInTopology.Root.ID,
-				CollectionID:   value.registration.CollectionID,
 				SourceID:       i.builtInTopology.Sources[0].ID,
-				PackageAddress: value.packageAddress,
-				Document:       value.parsed,
-				Registrations:  value.registration.ToBundleRegistrations(),
-				PackageFiles:   value.packageFiles,
+				PackageAddress: value.PackageAddress,
+				DocumentFile:   value.DocumentFile,
+				PackageFiles:   value.PackageFiles,
+				Expectations:   value.Expectations,
 			},
 		); err != nil {
 			return fmt.Errorf(
-				"install protected MCP Bundle %q: %w",
-				value.registration.CollectionID,
+				"install built-in MCP package %q: %w",
+				value.Registration.EmbeddedPackageRoot,
 				err,
 			)
 		}
 	}
-
-	return i.ensureCurrentBundles(ctx)
+	return i.FinalizeHydration(ctx)
 }
 
-// FinalizeHydration reconciles MCP catalogs after all installers sharing the
-// protected managed Source have completed package publication.
-//
-// It intentionally does not write MCP packages. The generic bootstrap calls
-// this after the primary install pass, which lets MCP and Skill catalogs
-// converge on the same final Source revision and generation.
 func (i *Installer) FinalizeHydration(
 	ctx context.Context,
 ) error {
@@ -258,478 +174,61 @@ func (i *Installer) FinalizeHydration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	return i.ensureCurrentBundles(ctx)
-}
-
-func (*Installer) BuiltInName() string {
-	return artifactbuiltin.MCPBuiltInInstallerName
-}
-
-// BuiltInIDs exposes only Collection and Artifact IDs. The generic bootstrap
-// registry reserves the protected Root and shared Source IDs itself.
-func (i *Installer) BuiltInIDs() []string {
-	if i == nil {
-		return nil
-	}
-
-	ids := make([]string, 0)
-	for _, registered := range i.registry.OrderedBundles() {
-		ids = append(ids, string(registered.CollectionID))
-		for _, value := range registered.Artifacts {
-			ids = append(ids, string(value.ID))
-		}
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
-	if i == nil {
-		return nil
-	}
-	return append([]basespec.Locator(nil), i.packageScopes...)
-}
-
-// builtInPackageScopes returns destination managed-package roots, not
-// embedded source-tree roots. Bootstrap scope checks must protect the shared
-// managed Source namespace used after hydration.
-func builtInPackageScopes(
-	prepared []preparedBundle,
-) ([]basespec.Locator, error) {
-	scopes := make([]basespec.Locator, 0, len(prepared))
-	for _, value := range prepared {
-		scope, err := value.packageAddress.Directory()
-		if err != nil {
-			return nil, err
-		}
-		scopes = append(scopes, scope)
-	}
-	slices.Sort(scopes)
-	return scopes, nil
-}
-
-// Ensure satisfies the generic installer contract. Hydration-aware bootstrap
-// calls EnsureHydration instead and supplies the current marker state.
-func (i *Installer) Ensure(ctx context.Context) error {
-	return i.EnsureHydration(ctx, false)
-}
-
-func (i *Installer) ensureCurrentBundles(ctx context.Context) error {
-	prepared, err := i.preparedBundles(ctx)
-	if err != nil {
-		return err
-	}
-	for _, expected := range prepared {
-		if err := i.bundles.EnsureBuiltInCurrent(
-			ctx,
-			collection.CollectionRef{
-				RootID:       i.builtInTopology.Root.ID,
-				CollectionID: expected.registration.CollectionID,
-			},
-		); err != nil {
-			return err
-		}
-		if err := i.verifyCurrentBundle(ctx, expected); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// verifyCurrentBundle proves that the current catalog is backed by the static
-// Artifact registrations expected by the embedded MCP registry. Catalog
-// freshness alone does not prove that a previous interrupted install retained
-// every pinned server and policy Artifact.
-func (i *Installer) verifyCurrentBundle(
-	ctx context.Context,
-	expected preparedBundle,
-) error {
-	ref := collection.CollectionRef{
-		RootID:       i.builtInTopology.Root.ID,
-		CollectionID: expected.registration.CollectionID,
-	}
-	current, err := i.bundles.Get(ctx, ref)
-	if err != nil {
-		return err
-	}
-	documentLocator, err := mcpDomainBundle.DocumentLocatorForPackage(
-		expected.packageAddress,
+	return i.mcp.EnsureBuiltInSourceCurrent(
+		ctx,
+		i.builtInTopology.Root.ID,
+		i.builtInTopology.Sources[0].ID,
 	)
-	if err != nil {
-		return err
-	}
-	if current.Collection.RootID != ref.RootID ||
-		current.Collection.ID != ref.CollectionID ||
-		current.Source.ID != i.builtInTopology.Sources[0].ID ||
-		current.PackageAddress != expected.packageAddress ||
-		current.DocumentLocator != documentLocator {
-		return fmt.Errorf(
-			"%w: built-in MCP Bundle %q does not match static topology",
-			basespec.ErrConflict,
-			expected.registration.CollectionID,
-		)
-	}
-
-	servers, err := i.bundles.ListServers(ctx, ref)
-	if err != nil {
-		return err
-	}
-	policies, err := i.bundles.ListPolicies(ctx, ref)
-	if err != nil {
-		return err
-	}
-	//nolint:gocritic // Need all records.
-	records := append(servers, policies...)
-
-	expectedByID := make(
-		map[artifact.ArtifactID]ArtifactRegistration,
-		len(expected.registration.Artifacts),
-	)
-	for _, registration := range expected.registration.Artifacts {
-		expectedByID[registration.ID] = registration
-	}
-	if len(records) != len(expectedByID) {
-		return fmt.Errorf(
-			"%w: built-in MCP Bundle %q has %d Artifacts, expected %d",
-			basespec.ErrConflict,
-			expected.registration.CollectionID,
-			len(records),
-			len(expectedByID),
-		)
-	}
-
-	seen := make(map[artifact.ArtifactID]struct{}, len(records))
-	for _, record := range records {
-		registration, found := expectedByID[record.ID]
-		if !found {
-			return fmt.Errorf(
-				"%w: built-in MCP Bundle %q contains undeclared Artifact %q",
-				basespec.ErrConflict,
-				expected.registration.CollectionID,
-				record.ID,
-			)
-		}
-		seen[record.ID] = struct{}{}
-
-		if record.RootID != ref.RootID ||
-			record.CollectionID != ref.CollectionID ||
-			record.Kind != registration.Kind ||
-			record.Adoption != artifact.AdoptionPinned ||
-			record.Enabled != registration.Enabled ||
-			record.Binding.SourceID != current.Source.ID ||
-			record.Binding.Locator != current.DocumentLocator ||
-			record.Binding.SubresourceLocator != registration.Subresource ||
-			record.Binding.ExpectedKind != registration.Kind ||
-			record.State != artifact.StateAvailable ||
-			record.ResolvedDefinition == nil {
-			return fmt.Errorf(
-				"%w: built-in MCP Artifact %q does not match static registry state",
-				basespec.ErrReferenceUnresolved,
-				record.ID,
-			)
-		}
-	}
-
-	for artifactID := range expectedByID {
-		if _, found := seen[artifactID]; found {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: built-in MCP Bundle %q is missing Artifact %q",
-			basespec.ErrReferenceUnresolved,
-			expected.registration.CollectionID,
-			artifactID,
-		)
-	}
-	return nil
 }
 
-func (i *Installer) preparedBundles(
-	ctx context.Context,
-) ([]preparedBundle, error) {
-	if i == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if len(i.prepared) == 0 {
-		return nil, fmt.Errorf("%w: MCP built-in bundles are not prepared", basespec.ErrClosed)
-	}
-	return append([]preparedBundle(nil), i.prepared...), nil
-}
-
-func (i *Installer) prepareBundles(
-	ctx context.Context,
-) ([]preparedBundle, error) {
-	if err := i.registry.Validate(); err != nil {
-		return nil, err
-	}
-
-	output := make([]preparedBundle, 0, len(i.registry.Bundles))
-	for _, registered := range i.registry.OrderedBundles() {
-		embeddedFiles, err := topology.ReadPackageFiles(
-			ctx,
-			i.packages,
-			registered.EmbeddedPackageRoot,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		documentFile := basespec.Locator(
-			path.Base(string(registered.EmbeddedDocumentLocator)),
-		)
-		var (
-			raw           []byte
-			foundDocument bool
-		)
-		for _, file := range embeddedFiles {
-			if file.Locator != documentFile {
-				continue
-			}
-			raw = append([]byte(nil), file.Content...)
-			foundDocument = true
-			break
-		}
-		if !foundDocument {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP package %q lacks document %q",
-				basespec.ErrInvalid,
-				registered.EmbeddedPackageRoot,
-				registered.EmbeddedDocumentLocator,
-			)
-		}
-
-		parsed, err := i.documents.CanonicalizeExpected(
-			ctx,
-			mcpbundlev1.MCPBundleSchemaKey,
-			raw,
-		)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"canonicalize built-in MCP document %q through the Artifact Store schema registry: %w",
-				registered.EmbeddedDocumentLocator,
-				err,
-			)
-		}
-
-		document, err := mcpDomainBundle.BundleFromParsedDocument(parsed)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"project canonical built-in MCP document %q: %w",
-				registered.EmbeddedDocumentLocator,
-				err,
-			)
-		}
-		if document.Digest != parsed.Digest {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP document %q digest differs from schema registry output",
-				basespec.ErrDigestMismatch,
-				registered.EmbeddedDocumentLocator,
-			)
-		}
-		packageAddress, err := mcpDomainBundle.PackageAddressForBundle(
-			document.LogicalName,
-			document.LogicalVersion,
-		)
-		if err != nil {
-			return nil, err
-		}
-		packageFiles, packageDigest, err := canonicalPackageFiles(
-			registered,
-			packageAddress,
-			embeddedFiles,
-			parsed.Raw,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		definitions, err := bundleDefinitions(document)
-		if err != nil {
-			return nil, err
-		}
-		if len(definitions) != len(registered.Artifacts) {
-			return nil, fmt.Errorf(
-				"%w: static MCP registration does not cover document %q",
-				basespec.ErrInvalid,
-				registered.EmbeddedDocumentLocator,
-			)
-		}
-		for subresource, kind := range definitions {
-			if !registeredHasKind(
-				registered,
-				subresource,
-				kind,
-			) {
-				return nil, fmt.Errorf(
-					"%w: static MCP registration lacks %q",
-					basespec.ErrReferenceUnresolved,
-					subresource,
-				)
-			}
-		}
-
-		output = append(output, preparedBundle{
-			registration:   registered,
-			document:       document,
-			parsed:         parsed.Clone(),
-			packageAddress: packageAddress,
-			packageFiles:   packageFiles,
-			packageDigest:  packageDigest,
-		})
-	}
-	return output, nil
-}
-
-func canonicalPackageFiles(
-	registered BundleRegistration,
-	address source.ManagedPackageAddress,
-	embeddedFiles []source.ManagedPackageFile,
-	canonicalDocument json.RawMessage,
-) ([]source.ManagedPackageFile, cryptoutil.Digest, error) {
-	documentFile := basespec.Locator(
-		path.Base(string(registered.EmbeddedDocumentLocator)),
-	)
-	files := make([]source.ManagedPackageFile, len(embeddedFiles))
-	foundDocument := false
-	for index, file := range embeddedFiles {
-		files[index] = source.ManagedPackageFile{
-			Locator: file.Locator,
-			Content: append([]byte(nil), file.Content...),
-		}
-		if file.Locator == documentFile {
-			files[index].Content = append([]byte(nil), canonicalDocument...)
-			foundDocument = true
-		}
-	}
-	if !foundDocument {
-		return nil, "", fmt.Errorf(
-			"%w: built-in MCP package %q lacks %q",
-			basespec.ErrInvalid,
-			registered.EmbeddedPackageRoot,
-			documentFile,
-		)
-	}
-
-	publication, err := source.NormalizeManagedPackagePublication(
-		source.ManagedPackagePublication{
-			Address: address,
-			Files:   files,
-		},
-	)
-	if err != nil {
-		return nil, "", err
-	}
-
-	type fingerprintFile struct {
-		Locator basespec.Locator  `json:"locator"`
-		Digest  cryptoutil.Digest `json:"digest"`
-		Size    int64             `json:"size"`
-	}
-	fingerprint := make(
-		[]fingerprintFile,
-		0,
-		len(publication.Files),
-	)
-	for _, file := range publication.Files {
-		fingerprint = append(fingerprint, fingerprintFile{
-			Locator: file.Locator,
-			Digest:  cryptoutil.DigestBytes(file.Content),
-			Size:    int64(len(file.Content)),
-		})
-	}
-	raw, err := json.Marshal(fingerprint)
-	if err != nil {
-		return nil, "", err
-	}
-	return publication.Files, cryptoutil.DigestBytes(raw), nil
-}
-
-func (i *Installer) hydrationFingerprint(
-	prepared []preparedBundle,
+func hydrationFingerprint(
+	topologyValue topology.Declaration,
+	prepared []PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	type artifactFingerprint struct {
-		ID          artifact.ArtifactID         `json:"id"`
-		Subresource basespec.SubresourceLocator `json:"subresource"`
-		Kind        artifact.ArtifactKind       `json:"kind"`
-		Enabled     bool                        `json:"enabled"`
+	type packageFingerprint struct {
+		Root   basespec.Locator  `json:"root"`
+		Digest cryptoutil.Digest `json:"digest"`
 	}
-	type bundleFingerprint struct {
-		CollectionID    collection.CollectionID      `json:"collectionID"`
-		PackageAddress  source.ManagedPackageAddress `json:"packageAddress"`
-		DocumentLocator basespec.Locator             `json:"embeddedDocumentLocator"`
-		DocumentDigest  cryptoutil.Digest            `json:"documentDigest"`
-		PackageDigest   cryptoutil.Digest            `json:"packageDigest"`
-		Artifacts       []artifactFingerprint        `json:"artifacts"`
-	}
-
-	values := make([]bundleFingerprint, 0, len(prepared))
+	values := make(
+		[]packageFingerprint,
+		0,
+		len(prepared),
+	)
 	for _, value := range prepared {
-		artifacts := make(
-			[]artifactFingerprint,
-			0,
-			len(value.registration.Artifacts),
-		)
-		for _, artifactValue := range value.registration.Artifacts {
-			artifacts = append(artifacts, artifactFingerprint(artifactValue))
+		digest, err := PackageFingerprint(value)
+		if err != nil {
+			return "", err
 		}
-		sort.Slice(artifacts, func(left, right int) bool {
-			return artifacts[left].ID < artifacts[right].ID
-		})
-		values = append(values, bundleFingerprint{
-			CollectionID:    value.registration.CollectionID,
-			PackageAddress:  value.packageAddress,
-			DocumentLocator: value.registration.EmbeddedDocumentLocator,
-			DocumentDigest:  value.document.Digest,
-			PackageDigest:   value.packageDigest,
-			Artifacts:       artifacts,
+		values = append(values, packageFingerprint{
+			Root:   value.Registration.EmbeddedPackageRoot,
+			Digest: digest,
 		})
 	}
-
-	raw, err := json.Marshal(struct {
+	sort.Slice(values, func(left, right int) bool {
+		return values[left].Root < values[right].Root
+	})
+	return cryptoutil.CanonicalDigest(struct {
 		SchemaVersion string               `json:"schemaVersion"`
 		Topology      topology.Declaration `json:"topology"`
-		Bundles       []bundleFingerprint  `json:"bundles"`
+		Packages      []packageFingerprint `json:"packages"`
 	}{
-		SchemaVersion: artifactbuiltin.MCPBundleHydrationFingerprintSchemaVersion,
-		Topology:      i.builtInTopology,
-		Bundles:       values,
+		SchemaVersion: mcpDomain.HydrationSchemaVersion,
+		Topology:      topologyValue,
+		Packages:      values,
 	})
-	if err != nil {
-		return "", err
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return "", err
-	}
-	return cryptoutil.DigestBytes(canonical), nil
 }
 
-func bundleDefinitions(
-	document mcpDomainBundle.BundleDocument,
-) (map[basespec.SubresourceLocator]artifact.ArtifactKind, error) {
-	definitions, err := mcpDomainBundle.DefinitionsForDocument(document)
-	if err != nil {
-		return nil, err
-	}
-	output := make(map[basespec.SubresourceLocator]artifact.ArtifactKind, len(definitions))
-	for locator, definitionValue := range definitions {
-		output[locator] = definitionValue.Kind
-	}
-	return output, nil
-}
-
-func registeredHasKind(
-	registered BundleRegistration,
-	subresource basespec.SubresourceLocator,
-	kind artifact.ArtifactKind,
-) bool {
-	for _, value := range registered.Artifacts {
-		if value.Subresource == subresource && value.Kind == kind {
-			return true
+func packageScopes(
+	prepared []PreparedPackage,
+) ([]basespec.Locator, error) {
+	output := make([]basespec.Locator, 0, len(prepared))
+	for _, value := range prepared {
+		scope, err := value.PackageAddress.Directory()
+		if err != nil {
+			return nil, err
 		}
+		output = append(output, scope)
 	}
-	return false
+	slices.Sort(output)
+	return output, nil
 }

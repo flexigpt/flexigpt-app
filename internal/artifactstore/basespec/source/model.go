@@ -14,6 +14,7 @@ type Draft struct {
 	DisplayName string              `json:"displayName"`
 	Enabled     bool                `json:"enabled"`
 	Config      json.RawMessage     `json:"config"`
+	Discovery   DiscoverySpec       `json:"discovery"`
 }
 
 type Update struct {
@@ -25,6 +26,10 @@ type Update struct {
 	// the current normalized configuration so public callers can update Source
 	// metadata without reading or resending private Source configuration.
 	Config json.RawMessage `json:"config,omitempty"`
+
+	// Discovery is a complete replacement when non-nil. A nil value preserves
+	// the current Store-owned declaration discovery configuration.
+	Discovery *DiscoverySpec `json:"discovery,omitempty"`
 }
 
 func cloneTime(value *time.Time) *time.Time {

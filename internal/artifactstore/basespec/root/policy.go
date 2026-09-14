@@ -8,11 +8,11 @@ type RootPolicy interface {
 }
 
 // RootDeletionPolicy is an optional lifecycle policy for Roots that must
-// remain present while still allowing ordinary mutation of their descendants.
+// remain present while still allowing ordinary descendant mutation.
 //
 // A retained Root is intentionally different from a protected topology Root:
-// protected Roots reject ordinary Source, Collection, and Artifact mutations;
-// retained Roots reject only Root retirement and purge.
+// protected Roots reject ordinary Source and Artifact mutations; retained
+// Roots reject only Root retirement and purge.
 type RootDeletionPolicy interface {
 	IsRootDeletionProtected(rootID RootID) bool
 }

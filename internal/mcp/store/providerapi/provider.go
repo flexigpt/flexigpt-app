@@ -2,33 +2,29 @@ package providerapi
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
-const artifactProviderName = "mcp-bundle"
+const artifactProviderName = "mcp"
 
-// Provider registers the MCP Bundle collection behavior, portable schemas,
-// and bundle decoder as one Artifact Store plugin.
+// Provider registers standalone MCP and MCP Policy schemas plus source format
+// adapters. It has no Collection behavior and emits only flat Artifacts.
 type Provider struct {
 	descriptor providerapi.Descriptor
 }
 
 func NewProvider() (*Provider, error) {
+	decoder := NewDecoder()
 	descriptor := providerapi.Descriptor{
 		Name: artifactProviderName,
-		CollectionBehaviors: []providerapi.CollectionBehavior{
-			NewCollectionBehavior(),
-		},
 		Schemas: []providerapi.SchemaCodec{
-			NewBundleCodec(),
-			NewServerCodec(),
+			NewMCPCodec(),
 			NewPolicyCodec(),
 		},
 		Decoders: []providerapi.Decoder{
-			NewDecoder(),
+			decoder,
 		},
 	}
 	if err := descriptor.Validate(); err != nil {
 		return nil, err
 	}
-
 	return &Provider{
 		descriptor: descriptor.Clone(),
 	}, nil

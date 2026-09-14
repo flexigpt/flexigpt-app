@@ -41,14 +41,35 @@ func MarshalCanonicalObject(value any, maximumBytes int) (json.RawMessage, error
 func DecodeCanonicalObject[T any](raw []byte, maximumBytes int) (T, error) {
 	var output T
 
-	canonical, err := CanonicalizeObject(raw, maximumBytes)
-	if err != nil {
-		return output, fmt.Errorf("canonicalize JSON object: %w", err)
-	}
-	if err := decodeBytes(canonical, &output, true, true); err != nil {
-		return output, fmt.Errorf("decode canonical JSON object: %w", err)
+	if err := DecodeCanonicalObjectInto(
+		raw,
+		&output,
+		maximumBytes,
+	); err != nil {
+		return output, err
 	}
 	return output, nil
+}
+
+// DecodeCanonicalObjectInto validates raw as one JSON object, canonicalizes
+// it, and strictly decodes it into target. It is the non-generic counterpart
+// to DecodeCanonicalObject for polymorphic contract values.
+func DecodeCanonicalObjectInto(
+	raw []byte,
+	target any,
+	maximumBytes int,
+) error {
+	if target == nil {
+		return errors.New("decode canonical JSON object target is nil")
+	}
+	canonical, err := CanonicalizeObject(raw, maximumBytes)
+	if err != nil {
+		return fmt.Errorf("canonicalize JSON object: %w", err)
+	}
+	if err := decodeBytes(canonical, target, true, true); err != nil {
+		return fmt.Errorf("decode canonical JSON object: %w", err)
+	}
+	return nil
 }
 
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {

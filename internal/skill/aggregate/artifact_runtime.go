@@ -14,15 +14,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
-// Service is an internal Artifact Store to Agent Skills bridge.
-//
-// Wails runtime APIs belong to SkillRuntimeWrapper. This service exists only
-// where backend callers hold ArtifactRef identities and need them translated
-// into runtime-owned SkillDef identities.
 type Service struct {
 	resolver *ArtifactRouter
 	runtime  *skillRuntime.Service
@@ -36,12 +31,11 @@ func New(
 	runtimeService *skillRuntime.Service,
 ) (*Service, error) {
 	if resolver == nil {
-		return nil, errors.New("artifact skill router is required")
+		return nil, errors.New("artifact Skill router is required")
 	}
 	if runtimeService == nil {
 		return nil, errors.New("skill runtime service is required")
 	}
-
 	return &Service{
 		resolver: resolver,
 		runtime:  runtimeService,
@@ -59,15 +53,11 @@ func (s *Service) Close() {
 	if s == nil {
 		return
 	}
-
 	s.lifecycleMu.Lock()
 	s.closed = true
 	s.lifecycleMu.Unlock()
 }
 
-// ResolveArtifactSkill resolves one durable Artifact identity into its
-// runtime-native SkillDef and ensures that the owning runtime catalog has
-// been synchronized before returning it.
 func (s *Service) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -78,24 +68,16 @@ func (s *Service) ResolveArtifactSkill(
 	if err := ref.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-
-	collectionRef, err := s.resolver.CollectionForArtifact(ctx, ref)
+	rootID, err := s.resolver.RootForArtifact(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	if err := s.resyncCollection(ctx, collectionRef); err != nil {
+	if err := s.resyncRoot(ctx, rootID); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-
 	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
-	}
-	if value.Collection != collectionRef {
-		return ResolvedArtifactSkill{}, fmt.Errorf(
-			"%w: resolved Skill belongs to another Collection",
-			basespec.ErrInvalid,
-		)
 	}
 	if !s.runtime.IsRegistered(skillRuntime.SkillRegistration{
 		Definition: value.Definition,
@@ -110,11 +92,6 @@ func (s *Service) ResolveArtifactSkill(
 	return value, nil
 }
 
-// GetArtifactSkillsPrompt resolves Artifact Store allow-list entries before
-// delegating prompt generation to the Agent Skills runtime.
-//
-// An empty AllowArtifacts list intentionally preserves native runtime
-// semantics: all currently registered Skills are eligible.
 func (s *Service) GetArtifactSkillsPrompt(
 	ctx context.Context,
 	filter ArtifactSkillFilter,
@@ -122,7 +99,6 @@ func (s *Service) GetArtifactSkillsPrompt(
 	if err := s.ensureConfigured(); err != nil {
 		return "", err
 	}
-
 	resolved, err := s.resolveArtifactSkills(
 		ctx,
 		filter.AllowArtifacts,
@@ -130,12 +106,10 @@ func (s *Service) GetArtifactSkillsPrompt(
 	if err != nil {
 		return "", err
 	}
-
 	if len(filter.Inserts) != 0 &&
 		!containsInstructionInsert(filter.Inserts) {
 		return "", nil
 	}
-
 	return s.runtime.SkillsPrompt(ctx, &agentskillsRuntime.SkillFilter{
 		Types:          append([]string(nil), filter.Types...),
 		NamePrefix:     filter.NamePrefix,
@@ -146,9 +120,6 @@ func (s *Service) GetArtifactSkillsPrompt(
 	})
 }
 
-// ListArtifactSkillRefs returns Artifact identities corresponding to the
-// selected runtime view. An explicit Artifact allow-list is required because
-// the Agent Skills runtime deliberately does not know Artifact identities.
 func (s *Service) ListArtifactSkillRefs(
 	ctx context.Context,
 	filter ArtifactSkillFilter,
@@ -159,7 +130,6 @@ func (s *Service) ListArtifactSkillRefs(
 	if len(filter.AllowArtifacts) == 0 {
 		return nil, ErrArtifactSkillSelectionRequired
 	}
-
 	resolved, err := s.resolveArtifactSkills(
 		ctx,
 		filter.AllowArtifacts,
@@ -186,13 +156,13 @@ func (s *Service) ListArtifactSkillRefs(
 
 	output := make([]artifact.ArtifactRef, 0, len(records))
 	for _, record := range records {
-		ref, found := resolved.DefToArtifacts[record.Def]
-		if found {
+		if ref, found := resolved.DefToArtifacts[record.Def]; found {
 			output = append(output, ref)
 		}
 	}
 	sort.Slice(output, func(left, right int) bool {
-		return artifactRefKey(output[left]) < artifactRefKey(output[right])
+		return artifactRefKey(output[left]) <
+			artifactRefKey(output[right])
 	})
 	return output, nil
 }
@@ -208,22 +178,10 @@ func (s *Service) DescribeArtifactSkill(
 		return ArtifactSkillSummary{}, err
 	}
 
-	resolved, found := s.resolveArtifactSkill(ctx, ref)
-	if !found {
-		if _, err := s.resolver.ResolveArtifactSkill(ctx, ref); err != nil {
-			return ArtifactSkillSummary{}, fmt.Errorf(
-				"artifact skill %q is unavailable: %w",
-				ref.ArtifactID,
-				err,
-			)
-		}
-		return ArtifactSkillSummary{}, fmt.Errorf(
-			"%w: artifact skill %q could not be registered",
-			basespec.ErrReferenceUnresolved,
-			ref.ArtifactID,
-		)
+	resolved, err := s.ResolveArtifactSkill(ctx, ref)
+	if err != nil {
+		return ArtifactSkillSummary{}, err
 	}
-
 	records, err := s.runtime.ListAgentSkills(
 		ctx,
 		&agentskillsRuntime.SkillListFilter{
@@ -233,7 +191,6 @@ func (s *Service) DescribeArtifactSkill(
 	if err != nil {
 		return ArtifactSkillSummary{}, err
 	}
-
 	for _, record := range records {
 		if record.Def != resolved.Definition {
 			continue
@@ -246,45 +203,34 @@ func (s *Service) DescribeArtifactSkill(
 			HasResources: record.Resources.HasResources,
 		}, nil
 	}
-
 	return ArtifactSkillSummary{}, fmt.Errorf(
-		"%w: runtime did not index artifact skill %q",
+		"%w: runtime did not index Artifact Skill %q",
 		basespec.ErrReferenceUnresolved,
 		ref.ArtifactID,
 	)
 }
 
-func (s *Service) resyncCollection(
+func (s *Service) resyncRoot(
 	ctx context.Context,
-	ref collection.CollectionRef,
+	rootID root.RootID,
 ) error {
-	if err := s.ensureConfigured(); err != nil {
-		return err
-	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-
-	catalogID, err := CollectionCatalogID(ref)
+	catalogID, err := RootCatalogID(rootID)
 	if err != nil {
 		return err
 	}
-
 	return s.runtime.SyncCatalog(ctx, catalogID)
 }
 
 func (s *Service) ensureConfigured() error {
 	if s == nil {
-		return errors.New("artifact skill runtime bridge is not configured")
+		return errors.New("artifact Skill runtime bridge is not configured")
 	}
-
 	s.lifecycleMu.RLock()
 	closed := s.closed
 	configured := s.resolver != nil && s.runtime != nil
 	s.lifecycleMu.RUnlock()
-
 	if closed || !configured {
-		return errors.New("artifact skill runtime bridge is not configured")
+		return errors.New("artifact Skill runtime bridge is not configured")
 	}
 	return nil
 }
@@ -297,7 +243,6 @@ func (s *Service) isClosed() bool {
 
 type resolvedArtifactSkills struct {
 	DefToArtifacts map[provider.SkillDef]artifact.ArtifactRef
-	RefToDef       map[string]provider.SkillDef
 	AllowDefs      []provider.SkillDef
 }
 
@@ -308,106 +253,77 @@ func (s *Service) resolveArtifactSkills(
 	if err := validateArtifactRefs(refs); err != nil {
 		return resolvedArtifactSkills{}, err
 	}
-
 	output := resolvedArtifactSkills{
-		DefToArtifacts: map[provider.SkillDef]artifact.ArtifactRef{},
-		RefToDef:       map[string]provider.SkillDef{},
+		DefToArtifacts: make(
+			map[provider.SkillDef]artifact.ArtifactRef,
+		),
 	}
-	resynced := map[collection.CollectionRef]error{}
+	resynced := map[root.RootID]error{}
 	unavailable := make([]artifact.ArtifactRef, 0)
 
 	for _, ref := range refs {
-		value, found := s.resolveArtifactSkillWithResync(
-			ctx,
-			ref,
-			resynced,
-		)
-		if !found {
+		rootID, err := s.resolver.RootForArtifact(ctx, ref)
+		if err != nil {
 			unavailable = append(unavailable, ref)
 			continue
 		}
+		if previous, found := resynced[rootID]; found {
+			if previous != nil {
+				unavailable = append(unavailable, ref)
+				continue
+			}
+		} else {
+			err := s.resyncRoot(ctx, rootID)
+			resynced[rootID] = err
+			if err != nil {
+				unavailable = append(unavailable, ref)
+				continue
+			}
+		}
 
-		if previous, exists := output.DefToArtifacts[value.Definition]; exists && previous != value.Artifact {
+		value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
+		if err != nil ||
+			!s.runtime.IsRegistered(skillRuntime.SkillRegistration{
+				Definition: value.Definition,
+				Revision:   value.Version,
+			}) {
+			unavailable = append(unavailable, ref)
+			continue
+		}
+		if previous, exists := output.DefToArtifacts[value.Definition]; exists &&
+			previous != value.Artifact {
 			return resolvedArtifactSkills{}, fmt.Errorf(
-				"%w: artifact skills %q and %q resolve to the same runtime definition",
+				"%w: Artifacts %q and %q resolve to one runtime Skill",
 				basespec.ErrConflict,
 				previous.ArtifactID,
 				value.Artifact.ArtifactID,
 			)
 		}
-
 		output.DefToArtifacts[value.Definition] = value.Artifact
-		output.RefToDef[artifactRefKey(value.Artifact)] = value.Definition
 		output.AllowDefs = append(output.AllowDefs, value.Definition)
 	}
-
 	if len(unavailable) != 0 {
-		return resolvedArtifactSkills{}, unavailableArtifactSkillsError(unavailable)
+		return resolvedArtifactSkills{}, unavailableArtifactSkillsError(
+			unavailable,
+		)
 	}
-
 	sortSkillDefs(output.AllowDefs)
 	return output, nil
-}
-
-func (s *Service) resolveArtifactSkill(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (ResolvedArtifactSkill, bool) {
-	return s.resolveArtifactSkillWithResync(ctx, ref, nil)
-}
-
-func (s *Service) resolveArtifactSkillWithResync(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	resynced map[collection.CollectionRef]error,
-) (ResolvedArtifactSkill, bool) {
-	if resynced == nil {
-		resynced = map[collection.CollectionRef]error{}
-	}
-
-	collectionRef, err := s.resolver.CollectionForArtifact(ctx, ref)
-	if err != nil {
-		return ResolvedArtifactSkill{}, false
-	}
-
-	if previous, found := resynced[collectionRef]; found {
-		if previous != nil {
-			return ResolvedArtifactSkill{}, false
-		}
-	} else {
-		err := s.resyncCollection(ctx, collectionRef)
-		resynced[collectionRef] = err
-		if err != nil {
-			return ResolvedArtifactSkill{}, false
-		}
-	}
-
-	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
-	if err != nil || value.Collection != collectionRef {
-		return ResolvedArtifactSkill{}, false
-	}
-	if !s.runtime.IsRegistered(skillRuntime.SkillRegistration{
-		Definition: value.Definition,
-		Revision:   value.Version,
-	}) {
-		return ResolvedArtifactSkill{}, false
-	}
-	return value, true
 }
 
 func unavailableArtifactSkillsError(
 	refs []artifact.ArtifactRef,
 ) error {
 	sort.Slice(refs, func(left, right int) bool {
-		return artifactRefKey(refs[left]) < artifactRefKey(refs[right])
+		return artifactRefKey(refs[left]) <
+			artifactRefKey(refs[right])
 	})
-
 	values := make([]string, 0, len(refs))
 	for _, ref := range refs {
 		values = append(values, artifactRefKey(ref))
 	}
 	return fmt.Errorf(
-		"%w: unavailable artifact skills: %s",
+		"%w: unavailable Artifact Skills: %s",
 		basespec.ErrReferenceUnresolved,
 		strings.Join(values, ", "),
 	)
@@ -428,9 +344,7 @@ func validateArtifactRefs(values []artifact.ArtifactRef) error {
 	return nil
 }
 
-func containsInstructionInsert(
-	values []document.SkillInsert,
-) bool {
+func containsInstructionInsert(values []document.SkillInsert) bool {
 	for _, value := range values {
 		insert, supported := document.NormalizeSkillInsert(value)
 		if supported && insert == document.SkillInsertInstructions {

@@ -127,6 +127,7 @@ func (a *skillLookupAdapter) GetSkillSummaryForSelection(
 }
 
 type MCPServerResolver interface {
+	// Runtime server IDs remain opaque runtime identities.
 	ResolveMCPServer(
 		ctx context.Context,
 		ref mcpServer.ServerID,

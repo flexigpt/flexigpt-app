@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"maps"
 	"net"
@@ -10,10 +9,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpserverv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
@@ -182,12 +179,10 @@ func (value MaterializedServer) Validate() error {
 	return nil
 }
 
-func CanonicalizeServer(
-	input ServerDocument,
-) (ServerDocument, json.RawMessage, error) {
+func CanonicalizeServer(input ServerDocument) (ServerDocument, error) {
 	value, err := jsonutil.CloneJSON(input)
 	if err != nil {
-		return ServerDocument{}, nil, err
+		return ServerDocument{}, err
 	}
 	value.Labels = maps.Clone(value.Labels)
 	value.MCPServer = NormalizeCoreServer(value.MCPServer)
@@ -195,32 +190,10 @@ func CanonicalizeServer(
 		string(value.LogicalName),
 		value.Extension,
 	)
-
 	if err := value.Validate(); err != nil {
-		return ServerDocument{}, nil, err
+		return ServerDocument{}, err
 	}
-
-	supplied := value.Digest
-	value.Digest = ""
-	calculated, err := cryptoutil.CanonicalDigest(value)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	if supplied != "" && supplied != calculated {
-		return ServerDocument{}, nil, fmt.Errorf(
-			"%w: supplied MCP Server digest %q, calculated %q",
-			basespec.ErrDigestMismatch,
-			supplied,
-			calculated,
-		)
-	}
-	value.Digest = calculated
-
-	raw, err := jsonutil.MarshalCanonicalObject(value, basespec.MaxDefinitionBytes)
-	if err != nil {
-		return ServerDocument{}, nil, err
-	}
-	return value, raw, nil
+	return value, nil
 }
 
 func NormalizeCoreServer(value CoreServer) CoreServer {
@@ -260,25 +233,37 @@ func normalizeAuthentication(
 }
 
 func (value ServerDocument) Validate() error {
-	if value.Kind != mcpserverv1.MCPServerKind ||
-		value.SchemaID != mcpserverv1.MCPServerSchemaID ||
-		value.SchemaVersion != mcpserverv1.MCPServerSchemaVersion {
-		return fmt.Errorf(
-			"%w: unsupported MCP Server schema",
-			basespec.ErrInvalid,
-		)
+	if err := value.LogicalName.Validate(); err != nil {
+		return err
 	}
-	if err := basespec.ValidatePortableMetadata(
-		value.LogicalName,
-		value.LogicalVersion,
+	if err := value.LogicalVersion.Validate(true); err != nil {
+		return err
+	}
+	if err := basespec.ValidateOptionalText(
+		"MCP server display name",
 		value.DisplayName,
-		value.Description,
-		value.Labels,
-		nil,
+		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	return validateParts(string(value.LogicalName), value.MCPServer, value.Extension)
+	if err := basespec.ValidateOptionalText(
+		"MCP server description",
+		value.Description,
+		basespec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	if err := basespec.ValidateLabels(
+		"MCP server",
+		value.Labels,
+	); err != nil {
+		return err
+	}
+	return validateParts(
+		string(value.LogicalName),
+		value.MCPServer,
+		value.Extension,
+	)
 }
 
 func validateParts(

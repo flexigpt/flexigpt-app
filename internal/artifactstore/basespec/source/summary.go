@@ -16,6 +16,7 @@ type Summary struct {
 	Kind           SourceKind          `json:"kind"`
 	DisplayName    string              `json:"displayName"`
 	Enabled        bool                `json:"enabled"`
+	Discovery      DiscoverySpec       `json:"discovery"`
 	Revision       uint64              `json:"revision"`
 	CreatedAt      time.Time           `json:"createdAt"`
 	ModifiedAt     time.Time           `json:"modifiedAt"`
@@ -46,6 +47,9 @@ func (s Summary) Validate() error {
 	); err != nil {
 		return err
 	}
+	if err := s.Discovery.Validate(); err != nil {
+		return fmt.Errorf("source discovery: %w", err)
+	}
 	if s.Revision == 0 {
 		return fmt.Errorf("%w: source revision must be greater than zero", basespec.ErrInvalid)
 	}
@@ -70,6 +74,7 @@ func (s Summary) Validate() error {
 
 func (s Summary) Clone() Summary {
 	output := s
+	output.Discovery = s.Discovery.Clone()
 	if s.RetiredAt != nil {
 		retiredAt := *s.RetiredAt
 		output.RetiredAt = &retiredAt

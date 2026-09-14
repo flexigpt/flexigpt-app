@@ -43,6 +43,7 @@ type Source struct {
 	DisplayName    string              `json:"displayName"`
 	Enabled        bool                `json:"enabled"`
 	Config         json.RawMessage     `json:"-"`
+	Discovery      DiscoverySpec       `json:"discovery"`
 
 	Revision   uint64     `json:"revision"`
 	CreatedAt  time.Time  `json:"createdAt"`
@@ -53,6 +54,7 @@ type Source struct {
 func (s Source) Clone() Source {
 	output := s
 	output.Config = append(json.RawMessage(nil), s.Config...)
+	output.Discovery = s.Discovery.Clone()
 	output.RetiredAt = cloneTime(s.RetiredAt)
 	return output
 }
@@ -67,6 +69,9 @@ func (s Source) Validate() error {
 	); err != nil {
 		return fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
 	}
+	if err := s.Discovery.Validate(); err != nil {
+		return fmt.Errorf("source discovery: %w", err)
+	}
 
 	return nil
 }
@@ -80,6 +85,7 @@ func (s Source) Summary() Summary {
 		Kind:           s.Kind,
 		DisplayName:    s.DisplayName,
 		Enabled:        s.Enabled,
+		Discovery:      s.Discovery.Clone(),
 		Revision:       s.Revision,
 		CreatedAt:      s.CreatedAt,
 		ModifiedAt:     s.ModifiedAt,

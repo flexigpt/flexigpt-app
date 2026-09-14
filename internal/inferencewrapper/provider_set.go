@@ -362,13 +362,13 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 	skillSessionID := strings.TrimSpace(body.SkillSessionID)
 
-	// A Workspace selection is authoritative for which Workspace Skills may
-	// participate in this turn. If no runtime allow-list reaches the Skill
-	// Runtime, do not report selected Workspace Skills as silently available.
+	// A Workspace selection is authoritative for which Root-scoped Skills may
+	// participate in this turn. If no runtime allow-list reaches Skill Runtime,
+	// do not report selected Skills as silently available.
 	//
-	// This covers stale persisted conversations and frontend catalog races
-	// where Workspace selection survives but its corresponding runtime ref was
-	// omitted. A usable Context may still make the turn partial rather than
+	// This covers stale persisted conversations where Workspace selection
+	// survives but a selected Artifact can no longer resolve. A usable Context
+	// may still make the turn partial rather than
 	// completely unavailable.
 	if workspaceUsage != nil &&
 		len(workspaceUsage.Skills) > 0 &&

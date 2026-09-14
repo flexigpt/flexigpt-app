@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -101,85 +101,23 @@ type SourceAPI interface {
 	Kinds() []source.SourceKind
 }
 
-type CollectionAPI interface {
-	Create(
+type DiscoveryAPI interface {
+	RefreshRoot(
 		ctx context.Context,
 		rootID root.RootID,
-		draft collection.Draft,
-		attachments []collection.AttachmentDraft,
-	) (collection.Collection, []collection.Attachment, error)
+	) (refresh.RefreshRootResult, error)
 
-	Get(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (collection.Collection, error)
-
-	GetRetired(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (collection.Collection, error)
-
-	ListByRoot(
+	RefreshSource(
 		ctx context.Context,
 		rootID root.RootID,
-	) ([]collection.Collection, error)
-
-	Update(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		update collection.Update,
-	) (collection.Collection, error)
-
-	Retire(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		expectedRevision uint64,
-	) (collection.Collection, error)
-
-	Purge(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		expectedRevision uint64,
-	) error
-
-	Attach(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		expectedCollectionRevision uint64,
-		draft collection.AttachmentDraft,
-	) (collection.Collection, collection.Attachment, error)
-
-	GetAttachment(
-		ctx context.Context,
-		ref collection.CollectionRef,
 		sourceID source.SourceID,
-	) (collection.Attachment, error)
+	) (refresh.RefreshSourceResult, error)
 
-	ListAttachments(
+	InspectSource(
 		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]collection.Attachment, error)
-
-	UpdateAttachment(
-		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 		sourceID source.SourceID,
-		update collection.AttachmentUpdate,
-	) (collection.Collection, collection.Attachment, error)
-
-	Detach(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		sourceID source.SourceID,
-		expectedCollectionRevision uint64,
-		expectedAttachmentRevision uint64,
-	) (collection.Collection, error)
-
-	ReplaceAttachment(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		replacement collection.AttachmentReplacement,
-	) (collection.Collection, collection.Attachment, error)
+	) (source.RefreshInspection, error)
 }
 
 type ArtifactAPI interface {
@@ -188,20 +126,35 @@ type ArtifactAPI interface {
 		ref artifact.ArtifactRef,
 	) (artifact.Artifact, error)
 
-	ListByCollection(
+	ListByRoot(
 		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 	) ([]artifact.Artifact, error)
 
-	Adopt(
+	ListBySource(
 		ctx context.Context,
-		request catalog.AdoptRequest,
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) ([]artifact.Artifact, error)
+
+	FindByIdentity(
+		ctx context.Context,
+		rootID root.RootID,
+		kind artifact.ArtifactKind,
+		logicalName basespec.LogicalName,
+	) ([]artifact.Artifact, error)
+
+	FindByOrigin(
+		ctx context.Context,
+		rootID root.RootID,
+		binding artifact.SourceBinding,
+		kind artifact.ArtifactKind,
 	) (artifact.Artifact, error)
 
-	Pin(
+	GetDefinition(
 		ctx context.Context,
-		request catalog.PinRequest,
-	) (artifact.Artifact, error)
+		ref artifact.ArtifactRef,
+	) (definition.Definition, error)
 
 	SetEnabled(
 		ctx context.Context,
@@ -210,11 +163,11 @@ type ArtifactAPI interface {
 		enabled bool,
 	) (artifact.Artifact, error)
 
-	SetName(
+	SetDisplayName(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 		expectedRevision uint64,
-		name string,
+		displayName string,
 	) (artifact.Artifact, error)
 
 	UpdateData(
@@ -224,58 +177,11 @@ type ArtifactAPI interface {
 		data json.RawMessage,
 	) (artifact.Artifact, error)
 
-	Unadopt(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-		suppress bool,
-	) error
-
 	Purge(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 		expectedRevision uint64,
 	) error
-
-	PurgeAndSuppress(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-		expectedRevision uint64,
-	) error
-
-	ListSuppressions(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]artifact.Suppression, error)
-
-	Suppress(
-		ctx context.Context,
-		request catalog.SuppressRequest,
-	) (artifact.Suppression, error)
-
-	Unsuppress(
-		ctx context.Context,
-		ref collection.CollectionRef,
-		binding artifact.SourceBinding,
-		expectedRevision uint64,
-	) error
-}
-
-type CatalogAPI interface {
-	RefreshCollection(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (catalog.RefreshCollectionResult, error)
-
-	CurrentCatalog(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (catalog.Snapshot, error)
-
-	InspectCollectionCatalog(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (catalog.CatalogInspection, error)
 }
 
 type ResourceAPI interface {
@@ -285,32 +191,30 @@ type ResourceAPI interface {
 		options resource.ResolveOptions,
 	) (resource.ResolvedArtifact, error)
 
-	InspectCollectionResources(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) (resource.CollectionResourceInspection, error)
-
 	ResolveVerifiedLocalPath(
 		ctx context.Context,
 		resolved resource.ResolvedArtifact,
 		localLocator basespec.Locator,
 	) (string, error)
 
-	ReadCollectionEntry(
+	ReadSourceEntry(
 		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 		sourceID source.SourceID,
 		locator basespec.Locator,
 		maximumBytes int64,
 	) (resource.VerifiedEntry, error)
 
-	ReadCollectionEntryWithCatalog(
+	ReadSourceTree(
 		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
 		sourceID source.SourceID,
-		locator basespec.Locator,
+		base basespec.Locator,
+		include []string,
+		exclude []string,
+		maximumEntries int,
 		maximumBytes int64,
-	) (resource.VerifiedCollectionEntry, error)
+	) ([]resource.VerifiedEntry, error)
 
 	ResolveSourceLocalPath(
 		ctx context.Context,
@@ -335,11 +239,6 @@ type ManagedArtifactAPI interface {
 		ctx context.Context,
 		request artifact.PublishArtifactRequest,
 	) (artifact.PublishArtifactResult, error)
-
-	PublishCollection(
-		ctx context.Context,
-		request collection.PublishCollectionRequest,
-	) (collection.PublishCollectionResult, error)
 
 	Remove(
 		ctx context.Context,

@@ -17,7 +17,7 @@ func ManagedPackageAddressForSkill(
 		version = artifactbuiltin.UnversionedPackageVersion
 	}
 	return source.NewManagedPackageAddress(
-		artifactbuiltin.AgentSkillPackageKind,
+		ManagedSkillPackageKind,
 		name,
 		version,
 	)
@@ -29,7 +29,7 @@ func ManagedPackageLocatorForSkill(
 	if err := validateManagedSkillPackageAddress(address); err != nil {
 		return "", err
 	}
-	return address.FileLocator(artifactbuiltin.AgentSkillDefinitionFileName)
+	return address.FileLocator(SkillDefinitionFileName)
 }
 
 func ManagedPackageAddressFromSkillLocator(
@@ -38,12 +38,12 @@ func ManagedPackageAddressFromSkillLocator(
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(artifactbuiltin.AgentSkillDefinitionFileName) {
+	if path.Base(string(locator)) != string(SkillDefinitionFileName) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Skill locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			artifactbuiltin.AgentSkillDefinitionFileName,
+			SkillDefinitionFileName,
 		)
 	}
 
@@ -62,11 +62,14 @@ func ManagedPackageAddressFromSkillLocator(
 func validateManagedSkillPackageAddress(
 	address source.ManagedPackageAddress,
 ) error {
-	if address.Kind != artifactbuiltin.AgentSkillPackageKind {
+	if err := address.Validate(); err != nil {
+		return err
+	}
+	if address.Kind != ManagedSkillPackageKind {
 		return fmt.Errorf(
 			"%w: Skill package kind must be %q",
 			basespec.ErrInvalid,
-			artifactbuiltin.AgentSkillPackageKind,
+			ManagedSkillPackageKind,
 		)
 	}
 	return nil

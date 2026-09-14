@@ -7,14 +7,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 const (
 	artifactServerIDPrefix  = "artifact-server:v1:"
-	artifactCatalogIDPrefix = "artifact-catalog:v1:"
+	artifactCatalogIDPrefix = "artifact-root:v1:"
 )
 
 func RuntimeServerIDForArtifact(
@@ -68,53 +67,43 @@ func ArtifactRefForRuntimeServerID(
 	return ref, nil
 }
 
-func RuntimeCatalogIDForCollection(
-	ref collection.CollectionRef,
+func RuntimeCatalogIDForRoot(
+	rootID root.RootID,
 ) (mcpServer.CatalogID, error) {
-	if err := ref.Validate(); err != nil {
+	if err := rootID.Validate(); err != nil {
 		return "", err
 	}
-	raw := string(ref.RootID) + "\x00" + string(ref.CollectionID)
 	return mcpServer.CatalogID(
 		artifactCatalogIDPrefix +
-			base64.RawURLEncoding.EncodeToString([]byte(raw)),
+			base64.RawURLEncoding.EncodeToString([]byte(rootID)),
 	), nil
 }
 
-func CollectionRefForRuntimeCatalogID(
+func RootIDForRuntimeCatalogID(
 	id mcpServer.CatalogID,
-) (collection.CollectionRef, error) {
+) (root.RootID, error) {
 	if err := id.Validate(); err != nil {
-		return collection.CollectionRef{}, err
+		return "", err
 	}
 	raw, found := strings.CutPrefix(string(id), artifactCatalogIDPrefix)
 	if !found {
-		return collection.CollectionRef{}, fmt.Errorf(
+		return "", fmt.Errorf(
 			"%w: unsupported MCP runtime catalog ID",
 			basespec.ErrInvalid,
 		)
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return collection.CollectionRef{}, fmt.Errorf(
+		return "", fmt.Errorf(
 			"%w: decode MCP runtime catalog ID: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
-	rootID, collectionID, found := strings.Cut(string(decoded), "\x00")
-	if !found {
-		return collection.CollectionRef{}, fmt.Errorf(
-			"%w: malformed MCP runtime catalog ID",
-			basespec.ErrInvalid,
-		)
+	rootID := root.RootID(decoded)
+	if err := rootID.Validate(); err != nil {
+		return "", err
 	}
-	ref := collection.CollectionRef{
-		RootID:       root.RootID(rootID),
-		CollectionID: collection.CollectionID(collectionID),
-	}
-	if err := ref.Validate(); err != nil {
-		return collection.CollectionRef{}, err
-	}
-	return ref, nil
+
+	return rootID, nil
 }

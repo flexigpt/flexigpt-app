@@ -81,6 +81,13 @@ func (d Declaration) Validate() error {
 		); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
+		if err := draft.Discovery.Validate(); err != nil {
+			return fmt.Errorf(
+				"protected Sources[%d] discovery: %w",
+				index,
+				err,
+			)
+		}
 		if _, duplicate := seen[draft.ID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate protected Source %q",

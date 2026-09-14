@@ -7,299 +7,154 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-type CollectionReader interface {
-	Get(
+type RefreshStateReader interface {
+	GetRefreshState(
 		ctx context.Context,
-		ref collection.CollectionRef,
-	) (collection.Collection, error)
-
-	ListAttachments(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]collection.Attachment, error)
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) (source.RefreshState, error)
 }
 
 type ArtifactReader interface {
-	ListByCollection(
+	ListBySource(
 		ctx context.Context,
-		ref collection.CollectionRef,
+		rootID root.RootID,
+		sourceID source.SourceID,
 	) ([]artifact.Artifact, error)
-
-	ListSuppressions(
-		ctx context.Context,
-		ref collection.CollectionRef,
-	) ([]artifact.Suppression, error)
 }
 
 type Publication struct {
-	Ref collection.CollectionRef
+	RootID root.RootID
 
-	// ExpectedCatalogRevision is zero when the root has no prior publication.
-	// It prevents a concurrent refresh from replacing a newer catalog with an
-	// older source observation.
-	ExpectedCatalogRevision     uint64
-	ExpectedCollectionRevision  uint64
-	ExpectedAttachmentRevisions map[source.SourceID]uint64
-	ExpectedSourceRevisions     map[source.SourceID]uint64
+	SourceID                source.SourceID
+	ExpectedSourceRevision  uint64
+	ExpectedRefreshRevision uint64
 
-	// SourceGenerations contains one confirmed generation for every Source
-	// whose attachment and Source are enabled at publication time. Publisher
-	// verifies that set against persisted metadata.
-	SourceGenerations map[source.SourceID]string
+	SourceGeneration     string
+	DiscoveryFingerprint cryptoutil.Digest
+	DecoderFingerprint   cryptoutil.Digest
 
-	PlanFingerprint    cryptoutil.Digest
-	DecoderFingerprint cryptoutil.Digest
-	Occurrences        []catalog.Occurrence
-	ArtifactCreates    []artifact.Artifact
-	ArtifactUpdates    []artifactimpl.SourceStateUpdate
-	Diagnostics        []diagnostic.Diagnostic
-	PublishedAt        time.Time
+	Definitions     []definition.Definition
+	ArtifactCreates []artifact.Artifact
+	ArtifactUpdates []artifactimpl.SourceStateUpdate
+	Diagnostics     []diagnostic.Diagnostic
+	RefreshedAt     time.Time
 }
 
 func (p Publication) Validate() error {
-	if err := p.Ref.Validate(); err != nil {
+	if err := p.RootID.Validate(); err != nil {
 		return err
 	}
-	if p.ExpectedCollectionRevision == 0 {
+	if err := p.SourceID.Validate(); err != nil {
+		return err
+	}
+	if p.ExpectedSourceRevision == 0 {
 		return fmt.Errorf(
-			"%w: expected collection revision is required",
+			"%w: expected Source revision is required",
 			basespec.ErrInvalid,
 		)
 	}
-	if err := cryptoutil.ValidateDigest(p.PlanFingerprint); err != nil {
+	if err := basespec.ValidateSourceGeneration(
+		p.SourceGeneration,
+	); err != nil {
 		return err
 	}
-	if err := cryptoutil.ValidateDigest(p.DecoderFingerprint); err != nil {
+	if err := cryptoutil.ValidateDigest(
+		p.DiscoveryFingerprint,
+	); err != nil {
 		return err
 	}
-	knownSources := make(map[source.SourceID]struct{}, len(p.ExpectedSourceRevisions))
-	for sourceID, revision := range p.ExpectedSourceRevisions {
-		if err := sourceID.Validate(); err != nil {
-			return err
-		}
-		if revision == 0 {
-			return fmt.Errorf(
-				"%w: expected source revision must be positive",
-				basespec.ErrInvalid,
-			)
-		}
-		knownSources[sourceID] = struct{}{}
+	if err := cryptoutil.ValidateDigest(
+		p.DecoderFingerprint,
+	); err != nil {
+		return err
 	}
-	for sourceID := range knownSources {
-		if _, exists := p.ExpectedAttachmentRevisions[sourceID]; !exists {
-			return fmt.Errorf(
-				"%w: expected source revision has no collection attachment",
-				basespec.ErrInvalid,
-			)
-		}
+	if p.RefreshedAt.IsZero() {
+		return fmt.Errorf(
+			"%w: Source refresh publication time is required",
+			basespec.ErrInvalid,
+		)
 	}
-	for sourceID, revision := range p.ExpectedAttachmentRevisions {
-		if err := sourceID.Validate(); err != nil {
-			return err
-		}
-		if revision == 0 {
-			return fmt.Errorf(
-				"%w: expected attachment revision must be positive",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, exists := knownSources[sourceID]; !exists {
-			return fmt.Errorf("%w: attachment has no source revision", basespec.ErrInvalid)
-		}
-	}
-	for sourceID, generation := range p.SourceGenerations {
-		if err := sourceID.Validate(); err != nil {
-			return err
-		}
-		if _, exists := knownSources[sourceID]; !exists {
-			return fmt.Errorf(
-				"%w: source generation belongs to an unattached source %q",
-				basespec.ErrInvalid,
-				sourceID,
-			)
-		}
-		if err := basespec.ValidateSourceGeneration(generation); err != nil {
-			return err
-		}
+	if err := diagnostic.Validate(p.Diagnostics); err != nil {
+		return err
 	}
 
-	validOccurrences := make(
-		map[artifact.SourceBinding]catalog.Occurrence,
-		len(p.Occurrences),
+	seenDefinitions := make(
+		map[cryptoutil.Digest]struct{},
+		len(p.Definitions),
 	)
-	seenOccurrences := make(map[catalog.OccurrenceKey]struct{}, len(p.Occurrences))
-	for index, occurrence := range p.Occurrences {
-		if occurrence.RootID != p.Ref.RootID ||
-			occurrence.CollectionID != p.Ref.CollectionID {
+	for index, value := range p.Definitions {
+		canonical, err := definition.Canonicalize(value)
+		if err != nil {
+			return fmt.Errorf("definition %d: %w", index, err)
+		}
+		if canonical.Digest != value.Digest {
 			return fmt.Errorf(
-				"%w: occurrence %d belongs to another collection",
+				"%w: publication Definition %d is not canonical",
 				basespec.ErrInvalid,
 				index,
 			)
 		}
-
-		if _, exists := knownSources[occurrence.Key.SourceID]; !exists {
+		if _, duplicate := seenDefinitions[value.Digest]; duplicate {
 			return fmt.Errorf(
-				"%w: occurrence %d belongs to an unattached source",
+				"%w: publication repeats Definition %q",
 				basespec.ErrInvalid,
-				index,
+				value.Digest,
 			)
 		}
-
-		if _, exists := p.SourceGenerations[occurrence.Key.SourceID]; !exists {
-			return fmt.Errorf(
-				"%w: occurrence %d has no source generation",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-
-		if _, duplicate := seenOccurrences[occurrence.Key]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate occurrence %d",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-
-		seenOccurrences[occurrence.Key] = struct{}{}
-		if err := occurrence.Validate(); err != nil {
-			return err
-		}
-
-		if occurrence.State == catalog.OccurrenceValid &&
-			occurrence.DefinitionDigest != nil {
-			binding := artifact.SourceBinding{
-				SourceID:           occurrence.Key.SourceID,
-				Locator:            occurrence.Key.Locator,
-				SubresourceLocator: occurrence.Key.SubresourceLocator,
-				ExpectedKind:       occurrence.Kind,
-			}
-			validOccurrences[binding] = occurrence
-		}
+		seenDefinitions[value.Digest] = struct{}{}
 	}
 
 	seenArtifacts := make(map[artifact.ArtifactID]struct{})
-	validateArtifact := func(value artifact.Artifact) error {
+	for index, value := range p.ArtifactCreates {
 		if err := value.Validate(); err != nil {
-			return err
+			return fmt.Errorf("artifact create %d: %w", index, err)
 		}
-		if value.RootID != p.Ref.RootID ||
-			value.CollectionID != p.Ref.CollectionID {
+		if value.RootID != p.RootID ||
+			value.Binding.SourceID != p.SourceID ||
+			value.Revision != 1 ||
+			value.State != artifact.StateAvailable {
 			return fmt.Errorf(
-				"%w: artifact belongs to another collection",
+				"%w: invalid source-created Artifact",
 				basespec.ErrInvalid,
 			)
 		}
-
-		if _, exists := knownSources[value.Binding.SourceID]; !exists {
-			return fmt.Errorf(
-				"%w: artifact belongs to an unattached source",
-				basespec.ErrInvalid,
-			)
-		}
-
 		if _, duplicate := seenArtifacts[value.ID]; duplicate {
 			return fmt.Errorf(
-				"%w: duplicate artifact publication %q",
+				"%w: publication repeats Artifact %q",
 				basespec.ErrInvalid,
 				value.ID,
 			)
 		}
-
 		seenArtifacts[value.ID] = struct{}{}
-		return nil
 	}
-
-	for index, value := range p.ArtifactCreates {
-		if err := validateArtifact(value); err != nil {
-			return fmt.Errorf("artifact create %d: %w", index, err)
-		}
-		if value.Revision != 1 {
-			return fmt.Errorf(
-				"%w: artifact create %d must start at revision one",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-
-		if value.Adoption != artifact.AdoptionObserved {
-			return fmt.Errorf(
-				"%w: refresh publication cannot create a non-observed artifact",
-				basespec.ErrInvalid,
-			)
-		}
-		if value.State != artifact.StateAvailable {
-			return fmt.Errorf(
-				"%w: refresh publication can only create available observed artifacts",
-				basespec.ErrInvalid,
-			)
-		}
-
-		occurrence, exists := validOccurrences[value.Binding]
-		if !exists || occurrence.DefinitionDigest == nil {
-			return fmt.Errorf(
-				"%w: artifact create %d has no current valid occurrence",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-		if value.ResolvedDefinition == nil ||
-			*value.ResolvedDefinition != *occurrence.DefinitionDigest {
-			return fmt.Errorf(
-				"%w: artifact create %d definition does not match its occurrence",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-		if value.Kind != occurrence.Kind {
-			return fmt.Errorf(
-				"%w: artifact create %d kind does not match its occurrence",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-	}
-
-	for index, update := range p.ArtifactUpdates {
-		if err := update.Validate(); err != nil {
+	for index, value := range p.ArtifactUpdates {
+		if err := value.Validate(); err != nil {
 			return fmt.Errorf("artifact update %d: %w", index, err)
 		}
-		if update.RootID != p.Ref.RootID ||
-			update.CollectionID != p.Ref.CollectionID {
+		if value.RootID != p.RootID ||
+			value.Binding.SourceID != p.SourceID {
 			return fmt.Errorf(
-				"%w: artifact update belongs to another collection",
+				"%w: source-derived Artifact update belongs to another Source",
 				basespec.ErrInvalid,
 			)
 		}
-
-		if _, duplicate := seenArtifacts[update.ArtifactID]; duplicate {
+		if _, duplicate := seenArtifacts[value.ArtifactID]; duplicate {
 			return fmt.Errorf(
-				"%w: duplicate artifact publication %q",
+				"%w: publication repeats Artifact %q",
 				basespec.ErrInvalid,
-				update.ArtifactID,
+				value.ArtifactID,
 			)
 		}
-
-		seenArtifacts[update.ArtifactID] = struct{}{}
-	}
-
-	if err := diagnostic.Validate(p.Diagnostics); err != nil {
-		return err
-	}
-	if p.PublishedAt.IsZero() {
-		return fmt.Errorf(
-			"%w: publication time is required",
-			basespec.ErrInvalid,
-		)
+		seenArtifacts[value.ArtifactID] = struct{}{}
 	}
 	return nil
 }
@@ -308,5 +163,5 @@ type Publisher interface {
 	Publish(
 		ctx context.Context,
 		publication Publication,
-	) (catalog.Snapshot, error)
+	) (source.RefreshState, error)
 }

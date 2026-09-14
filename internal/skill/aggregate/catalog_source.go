@@ -6,15 +6,14 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
-const artifactCollectionCatalogPrefix = "artifact-collection:"
+const artifactRootCatalogPrefix = "artifact-root:"
 
-// CatalogSource adapts Artifact Store Collections to the runtime-owned
-// CatalogSource contract. Runtime treats CatalogID as an opaque string.
+// CatalogSource maps one Root's currently enabled Skill Artifacts into the
+// runtime-owned CatalogSource contract. The runtime treats CatalogID as opaque.
 type CatalogSource struct {
 	router *ArtifactRouter
 }
@@ -41,13 +40,11 @@ func (s *CatalogSource) Skills(
 			basespec.ErrClosed,
 		)
 	}
-
-	ref, err := collectionRefForCatalogID(catalogID)
+	rootID, err := RootCatalogIDRoot(catalogID)
 	if err != nil {
 		return nil, err
 	}
-
-	values, err := s.router.ListCollectionSkills(ctx, ref)
+	values, err := s.router.ListRootSkills(ctx, rootID)
 	if err != nil {
 		return nil, err
 	}
@@ -62,49 +59,34 @@ func (s *CatalogSource) Skills(
 	return output, nil
 }
 
-func CollectionCatalogID(
-	ref collection.CollectionRef,
+func RootCatalogID(
+	rootID root.RootID,
 ) (skillRuntime.CatalogID, error) {
-	if err := ref.Validate(); err != nil {
+	if err := rootID.Validate(); err != nil {
 		return "", err
 	}
 	return skillRuntime.CatalogID(
-		artifactCollectionCatalogPrefix +
-			string(ref.RootID) + ":" +
-			string(ref.CollectionID),
+		artifactRootCatalogPrefix + string(rootID),
 	), nil
 }
 
-func collectionRefForCatalogID(
+func RootCatalogIDRoot(
 	catalogID skillRuntime.CatalogID,
-) (collection.CollectionRef, error) {
+) (root.RootID, error) {
 	raw, found := strings.CutPrefix(
 		string(catalogID),
-		artifactCollectionCatalogPrefix,
+		artifactRootCatalogPrefix,
 	)
 	if !found {
-		return collection.CollectionRef{}, fmt.Errorf(
+		return "", fmt.Errorf(
 			"%w: unsupported Skill catalog ID %q",
 			basespec.ErrInvalid,
 			catalogID,
 		)
 	}
-
-	rootID, collectionID, found := strings.Cut(raw, ":")
-	if !found {
-		return collection.CollectionRef{}, fmt.Errorf(
-			"%w: malformed Skill catalog ID %q",
-			basespec.ErrInvalid,
-			catalogID,
-		)
+	rootID := root.RootID(raw)
+	if err := rootID.Validate(); err != nil {
+		return "", err
 	}
-
-	ref := collection.CollectionRef{
-		RootID:       root.RootID(rootID),
-		CollectionID: collection.CollectionID(collectionID),
-	}
-	if err := ref.Validate(); err != nil {
-		return collection.CollectionRef{}, err
-	}
-	return ref, nil
+	return rootID, nil
 }

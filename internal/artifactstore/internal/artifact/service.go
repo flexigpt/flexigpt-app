@@ -4,51 +4,42 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	catalogimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/catalog"
-	collectionimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Service struct {
 	repository  Repository
-	collections collectionimpl.Reader
-	catalogs    catalogimpl.Reader
+	definitions DefinitionReader
 	clock       clockutil.Clock
 	policy      root.RootPolicy
 }
 
 func NewService(
 	repository Repository,
-	collections collectionimpl.Reader,
-	catalogs catalogimpl.Reader,
+	definitions DefinitionReader,
 	timeClock clockutil.Clock,
 	policy root.RootPolicy,
 ) (*Service, error) {
 	if repository == nil ||
-		collections == nil ||
-		catalogs == nil ||
+		definitions == nil ||
 		timeClock == nil {
 		return nil, fmt.Errorf(
-			"%w: artifact service dependencies are incomplete",
+			"%w: Artifact service dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
 		repository:  repository,
-		collections: collections,
-		catalogs:    catalogs,
+		definitions: definitions,
 		clock:       timeClock,
 		policy:      policy,
 	}, nil
@@ -64,273 +55,105 @@ func (s *Service) Get(
 	return s.repository.Get(ctx, ref)
 }
 
-func (s *Service) ListByCollection(
+func (s *Service) ListByRoot(
 	ctx context.Context,
-	ref collection.CollectionRef,
+	rootID root.RootID,
 ) ([]artifact.Artifact, error) {
-	if err := ref.Validate(); err != nil {
+	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-	if _, err := s.collections.Get(ctx, ref); err != nil {
-		return nil, err
-	}
-	return s.repository.ListByCollection(ctx, ref)
+	return s.repository.ListByRoot(ctx, rootID)
 }
 
-func (s *Service) ListSuppressions(
+func (s *Service) ListBySource(
 	ctx context.Context,
-	ref collection.CollectionRef,
-) ([]artifact.Suppression, error) {
-	if err := ref.Validate(); err != nil {
+	rootID root.RootID,
+	sourceID source.SourceID,
+) ([]artifact.Artifact, error) {
+	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-	if _, err := s.collections.Get(ctx, ref); err != nil {
+	if err := sourceID.Validate(); err != nil {
 		return nil, err
 	}
-	values, err := s.repository.ListSuppressions(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return append([]artifact.Suppression(nil), values...), nil
+	return s.repository.ListBySource(ctx, rootID, sourceID)
 }
 
-func (s *Service) Adopt(
+func (s *Service) FindByIdentity(
 	ctx context.Context,
-	request catalog.AdoptRequest,
-) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(
+	rootID root.RootID,
+	kind artifact.ArtifactKind,
+	logicalName basespec.LogicalName,
+) ([]artifact.Artifact, error) {
+	if err := rootID.Validate(); err != nil {
+		return nil, err
+	}
+	if err := kind.Validate(); err != nil {
+		return nil, err
+	}
+	if err := logicalName.Validate(); err != nil {
+		return nil, err
+	}
+	return s.repository.FindByIdentity(
 		ctx,
-		s.policy,
-		request.Collection.RootID,
-	); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := request.ArtifactID.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := request.Collection.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := request.Occurrence.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if request.Occurrence.CollectionID != request.Collection.CollectionID {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: occurrence belongs to another collection",
-			basespec.ErrInvalid,
-		)
-	}
-	collectionValue, err := s.activeCollection(ctx, request.Collection)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if _, err := s.collections.GetAttachment(
-		ctx,
-		request.Collection,
-		request.Occurrence.SourceID,
-	); err != nil {
-		return artifact.Artifact{}, err
-	}
-	snapshot, err := catalogimpl.ReadCurrent(ctx, s.catalogs, request.Collection)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if request.ExpectedCatalogRevision == 0 ||
-		snapshot.Revision != request.ExpectedCatalogRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-
-	var occurrence *catalog.Occurrence
-	for index := range snapshot.Occurrences {
-		if snapshot.Occurrences[index].Key == request.Occurrence {
-			value := snapshot.Occurrences[index]
-			occurrence = &value
-			break
-		}
-	}
-
-	if occurrence == nil ||
-		occurrence.State != catalog.OccurrenceValid ||
-		occurrence.DefinitionDigest == nil {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: occurrence is not currently adoptable",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	data, err := canonicalArtifactData(request.Data)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-
-	name := request.Name
-	if name == "" {
-		name = string(occurrence.LogicalName)
-	}
-	resolved := *occurrence.DefinitionDigest
-	now := clockutil.NowUTC(s.clock)
-	value := artifact.Artifact{
-		ID:           request.ArtifactID,
-		RootID:       request.Collection.RootID,
-		CollectionID: request.Collection.CollectionID,
-		Binding: artifact.SourceBinding{
-			SourceID:           occurrence.Key.SourceID,
-			Locator:            occurrence.Key.Locator,
-			SubresourceLocator: occurrence.Key.SubresourceLocator,
-			ExpectedKind:       occurrence.Kind,
-		},
-		Kind:               occurrence.Kind,
-		Name:               name,
-		Enabled:            request.Enabled,
-		Adoption:           artifact.AdoptionObserved,
-		ResolvedDefinition: &resolved,
-		Data:               data,
-		State:              artifact.StateAvailable,
-		Diagnostics:        diagnostic.Clone(occurrence.Diagnostics),
-		Revision:           1,
-		CreatedAt:          now,
-		ModifiedAt:         now,
-	}
-	if err := value.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.repository.CreateAdopted(
-		ctx,
-		value,
-		collectionValue.Revision,
-		request.ExpectedCatalogRevision,
-	); err != nil {
-		return s.resolveCreateConflict(ctx, value, err)
-	}
-	return value.Clone(), nil
-}
-
-func (s *Service) Pin(
-	ctx context.Context,
-	request catalog.PinRequest,
-) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(
-		ctx,
-		s.policy,
-		request.Collection.RootID,
-	); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := request.ArtifactID.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	collectionValue, err := s.activeCollection(ctx, request.Collection)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-
-	if request.ExpectedCollectionRevision == 0 {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: expected collection revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	if collectionValue.Revision != request.ExpectedCollectionRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-
-	if err := s.requireAttachedBinding(ctx, request.Collection, request.Binding); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := basespec.ValidateRequiredText(
-		"pinned artifact name",
-		request.Name,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return artifact.Artifact{}, err
-	}
-
-	data, err := canonicalArtifactData(request.Data)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-
-	var (
-		resolvedDefinition *cryptoutil.Digest
-		state              = artifact.StateMissing
-		diagnostics        = []diagnostic.Diagnostic{{
-			Severity: diagnostic.SeverityInfo,
-			Code:     "artifact.pinned.awaiting-catalog",
-			Message:  "the pinned source binding has no current catalog observation",
-		}}
-		expectedCatalogRevision uint64
+		rootID,
+		kind,
+		logicalName,
 	)
+}
 
-	snapshot, snapshotErr := catalogimpl.ReadCurrent(ctx, s.catalogs, request.Collection)
-	switch {
-	case snapshotErr == nil:
-		expectedCatalogRevision = snapshot.Revision
-		var observed *catalog.Occurrence
-		for index := range snapshot.Occurrences {
-			value := snapshot.Occurrences[index]
-			if value.Key.SourceID != request.Binding.SourceID ||
-				value.Key.Locator != request.Binding.Locator ||
-				value.Key.SubresourceLocator != request.Binding.SubresourceLocator {
-				continue
-			}
-			observed = &value
-			break
-		}
-
-		provisional := artifact.Artifact{
-			Binding: request.Binding,
-			Kind:    request.Binding.ExpectedKind,
-		}
-		resolvedDefinition, state, diagnostics, err = DeriveSourceState(
-			provisional,
-			observed,
-		)
-		if err != nil {
-			return artifact.Artifact{}, err
-		}
-
-	case errors.Is(snapshotErr, basespec.ErrCatalogUnavailable):
-	case errors.Is(snapshotErr, basespec.ErrCatalogStale):
-		diagnostics = diagnostic.Append(
-			diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.SeverityWarning,
-				Code:     "artifact.pinned.catalog-stale",
-				Message:  "the pinned source binding will be reconciled after the collection catalog is refreshed",
-			},
-		)
-	default:
-		return artifact.Artifact{}, snapshotErr
-	}
-
-	now := clockutil.NowUTC(s.clock)
-	value := artifact.Artifact{
-		ID:                 request.ArtifactID,
-		RootID:             request.Collection.RootID,
-		CollectionID:       request.Collection.CollectionID,
-		Binding:            request.Binding,
-		Kind:               request.Binding.ExpectedKind,
-		Name:               request.Name,
-		Enabled:            request.Enabled,
-		Adoption:           artifact.AdoptionPinned,
-		Data:               data,
-		ResolvedDefinition: resolvedDefinition,
-		State:              state,
-		Diagnostics:        diagnostics,
-		Revision:           1,
-		CreatedAt:          now,
-		ModifiedAt:         now,
-	}
-	if err := value.Validate(); err != nil {
+func (s *Service) FindByOrigin(
+	ctx context.Context,
+	rootID root.RootID,
+	binding artifact.SourceBinding,
+	kind artifact.ArtifactKind,
+) (artifact.Artifact, error) {
+	if err := rootID.Validate(); err != nil {
 		return artifact.Artifact{}, err
 	}
-	if err := s.repository.CreatePinned(
+	if err := binding.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := kind.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	return s.repository.FindByOrigin(
 		ctx,
-		value,
-		request.ExpectedCollectionRevision,
-		expectedCatalogRevision,
-	); err != nil {
-		return s.resolveCreateConflict(ctx, value, err)
+		rootID,
+		binding,
+		kind,
+	)
+}
+
+func (s *Service) GetDefinition(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (definition.Definition, error) {
+	record, err := s.Get(ctx, ref)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if record.ResolvedDefinition == nil {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Artifact %q has no current Definition",
+			basespec.ErrDefinitionNotFound,
+			record.ID,
+		)
+	}
+	value, err := s.definitions.GetDefinition(
+		ctx,
+		record.RootID,
+		*record.ResolvedDefinition,
+	)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if value.Kind != record.Kind ||
+		value.Digest != *record.ResolvedDefinition {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Artifact Definition does not match Artifact state",
+			basespec.ErrDigestMismatch,
+		)
 	}
 	return value.Clone(), nil
 }
@@ -341,75 +164,37 @@ func (s *Service) SetEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return artifact.Artifact{}, err
-	}
-	current, err := s.repository.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.ensureArtifactCollection(ctx, current); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-	if current.Enabled == enabled {
-		return current, nil
-	}
-	next := current
-	next.Enabled = enabled
-	next.Revision++
-	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
-	if err := next.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return next.Clone(), nil
+	return s.updateLocal(
+		ctx,
+		ref,
+		expectedRevision,
+		func(value *artifact.Artifact) {
+			value.Enabled = enabled
+		},
+	)
 }
 
-func (s *Service) SetName(
+func (s *Service) SetDisplayName(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
-	name string,
+	displayName string,
 ) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return artifact.Artifact{}, err
-	}
 	if err := basespec.ValidateRequiredText(
-		"artifact name",
-		name,
+		"Artifact display name",
+		displayName,
 		basespec.MaxDisplayNameBytes,
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
-	current, err := s.repository.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.ensureArtifactCollection(ctx, current); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-	if current.Name == name {
-		return current.Clone(), nil
-	}
-	next := current
-	next.Name = name
-	next.Revision++
-	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
-	if err := next.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return next.Clone(), nil
+	return s.updateLocal(
+		ctx,
+		ref,
+		expectedRevision,
+		func(value *artifact.Artifact) {
+			value.DisplayName = displayName
+		},
+	)
 }
 
 func (s *Service) UpdateData(
@@ -418,192 +203,33 @@ func (s *Service) UpdateData(
 	expectedRevision uint64,
 	data json.RawMessage,
 ) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return artifact.Artifact{}, err
-	}
-	canonical, err := canonicalArtifactData(data)
+	canonical, err := jsonutil.CanonicalizeObject(
+		data,
+		basespec.MaxLocalDataBytes,
+	)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	current, err := s.repository.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.ensureArtifactCollection(ctx, current); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
-	}
-	if bytes.Equal(current.Data, canonical) {
-		return current, nil
-	}
-	next := current
-	next.Data = canonical
-	next.Revision++
-	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
-	if err := next.Validate(); err != nil {
-		return artifact.Artifact{}, err
-	}
-	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return next.Clone(), nil
-}
-
-func (s *Service) Unadopt(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	suppress bool,
-) error {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return err
-	}
-	current, err := s.repository.Get(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if err := s.ensureArtifactCollection(ctx, current); err != nil {
-		return err
-	}
-	if expectedRevision == 0 || current.Revision != expectedRevision {
-		return basespec.ErrConflict
-	}
-	if current.Adoption != artifact.AdoptionObserved {
-		return fmt.Errorf(
-			"%w: only observed artifacts can be unadopted",
-			basespec.ErrConflict,
-		)
-	}
-
-	var suppression *artifact.Suppression
-	if suppress {
-		ref := collection.CollectionRef{
-			RootID:       current.RootID,
-			CollectionID: current.CollectionID,
-		}
-		if err := s.requireAttachedBinding(ctx, ref, current.Binding); err != nil {
-			return err
-		}
-		now := clockutil.NowUTC(s.clock)
-		value := artifact.Suppression{
-			RootID:       current.RootID,
-			CollectionID: current.CollectionID,
-			Binding:      current.Binding,
-			Revision:     1,
-			CreatedAt:    now,
-			ModifiedAt:   now,
-		}
-		if err := value.Validate(); err != nil {
-			return err
-		}
-		suppression = &value
-	}
-
-	return s.repository.Unadopt(ctx, ref, expectedRevision, suppression)
-}
-
-func (s *Service) Suppress(
-	ctx context.Context,
-	request catalog.SuppressRequest,
-) (artifact.Suppression, error) {
-	if err := rootimpl.RequireMutableRoot(
-		ctx,
-		s.policy,
-		request.Collection.RootID,
-	); err != nil {
-		return artifact.Suppression{}, err
-	}
-	if err := request.Collection.Validate(); err != nil {
-		return artifact.Suppression{}, err
-	}
-	if request.ExpectedCollectionRevision == 0 {
-		return artifact.Suppression{}, fmt.Errorf(
-			"%w: expected collection revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-
-	current, err := s.activeCollection(ctx, request.Collection)
-	if err != nil {
-		return artifact.Suppression{}, err
-	}
-	if current.Revision != request.ExpectedCollectionRevision {
-		return artifact.Suppression{}, basespec.ErrConflict
-	}
-
-	if err := s.requireAttachedBinding(ctx, request.Collection, request.Binding); err != nil {
-		return artifact.Suppression{}, err
-	}
-
-	now := clockutil.NowUTC(s.clock)
-	value := artifact.Suppression{
-		RootID:       request.Collection.RootID,
-		CollectionID: request.Collection.CollectionID,
-		Binding:      request.Binding,
-		Revision:     1,
-		CreatedAt:    now,
-		ModifiedAt:   now,
-	}
-
-	if err := value.Validate(); err != nil {
-		return artifact.Suppression{}, err
-	}
-	if err := s.repository.Suppress(
-		ctx,
-		value,
-		request.ExpectedCollectionRevision,
-	); err != nil {
-		return artifact.Suppression{}, err
-	}
-	return value, nil
-}
-
-func (s *Service) Unsuppress(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	binding artifact.SourceBinding,
-	expectedRevision uint64,
-) error {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return err
-	}
-	if err := ref.Validate(); err != nil {
-		return err
-	}
-	if err := binding.Validate(); err != nil {
-		return err
-	}
-
-	if expectedRevision == 0 {
-		return fmt.Errorf(
-			"%w: expected suppression revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	if _, err := s.collections.Get(ctx, ref); err != nil {
-		return err
-	}
-
-	return s.repository.Unsuppress(
+	return s.updateLocal(
 		ctx,
 		ref,
-		binding,
 		expectedRevision,
+		func(value *artifact.Artifact) {
+			value.Data = json.RawMessage(canonical)
+		},
 	)
 }
 
-// Purge destructively removes one local Artifact Record.
-//
-// Unlike Unadopt, Purge never creates a suppression. It does not remove
-// externally owned Source content or immutable definitions.
 func (s *Service) Purge(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
+	if err := rootimpl.RequireMutableRoot(
+		ctx,
+		s.policy,
+		ref.RootID,
+	); err != nil {
 		return err
 	}
 	if err := ref.Validate(); err != nil {
@@ -611,167 +237,68 @@ func (s *Service) Purge(
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
-			"%w: expected artifact revision is required",
+			"%w: expected Artifact revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 	return s.repository.Purge(ctx, ref, expectedRevision)
 }
 
-// PurgeAndSuppress destructively removes one local Artifact Record and
-// records its binding as suppressed in the same repository transaction.
-//
-// It is for source-owned Artifacts whose source role would otherwise
-// automatically adopt the same occurrence again after the next refresh.
-func (s *Service) PurgeAndSuppress(
+func (s *Service) updateLocal(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
-) error {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, ref.RootID); err != nil {
-		return err
+	mutate func(*artifact.Artifact),
+) (artifact.Artifact, error) {
+	if err := rootimpl.RequireMutableRoot(
+		ctx,
+		s.policy,
+		ref.RootID,
+	); err != nil {
+		return artifact.Artifact{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	if expectedRevision == 0 {
-		return fmt.Errorf(
-			"%w: expected artifact revision is required",
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: expected Artifact revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return err
-	}
-	if err := s.ensureArtifactCollection(ctx, current); err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	if current.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return artifact.Artifact{}, basespec.ErrConflict
 	}
 
-	collectionRef := collection.CollectionRef{
-		RootID:       current.RootID,
-		CollectionID: current.CollectionID,
+	next := current.Clone()
+	mutate(&next)
+	if current.Enabled == next.Enabled &&
+		current.DisplayName == next.DisplayName &&
+		bytes.Equal(current.Data, next.Data) {
+		return current, nil
 	}
-	if err := s.requireAttachedBinding(ctx, collectionRef, current.Binding); err != nil {
-		return err
-	}
-
-	now := clockutil.NowUTC(s.clock)
-	suppression := artifact.Suppression{
-		RootID:       current.RootID,
-		CollectionID: current.CollectionID,
-		Binding:      current.Binding,
-		Revision:     1,
-		CreatedAt:    now,
-		ModifiedAt:   now,
-	}
-	if err := suppression.Validate(); err != nil {
-		return err
-	}
-	return s.repository.PurgeAndSuppress(
-		ctx,
-		ref,
-		expectedRevision,
-		suppression,
-	)
-}
-
-func (s *Service) activeCollection(
-	ctx context.Context,
-	ref collection.CollectionRef,
-) (collection.Collection, error) {
-	if err := ref.Validate(); err != nil {
-		return collection.Collection{}, err
-	}
-	value, err := s.collections.Get(ctx, ref)
-	if err != nil {
-		return collection.Collection{}, err
-	}
-	if !value.Enabled {
-		return collection.Collection{}, fmt.Errorf(
-			"%w: collection %q is disabled",
-			basespec.ErrConflict,
-			ref.CollectionID,
-		)
-	}
-	return value, nil
-}
-
-func (s *Service) requireAttachedBinding(
-	ctx context.Context,
-	ref collection.CollectionRef,
-	binding artifact.SourceBinding,
-) error {
-	if err := binding.Validate(); err != nil {
-		return err
-	}
-	_, err := s.collections.GetAttachment(ctx, ref, binding.SourceID)
-	return err
-}
-
-func (s *Service) ensureArtifactCollection(
-	ctx context.Context,
-	value artifact.Artifact,
-) error {
-	ref := collection.CollectionRef{
-		RootID:       value.RootID,
-		CollectionID: value.CollectionID,
-	}
-	collectionValue, err := s.collections.Get(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if collectionValue.RootID != value.RootID ||
-		collectionValue.ID != value.CollectionID {
-		return fmt.Errorf(
-			"%w: artifact belongs to an unavailable collection",
+	if current.Revision == ^uint64(0) {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: Artifact revision is exhausted",
 			basespec.ErrInvalid,
 		)
 	}
-	return nil
-}
-
-func canonicalArtifactData(raw json.RawMessage) (json.RawMessage, error) {
-	value, err := jsonutil.CanonicalizeObject(
-		raw,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, err
+	next.Revision++
+	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
+	if err := next.Validate(); err != nil {
+		return artifact.Artifact{}, err
 	}
-	return json.RawMessage(value), nil
-}
-
-func (s *Service) resolveCreateConflict(
-	ctx context.Context,
-	requested artifact.Artifact,
-	createErr error,
-) (artifact.Artifact, error) {
-	if !errors.Is(createErr, basespec.ErrConflict) {
-		return artifact.Artifact{}, createErr
+	if err := s.repository.UpdateLocal(
+		ctx,
+		next,
+		expectedRevision,
+	); err != nil {
+		return artifact.Artifact{}, err
 	}
-	existing, err := s.repository.Get(ctx, requested.Ref())
-	if err != nil {
-		return artifact.Artifact{}, createErr
-	}
-	if existing.RootID != requested.RootID ||
-		existing.CollectionID != requested.CollectionID ||
-		existing.Binding != requested.Binding ||
-		existing.Kind != requested.Kind ||
-		existing.Adoption != requested.Adoption ||
-		existing.Name != requested.Name ||
-		existing.Enabled != requested.Enabled ||
-		!bytes.Equal(existing.Data, requested.Data) {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: artifact %q creation intent differs",
-			basespec.ErrConflict,
-			requested.ID,
-		)
-	}
-
-	return existing.Clone(), nil
+	return next.Clone(), nil
 }

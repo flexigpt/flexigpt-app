@@ -136,12 +136,9 @@ func (s *Store) PurgeTopologyRoot(
 	defer func() { _ = tx.Rollback() }()
 
 	statements := []string{
+		`DELETE FROM artifact_source_refresh_state WHERE root_id = ?`,
 		`DELETE FROM artifact_artifacts WHERE root_id = ?`,
-		`DELETE FROM artifact_suppressions WHERE root_id = ?`,
-		`DELETE FROM artifact_current_occurrences WHERE root_id = ?`,
-		`DELETE FROM artifact_current_catalogs WHERE root_id = ?`,
-		`DELETE FROM artifact_collection_attachments WHERE root_id = ?`,
-		`DELETE FROM artifact_collections WHERE root_id = ?`,
+		`DELETE FROM artifact_definitions WHERE root_id = ?`,
 		`DELETE FROM artifact_sources WHERE root_id = ?`,
 		`DELETE FROM artifact_roots WHERE id = ?`,
 	}

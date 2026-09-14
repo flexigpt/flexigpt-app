@@ -7,11 +7,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
-// Provider creates Store-owned Artifact IDs for automatic adoption.
+// Provider creates Store-owned Artifact IDs for source synchronization.
 //
-// Providers never receive this capability. Explicit Artifact creation remains
-// caller-ID-based, while reconciliation-created observed Artifacts receive IDs
-// only from Artifact Store.
+// Providers never receive this capability. Valid named source declarations
+// receive IDs only from Artifact Store.
 type Provider interface {
 	NewArtifactID(ctx context.Context) (artifact.ArtifactID, error)
 }
