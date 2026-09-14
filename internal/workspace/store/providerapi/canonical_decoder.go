@@ -5,17 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collectionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/teamv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workflowv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -73,7 +73,7 @@ func (*CanonicalDecoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
+		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return providerapi.RecognitionNone
@@ -100,7 +100,7 @@ func (d *CanonicalDecoder) Decode(
 	}
 
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
+		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return nil, nil
@@ -126,7 +126,7 @@ func (d *CanonicalDecoder) Decode(
 		}}
 	}
 
-	root, err := artifactcontract.DecodeEntryJSON(parsed.Raw)
+	root, err := declaration.DecodeEntryJSON(parsed.Raw)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityError,
@@ -137,7 +137,7 @@ func (d *CanonicalDecoder) Decode(
 			},
 		}}
 	}
-	entries, err := artifactcontract.WalkNamedEntries(root)
+	entries, err := declaration.WalkNamedEntries(root)
 	if err != nil {
 		return nil, []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityError,
@@ -176,28 +176,28 @@ func (d *CanonicalDecoder) Decode(
 }
 
 func canonicalSchemaKey(
-	declarationType artifactcontract.Type,
+	declarationType declaration.Type,
 ) (schema.Key, bool) {
 	switch declarationType {
-	case artifactcontract.TypeInstruction:
+	case declaration.TypeInstruction:
 		return instructionv1.InstructionSchemaKey, true
-	case artifactcontract.TypeContext:
+	case declaration.TypeContext:
 		return contextv1.ContextSchemaKey, true
-	case artifactcontract.TypeTool:
+	case declaration.TypeTool:
 		return toolv1.ToolSchemaKey, true
-	case artifactcontract.TypeModel:
+	case declaration.TypeModel:
 		return modelv1.ModelSchemaKey, true
-	case artifactcontract.TypeCollection:
+	case declaration.TypeCollection:
 		return collectionv1.CollectionSchemaKey, true
-	case artifactcontract.TypeAgent:
+	case declaration.TypeAgent:
 		return agentv1.AgentSchemaKey, true
-	case artifactcontract.TypeTeam:
+	case declaration.TypeTeam:
 		return teamv1.TeamSchemaKey, true
-	case artifactcontract.TypeLoop:
+	case declaration.TypeLoop:
 		return loopv1.LoopSchemaKey, true
-	case artifactcontract.TypeWorkflow:
+	case declaration.TypeWorkflow:
 		return workflowv1.WorkflowSchemaKey, true
-	case artifactcontract.TypeWorkspace:
+	case declaration.TypeWorkspace:
 		return workspacev1.WorkspaceSchemaKey, true
 	default:
 		return schema.Key{}, false

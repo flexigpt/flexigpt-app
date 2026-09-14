@@ -3,7 +3,7 @@ package domain
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 )

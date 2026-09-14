@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -70,12 +70,12 @@ func DecodeSkillDocument(
 // DefinitionForSkillDeclaration projects one standalone canonical skillv1
 // declaration into the generic Artifact Store Definition value.
 func DefinitionForSkillDeclaration(
-	declaration skillv1.SkillDocument,
+	doc skillv1.SkillDocument,
 ) (definition.Definition, error) {
-	if err := declaration.Validate(); err != nil {
+	if err := doc.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	body, err := declaration.CanonicalJSON()
+	body, err := doc.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -83,9 +83,9 @@ func DefinitionForSkillDeclaration(
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
-		LogicalName:   basespec.LogicalName(declaration.Name),
-		DisplayName:   declaration.Name,
-		Description:   declaration.Description,
+		LogicalName:   basespec.LogicalName(doc.Name),
+		DisplayName:   doc.Name,
+		Description:   doc.Description,
 		Body:          body,
 		Dependencies:  nil,
 	}
@@ -140,17 +140,17 @@ func ValidateDefinition(
 		)
 	}
 
-	declaration, err := skillv1.DecodeSkillJSON(value.Body)
+	doc, err := skillv1.DecodeSkillJSON(value.Body)
 	if err != nil {
 		return err
 	}
-	if declaration.Name != string(value.LogicalName) {
+	if doc.Name != string(value.LogicalName) {
 		return fmt.Errorf(
 			"%w: Skill Definition logical name does not match declaration name",
 			basespec.ErrInvalid,
 		)
 	}
-	if declaration.Description != value.Description {
+	if doc.Description != value.Description {
 		return fmt.Errorf(
 			"%w: Skill Definition description does not match declaration description",
 			basespec.ErrInvalid,
@@ -162,13 +162,13 @@ func ValidateDefinition(
 func definitionForSkillDocument(
 	doc document.SkillDocument,
 ) (definition.Definition, error) {
-	declaration := skillv1.SkillDocument{
+	decl := skillv1.SkillDocument{
 		APIVersion:  SkillSchemaVersion,
-		Type:        artifactcontract.TypeSkill,
+		Type:        declaration.TypeSkill,
 		Name:        doc.Name,
 		Description: doc.Description,
 	}
-	body, err := declaration.CanonicalJSON()
+	body, err := decl.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err
 	}

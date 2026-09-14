@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -63,7 +63,7 @@ func (*InstructionDecoder) Decode(
 		"instruction",
 		candidate.Locator,
 	)
-	declaration := instructionv1.InstructionDocument{
+	dec := instructionv1.InstructionDocument{
 		APIVersion:  instructionv1.InstructionSchemaVersion,
 		Type:        instructionv1.InstructionType,
 		Name:        string(name),
@@ -71,7 +71,7 @@ func (*InstructionDecoder) Decode(
 		Content:     stringPointer(content),
 		MediaType:   markdownMediaType,
 	}
-	entry, err := artifactcontract.NewEntry(declaration)
+	entry, err := declaration.NewEntry(dec)
 	if err != nil {
 		return nil, instructionDiagnostics(candidate.Locator, err)
 	}

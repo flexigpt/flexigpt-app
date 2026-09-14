@@ -1,7 +1,7 @@
 package consumerapi
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
@@ -20,7 +20,7 @@ type FilesystemSourceRegistration struct {
 
 type WorkspaceLoad struct {
 	Workspace workspaceDomain.Workspace
-	Roots     []artifactcontract.Entry
+	Roots     []declaration.Entry
 }
 
 type WorkspaceRefresh struct {

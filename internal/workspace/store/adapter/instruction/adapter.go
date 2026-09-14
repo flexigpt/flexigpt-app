@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -125,7 +125,7 @@ func (a *Adapter) contentForDocument(
 		)
 	}
 
-	locator, err := artifactcontract.ResolveSourceRelativePathLocator(
+	locator, err := declaration.ResolveSourceRelativePathLocator(
 		*document.Locator,
 		resolved.Artifact.Binding.Locator,
 	)

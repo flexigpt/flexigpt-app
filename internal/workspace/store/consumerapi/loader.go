@@ -8,8 +8,8 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
@@ -177,7 +177,7 @@ func workspaceDiscoveryForDocument(
 }
 
 func localSourceLocator(
-	locator artifactcontract.Locator,
+	locator declaration.Locator,
 	declarationLocator basespec.Locator,
 ) (basespec.Locator, bool, error) {
 	if err := locator.Validate(); err != nil {
@@ -194,14 +194,14 @@ func localSourceLocator(
 			return "", false, nil
 		}
 
-	case artifactcontract.LocatorKindPath:
+	case declaration.LocatorKindPath:
 		// Resolved below.
 
 	default:
 		return "", false, nil
 	}
 
-	value, err := artifactcontract.ResolveSourceRelativePathLocator(
+	value, err := declaration.ResolveSourceRelativePathLocator(
 		locator,
 		declarationLocator,
 	)

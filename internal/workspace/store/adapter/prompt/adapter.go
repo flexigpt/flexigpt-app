@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"

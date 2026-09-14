@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -199,7 +199,7 @@ func (a *StoreAPI) LoadWorkspace(
 	}
 
 	roots := make(
-		[]artifactcontract.Entry,
+		[]declaration.Entry,
 		len(workspace.Document.Roots),
 	)
 	for index, value := range workspace.Document.Roots {

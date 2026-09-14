@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -54,12 +54,12 @@ func (*CanonicalDecoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
+		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return providerapi.RecognitionNone
 	}
-	if header.Type != artifactcontract.TypeSkill {
+	if header.Type != declaration.TypeSkill {
 		return providerapi.RecognitionNone
 	}
 	return providerapi.RecognitionPreferred

@@ -1,7 +1,7 @@
 package domain
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"

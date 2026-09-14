@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -58,16 +58,16 @@ func (*Decoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
-		Kind string                `json:"kind"`
+		Type declaration.Type `json:"type"`
+		Kind string           `json:"kind"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return providerapi.RecognitionNone
 	}
 
 	switch {
-	case header.Type == artifactcontract.TypeMCP,
-		header.Type == artifactcontract.TypeMCPPolicy:
+	case header.Type == declaration.TypeMCP,
+		header.Type == declaration.TypeMCPPolicy:
 		return providerapi.RecognitionPreferred
 	case header.Kind == "mcp.bundle":
 		return providerapi.RecognitionPreferred
@@ -94,15 +94,15 @@ func (d *Decoder) Decode(
 	}
 
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
-		Kind string                `json:"kind"`
+		Type declaration.Type `json:"type"`
+		Kind string           `json:"kind"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return nil, nil
 	}
 
 	switch {
-	case header.Type == artifactcontract.TypeMCP:
+	case header.Type == declaration.TypeMCP:
 		parsed, err := d.documents.CanonicalizeExpected(
 			ctx,
 			mcpv1.MCPSchemaKey,
@@ -125,7 +125,7 @@ func (d *Decoder) Decode(
 			Definition: definitionValue,
 		}}, nil
 
-	case header.Type == artifactcontract.TypeMCPPolicy:
+	case header.Type == declaration.TypeMCPPolicy:
 		parsed, err := d.documents.CanonicalizeExpected(
 			ctx,
 			mcppolicyv1.MCPPolicySchemaKey,

@@ -4,20 +4,20 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collectionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/teamv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workflowv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -27,7 +27,7 @@ import (
 // DefinitionForEntry projects one fully named canonical declaration into the
 // generic Store Definition model. The Store remains unaware of this mapping.
 func DefinitionForEntry(
-	entry artifactcontract.Entry,
+	entry declaration.Entry,
 ) (definition.Definition, error) {
 	if err := entry.Validate(); err != nil {
 		return definition.Definition{}, err
@@ -45,7 +45,7 @@ func DefinitionForEntry(
 	}
 
 	switch entry.Header().Type {
-	case artifactcontract.TypeInstruction:
+	case declaration.TypeInstruction:
 		value, err := instructionv1.DecodeInstructionJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -61,7 +61,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeContext:
+	case declaration.TypeContext:
 		value, err := contextv1.DecodeContextJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -77,7 +77,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeTool:
+	case declaration.TypeTool:
 		value, err := toolv1.DecodeToolJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -93,7 +93,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeModel:
+	case declaration.TypeModel:
 		value, err := modelv1.DecodeModelJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -109,7 +109,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeSkill:
+	case declaration.TypeSkill:
 		value, err := skillv1.DecodeSkillJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -125,14 +125,14 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeMCP:
+	case declaration.TypeMCP:
 		value, err := mcpv1.DecodeMCPJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
 		}
 		return mcpv1.DefinitionForDeclaration(value)
 
-	case artifactcontract.TypeMCPPolicy:
+	case declaration.TypeMCPPolicy:
 		value, err := mcppolicyv1.DecodeMCPPolicyJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -148,7 +148,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeCollection:
+	case declaration.TypeCollection:
 		value, err := collectionv1.DecodeCollectionJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -164,7 +164,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeAgent:
+	case declaration.TypeAgent:
 		value, err := agentv1.DecodeAgentJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -180,7 +180,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeTeam:
+	case declaration.TypeTeam:
 		value, err := teamv1.DecodeTeamJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -196,7 +196,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeLoop:
+	case declaration.TypeLoop:
 		value, err := loopv1.DecodeLoopJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -212,7 +212,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeWorkflow:
+	case declaration.TypeWorkflow:
 		value, err := workflowv1.DecodeWorkflowJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -228,7 +228,7 @@ func DefinitionForEntry(
 			body,
 		)
 
-	case artifactcontract.TypeWorkspace:
+	case declaration.TypeWorkspace:
 		value, err := workspacev1.DecodeWorkspaceJSON(raw)
 		if err != nil {
 			return definition.Definition{}, err
@@ -254,7 +254,7 @@ func DefinitionForEntry(
 }
 
 func definitionForDocument(
-	header artifactcontract.Header,
+	header declaration.Header,
 	key schema.Key,
 	logicalVersion basespec.LogicalVersion,
 	body []byte,
@@ -262,8 +262,8 @@ func definitionForDocument(
 	if err := key.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	if err := header.Validate(artifactcontract.HeaderValidation{
-		ExpectedType: artifactcontract.Type(key.Kind),
+	if err := header.Validate(declaration.HeaderValidation{
+		ExpectedType: declaration.Type(key.Kind),
 		APIVersion:   key.SchemaVersion,
 		RequireName:  true,
 	}); err != nil {

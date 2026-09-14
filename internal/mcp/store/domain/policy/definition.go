@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"

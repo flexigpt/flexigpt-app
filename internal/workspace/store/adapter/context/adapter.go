@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -193,10 +193,10 @@ func (a *Adapter) contentForDocument(
 }
 
 func declarationRelativeSourceLocator(
-	locator artifactcontract.Locator,
+	locator declaration.Locator,
 	declarationLocator basespec.Locator,
 ) (basespec.Locator, error) {
-	return artifactcontract.ResolveSourceRelativePathLocator(
+	return declaration.ResolveSourceRelativePathLocator(
 		locator, declarationLocator,
 	)
 }

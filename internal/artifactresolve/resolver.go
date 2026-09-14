@@ -5,20 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collectionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/instructionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/skillv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/teamv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workflowv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -61,7 +61,7 @@ func (r *Resolver) resolveInlineGraph(
 	ctx context.Context,
 	state *resolutionState,
 	rootID root.RootID,
-	entry artifactcontract.Entry,
+	entry declaration.Entry,
 ) (Graph, error) {
 	if r == nil || r.artifacts == nil {
 		return Graph{}, basespec.ErrClosed
@@ -87,7 +87,7 @@ func (r *Resolver) resolveInlineGraph(
 func (r *Resolver) ResolveReference(
 	ctx context.Context,
 	rootID root.RootID,
-	declarationType artifactcontract.Type,
+	declarationType declaration.Type,
 	name basespec.LogicalName,
 ) (Graph, error) {
 	if r == nil || r.artifacts == nil {
@@ -129,7 +129,7 @@ func (r *Resolver) ResolveWorkspace(
 		return nil, err
 	}
 	if graph.Root == nil ||
-		graph.Root.Type != artifactcontract.TypeWorkspace ||
+		graph.Root.Type != declaration.TypeWorkspace ||
 		graph.Root.Workspace == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact %q is not a Workspace",
@@ -144,7 +144,7 @@ func (r *Resolver) resolveArtifact(
 	ctx context.Context,
 	state *resolutionState,
 	ref artifact.ArtifactRef,
-	expected artifactcontract.Type,
+	expected declaration.Type,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if err := r.reserve(state, depth); err != nil {
@@ -170,7 +170,7 @@ func (r *Resolver) resolveArtifact(
 		)
 	}
 
-	declarationType := artifactcontract.Type(record.Kind)
+	declarationType := declaration.Type(record.Kind)
 	if err := declarationType.Validate(); err != nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact %q has unsupported declaration type: %w",
@@ -206,7 +206,7 @@ func (r *Resolver) resolveArtifact(
 			basespec.ErrDigestMismatch,
 		)
 	}
-	entry, err := artifactcontract.DecodeEntryJSON(definitionValue.Body)
+	entry, err := declaration.DecodeEntryJSON(definitionValue.Body)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Definition body is not a canonical declaration: %w",
@@ -234,7 +234,7 @@ func (r *Resolver) resolveArtifact(
 		Definition:  pointerDefinition(definitionValue),
 	}
 
-	if declarationType == artifactcontract.TypeCollection {
+	if declarationType == declaration.TypeCollection {
 		if _, cycle := state.collections[ref]; cycle {
 			return nil, fmt.Errorf(
 				"%w: Collection inclusion cycle at Artifact %q",
@@ -263,7 +263,7 @@ func (r *Resolver) resolveSymbolic(
 	ctx context.Context,
 	state *resolutionState,
 	rootID root.RootID,
-	declarationType artifactcontract.Type,
+	declarationType declaration.Type,
 	name basespec.LogicalName,
 	depth int,
 ) (*ResolvedEntry, error) {
@@ -319,7 +319,7 @@ func (r *Resolver) resolveEntry(
 	ctx context.Context,
 	state *resolutionState,
 	rootID root.RootID,
-	entry artifactcontract.Entry,
+	entry declaration.Entry,
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
@@ -398,7 +398,7 @@ func (r *Resolver) resolveStructure(
 	ctx context.Context,
 	state *resolutionState,
 	node *ResolvedEntry,
-	entry artifactcontract.Entry,
+	entry declaration.Entry,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
 ) error {
@@ -416,23 +416,23 @@ func (r *Resolver) resolveStructure(
 	}
 
 	switch node.Type {
-	case artifactcontract.TypeInstruction:
+	case declaration.TypeInstruction:
 		_, err := instructionv1.DecodeInstructionEntry(entry)
 		return err
 
-	case artifactcontract.TypeContext:
+	case declaration.TypeContext:
 		_, err := contextv1.DecodeContextEntry(entry)
 		return err
 
-	case artifactcontract.TypeTool:
+	case declaration.TypeTool:
 		_, err := toolv1.DecodeToolEntry(entry)
 		return err
 
-	case artifactcontract.TypeModel:
+	case declaration.TypeModel:
 		_, err := modelv1.DecodeModelEntry(entry)
 		return err
 
-	case artifactcontract.TypeSkill:
+	case declaration.TypeSkill:
 		value, err := skillv1.DecodeSkillEntry(entry)
 		if err != nil {
 			return err
@@ -448,15 +448,15 @@ func (r *Resolver) resolveStructure(
 		)
 		return err
 
-	case artifactcontract.TypeMCP:
+	case declaration.TypeMCP:
 		_, err := mcpv1.DecodeMCPEntry(entry)
 		return err
 
-	case artifactcontract.TypeMCPPolicy:
+	case declaration.TypeMCPPolicy:
 		_, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
 		return err
 
-	case artifactcontract.TypeCollection:
+	case declaration.TypeCollection:
 		value, err := collectionv1.DecodeCollectionEntry(entry)
 		if err != nil {
 			return err
@@ -472,7 +472,7 @@ func (r *Resolver) resolveStructure(
 		)
 		return err
 
-	case artifactcontract.TypeAgent:
+	case declaration.TypeAgent:
 		value, err := agentv1.DecodeAgentEntry(entry)
 		if err != nil {
 			return err
@@ -502,7 +502,7 @@ func (r *Resolver) resolveStructure(
 		}
 		return err
 
-	case artifactcontract.TypeTeam:
+	case declaration.TypeTeam:
 		value, err := teamv1.DecodeTeamEntry(entry)
 		if err != nil {
 			return err
@@ -532,7 +532,7 @@ func (r *Resolver) resolveStructure(
 		}
 		return err
 
-	case artifactcontract.TypeLoop:
+	case declaration.TypeLoop:
 		value, err := loopv1.DecodeLoopEntry(
 			entry,
 			implicitLoopOwner != nil,
@@ -563,7 +563,7 @@ func (r *Resolver) resolveStructure(
 		loop.Body = implicitLoopOwner
 		return nil
 
-	case artifactcontract.TypeWorkflow:
+	case declaration.TypeWorkflow:
 		value, err := workflowv1.DecodeWorkflowEntry(entry)
 		if err != nil {
 			return err
@@ -621,7 +621,7 @@ func (r *Resolver) resolveStructure(
 		}
 		return nil
 
-	case artifactcontract.TypeWorkspace:
+	case declaration.TypeWorkspace:
 		value, err := workspacev1.DecodeWorkspaceEntry(entry)
 		if err != nil {
 			return err
@@ -660,7 +660,7 @@ func (r *Resolver) resolveEntries(
 	ctx context.Context,
 	state *resolutionState,
 	rootID root.RootID,
-	values []artifactcontract.Entry,
+	values []declaration.Entry,
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
@@ -707,11 +707,11 @@ func (r *Resolver) reserve(
 }
 
 func shouldResolveLocator(
-	entry artifactcontract.Entry,
-	locator *artifactcontract.Locator,
+	entry declaration.Entry,
+	locator *declaration.Locator,
 ) bool {
 	if locator == nil ||
-		locator.Kind == artifactcontract.LocatorKindCommand {
+		locator.Kind == declaration.LocatorKindCommand {
 		return false
 	}
 	raw, err := entry.CanonicalJSON()
@@ -762,8 +762,8 @@ func pointerDefinition(
 }
 
 func pointerEntry(
-	value artifactcontract.Entry,
-) *artifactcontract.Entry {
+	value declaration.Entry,
+) *declaration.Entry {
 	copyValue := value.Clone()
 	return &copyValue
 }

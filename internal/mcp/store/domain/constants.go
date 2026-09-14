@@ -1,8 +1,8 @@
 package domain
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"

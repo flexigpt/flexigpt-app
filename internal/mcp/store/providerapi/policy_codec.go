@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"

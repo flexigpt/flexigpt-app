@@ -14,7 +14,7 @@ import (
 
 	"go.yaml.in/yaml/v4"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -55,7 +55,7 @@ func (*YAMLDecoder) Recognize(
 		return providerapi.RecognitionNone
 	}
 	var header struct {
-		Type artifactcontract.Type `json:"type"`
+		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
 		return providerapi.RecognitionNone
@@ -74,11 +74,11 @@ func (*YAMLDecoder) Decode(
 	if err != nil {
 		return nil, yamlDiagnostic(candidate.Locator, "", err)
 	}
-	root, err := artifactcontract.DecodeEntryJSON(raw)
+	root, err := declaration.DecodeEntryJSON(raw)
 	if err != nil {
 		return nil, yamlDiagnostic(candidate.Locator, "", err)
 	}
-	entries, err := artifactcontract.WalkNamedEntries(root)
+	entries, err := declaration.WalkNamedEntries(root)
 	if err != nil {
 		return nil, yamlDiagnostic(candidate.Locator, "", err)
 	}

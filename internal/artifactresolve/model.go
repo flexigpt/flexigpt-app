@@ -10,7 +10,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -21,8 +21,8 @@ import (
 type LocatorRequest struct {
 	RootID       root.RootID
 	From         *artifact.Artifact
-	Locator      artifactcontract.Locator
-	ExpectedType artifactcontract.Type
+	Locator      declaration.Locator
+	ExpectedType declaration.Type
 }
 
 // LocatorResolver is implemented by application-owned path, URL, Git,
@@ -112,7 +112,7 @@ func New(
 func (r *Resolver) ResolveInline(
 	ctx context.Context,
 	rootID root.RootID,
-	entry artifactcontract.Entry,
+	entry declaration.Entry,
 ) (Graph, error) {
 	if err := rootID.Validate(); err != nil {
 		return Graph{}, err
@@ -128,13 +128,13 @@ type Graph struct {
 }
 
 type ResolvedEntry struct {
-	Type artifactcontract.Type
+	Type declaration.Type
 
 	scopeRootID root.RootID
 
 	Artifact   *artifact.Artifact
 	Definition *definition.Definition
-	Inline     *artifactcontract.Entry
+	Inline     *declaration.Entry
 
 	Members      []*ResolvedEntry
 	AllowedTools []*ResolvedEntry
@@ -148,7 +148,7 @@ type ResolvedEntry struct {
 type ResolvedLoop struct {
 	Body          *ResolvedEntry
 	MaxIterations int
-	Until         *artifactcontract.OutputMatch
+	Until         *declaration.OutputMatch
 }
 
 type ResolvedWorkflow struct {
@@ -166,7 +166,7 @@ type ResolvedWorkflowNode struct {
 type ResolvedWorkflowEdge struct {
 	From  string
 	To    string
-	Match *artifactcontract.OutputMatch
+	Match *declaration.OutputMatch
 }
 
 type ResolvedWorkspace struct {

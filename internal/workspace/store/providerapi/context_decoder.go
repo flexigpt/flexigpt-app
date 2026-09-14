@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -67,7 +67,7 @@ func (*ContextDecoder) Decode(
 		return nil, contextDiagnostics(candidate.Locator, err)
 	}
 	name := logicalNameForLocator("context", candidate.Locator)
-	declaration := contextv1.ContextDocument{
+	dec := contextv1.ContextDocument{
 		APIVersion:  contextv1.ContextSchemaVersion,
 		Type:        contextv1.ContextType,
 		Name:        string(name),
@@ -75,7 +75,7 @@ func (*ContextDecoder) Decode(
 		Content:     stringPointer(content),
 		MediaType:   markdownMediaType,
 	}
-	entry, err := artifactcontract.NewEntry(declaration)
+	entry, err := declaration.NewEntry(dec)
 	if err != nil {
 		return nil, contextDiagnostics(candidate.Locator, err)
 	}
