@@ -42,10 +42,6 @@ type WorkspaceRefresh struct {
 	Result    refresh.RefreshRootResult
 }
 
-type WorkspaceArtifactSettings struct {
-	RuntimeDisabled bool `json:"runtimeDisabled"`
-}
-
 type WorkspacePathRegistrationResult struct {
 	Source    source.Summary            `json:"source"`
 	Workspace workspaceDomain.Workspace `json:"workspace"`

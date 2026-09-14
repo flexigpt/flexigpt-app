@@ -59,11 +59,13 @@ func (*InstructionDecoder) Decode(
 	if err != nil {
 		return nil, instructionDiagnostics(candidate.Locator, err)
 	}
-
-	name := logicalNameForLocator(
+	name, err := declaration.DeriveLogicalName(
 		"instruction",
 		candidate.Locator,
 	)
+	if err != nil {
+		return nil, instructionDiagnostics(candidate.Locator, err)
+	}
 	dec := instructionv1.InstructionDocument{
 		APIVersion:  instructionv1.InstructionSchemaVersion,
 		Type:        instructionv1.InstructionType,

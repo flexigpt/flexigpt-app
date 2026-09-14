@@ -9,7 +9,7 @@ import (
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-const settingsOverlayPrefix = "mcp.installation.v2/"
+const settingsOverlayPrefix = "mcp.installation.v1/"
 
 type SettingsValueStore interface {
 	GetMCPInstallationValue(

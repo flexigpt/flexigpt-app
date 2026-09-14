@@ -36,10 +36,7 @@ func (*ContextDecoder) Recognize(
 	if !isMarkdownContextCandidate(candidate.Locator) {
 		return providerapi.RecognitionNone
 	}
-	if strings.EqualFold(
-		path.Base(string(candidate.Locator)),
-		"README.md",
-	) {
+	if isDefaultContextFile(candidate.Locator) {
 		return providerapi.RecognitionPreferred
 	}
 	if candidate.RequestsDecoder(ContextMarkdownDecoderID) {
@@ -55,11 +52,7 @@ func (*ContextDecoder) Decode(
 	if !isMarkdownContextCandidate(candidate.Locator) {
 		return nil, nil
 	}
-	if !candidate.RequestsDecoder(ContextMarkdownDecoderID) &&
-		!strings.EqualFold(
-			path.Base(string(candidate.Locator)),
-			"README.md",
-		) {
+	if !candidate.RequestsDecoder(ContextMarkdownDecoderID) && !isDefaultContextFile(candidate.Locator) {
 		return nil, nil
 	}
 
@@ -67,7 +60,13 @@ func (*ContextDecoder) Decode(
 	if err != nil {
 		return nil, contextDiagnostics(candidate.Locator, err)
 	}
-	name := logicalNameForLocator("context", candidate.Locator)
+	name, err := declaration.DeriveLogicalName(
+		"context",
+		candidate.Locator,
+	)
+	if err != nil {
+		return nil, contextDiagnostics(candidate.Locator, err)
+	}
 	dec := contextv1.ContextDocument{
 		APIVersion:  contextv1.ContextSchemaVersion,
 		Type:        contextv1.ContextType,
@@ -92,6 +91,9 @@ func (*ContextDecoder) Decode(
 func isMarkdownContextCandidate(
 	locator basespec.Locator,
 ) bool {
+	if strings.EqualFold(path.Base(string(locator)), "llms.txt") {
+		return true
+	}
 	if !strings.EqualFold(path.Ext(string(locator)), ".md") {
 		return false
 	}
@@ -100,6 +102,17 @@ func isMarkdownContextCandidate(
 		return false
 	default:
 		return true
+	}
+}
+
+func isDefaultContextFile(
+	locator basespec.Locator,
+) bool {
+	switch strings.ToUpper(path.Base(string(locator))) {
+	case "README.MD", "LLMS.TXT":
+		return true
+	default:
+		return false
 	}
 }
 

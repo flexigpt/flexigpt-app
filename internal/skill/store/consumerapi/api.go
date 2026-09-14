@@ -9,6 +9,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -491,6 +495,12 @@ func (a *API) InstallBuiltInSkill(
 			skillDomain.ManagedSkillPackageKind,
 		)
 	}
+	if !a.protection.IsProtectedRoot(request.RootID) {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill Root is not protected",
+			basespec.ErrProtected,
+		)
+	}
 	if err := a.requireMutable(ctx, request.RootID, true); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -554,6 +564,167 @@ func (a *API) InstallBuiltInSkill(
 		if err != nil {
 			return artifact.Artifact{}, err
 		}
+	}
+	return value, nil
+}
+
+// InstallBuiltInSkillCollection publishes the canonical Collection that
+// exposes all installed built-in Skills as ordered symbolic members.
+func (a *API) InstallBuiltInSkillCollection(
+	ctx context.Context,
+	request BuiltInSkillCollectionInstallRequest,
+) (artifact.Artifact, error) {
+	if a == nil {
+		return artifact.Artifact{}, basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := request.RootID.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := request.SourceID.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := request.Name.Validate(); err != nil {
+		return artifact.Artifact{}, err
+	}
+	if len(request.Members) == 0 ||
+		len(request.Members) > basespec.MaxDefinitionDependencies {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill Collection has invalid member count",
+			basespec.ErrInvalid,
+		)
+	}
+	if !a.protection.IsProtectedRoot(request.RootID) {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill Collection Root is not protected",
+			basespec.ErrProtected,
+		)
+	}
+	if err := a.requireMutable(ctx, request.RootID, true); err != nil {
+		return artifact.Artifact{}, err
+	}
+
+	sourceValue, err := a.sources.Get(
+		ctx,
+		request.RootID,
+		request.SourceID,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: built-in Skill Collection Source must be managed",
+			basespec.ErrInvalid,
+		)
+	}
+
+	seen := make(map[basespec.LogicalName]struct{}, len(request.Members))
+	members := make([]declaration.Entry, 0, len(request.Members))
+	for index, name := range request.Members {
+		if err := name.Validate(); err != nil {
+			return artifact.Artifact{}, fmt.Errorf(
+				"built-in Skill Collection members[%d]: %w",
+				index,
+				err,
+			)
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return artifact.Artifact{}, fmt.Errorf(
+				"%w: built-in Skill Collection repeats Skill %q",
+				basespec.ErrInvalid,
+				name,
+			)
+		}
+		seen[name] = struct{}{}
+		member, err := declaration.NewSymbolicEntry(
+			declaration.TypeSkill,
+			name,
+		)
+		if err != nil {
+			return artifact.Artifact{}, err
+		}
+		members = append(members, member)
+	}
+
+	document := collectionv1.CollectionDocument{
+		APIVersion:  collectionv1.CollectionSchemaVersion,
+		Type:        collectionv1.CollectionType,
+		Name:        string(request.Name),
+		Description: request.Description,
+		Version:     string(artifactbuiltin.UnversionedPackageVersion),
+		Members:     members,
+	}
+	raw, err := document.CanonicalJSON()
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	entry, err := declaration.NewEntry(document)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	definitionValue, err := decoder.DefinitionForEntry(entry)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+
+	address, err := source.NewManagedPackageAddress(
+		skillDomain.BuiltinCollectionPackageKind,
+		request.Name,
+		artifactbuiltin.UnversionedPackageVersion,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	locator, err := address.FileLocator(
+		skillDomain.BuiltinCollectionDocumentFile,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := validateCanonicalCollectionSourceDiscovery(
+		sourceValue.Discovery,
+		locator,
+	); err != nil {
+		return artifact.Artifact{}, err
+	}
+
+	published, err := a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: request.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID: request.SourceID,
+				Locator:  locator,
+			},
+			ExpectedKind: artifact.ArtifactKind(
+				collectionv1.CollectionType,
+			),
+			ExpectedLogicalName: request.Name,
+			ExpectedDefinition:  definitionValue.Digest,
+			Package: source.ManagedPackagePublication{
+				Address: address,
+				Files: []source.ManagedPackageFile{{
+					Locator: skillDomain.BuiltinCollectionDocumentFile,
+					Content: raw,
+				}},
+			},
+			AllowProtected: true,
+		},
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	value := published.Artifact
+	if value.Enabled != request.Enabled {
+		return a.artifacts.SetEnabled(
+			ctx,
+			value.Ref(),
+			value.Revision,
+			request.Enabled,
+		)
 	}
 	return value, nil
 }
@@ -642,6 +813,42 @@ func validateSkillSourceDiscovery(
 		"%w: Skill Source does not allow decoder %q",
 		basespec.ErrInvalid,
 		skillDomain.MarkdownDecoderID,
+	)
+}
+
+func validateCanonicalCollectionSourceDiscovery(
+	discovery source.DiscoverySpec,
+	locator basespec.Locator,
+) error {
+	discovery = discovery.Effective()
+	if discovery.Empty() {
+		return fmt.Errorf(
+			"%w: Collection Source has no declaration discovery configuration",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	inScope, err := discovery.InScope(locator)
+	if err != nil {
+		return err
+	}
+	if !inScope {
+		return fmt.Errorf(
+			"%w: Collection declaration locator %q is outside Source discovery",
+			basespec.ErrInvalid,
+			locator,
+		)
+	}
+	if len(discovery.AllowedDecoderIDs) == 0 ||
+		slices.Contains(
+			discovery.AllowedDecoderIDs,
+			decoder.JSONDecoderID,
+		) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: Collection Source does not allow decoder %q",
+		basespec.ErrInvalid,
+		decoder.JSONDecoderID,
 	)
 }
 

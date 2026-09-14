@@ -177,6 +177,13 @@ func (s *Service) ResolveVerifiedLocalPath(
 	if err != nil {
 		return "", err
 	}
+	if !value.Enabled {
+		return "", fmt.Errorf(
+			"%w: Artifact Source %q is disabled",
+			basespec.ErrSourceUnavailable,
+			value.ID,
+		)
+	}
 	if value.Revision != resolved.RefreshState.SourceRevision {
 		return "", fmt.Errorf(
 			"%w: Source changed after Artifact resolution",
@@ -228,6 +235,13 @@ func (s *Service) ReadSourceEntry(
 	if err != nil {
 		return resource.VerifiedEntry{}, err
 	}
+	if !value.Enabled {
+		return resource.VerifiedEntry{}, fmt.Errorf(
+			"%w: Source %q is disabled",
+			basespec.ErrSourceUnavailable,
+			value.ID,
+		)
+	}
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
 		return resource.VerifiedEntry{}, err
@@ -237,6 +251,17 @@ func (s *Service) ReadSourceEntry(
 	entry, err := snapshot.Stat(ctx, locator)
 	if err != nil {
 		return resource.VerifiedEntry{}, err
+	}
+	if err := entry.Validate(); err != nil {
+		return resource.VerifiedEntry{}, err
+	}
+	if entry.Locator != locator {
+		return resource.VerifiedEntry{}, fmt.Errorf(
+			"%w: Source stat for %q returned %q",
+			basespec.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
 	}
 	content, err := sourceimpl.ReadSnapshotEntry(
 		ctx,
@@ -387,6 +412,13 @@ func (s *Service) ReadSourceTree(
 	if err != nil {
 		return nil, err
 	}
+	if !value.Enabled {
+		return nil, fmt.Errorf(
+			"%w: Source %q is disabled",
+			basespec.ErrSourceUnavailable,
+			value.ID,
+		)
+	}
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
 		return nil, err
@@ -400,6 +432,14 @@ func (s *Service) ReadSourceTree(
 	}
 	if err := rootEntry.Validate(); err != nil {
 		return nil, err
+	}
+	if rootEntry.Locator != base {
+		return nil, fmt.Errorf(
+			"%w: Source stat for %q returned %q",
+			basespec.ErrInvalid,
+			base,
+			rootEntry.Locator,
+		)
 	}
 
 	type selectedEntry struct {

@@ -1,9 +1,7 @@
 package sqlite
 
 // schema is the complete Artifact Store metadata schema for the direct v3
-// Root-scoped model. Existing v2 metadata is intentionally rejected rather
-// than migrated because Collection-owned ownership, Catalog occurrences,
-// adoption, pinning, and suppression do not map safely to this model.
+// Root-scoped model.
 const sqliteSchema = `
 CREATE TABLE artifact_store_v3 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)

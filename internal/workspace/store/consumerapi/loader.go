@@ -41,8 +41,16 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 	if err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
+
+	base, err := a.workspaceDiscoveryBase(
+		sourceValue,
+		workspace.Artifact.Binding.Locator,
+	)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
 	desired, err := workspaceDiscoveryForDocument(
-		sourceValue.Discovery,
+		base,
 		workspace.Artifact.Binding.Locator,
 		workspace.Document,
 	)
@@ -75,6 +83,38 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		}
 	}
 	return workspace, nil
+}
+
+// workspaceDiscoveryBase prevents old Workspace declarations from remaining
+// in Source discovery after they were removed from a Workspace manifest.
+//
+// Sources created by this Workspace API use the workspace-* storage-key
+// namespace and are owned by the Workspace Loader. Other manually registered
+// Sources retain their caller-managed baseline discovery configuration.
+func (a *StoreAPI) workspaceDiscoveryBase(
+	current source.Summary,
+	declarationLocator basespec.Locator,
+) (source.DiscoverySpec, error) {
+	output := current.Discovery.Clone()
+	if strings.HasPrefix(
+		string(current.StorageKey),
+		"workspace-",
+	) {
+		var err error
+		output, err = a.defaultDiscovery()
+		if err != nil {
+			return source.DiscoverySpec{}, err
+		}
+	}
+	output.ExplicitLocators = appendUniqueLocator(
+		output.ExplicitLocators,
+		declarationLocator,
+	)
+	output = output.Normalized()
+	if err := output.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	return output, nil
 }
 
 func (a *StoreAPI) refreshAndResolveWorkspace(
@@ -200,32 +240,22 @@ func (a *StoreAPI) expandWorkspaceDirectoryDeclarations(
 		if !entry.IsDirectory {
 			continue
 		}
-
-		*discovery = source.DiscoverySpec{
-			ExplicitLocators: discovery.ExplicitLocators,
-			DirectoryRoots: appendDirectoryRoot(
-				discovery.DirectoryRoots,
-				workspaceDirectoryRoot(local),
-			),
-			DecoderHints: appendDecoderHint(
-				discovery.DecoderHints,
-				source.DecoderHint{
-					Locator:   local,
-					Recursive: true,
-					DecoderIDs: []basespec.DecoderID{
-						workspaceProviderAPI.ContextMarkdownDecoderID,
-					},
+		next := discovery.Clone()
+		next.DirectoryRoots = appendDirectoryRoot(
+			next.DirectoryRoots,
+			workspaceDirectoryRoot(local),
+		)
+		next.DecoderHints = appendDecoderHint(
+			next.DecoderHints,
+			source.DecoderHint{
+				Locator:   local,
+				Recursive: true,
+				DecoderIDs: []basespec.DecoderID{
+					workspaceProviderAPI.ContextMarkdownDecoderID,
 				},
-			),
-			AllowedDecoderIDs:      discovery.AllowedDecoderIDs,
-			ExpectedContentDigests: discovery.ExpectedContentDigests,
-			Authoritative:          discovery.Authoritative,
-			MaxCandidateBytes:      discovery.MaxCandidateBytes,
-			MaxTotalBytes:          discovery.MaxTotalBytes,
-			MaxCandidates:          discovery.MaxCandidates,
-			MaxEntries:             discovery.MaxEntries,
-			MaxDepth:               discovery.MaxDepth,
-		}
+			},
+		)
+		*discovery = next
 	}
 	return nil
 }
@@ -241,6 +271,7 @@ func workspaceDirectoryRoot(
 			"**/*.yaml",
 			"**/*.yml",
 			"**/*.md",
+			"**/llms.txt",
 		},
 	}
 }
@@ -390,6 +421,9 @@ func localSourceLocator(
 func isContextMarkdownLocator(
 	value basespec.Locator,
 ) bool {
+	if strings.EqualFold(path.Base(string(value)), "llms.txt") {
+		return true
+	}
 	if !strings.EqualFold(path.Ext(string(value)), ".md") {
 		return false
 	}

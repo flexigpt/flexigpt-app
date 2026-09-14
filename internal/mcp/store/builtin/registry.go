@@ -1,23 +1,21 @@
 package builtin
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"path"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
@@ -63,22 +61,15 @@ func LoadEmbeddedRegistry() (Registry, fs.FS, error) {
 	if err != nil {
 		return Registry{}, nil, err
 	}
-
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	var registry Registry
-	if err := decoder.Decode(&registry); err != nil {
+	registry, err := jsonutil.DecodeCanonicalObject[Registry](
+		raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
 		return Registry{}, nil, fmt.Errorf(
 			"decode embedded MCP registry: %w",
 			err,
 		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("embedded MCP registry contains trailing JSON")
-		}
-		return Registry{}, nil, err
 	}
 	if err := registry.Validate(); err != nil {
 		return Registry{}, nil, err
@@ -221,22 +212,6 @@ func PreparePackages(
 			)
 		}
 
-		decoded, err := sourceformat.DecodeLegacyBundle(document)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"decode embedded MCP package %q: %w",
-				registration.EmbeddedPackageRoot,
-				err,
-			)
-		}
-		expectations, err := expectedArtifacts(
-			registration,
-			decoded,
-		)
-		if err != nil {
-			return nil, err
-		}
-
 		packageName := basespec.LogicalName(
 			path.Base(string(registration.EmbeddedPackageRoot)),
 		)
@@ -248,6 +223,32 @@ func PreparePackages(
 			packageName,
 			artifactbuiltin.UnversionedPackageVersion,
 		)
+		if err != nil {
+			return nil, err
+		}
+		documentLocator, err := address.FileLocator(documentFile)
+		if err != nil {
+			return nil, err
+		}
+		collectionName, err := declaration.DeriveLogicalName(
+			"mcp-bundle",
+			documentLocator,
+		)
+		if err != nil {
+			return nil, err
+		}
+		decoded, err := sourceformat.DecodeLegacyBundleWithCollection(
+			document,
+			collectionName,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"decode embedded MCP package %q: %w",
+				registration.EmbeddedPackageRoot,
+				err,
+			)
+		}
+		expectations, err := expectedArtifacts(registration, decoded)
 		if err != nil {
 			return nil, err
 		}
@@ -284,33 +285,53 @@ func expectedArtifacts(
 		}
 		bySubresource[value.SubresourceLocator] = value.Definition
 	}
-	if len(bySubresource) != len(registration.Artifacts) {
-		return nil, fmt.Errorf(
-			"%w: MCP package registration does not cover decoded Artifacts",
-			basespec.ErrInvalid,
-		)
-	}
 
 	output := make(
 		[]mcpConsumerAPI.BuiltInArtifactExpectation,
 		0,
 		len(registration.Artifacts),
 	)
-	for _, registered := range registration.Artifacts {
-		value, found := bySubresource[registered.Subresource]
-		if !found || value.Kind != registered.Kind {
+	registered := make(
+		map[basespec.SubresourceLocator]struct{},
+		len(registration.Artifacts),
+	)
+	for _, item := range registration.Artifacts {
+		registered[item.Subresource] = struct{}{}
+		value, found := bySubresource[item.Subresource]
+		if !found || value.Kind != item.Kind {
 			return nil, fmt.Errorf(
 				"%w: MCP package registration does not match %q",
 				basespec.ErrInvalid,
-				registered.Subresource,
+				item.Subresource,
 			)
 		}
 		output = append(output, mcpConsumerAPI.BuiltInArtifactExpectation{
-			Subresource:      registered.Subresource,
-			Kind:             registered.Kind,
+			Subresource:      item.Subresource,
+			Kind:             item.Kind,
 			LogicalName:      value.LogicalName,
 			DefinitionDigest: value.Digest,
-			Enabled:          registered.Enabled,
+			Enabled:          item.Enabled,
+		})
+	}
+	for subresource, value := range bySubresource {
+		if _, found := registered[subresource]; found {
+			continue
+		}
+		if subresource != "collection" ||
+			value.Kind != artifact.ArtifactKind(declaration.TypeCollection) {
+			return nil, fmt.Errorf(
+				"%w: MCP package emitted unexpected Artifact %q/%q",
+				basespec.ErrInvalid,
+				subresource,
+				value.Kind,
+			)
+		}
+		output = append(output, mcpConsumerAPI.BuiltInArtifactExpectation{
+			Subresource:      subresource,
+			Kind:             value.Kind,
+			LogicalName:      value.LogicalName,
+			DefinitionDigest: value.Digest,
+			Enabled:          true,
 		})
 	}
 	sort.Slice(output, func(left, right int) bool {

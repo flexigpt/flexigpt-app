@@ -6,8 +6,11 @@ import (
 	"maps"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -52,7 +55,9 @@ func IsLegacyBundle(
 
 // DecodeLegacyBundle preserves the old physical mcps.json input format while
 // normalizing every contained server and policy into ordinary flat Artifacts.
-// It does not produce an mcp.bundle Artifact or any Store Collection.
+//
+// Callers that need the final bundle semantics should use
+// DecodeLegacyBundleWithCollection.
 func DecodeLegacyBundle(
 	raw []byte,
 ) ([]Decoded, error) {
@@ -184,6 +189,65 @@ func DecodeLegacyBundle(
 	return output, nil
 }
 
+// DecodeLegacyBundleWithCollection normalizes one legacy MCP bundle into its
+// ordinary MCP and MCP policy Artifacts plus one canonical Collection Artifact.
+//
+// The legacy format has no portable bundle name, so the caller supplies a
+// deterministic name derived from its physical source origin.
+func DecodeLegacyBundleWithCollection(
+	raw []byte,
+	collectionName basespec.LogicalName,
+) ([]Decoded, error) {
+	if err := collectionName.Validate(); err != nil {
+		return nil, err
+	}
+	output, err := DecodeLegacyBundle(raw)
+	if err != nil {
+		return nil, err
+	}
+
+	members := make([]declaration.Entry, 0, len(output))
+	for index, value := range output {
+		switch declaration.Type(value.Definition.Kind) {
+		case declaration.TypeMCP, declaration.TypeMCPPolicy:
+		default:
+			return nil, fmt.Errorf(
+				"%w: legacy MCP decoded member %d has unsupported type %q",
+				basespec.ErrInvalid,
+				index,
+				value.Definition.Kind,
+			)
+		}
+		member, err := declaration.NewSymbolicEntry(
+			declaration.Type(value.Definition.Kind),
+			value.Definition.LogicalName,
+		)
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, member)
+	}
+
+	document := collectionv1.CollectionDocument{
+		APIVersion: collectionv1.CollectionSchemaVersion,
+		Type:       collectionv1.CollectionType,
+		Name:       string(collectionName),
+		Members:    members,
+	}
+	entry, err := declaration.NewEntry(document)
+	if err != nil {
+		return nil, err
+	}
+	definitionValue, err := decoder.DefinitionForEntry(entry)
+	if err != nil {
+		return nil, err
+	}
+	return append(output, Decoded{
+		SubresourceLocator: "collection",
+		Definition:         definitionValue,
+	}), nil
+}
+
 type configDocument struct {
 	MCPServers map[string]configServer `json:"mcpServers"`
 }
@@ -255,7 +319,7 @@ func DecodeMCPConfig(
 		case "http", "streamable-http":
 			core.Type = mcpDomainServer.ServerTypeHTTP
 		case "sse":
-			declaration := mcpv1.MCPDocument{
+			decl := mcpv1.MCPDocument{
 				APIVersion: mcpv1.MCPSchemaVersion,
 				Type:       mcpv1.MCPType,
 				Name:       name,
@@ -266,7 +330,7 @@ func DecodeMCPConfig(
 				URL:        input.URL,
 				Headers:    maps.Clone(input.Headers),
 			}
-			definitionValue, err := mcpv1.DefinitionForDeclaration(declaration)
+			definitionValue, err := mcpv1.DefinitionForDeclaration(decl)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"decode MCP config SSE server %q: %w",

@@ -365,6 +365,16 @@ func (r *Resolver) resolveEntry(
 			depth,
 		)
 	}
+	if shouldResolveDeclarationLocator(entry, header.Locator) {
+		return r.resolveDeclarationLocator(
+			ctx,
+			state,
+			rootID,
+			from,
+			entry,
+			depth,
+		)
+	}
 	if from != nil &&
 		header.Name != "" &&
 		(header.Type != declaration.TypeLoop || implicitLoopOwner == nil) {
@@ -372,16 +382,6 @@ func (r *Resolver) resolveEntry(
 			ctx,
 			state,
 			rootID,
-			entry,
-			depth,
-		)
-	}
-	if shouldResolveDeclarationLocator(entry, header.Locator) {
-		return r.resolveDeclarationLocator(
-			ctx,
-			state,
-			rootID,
-			from,
 			entry,
 			depth,
 		)
@@ -417,38 +417,63 @@ func (r *Resolver) resolveNamedInlineArtifact(
 	depth int,
 ) (*ResolvedEntry, error) {
 	header := entry.Header()
-	resolved, err := r.resolveSymbolic(
-		ctx,
-		state,
-		rootID,
-		header.Type,
-		basespec.LogicalName(header.Name),
-		depth,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if resolved.Definition == nil {
-		return nil, fmt.Errorf(
-			"%w: named inline declaration %s/%s has no persisted Definition",
-			basespec.ErrReferenceUnresolved,
-			header.Type,
-			header.Name,
-		)
-	}
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
 		return nil, err
 	}
-	if !bytes.Equal(raw, resolved.Definition.Body) {
+	records, err := r.artifacts.FindByIdentity(
+		ctx,
+		rootID,
+		artifact.ArtifactKind(header.Type),
+		basespec.LogicalName(header.Name),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	matches := make([]artifact.Artifact, 0, len(records))
+	for _, record := range records {
+		if record.State != artifact.StateAvailable ||
+			(!r.options.IncludeDisabled && !record.Enabled) {
+			continue
+		}
+		definitionValue, err := r.artifacts.GetDefinition(
+			ctx,
+			record.Ref(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if bytes.Equal(raw, definitionValue.Body) {
+			matches = append(matches, record)
+		}
+	}
+
+	switch len(matches) {
+	case 0:
 		return nil, fmt.Errorf(
-			"%w: named inline declaration %s/%s differs from its Root Artifact",
-			basespec.ErrDigestMismatch,
+			"%w: named inline declaration %s/%s has no matching Root Artifact",
+			basespec.ErrReferenceUnresolved,
 			header.Type,
 			header.Name,
 		)
+	case 1:
+		return r.resolveArtifact(
+			ctx,
+			state,
+			matches[0].Ref(),
+			header.Type,
+			depth,
+		)
+	default:
+		return nil, fmt.Errorf(
+			"%w: named inline declaration %s/%s matches %d Artifacts",
+			basespec.ErrIdentityConflict,
+			header.Type,
+			header.Name,
+			len(matches),
+		)
 	}
-	return resolved, nil
 }
 
 func (r *Resolver) resolveStructure(
@@ -811,6 +836,7 @@ func shouldResolveDeclarationLocator(
 	}
 	switch entry.Header().Type {
 	case declaration.TypeCollection,
+		declaration.TypeSkill,
 		declaration.TypeAgent,
 		declaration.TypeTeam,
 		declaration.TypeLoop,

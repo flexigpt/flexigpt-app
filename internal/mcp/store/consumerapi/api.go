@@ -188,7 +188,10 @@ func (a *API) UpdateServerInstallation(
 	if err := data.ValidateFor(ref, material.Document); err != nil {
 		return artifact.Artifact{}, err
 	}
-	encoded, err := mcpDomainServer.EncodeServerData(data)
+	encoded, err := mcpDomainServer.MergeServerData(
+		material.Resource.Artifact.Data,
+		data,
+	)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}

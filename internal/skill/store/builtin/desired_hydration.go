@@ -25,10 +25,12 @@ type hydrationSkill struct {
 }
 
 type hydrationFingerprintDocument struct {
-	SchemaVersion string               `json:"schemaVersion"`
-	Topology      topology.Declaration `json:"topology"`
-	Registry      Registry             `json:"registry"`
-	Skills        []hydrationSkill     `json:"skills"`
+	SchemaVersion         string               `json:"schemaVersion"`
+	Topology              topology.Declaration `json:"topology"`
+	Registry              Registry             `json:"registry"`
+	Skills                []hydrationSkill     `json:"skills"`
+	CollectionName        basespec.LogicalName `json:"collectionName"`
+	CollectionDescription string               `json:"collectionDescription"`
 }
 
 func (i *Installer) DesiredHydration(
@@ -71,10 +73,12 @@ func (i *Installer) desiredHydrationFingerprint() (
 	error,
 ) {
 	input := hydrationFingerprintDocument{
-		SchemaVersion: skillDomain.HydrationSchemaVersion,
-		Topology:      i.builtInTopology,
-		Registry:      i.hydrated.Registry,
-		Skills:        make([]hydrationSkill, 0, len(i.hydrated.Skills)),
+		SchemaVersion:         skillDomain.HydrationSchemaVersion,
+		Topology:              i.builtInTopology,
+		Registry:              i.hydrated.Registry,
+		Skills:                make([]hydrationSkill, 0, len(i.hydrated.Skills)),
+		CollectionName:        skillDomain.BuiltinSkillCollectionName,
+		CollectionDescription: skillDomain.BuiltinSkillCollectionDescription,
 	}
 	for _, value := range i.hydrated.OrderedSkills() {
 		files := make(

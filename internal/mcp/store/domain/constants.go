@@ -27,11 +27,11 @@ const (
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
 	LegacyMCPDocumentFile        basespec.Locator = "mcps.json"
 
-	InstallationDataSchemaVersion = "v2"
+	InstallationDataSchemaVersion = "v1"
 	RuntimeExtensionMetadataKey   = "flexigpt.dev/mcp-runtime-v1"
 	BuiltInInstallerName          = "mcp"
-	BuiltInRegistrySchemaVersion  = "v2"
-	HydrationSchemaVersion        = "mcp.builtin-hydration/v2"
+	BuiltInRegistrySchemaVersion  = "v1"
+	HydrationSchemaVersion        = "mcp.builtin-hydration/v3"
 )
 
 func IsMCPKind(value artifact.ArtifactKind) bool {

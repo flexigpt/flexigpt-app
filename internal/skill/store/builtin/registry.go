@@ -1,12 +1,8 @@
 package builtin
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"io/fs"
 	"path"
 	"sort"
@@ -17,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
@@ -53,24 +50,15 @@ func LoadRegistry() (Registry, error) {
 	if err != nil {
 		return Registry{}, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	var value Registry
-	if err := decoder.Decode(&value); err != nil {
+	value, err := jsonutil.DecodeCanonicalObject[Registry](
+		raw,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
 		return Registry{}, fmt.Errorf(
 			"decode built-in Skill registry: %w",
 			err,
 		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New(
-				"built-in Skill registry contains trailing JSON values",
-			)
-		}
-		return Registry{}, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
 	}
 	if err := value.Validate(); err != nil {
 		return Registry{}, err

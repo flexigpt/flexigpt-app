@@ -11,6 +11,11 @@ import (
 
 var errInvalid = errors.New("invalid jsonschema")
 
+const (
+	anonymousSchemaID    = "https://schemas.flexigpt.dev/internal/jsonschema/anonymous"
+	draft202012SchemaURI = "https://json-schema.org/draft/2020-12/schema"
+)
+
 // MustCompileJSONSchema compiles an embedded schema during package
 // initialization. Embedded source-controlled schemas are expected to be valid.
 func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
@@ -21,52 +26,122 @@ func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
 	return compiled
 }
 
-// CompileJSONSchema compiles one published JSON Schema. The caller owns input
-// size limits when schemas are not embedded and source-controlled.
+// CompileJSONSchema compiles one JSON Schema.
+//
+// Published schemas normally provide both $schema and $id. Schema-valued
+// declaration fields may instead contain a valid JSON Schema fragment such as
+// {"type":"object"} or {"const":true}; those receive private Draft 2020-12
+// metadata before compilation.
 func CompileJSONSchema(
 	raw []byte,
 ) (*jsonschema.Schema, error) {
+	raw = bytes.TrimSpace(raw)
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("%w: JSON Schema is empty", errInvalid)
+	}
+
 	var header struct {
 		Schema string `json:"$schema"`
 		ID     string `json:"$id"`
 	}
-	if err := json.Unmarshal(raw, &header); err != nil {
+
+	objectSchema := raw[0] == '{'
+	switch {
+	case objectSchema:
+		if err := json.Unmarshal(raw, &header); err != nil {
+			return nil, fmt.Errorf(
+				"decode JSON Schema header: %w",
+				err,
+			)
+		}
+
+	case bytes.Equal(raw, []byte("true")),
+		bytes.Equal(raw, []byte("false")):
+		// Boolean schemas are valid JSON Schemas and need a wrapper because
+		// they cannot carry $schema or $id members directly.
+
+	default:
 		return nil, fmt.Errorf(
-			"decode JSON Schema header: %w",
-			err,
-		)
-	}
-	if header.Schema == "" || header.ID == "" {
-		return nil, fmt.Errorf(
-			"%w: JSON Schema requires $schema and $id",
+			"%w: JSON Schema must be an object or boolean",
 			errInvalid,
 		)
 	}
 
+	var resourceRaw []byte
+	resourceID := header.ID
+	if objectSchema {
+		var object map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &object); err != nil {
+			return nil, fmt.Errorf(
+				"decode JSON Schema object: %w",
+				err,
+			)
+		}
+		if header.Schema == "" {
+			value, err := json.Marshal(draft202012SchemaURI)
+			if err != nil {
+				return nil, err
+			}
+			object["$schema"] = value
+		}
+		if resourceID == "" {
+			value, err := json.Marshal(anonymousSchemaID)
+			if err != nil {
+				return nil, err
+			}
+			object["$id"] = value
+			resourceID = anonymousSchemaID
+		}
+		var err error
+		resourceRaw, err = json.Marshal(object)
+		if err != nil {
+			return nil, fmt.Errorf("encode JSON Schema object: %w", err)
+		}
+	} else {
+		resourceID = anonymousSchemaID
+		wrapped, err := json.Marshal(struct {
+			Schema string            `json:"$schema"`
+			ID     string            `json:"$id"`
+			AllOf  []json.RawMessage `json:"allOf"`
+		}{
+			Schema: draft202012SchemaURI,
+			ID:     resourceID,
+			AllOf: []json.RawMessage{
+				json.RawMessage(append([]byte(nil), raw...)),
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("wrap boolean JSON Schema: %w", err)
+		}
+		resourceRaw = wrapped
+	}
+
 	compiler := jsonschema.NewCompiler()
 
-	resource, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
+	resource, err := jsonschema.UnmarshalJSON(
+		bytes.NewReader(resourceRaw),
+	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"decode JSON Schema resource: %w",
 			err,
 		)
 	}
-	if err := compiler.AddResource(header.ID, resource); err != nil {
+	if err := compiler.AddResource(resourceID, resource); err != nil {
 		return nil, fmt.Errorf(
 			"%w: register JSON Schema resource %q: %w",
 			errInvalid,
-			header.ID,
+			resourceID,
 			err,
 		)
 	}
 
-	compiled, err := compiler.Compile(header.ID)
+	compiled, err := compiler.Compile(resourceID)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: compile JSON Schema resource %q: %w",
 			errInvalid,
-			header.ID,
+			resourceID,
 			err,
 		)
 	}

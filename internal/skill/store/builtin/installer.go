@@ -132,6 +132,32 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		}
 	}
 
+	members := make(
+		[]basespec.LogicalName,
+		0,
+		len(i.hydrated.Skills),
+	)
+	for _, value := range i.hydrated.OrderedSkills() {
+		members = append(members, value.Definition.LogicalName)
+	}
+	collection, err := i.skills.InstallBuiltInSkillCollection(
+		ctx,
+		skillConsumerAPI.BuiltInSkillCollectionInstallRequest{
+			RootID:      i.builtInTopology.Root.ID,
+			SourceID:    i.builtInTopology.Sources[0].ID,
+			Name:        skillDomain.BuiltinSkillCollectionName,
+			Description: skillDomain.BuiltinSkillCollectionDescription,
+			Members:     members,
+			Enabled:     true,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("install built-in Skill Collection: %w", err)
+	}
+	if collection.State != artifact.StateAvailable {
+		return fmt.Errorf("%w: built-in Skill Collection is unavailable", basespec.ErrReferenceUnresolved)
+	}
+
 	return i.FinalizeHydration(ctx)
 }
 
@@ -165,6 +191,19 @@ func builtInPackageScopes(
 		}
 		output = append(output, directory)
 	}
+	collectionAddress, err := source.NewManagedPackageAddress(
+		skillDomain.BuiltinCollectionPackageKind,
+		skillDomain.BuiltinSkillCollectionName,
+		artifactbuiltin.UnversionedPackageVersion,
+	)
+	if err != nil {
+		return nil, err
+	}
+	collectionScope, err := collectionAddress.Directory()
+	if err != nil {
+		return nil, err
+	}
+	output = append(output, collectionScope)
 	slices.Sort(output)
 	return output, nil
 }

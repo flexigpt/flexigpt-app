@@ -338,7 +338,10 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 		return WorkspaceArtifactView{}, err
 	}
 	data.RuntimeDisabled = runtimeDisabled
-	raw, err := workspaceDomain.EncodeArtifactData(data)
+	raw, err := workspaceDomain.MergeArtifactData(
+		record.Data,
+		data,
+	)
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
@@ -373,12 +376,6 @@ func (a *StoreAPI) defaultDiscovery() (
 	error,
 ) {
 	value := source.DiscoverySpec{
-		ExplicitLocators: []basespec.Locator{
-			"AGENTS.md",
-			"CLAUDE.md",
-			"README.md",
-			".mcp.json",
-		},
 		DirectoryRoots: []source.DirectoryRoot{
 			{
 				Root:      ".",
@@ -390,13 +387,9 @@ func (a *StoreAPI) defaultDiscovery() (
 					"**/SKILL.md",
 					"**/AGENTS.md",
 					"**/CLAUDE.md",
-				},
-			},
-			{
-				Root:      "docs",
-				Recursive: true,
-				IncludePatterns: []string{
-					"**/*.md",
+					"**/README.md",
+					"**/llms.txt",
+					"docs/**/*.md",
 				},
 			},
 		},

@@ -15,6 +15,10 @@ type BuiltinStore interface {
 		ctx context.Context,
 		request BuiltInSkillInstallRequest,
 	) (artifact.Artifact, error)
+	InstallBuiltInSkillCollection(
+		ctx context.Context,
+		request BuiltInSkillCollectionInstallRequest,
+	) (artifact.Artifact, error)
 
 	EnsureBuiltInSkillSourceCurrent(
 		ctx context.Context,

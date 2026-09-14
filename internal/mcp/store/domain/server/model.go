@@ -1,11 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -14,6 +11,15 @@ import (
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
+
+const installationDataNamespace = "flexigpt.dev/mcp-installation-v1"
+
+var legacyInstallationDataKeys = []string{
+	"schemaVersion",
+	"selectedConnectionProfile",
+	"inputs",
+	"additionalPolicies",
+}
 
 type InputBinding struct {
 	Value     *string `json:"value,omitempty"`
@@ -38,6 +44,18 @@ func DefaultServerData() ServerData {
 func EncodeServerData(
 	input ServerData,
 ) (json.RawMessage, error) {
+	return MergeServerData(
+		json.RawMessage(jsonutil.EmptyObject),
+		input,
+	)
+}
+
+// MergeServerData updates MCP-owned installation data while preserving other
+// Artifact consumers' namespaced local state.
+func MergeServerData(
+	raw json.RawMessage,
+	input ServerData,
+) (json.RawMessage, error) {
 	value := input
 	value.Inputs = maps.Clone(input.Inputs)
 	value.AdditionalPolicies = append(
@@ -47,21 +65,56 @@ func EncodeServerData(
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}
-	raw, err := json.Marshal(value)
+	fields, err := artifact.DecodeDataObject(raw)
 	if err != nil {
 		return nil, err
 	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
+	payload, err := jsonutil.MarshalCanonicalObject(
+		value,
 		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return json.RawMessage(canonical), nil
+	for _, key := range legacyInstallationDataKeys {
+		delete(fields, key)
+	}
+	fields[installationDataNamespace] = payload
+	return artifact.EncodeDataObject(fields)
 }
 
 func DecodeServerData(
+	raw json.RawMessage,
+) (ServerData, error) {
+	fields, err := artifact.DecodeDataObject(raw)
+	if err != nil {
+		return ServerData{}, err
+	}
+	if payload, found := fields[installationDataNamespace]; found {
+		return decodeServerDataPayload(payload)
+	}
+	if !containsLegacyInstallationData(fields) {
+		return DefaultServerData(), nil
+	}
+	legacy, err := artifact.EncodeDataObject(fields)
+	if err != nil {
+		return ServerData{}, err
+	}
+	return decodeServerDataPayload(legacy)
+}
+
+func containsLegacyInstallationData(
+	values map[string]json.RawMessage,
+) bool {
+	for _, key := range legacyInstallationDataKeys {
+		if _, found := values[key]; found {
+			return true
+		}
+	}
+	return false
+}
+
+func decodeServerDataPayload(
 	raw json.RawMessage,
 ) (ServerData, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
@@ -71,31 +124,22 @@ func DecodeServerData(
 	if err != nil {
 		return ServerData{}, err
 	}
-	if bytes.Equal(canonical, []byte(jsonutil.EmptyObject)) {
+	if string(canonical) == jsonutil.EmptyObject {
 		return DefaultServerData(), nil
 	}
-
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
 	var value ServerData
-	if err := decoder.Decode(&value); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		&value,
+		basespec.MaxLocalDataBytes,
+	); err != nil {
 		return ServerData{}, fmt.Errorf(
 			"%w: decode MCP installation data: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("MCP installation data has trailing JSON")
-		}
-		return ServerData{}, fmt.Errorf(
-			"%w: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
+
 	if err := value.Validate(); err != nil {
 		return ServerData{}, err
 	}

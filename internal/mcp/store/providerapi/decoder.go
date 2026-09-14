@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -22,7 +23,7 @@ func (*Decoder) ID() basespec.DecoderID {
 }
 
 func (*Decoder) Revision() string {
-	return "mcp-source-decoder-v3"
+	return "mcp-source-decoder-v4"
 }
 
 func (*Decoder) Recognize(
@@ -61,8 +62,16 @@ func (d *Decoder) Decode(
 	switch {
 
 	case header.Kind == "mcp.bundle":
-		values, err := sourceformat.DecodeLegacyBundle(
+		collectionName, err := declaration.DeriveLogicalName(
+			"mcp-bundle",
+			candidate.Locator,
+		)
+		if err != nil {
+			return nil, decoderError(candidate.Locator, "", err)
+		}
+		values, err := sourceformat.DecodeLegacyBundleWithCollection(
 			candidate.Content,
+			collectionName,
 		)
 		if err != nil {
 			return nil, decoderError(candidate.Locator, "", err)

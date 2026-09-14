@@ -9,7 +9,7 @@ import (
 
 var ErrNotFound = errors.New("MCP secret not found")
 
-const SecretRefVersion = "mcpv2"
+const SecretRefVersion = "mcpv1"
 
 type MCPSecretKind string
 

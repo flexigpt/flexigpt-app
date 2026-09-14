@@ -36,6 +36,15 @@ type ManagedSkillCreateRequest struct {
 	Enabled   bool                        `json:"enabled"`
 }
 
+type BuiltInSkillCollectionInstallRequest struct {
+	RootID      root.RootID            `json:"rootID"`
+	SourceID    source.SourceID        `json:"sourceID"`
+	Name        basespec.LogicalName   `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Members     []basespec.LogicalName `json:"members"`
+	Enabled     bool                   `json:"enabled"`
+}
+
 type ManagedSkillCreateResult struct {
 	Artifact artifact.Artifact        `json:"artifact"`
 	Address  artifact.ArtifactAddress `json:"address"`

@@ -82,6 +82,23 @@ func NewEntry(value any) (Entry, error) {
 	return DecodeCanonicalEntryJSON(raw)
 }
 
+// NewSymbolicEntry constructs the portable exact symbolic-reference form.
+func NewSymbolicEntry(
+	declarationType Type,
+	name basespec.LogicalName,
+) (Entry, error) {
+	if err := declarationType.Validate(); err != nil {
+		return Entry{}, err
+	}
+	if err := name.Validate(); err != nil {
+		return Entry{}, err
+	}
+	return NewEntry(Header{
+		Type: declarationType,
+		Name: string(name),
+	})
+}
+
 func (e Entry) Header() Header {
 	return e.header.Clone()
 }
