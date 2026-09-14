@@ -1,10 +1,10 @@
-// Package artifactresolve resolves typed Artifact declaration graphs above the
+// Package resolve resolves typed Artifact declaration graphs above the
 // generic Artifact Store boundary.
 //
 // Artifact Store indexes source-backed Definitions and Artifacts. This package
 // resolves symbolic references, typed composition, Collection inclusion, Agent
 // members, Team members, Loops, Workflows, and Workspace roots.
-package artifactresolve
+package resolve
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 )
 
 type LocatorRequest struct {
@@ -79,14 +78,14 @@ type Options struct {
 }
 
 type Resolver struct {
-	artifacts compositionapi.ArtifactAPI
+	artifacts ArtifactReader
 	locators  LocatorResolver
 	limits    Limits
 	options   Options
 }
 
 func New(
-	artifacts compositionapi.ArtifactAPI,
+	artifacts ArtifactReader,
 	locators LocatorResolver,
 	limits Limits,
 	options Options,

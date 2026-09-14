@@ -72,6 +72,48 @@ func DecodeCanonicalObjectInto(
 	return nil
 }
 
+// DecodeCanonicalObjectBytesInto strictly decodes already-canonical JSON
+// object bytes into target.
+//
+// The caller owns the canonicality precondition. This function intentionally
+// does not parse and canonicalize raw again. It remains suitable only for
+// bytes created by CanonicalizeObject, MarshalCanonicalObject, or another
+// equally strict canonical producer.
+func DecodeCanonicalObjectBytesInto(
+	raw []byte,
+	target any,
+	maximumBytes int,
+) error {
+	if target == nil {
+		return errors.New(
+			"decode canonical JSON object target is nil",
+		)
+	}
+	if maximumBytes <= 0 {
+		return errors.New(
+			"decode canonical JSON object byte limit is invalid",
+		)
+	}
+	if len(raw) == 0 || len(raw) > maximumBytes {
+		return fmt.Errorf(
+			"canonical JSON object exceeds %d bytes",
+			maximumBytes,
+		)
+	}
+	if raw[0] != '{' {
+		return errors.New(
+			"canonical JSON value must be an object",
+		)
+	}
+	if err := decodeBytes(raw, target, true, true); err != nil {
+		return fmt.Errorf(
+			"decode canonical JSON object bytes: %w",
+			err,
+		)
+	}
+	return nil
+}
+
 func CanonicalizeObject(raw []byte, maximum int) ([]byte, error) {
 	if len(raw) == 0 {
 		raw = []byte(EmptyObject)

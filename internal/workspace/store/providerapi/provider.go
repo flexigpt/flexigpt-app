@@ -12,15 +12,11 @@ type Provider struct {
 }
 
 func NewProvider() (*Provider, error) {
-	canonical := NewCanonicalDecoder()
 	descriptor := providerapi.Descriptor{
-		Name:    providerName,
-		Schemas: NewSchemaCodecs(),
+		Name: providerName,
 		Decoders: []providerapi.Decoder{
 			NewInstructionDecoder(),
 			NewContextDecoder(),
-			canonical,
-			NewYAMLDecoder(),
 		},
 	}
 	if err := descriptor.Validate(); err != nil {
@@ -42,7 +38,5 @@ func DefaultDecoderIDs() []string {
 	return []string{
 		string(InstructionMarkdownDecoderID),
 		string(ContextMarkdownDecoderID),
-		string(CanonicalJSONDecoderID),
-		string(CanonicalYAMLDecoderID),
 	}
 }

@@ -11,11 +11,13 @@ import (
 )
 
 // SchemaCodec supplies one published JSON Schema and domain-specific semantic
-// canonicalization.
+// projection.
 //
 // Artifact Store owns schema registration, schema execution, registry
-// dispatch, canonical JSON checks, and output verification. The provider owns
-// only its schema semantics and canonicalization rules.
+// dispatch, input canonicalization, and output verification. Canonicalize
+// receives an already-canonical JSON object that has already passed the
+// registered JSON Schema. A codec therefore does not canonicalize or execute
+// the same JSON Schema again.
 type SchemaCodec interface {
 	Key() schema.Key
 	JSONSchema() []byte

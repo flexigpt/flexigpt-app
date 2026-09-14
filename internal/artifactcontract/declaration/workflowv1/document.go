@@ -67,11 +67,14 @@ func DecodeWorkflowJSON(raw []byte) (WorkflowDocument, error) {
 func DecodeWorkflowEntry(
 	entry declaration.Entry,
 ) (WorkflowDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value WorkflowDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return WorkflowDocument{}, err
 	}
-	return decodeWorkflow(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return WorkflowDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeWorkflow(

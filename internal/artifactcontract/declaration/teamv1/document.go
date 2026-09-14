@@ -47,11 +47,14 @@ func DecodeTeamJSON(raw []byte) (TeamDocument, error) {
 func DecodeTeamEntry(
 	entry declaration.Entry,
 ) (TeamDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value TeamDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return TeamDocument{}, err
 	}
-	return decodeTeam(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return TeamDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeTeam(

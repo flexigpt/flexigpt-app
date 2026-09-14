@@ -1,4 +1,4 @@
-package artifactresolve
+package resolve
 
 import (
 	"context"
@@ -206,7 +206,7 @@ func (r *Resolver) resolveArtifact(
 			basespec.ErrDigestMismatch,
 		)
 	}
-	entry, err := declaration.DecodeEntryJSON(definitionValue.Body)
+	entry, err := declaration.DecodeCanonicalEntryJSON(definitionValue.Body)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Definition body is not a canonical declaration: %w",

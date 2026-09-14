@@ -47,11 +47,14 @@ func DecodeToolJSON(raw []byte) (ToolDocument, error) {
 func DecodeToolEntry(
 	entry declaration.Entry,
 ) (ToolDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value ToolDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return ToolDocument{}, err
 	}
-	return decodeTool(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return ToolDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeTool(

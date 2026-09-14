@@ -32,7 +32,7 @@ func DecodeDocumentInto(
 	); err != nil {
 		return err
 	}
-	return jsonutil.DecodeCanonicalObjectInto(
+	return jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		target,
 		basespec.MaxDefinitionBytes,

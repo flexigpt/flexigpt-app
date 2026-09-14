@@ -1,12 +1,12 @@
 # Artifact contracts
 
-`internal/artifactcontract` contains portable artifact declaration contracts.
+`internal/artifactcontract/declaration` contains portable artifact declaration contracts.
 
 The generic Artifact Store does not import concrete declaration contracts. It
 stores generic Definitions, source-backed Artifacts, Source refresh state, and
 verified resources.
 
-The root package contains shared declaration utilities:
+The `declaration` package contains shared declaration utilities:
 
 - Common `type`, `name`, `description`, `locator`, and `metadata` header.
 - Portable locator representation and validation.

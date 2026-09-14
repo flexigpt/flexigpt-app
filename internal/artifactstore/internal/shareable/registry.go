@@ -52,9 +52,15 @@ func NewRegistry(codecs ...providerapi.SchemaCodec) (*Registry, error) {
 		if err := key.Validate(); err != nil {
 			return nil, err
 		}
-		compiled, err := compilePublishedJSONSchema(codec.JSONSchema())
+		compiled, err := jsonutil.CompileJSONSchema(
+			codec.JSONSchema(),
+		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf(
+				"%w: compile published JSON Schema: %w",
+				basespec.ErrInvalid,
+				err,
+			)
 		}
 		if _, exists := values[key]; exists {
 			return nil, fmt.Errorf(
@@ -186,15 +192,6 @@ func (r *Registry) CanonicalizeEntity(
 			entity,
 		)
 	}
-	if ctx == nil {
-		return schema.ParsedDocument{}, fmt.Errorf(
-			"%w: shareable document context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return schema.ParsedDocument{}, err
-	}
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
@@ -223,8 +220,16 @@ func (r *Registry) CanonicalizeEntity(
 		)
 	}
 
-	if err := validateJSONSchemaInstance(registered.schema, canonical); err != nil {
-		return schema.ParsedDocument{}, err
+	if err := jsonutil.ValidateJSONSchema(
+		registered.schema,
+		json.RawMessage(canonical),
+		basespec.MaxDefinitionBytes,
+	); err != nil {
+		return schema.ParsedDocument{}, fmt.Errorf(
+			"%w: shareable document does not satisfy its JSON Schema: %w",
+			basespec.ErrInvalid,
+			err,
+		)
 	}
 
 	value, err := registered.codec.Canonicalize(ctx, canonical)
@@ -241,12 +246,18 @@ func (r *Registry) CanonicalizeEntity(
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	if err := validateJSONSchemaInstance(
+	if err := jsonutil.ValidateJSONSchema(
 		registered.schema,
-		can,
+		json.RawMessage(can),
+		basespec.MaxDefinitionBytes,
 	); err != nil {
-		return schema.ParsedDocument{}, err
+		return schema.ParsedDocument{}, fmt.Errorf(
+			"%w: canonical codec output does not satisfy its JSON Schema: %w",
+			basespec.ErrInvalid,
+			err,
+		)
 	}
+
 	value.Raw = json.RawMessage(can)
 	return value.Clone(), nil
 }
@@ -466,71 +477,4 @@ func validateCodecOutput(
 
 func artifactKindFromSchemaKind(value schema.Kind) artifact.ArtifactKind {
 	return artifact.ArtifactKind(value)
-}
-
-func compilePublishedJSONSchema(raw []byte) (*jsonschema.Schema, error) {
-	var value struct {
-		Schema string `json:"$schema"`
-		ID     string `json:"$id"`
-	}
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, fmt.Errorf(
-			"%w: published JSON Schema is invalid JSON: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if value.Schema == "" || value.ID == "" {
-		return nil, fmt.Errorf(
-			"%w: published JSON Schema requires $schema and $id",
-			basespec.ErrInvalid,
-		)
-	}
-
-	compiler := jsonschema.NewCompiler()
-	inst, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
-	if err != nil {
-		return nil, err
-	}
-	if err := compiler.AddResource(value.ID, inst); err != nil {
-		return nil, fmt.Errorf(
-			"%w: register published JSON Schema %q: %w",
-			basespec.ErrInvalid,
-			value.ID,
-			err,
-		)
-	}
-	compiled, err := compiler.Compile(value.ID)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%w: compile published JSON Schema %q: %w",
-			basespec.ErrInvalid,
-			value.ID,
-			err,
-		)
-	}
-	return compiled, nil
-}
-
-func validateJSONSchemaInstance(
-	sch *jsonschema.Schema,
-	raw []byte,
-) error {
-	// Using jsonschema.UnmarshalJSON ensures proper float/integer typing alignment for v6.
-	value, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
-	if err != nil {
-		return fmt.Errorf(
-			"%w: decode shareable JSON for schema validation: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if err := sch.Validate(value); err != nil {
-		return fmt.Errorf(
-			"%w: shareable document does not satisfy its JSON Schema: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	return nil
 }

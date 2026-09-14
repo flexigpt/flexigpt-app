@@ -48,11 +48,14 @@ func DecodeModelJSON(raw []byte) (ModelDocument, error) {
 func DecodeModelEntry(
 	entry declaration.Entry,
 ) (ModelDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value ModelDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return ModelDocument{}, err
 	}
-	return decodeModel(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return ModelDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeModel(

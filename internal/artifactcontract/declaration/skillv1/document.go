@@ -47,11 +47,14 @@ func DecodeSkillJSON(raw []byte) (SkillDocument, error) {
 func DecodeSkillEntry(
 	entry declaration.Entry,
 ) (SkillDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value SkillDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return SkillDocument{}, err
 	}
-	return decodeSkill(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return SkillDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeSkill(

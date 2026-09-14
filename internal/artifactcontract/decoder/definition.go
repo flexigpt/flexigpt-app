@@ -1,4 +1,4 @@
-package providerapi
+package decoder
 
 import (
 	"encoding/json"
@@ -24,33 +24,34 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 )
 
-// DefinitionForEntry projects one fully named canonical declaration into the
-// generic Store Definition model. The Store remains unaware of this mapping.
+// DefinitionForEntry projects one named canonical declaration Entry into the
+// generic immutable Artifact Store Definition model.
+//
+// Entry bytes are already canonical. Projection validates the concrete
+// declaration type but retains those exact canonical bytes as Definition.Body.
 func DefinitionForEntry(
 	entry declaration.Entry,
 ) (definition.Definition, error) {
 	if err := entry.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	if entry.Header().Name == "" {
+
+	header := entry.Header()
+	if header.Name == "" {
 		return definition.Definition{}, fmt.Errorf(
-			"%w: standalone Definition projection requires a named declaration",
+			"%w: Definition projection requires a named declaration",
 			basespec.ErrInvalid,
 		)
 	}
 
-	raw, err := entry.CanonicalJSON()
+	body, err := entry.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err
 	}
 
-	switch entry.Header().Type {
+	switch header.Type {
 	case declaration.TypeInstruction:
-		value, err := instructionv1.DecodeInstructionJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := instructionv1.DecodeInstructionEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -62,11 +63,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeContext:
-		value, err := contextv1.DecodeContextJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := contextv1.DecodeContextEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -78,11 +75,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeTool:
-		value, err := toolv1.DecodeToolJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := toolv1.DecodeToolEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -94,11 +87,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeModel:
-		value, err := modelv1.DecodeModelJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := modelv1.DecodeModelEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -110,11 +99,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeSkill:
-		value, err := skillv1.DecodeSkillJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := skillv1.DecodeSkillEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -126,18 +111,19 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeMCP:
-		value, err := mcpv1.DecodeMCPJSON(raw)
+		value, err := mcpv1.DecodeMCPEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
-		return mcpv1.DefinitionForDeclaration(value)
+		return definitionForDocument(
+			value.Header,
+			mcpv1.MCPSchemaKey,
+			"",
+			body,
+		)
 
 	case declaration.TypeMCPPolicy:
-		value, err := mcppolicyv1.DecodeMCPPolicyJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -149,11 +135,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeCollection:
-		value, err := collectionv1.DecodeCollectionJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := collectionv1.DecodeCollectionEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -165,11 +147,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeAgent:
-		value, err := agentv1.DecodeAgentJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := agentv1.DecodeAgentEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -181,11 +159,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeTeam:
-		value, err := teamv1.DecodeTeamJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := teamv1.DecodeTeamEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -197,11 +171,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := loopv1.DecodeLoopEntry(entry, false)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -213,11 +183,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeWorkflow:
-		value, err := workflowv1.DecodeWorkflowJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := workflowv1.DecodeWorkflowEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -229,11 +195,7 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeWorkspace:
-		value, err := workspacev1.DecodeWorkspaceJSON(raw)
-		if err != nil {
-			return definition.Definition{}, err
-		}
-		body, err := value.CanonicalJSON()
+		value, err := workspacev1.DecodeWorkspaceEntry(entry)
 		if err != nil {
 			return definition.Definition{}, err
 		}
@@ -248,7 +210,7 @@ func DefinitionForEntry(
 		return definition.Definition{}, fmt.Errorf(
 			"%w: unsupported canonical declaration type %q",
 			basespec.ErrUnsupported,
-			entry.Header().Type,
+			header.Type,
 		)
 	}
 }

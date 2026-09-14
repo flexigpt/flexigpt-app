@@ -47,11 +47,14 @@ func DecodeCollectionJSON(raw []byte) (CollectionDocument, error) {
 func DecodeCollectionEntry(
 	entry declaration.Entry,
 ) (CollectionDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value CollectionDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return CollectionDocument{}, err
 	}
-	return decodeCollection(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return CollectionDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeCollection(

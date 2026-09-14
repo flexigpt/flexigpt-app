@@ -76,11 +76,14 @@ func DecodeMCPPolicyJSON(raw []byte) (MCPPolicyDocument, error) {
 func DecodeMCPPolicyEntry(
 	entry declaration.Entry,
 ) (MCPPolicyDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value MCPPolicyDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return MCPPolicyDocument{}, err
 	}
-	return decodeMCPPolicy(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return MCPPolicyDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeMCPPolicy(

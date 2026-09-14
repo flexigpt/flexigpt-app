@@ -72,11 +72,14 @@ func DecodeMCPJSON(raw []byte) (MCPDocument, error) {
 func DecodeMCPEntry(
 	entry declaration.Entry,
 ) (MCPDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value MCPDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return MCPDocument{}, err
 	}
-	return decodeMCP(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return MCPDocument{}, err
+	}
+	return value, nil
 }
 
 // DefinitionForDeclaration projects a named canonical MCP declaration without

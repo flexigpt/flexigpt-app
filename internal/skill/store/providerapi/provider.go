@@ -12,15 +12,10 @@ type Provider struct {
 
 func NewProvider() (*Provider, error) {
 	markdownDecoder := NewDecoder()
-	canonicalDecoder := NewCanonicalDecoder()
 	descriptor := providerapi.Descriptor{
 		Name: artifactProviderName,
-		Schemas: []providerapi.SchemaCodec{
-			NewShareableCodec(),
-		},
 		Decoders: []providerapi.Decoder{
 			markdownDecoder,
-			canonicalDecoder,
 		},
 	}
 	if err := descriptor.Validate(); err != nil {

@@ -49,11 +49,14 @@ func DecodeContextJSON(raw []byte) (ContextDocument, error) {
 func DecodeContextEntry(
 	entry declaration.Entry,
 ) (ContextDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value ContextDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return ContextDocument{}, err
 	}
-	return decodeContext(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return ContextDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeContext(

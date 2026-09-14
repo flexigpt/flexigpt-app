@@ -14,40 +14,63 @@ var errInvalid = errors.New("invalid jsonschema")
 // MustCompileJSONSchema compiles an embedded schema during package
 // initialization. Embedded source-controlled schemas are expected to be valid.
 func MustCompileJSONSchema(raw []byte) *jsonschema.Schema {
+	compiled, err := CompileJSONSchema(raw)
+	if err != nil {
+		panic(fmt.Sprintf("compile embedded JSON Schema: %v", err))
+	}
+	return compiled
+}
+
+// CompileJSONSchema compiles one published JSON Schema. The caller owns input
+// size limits when schemas are not embedded and source-controlled.
+func CompileJSONSchema(
+	raw []byte,
+) (*jsonschema.Schema, error) {
 	var header struct {
 		Schema string `json:"$schema"`
 		ID     string `json:"$id"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
-		panic(fmt.Sprintf("decode embedded JSON Schema: %v", err))
+		return nil, fmt.Errorf(
+			"decode JSON Schema header: %w",
+			err,
+		)
 	}
 	if header.Schema == "" || header.ID == "" {
-		panic("embedded JSON Schema requires $schema and $id")
+		return nil, fmt.Errorf(
+			"%w: JSON Schema requires $schema and $id",
+			errInvalid,
+		)
 	}
 
 	compiler := jsonschema.NewCompiler()
 
 	resource, err := jsonschema.UnmarshalJSON(bytes.NewReader(raw))
 	if err != nil {
-		panic(fmt.Sprintf("decode embedded JSON Schema resource: %v", err))
+		return nil, fmt.Errorf(
+			"decode JSON Schema resource: %w",
+			err,
+		)
 	}
 	if err := compiler.AddResource(header.ID, resource); err != nil {
-		panic(fmt.Sprintf(
-			"register embedded JSON Schema resource %q: %v",
+		return nil, fmt.Errorf(
+			"%w: register JSON Schema resource %q: %w",
+			errInvalid,
 			header.ID,
 			err,
-		))
+		)
 	}
 
 	compiled, err := compiler.Compile(header.ID)
 	if err != nil {
-		panic(fmt.Sprintf(
-			"compile embedded JSON Schema resource %q: %v",
+		return nil, fmt.Errorf(
+			"%w: compile JSON Schema resource %q: %w",
+			errInvalid,
 			header.ID,
 			err,
-		))
+		)
 	}
-	return compiled
+	return compiled, nil
 }
 
 // ValidateJSONSchema validates a typed document against an already-compiled

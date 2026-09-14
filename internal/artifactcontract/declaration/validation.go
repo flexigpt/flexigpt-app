@@ -61,8 +61,17 @@ func ValidateJSONValue(
 	value json.RawMessage,
 	maximum int,
 ) error {
+	_, err := canonicalJSONValue(label, value, maximum)
+	return err
+}
+
+func canonicalJSONValue(
+	label string,
+	value json.RawMessage,
+	maximum int,
+) ([]byte, error) {
 	if len(value) == 0 {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: %s is required",
 			basespec.ErrInvalid,
 			label,
@@ -70,31 +79,26 @@ func ValidateJSONValue(
 	}
 	canonical, err := jsonutil.Canonicalize(value)
 	if err != nil {
-		return fmt.Errorf("%s: %w", label, err)
+		return nil, fmt.Errorf("%s: %w", label, err)
 	}
 	if len(canonical) > maximum {
-		return fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: %s exceeds %d bytes",
 			basespec.ErrInvalid,
 			label,
 			maximum,
 		)
 	}
-	return nil
+	return canonical, nil
 }
 
 func ValidateJSONSchemaValue(
 	label string,
 	value json.RawMessage,
 ) error {
-	if err := ValidateJSONValue(
-		label,
-		value,
-		basespec.MaxDefinitionBodyBytes,
-	); err != nil {
-		return err
-	}
-	canonical, err := jsonutil.Canonicalize(value)
+	canonical, err := canonicalJSONValue(
+		label, value, basespec.MaxDefinitionBodyBytes,
+	)
 	if err != nil {
 		return err
 	}

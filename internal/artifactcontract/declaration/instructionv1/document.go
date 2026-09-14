@@ -48,11 +48,14 @@ func DecodeInstructionJSON(
 func DecodeInstructionEntry(
 	entry declaration.Entry,
 ) (InstructionDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value InstructionDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return InstructionDocument{}, err
 	}
-	return decodeInstruction(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return InstructionDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeInstruction(

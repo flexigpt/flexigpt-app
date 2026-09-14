@@ -64,7 +64,7 @@ func (s DeclarationSource) AsEntry() (
 	if _, found := fields["type"]; !found {
 		return declaration.Entry{}, false, nil
 	}
-	value, err := declaration.DecodeEntryJSON(raw)
+	value, err := declaration.DecodeCanonicalEntryJSON(raw)
 	if err != nil {
 		return declaration.Entry{}, false, err
 	}
@@ -90,7 +90,7 @@ func (s DeclarationSource) AsScan() (
 		return DeclarationScan{}, false, nil
 	}
 	var value DeclarationScan
-	if err := jsonutil.DecodeCanonicalObjectInto(
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		raw,
 		&value,
 		basespec.MaxDefinitionBodyBytes,

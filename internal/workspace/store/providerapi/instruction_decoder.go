@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -75,7 +76,7 @@ func (*InstructionDecoder) Decode(
 	if err != nil {
 		return nil, instructionDiagnostics(candidate.Locator, err)
 	}
-	value, err := DefinitionForEntry(entry)
+	value, err := decoder.DefinitionForEntry(entry)
 	if err != nil {
 		return nil, instructionDiagnostics(candidate.Locator, err)
 	}

@@ -32,9 +32,26 @@ func DecodeEntryJSON(raw []byte) (Entry, error) {
 			err,
 		)
 	}
+	return DecodeCanonicalEntryJSON(canonical)
+}
 
+// DecodeCanonicalEntryJSON decodes canonical declaration object bytes.
+//
+// The input is expected to have been produced by jsonutil or yamlutil. This
+// function avoids canonicalizing the same Entry a second time.
+func DecodeCanonicalEntryJSON(
+	raw []byte,
+) (Entry, error) {
+	if len(raw) == 0 ||
+		len(raw) > basespec.MaxDefinitionBodyBytes ||
+		raw[0] != '{' {
+		return Entry{}, fmt.Errorf(
+			"%w: canonical declaration entry must be a bounded JSON object",
+			basespec.ErrInvalid,
+		)
+	}
 	var header Header
-	if err := json.Unmarshal(canonical, &header); err != nil {
+	if err := json.Unmarshal(raw, &header); err != nil {
 		return Entry{}, fmt.Errorf(
 			"%w: decode declaration entry header: %w",
 			basespec.ErrInvalid,
@@ -45,7 +62,7 @@ func DecodeEntryJSON(raw []byte) (Entry, error) {
 		return Entry{}, err
 	}
 	return Entry{
-		raw:    json.RawMessage(canonical),
+		raw:    append(json.RawMessage(nil), raw...),
 		header: header,
 	}, nil
 }
@@ -58,7 +75,7 @@ func NewEntry(value any) (Entry, error) {
 	if err != nil {
 		return Entry{}, err
 	}
-	return DecodeEntryJSON(raw)
+	return DecodeCanonicalEntryJSON(raw)
 }
 
 func (e Entry) Header() Header {
@@ -101,11 +118,7 @@ func (e Entry) DecodeInto(target any) error {
 	if err := e.Validate(); err != nil {
 		return err
 	}
-	return jsonutil.DecodeCanonicalObjectInto(
-		e.raw,
-		target,
-		basespec.MaxDefinitionBodyBytes,
-	)
+	return jsonutil.DecodeCanonicalObjectBytesInto(e.raw, target, basespec.MaxDefinitionBodyBytes)
 }
 
 // IsSymbolic reports the portable exact reference form:

@@ -14,10 +14,6 @@ func NewProvider() (*Provider, error) {
 	decoder := NewDecoder()
 	descriptor := providerapi.Descriptor{
 		Name: artifactProviderName,
-		Schemas: []providerapi.SchemaCodec{
-			NewMCPCodec(),
-			NewPolicyCodec(),
-		},
 		Decoders: []providerapi.Decoder{
 			decoder,
 		},

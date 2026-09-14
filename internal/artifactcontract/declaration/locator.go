@@ -103,7 +103,7 @@ func (l Locator) MarshalJSON() ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		return jsonutil.Canonicalize(raw)
+		return raw, nil
 	}
 	if err := l.Validate(); err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (l *Locator) UnmarshalJSON(raw []byte) error {
 	}
 
 	var object locatorObject
-	if err := jsonutil.DecodeCanonicalObjectInto(
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		trimmed,
 		&object,
 		basespec.MaxDefinitionBodyBytes,

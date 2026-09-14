@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -16,6 +17,11 @@ func composeArtifactStore(
 	baseDirectory string,
 ) (*compositionapi.Store, error) {
 	if err := artifactbuiltin.ValidateApplicationTopology(); err != nil {
+		return nil, err
+	}
+
+	canonicalProvider, err := provider.New()
+	if err != nil {
 		return nil, err
 	}
 
@@ -35,6 +41,7 @@ func composeArtifactStore(
 	}
 
 	providers := []providerapi.Provider{
+		canonicalProvider,
 		workspaceProvider,
 		skillPlugin,
 		mcpProvider,

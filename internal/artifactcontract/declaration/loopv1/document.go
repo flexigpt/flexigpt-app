@@ -2,7 +2,6 @@ package loopv1
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -50,11 +49,14 @@ func DecodeLoopEntry(
 	entry declaration.Entry,
 	implicitBody bool,
 ) (LoopDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value LoopDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return LoopDocument{}, err
 	}
-	return decodeLoop(raw, false, implicitBody, entry.IsSymbolic())
+	if err := value.validate(false, implicitBody, entry.IsSymbolic()); err != nil {
+		return LoopDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeLoop(
@@ -132,22 +134,6 @@ func (v LoopDocument) validate(
 			"%w: Loop maxIterations cannot be negative",
 			basespec.ErrInvalid,
 		)
-	}
-	if v.MaxIterations == 0 {
-		var values map[string]json.RawMessage
-		raw, err := declaration.CanonicalDocumentJSON(v)
-		if err != nil {
-			return err
-		}
-		if err := json.Unmarshal(raw, &values); err != nil {
-			return err
-		}
-		if _, present := values["maxIterations"]; present {
-			return fmt.Errorf(
-				"%w: loop maxIterations must be positive",
-				basespec.ErrInvalid,
-			)
-		}
 	}
 	if v.Body != nil {
 		if err := v.Body.Validate(); err != nil {

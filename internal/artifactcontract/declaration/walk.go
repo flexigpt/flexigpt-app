@@ -179,7 +179,7 @@ func walkEntryArray(
 		return err
 	}
 	for index, value := range entries {
-		entry, err := DecodeEntryJSON(value)
+		entry, err := DecodeCanonicalEntryJSON(value)
 		if err != nil {
 			return err
 		}
@@ -203,7 +203,7 @@ func walkSingleEntry(
 	if len(raw) == 0 {
 		return nil
 	}
-	entry, err := DecodeEntryJSON(raw)
+	entry, err := DecodeCanonicalEntryJSON(raw)
 	if err != nil {
 		return err
 	}
@@ -260,7 +260,7 @@ func walkWorkspaceDeclarationEntries(
 		if _, found := fields["type"]; !found {
 			continue
 		}
-		entry, err := DecodeEntryJSON(rawDeclaration)
+		entry, err := DecodeCanonicalEntryJSON(rawDeclaration)
 		if err != nil {
 			return err
 		}

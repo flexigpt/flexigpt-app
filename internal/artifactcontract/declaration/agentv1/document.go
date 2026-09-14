@@ -47,11 +47,14 @@ func DecodeAgentJSON(raw []byte) (AgentDocument, error) {
 func DecodeAgentEntry(
 	entry declaration.Entry,
 ) (AgentDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value AgentDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return AgentDocument{}, err
 	}
-	return decodeAgent(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return AgentDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeAgent(

@@ -61,11 +61,7 @@ func NewLocatorDeclarationSource(
 	if err != nil {
 		return DeclarationSource{}, err
 	}
-	var output DeclarationSource
-	if err := output.UnmarshalJSON(raw); err != nil {
-		return DeclarationSource{}, err
-	}
-	return output, nil
+	return newCanonicalDeclarationSource(raw)
 }
 
 func NewEntryDeclarationSource(
@@ -75,11 +71,7 @@ func NewEntryDeclarationSource(
 	if err != nil {
 		return DeclarationSource{}, err
 	}
-	var output DeclarationSource
-	if err := output.UnmarshalJSON(raw); err != nil {
-		return DeclarationSource{}, err
-	}
-	return output, nil
+	return newCanonicalDeclarationSource(raw)
 }
 
 func NewScanDeclarationSource(
@@ -92,11 +84,19 @@ func NewScanDeclarationSource(
 	if err != nil {
 		return DeclarationSource{}, err
 	}
-	var output DeclarationSource
-	if err := output.UnmarshalJSON(raw); err != nil {
+	return newCanonicalDeclarationSource(raw)
+}
+
+func newCanonicalDeclarationSource(
+	raw []byte,
+) (DeclarationSource, error) {
+	value := DeclarationSource{
+		raw: append(json.RawMessage(nil), raw...),
+	}
+	if err := value.Validate(); err != nil {
 		return DeclarationSource{}, err
 	}
-	return output, nil
+	return value, nil
 }
 
 func (s DeclarationSource) Clone() DeclarationSource {
@@ -127,12 +127,11 @@ func (s *DeclarationSource) UnmarshalJSON(raw []byte) error {
 	if err != nil {
 		return err
 	}
-	value := DeclarationSource{
-		raw: json.RawMessage(canonical),
-	}
-	if err := value.Validate(); err != nil {
+	value, err := newCanonicalDeclarationSource(canonical)
+	if err != nil {
 		return err
 	}
+
 	*s = value
 	return nil
 }
@@ -161,7 +160,7 @@ func (s DeclarationSource) Validate() error {
 		)
 	}
 	if _, found := fields["type"]; found {
-		entry, err := declaration.DecodeEntryJSON(trimmed)
+		entry, err := declaration.DecodeCanonicalEntryJSON(trimmed)
 		if err != nil {
 			return err
 		}
@@ -176,7 +175,7 @@ func (s DeclarationSource) Validate() error {
 	}
 
 	var scan DeclarationScan
-	if err := jsonutil.DecodeCanonicalObjectInto(
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		trimmed,
 		&scan,
 		basespec.MaxDefinitionBodyBytes,
@@ -211,11 +210,14 @@ func DecodeWorkspaceJSON(raw []byte) (WorkspaceDocument, error) {
 func DecodeWorkspaceEntry(
 	entry declaration.Entry,
 ) (WorkspaceDocument, error) {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	var value WorkspaceDocument
+	if err := entry.DecodeInto(&value); err != nil {
 		return WorkspaceDocument{}, err
 	}
-	return decodeWorkspace(raw, false)
+	if err := value.ValidateEntry(); err != nil {
+		return WorkspaceDocument{}, err
+	}
+	return value, nil
 }
 
 func decodeWorkspace(

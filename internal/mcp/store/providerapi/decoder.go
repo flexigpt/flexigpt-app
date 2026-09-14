@@ -3,23 +3,15 @@ package providerapi
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
-	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
 
-type Decoder struct {
-	documents providerapi.ExpectedCanonicalizer
-}
+type Decoder struct{}
 
 func NewDecoder() *Decoder {
 	return &Decoder{}
@@ -30,27 +22,7 @@ func (*Decoder) ID() basespec.DecoderID {
 }
 
 func (*Decoder) Revision() string {
-	return "mcp-source-decoder-v2"
-}
-
-func (*Decoder) RequiredSchemaKeys() []schema.Key {
-	return []schema.Key{
-		mcpv1.MCPSchemaKey,
-		mcppolicyv1.MCPPolicySchemaKey,
-	}
-}
-
-func (d *Decoder) BindExpectedCanonicalizer(
-	documents providerapi.SchemaCatalog,
-) error {
-	if d == nil || documents == nil {
-		return fmt.Errorf(
-			"%w: MCP decoder schema catalog is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	d.documents = documents
-	return nil
+	return "mcp-source-decoder-v3"
 }
 
 func (*Decoder) Recognize(
@@ -58,17 +30,14 @@ func (*Decoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	var header struct {
-		Type declaration.Type `json:"type"`
-		Kind string           `json:"kind"`
+		Kind string `json:"kind"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return providerapi.RecognitionNone
 	}
 
 	switch {
-	case header.Type == declaration.TypeMCP,
-		header.Type == declaration.TypeMCPPolicy:
-		return providerapi.RecognitionPreferred
+
 	case header.Kind == "mcp.bundle":
 		return providerapi.RecognitionPreferred
 	case sourceformat.IsMCPConfig(candidate.Content):
@@ -82,71 +51,14 @@ func (d *Decoder) Decode(
 	ctx context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	if d == nil || d.documents == nil {
-		return nil, decoderError(
-			candidate.Locator,
-			"",
-			fmt.Errorf(
-				"%w: MCP decoder has no bound schema catalog",
-				basespec.ErrClosed,
-			),
-		)
-	}
-
 	var header struct {
-		Type declaration.Type `json:"type"`
-		Kind string           `json:"kind"`
+		Kind string `json:"kind"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		return nil, nil
 	}
 
 	switch {
-	case header.Type == declaration.TypeMCP:
-		parsed, err := d.documents.CanonicalizeExpected(
-			ctx,
-			mcpv1.MCPSchemaKey,
-			candidate.Content,
-		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		document, err := mcpv1.DecodeMCPJSON(parsed.Raw)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		definitionValue, err := sourceformat.MCPDocumentFromCanonical(
-			document,
-		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		return []providerapi.Decoded{{
-			Definition: definitionValue,
-		}}, nil
-
-	case header.Type == declaration.TypeMCPPolicy:
-		parsed, err := d.documents.CanonicalizeExpected(
-			ctx,
-			mcppolicyv1.MCPPolicySchemaKey,
-			candidate.Content,
-		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		document, err := mcppolicyv1.DecodeMCPPolicyJSON(parsed.Raw)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		definitionValue, err := mcpDomainPolicy.DefinitionForDocument(
-			document,
-		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		return []providerapi.Decoded{{
-			Definition: definitionValue,
-		}}, nil
 
 	case header.Kind == "mcp.bundle":
 		values, err := sourceformat.DecodeLegacyBundle(
