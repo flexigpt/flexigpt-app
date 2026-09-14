@@ -6,6 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
@@ -60,6 +61,35 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 			artifacts,
 		)
 	})
+}
+
+func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
+	workspace workspaceConsumerAPI.WorkspaceRef,
+	artifacts []artifact.ArtifactRef,
+) (mcp.LoadPlan, error) {
+	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (mcp.LoadPlan, error) {
+		return api.LoadWorkspaceMCPServers(
+			context.Background(),
+			workspace,
+			artifacts,
+		)
+	})
+}
+
+func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceRuntimePlan(
+	workspace workspaceConsumerAPI.WorkspaceRef,
+	selection workspaceConsumerAPI.WorkspaceRuntimeSelection,
+) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
+			return api.ResolveWorkspaceRuntimePlan(
+				context.Background(),
+				workspace,
+				selection,
+			)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) close() {

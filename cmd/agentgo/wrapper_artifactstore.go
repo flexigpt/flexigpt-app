@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
-	workspaceProviderAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/providerapi"
 )
 
 func composeArtifactStore(
@@ -25,7 +25,7 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	workspaceProvider, err := workspaceProviderAPI.NewProvider()
+	markdownProvider, err := markdown.NewProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +42,7 @@ func composeArtifactStore(
 
 	providers := []providerapi.Provider{
 		canonicalProvider,
-		workspaceProvider,
+		markdownProvider,
 		skillPlugin,
 		mcpProvider,
 	}

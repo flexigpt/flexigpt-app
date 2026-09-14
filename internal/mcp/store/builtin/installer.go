@@ -49,7 +49,7 @@ func NewInstaller(
 	if err := dependencies.Registry.Validate(); err != nil {
 		return nil, err
 	}
-	prepared, err := PreparePackages(
+	prepared, err := PrepareCollections(
 		context.Background(),
 		dependencies.Registry,
 		dependencies.Packages,
@@ -210,11 +210,11 @@ func hydrationFingerprint(
 	return cryptoutil.CanonicalDigest(struct {
 		SchemaVersion string               `json:"schemaVersion"`
 		Topology      topology.Declaration `json:"topology"`
-		Packages      []packageFingerprint `json:"packages"`
+		Collections   []packageFingerprint `json:"collections"`
 	}{
 		SchemaVersion: mcpDomain.HydrationSchemaVersion,
 		Topology:      topologyValue,
-		Packages:      values,
+		Collections:   values,
 	})
 }
 

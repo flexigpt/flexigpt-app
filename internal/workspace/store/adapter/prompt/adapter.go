@@ -7,13 +7,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	contextAdapter "github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/context"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/instruction"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
-	contextAdapter "github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/context"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/instruction"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -87,10 +87,35 @@ func New(
 	}, nil
 }
 
+// ComposeSelected composes exactly refs in order. Unlike Compose, an empty
+// ref list means an intentionally empty selection rather than every prompt
+// Artifact in the Root.
+func (a *Adapter) ComposeSelected(
+	ctx context.Context,
+	workspace workspaceDomain.Workspace,
+	refs []artifact.ArtifactRef,
+) (Plan, error) {
+	return a.compose(
+		ctx,
+		workspace,
+		refs,
+		false,
+	)
+}
+
 func (a *Adapter) Compose(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
+) (Plan, error) {
+	return a.compose(ctx, workspace, refs, true)
+}
+
+func (a *Adapter) compose(
+	ctx context.Context,
+	workspace workspaceDomain.Workspace,
+	refs []artifact.ArtifactRef,
+	useRootDefault bool,
 ) (Plan, error) {
 	if a == nil || a.artifacts == nil || a.engine == nil {
 		return Plan{}, basespec.ErrClosed
@@ -102,7 +127,12 @@ func (a *Adapter) Compose(
 		return Plan{}, err
 	}
 
-	selected, err := a.selection(ctx, workspace, refs)
+	selected, err := a.selection(
+		ctx,
+		workspace,
+		refs,
+		useRootDefault,
+	)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -243,8 +273,12 @@ func (a *Adapter) selection(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
+	useRootDefault bool,
 ) ([]artifact.Artifact, error) {
 	if len(refs) == 0 {
+		if !useRootDefault {
+			return []artifact.Artifact{}, nil
+		}
 		values, err := a.artifacts.ListByRoot(
 			ctx,
 			workspace.Artifact.RootID,
@@ -252,6 +286,7 @@ func (a *Adapter) selection(
 		if err != nil {
 			return nil, err
 		}
+
 		output := make([]artifact.Artifact, 0)
 		for _, value := range values {
 			if value.Kind != artifact.ArtifactKind(instructionv1.InstructionType) &&

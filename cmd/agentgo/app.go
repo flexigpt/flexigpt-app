@@ -267,26 +267,6 @@ func (a *App) initManagers() {
 
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
-	err = InitWorkspaceWrappers(
-		a.workspaceStoreAPI,
-		a.workspaceRuntimeAPI,
-		a.workspaceAggregateAPI,
-		artifactComposition.Sources,
-		artifactComposition.Discovery,
-		artifactComposition.Artifacts,
-		artifactComposition.Resources,
-		artifactComposition.LocatorResolvers,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Workspace APIs",
-			"directory", a.artifactStoreDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: workspace initialization failed\n" + err.Error())
-	}
-	slog.Info("workspace consumer, runtime engine, and aggregate APIs initialized")
-
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
 		artifactComposition.Roots,
@@ -370,6 +350,26 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: artifact-backed mcp initialization failed\n" + err.Error())
 	}
 	slog.Info("artifact-backed mcp host initialized")
+
+	err = InitWorkspaceWrappers(
+		a.workspaceStoreAPI,
+		a.workspaceRuntimeAPI,
+		a.workspaceAggregateAPI,
+		artifactComposition.Sources,
+		artifactComposition.Discovery,
+		artifactComposition.Artifacts,
+		artifactComposition.Resources,
+		artifactComposition.LocatorResolvers,
+		a.mcpStoreAPI.api,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Workspace APIs",
+			"error", err,
+		)
+		panic("failed to initialize managers: workspace initialization failed\n" + err.Error())
+	}
+	slog.Info("workspace consumer, runtime engine, and aggregate APIs initialized")
 
 	err = EnsureBuiltinArtifactTopology(
 		context.Background(),

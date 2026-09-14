@@ -1,4 +1,4 @@
-package providerapi
+package markdown
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const AgentMarkdownDecoderID basespec.DecoderID = "workspace-agent-markdown"
+const AgentMarkdownDecoderID basespec.DecoderID = "agent-markdown"
 
 // AgentMarkdownDecoder adapts AGENT.md and *.agent.md files. YAML front
 // matter provides Agent declaration fields. The Markdown body becomes an

@@ -8,6 +8,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -46,6 +49,32 @@ type WorkspacePathRegistrationResult struct {
 	Source    source.Summary            `json:"source"`
 	Workspace workspaceDomain.Workspace `json:"workspace"`
 	Load      WorkspaceLoad             `json:"load"`
+}
+
+// WorkspaceCapabilityPlan is the ordered Artifact-backed capability projection
+// of resolved Workspace roots. It is a consumer plan, not a Store entity.
+type WorkspaceCapabilityPlan struct {
+	Workspace       WorkspaceRef           `json:"workspace"`
+	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts"`
+	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts"`
+	MCPArtifacts    []artifact.ArtifactRef `json:"mcpArtifacts"`
+}
+
+type WorkspaceRuntimeSelection struct {
+	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts,omitempty"`
+	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts,omitempty"`
+	MCPArtifacts    []artifact.ArtifactRef `json:"mcpArtifacts,omitempty"`
+}
+
+// WorkspaceRuntimePlan contains source-verified material ready for existing
+// prompt, Skill, and MCP runtime consumers. Execution remains outside this
+// plan and outside Artifact Store.
+type WorkspaceRuntimePlan struct {
+	Workspace    workspaceDomain.Workspace `json:"workspace"`
+	Capabilities WorkspaceCapabilityPlan   `json:"capabilities"`
+	Prompt       prompt.Plan               `json:"prompt"`
+	Skills       skill.LoadPlan            `json:"skills"`
+	MCPServers   mcp.LoadPlan              `json:"mcpServers"`
 }
 
 type WorkspaceArtifactView struct {

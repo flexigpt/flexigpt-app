@@ -1,4 +1,4 @@
-package providerapi
+package markdown
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
-const InstructionMarkdownDecoderID basespec.DecoderID = "workspace-instruction-markdown"
+const InstructionMarkdownDecoderID basespec.DecoderID = "instruction-markdown"
 
 type InstructionDecoder struct{}
 

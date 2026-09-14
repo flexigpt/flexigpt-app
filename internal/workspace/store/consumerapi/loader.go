@@ -10,12 +10,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
-	workspaceProviderAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/providerapi"
 )
 
 // applyWorkspaceDeclarations converts Workspace-local declaration sources into
@@ -252,7 +252,7 @@ func (a *StoreAPI) expandWorkspaceDirectoryDeclarations(
 				Locator:   local,
 				Recursive: true,
 				DecoderIDs: []basespec.DecoderID{
-					workspaceProviderAPI.ContextMarkdownDecoderID,
+					markdown.ContextMarkdownDecoderID,
 				},
 			},
 		)
@@ -315,7 +315,7 @@ func workspaceDiscoveryForDocument(
 						Locator:   value,
 						Recursive: false,
 						DecoderIDs: []basespec.DecoderID{
-							workspaceProviderAPI.ContextMarkdownDecoderID,
+							markdown.ContextMarkdownDecoderID,
 						},
 					},
 				)
@@ -357,7 +357,7 @@ func workspaceDiscoveryForDocument(
 					Locator:   base,
 					Recursive: true,
 					DecoderIDs: []basespec.DecoderID{
-						workspaceProviderAPI.ContextMarkdownDecoderID,
+						markdown.ContextMarkdownDecoderID,
 					},
 				},
 			)

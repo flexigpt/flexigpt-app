@@ -1,4 +1,4 @@
-package providerapi
+package markdown
 
 import (
 	"bytes"

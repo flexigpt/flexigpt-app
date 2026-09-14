@@ -1,12 +1,11 @@
-package providerapi
+package markdown
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
-const providerName = "workspace"
+const providerName = "artifact-markdown"
 
-// Provider registers Workspace-owned source adapters and canonical declaration
-// schemas. It owns no Collection behavior, Source attachment role, adoption,
-// or Artifact lifecycle policy.
+// Provider registers physical Markdown source-format adapters. It emits
+// ordinary instruction, context, and agent Artifacts for any Store Root.
 type Provider struct {
 	descriptor providerapi.Descriptor
 }

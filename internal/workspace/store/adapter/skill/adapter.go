@@ -113,7 +113,27 @@ func (a *Adapter) Load(
 			Skills:    values,
 		}, nil
 	}
+	return a.loadSelected(ctx, workspace, refs)
+}
 
+// LoadSelected loads exactly refs in order. An empty list means no Skills,
+// rather than every available Skill in the Workspace Root.
+func (a *Adapter) LoadSelected(
+	ctx context.Context,
+	workspace workspaceDomain.Workspace,
+	refs []artifact.ArtifactRef,
+) (LoadPlan, error) {
+	if err := workspace.Validate(); err != nil {
+		return LoadPlan{}, err
+	}
+	return a.loadSelected(ctx, workspace, refs)
+}
+
+func (a *Adapter) loadSelected(
+	ctx context.Context,
+	workspace workspaceDomain.Workspace,
+	refs []artifact.ArtifactRef,
+) (LoadPlan, error) {
 	seen := make(map[artifact.ArtifactID]struct{}, len(refs))
 	output := LoadPlan{
 		Workspace: workspace.Ref(),
@@ -147,6 +167,7 @@ func (a *Adapter) Load(
 		}
 		output.Skills = append(output.Skills, value)
 	}
+
 	return output, nil
 }
 

@@ -491,7 +491,7 @@ linters:
           alias: ${1}StoreServer
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/bundle
           alias: ${1}Bundle
-        - pkg: github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/context
+        - pkg: "github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/context"
           alias: contextAdapter
 
     nakedret:

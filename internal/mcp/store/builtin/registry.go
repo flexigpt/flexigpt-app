@@ -30,9 +30,9 @@ type ArtifactRegistration struct {
 	Enabled     bool                        `json:"enabled"`
 }
 
-// PackageRegistration describes one physical embedded MCP package. The
-// physical registry keeps its existing `bundles` JSON field, while every
-// package normalizes into an ordinary canonical collection Artifact.
+// PackageRegistration describes one physical embedded MCP Collection package.
+// Every registration normalizes into an ordinary canonical collection Artifact
+// plus its contributed MCP Artifacts.
 type PackageRegistration struct {
 	EmbeddedPackageRoot     basespec.Locator       `json:"embeddedPackageRoot"`
 	EmbeddedDocumentLocator basespec.Locator       `json:"embeddedDocumentLocator"`
@@ -41,7 +41,7 @@ type PackageRegistration struct {
 
 type Registry struct {
 	SchemaVersion string                `json:"schemaVersion"`
-	Packages      []PackageRegistration `json:"bundles"`
+	Collections   []PackageRegistration `json:"collections"`
 }
 
 type PreparedPackage struct {
@@ -85,20 +85,20 @@ func (r Registry) Validate() error {
 			r.SchemaVersion,
 		)
 	}
-	if len(r.Packages) == 0 {
+	if len(r.Collections) == 0 {
 		return fmt.Errorf(
-			"%w: embedded MCP registry has no package registrations",
+			"%w: embedded MCP registry has no Collection registrations",
 			basespec.ErrInvalid,
 		)
 	}
 
-	roots := make(map[basespec.Locator]struct{}, len(r.Packages))
-	for index, value := range r.Packages {
+	roots := make(map[basespec.Locator]struct{}, len(r.Collections))
+	for index, value := range r.Collections {
 		if err := value.EmbeddedPackageRoot.ValidatePortable(false); err != nil {
-			return fmt.Errorf("packages[%d]: %w", index, err)
+			return fmt.Errorf("collections[%d]: %w", index, err)
 		}
 		if err := value.EmbeddedDocumentLocator.ValidatePortable(false); err != nil {
-			return fmt.Errorf("packages[%d]: %w", index, err)
+			return fmt.Errorf("collections[%d]: %w", index, err)
 		}
 		if path.Dir(string(value.EmbeddedDocumentLocator)) !=
 			string(value.EmbeddedPackageRoot) {
@@ -117,7 +117,7 @@ func (r Registry) Validate() error {
 		roots[value.EmbeddedPackageRoot] = struct{}{}
 		if len(value.Artifacts) == 0 {
 			return fmt.Errorf(
-				"%w: MCP package %q has no Artifact registrations",
+				"%w: MCP Collection %q has no Artifact registrations",
 				basespec.ErrInvalid,
 				value.EmbeddedPackageRoot,
 			)
@@ -130,7 +130,7 @@ func (r Registry) Validate() error {
 		for artifactIndex, registration := range value.Artifacts {
 			if err := registration.Subresource.Validate(); err != nil {
 				return fmt.Errorf(
-					"packages[%d].artifacts[%d]: %w",
+					"collections[%d].artifacts[%d]: %w",
 					index,
 					artifactIndex,
 					err,
@@ -159,8 +159,8 @@ func (r Registry) Validate() error {
 	return nil
 }
 
-func (r Registry) OrderedPackages() []PackageRegistration {
-	output := append([]PackageRegistration(nil), r.Packages...)
+func (r Registry) OrderedCollections() []PackageRegistration {
+	output := append([]PackageRegistration(nil), r.Collections...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].EmbeddedPackageRoot <
 			output[right].EmbeddedPackageRoot
@@ -168,7 +168,7 @@ func (r Registry) OrderedPackages() []PackageRegistration {
 	return output
 }
 
-func PreparePackages(
+func PrepareCollections(
 	ctx context.Context,
 	registry Registry,
 	packages fs.FS,
@@ -183,8 +183,8 @@ func PreparePackages(
 		)
 	}
 
-	output := make([]PreparedPackage, 0, len(registry.Packages))
-	for _, registration := range registry.OrderedPackages() {
+	output := make([]PreparedPackage, 0, len(registry.Collections))
+	for _, registration := range registry.OrderedCollections() {
 		files, err := topology.ReadPackageFiles(
 			ctx,
 			packages,
@@ -243,7 +243,7 @@ func PreparePackages(
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
-				"decode embedded MCP package %q: %w",
+				"decode embedded MCP Collection %q: %w",
 				registration.EmbeddedPackageRoot,
 				err,
 			)

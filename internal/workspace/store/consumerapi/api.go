@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -15,10 +16,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
-	workspaceProviderAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/providerapi"
 )
 
 type StoreAPI struct {
@@ -27,10 +28,11 @@ type StoreAPI struct {
 	artifacts compositionapi.ArtifactAPI
 	resources compositionapi.ResourceAPI
 
-	config         Config
-	contextAdapter *prompt.Adapter
-	skillAdapter   *skill.Adapter
-	resolver       *resolve.Resolver
+	config        Config
+	promptAdapter *prompt.Adapter
+	skillAdapter  *skill.Adapter
+	mcpAdapter    *mcp.Adapter
+	resolver      *resolve.Resolver
 }
 
 func NewStoreAPI(
@@ -62,7 +64,7 @@ func NewStoreAPI(
 		config:    config,
 	}
 
-	contextAdapter, err := prompt.New(
+	promptAdapter, err := prompt.New(
 		artifacts,
 		resources,
 		config.ContextComposition,
@@ -73,6 +75,14 @@ func NewStoreAPI(
 	skillAdapter, err := skill.New(artifacts, resources)
 	if err != nil {
 		return nil, err
+	}
+
+	var mcpAdapter *mcp.Adapter
+	if config.MCPServers != nil {
+		mcpAdapter, err = mcp.New(config.MCPServers)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	locators, err := resolve.NewProviderLocatorResolver(
@@ -92,8 +102,9 @@ func NewStoreAPI(
 		return nil, err
 	}
 
-	output.contextAdapter = contextAdapter
+	output.promptAdapter = promptAdapter
 	output.skillAdapter = skillAdapter
+	output.mcpAdapter = mcpAdapter
 	output.resolver = resolver
 	return output, nil
 }
@@ -357,11 +368,11 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	return workspaceArtifactViewOf(updated)
 }
 
-func (a *StoreAPI) ContextAdapter() *prompt.Adapter {
+func (a *StoreAPI) PromptAdapter() *prompt.Adapter {
 	if a == nil {
 		return nil
 	}
-	return a.contextAdapter
+	return a.promptAdapter
 }
 
 func (a *StoreAPI) SkillAdapter() *skill.Adapter {
@@ -399,7 +410,7 @@ func (a *StoreAPI) defaultDiscovery() (
 			Locator:   "docs",
 			Recursive: true,
 			DecoderIDs: []basespec.DecoderID{
-				workspaceProviderAPI.ContextMarkdownDecoderID,
+				markdown.ContextMarkdownDecoderID,
 			},
 		}},
 		Authoritative: true,

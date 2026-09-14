@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
@@ -28,10 +29,12 @@ func InitWorkspaceWrappers(
 	artifacts compositionapi.ArtifactAPI,
 	resources compositionapi.ResourceAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
+	mcpServers mcp.ServerResolver,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
-		aggregateWrapper == nil {
+		aggregateWrapper == nil ||
+		mcpServers == nil {
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
@@ -40,6 +43,8 @@ func InitWorkspaceWrappers(
 		[]providerapi.LocatorResolverFactory(nil),
 		locatorResolvers...,
 	)
+	config.MCPServers = mcpServers
+	config.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,
 		discovery,
