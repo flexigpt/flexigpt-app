@@ -246,16 +246,18 @@ func (r *Registry) CanonicalizeEntity(
 	if err != nil {
 		return schema.ParsedDocument{}, err
 	}
-	if err := jsonutil.ValidateJSONSchema(
-		registered.schema,
-		json.RawMessage(can),
-		basespec.MaxDefinitionBytes,
-	); err != nil {
-		return schema.ParsedDocument{}, fmt.Errorf(
-			"%w: canonical codec output does not satisfy its JSON Schema: %w",
-			basespec.ErrInvalid,
-			err,
-		)
+	if !bytes.Equal(can, canonical) {
+		if err := jsonutil.ValidateJSONSchema(
+			registered.schema,
+			json.RawMessage(can),
+			basespec.MaxDefinitionBytes,
+		); err != nil {
+			return schema.ParsedDocument{}, fmt.Errorf(
+				"%w: canonical codec output does not satisfy its JSON Schema: %w",
+				basespec.ErrInvalid,
+				err,
+			)
+		}
 	}
 
 	value.Raw = json.RawMessage(can)

@@ -71,6 +71,75 @@ func ValidatePathPatterns(
 	return nil
 }
 
+// PathSelection is one validated reusable include/exclude matcher.
+// It avoids validating the same patterns for every Source entry.
+type PathSelection struct {
+	include []string
+	exclude []string
+}
+
+func NewPathSelection(
+	include []string,
+	exclude []string,
+) (PathSelection, error) {
+	if err := ValidatePathPatterns(
+		"path selection include patterns",
+		include,
+	); err != nil {
+		return PathSelection{}, err
+	}
+	if err := ValidatePathPatterns(
+		"path selection exclude patterns",
+		exclude,
+	); err != nil {
+		return PathSelection{}, err
+	}
+	return PathSelection{
+		include: append([]string(nil), include...),
+		exclude: append([]string(nil), exclude...),
+	}, nil
+}
+
+func (s PathSelection) Match(
+	value string,
+) (bool, error) {
+	if err := validatePatternValue(value); err != nil {
+		return false, err
+	}
+
+	included := len(s.include) == 0
+	for _, pattern := range s.include {
+		matched, err := matchValidatedPathPattern(
+			pattern,
+			value,
+		)
+		if err != nil {
+			return false, err
+		}
+		if matched {
+			included = true
+			break
+		}
+	}
+	if !included {
+		return false, nil
+	}
+
+	for _, pattern := range s.exclude {
+		matched, err := matchValidatedPathPattern(
+			pattern,
+			value,
+		)
+		if err != nil {
+			return false, err
+		}
+		if matched {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
 // MatchPathPattern matches one source-relative path.
 //
 // Unlike path.Match, a complete "**" segment consumes zero or more complete
@@ -85,7 +154,13 @@ func MatchPathPattern(
 	if err := validatePatternValue(value); err != nil {
 		return false, err
 	}
+	return matchValidatedPathPattern(pattern, value)
+}
 
+func matchValidatedPathPattern(
+	pattern string,
+	value string,
+) (bool, error) {
 	patternSegments := strings.Split(pattern, "/")
 	valueSegments := strings.Split(value, "/")
 
@@ -166,31 +241,11 @@ func MatchPathSelection(
 	include []string,
 	exclude []string,
 ) (bool, error) {
-	included := len(include) == 0
-	for _, pattern := range include {
-		matched, err := MatchPathPattern(pattern, value)
-		if err != nil {
-			return false, err
-		}
-		if matched {
-			included = true
-			break
-		}
+	selection, err := NewPathSelection(include, exclude)
+	if err != nil {
+		return false, err
 	}
-	if !included {
-		return false, nil
-	}
-
-	for _, pattern := range exclude {
-		matched, err := MatchPathPattern(pattern, value)
-		if err != nil {
-			return false, err
-		}
-		if matched {
-			return false, nil
-		}
-	}
-	return true, nil
+	return selection.Match(value)
 }
 
 func validatePatternValue(value string) error {

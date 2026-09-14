@@ -1,6 +1,8 @@
 package compositionapi
 
 import (
+	"io/fs"
+
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
@@ -11,6 +13,8 @@ import (
 // both lifecycle-policy declarations and initial generic Root declarations.
 type Config struct {
 	BaseDirectory string
+
+	EmbeddedProviders map[string]fs.FS
 
 	Providers []providerapi.Provider
 

@@ -68,7 +68,7 @@ func (*YAMLDecoder) Recognize(
 	)
 	if err != nil {
 		if requested {
-			return providerapi.RecognitionPreferred
+			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}
@@ -77,13 +77,13 @@ func (*YAMLDecoder) Recognize(
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
 		if requested {
-			return providerapi.RecognitionPreferred
+			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
 		if requested {
-			return providerapi.RecognitionPreferred
+			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}

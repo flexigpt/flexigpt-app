@@ -1,7 +1,6 @@
 package fsdir
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -64,10 +63,12 @@ func (a *Adapter) NormalizeConfig(
 		return nil, fmt.Errorf("%w: filesystem source config: %w", basespec.ErrInvalid, err)
 	}
 
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
 	var config Config
-	if err := decoder.Decode(&config); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		&config,
+		basespec.MaxConfigBytes,
+	); err != nil {
 		return nil, fmt.Errorf("%w: decode filesystem source config: %w", basespec.ErrInvalid, err)
 	}
 	root, err := normalizeFilesystemRoot(config.RootPath)
@@ -150,10 +151,12 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
 	var config Config
-	if err := decoder.Decode(&config); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		&config,
+		basespec.MaxConfigBytes,
+	); err != nil {
 		return Config{}, err
 	}
 	if !filepath.IsAbs(config.RootPath) ||

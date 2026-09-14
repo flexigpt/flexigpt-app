@@ -381,16 +381,11 @@ func (s *Service) ReadSourceTree(
 	if err := base.Validate(true); err != nil {
 		return nil, err
 	}
-	if err := basespec.ValidatePathPatterns(
-		"Source tree include patterns",
+	selection, err := basespec.NewPathSelection(
 		include,
-	); err != nil {
-		return nil, err
-	}
-	if err := basespec.ValidatePathPatterns(
-		"Source tree exclude patterns",
 		exclude,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
 	}
 	if maximumEntries <= 0 ||
@@ -456,11 +451,7 @@ func (s *Service) ReadSourceTree(
 		if !entry.IsRegular {
 			return nil
 		}
-		matched, err := basespec.MatchPathSelection(
-			relative,
-			include,
-			exclude,
-		)
+		matched, err := selection.Match(relative)
 		if err != nil {
 			return err
 		}

@@ -1,12 +1,9 @@
 package overlay
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -194,20 +191,11 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 	if err != nil {
 		return err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(target); err != nil {
-		return fmt.Errorf(
-			"%w: decode MCP installation overlay: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("MCP installation overlay has trailing JSON")
-		}
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		target,
+		basespec.MaxLocalDataBytes,
+	); err != nil {
 		return fmt.Errorf(
 			"%w: decode MCP installation overlay: %w",
 			basespec.ErrInvalid,

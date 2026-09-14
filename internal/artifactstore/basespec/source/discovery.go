@@ -56,10 +56,17 @@ func (r DirectoryRoot) Validate() error {
 func (r DirectoryRoot) Matches(
 	locator basespec.Locator,
 ) (bool, error) {
-	if err := r.Validate(); err != nil {
+	if err := r.Root.Validate(true); err != nil {
 		return false, err
 	}
 	if err := locator.Validate(false); err != nil {
+		return false, err
+	}
+	selection, err := basespec.NewPathSelection(
+		r.IncludePatterns,
+		r.ExcludePatterns,
+	)
+	if err != nil {
 		return false, err
 	}
 
@@ -79,11 +86,7 @@ func (r DirectoryRoot) Matches(
 		return false, nil
 	}
 
-	return basespec.MatchPathSelection(
-		relative,
-		r.IncludePatterns,
-		r.ExcludePatterns,
-	)
+	return selection.Match(relative)
 }
 
 // DecoderHint requests one or more decoders for a source-relative scope.

@@ -59,12 +59,6 @@ type SourceAPI interface {
 		draft source.Draft,
 	) (source.Summary, bool, error)
 
-	CreateWithStatus(
-		ctx context.Context,
-		rootID root.RootID,
-		draft source.Draft,
-	) (source.Summary, bool, error)
-
 	Discard(
 		ctx context.Context,
 		rootID root.RootID,

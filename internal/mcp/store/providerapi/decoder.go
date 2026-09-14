@@ -25,7 +25,7 @@ func (*Decoder) ID() basespec.DecoderID {
 }
 
 func (*Decoder) Revision() string {
-	return "mcp-source-decoder-v6"
+	return "mcp-source-decoder-v1"
 }
 
 func (*Decoder) Recognize(
@@ -34,6 +34,8 @@ func (*Decoder) Recognize(
 ) providerapi.Recognition {
 	switch {
 	case sourceformat.IsMCPCollection(candidate.Content):
+		return providerapi.RecognitionPreferred
+	case sourceformat.IsMCPConfig(candidate.Content):
 		return providerapi.RecognitionPreferred
 	case isMCPConfigCandidate(candidate):
 		return providerapi.RecognitionPossible

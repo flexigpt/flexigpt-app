@@ -761,12 +761,7 @@ func (a *API) effectivePolicy(
 		values = append(values, body)
 	}
 
-	baseline := a.baselinePolicy
-	if len(values) != 0 {
-		baseline = values[0]
-		values = values[1:]
-	}
-	return mcpPolicy.Compose(baseline, values...)
+	return mcpPolicy.Compose(a.baselinePolicy, values...)
 }
 
 func (a *API) policyBodiesByLogicalName(

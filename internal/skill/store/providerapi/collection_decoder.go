@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -349,6 +350,12 @@ func expectedSkillName(locator basespec.Locator) string {
 	parent := path.Dir(string(locator))
 	if parent == "." {
 		return ""
+	}
+	if address, err := source.ParseManagedPackageAddressDirectory(
+		basespec.Locator(parent),
+	); err == nil &&
+		address.Kind == skillDomain.ManagedSkillPackageKind {
+		return string(address.Name)
 	}
 	return path.Base(parent)
 }

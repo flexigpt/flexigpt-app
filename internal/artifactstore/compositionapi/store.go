@@ -91,7 +91,8 @@ func Open(
 	components, err := system.Open(
 		ctx,
 		system.Config{
-			BaseDirectory: config.BaseDirectory,
+			BaseDirectory:     config.BaseDirectory,
+			EmbeddedProviders: config.EmbeddedProviders,
 			ArtifactProviders: append(
 				[]providerapi.Provider(nil),
 				config.Providers...,

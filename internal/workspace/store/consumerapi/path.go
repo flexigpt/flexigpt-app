@@ -69,6 +69,11 @@ func (a *StoreAPI) AddWorkspacePath(
 			discovery.ExplicitLocators,
 			manifest,
 		)
+		discovery.DecoderHints = appendCanonicalDeclarationDecoderHint(
+			discovery.DecoderHints,
+			discovery.AllowedDecoderIDs,
+			manifest,
+		)
 		discovery = discovery.Normalized()
 	}
 

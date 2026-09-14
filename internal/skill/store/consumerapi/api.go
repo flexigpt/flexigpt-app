@@ -472,7 +472,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	return a.managedArtifacts.Remove(
+	if err := a.managedArtifacts.Remove(
 		ctx,
 		artifact.RemoveArtifactRequest{
 			RootID:           value.RootID,
@@ -480,6 +480,24 @@ func (a *API) PurgeSkill(
 			Package:          packageAddress,
 			ExpectedArtifact: &ref,
 		},
+	); err != nil {
+		return err
+	}
+
+	missing, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if missing.State != artifact.StateMissing {
+		return fmt.Errorf(
+			"%w: removed managed Skill Artifact is not missing",
+			basespec.ErrConflict,
+		)
+	}
+	return a.artifacts.Purge(
+		ctx,
+		ref,
+		missing.Revision,
 	)
 }
 

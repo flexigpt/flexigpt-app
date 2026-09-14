@@ -1,7 +1,6 @@
 package embedded
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -120,11 +119,13 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
 
 	var config Config
-	if err := decoder.Decode(&config); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		&config,
+		basespec.MaxConfigBytes,
+	); err != nil {
 		return Config{}, fmt.Errorf(
 			"%w: decode embedded source config: %w",
 			basespec.ErrInvalid,

@@ -909,6 +909,13 @@ func collectCandidates(
 				root.Root,
 			)
 		}
+		selection, err := basespec.NewPathSelection(
+			root.IncludePatterns,
+			root.ExcludePatterns,
+		)
+		if err != nil {
+			return nil, err
+		}
 
 		var visit func(basespec.Locator, int) error
 		visit = func(directory basespec.Locator, depth int) error {
@@ -954,7 +961,20 @@ func collectCandidates(
 					}
 					continue
 				}
-				matched, err := root.Matches(entry.Locator)
+
+				relative := string(entry.Locator)
+				if root.Root != "." {
+					prefix := string(root.Root) + "/"
+					var found bool
+					relative, found = strings.CutPrefix(
+						relative,
+						prefix,
+					)
+					if !found || relative == "" {
+						continue
+					}
+				}
+				matched, err := selection.Match(relative)
 				if err != nil {
 					return err
 				}

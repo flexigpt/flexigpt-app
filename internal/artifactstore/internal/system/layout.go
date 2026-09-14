@@ -1,17 +1,16 @@
 package system
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type storeManifest struct {
@@ -159,26 +158,13 @@ func writeNewStoreManifest(
 }
 
 func decodeStoreManifest(raw []byte) (storeManifest, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.DisallowUnknownFields()
-
-	var manifest storeManifest
-	if err := decoder.Decode(&manifest); err != nil {
+	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](
+		raw,
+		basespec.MaxConfigBytes,
+	)
+	if err != nil {
 		return storeManifest{}, fmt.Errorf(
 			"%w: decode artifact store layout manifest: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New(
-				"artifact store layout manifest has trailing JSON",
-			)
-		}
-		return storeManifest{}, fmt.Errorf(
-			"%w: %w",
 			basespec.ErrInvalid,
 			err,
 		)

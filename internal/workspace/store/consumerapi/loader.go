@@ -88,25 +88,15 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 	return workspace, false, nil
 }
 
-// workspaceDiscoveryBase makes Workspace-owned Sources authoritative for the
-// selected manifest instead of retaining the broad bootstrap scan.
-//
-// Sources created by this Workspace API use the workspace-* storage-key
-// namespace and are owned by the Workspace Loader. Other manually registered
-// Sources retain their caller-managed baseline discovery configuration.
+// workspaceDiscoveryBase augments the Root-owned Source discovery universe.
+// A Source can contain multiple Workspace manifests and can also be configured
+// directly by another Root consumer, so loading one Workspace must not discard
+// existing declaration scopes.
 func (a *StoreAPI) workspaceDiscoveryBase(
 	current source.Summary,
 	declarationLocator basespec.Locator,
 ) (source.DiscoverySpec, error) {
 	output := current.Discovery.Clone()
-	if strings.HasPrefix(
-		string(current.StorageKey),
-		"workspace-",
-	) {
-		output = source.DiscoverySpec{
-			Authoritative: true,
-		}
-	}
 	output.ExplicitLocators = appendUniqueLocator(
 		output.ExplicitLocators,
 		declarationLocator,
@@ -331,6 +321,11 @@ func workspaceDiscoveryForDocument(
 				output.ExplicitLocators,
 				value,
 			)
+			output.DecoderHints = appendCanonicalDeclarationDecoderHint(
+				output.DecoderHints,
+				output.AllowedDecoderIDs,
+				value,
+			)
 			if isContextMarkdownLocator(value) {
 				output.DecoderHints = appendDecoderHint(
 					output.DecoderHints,
@@ -477,6 +472,16 @@ func appendCanonicalDeclarationDecoderHint(
 		decoderID = decoder.YAMLDecoderID
 	default:
 		return values
+	}
+
+	// Standard MCP configuration files have their own physical-format
+	// decoder. Valid canonical MCP declarations using these names are still
+	// recognized strongly by the canonical JSON decoder without a hint.
+	if decoderID == decoder.JSONDecoderID {
+		switch strings.ToLower(path.Base(string(locator))) {
+		case ".mcp.json", "mcp.json":
+			return values
+		}
 	}
 
 	if len(allowed) != 0 &&

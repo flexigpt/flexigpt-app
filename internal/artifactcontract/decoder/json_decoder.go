@@ -31,7 +31,7 @@ func (*JSONDecoder) ID() basespec.DecoderID {
 }
 
 func (*JSONDecoder) Revision() string {
-	return "artifact-declaration-json/v2"
+	return "artifact-declaration-json/v1"
 }
 
 func (*JSONDecoder) RequiredSchemaKeys() []schema.Key {
@@ -68,13 +68,13 @@ func (*JSONDecoder) Recognize(
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		if requested {
-			return providerapi.RecognitionPreferred
+			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
 		if requested {
-			return providerapi.RecognitionPreferred
+			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}

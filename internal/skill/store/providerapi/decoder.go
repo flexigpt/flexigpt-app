@@ -49,15 +49,7 @@ func (*Decoder) Decode(
 		return nil, nil
 	}
 
-	parent := path.Dir(string(candidate.Locator))
-	if parent == "/" || parent == "" {
-		return nil, nil
-	}
-	expectedName := ""
-	if parent != "." {
-		expectedName = path.Base(parent)
-	}
-
+	expectedName := expectedSkillName(candidate.Locator)
 	value, warnings, err := skillDomain.DecodeSkillDocument(
 		candidate.Content,
 		expectedName,

@@ -24,13 +24,17 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	if err != nil {
 		return prompt.Plan{}, err
 	}
+	selected, err := selectedWorkspaceArtifacts(
+		artifacts,
+		capabilities.PromptArtifacts,
+	)
+	if err != nil {
+		return prompt.Plan{}, err
+	}
 	return a.promptAdapter.ComposeSelected(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			artifacts,
-			capabilities.PromptArtifacts,
-		),
+		selected,
 	)
 }
 
@@ -46,13 +50,17 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	if err != nil {
 		return skill.LoadPlan{}, err
 	}
+	selected, err := selectedWorkspaceArtifacts(
+		artifacts,
+		capabilities.SkillArtifacts,
+	)
+	if err != nil {
+		return skill.LoadPlan{}, err
+	}
 	return a.skillAdapter.LoadSelected(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			artifacts,
-			capabilities.SkillArtifacts,
-		),
+		selected,
 	)
 }
 
@@ -79,13 +87,17 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	if err != nil {
 		return mcp.LoadPlan{}, err
 	}
+	selected, err := selectedWorkspaceArtifacts(
+		artifacts,
+		capabilities.MCPArtifacts,
+	)
+	if err != nil {
+		return mcp.LoadPlan{}, err
+	}
 	return a.loadWorkspaceMCPServers(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			artifacts,
-			capabilities.MCPArtifacts,
-		),
+		selected,
 	)
 }
 
@@ -102,13 +114,32 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 		return WorkspaceRuntimePlan{}, err
 	}
 
+	promptArtifacts, err := selectedWorkspaceArtifacts(
+		selection.PromptArtifacts,
+		capabilities.PromptArtifacts,
+	)
+	if err != nil {
+		return WorkspaceRuntimePlan{}, err
+	}
+	skillArtifacts, err := selectedWorkspaceArtifacts(
+		selection.SkillArtifacts,
+		capabilities.SkillArtifacts,
+	)
+	if err != nil {
+		return WorkspaceRuntimePlan{}, err
+	}
+	mcpArtifacts, err := selectedWorkspaceArtifacts(
+		selection.MCPArtifacts,
+		capabilities.MCPArtifacts,
+	)
+	if err != nil {
+		return WorkspaceRuntimePlan{}, err
+	}
+
 	promptPlan, err := a.promptAdapter.ComposeSelected(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			selection.PromptArtifacts,
-			capabilities.PromptArtifacts,
-		),
+		promptArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
@@ -116,10 +147,7 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	skillPlan, err := a.skillAdapter.LoadSelected(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			selection.SkillArtifacts,
-			capabilities.SkillArtifacts,
-		),
+		skillArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
@@ -127,10 +155,7 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	mcpPlan, err := a.loadWorkspaceMCPServers(
 		ctx,
 		value,
-		selectedWorkspaceArtifacts(
-			selection.MCPArtifacts,
-			capabilities.MCPArtifacts,
-		),
+		mcpArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
@@ -168,9 +193,31 @@ func (a *StoreAPI) loadWorkspaceMCPServers(
 func selectedWorkspaceArtifacts(
 	explicit []artifact.ArtifactRef,
 	defaults []artifact.ArtifactRef,
-) []artifact.ArtifactRef {
+) ([]artifact.ArtifactRef, error) {
 	if explicit != nil {
-		return append([]artifact.ArtifactRef(nil), explicit...)
+		allowed := make(
+			map[artifact.ArtifactRef]struct{},
+			len(defaults),
+		)
+		for _, ref := range defaults {
+			allowed[ref] = struct{}{}
+		}
+
+		output := make([]artifact.ArtifactRef, 0, len(explicit))
+		for _, ref := range explicit {
+			if err := ref.Validate(); err != nil {
+				return nil, err
+			}
+			if _, found := allowed[ref]; !found {
+				return nil, fmt.Errorf(
+					"%w: Artifact %q is not a resolved Workspace capability",
+					workspaceDomain.ErrReferenceUnresolved,
+					ref.ArtifactID,
+				)
+			}
+			output = append(output, ref)
+		}
+		return output, nil
 	}
-	return append([]artifact.ArtifactRef(nil), defaults...)
+	return append([]artifact.ArtifactRef(nil), defaults...), nil
 }

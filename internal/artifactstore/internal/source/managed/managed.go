@@ -513,22 +513,17 @@ func (*Adapter) NormalizeConfig(
 			err,
 		)
 	}
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
 	var value config
-	if err := decoder.Decode(&value); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		canonical,
+		&value,
+		basespec.MaxConfigBytes,
+	); err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config must be an empty object: %w",
 			basespec.ErrInvalid,
 			err,
 		)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("managed Source config has trailing JSON")
-		}
-		return nil, fmt.Errorf("%w: %w", basespec.ErrInvalid, err)
 	}
 	return json.RawMessage(jsonutil.EmptyObject), nil
 }

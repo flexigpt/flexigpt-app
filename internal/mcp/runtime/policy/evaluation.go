@@ -18,20 +18,18 @@ func InferToolRisk(
 	hints ToolRiskHints,
 	trustLevel MCPTrustLevel,
 ) string {
-	risk := "unknown"
-	if hints.DestructiveHint != nil && *hints.DestructiveHint {
-		risk = "destructive"
+	switch {
+	case hints.DestructiveHint != nil && *hints.DestructiveHint:
+		return "destructive"
+	case hints.OpenWorldHint != nil && *hints.OpenWorldHint:
+		return "openWorld"
+	case hints.ReadOnlyHint && trustLevel == MCPTrustLevelTrusted:
+		return "read"
+	case hints.DestructiveHint != nil && !*hints.DestructiveHint:
+		return "write"
+	default:
+		return "unknown"
 	}
-	if hints.OpenWorldHint != nil && *hints.OpenWorldHint {
-		risk = "openWorld"
-	}
-	if hints.ReadOnlyHint && trustLevel == MCPTrustLevelTrusted {
-		risk = "read"
-	}
-	if hints.DestructiveHint != nil && !*hints.DestructiveHint {
-		risk = "write"
-	}
-	return risk
 }
 
 type ToolDecision string

@@ -62,7 +62,7 @@ const (
 	BuiltinRootDescription                     = "Protected application-provided artifact source namespace."
 
 	BuiltinSourceID          source.SourceID     = "0192c4c0-0001-7000-8000-000000000001"
-	BuiltinSourceStorageKey  basespec.StorageKey = "catalog"
+	BuiltinSourceStorageKey  basespec.StorageKey = "artifacts"
 	BuiltinSourceDisplayName                     = "Application Built-in Artifact Source"
 )
 

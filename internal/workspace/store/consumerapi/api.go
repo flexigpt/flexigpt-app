@@ -80,7 +80,10 @@ func NewStoreAPI(
 
 	var mcpAdapter *mcp.Adapter
 	if config.MCPServers != nil {
-		mcpAdapter, err = mcp.New(config.MCPServers)
+		mcpAdapter, err = mcp.New(
+			artifacts,
+			config.MCPServers,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -417,19 +420,19 @@ func (a *StoreAPI) defaultDiscovery() (
 					"**/CLAUDE.md",
 					"**/README.md",
 					"**/llms.txt",
-					"docs/**/*.md",
+					"**/docs/**/*.md",
 				},
 			},
 		},
-		DecoderHints: []source.DecoderHint{{
-			Locator:   "docs",
-			Recursive: true,
-			DecoderIDs: []basespec.DecoderID{
-				markdown.ContextMarkdownDecoderID,
-			},
-		}},
 		Authoritative: true,
 	}
+	value.DecoderHints = append(value.DecoderHints, source.DecoderHint{
+		Locator:   ".",
+		Recursive: true,
+		DecoderIDs: []basespec.DecoderID{
+			markdown.ContextMarkdownDecoderID,
+		},
+	})
 	for _, hint := range a.config.AdditionalDecoderHints {
 		value.DecoderHints = appendDecoderHint(
 			value.DecoderHints,

@@ -10,6 +10,13 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
+type ArtifactReader interface {
+	Get(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) (artifact.Artifact, error)
+}
+
 // ServerResolver is satisfied by mcp/store/consumerapi.API. Workspace only
 // needs resolved server material and does not own MCP installation or runtime
 // connection behavior.
@@ -21,8 +28,9 @@ type ServerResolver interface {
 }
 
 type WorkspaceServer struct {
-	Artifact artifact.ArtifactRef     `json:"artifact"`
-	Server   mcpDomainServer.Resolved `json:"server"`
+	Artifact        artifact.ArtifactRef     `json:"artifact"`
+	Server          mcpDomainServer.Resolved `json:"server"`
+	RuntimeDisabled bool                     `json:"runtimeDisabled"`
 }
 
 type LoadPlan struct {
@@ -31,20 +39,23 @@ type LoadPlan struct {
 }
 
 type Adapter struct {
-	servers ServerResolver
+	artifacts ArtifactReader
+	servers   ServerResolver
 }
 
 func New(
+	artifacts ArtifactReader,
 	servers ServerResolver,
 ) (*Adapter, error) {
-	if servers == nil {
+	if artifacts == nil || servers == nil {
 		return nil, fmt.Errorf(
-			"%w: Workspace MCP adapter requires an MCP server resolver",
+			"%w: Workspace MCP adapter dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
 	return &Adapter{
-		servers: servers,
+		artifacts: artifacts,
+		servers:   servers,
 	}, nil
 }
 
@@ -55,7 +66,9 @@ func (a *Adapter) Load(
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
 ) (LoadPlan, error) {
-	if a == nil || a.servers == nil {
+	if a == nil ||
+		a.artifacts == nil ||
+		a.servers == nil {
 		return LoadPlan{}, basespec.ErrClosed
 	}
 	if err := workspace.Validate(); err != nil {
@@ -82,13 +95,36 @@ func (a *Adapter) Load(
 		}
 		seen[ref] = struct{}{}
 
+		record, err := a.artifacts.Get(ctx, ref)
+		if err != nil {
+			return LoadPlan{}, err
+		}
+		if !record.Enabled ||
+			record.State != artifact.StateAvailable {
+			return LoadPlan{}, fmt.Errorf(
+				"%w: Workspace MCP Artifact %q is unavailable",
+				workspaceDomain.ErrReferenceUnresolved,
+				ref.ArtifactID,
+			)
+		}
+		settings, err := workspaceDomain.DecodeArtifactData(
+			record.Data,
+		)
+		if err != nil {
+			return LoadPlan{}, err
+		}
+
 		server, err := a.servers.ResolveMCPServer(ctx, ref)
 		if err != nil {
 			return LoadPlan{}, err
 		}
+		if settings.RuntimeDisabled {
+			server.RuntimeEnabled = false
+		}
 		output.Servers = append(output.Servers, WorkspaceServer{
-			Artifact: ref,
-			Server:   server,
+			Artifact:        ref,
+			Server:          server,
+			RuntimeDisabled: settings.RuntimeDisabled,
 		})
 	}
 	return output, nil
