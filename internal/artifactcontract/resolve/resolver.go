@@ -836,7 +836,6 @@ func shouldResolveDeclarationLocator(
 	}
 	switch entry.Header().Type {
 	case declaration.TypeCollection,
-		declaration.TypeSkill,
 		declaration.TypeAgent,
 		declaration.TypeTeam,
 		declaration.TypeLoop,

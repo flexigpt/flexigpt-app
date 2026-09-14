@@ -55,10 +55,6 @@ func (*InstructionDecoder) Decode(
 		return nil, nil
 	}
 
-	content, err := normalizeMarkdown(candidate.Content)
-	if err != nil {
-		return nil, instructionDiagnostics(candidate.Locator, err)
-	}
 	name, err := declaration.DeriveLogicalName(
 		"instruction",
 		candidate.Locator,
@@ -71,8 +67,8 @@ func (*InstructionDecoder) Decode(
 		Type:        instructionv1.InstructionType,
 		Name:        string(name),
 		Description: "Instruction source " + string(candidate.Locator),
-		Content:     stringPointer(content),
 		MediaType:   markdownMediaType,
+		Locator:     sourceEntryDeclarationLocator(candidate.Locator),
 	}
 	entry, err := declaration.NewEntry(dec)
 	if err != nil {

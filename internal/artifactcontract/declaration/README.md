@@ -67,4 +67,5 @@ The portable document does not contain:
 - `logicalVersion`
 - `displayName`
 
-Those are internal Store Definition fields created by a contract integration.
+Physical source-format adapters normalize their inputs into these portable
+declarations. They do not introduce alternate portable declaration headers.

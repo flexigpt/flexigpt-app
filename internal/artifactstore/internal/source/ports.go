@@ -37,11 +37,6 @@ type Repository interface {
 		value source.Source,
 	) error
 
-	List(
-		ctx context.Context,
-		rootID root.RootID,
-	) ([]source.Source, error)
-
 	Update(
 		ctx context.Context,
 		value source.Source,

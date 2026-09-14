@@ -15,7 +15,7 @@ import (
 // handling for an independently versioned declaration contract.
 func DecodeDocumentInto(
 	raw []byte,
-	compiled *jsonschema.Schema,
+	_ *jsonschema.Schema,
 	target any,
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
@@ -25,13 +25,10 @@ func DecodeDocumentInto(
 	if err != nil {
 		return err
 	}
-	if err := jsonutil.ValidateJSONSchema(
-		compiled,
-		json.RawMessage(canonical),
-		basespec.MaxDefinitionBytes,
-	); err != nil {
-		return err
-	}
+
+	// Each concrete Decode function validates its decoded document
+	// immediately afterward. Keep schema execution there so direct decoding
+	// and source decoding do not validate the same document twice.
 	return jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		target,

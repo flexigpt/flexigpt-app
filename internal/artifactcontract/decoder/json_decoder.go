@@ -31,7 +31,7 @@ func (*JSONDecoder) ID() basespec.DecoderID {
 }
 
 func (*JSONDecoder) Revision() string {
-	return "artifact-declaration-json/v1"
+	return "artifact-declaration-json/v2"
 }
 
 func (*JSONDecoder) RequiredSchemaKeys() []schema.Key {

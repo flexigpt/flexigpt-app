@@ -3,29 +3,18 @@ package providerapi
 import (
 	"bytes"
 	"fmt"
+	"path"
 	"strings"
 	"unicode/utf8"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
 const markdownMediaType = "text/markdown"
 
-func normalizeMarkdown(
-	content []byte,
-) (string, error) {
-	return normalizeMarkdownContent(content, true)
-}
-
 func normalizeMarkdownOptional(
 	content []byte,
-) (string, error) {
-	return normalizeMarkdownContent(content, false)
-}
-
-func normalizeMarkdownContent(
-	content []byte,
-	requireContent bool,
 ) (string, error) {
 	if !utf8.Valid(content) {
 		return "", fmt.Errorf(
@@ -45,14 +34,19 @@ func normalizeMarkdownContent(
 		"\r",
 		"\n",
 	)
-	if requireContent &&
-		strings.TrimSpace(value) == "" {
-		return "", fmt.Errorf(
-			"%w: Markdown source is empty",
-			basespec.ErrInvalid,
-		)
-	}
 	return value, nil
+}
+
+// sourceEntryDeclarationLocator points back to the physical source entry
+// containing a source-format declaration. It keeps source material out of
+// Definition.Body while preserving declaration-relative locator semantics.
+func sourceEntryDeclarationLocator(
+	locator basespec.Locator,
+) *declaration.Locator {
+	value := declaration.ScalarLocator(
+		"./" + path.Base(string(locator)),
+	)
+	return &value
 }
 
 func stringPointer(value string) *string {

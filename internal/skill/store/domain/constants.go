@@ -28,7 +28,7 @@ const (
 	BuiltInInstallerName              = "agent.skill"
 	BuiltinSkillCollectionName        = basespec.LogicalName("built-in-skills")
 	BuiltinSkillCollectionDescription = "Application built-in Skill capabilities"
-	HydrationSchemaVersion            = "agent.skill.builtin-hydration/v3"
+	HydrationSchemaVersion            = "agent.skill.builtin-hydration/v1"
 	RegistrySchemaVersion             = "v1"
 )
 

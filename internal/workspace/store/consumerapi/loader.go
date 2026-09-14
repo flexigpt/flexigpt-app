@@ -22,8 +22,9 @@ import (
 // Source-owned Store discovery configuration.
 //
 // Local path declarations reuse the physical Source that contains the
-// Workspace Artifact. URL, Git, package, and command locators are deliberately
-// left to locator resolver integrations outside the generic Store.
+// Workspace Artifact. URL, Git, package, archive, and zip sources require
+// dedicated Source adapters and locator resolvers. Command locators remain
+// runtime implementation data and are not opened by Workspace discovery.
 func (a *StoreAPI) applyWorkspaceDeclarations(
 	ctx context.Context,
 	ref WorkspaceRef,
@@ -454,22 +455,22 @@ func appendDirectoryRoot(
 	values []source.DirectoryRoot,
 	value source.DirectoryRoot,
 ) []source.DirectoryRoot {
-	for index := range values {
-		if values[index].Root != value.Root {
-			continue
+	for _, current := range values {
+		if current.Root == value.Root &&
+			current.Recursive == value.Recursive &&
+			slices.Equal(
+				current.IncludePatterns,
+				value.IncludePatterns,
+			) &&
+			slices.Equal(
+				current.ExcludePatterns,
+				value.ExcludePatterns,
+			) {
+			return values
 		}
-		values[index].Recursive =
-			values[index].Recursive || value.Recursive
-		values[index].IncludePatterns = mergePatterns(
-			values[index].IncludePatterns,
-			value.IncludePatterns,
-		)
-		values[index].ExcludePatterns = mergePatterns(
-			values[index].ExcludePatterns,
-			value.ExcludePatterns,
-		)
-		return values
 	}
+	// Include/exclude pairs are one declaration scan's semantics. Merging
+	// scans sharing a base changes exclusion behavior, so preserve scopes.
 	return append(values, value.Clone())
 }
 
@@ -496,20 +497,4 @@ func appendDecoderHint(
 		return values
 	}
 	return append(values, value.Clone())
-}
-
-func mergePatterns(
-	left []string,
-	right []string,
-) []string {
-	if len(left) == 0 || len(right) == 0 {
-		return nil
-	}
-	output := append([]string(nil), left...)
-	for _, value := range right {
-		if !slices.Contains(output, value) {
-			output = append(output, value)
-		}
-	}
-	return output
 }

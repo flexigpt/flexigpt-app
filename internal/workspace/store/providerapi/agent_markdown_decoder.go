@@ -82,9 +82,29 @@ func (*AgentMarkdownDecoder) Decode(
 	if err != nil {
 		return nil, agentMarkdownDiagnostics(candidate.Locator, err)
 	}
-	return []providerapi.Decoded{{
-		Definition: definitionValue,
-	}}, nil
+	namedEntries, err := declaration.WalkNamedEntries(entry)
+	if err != nil {
+		return nil, agentMarkdownDiagnostics(candidate.Locator, err)
+	}
+
+	output := make([]providerapi.Decoded, 0, len(namedEntries))
+	for index, named := range namedEntries {
+		value := definitionValue
+		if index != 0 {
+			value, err = decoder.DefinitionForNamedEntry(named)
+			if err != nil {
+				return nil, agentMarkdownDiagnostics(
+					candidate.Locator,
+					err,
+				)
+			}
+		}
+		output = append(output, providerapi.Decoded{
+			SubresourceLocator: named.SubresourceLocator,
+			Definition:         value,
+		})
+	}
+	return output, nil
 }
 
 func isAgentMarkdownCandidate(
@@ -117,7 +137,11 @@ func decodeAgentMarkdown(
 		if err != nil {
 			return agentv1.AgentDocument{}, "", err
 		}
-		if err := json.Unmarshal(raw, &fields); err != nil {
+		if err := jsonutil.DecodeCanonicalObjectBytesInto(
+			raw,
+			&fields,
+			basespec.MaxDefinitionBytes,
+		); err != nil {
 			return agentv1.AgentDocument{}, "", err
 		}
 	}

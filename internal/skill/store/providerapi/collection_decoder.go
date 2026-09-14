@@ -5,8 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -23,19 +21,17 @@ import (
 // CollectionDecoder adapts a physical Skill Collection manifest into one
 // canonical collection Artifact and source-backed Skill Artifacts.
 //
-// The source manifest accepts an ordered skills array of path locators, or a
-// map whose values are path locators or objects containing locator. Each path
-// identifies either SKILL.md or its containing Skill directory.
+// The source manifest uses `format: skill-collection` and an ordered skills
+// array. Each path identifies either SKILL.md or its containing Skill
+// directory.
 type CollectionDecoder struct{}
 
 type skillCollectionManifest struct {
-	Kind          string          `json:"kind"`
-	SchemaID      string          `json:"schemaID,omitempty"`
-	SchemaVersion string          `json:"schemaVersion,omitempty"`
-	Name          string          `json:"name,omitempty"`
-	Description   string          `json:"description,omitempty"`
-	Version       string          `json:"version,omitempty"`
-	Skills        json.RawMessage `json:"skills,omitempty"`
+	Format      string          `json:"format"`
+	Name        string          `json:"name,omitempty"`
+	Description string          `json:"description,omitempty"`
+	Version     string          `json:"version,omitempty"`
+	Skills      json.RawMessage `json:"skills,omitempty"`
 }
 
 func NewCollectionDecoder() *CollectionDecoder {
@@ -47,7 +43,7 @@ func (*CollectionDecoder) ID() basespec.DecoderID {
 }
 
 func (*CollectionDecoder) Revision() string {
-	return "agent.skill-collection/v1"
+	return "skill-collection/v1"
 }
 
 func (*CollectionDecoder) Recognize(
@@ -105,22 +101,15 @@ func (*CollectionDecoder) decode(
 	}
 
 	members := make([]declaration.Entry, 0, len(rawMembers))
-	skillOutputs := make([]providerapi.Decoded, 0, len(rawMembers))
+	skills := make([]providerapi.Decoded, 0, len(rawMembers))
 	for index, rawMember := range rawMembers {
-		subresource := basespec.SubresourceLocator(
-			"skills/" + strconv.Itoa(index),
-		)
 		locator, err := decodeSkillCollectionMember(rawMember)
 		if err != nil {
-			skillOutputs = append(skillOutputs, providerapi.Decoded{
-				SubresourceLocator: subresource,
-				Diagnostics: skillCollectionDiagnostics(
-					candidate.Locator,
-					subresource,
-					err,
-				),
-			})
-			continue
+			return nil, skillCollectionDiagnostics(
+				candidate.Locator,
+				"",
+				fmt.Errorf("skill collection member %d: %w", index, err),
+			)
 		}
 
 		documentLocator, err := skillCollectionDocumentLocator(
@@ -128,15 +117,11 @@ func (*CollectionDecoder) decode(
 			candidate.Locator,
 		)
 		if err != nil {
-			skillOutputs = append(skillOutputs, providerapi.Decoded{
-				SubresourceLocator: subresource,
-				Diagnostics: skillCollectionDiagnostics(
-					candidate.Locator,
-					subresource,
-					err,
-				),
-			})
-			continue
+			return nil, skillCollectionDiagnostics(
+				candidate.Locator,
+				"",
+				fmt.Errorf("skill collection member %d: %w", index, err),
+			)
 		}
 
 		sourceContent, err := reader.ReadSourceEntry(
@@ -144,15 +129,11 @@ func (*CollectionDecoder) decode(
 			documentLocator,
 		)
 		if err != nil {
-			skillOutputs = append(skillOutputs, providerapi.Decoded{
-				OriginLocator: documentLocator,
-				Diagnostics: skillCollectionDiagnostics(
-					documentLocator,
-					"",
-					err,
-				),
-			})
-			continue
+			return nil, skillCollectionDiagnostics(
+				candidate.Locator,
+				"",
+				fmt.Errorf("skill collection member %d: %w", index, err),
+			)
 		}
 
 		definitionValue, warnings, err := skillDomain.DecodeSkillDocument(
@@ -160,17 +141,11 @@ func (*CollectionDecoder) decode(
 			expectedSkillName(sourceContent.Locator),
 		)
 		if err != nil {
-			digest := sourceContent.Digest
-			skillOutputs = append(skillOutputs, providerapi.Decoded{
-				OriginLocator:       sourceContent.Locator,
-				OriginContentDigest: &digest,
-				Diagnostics: skillCollectionDiagnostics(
-					sourceContent.Locator,
-					"",
-					err,
-				),
-			})
-			continue
+			return nil, skillCollectionDiagnostics(
+				candidate.Locator,
+				"",
+				fmt.Errorf("skill collection member %d: %w", index, err),
+			)
 		}
 		for warningIndex := range warnings {
 			warnings[warningIndex].Location = &diagnostic.Location{
@@ -192,7 +167,10 @@ func (*CollectionDecoder) decode(
 		members = append(members, member)
 
 		digest := sourceContent.Digest
-		skillOutputs = append(skillOutputs, providerapi.Decoded{
+		// A Skill owns SKILL.md as its physical declaration origin. It must
+		// not use a manifest-relative subresource because the Skill runtime
+		// derives its package directory from that origin.
+		skills = append(skills, providerapi.Decoded{
 			OriginLocator:       sourceContent.Locator,
 			OriginContentDigest: &digest,
 			Definition:          definitionValue,
@@ -232,12 +210,12 @@ func (*CollectionDecoder) decode(
 		return nil, skillCollectionDiagnostics(candidate.Locator, "", err)
 	}
 
-	output := make([]providerapi.Decoded, 0, 1+len(skillOutputs))
+	output := make([]providerapi.Decoded, 0, 1+len(skills))
 	output = append(output, providerapi.Decoded{
 		SubresourceLocator: "collection",
 		Definition:         collectionDefinition,
 	})
-	output = append(output, skillOutputs...)
+	output = append(output, skills...)
 	return output, nil
 }
 
@@ -248,19 +226,17 @@ func parseSkillCollectionManifest(
 	if err != nil {
 		return skillCollectionManifest{}, false, err
 	}
-	var header struct {
-		Kind string `json:"kind"`
-	}
-	if err := json.Unmarshal(raw, &header); err != nil {
-		return skillCollectionManifest{}, false, err
-	}
-	if header.Kind != "skill.collection" && header.Kind != "skill.bundle" {
-		return skillCollectionManifest{}, false, nil
-	}
 
 	var value skillCollectionManifest
-	if err := json.Unmarshal(raw, &value); err != nil {
+	if err := jsonutil.DecodeCanonicalObjectBytesInto(
+		raw,
+		&value,
+		basespec.MaxDefinitionBytes,
+	); err != nil {
 		return skillCollectionManifest{}, false, err
+	}
+	if value.Format != "skill-collection" {
+		return skillCollectionManifest{}, false, nil
 	}
 	return value, true, nil
 }
@@ -287,36 +263,16 @@ func skillCollectionMembers(
 	}
 
 	var values []json.RawMessage
-	if err := json.Unmarshal(raw, &values); err == nil {
-		return values, nil
-	}
-
-	var keyed map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &keyed); err != nil {
+	if err := json.Unmarshal(raw, &values); err != nil {
 		return nil, fmt.Errorf(
-			"%w: Skill Collection skills must be an array or object",
+			"%w: Skill Collection skills must be an ordered array",
 			basespec.ErrInvalid,
 		)
 	}
-	if _, found := keyed["locator"]; found {
-		return []json.RawMessage{append(json.RawMessage(nil), raw...)}, nil
-	}
-	if _, found := keyed["kind"]; found {
-		return []json.RawMessage{append(json.RawMessage(nil), raw...)}, nil
-	}
 
-	keys := make([]string, 0, len(keyed))
-	for key := range keyed {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-
-	output := make([]json.RawMessage, 0, len(keys))
-	for _, key := range keys {
-		output = append(
-			output,
-			append(json.RawMessage(nil), keyed[key]...),
-		)
+	output := make([]json.RawMessage, len(values))
+	for index, value := range values {
+		output[index] = append(json.RawMessage(nil), value...)
 	}
 	return output, nil
 }

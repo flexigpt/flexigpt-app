@@ -841,7 +841,7 @@ func collectCandidates(
 	spec source.DiscoverySpec,
 ) ([]source.Entry, error) {
 	found := make(map[basespec.Locator]source.Entry)
-	visited := 0
+	visited := make(map[basespec.Locator]struct{})
 
 	add := func(entry source.Entry) error {
 		if err := entry.Validate(); err != nil {
@@ -905,13 +905,15 @@ func collectCandidates(
 				if err := ctx.Err(); err != nil {
 					return err
 				}
-				visited++
-				if visited > spec.MaxEntries {
-					return fmt.Errorf(
-						"%w: discovery exceeds %d entries",
-						basespec.ErrInvalid,
-						spec.MaxEntries,
-					)
+				if _, seen := visited[entry.Locator]; !seen {
+					visited[entry.Locator] = struct{}{}
+					if len(visited) > spec.MaxEntries {
+						return fmt.Errorf(
+							"%w: discovery exceeds %d entries",
+							basespec.ErrInvalid,
+							spec.MaxEntries,
+						)
+					}
 				}
 				nextDepth := depth + 1
 				if nextDepth > spec.MaxDepth {

@@ -35,7 +35,16 @@ func DefinitionForEntry(
 	if err := ValidateEntryTree(entry); err != nil {
 		return definition.Definition{}, err
 	}
-	return definitionForEntry(entry, false)
+	return definitionForEntry(entry)
+}
+
+// DefinitionForNamedEntry projects one already tree-validated named entry.
+// Canonical and source-format decoders use this after validating the complete
+// containing declaration and walking its named entries.
+func DefinitionForNamedEntry(
+	named declaration.NamedEntry,
+) (definition.Definition, error) {
+	return definitionForNamedEntry(named)
 }
 
 // definitionForNamedEntry is used by canonicalDecoder after the complete
@@ -46,15 +55,11 @@ func definitionForNamedEntry(
 	if err := named.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	return definitionForEntry(
-		named.Entry,
-		named.ImplicitLoopBody,
-	)
+	return definitionForEntry(named.Entry)
 }
 
 func definitionForEntry(
 	entry declaration.Entry,
-	implicitLoopBody bool,
 ) (definition.Definition, error) {
 	if err := entry.Validate(); err != nil {
 		return definition.Definition{}, err
@@ -197,7 +202,7 @@ func definitionForEntry(
 	case declaration.TypeLoop:
 		value, err := loopv1.DecodeLoopEntry(
 			entry,
-			implicitLoopBody,
+			false,
 		)
 		if err != nil {
 			return definition.Definition{}, err

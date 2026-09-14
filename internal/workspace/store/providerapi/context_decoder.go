@@ -56,10 +56,6 @@ func (*ContextDecoder) Decode(
 		return nil, nil
 	}
 
-	content, err := normalizeMarkdown(candidate.Content)
-	if err != nil {
-		return nil, contextDiagnostics(candidate.Locator, err)
-	}
 	name, err := declaration.DeriveLogicalName(
 		"context",
 		candidate.Locator,
@@ -72,8 +68,8 @@ func (*ContextDecoder) Decode(
 		Type:        contextv1.ContextType,
 		Name:        string(name),
 		Description: "Context source " + string(candidate.Locator),
-		Content:     stringPointer(content),
 		MediaType:   markdownMediaType,
+		Locator:     sourceEntryDeclarationLocator(candidate.Locator),
 	}
 	entry, err := declaration.NewEntry(dec)
 	if err != nil {

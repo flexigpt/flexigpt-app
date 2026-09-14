@@ -14,13 +14,6 @@ import (
 
 const installationDataNamespace = "flexigpt.dev/mcp-installation-v1"
 
-var unscopedInstallationDataKeys = []string{
-	"schemaVersion",
-	"selectedConnectionProfile",
-	"inputs",
-	"additionalPolicies",
-}
-
 type InputBinding struct {
 	Value     *string `json:"value,omitempty"`
 	SecretRef string  `json:"secretRef,omitempty"`
@@ -76,9 +69,6 @@ func MergeServerData(
 	if err != nil {
 		return nil, err
 	}
-	for _, key := range unscopedInstallationDataKeys {
-		delete(fields, key)
-	}
 	fields[installationDataNamespace] = payload
 	return artifact.EncodeDataObject(fields)
 }
@@ -93,25 +83,7 @@ func DecodeServerData(
 	if payload, found := fields[installationDataNamespace]; found {
 		return decodeServerDataPayload(payload)
 	}
-	if !containsUnscopedInstallationData(fields) {
-		return DefaultServerData(), nil
-	}
-	unscoped, err := artifact.EncodeDataObject(fields)
-	if err != nil {
-		return ServerData{}, err
-	}
-	return decodeServerDataPayload(unscoped)
-}
-
-func containsUnscopedInstallationData(
-	values map[string]json.RawMessage,
-) bool {
-	for _, key := range unscopedInstallationDataKeys {
-		if _, found := values[key]; found {
-			return true
-		}
-	}
-	return false
+	return DefaultServerData(), nil
 }
 
 func decodeServerDataPayload(

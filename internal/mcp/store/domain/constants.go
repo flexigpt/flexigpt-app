@@ -29,7 +29,7 @@ const (
 	RuntimeExtensionMetadataKey   = "flexigpt.dev/mcp-runtime-v1"
 	BuiltInInstallerName          = "mcp"
 	BuiltInRegistrySchemaVersion  = "v1"
-	HydrationSchemaVersion        = "mcp.builtin-hydration/v3"
+	HydrationSchemaVersion        = "mcp.builtin-hydration/v1"
 )
 
 func IsMCPKind(value artifact.ArtifactKind) bool {

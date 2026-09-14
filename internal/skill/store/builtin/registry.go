@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactbuiltin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -115,12 +114,8 @@ func (r Registry) Validate() error {
 }
 
 func (r Registry) OrderedSkills() []Skill {
-	output := append([]Skill(nil), r.Skills...)
-	sort.Slice(output, func(left, right int) bool {
-		return output[left].EmbeddedSkillLocator <
-			output[right].EmbeddedSkillLocator
-	})
-	return output
+	// Registry order becomes Collection.members order.
+	return append([]Skill(nil), r.Skills...)
 }
 
 func (r Registry) Hydrate(
@@ -165,17 +160,8 @@ func (r Registry) Hydrate(
 }
 
 func (r HydratedRegistry) OrderedSkills() []HydratedSkill {
-	output := append([]HydratedSkill(nil), r.Skills...)
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Definition.LogicalName !=
-			output[right].Definition.LogicalName {
-			return output[left].Definition.LogicalName <
-				output[right].Definition.LogicalName
-		}
-		return output[left].Registration.EmbeddedSkillLocator <
-			output[right].Registration.EmbeddedSkillLocator
-	})
-	return output
+	// Hydration retains Registry order for semantic Collection membership.
+	return append([]HydratedSkill(nil), r.Skills...)
 }
 
 func hydrateSkill(

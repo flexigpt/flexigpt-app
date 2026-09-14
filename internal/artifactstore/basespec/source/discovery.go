@@ -359,10 +359,6 @@ func (s DiscoverySpec) Validate() error {
 		seenLocators[locator] = struct{}{}
 	}
 
-	seenRoots := make(
-		map[basespec.Locator]struct{},
-		len(s.DirectoryRoots),
-	)
 	for index, root := range s.DirectoryRoots {
 		if err := root.Validate(); err != nil {
 			return fmt.Errorf(
@@ -371,14 +367,6 @@ func (s DiscoverySpec) Validate() error {
 				err,
 			)
 		}
-		if _, duplicate := seenRoots[root.Root]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate Source directory root %q",
-				basespec.ErrInvalid,
-				root.Root,
-			)
-		}
-		seenRoots[root.Root] = struct{}{}
 	}
 
 	seenHints := make(

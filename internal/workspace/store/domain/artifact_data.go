@@ -77,17 +77,5 @@ func DecodeArtifactData(
 		}
 		return value, nil
 	}
-	legacy, found := fields["runtimeDisabled"]
-	if !found {
-		return ArtifactData{}, nil
-	}
-	var runtimeDisabled bool
-	if err := json.Unmarshal(legacy, &runtimeDisabled); err != nil {
-		return ArtifactData{}, fmt.Errorf(
-			"%w: decode Workspace Artifact data: %w",
-			ErrInvalidWorkspace,
-			err,
-		)
-	}
-	return ArtifactData{RuntimeDisabled: runtimeDisabled}, nil
+	return ArtifactData{}, nil
 }

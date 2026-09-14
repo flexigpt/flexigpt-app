@@ -19,9 +19,6 @@ func NewProvider() (*Provider, error) {
 			markdownDecoder,
 			collectionDecoder,
 		},
-		LocatorResolvers: []providerapi.LocatorResolverFactory{
-			NewPathLocatorResolver(),
-		},
 	}
 	if err := descriptor.Validate(); err != nil {
 		return nil, err

@@ -16,15 +16,12 @@ import (
 type NamedEntry struct {
 	SubresourceLocator basespec.SubresourceLocator
 	Entry              Entry
-
-	ImplicitLoopBody bool
 }
 
 func (e NamedEntry) Clone() NamedEntry {
 	return NamedEntry{
 		SubresourceLocator: e.SubresourceLocator,
 		Entry:              e.Entry.Clone(),
-		ImplicitLoopBody:   e.ImplicitLoopBody,
 	}
 }
 
@@ -38,13 +35,6 @@ func (e NamedEntry) Validate() error {
 	if e.Entry.Header().Name == "" {
 		return fmt.Errorf(
 			"%w: named declaration has no name",
-			basespec.ErrInvalid,
-		)
-	}
-	if e.ImplicitLoopBody &&
-		e.Entry.Header().Type != TypeLoop {
-		return fmt.Errorf(
-			"%w: only a Loop may use an implicit containing body",
 			basespec.ErrInvalid,
 		)
 	}
@@ -92,23 +82,6 @@ func walkNamedEntry(
 	implicitLoopBody bool,
 	output *[]NamedEntry,
 ) error {
-	if topLevel {
-		*output = append(*output, NamedEntry{
-			Entry:            entry.Clone(),
-			ImplicitLoopBody: implicitLoopBody,
-		})
-	} else if entry.Header().Name != "" && !entry.IsSymbolic() {
-		subresource, err := subresourceForPath(path)
-		if err != nil {
-			return err
-		}
-		*output = append(*output, NamedEntry{
-			SubresourceLocator: subresource,
-			Entry:              entry.Clone(),
-			ImplicitLoopBody:   implicitLoopBody,
-		})
-	}
-
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
 		return err
@@ -116,6 +89,31 @@ func walkNamedEntry(
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return err
+	}
+
+	_, hasLoopBody := fields["body"]
+	contextualBodylessLoop := implicitLoopBody &&
+		entry.Header().Type == TypeLoop &&
+		!hasLoopBody
+
+	// A body-less Loop nested under Agent.program or Team.program uses its
+	// containing Agent or Team as its body. It is graph-local and cannot be
+	// independently resolved, so it must not become a standalone Artifact.
+	if topLevel {
+		*output = append(*output, NamedEntry{
+			Entry: entry.Clone(),
+		})
+	} else if entry.Header().Name != "" && !entry.IsSymbolic() {
+		if !contextualBodylessLoop {
+			subresource, err := subresourceForPath(path)
+			if err != nil {
+				return err
+			}
+			*output = append(*output, NamedEntry{
+				SubresourceLocator: subresource,
+				Entry:              entry.Clone(),
+			})
+		}
 	}
 
 	switch entry.Header().Type {
