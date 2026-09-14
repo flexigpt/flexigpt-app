@@ -148,8 +148,9 @@ func (s *Service) GetDefinition(
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	if value.Kind != record.Kind ||
-		value.Digest != *record.ResolvedDefinition {
+	if value.Digest != *record.ResolvedDefinition ||
+		(record.State != artifact.StateIncompatible &&
+			value.Kind != record.Kind) {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: Artifact Definition does not match Artifact state",
 			basespec.ErrDigestMismatch,

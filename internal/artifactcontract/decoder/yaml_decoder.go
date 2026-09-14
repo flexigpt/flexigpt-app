@@ -55,8 +55,11 @@ func (*YAMLDecoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
+	requested := candidate.RequestsDecoder(YAMLDecoderID)
 	extension := strings.ToLower(path.Ext(string(candidate.Locator)))
-	if extension != ".yaml" && extension != ".yml" {
+	if extension != ".yaml" &&
+		extension != ".yml" &&
+		!requested {
 		return providerapi.RecognitionNone
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -64,15 +67,24 @@ func (*YAMLDecoder) Recognize(
 		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
+		if requested {
+			return providerapi.RecognitionPreferred
+		}
 		return providerapi.RecognitionNone
 	}
 	var header struct {
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
+		if requested {
+			return providerapi.RecognitionPreferred
+		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
+		if requested {
+			return providerapi.RecognitionPreferred
+		}
 		return providerapi.RecognitionNone
 	}
 	return providerapi.RecognitionPreferred

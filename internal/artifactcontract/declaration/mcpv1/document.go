@@ -198,13 +198,6 @@ func (v MCPDocument) validate(requireName bool) error {
 			return err
 		}
 	}
-	if err := declaration.ValidateTextSlice(
-		"MCP args",
-		v.Args,
-		basespec.MaxURIBytes,
-	); err != nil {
-		return err
-	}
 	if err := declaration.ValidateStringMap(
 		"MCP env",
 		v.Env,

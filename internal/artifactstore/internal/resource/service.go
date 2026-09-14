@@ -59,7 +59,7 @@ func NewService(
 func (s *Service) ResolveArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	options resource.ResolveOptions,
+	_ resource.ResolveOptions,
 ) (resource.ResolvedArtifact, error) {
 	if err := validateContext(ctx, "Artifact resolution"); err != nil {
 		return resource.ResolvedArtifact{}, err

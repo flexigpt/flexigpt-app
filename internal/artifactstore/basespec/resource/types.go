@@ -11,11 +11,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-type ResolveOptions struct {
-	// VerifySourceContent is retained for source compatibility. Artifact
-	// resolution always verifies the refreshed declaration source content.
-	VerifySourceContent bool `json:"verifySourceContent"`
-}
+// ResolveOptions is reserved for future resource projection options.
+// Declaration source verification is unconditional.
+type ResolveOptions struct{}
 
 // ResolvedArtifact contains the verified current Store resource chain:
 //

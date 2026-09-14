@@ -33,8 +33,8 @@ type InvokeMCPToolRequest struct {
 }
 
 type MCPToolCallProvenance struct {
-	Server     ServerID
-	Collection CatalogID
+	Server  ServerID  `json:"server"`
+	Catalog CatalogID `json:"catalog"`
 
 	ServerDisplayName string `json:"serverDisplayName,omitempty"`
 

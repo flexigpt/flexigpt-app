@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -28,10 +29,10 @@ import (
 func (a *StoreAPI) applyWorkspaceDeclarations(
 	ctx context.Context,
 	ref WorkspaceRef,
-) (workspaceDomain.Workspace, error) {
+) (workspaceDomain.Workspace, bool, error) {
 	workspace, err := a.GetWorkspace(ctx, ref)
 	if err != nil {
-		return workspaceDomain.Workspace{}, err
+		return workspaceDomain.Workspace{}, false, err
 	}
 
 	sourceValue, err := a.sources.Get(
@@ -40,7 +41,7 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		workspace.Artifact.Binding.SourceID,
 	)
 	if err != nil {
-		return workspaceDomain.Workspace{}, err
+		return workspaceDomain.Workspace{}, false, err
 	}
 
 	base, err := a.workspaceDiscoveryBase(
@@ -48,7 +49,7 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		workspace.Artifact.Binding.Locator,
 	)
 	if err != nil {
-		return workspaceDomain.Workspace{}, err
+		return workspaceDomain.Workspace{}, false, err
 	}
 	desired, err := workspaceDiscoveryForDocument(
 		base,
@@ -56,7 +57,7 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		workspace.Document,
 	)
 	if err != nil {
-		return workspaceDomain.Workspace{}, err
+		return workspaceDomain.Workspace{}, false, err
 	}
 	if err := a.expandWorkspaceDirectoryDeclarations(
 		ctx,
@@ -65,7 +66,7 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		workspace.Document,
 		&desired,
 	); err != nil {
-		return workspaceDomain.Workspace{}, err
+		return workspaceDomain.Workspace{}, false, err
 	}
 	if !sourceValue.Discovery.Equal(desired) {
 		update := source.Update{
@@ -80,14 +81,15 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 			sourceValue.ID,
 			update,
 		); err != nil {
-			return workspaceDomain.Workspace{}, err
+			return workspaceDomain.Workspace{}, false, err
 		}
+		return workspace, true, nil
 	}
-	return workspace, nil
+	return workspace, false, nil
 }
 
-// workspaceDiscoveryBase prevents old Workspace declarations from remaining
-// in Source discovery after they were removed from a Workspace manifest.
+// workspaceDiscoveryBase makes Workspace-owned Sources authoritative for the
+// selected manifest instead of retaining the broad bootstrap scan.
 //
 // Sources created by this Workspace API use the workspace-* storage-key
 // namespace and are owned by the Workspace Loader. Other manually registered
@@ -101,14 +103,17 @@ func (a *StoreAPI) workspaceDiscoveryBase(
 		string(current.StorageKey),
 		"workspace-",
 	) {
-		var err error
-		output, err = a.defaultDiscovery()
-		if err != nil {
-			return source.DiscoverySpec{}, err
+		output = source.DiscoverySpec{
+			Authoritative: true,
 		}
 	}
 	output.ExplicitLocators = appendUniqueLocator(
 		output.ExplicitLocators,
+		declarationLocator,
+	)
+	output.DecoderHints = appendCanonicalDeclarationDecoderHint(
+		output.DecoderHints,
+		output.AllowedDecoderIDs,
 		declarationLocator,
 	)
 	output = output.Normalized()
@@ -133,23 +138,41 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 			resolve.Graph{},
 			basespec.ErrClosed
 	}
+	if err := ref.Validate(); err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
 
-	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
+	result, err := a.discovery.RefreshRoot(ctx, ref.RootID)
 	if err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
 			resolve.Graph{},
 			err
 	}
-	result, err := a.discovery.RefreshRoot(
+	workspace, discoveryChanged, err := a.applyWorkspaceDeclarations(
 		ctx,
-		workspace.Artifact.RootID,
+		ref,
 	)
 	if err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
 			resolve.Graph{},
 			err
+	}
+	if discoveryChanged {
+		result, err = a.discovery.RefreshRoot(
+			ctx,
+			workspace.Artifact.RootID,
+		)
+		if err != nil {
+			return workspaceDomain.Workspace{},
+				refresh.RefreshRootResult{},
+				resolve.Graph{},
+				err
+		}
 	}
 	workspace, err = a.GetWorkspace(ctx, ref)
 	if err != nil {
@@ -439,6 +462,37 @@ func isContextMarkdownLocator(
 	default:
 		return true
 	}
+}
+
+func appendCanonicalDeclarationDecoderHint(
+	values []source.DecoderHint,
+	allowed []basespec.DecoderID,
+	locator basespec.Locator,
+) []source.DecoderHint {
+	var decoderID basespec.DecoderID
+	switch strings.ToLower(path.Ext(string(locator))) {
+	case ".json":
+		decoderID = decoder.JSONDecoderID
+	case ".yaml", ".yml":
+		decoderID = decoder.YAMLDecoderID
+	default:
+		return values
+	}
+
+	if len(allowed) != 0 &&
+		!slices.Contains(allowed, decoderID) {
+		return values
+	}
+	return appendDecoderHint(
+		values,
+		source.DecoderHint{
+			Locator:   locator,
+			Recursive: false,
+			DecoderIDs: []basespec.DecoderID{
+				decoderID,
+			},
+		},
+	)
 }
 
 func appendUniqueLocator(

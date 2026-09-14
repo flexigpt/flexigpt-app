@@ -30,7 +30,7 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	skillPlugin, err := skillProviderAPI.NewProvider()
+	skillProvider, err := skillProviderAPI.NewProvider()
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func composeArtifactStore(
 	providers := []providerapi.Provider{
 		canonicalProvider,
 		markdownProvider,
-		skillPlugin,
+		skillProvider,
 		mcpProvider,
 	}
 

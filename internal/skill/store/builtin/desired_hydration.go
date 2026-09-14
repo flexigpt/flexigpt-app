@@ -109,13 +109,10 @@ func (i *Installer) desiredHydrationFingerprint() (
 
 func (i *Installer) EnsureHydration(
 	ctx context.Context,
-	current bool,
+	_ bool,
 ) error {
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
-	}
-	if current {
-		return nil
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
 }

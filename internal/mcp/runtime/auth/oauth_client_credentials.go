@@ -36,8 +36,5 @@ func resolveOAuthClientCredentials(
 	if err != nil {
 		return nil, nil, err
 	}
-
-	// Redact both the full JSON payload and the secret itself.
-	sensitive = append([]string{raw}, sensitive...)
 	return creds, sensitive, nil
 }

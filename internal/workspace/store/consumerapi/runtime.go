@@ -169,7 +169,7 @@ func selectedWorkspaceArtifacts(
 	explicit []artifact.ArtifactRef,
 	defaults []artifact.ArtifactRef,
 ) []artifact.ArtifactRef {
-	if len(explicit) != 0 {
+	if explicit != nil {
 		return append([]artifact.ArtifactRef(nil), explicit...)
 	}
 	return append([]artifact.ArtifactRef(nil), defaults...)

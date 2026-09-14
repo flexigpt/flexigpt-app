@@ -375,9 +375,16 @@ func (r *Resolver) resolveEntry(
 			depth,
 		)
 	}
+	bodylessImplicitLoop, err := isBodylessImplicitLoop(
+		entry,
+		implicitLoopOwner,
+	)
+	if err != nil {
+		return nil, err
+	}
 	if from != nil &&
 		header.Name != "" &&
-		(header.Type != declaration.TypeLoop || implicitLoopOwner == nil) {
+		!bodylessImplicitLoop {
 		return r.resolveNamedInlineArtifact(
 			ctx,
 			state,
@@ -495,6 +502,8 @@ func (r *Resolver) resolveStructure(
 	var from *artifact.Artifact
 	if node.Artifact != nil {
 		from = node.Artifact
+	} else if node.DeclarationOrigin != nil {
+		from = node.DeclarationOrigin
 	}
 
 	switch node.Type {
@@ -909,6 +918,27 @@ func isLocatorOnlyEntry(
 		}
 	}
 	return true, nil
+}
+
+func isBodylessImplicitLoop(
+	entry declaration.Entry,
+	owner *ResolvedEntry,
+) (bool, error) {
+	if owner == nil ||
+		entry.Header().Type != declaration.TypeLoop {
+		return false, nil
+	}
+
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return false, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return false, err
+	}
+	_, hasBody := fields["body"]
+	return !hasBody, nil
 }
 
 func validateDefinitionContract(

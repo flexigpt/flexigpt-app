@@ -92,7 +92,7 @@ func (a *API) GetServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ServerInstallationView, error) {
-	material, err := a.resolveServerMaterial(ctx, ref, false)
+	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
 		return ServerInstallationView{}, err
 	}
@@ -150,14 +150,14 @@ func (a *API) ResolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (mcpDomainServer.Resolved, error) {
-	return a.resolveMCPServer(ctx, ref, true)
+	return a.resolveMCPServer(ctx, ref)
 }
 
 func (a *API) InspectMCPServerForRuntime(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (mcpDomainServer.Resolved, error) {
-	return a.resolveMCPServer(ctx, ref, false)
+	return a.resolveMCPServer(ctx, ref)
 }
 
 func (a *API) UpdateServerInstallation(
@@ -172,7 +172,7 @@ func (a *API) UpdateServerInstallation(
 			basespec.ErrInvalid,
 		)
 	}
-	material, err := a.resolveServerMaterial(ctx, ref, false)
+	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -244,7 +244,7 @@ func (a *API) UpdateProtectedServerInstallation(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	material, err := a.resolveServerMaterial(ctx, ref, false)
+	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
 		return err
 	}
@@ -519,9 +519,8 @@ type serverResolutionMaterial struct {
 func (a *API) resolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	verifySource bool,
 ) (mcpDomainServer.Resolved, error) {
-	material, err := a.resolveServerMaterial(ctx, ref, verifySource)
+	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
 		return mcpDomainServer.Resolved{}, err
 	}
@@ -586,7 +585,6 @@ func (a *API) resolveMCPServer(
 func (a *API) resolveServerMaterial(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	verifySource bool,
 ) (serverResolutionMaterial, error) {
 	if a == nil {
 		return serverResolutionMaterial{}, basespec.ErrClosed
@@ -594,9 +592,7 @@ func (a *API) resolveServerMaterial(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
-		resource.ResolveOptions{
-			VerifySourceContent: verifySource,
-		},
+		resource.ResolveOptions{},
 	)
 	if err != nil {
 		return serverResolutionMaterial{}, err

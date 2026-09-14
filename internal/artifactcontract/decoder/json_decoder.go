@@ -54,11 +54,12 @@ func (*JSONDecoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
+	requested := candidate.RequestsDecoder(JSONDecoderID)
 	extension := strings.ToLower(
 		path.Ext(string(candidate.Locator)),
 	)
 	if (extension == ".yaml" || extension == ".yml") &&
-		!candidate.RequestsDecoder(JSONDecoderID) {
+		!requested {
 		return providerapi.RecognitionNone
 	}
 
@@ -66,9 +67,15 @@ func (*JSONDecoder) Recognize(
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
+		if requested {
+			return providerapi.RecognitionPreferred
+		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
+		if requested {
+			return providerapi.RecognitionPreferred
+		}
 		return providerapi.RecognitionNone
 	}
 	return providerapi.RecognitionPreferred

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"regexp"
 	"strings"
@@ -273,12 +272,6 @@ func validateStdio(config *MCPRuntimeStdioConfig) error {
 	); err != nil {
 		return err
 	}
-	if shellCommand(config.Command) {
-		return fmt.Errorf(
-			"%w: MCP stdio command must execute the server directly",
-			ErrInvalid,
-		)
-	}
 	if err := validateTimeout(config.StartupTimeoutMS); err != nil {
 		return err
 	}
@@ -363,16 +356,12 @@ func validateRuntimeURL(raw string) error {
 			ErrInvalid,
 		)
 	}
-	switch value.Scheme {
-	case "https":
+	switch strings.ToLower(value.Scheme) {
+	case "http", "https":
 		return nil
-	case "http":
-		if isLoopback(value.Hostname()) {
-			return nil
-		}
 	}
 	return fmt.Errorf(
-		"%w: MCP HTTP URL must use HTTPS or loopback HTTP",
+		"%w: MCP HTTP URL must use HTTP or HTTPS",
 		ErrInvalid,
 	)
 }
@@ -402,27 +391,6 @@ func validateEnvironmentName(name string) error {
 		return fmt.Errorf("%w: invalid MCP environment name", ErrInvalid)
 	}
 	return nil
-}
-
-func shellCommand(command string) bool {
-	command = strings.ReplaceAll(command, "\\", "/")
-	parts := strings.Split(command, "/")
-	base := strings.ToLower(parts[len(parts)-1])
-	switch base {
-	case "bash", "sh", "zsh", "cmd", "cmd.exe",
-		"powershell", "powershell.exe", "pwsh", "pwsh.exe":
-		return true
-	default:
-		return false
-	}
-}
-
-func isLoopback(host string) bool {
-	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }
 
 type ResolvedServer struct {

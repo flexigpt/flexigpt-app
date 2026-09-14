@@ -24,11 +24,12 @@ func (a *API) serverDocumentForResolvedArtifact(
 		return mcpDomainServer.ServerDocument{}, err
 	}
 
-	// Inline stdio, streamable HTTP, SSE, and command locator declarations are
-	// already executable directly through ServerDocumentFromDefinition.
+	// A locator remains implementation data when the declaration already has
+	// complete connection details. Otherwise it identifies the source that
+	// supplies the missing command or URL.
 	if outer.Locator == nil ||
-		outer.Transport != "" ||
-		outer.Locator.Kind == declaration.LocatorKindCommand {
+		outer.Locator.Kind == declaration.LocatorKindCommand ||
+		hasInlineMCPConnection(outer) {
 		return mcpDomainServer.ServerDocumentFromDefinition(
 			resolved.Definition,
 		)
@@ -79,6 +80,19 @@ func (a *API) serverDocumentForResolvedArtifact(
 		resolved.Definition,
 		outer,
 	)
+}
+
+func hasInlineMCPConnection(
+	value mcpv1.MCPDocument,
+) bool {
+	switch value.Transport {
+	case mcpv1.TransportStdio:
+		return value.Command != ""
+	case mcpv1.TransportStreamableHTTP, mcpv1.TransportSSE:
+		return value.URL != ""
+	default:
+		return false
+	}
 }
 
 func decodeLocatedMCPDefinitions(

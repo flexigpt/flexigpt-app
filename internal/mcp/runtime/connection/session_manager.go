@@ -86,7 +86,7 @@ type ClientFactory interface {
 
 type sessionState struct {
 	server     mcpServer.ServerID
-	collection mcpServer.CatalogID
+	catalog    mcpServer.CatalogID
 	version    mcpServer.Digest
 	generation uint64
 	config     mcpServer.RuntimeConfig
@@ -248,7 +248,7 @@ func (m *MCPRuntimeManager) Disconnect(
 	return state.client.Close(ctx)
 }
 
-func (m *MCPRuntimeManager) InvalidateCollection(
+func (m *MCPRuntimeManager) InvalidateCatalog(
 	ctx context.Context,
 	ref mcpServer.CatalogID,
 ) error {
@@ -259,7 +259,7 @@ func (m *MCPRuntimeManager) InvalidateCollection(
 	m.mu.RLock()
 	refs := make([]mcpServer.ServerID, 0)
 	for serverRef, state := range m.sessions {
-		if state.collection == ref {
+		if state.catalog == ref {
 			refs = append(refs, serverRef)
 		}
 	}
@@ -650,7 +650,7 @@ func (m *MCPRuntimeManager) CallTool(
 	body.ToolName = request.ToolName
 	body.ProviderToolName = request.ProviderToolName
 	body.Provenance.Server = ref
-	body.Provenance.Collection = state.collection
+	body.Provenance.Catalog = state.catalog
 	body.Provenance.ServerDisplayName = state.config.DisplayName
 	body.Provenance.ToolName = request.ToolName
 	body.Provenance.ProviderToolName = request.ProviderToolName
@@ -923,7 +923,7 @@ func (m *MCPRuntimeManager) connect(
 		m.setErrorIfCurrent(ref, generation, err)
 		return nil, err
 	}
-	m.setConnectingCollectionIfCurrent(ref, generation, resolved.Catalog)
+	m.setConnectingCatalogIfCurrent(ref, generation, resolved.Catalog)
 	if !m.connectionCurrent(ref, generation) {
 		return nil, fmt.Errorf(
 			"%w: MCP connection was superseded",
@@ -1108,7 +1108,7 @@ func (m *MCPRuntimeManager) beginConnection(
 		status:     MCPServerStatusConnecting,
 	}
 	if previous != nil {
-		next.collection = previous.collection
+		next.catalog = previous.catalog
 		if previous.snapshotStillValid(time.Now().UTC()) {
 			next.snapshot = cloneSnapshot(previous.snapshot)
 			next.lastSyncedAt = previous.lastSyncedAt
@@ -1180,10 +1180,10 @@ func (m *MCPRuntimeManager) disconnectSession(
 	return closed, timer, attempt.cancel
 }
 
-func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
+func (m *MCPRuntimeManager) setConnectingCatalogIfCurrent(
 	ref mcpServer.ServerID,
 	generation uint64,
-	collectionRef mcpServer.CatalogID,
+	catalogRef mcpServer.CatalogID,
 ) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -1195,7 +1195,7 @@ func (m *MCPRuntimeManager) setConnectingCollectionIfCurrent(
 	if state == nil || state.generation != generation {
 		return
 	}
-	state.collection = collectionRef
+	state.catalog = catalogRef
 }
 
 func (m *MCPRuntimeManager) connectionCurrent(
@@ -1234,7 +1234,7 @@ func (m *MCPRuntimeManager) commitConnection(
 
 	m.sessions[ref] = &sessionState{
 		server:            ref,
-		collection:        resolved.Catalog,
+		catalog:           resolved.Catalog,
 		version:           resolved.Version,
 		generation:        generation,
 		config:            cloneRuntimeConfig(config),
@@ -1431,7 +1431,7 @@ func runtimeSnapshot(
 	}
 	output := &MCPServerRuntimeSnapshot{
 		Server:                    state.server,
-		Collection:                state.collection,
+		Catalog:                   state.catalog,
 		Status:                    state.status,
 		LastError:                 state.lastError,
 		NegotiatedProtocolVersion: snapshot.NegotiatedProtocolVersion,

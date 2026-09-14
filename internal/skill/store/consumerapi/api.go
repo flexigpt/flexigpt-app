@@ -396,9 +396,7 @@ func (a *API) GetManagedSkillDocument(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
-		resource.ResolveOptions{
-			VerifySourceContent: true,
-		},
+		resource.ResolveOptions{},
 	)
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err

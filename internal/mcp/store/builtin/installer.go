@@ -128,9 +128,6 @@ func (i *Installer) EnsureHydration(
 			return err
 		}
 	}
-	if current {
-		return nil
-	}
 	return i.ensurePackages(ctx)
 }
 

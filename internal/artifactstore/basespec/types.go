@@ -67,37 +67,103 @@ func (v Locator) Validate(allowRoot bool) error {
 // Generic Source locators can describe an existing platform-specific Source.
 // Portable locators remain bounded slash-separated relative references.
 func (v Locator) ValidatePortable(allowRoot bool) error {
-	if err := validateRelativePath(
+	return validatePortablePath(
 		"portable locator",
 		string(v),
 		allowRoot,
-	); err != nil {
-		return err
-	}
-	if v == "." {
-		return nil
-	}
+		false,
+	)
+}
 
-	for segment := range strings.SplitSeq(string(v), "/") {
+// ValidatePortableRelativeReference validates a declaration-relative portable
+// path. Dot segments are accepted here because the final resolved
+// basespec.Locator is validated separately and cannot escape its Source.
+func ValidatePortableRelativeReference(
+	label string,
+	value string,
+	allowRoot bool,
+) error {
+	return validatePortablePath(label, value, allowRoot, true)
+}
+
+func validatePortablePath(
+	label string,
+	value string,
+	allowRoot bool,
+	allowDotSegments bool,
+) error {
+	if value == "." {
+		if allowRoot {
+			return nil
+		}
+		return fmt.Errorf(
+			"%w: %s must be a bounded relative path",
+			ErrInvalid,
+			label,
+		)
+	}
+	if value == "" ||
+		len(value) > MaxLocatorBytes ||
+		!utf8.ValidString(value) ||
+		strings.ContainsRune(value, 0) ||
+		strings.Contains(value, "\\") ||
+		strings.Contains(value, ":") ||
+		strings.HasPrefix(value, "/") {
+		return fmt.Errorf(
+			"%w: %s must be a bounded relative path",
+			ErrInvalid,
+			label,
+		)
+	}
+	for segment := range strings.SplitSeq(value, "/") {
+		if segment == "" {
+			return fmt.Errorf(
+				"%w: %s contains an invalid path segment",
+				ErrInvalid,
+				label,
+			)
+		}
+		if segment == "." || segment == ".." {
+			if allowDotSegments {
+				continue
+			}
+			return fmt.Errorf(
+				"%w: %s contains an invalid path segment",
+				ErrInvalid,
+				label,
+			)
+		}
+		for _, character := range segment {
+			if unicode.IsControl(character) {
+				return fmt.Errorf(
+					"%w: %s contains a control character",
+					ErrInvalid,
+					label,
+				)
+			}
+		}
 		if strings.HasSuffix(segment, ".") ||
 			strings.HasSuffix(segment, " ") {
 			return fmt.Errorf(
-				"%w: portable locator contains a trailing dot or space",
+				"%w: %s contains a trailing dot or space",
 				ErrInvalid,
+				label,
 			)
 		}
 		if strings.ContainsAny(segment, `<>"|?*`) {
 			return fmt.Errorf(
-				"%w: portable locator contains a platform-reserved character",
+				"%w: %s contains a platform-reserved character",
 				ErrInvalid,
+				label,
 			)
 		}
 
 		baseName, _, _ := strings.Cut(segment, ".")
 		if _, reserved := portableReservedBaseNames[strings.ToUpper(baseName)]; reserved {
 			return fmt.Errorf(
-				"%w: portable locator contains reserved basename %q",
+				"%w: %s contains reserved basename %q",
 				ErrInvalid,
+				label,
 				segment,
 			)
 		}

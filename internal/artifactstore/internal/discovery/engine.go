@@ -445,20 +445,31 @@ func (e *Engine) Discover(
 			}
 			canonical, err := definition.Canonicalize(item.Definition)
 			if err != nil {
+				definitionDiagnostic := diagnostic.Diagnostic{
+					Severity: diagnostic.SeverityError,
+					Code:     DiagnosticCodeDefinitionInvalid,
+					Message: diagnostic.BoundedMessage(
+						err.Error(),
+					),
+					Location: &diagnostic.Location{
+						Locator: binding.Locator,
+						SubresourceLocator: binding.
+							SubresourceLocator,
+					},
+				}
 				diagnostics := diagnostic.Append(
 					itemDiagnostics,
-					diagnostic.Diagnostic{
-						Severity: diagnostic.SeverityError,
-						Code:     DiagnosticCodeDefinitionInvalid,
-						Message: diagnostic.BoundedMessage(
-							err.Error(),
-						),
-						Location: &diagnostic.Location{
-							Locator: entry.Locator,
-							SubresourceLocator: item.
-								SubresourceLocator,
-						},
-					},
+					definitionDiagnostic,
+				)
+				deleteValidOriginsForBinding(validOrigins, binding)
+				invalidBindings[binding] = struct{}{}
+				result.Diagnostics = diagnostic.Append(
+					result.Diagnostics,
+					definitionDiagnostic,
+				)
+				result.Observations = removeObservationsForBinding(
+					result.Observations,
+					binding,
 				)
 				appendInvalidBinding(
 					&result,
@@ -487,6 +498,14 @@ func (e *Engine) Discover(
 							SubresourceLocator,
 					},
 				}}
+				result.Observations = removeObservationsForBinding(
+					result.Observations,
+					binding,
+				)
+				result.Diagnostics = diagnostic.Append(
+					result.Diagnostics,
+					duplicateDiagnostics...,
+				)
 				appendInvalidBinding(
 					&result,
 					value,

@@ -118,6 +118,10 @@ func (s *Service) RefreshRoot(
 			return refresh.RefreshRootResult{}, err
 		}
 		result.Sources = append(result.Sources, refreshed)
+		result.Diagnostics = diagnostic.Append(
+			result.Diagnostics,
+			refreshed.Diagnostics...,
+		)
 	}
 	if err := result.Validate(); err != nil {
 		return refresh.RefreshRootResult{}, err

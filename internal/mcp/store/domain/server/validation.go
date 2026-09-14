@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"maps"
-	"net"
 	"net/url"
 	"regexp"
 	"slices"
@@ -221,6 +220,43 @@ func NormalizeServerExtension(
 		value.DisplayName = name
 	}
 	return value
+}
+
+// withImplicitEnvironmentInputs implements the portable `${NAME}` behavior
+// for declarations that do not provide the consumer-specific runtime
+// extension. Explicitly declared text, path, and secret inputs retain their
+// declared behavior.
+func withImplicitEnvironmentInputs(
+	core CoreServer,
+	value ServerExtension,
+) ServerExtension {
+	output := value
+	output.Install.AllowEnvironment = slices.Clone(
+		value.Install.AllowEnvironment,
+	)
+	seen := make(map[string]struct{}, len(output.Install.AllowEnvironment))
+	for _, name := range output.Install.AllowEnvironment {
+		seen[name] = struct{}{}
+	}
+	for name := range placeholdersInServer(
+		core,
+		output.Auth,
+		output.ConnectionProfiles,
+	) {
+		if _, declared := output.Install.Inputs[name]; declared {
+			continue
+		}
+		if _, found := seen[name]; found {
+			continue
+		}
+		seen[name] = struct{}{}
+		output.Install.AllowEnvironment = append(
+			output.Install.AllowEnvironment,
+			name,
+		)
+	}
+	slices.Sort(output.Install.AllowEnvironment)
+	return output
 }
 
 func normalizeAuthentication(
@@ -588,13 +624,6 @@ func validateConnectionProfile(
 			); err != nil {
 				return err
 			}
-			if shellCommand(*profile.Stdio.Command) {
-				return fmt.Errorf(
-					"%w: MCP profile %q uses a shell command",
-					basespec.ErrInvalid,
-					name,
-				)
-			}
 		}
 		for key := range profile.Stdio.Env {
 			if err := validateEnvironmentName(key); err != nil {
@@ -652,12 +681,7 @@ func validateCoreServer(value CoreServer) error {
 				basespec.ErrInvalid,
 			)
 		}
-		if shellCommand(value.Command) {
-			return fmt.Errorf(
-				"%w: MCP stdio command must execute the server directly",
-				basespec.ErrInvalid,
-			)
-		}
+
 		for key := range value.Env {
 			if err := validateEnvironmentName(key); err != nil {
 				return err
@@ -909,17 +933,10 @@ func validateURLTemplate(raw string) error {
 			basespec.ErrInvalid,
 		)
 	}
-	switch value.Scheme {
-	case "https":
+	switch strings.ToLower(value.Scheme) {
+	case "http", "https":
 		return nil
-	case "http":
-		if !isLoopback(value.Hostname()) {
-			return fmt.Errorf(
-				"%w: plain HTTP MCP URL must use a loopback host",
-				basespec.ErrInvalid,
-			)
-		}
-		return nil
+
 	default:
 		return fmt.Errorf(
 			"%w: MCP HTTP URL must use HTTP or HTTPS",
@@ -1020,25 +1037,4 @@ func placeholderInputNameValid(value string) bool {
 	return regexp.MustCompile(
 		`^[A-Za-z_][A-Za-z0-9_]*$`,
 	).MatchString(value)
-}
-
-func shellCommand(command string) bool {
-	command = strings.ReplaceAll(command, "\\", "/")
-	parts := strings.Split(command, "/")
-	base := strings.ToLower(parts[len(parts)-1])
-	switch base {
-	case "bash", "sh", "zsh", "cmd", "cmd.exe",
-		"powershell", "powershell.exe", "pwsh", "pwsh.exe":
-		return true
-	default:
-		return false
-	}
-}
-
-func isLoopback(host string) bool {
-	if strings.EqualFold(strings.TrimSpace(host), "localhost") {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
 }

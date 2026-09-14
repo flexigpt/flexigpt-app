@@ -273,7 +273,7 @@ func (l Locator) Validate() error {
 			return err
 		}
 		if l.Path != "" {
-			if err := ValidatePortableLocatorPath(
+			if err := validatePortableRootLocatorPath(
 				"Git path",
 				l.Path,
 				true,
@@ -318,7 +318,7 @@ func (l Locator) Validate() error {
 			}
 		}
 		if l.Path != "" {
-			if err := ValidatePortableLocatorPath(
+			if err := validatePortableRootLocatorPath(
 				"package Locator path",
 				l.Path,
 				true,
@@ -387,6 +387,18 @@ func ValidatePortableLocatorPath(
 	value string,
 	allowRoot bool,
 ) error {
+	return basespec.ValidatePortableRelativeReference(
+		label,
+		value,
+		allowRoot,
+	)
+}
+
+func validatePortableRootLocatorPath(
+	label string,
+	value string,
+	allowRoot bool,
+) error {
 	if after, ok := strings.CutPrefix(value, "./"); ok {
 		value = after
 	}
@@ -397,7 +409,10 @@ func ValidatePortableLocatorPath(
 			label,
 		)
 	}
-	return basespec.Locator(value).ValidatePortable(allowRoot)
+	if err := basespec.Locator(value).ValidatePortable(allowRoot); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	return nil
 }
 
 func ValidateAbsoluteURL(
@@ -502,13 +517,13 @@ func ResolveSourceRelativePathLocator(
 		)
 	}
 
-	relative = strings.TrimPrefix(relative, "./")
 	if relative == "" {
 		return "", fmt.Errorf(
 			"%w: local declaration locator is empty",
 			basespec.ErrInvalid,
 		)
 	}
+	relative = path.Clean(relative)
 
 	resolved := basespec.Locator(relative)
 	if parent := path.Dir(string(declarationLocator)); parent != "." {

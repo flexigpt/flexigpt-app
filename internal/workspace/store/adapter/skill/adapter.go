@@ -196,9 +196,7 @@ func (a *Adapter) resolve(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		record.Ref(),
-		resource.ResolveOptions{
-			VerifySourceContent: true,
-		},
+		resource.ResolveOptions{},
 	)
 	if err != nil {
 		return WorkspaceSkill{}, err

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"unicode"
 	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -46,12 +45,6 @@ func ValidateOptionalMediaType(
 		256,
 	); err != nil {
 		return err
-	}
-	if strings.ContainsAny(value, " \t\r\n") {
-		return fmt.Errorf(
-			"%w: media type cannot contain whitespace",
-			basespec.ErrInvalid,
-		)
 	}
 	return nil
 }
@@ -264,15 +257,6 @@ func ValidateWorkflowID(
 		basespec.MaxLogicalNameBytes,
 	); err != nil {
 		return err
-	}
-	for _, character := range value {
-		if unicode.IsSpace(character) {
-			return fmt.Errorf(
-				"%w: %s cannot contain whitespace",
-				basespec.ErrInvalid,
-				label,
-			)
-		}
 	}
 	return nil
 }

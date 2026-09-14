@@ -23,17 +23,23 @@ func NewDocument(
 	core CoreServer,
 	extension ServerExtension,
 ) (ServerDocument, error) {
+	normalizedCore := NormalizeCoreServer(core)
+	normalizedExtension := NormalizeServerExtension(
+		string(name),
+		extension,
+	)
+	normalizedExtension = withImplicitEnvironmentInputs(
+		normalizedCore,
+		normalizedExtension,
+	)
 	value := ServerDocument{
 		LogicalName:    name,
 		LogicalVersion: version,
 		DisplayName:    displayName,
 		Description:    description,
 		Labels:         maps.Clone(labels),
-		MCPServer:      NormalizeCoreServer(core),
-		Extension: NormalizeServerExtension(
-			string(name),
-			extension,
-		),
+		MCPServer:      normalizedCore,
+		Extension:      normalizedExtension,
 	}
 	if err := value.Validate(); err != nil {
 		return ServerDocument{}, err
@@ -320,6 +326,10 @@ func RebindLocatedDocument(
 	if output.DisplayName == "" {
 		output.DisplayName = string(identity.LogicalName)
 	}
+	output.MCPServer, err = overlayLocatedCore(output.MCPServer, outer)
+	if err != nil {
+		return ServerDocument{}, err
+	}
 	if outer.Include != nil {
 		output.Include = includeFromDeclaration(outer.Include)
 	} else {
@@ -335,8 +345,59 @@ func RebindLocatedDocument(
 		}
 		output.Extension = extension
 	}
+	output.Extension = withImplicitEnvironmentInputs(
+		output.MCPServer,
+		output.Extension,
+	)
 	if err := output.Validate(); err != nil {
 		return ServerDocument{}, err
 	}
 	return output, nil
+}
+
+func overlayLocatedCore(
+	input CoreServer,
+	outer mcpv1.MCPDocument,
+) (CoreServer, error) {
+	output := cloneCore(input)
+	switch outer.Transport {
+	case "":
+	case mcpv1.TransportStdio:
+		output.Type = ServerTypeStdio
+		output.URL = ""
+		output.Headers = nil
+	case mcpv1.TransportStreamableHTTP:
+		output.Type = ServerTypeHTTP
+		output.Command = ""
+		output.Args = nil
+		output.Env = nil
+	case mcpv1.TransportSSE:
+		output.Type = ServerTypeSSE
+		output.Command = ""
+		output.Args = nil
+		output.Env = nil
+	default:
+		return CoreServer{}, fmt.Errorf(
+			"%w: unsupported located MCP transport %q",
+			basespec.ErrInvalid,
+			outer.Transport,
+		)
+	}
+
+	if outer.Command != "" {
+		output.Command = outer.Command
+	}
+	if outer.Args != nil {
+		output.Args = slices.Clone(outer.Args)
+	}
+	if outer.Env != nil {
+		output.Env = maps.Clone(outer.Env)
+	}
+	if outer.URL != "" {
+		output.URL = outer.URL
+	}
+	if outer.Headers != nil {
+		output.Headers = maps.Clone(outer.Headers)
+	}
+	return NormalizeCoreServer(output), nil
 }

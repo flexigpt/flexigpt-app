@@ -359,12 +359,7 @@ func normalizeApprovalArguments(value jsonutil.JSONRawString) jsonutil.JSONRawSt
 		return jsonutil.JSONRawString(`{}`)
 	}
 
-	var decoded any
-	if err := json.Unmarshal([]byte(trimmed), &decoded); err != nil {
-		return jsonutil.JSONRawString(trimmed)
-	}
-
-	normalized, err := json.Marshal(decoded)
+	normalized, err := jsonutil.Canonicalize([]byte(trimmed))
 	if err != nil {
 		return jsonutil.JSONRawString(trimmed)
 	}

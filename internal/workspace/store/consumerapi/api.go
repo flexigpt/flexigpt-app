@@ -226,7 +226,9 @@ func (a *StoreAPI) ListWorkspaces(
 	}
 	output := make([]workspaceDomain.Workspace, 0)
 	for _, value := range values {
-		if value.Kind != workspaceDomain.WorkspaceArtifactKind {
+		if value.Kind != workspaceDomain.WorkspaceArtifactKind ||
+			value.State != artifact.StateAvailable ||
+			value.ResolvedDefinition == nil {
 			continue
 		}
 		workspace, err := a.GetWorkspace(ctx, value.Ref())
