@@ -12,7 +12,7 @@ type Registry struct {
 	providers        []providerapi.Descriptor
 	schemas          []providerapi.SchemaCodec
 	decoders         []providerapi.Decoder
-	locatorResolvers []providerapi.LocatorResolver
+	locatorResolvers []providerapi.LocatorResolverFactory
 }
 
 func New(
@@ -22,13 +22,13 @@ func New(
 		providers:        make([]providerapi.Descriptor, 0, len(providers)),
 		schemas:          make([]providerapi.SchemaCodec, 0),
 		decoders:         make([]providerapi.Decoder, 0),
-		locatorResolvers: make([]providerapi.LocatorResolver, 0),
+		locatorResolvers: make([]providerapi.LocatorResolverFactory, 0),
 	}
 
 	seenProviderNames := make(map[string]struct{}, len(providers))
 	schemaOwners := make(map[schema.Key]string)
 	decoderOwners := make(map[basespec.DecoderID]string)
-	locatorResolverOwners := make(map[string]string)
+	locatorResolverOwners := make(map[providerapi.LocatorResolverKey]string)
 
 	for index, provider := range providers {
 		if provider == nil {
@@ -83,17 +83,23 @@ func New(
 			decoderOwners[id] = descriptor.Name
 		}
 		for _, resolver := range descriptor.LocatorResolvers {
-			kind := resolver.LocatorKind()
-			if owner, exists := locatorResolverOwners[kind]; exists {
-				return nil, fmt.Errorf(
-					"%w: locator resolver %q is owned by both providers %q and %q",
-					basespec.ErrConflict,
-					kind,
-					owner,
-					descriptor.Name,
-				)
+			for _, artifactKind := range resolver.ArtifactKinds() {
+				key := providerapi.LocatorResolverKey{
+					LocatorKind:  resolver.LocatorKind(),
+					ArtifactKind: artifactKind,
+				}
+				if owner, exists := locatorResolverOwners[key]; exists {
+					return nil, fmt.Errorf(
+						"%w: locator resolver %q for Artifact kind %q is owned by both providers %q and %q",
+						basespec.ErrConflict,
+						key.LocatorKind,
+						key.ArtifactKind,
+						owner,
+						descriptor.Name,
+					)
+				}
+				locatorResolverOwners[key] = descriptor.Name
 			}
-			locatorResolverOwners[kind] = descriptor.Name
 		}
 
 		output.providers = append(
@@ -143,12 +149,12 @@ func (r *Registry) Decoders() []providerapi.Decoder {
 	return append([]providerapi.Decoder(nil), r.decoders...)
 }
 
-func (r *Registry) LocatorResolvers() []providerapi.LocatorResolver {
+func (r *Registry) LocatorResolvers() []providerapi.LocatorResolverFactory {
 	if r == nil {
 		return nil
 	}
 	return append(
-		[]providerapi.LocatorResolver(nil),
+		[]providerapi.LocatorResolverFactory(nil),
 		r.locatorResolvers...,
 	)
 }

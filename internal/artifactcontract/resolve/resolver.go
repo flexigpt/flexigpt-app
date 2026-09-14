@@ -1,10 +1,12 @@
 package resolve
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
@@ -26,8 +28,14 @@ import (
 )
 
 type resolutionState struct {
-	nodes       int
-	collections map[artifact.ArtifactRef]struct{}
+	nodes  int
+	active map[artifact.ArtifactRef]struct{}
+}
+
+func newResolutionState() resolutionState {
+	return resolutionState{
+		active: make(map[artifact.ArtifactRef]struct{}),
+	}
 }
 
 func (r *Resolver) ResolveArtifact(
@@ -37,13 +45,14 @@ func (r *Resolver) ResolveArtifact(
 	if r == nil || r.artifacts == nil {
 		return Graph{}, basespec.ErrClosed
 	}
+	if err := validateResolutionContext(ctx); err != nil {
+		return Graph{}, err
+	}
 	if err := ref.Validate(); err != nil {
 		return Graph{}, err
 	}
 
-	state := resolutionState{
-		collections: make(map[artifact.ArtifactRef]struct{}),
-	}
+	state := newResolutionState()
 	entry, err := r.resolveArtifact(
 		ctx,
 		&state,
@@ -93,6 +102,9 @@ func (r *Resolver) ResolveReference(
 	if r == nil || r.artifacts == nil {
 		return Graph{}, basespec.ErrClosed
 	}
+	if err := validateResolutionContext(ctx); err != nil {
+		return Graph{}, err
+	}
 	if err := rootID.Validate(); err != nil {
 		return Graph{}, err
 	}
@@ -103,9 +115,8 @@ func (r *Resolver) ResolveReference(
 		return Graph{}, err
 	}
 
-	state := resolutionState{
-		collections: make(map[artifact.ArtifactRef]struct{}),
-	}
+	state := newResolutionState()
+
 	entry, err := r.resolveSymbolic(
 		ctx,
 		&state,
@@ -150,6 +161,15 @@ func (r *Resolver) resolveArtifact(
 	if err := r.reserve(state, depth); err != nil {
 		return nil, err
 	}
+	if _, resolving := state.active[ref]; resolving {
+		return nil, fmt.Errorf(
+			"%w: declaration composition cycle at Artifact %q",
+			basespec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
+	}
+	state.active[ref] = struct{}{}
+	defer delete(state.active, ref)
 
 	record, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
@@ -193,6 +213,9 @@ func (r *Resolver) resolveArtifact(
 	if err != nil {
 		return nil, err
 	}
+	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
+		return nil, err
+	}
 	if definitionValue.Kind != record.Kind {
 		return nil, fmt.Errorf(
 			"%w: Artifact Definition kind does not match Artifact kind",
@@ -227,23 +250,26 @@ func (r *Resolver) resolveArtifact(
 		)
 	}
 
-	node := &ResolvedEntry{
-		Type:        declarationType,
-		scopeRootID: record.RootID,
-		Artifact:    pointerArtifact(record),
-		Definition:  pointerDefinition(definitionValue),
+	if shouldResolveDeclarationLocator(
+		entry,
+		entry.Header().Locator,
+	) {
+		return r.resolveDeclarationLocator(
+			ctx,
+			state,
+			record.RootID,
+			pointerArtifact(record),
+			entry,
+			depth,
+		)
 	}
 
-	if declarationType == declaration.TypeCollection {
-		if _, cycle := state.collections[ref]; cycle {
-			return nil, fmt.Errorf(
-				"%w: Collection inclusion cycle at Artifact %q",
-				basespec.ErrReferenceUnresolved,
-				record.ID,
-			)
-		}
-		state.collections[ref] = struct{}{}
-		defer delete(state.collections, ref)
+	node := &ResolvedEntry{
+		Type:              declarationType,
+		scopeRootID:       record.RootID,
+		DeclarationOrigin: pointerArtifact(record),
+		Artifact:          pointerArtifact(record),
+		Definition:        pointerDefinition(definitionValue),
 	}
 
 	if err := r.resolveStructure(
@@ -339,36 +365,24 @@ func (r *Resolver) resolveEntry(
 			depth,
 		)
 	}
-	if shouldResolveLocator(entry, header.Locator) {
-		if r.locators == nil {
-			return nil, fmt.Errorf(
-				"%w: declaration locator requires a locator resolver",
-				basespec.ErrLocatorUnresolved,
-			)
-		}
-		ref, err := r.locators.ResolveArtifactLocator(
-			ctx,
-			LocatorRequest{
-				RootID:       rootID,
-				From:         cloneArtifactPointer(from),
-				Locator:      header.Locator.Clone(),
-				ExpectedType: header.Type,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		if ref.RootID != rootID {
-			return nil, fmt.Errorf(
-				"%w: locator resolver returned Artifact from another Root",
-				basespec.ErrInvalid,
-			)
-		}
-		return r.resolveArtifact(
+	if from != nil &&
+		header.Name != "" &&
+		(header.Type != declaration.TypeLoop || implicitLoopOwner == nil) {
+		return r.resolveNamedInlineArtifact(
 			ctx,
 			state,
-			ref,
-			header.Type,
+			rootID,
+			entry,
+			depth,
+		)
+	}
+	if shouldResolveDeclarationLocator(entry, header.Locator) {
+		return r.resolveDeclarationLocator(
+			ctx,
+			state,
+			rootID,
+			from,
+			entry,
 			depth,
 		)
 	}
@@ -377,9 +391,10 @@ func (r *Resolver) resolveEntry(
 		return nil, err
 	}
 	node := &ResolvedEntry{
-		Type:        header.Type,
-		scopeRootID: rootID,
-		Inline:      pointerEntry(entry),
+		Type:              header.Type,
+		scopeRootID:       rootID,
+		DeclarationOrigin: cloneArtifactPointer(from),
+		Inline:            pointerEntry(entry),
 	}
 	if err := r.resolveStructure(
 		ctx,
@@ -392,6 +407,48 @@ func (r *Resolver) resolveEntry(
 		return nil, err
 	}
 	return node, nil
+}
+
+func (r *Resolver) resolveNamedInlineArtifact(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	entry declaration.Entry,
+	depth int,
+) (*ResolvedEntry, error) {
+	header := entry.Header()
+	resolved, err := r.resolveSymbolic(
+		ctx,
+		state,
+		rootID,
+		header.Type,
+		basespec.LogicalName(header.Name),
+		depth,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if resolved.Definition == nil {
+		return nil, fmt.Errorf(
+			"%w: named inline declaration %s/%s has no persisted Definition",
+			basespec.ErrReferenceUnresolved,
+			header.Type,
+			header.Name,
+		)
+	}
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(raw, resolved.Definition.Body) {
+		return nil, fmt.Errorf(
+			"%w: named inline declaration %s/%s differs from its Root Artifact",
+			basespec.ErrDigestMismatch,
+			header.Type,
+			header.Name,
+		)
+	}
+	return resolved, nil
 }
 
 func (r *Resolver) resolveStructure(
@@ -706,12 +763,61 @@ func (r *Resolver) reserve(
 	return nil
 }
 
-func shouldResolveLocator(
+func (r *Resolver) resolveDeclarationLocator(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	from *artifact.Artifact,
+	entry declaration.Entry,
+	depth int,
+) (*ResolvedEntry, error) {
+	if r.locators == nil {
+		return nil, fmt.Errorf(
+			"%w: declaration locator requires a locator resolver",
+			basespec.ErrLocatorUnresolved,
+		)
+	}
+	header := entry.Header()
+	ref, err := r.locators.ResolveArtifactLocator(
+		ctx,
+		LocatorRequest{
+			RootID:              rootID,
+			From:                cloneArtifactPointer(from),
+			Entry:               entry.Clone(),
+			Locator:             header.Locator.Clone(),
+			ExpectedType:        header.Type,
+			ExpectedLogicalName: basespec.LogicalName(header.Name),
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return r.resolveArtifact(
+		ctx,
+		state,
+		ref,
+		header.Type,
+		depth+1,
+	)
+}
+
+func shouldResolveDeclarationLocator(
 	entry declaration.Entry,
 	locator *declaration.Locator,
 ) bool {
 	if locator == nil ||
 		locator.Kind == declaration.LocatorKindCommand {
+		return false
+	}
+	switch entry.Header().Type {
+	case declaration.TypeCollection,
+		declaration.TypeAgent,
+		declaration.TypeTeam,
+		declaration.TypeLoop,
+		declaration.TypeWorkflow,
+		declaration.TypeWorkspace,
+		declaration.TypeMCPPolicy:
+	default:
 		return false
 	}
 	raw, err := entry.CanonicalJSON()
@@ -736,6 +842,29 @@ func shouldResolveLocator(
 		}
 	}
 	return true
+}
+
+func validateDefinitionContract(
+	value definition.Definition,
+	declarationType declaration.Type,
+) error {
+	key, found := codec.SchemaKeyForType(declarationType)
+	if !found {
+		return fmt.Errorf(
+			"%w: no canonical schema is registered for declaration type %q",
+			basespec.ErrUnsupported,
+			declarationType,
+		)
+	}
+	if value.SchemaID != key.SchemaID ||
+		value.SchemaVersion != key.SchemaVersion {
+		return fmt.Errorf(
+			"%w: Artifact Definition schema does not match declaration type %q",
+			basespec.ErrDigestMismatch,
+			declarationType,
+		)
+	}
+	return nil
 }
 
 func pointerArtifact(

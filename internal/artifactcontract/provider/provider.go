@@ -3,6 +3,7 @@ package provider
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locatorpath"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
@@ -21,6 +22,9 @@ func New() (*Provider, error) {
 		Decoders: []providerapi.Decoder{
 			decoder.NewJSONDecoder(),
 			decoder.NewYAMLDecoder(),
+		},
+		LocatorResolvers: []providerapi.LocatorResolverFactory{
+			locatorpath.NewCanonicalDeclarationFactory(),
 		},
 	}
 	if err := descriptor.Validate(); err != nil {

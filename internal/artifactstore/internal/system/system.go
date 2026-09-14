@@ -55,6 +55,7 @@ type Components struct {
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
 	ShareableSchemas *shareable.Registry
+	LocatorResolvers []providerapi.LocatorResolverFactory
 
 	ManagedArtifacts *managedartifactimpl.Service
 	SourceRuntime    sourceimpl.Runtime
@@ -269,6 +270,7 @@ func Open(
 		Refresh:            refreshService,
 		Resources:          resourceService,
 		ShareableSchemas:   shareableRegistry,
+		LocatorResolvers:   providerRegistry.LocatorResolvers(),
 		SourceRuntime:      sourceRuntime,
 		metadata:           metadata,
 		managedSources:     sourceRegistry,

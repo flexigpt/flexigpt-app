@@ -1,6 +1,7 @@
 package definition
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -8,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // Definition is a canonical source-decoded Artifact definition.
@@ -31,14 +31,16 @@ type Definition struct {
 }
 
 func (d Definition) Validate() error {
-	if err := validateDefinitionFields(d); err != nil {
+	canonical, err := Canonicalize(d)
+	if err != nil {
 		return err
 	}
-	if _, err := jsonutil.CanonicalizeObject(
-		d.Body,
-		basespec.MaxDefinitionBodyBytes,
-	); err != nil {
-		return fmt.Errorf("%w: definition body: %w", basespec.ErrInvalid, err)
+	if canonical.Digest != d.Digest ||
+		!bytes.Equal(canonical.Body, d.Body) {
+		return fmt.Errorf(
+			"%w: Definition digest or Body is not canonical",
+			basespec.ErrDigestMismatch,
+		)
 	}
 	return nil
 }

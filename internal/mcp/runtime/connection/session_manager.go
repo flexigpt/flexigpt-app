@@ -1701,6 +1701,13 @@ func cloneRuntimeConfig(input mcpServer.RuntimeConfig) mcpServer.RuntimeConfig {
 		value.Headers = maps.Clone(input.StreamableHTTP.Headers)
 		output.StreamableHTTP = &value
 	}
+	if input.Include != nil {
+		value := *input.Include
+		value.Tools = append([]string(nil), input.Include.Tools...)
+		value.Resources = append([]string(nil), input.Include.Resources...)
+		value.Prompts = append([]string(nil), input.Include.Prompts...)
+		output.Include = &value
+	}
 	output.Policy = mcpPolicy.Clone(input.Policy)
 	output.SensitiveValues = append([]string(nil), input.SensitiveValues...)
 	return output

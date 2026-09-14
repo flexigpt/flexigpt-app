@@ -45,6 +45,7 @@
             "skill",
             "tool",
             "mcp",
+            "mcp.policy",
             "collection",
             "agent"
           ]

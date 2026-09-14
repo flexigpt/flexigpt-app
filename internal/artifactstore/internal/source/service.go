@@ -61,6 +61,109 @@ func (s *Service) Create(
 	return value, err
 }
 
+// Ensure reuses a Source with the same Root-local storage key and physical
+// Source identity. Discovery and local display state are intentionally not
+// compared because the owner may reconcile them after ensure.
+func (s *Service) Ensure(
+	ctx context.Context,
+	rootID root.RootID,
+	draft source.Draft,
+) (source.Summary, bool, error) {
+	if ctx == nil {
+		return source.Summary{}, false, fmt.Errorf(
+			"%w: Source ensure context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := rootID.Validate(); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := draft.ID.Validate(); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := draft.StorageKey.Validate(); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := draft.Kind.Validate(); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := basespec.ValidateRequiredText(
+		"source display name",
+		draft.DisplayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+		return source.Summary{}, false, err
+	}
+
+	rootValue, err := s.roots.Get(ctx, rootID)
+	if err != nil {
+		return source.Summary{}, false, err
+	}
+	adapter, found := s.registry.adapter(draft.Kind)
+	if !found {
+		return source.Summary{}, false, fmt.Errorf(
+			"%w: source adapter %q",
+			basespec.ErrSourceUnavailable,
+			draft.Kind,
+		)
+	}
+	normalizedConfig, err := adapter.NormalizeConfig(ctx, draft.Config)
+	if err != nil {
+		return source.Summary{}, false, err
+	}
+	normalizedConfig, err = jsonutil.CanonicalizeObject(
+		normalizedConfig,
+		basespec.MaxConfigBytes,
+	)
+	if err != nil {
+		return source.Summary{}, false, err
+	}
+	if err := draft.Discovery.Normalized().Validate(); err != nil {
+		return source.Summary{}, false, err
+	}
+
+	existing, err := s.repository.FindByStorageKey(
+		ctx,
+		rootID,
+		draft.StorageKey,
+	)
+	if err == nil {
+		if existing.RetiredAt != nil {
+			return source.Summary{}, false, fmt.Errorf(
+				"%w: Source %q is retired",
+				basespec.ErrRetired,
+				existing.ID,
+			)
+		}
+		if !sameEnsuredSource(
+			existing,
+			rootID,
+			rootValue.StorageKey,
+			draft,
+			normalizedConfig,
+		) {
+			return source.Summary{}, false, fmt.Errorf(
+				"%w: Source storage key %q identifies another physical Source",
+				basespec.ErrConflict,
+				draft.StorageKey,
+			)
+		}
+		return existing.Summary(), false, nil
+	}
+	if !errors.Is(err, basespec.ErrSourceNotFound) &&
+		!errors.Is(err, basespec.ErrNotFound) {
+		return source.Summary{}, false, err
+	}
+
+	return s.CreateWithStatus(ctx, rootID, draft)
+}
+
 // CreateWithStatus follows the normal caller-supplied-ID replay contract and
 // additionally reports whether this invocation committed a new Source row.
 //
@@ -249,6 +352,20 @@ func sourceCreationIntentMatches(
 		existing.Enabled == requested.Enabled &&
 		bytes.Equal(existing.Config, requested.Config) &&
 		existing.Discovery.Equal(requested.Discovery)
+}
+
+func sameEnsuredSource(
+	existing source.Source,
+	rootID root.RootID,
+	rootStorageKey basespec.StorageKey,
+	draft source.Draft,
+	normalizedConfig json.RawMessage,
+) bool {
+	return existing.RootID == rootID &&
+		existing.RootStorageKey == rootStorageKey &&
+		existing.StorageKey == draft.StorageKey &&
+		existing.Kind == draft.Kind &&
+		bytes.Equal(existing.Config, normalizedConfig)
 }
 
 func (s *Service) Get(

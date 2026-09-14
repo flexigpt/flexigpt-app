@@ -2,6 +2,7 @@ package consumerapi
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
@@ -18,9 +19,22 @@ type FilesystemSourceRegistration struct {
 	SourceDisplayName string      `json:"sourceDisplayName"`
 }
 
+type WorkspacePathRegistration struct {
+	RootID            root.RootID          `json:"rootID"`
+	Path              string               `json:"path"`
+	SourceDisplayName string               `json:"sourceDisplayName,omitempty"`
+	WorkspaceName     basespec.LogicalName `json:"workspaceName,omitempty"`
+}
+
 type WorkspaceLoad struct {
 	Workspace workspaceDomain.Workspace
 	Roots     []declaration.Entry
+
+	resolved *resolve.ResolvedWorkspace
+}
+
+func (v WorkspaceLoad) ResolvedWorkspace() *resolve.ResolvedWorkspace {
+	return v.resolved
 }
 
 type WorkspaceRefresh struct {
@@ -30,6 +44,12 @@ type WorkspaceRefresh struct {
 
 type WorkspaceArtifactSettings struct {
 	RuntimeDisabled bool `json:"runtimeDisabled"`
+}
+
+type WorkspacePathRegistrationResult struct {
+	Source    source.Summary            `json:"source"`
+	Workspace workspaceDomain.Workspace `json:"workspace"`
+	Load      WorkspaceLoad             `json:"load"`
 }
 
 type WorkspaceArtifactView struct {

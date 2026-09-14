@@ -17,8 +17,6 @@ const (
 	)
 
 	CanonicalDecoderID basespec.DecoderID = "artifact.mcp-json"
-	PolicyDecoderID    basespec.DecoderID = "artifact.mcp-policy-json"
-	ConfigDecoderID    basespec.DecoderID = "mcp-config-json"
 	LegacyDecoderID    basespec.DecoderID = "mcp-legacy-package-json"
 
 	ManagedMCPPackageKind       source.PackageKind = "mcp"

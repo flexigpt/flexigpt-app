@@ -72,6 +72,14 @@ func (r *SourceRepository) Get(
 	return r.store.getSource(ctx, rootID, id)
 }
 
+func (r *SourceRepository) FindByStorageKey(
+	ctx context.Context,
+	rootID root.RootID,
+	storageKey basespec.StorageKey,
+) (source.Source, error) {
+	return r.store.findSourceByStorageKey(ctx, rootID, storageKey)
+}
+
 func (r *SourceRepository) List(
 	ctx context.Context,
 	rootID root.RootID,

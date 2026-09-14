@@ -104,6 +104,14 @@ func (w *SkillStoreWrapper) RegisterSkillDirectory(
 	})
 }
 
+func (w *SkillStoreWrapper) AddSkillPath(
+	request skillConsumerAPI.SkillPathRegistration,
+) (skillConsumerAPI.SkillPathRegistrationResult, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (skillConsumerAPI.SkillPathRegistrationResult, error) {
+		return api.AddSkillPath(context.Background(), request)
+	})
+}
+
 func (w *SkillStoreWrapper) RefreshSkillSource(
 	rootID root.RootID,
 	sourceID source.SourceID,

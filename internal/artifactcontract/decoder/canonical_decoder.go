@@ -106,6 +106,13 @@ func (d *canonicalDecoder) Decode(
 			err,
 		)
 	}
+	if err := ValidateEntryTree(root); err != nil {
+		return nil, decodeDiagnostic(
+			candidate,
+			"artifact.declaration-nested-invalid",
+			err,
+		)
+	}
 	entries, err := declaration.WalkNamedEntries(root)
 	if err != nil {
 		return nil, decodeDiagnostic(
@@ -117,7 +124,7 @@ func (d *canonicalDecoder) Decode(
 
 	output := make([]providerapi.Decoded, 0, len(entries))
 	for _, named := range entries {
-		value, err := DefinitionForEntry(named.Entry)
+		value, err := definitionForNamedEntry(named)
 		if err != nil {
 			output = append(output, providerapi.Decoded{
 				SubresourceLocator: named.SubresourceLocator,

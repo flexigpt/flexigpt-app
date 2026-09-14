@@ -10,7 +10,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 	workspaceProviderAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/providerapi"
@@ -47,6 +49,15 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 	if err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
+	if err := a.expandWorkspaceDirectoryDeclarations(
+		ctx,
+		sourceValue,
+		workspace.Artifact.Binding.Locator,
+		workspace.Document,
+		&desired,
+	); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
 	if !sourceValue.Discovery.Equal(desired) {
 		update := source.Update{
 			ExpectedRevision: sourceValue.Revision,
@@ -64,6 +75,174 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		}
 	}
 	return workspace, nil
+}
+
+func (a *StoreAPI) refreshAndResolveWorkspace(
+	ctx context.Context,
+	ref WorkspaceRef,
+) (
+	workspaceDomain.Workspace,
+	refresh.RefreshRootResult,
+	resolve.Graph,
+	error,
+) {
+	if a == nil || a.resolver == nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			basespec.ErrClosed
+	}
+
+	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
+	result, err := a.discovery.RefreshRoot(
+		ctx,
+		workspace.Artifact.RootID,
+	)
+	if err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
+	workspace, err = a.GetWorkspace(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
+	graph, err := a.resolver.ResolveArtifact(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
+	if graph.Root == nil ||
+		graph.Root.Type != declaration.TypeWorkspace ||
+		graph.Root.Workspace == nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			fmt.Errorf(
+				"%w: Artifact %q did not resolve as a Workspace",
+				basespec.ErrReferenceUnresolved,
+				ref.ArtifactID,
+			)
+	}
+	return workspace, result, graph, nil
+}
+
+// ResolveWorkspaceGraph applies local declaration sources, refreshes the
+// Root, and resolves every Workspace root in declaration order.
+//
+// The returned graph is a Go consumer API. It is intentionally not exposed
+// through the Wails wrapper because Loop bodies may create graph cycles.
+func (a *StoreAPI) ResolveWorkspaceGraph(
+	ctx context.Context,
+	ref WorkspaceRef,
+) (resolve.Graph, error) {
+	_, _, graph, err := a.refreshAndResolveWorkspace(ctx, ref)
+	if err != nil {
+		return resolve.Graph{}, err
+	}
+	return graph, nil
+}
+
+func (a *StoreAPI) expandWorkspaceDirectoryDeclarations(
+	ctx context.Context,
+	sourceValue source.Summary,
+	declarationLocator basespec.Locator,
+	document workspacev1.WorkspaceDocument,
+	discovery *source.DiscoverySpec,
+) error {
+	if discovery == nil {
+		return fmt.Errorf("%w: Workspace discovery target is nil", basespec.ErrInvalid)
+	}
+	for index, declarationSource := range document.Declarations {
+		locator, isLocator, err := declarationSource.AsLocator()
+		if err != nil {
+			return err
+		}
+		if !isLocator {
+			continue
+		}
+
+		local, isLocal, err := localSourceLocator(
+			locator,
+			declarationLocator,
+		)
+		if err != nil {
+			return err
+		}
+		if !isLocal {
+			continue
+		}
+		entry, err := a.resources.StatSourceEntry(
+			ctx,
+			sourceValue.RootID,
+			sourceValue.ID,
+			local,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"workspace declarations[%d]: %w",
+				index,
+				err,
+			)
+		}
+		if !entry.IsDirectory {
+			continue
+		}
+
+		*discovery = source.DiscoverySpec{
+			ExplicitLocators: discovery.ExplicitLocators,
+			DirectoryRoots: appendDirectoryRoot(
+				discovery.DirectoryRoots,
+				workspaceDirectoryRoot(local),
+			),
+			DecoderHints: appendDecoderHint(
+				discovery.DecoderHints,
+				source.DecoderHint{
+					Locator:   local,
+					Recursive: true,
+					DecoderIDs: []basespec.DecoderID{
+						workspaceProviderAPI.ContextMarkdownDecoderID,
+					},
+				},
+			),
+			AllowedDecoderIDs:      discovery.AllowedDecoderIDs,
+			ExpectedContentDigests: discovery.ExpectedContentDigests,
+			Authoritative:          discovery.Authoritative,
+			MaxCandidateBytes:      discovery.MaxCandidateBytes,
+			MaxTotalBytes:          discovery.MaxTotalBytes,
+			MaxCandidates:          discovery.MaxCandidates,
+			MaxEntries:             discovery.MaxEntries,
+			MaxDepth:               discovery.MaxDepth,
+		}
+	}
+	return nil
+}
+
+func workspaceDirectoryRoot(
+	base basespec.Locator,
+) source.DirectoryRoot {
+	return source.DirectoryRoot{
+		Root:      base,
+		Recursive: true,
+		IncludePatterns: []string{
+			"**/*.json",
+			"**/*.yaml",
+			"**/*.yml",
+			"**/*.md",
+		},
+	}
 }
 
 func workspaceDiscoveryForDocument(

@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
@@ -26,6 +27,7 @@ func InitWorkspaceWrappers(
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
 	resources compositionapi.ResourceAPI,
+	locatorResolvers []providerapi.LocatorResolverFactory,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
@@ -33,12 +35,17 @@ func InitWorkspaceWrappers(
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
+	config := workspaceConsumerAPI.DefaultConfig()
+	config.LocatorResolvers = append(
+		[]providerapi.LocatorResolverFactory(nil),
+		locatorResolvers...,
+	)
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,
 		discovery,
 		artifacts,
 		resources,
-		workspaceConsumerAPI.DefaultConfig(),
+		config,
 	)
 	if err != nil {
 		return err
@@ -68,6 +75,17 @@ func (w *WorkspaceStoreWrapper) RegisterFilesystemWorkspaceSource(
 	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (source.Summary, error) {
 		return api.RegisterFilesystemSource(context.Background(), request)
 	})
+}
+
+func (w *WorkspaceStoreWrapper) AddWorkspacePath(
+	request workspaceConsumerAPI.WorkspacePathRegistration,
+) (workspaceConsumerAPI.WorkspacePathRegistrationResult, error) {
+	return withWorkspaceStore(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspacePathRegistrationResult, error) {
+			return api.AddWorkspacePath(context.Background(), request)
+		},
+	)
 }
 
 func (w *WorkspaceStoreWrapper) GetWorkspace(

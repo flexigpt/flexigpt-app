@@ -24,6 +24,7 @@ type Store struct {
 	ManagedArtifacts ManagedArtifactAPI
 	Protection       ProtectionAPI
 	Topology         installerapi.API
+	LocatorResolvers []providerapi.LocatorResolverFactory
 
 	components *system.Components
 	closeOnce  sync.Once
@@ -113,6 +114,10 @@ func Open(
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},
+		LocatorResolvers: append(
+			[]providerapi.LocatorResolverFactory(nil),
+			components.LocatorResolvers...,
+		),
 		components: components,
 	}
 	output.Topology = output

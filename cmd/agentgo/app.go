@@ -275,6 +275,7 @@ func (a *App) initManagers() {
 		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
 		artifactComposition.Resources,
+		artifactComposition.LocatorResolvers,
 	)
 	if err != nil {
 		slog.Error(

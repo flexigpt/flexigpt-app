@@ -12,6 +12,8 @@ import (
 )
 
 type ResolveOptions struct {
+	// VerifySourceContent is retained for source compatibility. Artifact
+	// resolution always verifies the refreshed declaration source content.
 	VerifySourceContent bool `json:"verifySourceContent"`
 }
 
@@ -64,7 +66,9 @@ func (r ResolvedArtifact) Validate() error {
 		)
 	}
 	if r.Definition.Kind != r.Artifact.Kind ||
-		r.Definition.Digest != *r.Artifact.ResolvedDefinition {
+		r.Definition.Digest != *r.Artifact.ResolvedDefinition ||
+		r.Definition.LogicalName != r.Artifact.LogicalName ||
+		r.Definition.LogicalVersion != r.Artifact.LogicalVersion {
 		return fmt.Errorf(
 			"%w: resolved Definition does not match Artifact state",
 			basespec.ErrDigestMismatch,

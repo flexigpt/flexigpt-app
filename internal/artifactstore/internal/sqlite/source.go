@@ -104,6 +104,40 @@ func (s *Store) getSource(
 	return value, err
 }
 
+func (s *Store) findSourceByStorageKey(
+	ctx context.Context,
+	rootID root.RootID,
+	storageKey basespec.StorageKey,
+) (source.Source, error) {
+	if err := rootID.Validate(); err != nil {
+		return source.Source{}, err
+	}
+	if err := storageKey.Validate(); err != nil {
+		return source.Source{}, err
+	}
+	if err := s.requireActiveRoot(ctx, rootID); err != nil {
+		return source.Source{}, err
+	}
+
+	value, err := scanSource(s.db.QueryRowContext(
+		ctx,
+		`SELECT `+sourceColumns+`
+		 FROM artifact_sources
+		 WHERE root_id = ? AND storage_key = ?`,
+		string(rootID),
+		string(storageKey),
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return source.Source{}, fmt.Errorf(
+			"%w: Source storage key %q in Root %q",
+			basespec.ErrSourceNotFound,
+			storageKey,
+			rootID,
+		)
+	}
+	return value, err
+}
+
 func (s *Store) listSources(
 	ctx context.Context,
 	rootID root.RootID,

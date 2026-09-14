@@ -1,13 +1,17 @@
 package consumerapi
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 )
 
 type Config struct {
 	ContextComposition workspaceRuntime.CompositionPolicy
-
+	LocatorResolvers   []providerapi.LocatorResolverFactory
+	ResolverLimits     resolve.Limits
+	ResolverOptions    resolve.Options
 	// AdditionalDecoderHints lets application composition add dedicated
 	// providers such as MCP or future YAML adapters without making Workspace
 	// import those consumer domains.
@@ -17,6 +21,10 @@ type Config struct {
 func (c Config) normalized() Config {
 	output := c
 	output.ContextComposition = output.ContextComposition.Normalized()
+	output.LocatorResolvers = append(
+		[]providerapi.LocatorResolverFactory(nil),
+		c.LocatorResolvers...,
+	)
 	output.AdditionalDecoderHints = make(
 		[]source.DecoderHint,
 		len(c.AdditionalDecoderHints),

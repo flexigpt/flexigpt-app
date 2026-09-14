@@ -27,6 +27,7 @@ type ServerType string
 const (
 	ServerTypeStdio ServerType = "stdio"
 	ServerTypeHTTP  ServerType = "http"
+	ServerTypeSSE   ServerType = "sse"
 )
 
 type MCPHTTPAuthMode = mcpServer.MCPHTTPAuthMode
@@ -123,6 +124,12 @@ type ServerExtension struct {
 	Policy             *PolicyReference             `json:"policy,omitempty"`
 }
 
+type Include struct {
+	Tools     []string `json:"tools,omitempty"`
+	Resources []string `json:"resources,omitempty"`
+	Prompts   []string `json:"prompts,omitempty"`
+}
+
 // ServerDocument is the MCP consumer projection of one canonical mcpv1
 // declaration. It is not itself a portable document format.
 type ServerDocument struct {
@@ -133,6 +140,7 @@ type ServerDocument struct {
 	Labels         map[string]string       `json:"labels,omitempty"`
 
 	MCPServer CoreServer      `json:"mcpServer"`
+	Include   *Include        `json:"include,omitempty"`
 	Extension ServerExtension `json:"extension"`
 }
 

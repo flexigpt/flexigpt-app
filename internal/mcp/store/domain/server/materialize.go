@@ -287,7 +287,8 @@ func selectProfile(
 		}
 
 	case profile.HTTP != nil:
-		if output.Type != ServerTypeHTTP {
+		if output.Type != ServerTypeHTTP &&
+			output.Type != ServerTypeSSE {
 			if profile.HTTP.URL == nil {
 				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing HTTP profile requires URL",

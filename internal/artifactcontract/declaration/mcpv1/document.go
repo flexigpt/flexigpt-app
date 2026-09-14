@@ -244,14 +244,23 @@ func (v MCPDocument) validate(requireName bool) error {
 func validateTransport(v MCPDocument) error {
 	switch v.Transport {
 	case "":
-		if v.Locator == nil &&
-			(v.Command != "" ||
-				len(v.Args) != 0 ||
-				len(v.Env) != 0 ||
-				v.URL != "" ||
-				len(v.Headers) != 0) {
+		if v.Locator != nil &&
+			v.Locator.Kind == declaration.LocatorKindCommand {
+			if v.URL != "" || len(v.Headers) != 0 {
+				return fmt.Errorf(
+					"%w: command-located MCP cannot contain HTTP fields",
+					basespec.ErrInvalid,
+				)
+			}
+			return nil
+		}
+		if v.Command != "" ||
+			len(v.Args) != 0 ||
+			len(v.Env) != 0 ||
+			v.URL != "" ||
+			len(v.Headers) != 0 {
 			return fmt.Errorf(
-				"%w: inline MCP transport is required",
+				"%w: MCP transport is required when connection fields are present",
 				basespec.ErrInvalid,
 			)
 		}

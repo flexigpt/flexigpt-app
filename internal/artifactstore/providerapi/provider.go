@@ -20,7 +20,7 @@ type Descriptor struct {
 
 	Schemas          []SchemaCodec
 	Decoders         []Decoder
-	LocatorResolvers []LocatorResolver
+	LocatorResolvers []LocatorResolverFactory
 }
 
 func (d Descriptor) Clone() Descriptor {
@@ -28,7 +28,7 @@ func (d Descriptor) Clone() Descriptor {
 	output.Schemas = append([]SchemaCodec(nil), d.Schemas...)
 	output.Decoders = append([]Decoder(nil), d.Decoders...)
 	output.LocatorResolvers = append(
-		[]LocatorResolver(nil),
+		[]LocatorResolverFactory(nil),
 		d.LocatorResolvers...,
 	)
 	return output
@@ -118,20 +118,30 @@ func (d Descriptor) Validate() error {
 		seenDecoders[decoder.ID()] = struct{}{}
 	}
 
-	seenResolvers := make(map[string]struct{}, len(d.LocatorResolvers))
+	seenResolvers := make(
+		map[LocatorResolverKey]struct{},
+		len(d.LocatorResolvers),
+	)
 	for _, resolver := range d.LocatorResolvers {
-		if err := ValidateLocatorResolver(resolver); err != nil {
+		if err := ValidateLocatorResolverFactory(resolver); err != nil {
 			return err
 		}
-		if _, duplicate := seenResolvers[resolver.LocatorKind()]; duplicate {
-			return fmt.Errorf(
-				"%w: Artifact provider %q repeats locator resolver %q",
-				basespec.ErrConflict,
-				d.Name,
-				resolver.LocatorKind(),
-			)
+		for _, artifactKind := range resolver.ArtifactKinds() {
+			key := LocatorResolverKey{
+				LocatorKind:  resolver.LocatorKind(),
+				ArtifactKind: artifactKind,
+			}
+			if _, duplicate := seenResolvers[key]; duplicate {
+				return fmt.Errorf(
+					"%w: Artifact provider %q repeats locator resolver %q for Artifact kind %q",
+					basespec.ErrConflict,
+					d.Name,
+					resolver.LocatorKind(),
+					artifactKind,
+				)
+			}
+			seenResolvers[key] = struct{}{}
 		}
-		seenResolvers[resolver.LocatorKind()] = struct{}{}
 	}
 	return nil
 }

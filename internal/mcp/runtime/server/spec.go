@@ -148,6 +148,12 @@ type MCPRuntimeStreamableHTTPConfig struct {
 	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
 }
 
+type MCPInclude struct {
+	Tools     []string
+	Resources []string
+	Prompts   []string
+}
+
 type RuntimeConfig struct {
 	Server  ServerID
 	Catalog CatalogID
@@ -160,7 +166,8 @@ type RuntimeConfig struct {
 	StreamableHTTP            *MCPRuntimeStreamableHTTPConfig
 	OAuthClientSecretRequired bool
 
-	Policy mcpPolicy.MCPPolicy
+	Policy  mcpPolicy.MCPPolicy
+	Include *MCPInclude
 
 	SensitiveValues []string
 }
@@ -187,6 +194,9 @@ func (config RuntimeConfig) Validate() error {
 		return err
 	}
 	if err := validatePolicy(config); err != nil {
+		return err
+	}
+	if err := validateMCPInclude(config.Include); err != nil {
 		return err
 	}
 
@@ -221,6 +231,33 @@ func (config RuntimeConfig) Validate() error {
 func validatePolicy(config RuntimeConfig) error {
 	if err := config.Policy.Validate(); err != nil {
 		return fmt.Errorf("%w: invalid MCP runtime policy: %w", ErrInvalid, err)
+	}
+	return nil
+}
+
+func validateMCPInclude(value *MCPInclude) error {
+	if value == nil {
+		return nil
+	}
+	for _, group := range [][]string{
+		value.Tools,
+		value.Resources,
+		value.Prompts,
+	} {
+		seen := make(map[string]struct{}, len(group))
+		for _, name := range group {
+			if err := requiredText(
+				"MCP include member",
+				name,
+				MaxURIBytes,
+			); err != nil {
+				return err
+			}
+			if _, duplicate := seen[name]; duplicate {
+				return fmt.Errorf("%w: duplicate MCP include member %q", ErrInvalid, name)
+			}
+			seen[name] = struct{}{}
+		}
 	}
 	return nil
 }

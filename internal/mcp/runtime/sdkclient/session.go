@@ -121,6 +121,16 @@ func (s *Session) Discover(
 
 	wait.Wait()
 
+	if config.Include != nil {
+		tools = filterIncludedTools(tools, config.Include.Tools)
+		resources = filterIncludedResources(
+			resources,
+			config.Include.Resources,
+		)
+		resourceTemplates = filterIncludedTemplates(resourceTemplates, config.Include.Resources)
+		prompts = filterIncludedPrompts(prompts, config.Include.Prompts)
+	}
+
 	if toolsErr != nil {
 		s.log().Warn("mcp tools discovery failed", "server", s.server, "err", toolsErr)
 	} else {
@@ -969,4 +979,80 @@ func cloneMap(m map[string]any) map[string]any {
 
 func getEmptySchema() map[string]any {
 	return map[string]any{"type": "object"}
+}
+
+func filterIncludedTools(
+	values []mcpServer.MCPToolCapability,
+	include []string,
+) []mcpServer.MCPToolCapability {
+	allowed := includeSet(include)
+	output := make([]mcpServer.MCPToolCapability, 0)
+	for _, value := range values {
+		if _, found := allowed[value.ToolName]; found {
+			output = append(output, value)
+		}
+	}
+	return output
+}
+
+func filterIncludedResources(
+	values []mcpServer.MCPResourceRef,
+	include []string,
+) []mcpServer.MCPResourceRef {
+	allowed := includeSet(include)
+	output := make([]mcpServer.MCPResourceRef, 0)
+	for _, value := range values {
+		if _, found := allowed[value.URI]; found {
+			output = append(output, value)
+			continue
+		}
+		if value.Name != "" {
+			if _, found := allowed[value.Name]; found {
+				output = append(output, value)
+			}
+		}
+	}
+	return output
+}
+
+func filterIncludedTemplates(
+	values []mcpServer.MCPResourceTemplateRef,
+	include []string,
+) []mcpServer.MCPResourceTemplateRef {
+	allowed := includeSet(include)
+	output := make([]mcpServer.MCPResourceTemplateRef, 0)
+	for _, value := range values {
+		if _, found := allowed[value.URITemplate]; found {
+			output = append(output, value)
+			continue
+		}
+		if value.Name != "" {
+			if _, found := allowed[value.Name]; found {
+				output = append(output, value)
+			}
+		}
+	}
+	return output
+}
+
+func filterIncludedPrompts(
+	values []mcpServer.MCPPromptRef,
+	include []string,
+) []mcpServer.MCPPromptRef {
+	allowed := includeSet(include)
+	output := make([]mcpServer.MCPPromptRef, 0)
+	for _, value := range values {
+		if _, found := allowed[value.PromptName]; found {
+			output = append(output, value)
+		}
+	}
+	return output
+}
+
+func includeSet(values []string) map[string]struct{} {
+	output := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		output[value] = struct{}{}
+	}
+	return output
 }

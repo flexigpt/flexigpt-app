@@ -61,10 +61,14 @@ func DecodeCanonicalEntryJSON(
 	if err := header.Validate(HeaderValidation{}); err != nil {
 		return Entry{}, err
 	}
-	return Entry{
+	value := Entry{
 		raw:    append(json.RawMessage(nil), raw...),
 		header: header,
-	}, nil
+	}
+	if err := value.Validate(); err != nil {
+		return Entry{}, err
+	}
+	return value, nil
 }
 
 func NewEntry(value any) (Entry, error) {
@@ -89,7 +93,10 @@ func (e Entry) Validate() error {
 			basespec.ErrInvalid,
 		)
 	}
-	return e.header.Validate(HeaderValidation{})
+	if err := e.header.Validate(HeaderValidation{}); err != nil {
+		return err
+	}
+	return e.validateNestedForm()
 }
 
 func (e Entry) Clone() Entry {
@@ -129,6 +136,9 @@ func (e Entry) IsSymbolic() bool {
 	if err := e.Validate(); err != nil {
 		return false
 	}
+	if e.header.Name == "" {
+		return false
+	}
 	var values map[string]json.RawMessage
 	if err := json.Unmarshal(e.raw, &values); err != nil {
 		return false
@@ -158,6 +168,39 @@ func (e *Entry) UnmarshalJSON(raw []byte) error {
 	}
 	*e = value
 	return nil
+}
+
+func (e Entry) validateNestedForm() error {
+	if e.header.Name != "" || e.header.Locator != nil {
+		return nil
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(e.raw, &fields); err != nil {
+		return fmt.Errorf(
+			"%w: decode declaration entry shape: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	for key := range fields {
+		switch key {
+		case "$schema",
+			"apiVersion",
+			"type",
+			"name",
+			"description",
+			"locator",
+			"metadata":
+			continue
+		default:
+			return nil
+		}
+	}
+	return fmt.Errorf(
+		"%w: nested declaration requires name, locator, or type-specific fields",
+		basespec.ErrInvalid,
+	)
 }
 
 func ValidateEntryType(

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -46,11 +48,11 @@ func DefinitionForDocument(
 		return definition.Definition{}, err
 	}
 
-	declaration, err := declarationForDocument(input)
+	decl, err := declarationForDocument(input)
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	body, err := declaration.CanonicalJSON()
+	body, err := decl.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err
 	}
@@ -100,24 +102,24 @@ func ServerDocumentFromDefinition(
 		)
 	}
 
-	declaration, err := mcpv1.DecodeMCPJSON(input.Body)
+	decl, err := mcpv1.DecodeMCPJSON(input.Body)
 	if err != nil {
 		return ServerDocument{}, err
 	}
-	if declaration.Name != string(input.LogicalName) ||
-		declaration.Description != input.Description {
+	if decl.Name != string(input.LogicalName) ||
+		decl.Description != input.Description {
 		return ServerDocument{}, fmt.Errorf(
 			"%w: MCP Definition does not match declaration header",
 			basespec.ErrInvalid,
 		)
 	}
 
-	core, err := coreFromDeclaration(declaration)
+	core, err := coreFromDeclaration(decl)
 	if err != nil {
 		return ServerDocument{}, err
 	}
 	extension, err := extensionFromDeclaration(
-		declaration,
+		decl,
 		input.LogicalName,
 	)
 	if err != nil {
@@ -133,6 +135,10 @@ func ServerDocumentFromDefinition(
 		extension,
 	)
 	if err != nil {
+		return ServerDocument{}, err
+	}
+	document.Include = includeFromDeclaration(decl.Include)
+	if err := document.Validate(); err != nil {
 		return ServerDocument{}, err
 	}
 	return document, nil
@@ -155,7 +161,7 @@ func declarationForDocument(
 		return mcpv1.MCPDocument{}, err
 	}
 
-	declaration := mcpv1.MCPDocument{
+	decl := mcpv1.MCPDocument{
 		APIVersion:  mcpv1.MCPSchemaVersion,
 		Type:        mcpv1.MCPType,
 		Name:        string(input.LogicalName),
@@ -168,12 +174,15 @@ func declarationForDocument(
 		Env:     maps.Clone(input.MCPServer.Env),
 		URL:     input.MCPServer.URL,
 		Headers: maps.Clone(input.MCPServer.Headers),
+		Include: includeToDeclaration(input.Include),
 	}
 	switch input.MCPServer.Type {
 	case ServerTypeStdio:
-		declaration.Transport = mcpv1.TransportStdio
+		decl.Transport = mcpv1.TransportStdio
 	case ServerTypeHTTP:
-		declaration.Transport = mcpv1.TransportStreamableHTTP
+		decl.Transport = mcpv1.TransportStreamableHTTP
+	case ServerTypeSSE:
+		decl.Transport = mcpv1.TransportSSE
 	default:
 		return mcpv1.MCPDocument{}, fmt.Errorf(
 			"%w: unsupported MCP server transport %q",
@@ -181,10 +190,10 @@ func declarationForDocument(
 			input.MCPServer.Type,
 		)
 	}
-	if err := declaration.Validate(); err != nil {
+	if err := decl.Validate(); err != nil {
 		return mcpv1.MCPDocument{}, err
 	}
-	return declaration, nil
+	return decl, nil
 }
 
 func coreFromDeclaration(
@@ -197,16 +206,23 @@ func coreFromDeclaration(
 		URL:     input.URL,
 		Headers: maps.Clone(input.Headers),
 	}
+	if input.Transport == "" &&
+		input.Locator != nil &&
+		input.Locator.Kind == declaration.LocatorKindCommand {
+		output.Type = ServerTypeStdio
+		output.Command = input.Locator.Command
+		return output, validateCoreServer(output)
+	}
 	switch input.Transport {
 	case mcpv1.TransportStdio:
 		output.Type = ServerTypeStdio
 	case mcpv1.TransportStreamableHTTP:
 		output.Type = ServerTypeHTTP
 	case mcpv1.TransportSSE:
-		return CoreServer{}, fmt.Errorf(
-			"%w: MCP SSE transport requires an MCP runtime adapter",
-			basespec.ErrUnsupported,
-		)
+		// The configured SDK transport supports standalone SSE fallback when
+		// DisableStandaloneSSE is false. Preserve the semantic transport for
+		// round-trip declaration serialization.
+		output.Type = ServerTypeSSE
 	default:
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP declaration has no executable transport",
@@ -271,4 +287,76 @@ func PolicyReferenceSelector(
 		Kind:        mcpDomain.MCPPolicyArtifactKind,
 		LogicalName: name,
 	}
+}
+
+func includeFromDeclaration(input *mcpv1.Include) *Include {
+	if input == nil {
+		return nil
+	}
+	return &Include{
+		Tools:     slices.Clone(input.Tools),
+		Resources: slices.Clone(input.Resources),
+		Prompts:   slices.Clone(input.Prompts),
+	}
+}
+
+func includeToDeclaration(input *Include) *mcpv1.Include {
+	if input == nil {
+		return nil
+	}
+	return &mcpv1.Include{
+		Tools:     slices.Clone(input.Tools),
+		Resources: slices.Clone(input.Resources),
+		Prompts:   slices.Clone(input.Prompts),
+	}
+}
+
+func cloneInclude(input *Include) *Include {
+	if input == nil {
+		return nil
+	}
+	return &Include{
+		Tools:     slices.Clone(input.Tools),
+		Resources: slices.Clone(input.Resources),
+		Prompts:   slices.Clone(input.Prompts),
+	}
+}
+
+// RebindLocatedDocument applies a local MCP declaration identity and optional
+// include/runtime extension data to one server decoded from a local source.
+func RebindLocatedDocument(
+	input ServerDocument,
+	identity definition.Definition,
+	outer mcpv1.MCPDocument,
+) (ServerDocument, error) {
+	output, err := CanonicalizeServer(input)
+	if err != nil {
+		return ServerDocument{}, err
+	}
+	output.LogicalName = identity.LogicalName
+	output.LogicalVersion = identity.LogicalVersion
+	output.DisplayName = identity.DisplayName
+	output.Description = identity.Description
+	if output.DisplayName == "" {
+		output.DisplayName = string(identity.LogicalName)
+	}
+	if outer.Include != nil {
+		output.Include = includeFromDeclaration(outer.Include)
+	} else {
+		output.Include = cloneInclude(input.Include)
+	}
+	if _, found := outer.Metadata[mcpDomain.RuntimeExtensionMetadataKey]; found {
+		extension, err := extensionFromDeclaration(
+			outer,
+			identity.LogicalName,
+		)
+		if err != nil {
+			return ServerDocument{}, err
+		}
+		output.Extension = extension
+	}
+	if err := output.Validate(); err != nil {
+		return ServerDocument{}, err
+	}
+	return output, nil
 }

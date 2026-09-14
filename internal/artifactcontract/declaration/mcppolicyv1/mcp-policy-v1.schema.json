@@ -4,7 +4,7 @@
   "title": "FlexiGPT MCP Policy v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["type", "body"],
+  "required": ["type"],
   "properties": {
     "$schema": {"type": "string", "minLength": 1, "maxLength": 16384},
     "apiVersion": {"type": "string", "minLength": 1, "maxLength": 256},

@@ -167,6 +167,17 @@ func (h Header) Validate(
 		if err := h.Locator.Validate(); err != nil {
 			return fmt.Errorf("artifact declaration locator: %w", err)
 		}
+		if options.ExpectedType != "" &&
+			h.Locator.Kind == LocatorKindCommand {
+			switch options.ExpectedType {
+			case TypeTool, TypeMCP:
+			default:
+				return fmt.Errorf(
+					"%w: command Locator is valid only for Tool and MCP declarations",
+					basespec.ErrInvalid,
+				)
+			}
+		}
 	}
 	if len(h.Metadata) > basespec.MaxLabels {
 		return fmt.Errorf(

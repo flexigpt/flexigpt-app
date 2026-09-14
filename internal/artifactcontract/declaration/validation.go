@@ -113,6 +113,14 @@ func ValidateJSONSchemaValue(
 			label,
 		)
 	}
+	if _, err := jsonutil.CompileJSONSchema(canonical); err != nil {
+		return fmt.Errorf(
+			"%w: %s is not a valid JSON Schema: %w",
+			basespec.ErrInvalid,
+			label,
+			err,
+		)
+	}
 	return nil
 }
 

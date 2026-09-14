@@ -14,6 +14,18 @@ type SkillDirectoryRegistration struct {
 	SourceDisplayName string      `json:"sourceDisplayName"`
 }
 
+type SkillPathRegistration struct {
+	RootID            root.RootID `json:"rootID"`
+	Path              string      `json:"path"`
+	SourceDisplayName string      `json:"sourceDisplayName,omitempty"`
+	Enabled           bool        `json:"enabled"`
+}
+
+type SkillPathRegistrationResult struct {
+	Source   source.Summary    `json:"source"`
+	Artifact artifact.Artifact `json:"artifact"`
+}
+
 type ManagedSkillCreateRequest struct {
 	RootID   root.RootID     `json:"rootID"`
 	SourceID source.SourceID `json:"sourceID"`

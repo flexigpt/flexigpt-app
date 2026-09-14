@@ -2,6 +2,7 @@ package resource
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -133,18 +134,16 @@ func (s *Service) ResolveArtifact(
 	if err := output.Validate(); err != nil {
 		return resource.ResolvedArtifact{}, err
 	}
-	if options.VerifySourceContent {
-		if err := sourceimpl.VerifySnapshotContentDigest(
-			ctx,
-			s.sources,
-			value,
-			record.Binding.Locator,
-			inspection.State.SourceGeneration,
-			*record.SourceContentDigest,
-			basespec.MaxCandidateBytes,
-		); err != nil {
-			return resource.ResolvedArtifact{}, err
-		}
+	if err := sourceimpl.VerifySnapshotContentDigest(
+		ctx,
+		s.sources,
+		value,
+		record.Binding.Locator,
+		inspection.State.SourceGeneration,
+		*record.SourceContentDigest,
+		basespec.MaxCandidateBytes,
+	); err != nil {
+		return resource.ResolvedArtifact{}, err
 	}
 	return output.Clone(), nil
 }
@@ -264,6 +263,66 @@ func (s *Service) ReadSourceEntry(
 		return resource.VerifiedEntry{}, err
 	}
 	return output.Clone(), nil
+}
+
+// StatSourceEntry confirms one Source snapshot and returns only physical Entry
+// metadata. It is used for declaration planning, not as a Resource substitute.
+func (s *Service) StatSourceEntry(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	locator basespec.Locator,
+) (source.Entry, error) {
+	if err := validateContext(ctx, "Source entry stat"); err != nil {
+		return source.Entry{}, err
+	}
+	if s == nil {
+		return source.Entry{}, basespec.ErrClosed
+	}
+	if err := rootID.Validate(); err != nil {
+		return source.Entry{}, err
+	}
+	if err := sourceID.Validate(); err != nil {
+		return source.Entry{}, err
+	}
+	if err := locator.Validate(true); err != nil {
+		return source.Entry{}, err
+	}
+
+	value, err := s.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return source.Entry{}, err
+	}
+	if !value.Enabled {
+		return source.Entry{}, fmt.Errorf(
+			"%w: Source %q is disabled",
+			basespec.ErrSourceUnavailable,
+			sourceID,
+		)
+	}
+	snapshot, err := s.sources.Open(ctx, value)
+	if err != nil {
+		return source.Entry{}, err
+	}
+
+	entry, statErr := snapshot.Stat(ctx, locator)
+	confirmErr := snapshot.Confirm(ctx)
+	closeErr := snapshot.Close()
+	if err := errors.Join(statErr, confirmErr, closeErr); err != nil {
+		return source.Entry{}, err
+	}
+	if err := entry.Validate(); err != nil {
+		return source.Entry{}, err
+	}
+	if entry.Locator != locator {
+		return source.Entry{}, fmt.Errorf(
+			"%w: Source stat for %q returned %q",
+			basespec.ErrInvalid,
+			locator,
+			entry.Locator,
+		)
+	}
+	return entry, nil
 }
 
 // ReadSourceTree reads selected regular files from one Source snapshot.
@@ -562,49 +621,6 @@ func sourceTreeRelativeLocator(
 		)
 	}
 	return relative, nil
-}
-
-func (s *Service) ResolveSourceLocalPath(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) (string, error) {
-	if err := validateContext(ctx, "Source local-path resolution"); err != nil {
-		return "", err
-	}
-	if s == nil {
-		return "", basespec.ErrClosed
-	}
-	if err := rootID.Validate(); err != nil {
-		return "", err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return "", err
-	}
-	if err := locator.Validate(true); err != nil {
-		return "", err
-	}
-
-	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
-	if !supported {
-		return "", fmt.Errorf(
-			"%w: Source runtime has no local-path capability",
-			basespec.ErrUnsupported,
-		)
-	}
-	value, err := s.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return "", err
-	}
-	if !localPaths.SupportsLocalPath(value.Kind) {
-		return "", fmt.Errorf(
-			"%w: Source kind %q has no native local path",
-			basespec.ErrUnsupported,
-			value.Kind,
-		)
-	}
-	return localPaths.ResolveLocalPath(ctx, value, locator)
 }
 
 func (s *Service) SupportsLocalPath(

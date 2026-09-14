@@ -26,6 +26,12 @@ type Reader interface {
 type Repository interface {
 	Reader
 
+	FindByStorageKey(
+		ctx context.Context,
+		rootID root.RootID,
+		storageKey basespec.StorageKey,
+	) (source.Source, error)
+
 	Create(
 		ctx context.Context,
 		value source.Source,

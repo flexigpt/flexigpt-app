@@ -259,6 +259,9 @@ func (value ServerDocument) Validate() error {
 	); err != nil {
 		return err
 	}
+	if err := validateInclude(value.Include); err != nil {
+		return err
+	}
 	return validateParts(
 		string(value.LogicalName),
 		value.MCPServer,
@@ -661,7 +664,7 @@ func validateCoreServer(value CoreServer) error {
 			}
 		}
 
-	case ServerTypeHTTP:
+	case ServerTypeHTTP, ServerTypeSSE:
 		if value.Command != "" ||
 			len(value.Args) != 0 ||
 			len(value.Env) != 0 {
@@ -692,6 +695,51 @@ func validateCoreServer(value CoreServer) error {
 			basespec.ErrInvalid,
 			value.Type,
 		)
+	}
+	return nil
+}
+
+func validateInclude(value *Include) error {
+	if value == nil {
+		return nil
+	}
+	if err := validateIncludeValues(
+		"MCP include tools",
+		value.Tools,
+	); err != nil {
+		return err
+	}
+	if err := validateIncludeValues(
+		"MCP include resources",
+		value.Resources,
+	); err != nil {
+		return err
+	}
+	return validateIncludeValues("MCP include prompts", value.Prompts)
+}
+
+func validateIncludeValues(
+	label string,
+	values []string,
+) error {
+	seen := make(map[string]struct{}, len(values))
+	for index, value := range values {
+		if err := basespec.ValidateRequiredText(
+			label,
+			value,
+			basespec.MaxURIBytes,
+		); err != nil {
+			return fmt.Errorf("%s[%d]: %w", label, index, err)
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return fmt.Errorf(
+				"%w: %s repeats %q",
+				basespec.ErrInvalid,
+				label,
+				value,
+			)
+		}
+		seen[value] = struct{}{}
 	}
 	return nil
 }

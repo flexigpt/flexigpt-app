@@ -32,6 +32,30 @@ import (
 func DefinitionForEntry(
 	entry declaration.Entry,
 ) (definition.Definition, error) {
+	if err := ValidateEntryTree(entry); err != nil {
+		return definition.Definition{}, err
+	}
+	return definitionForEntry(entry, false)
+}
+
+// definitionForNamedEntry is used by canonicalDecoder after the complete
+// containing document has already passed ValidateEntryTree.
+func definitionForNamedEntry(
+	named declaration.NamedEntry,
+) (definition.Definition, error) {
+	if err := named.Validate(); err != nil {
+		return definition.Definition{}, err
+	}
+	return definitionForEntry(
+		named.Entry,
+		named.ImplicitLoopBody,
+	)
+}
+
+func definitionForEntry(
+	entry declaration.Entry,
+	implicitLoopBody bool,
+) (definition.Definition, error) {
 	if err := entry.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
@@ -171,7 +195,10 @@ func DefinitionForEntry(
 		)
 
 	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopEntry(entry, false)
+		value, err := loopv1.DecodeLoopEntry(
+			entry,
+			implicitLoopBody,
+		)
 		if err != nil {
 			return definition.Definition{}, err
 		}

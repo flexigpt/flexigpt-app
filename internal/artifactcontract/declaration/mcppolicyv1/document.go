@@ -32,7 +32,7 @@ var MCPPolicySchemaKey = schema.ArtifactKey(
 type MCPPolicyDocument struct {
 	declaration.Header
 
-	Body MCPPolicyBody `json:"body"`
+	Body *MCPPolicyBody `json:"body"`
 }
 
 type MCPPolicyBody struct {
@@ -153,6 +153,15 @@ func (v MCPPolicyDocument) validate(requireName bool) error {
 		RequireName:  requireName,
 	}); err != nil {
 		return err
+	}
+	if v.Body == nil {
+		if v.Locator != nil {
+			return nil
+		}
+		return fmt.Errorf(
+			"%w: MCP Policy requires body or locator",
+			basespec.ErrInvalid,
+		)
 	}
 	return v.Body.Validate()
 }

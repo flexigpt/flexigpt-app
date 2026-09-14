@@ -53,6 +53,12 @@ type SourceAPI interface {
 		draft source.Draft,
 	) (source.Summary, error)
 
+	Ensure(
+		ctx context.Context,
+		rootID root.RootID,
+		draft source.Draft,
+	) (source.Summary, bool, error)
+
 	CreateWithStatus(
 		ctx context.Context,
 		rootID root.RootID,
@@ -205,6 +211,13 @@ type ResourceAPI interface {
 		maximumBytes int64,
 	) (resource.VerifiedEntry, error)
 
+	StatSourceEntry(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+		locator basespec.Locator,
+	) (source.Entry, error)
+
 	ReadSourceTree(
 		ctx context.Context,
 		rootID root.RootID,
@@ -215,13 +228,6 @@ type ResourceAPI interface {
 		maximumEntries int,
 		maximumBytes int64,
 	) ([]resource.VerifiedEntry, error)
-
-	ResolveSourceLocalPath(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		locator basespec.Locator,
-	) (string, error)
 
 	SupportsLocalPath(kind source.SourceKind) bool
 }

@@ -16,12 +16,15 @@ import (
 type NamedEntry struct {
 	SubresourceLocator basespec.SubresourceLocator
 	Entry              Entry
+
+	ImplicitLoopBody bool
 }
 
 func (e NamedEntry) Clone() NamedEntry {
 	return NamedEntry{
 		SubresourceLocator: e.SubresourceLocator,
 		Entry:              e.Entry.Clone(),
+		ImplicitLoopBody:   e.ImplicitLoopBody,
 	}
 }
 
@@ -35,6 +38,13 @@ func (e NamedEntry) Validate() error {
 	if e.Entry.Header().Name == "" {
 		return fmt.Errorf(
 			"%w: named declaration has no name",
+			basespec.ErrInvalid,
+		)
+	}
+	if e.ImplicitLoopBody &&
+		e.Entry.Header().Type != TypeLoop {
+		return fmt.Errorf(
+			"%w: only a Loop may use an implicit containing body",
 			basespec.ErrInvalid,
 		)
 	}
@@ -61,7 +71,7 @@ func WalkNamedEntries(
 	}
 
 	output := make([]NamedEntry, 0)
-	if err := walkNamedEntry(root, nil, true, &output); err != nil {
+	if err := walkNamedEntry(root, nil, true, false, &output); err != nil {
 		return nil, err
 	}
 
@@ -79,11 +89,13 @@ func walkNamedEntry(
 	entry Entry,
 	path []string,
 	topLevel bool,
+	implicitLoopBody bool,
 	output *[]NamedEntry,
 ) error {
 	if topLevel {
 		*output = append(*output, NamedEntry{
-			Entry: entry.Clone(),
+			Entry:            entry.Clone(),
+			ImplicitLoopBody: implicitLoopBody,
 		})
 	} else if entry.Header().Name != "" && !entry.IsSymbolic() {
 		subresource, err := subresourceForPath(path)
@@ -93,6 +105,7 @@ func walkNamedEntry(
 		*output = append(*output, NamedEntry{
 			SubresourceLocator: subresource,
 			Entry:              entry.Clone(),
+			ImplicitLoopBody:   implicitLoopBody,
 		})
 	}
 
@@ -131,6 +144,7 @@ func walkNamedEntry(
 		return walkSingleEntry(
 			fields["program"],
 			appendPath(path, "program"),
+			true,
 			output,
 		)
 
@@ -138,6 +152,7 @@ func walkNamedEntry(
 		return walkSingleEntry(
 			fields["body"],
 			appendPath(path, "body"),
+			false,
 			output,
 		)
 
@@ -187,6 +202,7 @@ func walkEntryArray(
 			entry,
 			appendPath(base, strconv.Itoa(index)),
 			false,
+			false,
 			output,
 		); err != nil {
 			return err
@@ -198,6 +214,7 @@ func walkEntryArray(
 func walkSingleEntry(
 	raw json.RawMessage,
 	path []string,
+	implicitLoopBody bool,
 	output *[]NamedEntry,
 ) error {
 	if len(raw) == 0 {
@@ -207,7 +224,13 @@ func walkSingleEntry(
 	if err != nil {
 		return err
 	}
-	return walkNamedEntry(entry, path, false, output)
+	return walkNamedEntry(
+		entry,
+		path,
+		false,
+		implicitLoopBody && entry.Header().Type == TypeLoop,
+		output,
+	)
 }
 
 func walkWorkflowTargets(
@@ -232,6 +255,7 @@ func walkWorkflowTargets(
 				strconv.Itoa(index),
 				"target",
 			),
+			false,
 			output,
 		); err != nil {
 			return err
@@ -267,6 +291,7 @@ func walkWorkspaceDeclarationEntries(
 		if err := walkNamedEntry(
 			entry,
 			appendPath(base, strconv.Itoa(index)),
+			false,
 			false,
 			output,
 		); err != nil {

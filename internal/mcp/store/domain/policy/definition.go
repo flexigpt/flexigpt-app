@@ -31,9 +31,15 @@ func BodyFromDefinition(
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
+	if document.Body == nil {
+		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+			"%w: MCP Policy declaration has no resolved body",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
 
 	raw, err := jsonutil.MarshalCanonicalObject(
-		document.Body,
+		*document.Body,
 		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
@@ -47,6 +53,7 @@ func BodyFromDefinition(
 			err,
 		)
 	}
+	body = mcpPolicy.Normalize(body)
 	if err := body.Validate(); err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
@@ -86,7 +93,7 @@ func DocumentFromLegacyBody(
 		Type:        mcppolicyv1.MCPPolicyType,
 		Name:        string(name),
 		Description: description,
-		Body:        body,
+		Body:        &body,
 	}
 	if err := value.Validate(); err != nil {
 		return mcppolicyv1.MCPPolicyDocument{}, err

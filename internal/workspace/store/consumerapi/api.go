@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -29,6 +30,7 @@ type StoreAPI struct {
 	config         Config
 	contextAdapter *prompt.Adapter
 	skillAdapter   *skill.Adapter
+	resolver       *resolve.Resolver
 }
 
 func NewStoreAPI(
@@ -52,6 +54,14 @@ func NewStoreAPI(
 		return nil, err
 	}
 
+	output := &StoreAPI{
+		sources:   sources,
+		discovery: discovery,
+		artifacts: artifacts,
+		resources: resources,
+		config:    config,
+	}
+
 	contextAdapter, err := prompt.New(
 		artifacts,
 		resources,
@@ -65,15 +75,27 @@ func NewStoreAPI(
 		return nil, err
 	}
 
-	return &StoreAPI{
-		sources:        sources,
-		discovery:      discovery,
-		artifacts:      artifacts,
-		resources:      resources,
-		config:         config,
-		contextAdapter: contextAdapter,
-		skillAdapter:   skillAdapter,
-	}, nil
+	locators, err := resolve.NewProviderLocatorResolver(
+		config.LocatorResolvers,
+		output,
+	)
+	if err != nil {
+		return nil, err
+	}
+	resolver, err := resolve.New(
+		artifacts,
+		locators,
+		config.ResolverLimits,
+		config.ResolverOptions,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	output.contextAdapter = contextAdapter
+	output.skillAdapter = skillAdapter
+	output.resolver = resolver
+	return output, nil
 }
 
 func (a *StoreAPI) RegisterFilesystemSource(
@@ -193,11 +215,10 @@ func (a *StoreAPI) LoadWorkspace(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (WorkspaceLoad, error) {
-	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
+	workspace, _, resolved, err := a.refreshAndResolveWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspaceLoad{}, err
 	}
-
 	roots := make(
 		[]declaration.Entry,
 		len(workspace.Document.Roots),
@@ -208,6 +229,7 @@ func (a *StoreAPI) LoadWorkspace(
 	return WorkspaceLoad{
 		Workspace: workspace,
 		Roots:     roots,
+		resolved:  resolved.Root.Workspace,
 	}, nil
 }
 
@@ -215,19 +237,12 @@ func (a *StoreAPI) RefreshWorkspace(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (WorkspaceRefresh, error) {
-	workspace, err := a.applyWorkspaceDeclarations(ctx, ref)
-	if err != nil {
-		return WorkspaceRefresh{}, err
-	}
-	result, err := a.discovery.RefreshRoot(
-		ctx,
-		workspace.Artifact.RootID,
-	)
+	workspace, result, _, err := a.refreshAndResolveWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspaceRefresh{}, err
 	}
 	return WorkspaceRefresh{
-		Workspace: ref,
+		Workspace: workspace.Ref(),
 		Result:    result,
 	}, nil
 }
@@ -373,6 +388,8 @@ func (a *StoreAPI) defaultDiscovery() (
 					"**/*.yaml",
 					"**/*.yml",
 					"**/SKILL.md",
+					"**/AGENTS.md",
+					"**/CLAUDE.md",
 				},
 			},
 			{

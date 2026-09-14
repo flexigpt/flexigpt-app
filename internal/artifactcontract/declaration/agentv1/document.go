@@ -135,6 +135,7 @@ func (v AgentDocument) validate(requireName bool) error {
 		declaration.TypeSkill,
 		declaration.TypeTool,
 		declaration.TypeMCP,
+		declaration.TypeMCPPolicy,
 		declaration.TypeCollection,
 		declaration.TypeAgent,
 	); err != nil {

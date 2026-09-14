@@ -3,6 +3,7 @@ package consumerapi
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -30,6 +31,20 @@ type PolicyView struct {
 	Body             mcpPolicy.MCPPolicy   `json:"body"`
 	EffectiveEnabled bool                  `json:"effectiveEnabled"`
 	BuiltIn          bool                  `json:"builtIn"`
+}
+
+type ManagedMCPPolicyUpsertRequest struct {
+	RootID      root.RootID               `json:"rootID"`
+	SourceID    source.SourceID           `json:"sourceID"`
+	Name        basespec.LogicalName      `json:"name"`
+	Description string                    `json:"description,omitempty"`
+	Body        mcppolicyv1.MCPPolicyBody `json:"body"`
+	Enabled     bool                      `json:"enabled"`
+}
+
+type ManagedMCPPolicyUpsertResult struct {
+	Artifact artifact.Artifact        `json:"artifact"`
+	Address  artifact.ArtifactAddress `json:"address"`
 }
 
 type BuiltInArtifactExpectation struct {

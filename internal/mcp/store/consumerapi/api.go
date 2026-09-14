@@ -604,9 +604,7 @@ func (a *API) resolveServerMaterial(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	document, err := mcpDomainServer.ServerDocumentFromDefinition(
-		resolved.Definition,
-	)
+	document, err := a.serverDocumentForResolvedArtifact(ctx, resolved)
 	if err != nil {
 		return serverResolutionMaterial{}, err
 	}

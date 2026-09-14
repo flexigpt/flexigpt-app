@@ -42,7 +42,7 @@ func LoopJSONSchema() []byte {
 }
 
 func DecodeLoopJSON(raw []byte) (LoopDocument, error) {
-	return decodeLoop(raw, true, false, false)
+	return decodeLoop(raw, true, false)
 }
 
 func DecodeLoopEntry(
@@ -53,7 +53,7 @@ func DecodeLoopEntry(
 	if err := entry.DecodeInto(&value); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validate(false, implicitBody, entry.IsSymbolic()); err != nil {
+	if err := value.validate(false, implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -63,7 +63,6 @@ func decodeLoop(
 	raw []byte,
 	requireName bool,
 	implicitBody bool,
-	symbolic bool,
 ) (LoopDocument, error) {
 	var value LoopDocument
 	if err := declaration.DecodeDocumentInto(
@@ -73,7 +72,7 @@ func decodeLoop(
 	); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validate(requireName, implicitBody, symbolic); err != nil {
+	if err := value.validate(requireName, implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -102,19 +101,18 @@ func (v LoopDocument) CalculatedDigest() (
 }
 
 func (v LoopDocument) Validate() error {
-	return v.validate(true, false, false)
+	return v.validate(true, false)
 }
 
 func (v LoopDocument) ValidateEntry(
 	implicitBody bool,
 ) error {
-	return v.validate(false, implicitBody, false)
+	return v.validate(false, implicitBody)
 }
 
 func (v LoopDocument) validate(
 	requireName bool,
 	implicitBody bool,
-	symbolic bool,
 ) error {
 	if err := declaration.ValidateDocument(
 		compiledLoopSchema,
@@ -150,8 +148,7 @@ func (v LoopDocument) validate(
 	}
 	if v.Body == nil &&
 		v.Locator == nil &&
-		!implicitBody &&
-		!symbolic {
+		!implicitBody {
 		return fmt.Errorf(
 			"%w: inline standalone Loop requires body",
 			basespec.ErrInvalid,

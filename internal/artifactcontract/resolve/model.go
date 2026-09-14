@@ -18,10 +18,12 @@ import (
 )
 
 type LocatorRequest struct {
-	RootID       root.RootID
-	From         *artifact.Artifact
-	Locator      declaration.Locator
-	ExpectedType declaration.Type
+	RootID              root.RootID
+	From                *artifact.Artifact
+	Entry               declaration.Entry
+	Locator             declaration.Locator
+	ExpectedType        declaration.Type
+	ExpectedLogicalName basespec.LogicalName
 }
 
 // LocatorResolver is implemented by application-owned path, URL, Git,
@@ -113,12 +115,13 @@ func (r *Resolver) ResolveInline(
 	rootID root.RootID,
 	entry declaration.Entry,
 ) (Graph, error) {
+	if err := validateResolutionContext(ctx); err != nil {
+		return Graph{}, err
+	}
 	if err := rootID.Validate(); err != nil {
 		return Graph{}, err
 	}
-	state := resolutionState{
-		collections: make(map[artifact.ArtifactRef]struct{}),
-	}
+	state := newResolutionState()
 	return r.resolveInlineGraph(ctx, &state, rootID, entry)
 }
 
@@ -129,7 +132,8 @@ type Graph struct {
 type ResolvedEntry struct {
 	Type declaration.Type
 
-	scopeRootID root.RootID
+	scopeRootID       root.RootID
+	DeclarationOrigin *artifact.Artifact
 
 	Artifact   *artifact.Artifact
 	Definition *definition.Definition
@@ -190,4 +194,14 @@ func (r *ResolvedEntry) RootID() (root.RootID, bool) {
 		return r.scopeRootID, true
 	}
 	return "", false
+}
+
+func validateResolutionContext(ctx context.Context) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Artifact resolver context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	return ctx.Err()
 }

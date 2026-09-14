@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"maps"
+	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -126,6 +127,7 @@ func runtimeConfig(
 			[]string(nil),
 			input.SensitiveValues...,
 		),
+		Include: runtimeInclude(resolved.Document.Include),
 	}
 
 	switch input.Core.Type {
@@ -138,7 +140,7 @@ func runtimeConfig(
 			StartupTimeoutMS: input.TimeoutMS,
 		}
 
-	case mcpDomainServer.ServerTypeHTTP:
+	case mcpDomainServer.ServerTypeHTTP, mcpDomainServer.ServerTypeSSE:
 		authMode, err := runtimeHTTPAuthMode(input.Auth.Mode)
 		if err != nil {
 			return mcpServer.RuntimeConfig{}, err
@@ -163,6 +165,19 @@ func runtimeConfig(
 		return mcpServer.RuntimeConfig{}, err
 	}
 	return output, nil
+}
+
+func runtimeInclude(
+	input *mcpDomainServer.Include,
+) *mcpServer.MCPInclude {
+	if input == nil {
+		return nil
+	}
+	return &mcpServer.MCPInclude{
+		Tools:     slices.Clone(input.Tools),
+		Resources: slices.Clone(input.Resources),
+		Prompts:   slices.Clone(input.Prompts),
+	}
 }
 
 func runtimeHTTPAuthMode(
