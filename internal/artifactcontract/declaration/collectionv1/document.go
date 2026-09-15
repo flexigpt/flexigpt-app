@@ -131,6 +131,13 @@ func (v CollectionDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Collection",
+		v.Locator,
+		v.Version != "" || v.Members != nil,
+	); err != nil {
+		return err
+	}
 	if v.Version != "" {
 		if err := basespec.LogicalVersion(v.Version).Validate(false); err != nil {
 			return err

@@ -144,8 +144,10 @@ func (a *Adapter) contentForDocument(
 
 	var output strings.Builder
 	for index, entry := range entries {
-		if entry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
+		if entry.SourceRevision !=
+			resolved.RefreshState.SourceRevision ||
+			entry.SourceGeneration !=
+				resolved.RefreshState.SourceGeneration {
 			return "", fmt.Errorf(
 				"%w: Context Source changed during selection",
 				basespec.ErrRefreshRequired,

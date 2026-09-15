@@ -130,6 +130,25 @@ func (v ContextDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	switch {
+	case v.Content != nil && v.Locator != nil:
+		return fmt.Errorf(
+			"%w: Context cannot contain both content and locator",
+			basespec.ErrInvalid,
+		)
+	case v.Content == nil && v.Locator == nil:
+		return fmt.Errorf(
+			"%w: concrete Context requires content or locator",
+			basespec.ErrInvalid,
+		)
+	}
+	if v.Content != nil &&
+		(len(v.Include) != 0 || len(v.Exclude) != 0) {
+		return fmt.Errorf(
+			"%w: inline Context cannot contain source include or exclude patterns",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := declaration.ValidateOptionalContent(v.Content); err != nil {
 		return err
 	}

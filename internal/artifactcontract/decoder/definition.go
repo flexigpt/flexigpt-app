@@ -32,6 +32,12 @@ func DefinitionForEntry(
 func DefinitionForNamedEntry(
 	named declaration.NamedEntry,
 ) (definition.Definition, error) {
+	if err := named.Validate(); err != nil {
+		return definition.Definition{}, err
+	}
+	if err := ValidateEntryTree(named.Entry); err != nil {
+		return definition.Definition{}, err
+	}
 	return definitionForNamedEntry(named)
 }
 

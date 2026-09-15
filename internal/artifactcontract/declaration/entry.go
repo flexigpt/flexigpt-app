@@ -155,6 +155,52 @@ func (e Entry) IsSymbolic() bool {
 	return hasType && hasName
 }
 
+// IsDeclarationLocatorReference reports a located declaration edge.
+//
+// Composite declaration locators identify another declaration Artifact.
+// When nested, this form remains an edge and must not create an unused wrapper
+// Artifact at the containing document's subresource.
+func (e Entry) IsDeclarationLocatorReference() bool {
+	if err := e.Validate(); err != nil {
+		return false
+	}
+	header := e.Header()
+	if header.Locator == nil ||
+		header.Locator.Kind == LocatorKindCommand {
+		return false
+	}
+	switch header.Type {
+	case TypeCollection,
+		TypeAgent,
+		TypeTeam,
+		TypeLoop,
+		TypeWorkflow,
+		TypeWorkspace,
+		TypeMCPPolicy:
+	default:
+		return false
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(e.raw, &fields); err != nil {
+		return false
+	}
+	for key := range fields {
+		switch key {
+		case "$schema",
+			"apiVersion",
+			"type",
+			"name",
+			"description",
+			"locator",
+			"metadata":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func (e Entry) MarshalJSON() ([]byte, error) {
 	return e.CanonicalJSON()
 }

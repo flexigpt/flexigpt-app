@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -131,6 +132,18 @@ func (v InstructionDocument) validateFields() error {
 		APIVersion:   InstructionSchemaVersion,
 	}); err != nil {
 		return err
+	}
+	switch {
+	case v.Content != nil && v.Locator != nil:
+		return fmt.Errorf(
+			"%w: Instruction cannot contain both content and locator",
+			basespec.ErrInvalid,
+		)
+	case v.Content == nil && v.Locator == nil:
+		return fmt.Errorf(
+			"%w: concrete Instruction requires content or locator",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := declaration.ValidateOptionalContent(v.Content); err != nil {
 		return err

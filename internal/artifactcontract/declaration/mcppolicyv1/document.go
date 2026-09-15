@@ -160,6 +160,13 @@ func (v MCPPolicyDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"MCP Policy",
+		v.Locator,
+		v.Body != nil,
+	); err != nil {
+		return err
+	}
 	if v.Body == nil {
 		if v.Locator != nil {
 			return nil

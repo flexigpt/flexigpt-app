@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -387,6 +388,14 @@ func (a *API) GetManagedSkillDocument(
 			basespec.ErrUnsupported,
 		)
 	}
+	if value.Binding.SubresourceLocator != "" ||
+		path.Base(string(value.Binding.Locator)) !=
+			string(skillDomain.SkillDefinitionFileName) {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: collection-owned Skills must be edited through their owning declaration package",
+			basespec.ErrUnsupported,
+		)
+	}
 
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
@@ -408,7 +417,10 @@ func (a *API) GetManagedSkillDocument(
 	}
 	if value.SourceContentDigest == nil ||
 		entry.Digest != *value.SourceContentDigest ||
-		entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+		entry.SourceRevision !=
+			resolved.RefreshState.SourceRevision ||
+		entry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: Skill Source changed while reading managed document",
 			basespec.ErrRefreshRequired,
@@ -458,7 +470,18 @@ func (a *API) PurgeSkill(
 		return err
 	}
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return a.artifacts.Purge(ctx, ref, expectedRevision)
+		return fmt.Errorf(
+			"%w: source-backed Skill removal must update or unregister its Source",
+			basespec.ErrUnsupported,
+		)
+	}
+	if value.Binding.SubresourceLocator != "" ||
+		path.Base(string(value.Binding.Locator)) !=
+			string(skillDomain.SkillDefinitionFileName) {
+		return fmt.Errorf(
+			"%w: collection-owned Skills must be removed through their owning declaration package",
+			basespec.ErrUnsupported,
+		)
 	}
 
 	packageAddress, err := skillDomain.ManagedPackageAddressFromSkillLocator(

@@ -169,7 +169,10 @@ func (r *ArtifactRouter) resolveRecord(
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	if sourceEntry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+	if sourceEntry.SourceRevision !=
+		resolved.RefreshState.SourceRevision ||
+		sourceEntry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
 		return ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: Skill Source changed during runtime resolution",
 			basespec.ErrRefreshRequired,

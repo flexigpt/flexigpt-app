@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -389,6 +390,7 @@ func (r *Resolver) resolveEntry(
 			ctx,
 			state,
 			rootID,
+			from,
 			entry,
 			depth,
 		)
@@ -420,6 +422,7 @@ func (r *Resolver) resolveNamedInlineArtifact(
 	ctx context.Context,
 	state *resolutionState,
 	rootID root.RootID,
+	from *artifact.Artifact,
 	entry declaration.Entry,
 	depth int,
 ) (*ResolvedEntry, error) {
@@ -442,6 +445,10 @@ func (r *Resolver) resolveNamedInlineArtifact(
 	for _, record := range records {
 		if record.State != artifact.StateAvailable ||
 			(!r.options.IncludeDisabled && !record.Enabled) {
+			continue
+		}
+		if from != nil &&
+			!isNestedDeclarationOrigin(record, *from) {
 			continue
 		}
 		definitionValue, err := r.artifacts.GetDefinition(
@@ -481,6 +488,26 @@ func (r *Resolver) resolveNamedInlineArtifact(
 			len(matches),
 		)
 	}
+}
+
+func isNestedDeclarationOrigin(
+	record artifact.Artifact,
+	parent artifact.Artifact,
+) bool {
+	if record.Binding.SourceID != parent.Binding.SourceID ||
+		record.Binding.Locator != parent.Binding.Locator {
+		return false
+	}
+
+	child := string(record.Binding.SubresourceLocator)
+	ancestor := string(parent.Binding.SubresourceLocator)
+	if ancestor == "" {
+		return child != ""
+	}
+	return strings.HasPrefix(
+		child,
+		ancestor+"/",
+	)
 }
 
 func (r *Resolver) resolveStructure(
@@ -859,65 +886,8 @@ func shouldResolveDeclarationLocator(
 	entry declaration.Entry,
 	locator *declaration.Locator,
 ) bool {
-	if !declarationLocatorLoadsArtifact(entry.Header().Type) {
-		return false
-	}
-	value, err := isLocatorOnlyEntry(entry, locator)
-	return err == nil && value
-}
-
-// declarationLocatorLoadsArtifact identifies declarations whose locator is a
-// declaration source that the Resolver must load. Leaf declaration locators
-// identify implementation or resource material and remain available to their
-// corresponding consumer materializers.
-func declarationLocatorLoadsArtifact(
-	declarationType declaration.Type,
-) bool {
-	switch declarationType {
-	case declaration.TypeCollection,
-		declaration.TypeAgent,
-		declaration.TypeTeam,
-		declaration.TypeLoop,
-		declaration.TypeWorkflow,
-		declaration.TypeWorkspace,
-		declaration.TypeMCPPolicy:
-		return true
-	default:
-		return false
-	}
-}
-
-func isLocatorOnlyEntry(
-	entry declaration.Entry,
-	locator *declaration.Locator,
-) (bool, error) {
-	if locator == nil ||
-		locator.Kind == declaration.LocatorKindCommand {
-		return false, nil
-	}
-
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
-		return false, err
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &fields); err != nil {
-		return false, err
-	}
-	for key := range fields {
-		switch key {
-		case "$schema",
-			"apiVersion",
-			"type",
-			"name",
-			"description",
-			"locator",
-			"metadata":
-		default:
-			return false, nil
-		}
-	}
-	return true, nil
+	return locator != nil &&
+		entry.IsDeclarationLocatorReference()
 }
 
 func isBodylessImplicitLoop(

@@ -58,39 +58,7 @@ func DefinitionForDocument(
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	body, err := decl.CanonicalJSON()
-	if err != nil {
-		return definition.Definition{}, err
-	}
-
-	labels := maps.Clone(input.Labels)
-	if labels == nil {
-		labels = map[string]string{}
-	}
-	labels[TransportLabelKey] = string(input.MCPServer.Type)
-	labels[AuthModeLabelKey] = string(input.Extension.Auth.Mode)
-
-	dependencies := []definition.Selector(nil)
-	if input.Extension.Policy != nil {
-		dependencies = append(dependencies, definition.Selector{
-			Kind:        mcpDomain.MCPPolicyArtifactKind,
-			LogicalName: input.Extension.Policy.Ref,
-		})
-	}
-
-	value := definition.Definition{
-		Kind:           mcpDomain.MCPArtifactKind,
-		SchemaID:       mcpv1.MCPSchemaKey.SchemaID,
-		SchemaVersion:  mcpv1.MCPSchemaKey.SchemaVersion,
-		LogicalName:    input.LogicalName,
-		LogicalVersion: input.LogicalVersion,
-		DisplayName:    input.DisplayName,
-		Description:    input.Description,
-		Labels:         labels,
-		Body:           body,
-		Dependencies:   dependencies,
-	}
-	return definition.Canonicalize(value)
+	return mcpv1.DefinitionForDeclaration(decl)
 }
 
 func ServerDocumentFromDefinition(
@@ -224,8 +192,7 @@ func coreFromDeclaration(
 		URL:     input.URL,
 		Headers: maps.Clone(input.Headers),
 	}
-	if input.Transport == "" &&
-		input.Locator != nil &&
+	if input.Locator != nil &&
 		input.Locator.Kind == declaration.LocatorKindCommand {
 		output.Type = ServerTypeStdio
 		output.Command = input.Locator.Command

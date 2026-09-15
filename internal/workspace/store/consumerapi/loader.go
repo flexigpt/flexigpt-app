@@ -45,10 +45,18 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 		return workspaceDomain.Workspace{}, false, err
 	}
 
+	workspaceLocators, err := a.workspaceDeclarationLocators(
+		ctx,
+		sourceValue,
+	)
+	if err != nil {
+		return workspaceDomain.Workspace{}, false, err
+	}
 	base, err := a.workspaceDiscoveryBase(
 		sourceValue,
 		workspace.Artifact.Binding.Locator,
 		workspace.Document.Declarations != nil,
+		workspaceLocators,
 	)
 	if err != nil {
 		return workspaceDomain.Workspace{}, false, err
@@ -97,13 +105,19 @@ func (a *StoreAPI) workspaceDiscoveryBase(
 	current source.Summary,
 	declarationLocator basespec.Locator,
 	explicitDeclarations bool,
+	workspaceLocators []basespec.Locator,
 ) (source.DiscoverySpec, error) {
 	output := current.Discovery.Clone()
+	workspaceLocators = appendUniqueLocator(
+		workspaceLocators,
+		declarationLocator,
+	)
 	if explicitDeclarations {
 		output = source.DiscoverySpec{
-			ExplicitLocators: []basespec.Locator{
-				declarationLocator,
-			},
+			ExplicitLocators: append(
+				[]basespec.Locator(nil),
+				workspaceLocators...,
+			),
 			AllowedDecoderIDs: append(
 				[]basespec.DecoderID(nil),
 				current.Discovery.AllowedDecoderIDs...,
@@ -115,28 +129,35 @@ func (a *StoreAPI) workspaceDiscoveryBase(
 			MaxEntries:        current.Discovery.MaxEntries,
 			MaxDepth:          current.Discovery.MaxDepth,
 		}
-		if expected, found := current.Discovery.
-			ExpectedContentDigests[declarationLocator]; found {
-			output.ExpectedContentDigests = map[basespec.Locator]cryptoutil.Digest{
-				declarationLocator: expected,
+		for _, locator := range workspaceLocators {
+			if expected, found := current.Discovery.
+				ExpectedContentDigests[locator]; found {
+				if output.ExpectedContentDigests == nil {
+					output.ExpectedContentDigests = make(map[basespec.Locator]cryptoutil.Digest)
+				}
+				output.ExpectedContentDigests[locator] = expected
 			}
 		}
 	}
-	output.ExplicitLocators = appendUniqueLocator(
-		output.ExplicitLocators,
-		declarationLocator,
-	)
+	for _, locator := range workspaceLocators {
+		output.ExplicitLocators = appendUniqueLocator(
+			output.ExplicitLocators,
+			locator,
+		)
+	}
 	for _, hint := range a.config.AdditionalDecoderHints {
 		output.DecoderHints = appendDecoderHint(
 			output.DecoderHints,
 			hint,
 		)
 	}
-	output.DecoderHints = appendCanonicalDeclarationDecoderHint(
-		output.DecoderHints,
-		output.AllowedDecoderIDs,
-		declarationLocator,
-	)
+	for _, locator := range workspaceLocators {
+		output.DecoderHints = appendCanonicalDeclarationDecoderHint(
+			output.DecoderHints,
+			output.AllowedDecoderIDs,
+			locator,
+		)
+	}
 	output = output.Normalized()
 	if err := output.Validate(); err != nil {
 		return source.DiscoverySpec{}, err
@@ -166,6 +187,15 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 			err
 	}
 
+	if err := a.ensureWorkspaceDeclarationCandidate(
+		ctx,
+		ref,
+	); err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			resolve.Graph{},
+			err
+	}
 	result, err := a.discovery.RefreshRoot(ctx, ref.RootID)
 	if err != nil {
 		return workspaceDomain.Workspace{},
@@ -238,6 +268,94 @@ func (a *StoreAPI) ResolveWorkspaceGraph(
 		return resolve.Graph{}, err
 	}
 	return graph, nil
+}
+
+func (a *StoreAPI) ensureWorkspaceDeclarationCandidate(
+	ctx context.Context,
+	ref WorkspaceRef,
+) error {
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if record.Kind != workspaceDomain.WorkspaceArtifactKind {
+		return fmt.Errorf(
+			"%w: Artifact %q is not a Workspace",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	current, err := a.sources.Get(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return err
+	}
+	inScope, err := current.Discovery.InScope(
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return err
+	}
+	if inScope {
+		return nil
+	}
+
+	next := current.Discovery.Clone()
+	next.ExplicitLocators = appendUniqueLocator(
+		next.ExplicitLocators,
+		record.Binding.Locator,
+	)
+	next.DecoderHints = appendCanonicalDeclarationDecoderHint(
+		next.DecoderHints,
+		next.AllowedDecoderIDs,
+		record.Binding.Locator,
+	)
+	next = next.Normalized()
+	if err := next.Validate(); err != nil {
+		return err
+	}
+	_, err = a.sources.Update(
+		ctx,
+		current.RootID,
+		current.ID,
+		source.Update{
+			ExpectedRevision: current.Revision,
+			DisplayName:      current.DisplayName,
+			Enabled:          current.Enabled,
+			Discovery:        &next,
+		},
+	)
+	return err
+}
+
+func (a *StoreAPI) workspaceDeclarationLocators(
+	ctx context.Context,
+	sourceValue source.Summary,
+) ([]basespec.Locator, error) {
+	records, err := a.artifacts.ListBySource(
+		ctx,
+		sourceValue.RootID,
+		sourceValue.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]basespec.Locator, 0)
+	for _, record := range records {
+		if record.Kind != workspaceDomain.WorkspaceArtifactKind {
+			continue
+		}
+		output = appendUniqueLocator(
+			output,
+			record.Binding.Locator,
+		)
+	}
+	return output, nil
 }
 
 func (a *StoreAPI) expandWorkspaceDirectoryDeclarations(

@@ -294,6 +294,13 @@ func (v WorkspaceDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Workspace",
+		v.Locator,
+		v.Declarations != nil || v.Roots != nil,
+	); err != nil {
+		return err
+	}
 	for index, declaration := range v.Declarations {
 		if err := declaration.Validate(); err != nil {
 			return fmt.Errorf(

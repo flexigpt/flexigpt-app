@@ -125,6 +125,12 @@ func (v SkillDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if v.Locator == nil {
+		return fmt.Errorf(
+			"%w: concrete Skill requires a Skill package locator",
+			basespec.ErrInvalid,
+		)
+	}
 	if v.License != "" {
 		if err := basespec.ValidateRequiredText(
 			"Skill license",

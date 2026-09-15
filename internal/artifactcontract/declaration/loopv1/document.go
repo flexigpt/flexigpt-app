@@ -131,6 +131,15 @@ func (v LoopDocument) validateFields(
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Loop",
+		v.Locator,
+		v.Body != nil ||
+			v.MaxIterations != 0 ||
+			v.Until != nil,
+	); err != nil {
+		return err
+	}
 
 	if v.Body != nil {
 		if err := v.Body.Validate(); err != nil {

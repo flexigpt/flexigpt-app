@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -337,13 +338,18 @@ func (a *API) InstallBuiltInPackage(
 	if err := request.PackageAddress.Validate(); err != nil {
 		return nil, err
 	}
-	if err := request.DocumentFile.ValidatePortable(false); err != nil {
-		return nil, err
-	}
-	if len(request.Expectations) == 0 {
+	if request.PackageAddress.Kind != mcpDomain.MCPCollectionPackageKind {
 		return nil, fmt.Errorf(
-			"%w: built-in MCP package has no expected Artifacts",
+			"%w: built-in MCP package kind must be %q",
 			basespec.ErrInvalid,
+			mcpDomain.MCPCollectionPackageKind,
+		)
+	}
+	if request.DocumentFile != mcpDomain.MCPCollectionDocumentFile {
+		return nil, fmt.Errorf(
+			"%w: built-in MCP document file must be %q",
+			basespec.ErrInvalid,
+			mcpDomain.MCPCollectionDocumentFile,
 		)
 	}
 	if !a.protection.IsProtectedRoot(request.RootID) {
@@ -374,25 +380,10 @@ func (a *API) InstallBuiltInPackage(
 		return nil, err
 	}
 
-	expectations := append(
-		[]BuiltInArtifactExpectation(nil),
+	expectations, rootExpectation, err := normalizeBuiltInMCPExpectations(
 		request.Expectations...,
 	)
-	sort.Slice(expectations, func(left, right int) bool {
-		if expectations[left].Subresource != expectations[right].Subresource {
-			return expectations[left].Subresource <
-				expectations[right].Subresource
-		}
-		return expectations[left].Kind < expectations[right].Kind
-	})
-	first := expectations[0]
-	if err := first.Kind.Validate(); err != nil {
-		return nil, err
-	}
-	if err := first.LogicalName.Validate(); err != nil {
-		return nil, err
-	}
-	if err := cryptoutil.ValidateDigest(first.DefinitionDigest); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
@@ -403,11 +394,11 @@ func (a *API) InstallBuiltInPackage(
 			Binding: artifact.SourceBinding{
 				SourceID:           request.SourceID,
 				Locator:            documentLocator,
-				SubresourceLocator: first.Subresource,
+				SubresourceLocator: rootExpectation.Subresource,
 			},
-			ExpectedKind:        first.Kind,
-			ExpectedLogicalName: first.LogicalName,
-			ExpectedDefinition:  first.DefinitionDigest,
+			ExpectedKind:        rootExpectation.Kind,
+			ExpectedLogicalName: rootExpectation.LogicalName,
+			ExpectedDefinition:  rootExpectation.DefinitionDigest,
 			Package: source.ManagedPackagePublication{
 				Address: request.PackageAddress,
 				Files:   request.PackageFiles,
@@ -473,6 +464,82 @@ func (a *API) InstallBuiltInPackage(
 		output = append(output, value)
 	}
 	return output, nil
+}
+
+func normalizeBuiltInMCPExpectations(
+	values ...BuiltInArtifactExpectation,
+) (
+	expectations []BuiltInArtifactExpectation,
+	rootExpectation BuiltInArtifactExpectation,
+	err error,
+) {
+	if len(values) == 0 ||
+		len(values) > basespec.MaxDiscoveryEntries {
+		return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
+			"%w: built-in MCP package has invalid expectation count",
+			basespec.ErrInvalid,
+		)
+	}
+
+	output := append([]BuiltInArtifactExpectation(nil), values...)
+	seen := make(map[basespec.SubresourceLocator]struct{}, len(output))
+	var rootValue BuiltInArtifactExpectation
+	rootFound := false
+
+	for index, expected := range output {
+		if err := expected.Subresource.Validate(); err != nil {
+			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
+				"built-in MCP expectations[%d]: %w",
+				index,
+				err,
+			)
+		}
+		if err := expected.Kind.Validate(); err != nil {
+			return nil, BuiltInArtifactExpectation{}, err
+		}
+		if err := expected.LogicalName.Validate(); err != nil {
+			return nil, BuiltInArtifactExpectation{}, err
+		}
+		if err := cryptoutil.ValidateDigest(
+			expected.DefinitionDigest,
+		); err != nil {
+			return nil, BuiltInArtifactExpectation{}, err
+		}
+		if _, duplicate := seen[expected.Subresource]; duplicate {
+			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
+				"%w: built-in MCP package repeats subresource %q",
+				basespec.ErrInvalid,
+				expected.Subresource,
+			)
+		}
+		seen[expected.Subresource] = struct{}{}
+
+		if expected.Subresource != "" {
+			continue
+		}
+		if rootFound ||
+			expected.Kind != artifact.ArtifactKind(
+				declaration.TypeCollection,
+			) {
+			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
+				"%w: built-in MCP package requires exactly one root Collection",
+				basespec.ErrInvalid,
+			)
+		}
+		rootValue = expected
+		rootFound = true
+	}
+	if !rootFound {
+		return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
+			"%w: built-in MCP package has no root Collection",
+			basespec.ErrInvalid,
+		)
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		return output[left].Subresource < output[right].Subresource
+	})
+	return output, rootValue, nil
 }
 
 func (a *API) listArtifacts(

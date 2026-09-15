@@ -52,7 +52,10 @@ func (a *API) serverDocumentForResolvedArtifact(
 	if err != nil {
 		return mcpDomainServer.ServerDocument{}, err
 	}
-	if entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+	if entry.SourceRevision !=
+		resolved.RefreshState.SourceRevision ||
+		entry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
 		return mcpDomainServer.ServerDocument{}, fmt.Errorf(
 			"%w: located MCP source changed during resolution",
 			basespec.ErrRefreshRequired,

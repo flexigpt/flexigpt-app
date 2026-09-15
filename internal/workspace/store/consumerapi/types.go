@@ -22,6 +22,11 @@ type FilesystemSourceRegistration struct {
 	SourceDisplayName string      `json:"sourceDisplayName"`
 }
 
+type ManagedSourceRegistration struct {
+	RootID            root.RootID `json:"rootID"`
+	SourceDisplayName string      `json:"sourceDisplayName,omitempty"`
+}
+
 type WorkspacePathRegistration struct {
 	RootID            root.RootID          `json:"rootID"`
 	Path              string               `json:"path"`

@@ -2,9 +2,11 @@ package declaration
 
 import (
 	"encoding/json"
-	"strconv"
+	"fmt"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // NamedEntry is one named declaration reachable from a canonical declaration
@@ -54,10 +56,19 @@ func WalkNamedEntries(
 	}
 
 	result := make([]NamedEntry, len(output))
+	seen := make(map[basespec.SubresourceLocator]struct{}, len(output))
 	for index, value := range output {
 		if err := value.Validate(); err != nil {
 			return nil, err
 		}
+		if _, duplicate := seen[value.SubresourceLocator]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: declaration emits duplicate named subresource %q",
+				basespec.ErrIdentityConflict,
+				value.SubresourceLocator,
+			)
+		}
+		seen[value.SubresourceLocator] = struct{}{}
 		result[index] = value.Clone()
 	}
 	return result, nil
@@ -91,7 +102,8 @@ func walkNamedEntry(
 		*output = append(*output, NamedEntry{
 			Entry: entry.Clone(),
 		})
-	} else if !entry.IsSymbolic() {
+	} else if !entry.IsSymbolic() &&
+		!entry.IsDeclarationLocatorReference() {
 		if !contextualBodylessLoop {
 			subresource, err := subresourceForPath(path)
 			if err != nil {
@@ -179,14 +191,14 @@ func walkEntryArray(
 	if err := json.Unmarshal(raw, &entries); err != nil {
 		return err
 	}
-	for index, value := range entries {
+	for _, value := range entries {
 		entry, err := DecodeCanonicalEntryJSON(value)
 		if err != nil {
 			return err
 		}
 		if err := walkNamedEntry(
 			entry,
-			appendPath(base, strconv.Itoa(index)),
+			appendEntryPath(base, entry),
 			false,
 			false,
 			output,
@@ -199,7 +211,7 @@ func walkEntryArray(
 
 func walkSingleEntry(
 	raw json.RawMessage,
-	path []string,
+	base []string,
 	implicitLoopBody bool,
 	output *[]NamedEntry,
 ) error {
@@ -212,7 +224,7 @@ func walkSingleEntry(
 	}
 	return walkNamedEntry(
 		entry,
-		path,
+		appendEntryPath(base, entry),
 		false,
 		implicitLoopBody && entry.Header().Type == TypeLoop,
 		output,
@@ -228,17 +240,18 @@ func walkWorkflowTargets(
 		return nil
 	}
 	var nodes []struct {
+		ID     string          `json:"id"`
 		Target json.RawMessage `json:"target"`
 	}
 	if err := json.Unmarshal(raw, &nodes); err != nil {
 		return err
 	}
-	for index, node := range nodes {
+	for _, node := range nodes {
 		if err := walkSingleEntry(
 			node.Target,
 			appendPath(
 				base,
-				strconv.Itoa(index),
+				stableWorkflowNodeSegment(node.ID),
 				"target",
 			),
 			false,
@@ -262,7 +275,7 @@ func walkWorkspaceDeclarationEntries(
 	if err := json.Unmarshal(raw, &declarations); err != nil {
 		return err
 	}
-	for index, rawDeclaration := range declarations {
+	for _, rawDeclaration := range declarations {
 		var fields map[string]json.RawMessage
 		if err := json.Unmarshal(rawDeclaration, &fields); err != nil {
 			continue
@@ -276,7 +289,7 @@ func walkWorkspaceDeclarationEntries(
 		}
 		if err := walkNamedEntry(
 			entry,
-			appendPath(base, strconv.Itoa(index)),
+			appendEntryPath(base, entry),
 			false,
 			false,
 			output,
@@ -285,6 +298,32 @@ func walkWorkspaceDeclarationEntries(
 		}
 	}
 	return nil
+}
+
+func appendEntryPath(
+	current []string,
+	entry Entry,
+) []string {
+	header := entry.Header()
+	return appendPath(
+		current,
+		string(header.Type),
+		header.Name,
+	)
+}
+
+func stableWorkflowNodeSegment(value string) string {
+	if basespec.ValidatePortableName(
+		"Workflow node ID",
+		value,
+	) == nil {
+		return value
+	}
+	digest := strings.TrimPrefix(
+		string(cryptoutil.DigestBytes([]byte(value))),
+		cryptoutil.DigestSHA256Prefix,
+	)
+	return "id-" + digest
 }
 
 func appendPath(

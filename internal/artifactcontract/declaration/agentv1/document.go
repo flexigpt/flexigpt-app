@@ -125,6 +125,13 @@ func (v AgentDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Agent",
+		v.Locator,
+		v.Members != nil || v.Program != nil,
+	); err != nil {
+		return err
+	}
 	if err := declaration.ValidateEntryTypes(
 		"Agent members",
 		v.Members,

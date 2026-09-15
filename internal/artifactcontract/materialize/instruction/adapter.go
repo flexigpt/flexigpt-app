@@ -139,7 +139,10 @@ func (a *Adapter) contentForDocument(
 	if err != nil {
 		return "", err
 	}
-	if entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
+	if entry.SourceRevision !=
+		resolved.RefreshState.SourceRevision ||
+		entry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
 		return "", fmt.Errorf(
 			"%w: Instruction Source changed during resolution",
 			basespec.ErrRefreshRequired,

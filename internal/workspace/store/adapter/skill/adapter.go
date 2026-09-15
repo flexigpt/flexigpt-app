@@ -228,8 +228,10 @@ func (a *Adapter) resolve(
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
-	if sourceEntry.SourceGeneration !=
-		resolved.RefreshState.SourceGeneration {
+	if sourceEntry.SourceRevision !=
+		resolved.RefreshState.SourceRevision ||
+		sourceEntry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
 		return WorkspaceSkill{}, fmt.Errorf(
 			"%w: Skill Source changed during Workspace resolution",
 			basespec.ErrRefreshRequired,

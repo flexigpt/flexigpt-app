@@ -208,7 +208,7 @@ func (s *Service) ReadSourceEntry(
 	sourceID source.SourceID,
 	locator basespec.Locator,
 	maximumBytes int64,
-) (resource.VerifiedEntry, error) {
+) (_ resource.VerifiedEntry, returnErr error) {
 	if err := validateContext(ctx, "Source entry read"); err != nil {
 		return resource.VerifiedEntry{}, err
 	}
@@ -246,7 +246,9 @@ func (s *Service) ReadSourceEntry(
 	if err != nil {
 		return resource.VerifiedEntry{}, err
 	}
-	defer snapshot.Close()
+	defer func() {
+		returnErr = errors.Join(returnErr, snapshot.Close())
+	}()
 
 	entry, err := snapshot.Stat(ctx, locator)
 	if err != nil {
@@ -365,7 +367,7 @@ func (s *Service) ReadSourceTree(
 	exclude []string,
 	maximumEntries int,
 	maximumBytes int64,
-) ([]resource.VerifiedEntry, error) {
+) (_ []resource.VerifiedEntry, returnErr error) {
 	if err := validateContext(ctx, "Source tree read"); err != nil {
 		return nil, err
 	}
@@ -418,7 +420,9 @@ func (s *Service) ReadSourceTree(
 	if err != nil {
 		return nil, err
 	}
-	defer snapshot.Close()
+	defer func() {
+		returnErr = errors.Join(returnErr, snapshot.Close())
+	}()
 
 	generation := snapshot.Generation()
 	rootEntry, err := snapshot.Stat(ctx, base)

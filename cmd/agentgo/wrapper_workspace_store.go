@@ -114,6 +114,20 @@ func (w *WorkspaceStoreWrapper) RegisterFilesystemWorkspaceSource(
 	})
 }
 
+func (w *WorkspaceStoreWrapper) EnsureUserManagedArtifactSource(
+	request workspaceConsumerAPI.ManagedSourceRegistration,
+) (source.Summary, error) {
+	return withWorkspaceStore(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (source.Summary, error) {
+			return api.EnsureUserManagedArtifactSource(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
 func (w *WorkspaceStoreWrapper) AddWorkspacePath(
 	request workspaceConsumerAPI.WorkspacePathRegistration,
 ) (workspaceConsumerAPI.WorkspacePathRegistrationResult, error) {

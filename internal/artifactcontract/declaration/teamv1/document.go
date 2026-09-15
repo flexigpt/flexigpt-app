@@ -125,6 +125,13 @@ func (v TeamDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Team",
+		v.Locator,
+		v.Members != nil || v.Program != nil,
+	); err != nil {
+		return err
+	}
 	if err := declaration.ValidateEntryTypes(
 		"Team members",
 		v.Members,

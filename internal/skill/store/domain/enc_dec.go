@@ -162,11 +162,15 @@ func ValidateDefinition(
 func definitionForSkillDocument(
 	doc document.SkillDocument,
 ) (definition.Definition, error) {
+	sourceLocator := declaration.ScalarLocator(
+		"./" + string(SkillDefinitionFileName),
+	)
 	decl := skillv1.SkillDocument{
 		APIVersion:  SkillSchemaVersion,
 		Type:        declaration.TypeSkill,
 		Name:        doc.Name,
 		Description: doc.Description,
+		Locator:     &sourceLocator,
 	}
 	body, err := decl.CanonicalJSON()
 	if err != nil {

@@ -49,6 +49,24 @@ func ValidateOptionalMediaType(
 	return nil
 }
 
+// ValidateDeclarationLocatorExclusivity prevents a declaration-source locator
+// from being combined with an inline body. Composite declaration locators are
+// references to another declaration, not overlays on an inline declaration.
+func ValidateDeclarationLocatorExclusivity(
+	label string,
+	locator *Locator,
+	hasInlineBody bool,
+) error {
+	if locator != nil && hasInlineBody {
+		return fmt.Errorf(
+			"%w: %s cannot combine a declaration locator with inline fields",
+			basespec.ErrInvalid,
+			label,
+		)
+	}
+	return nil
+}
+
 func ValidateJSONValue(
 	label string,
 	value json.RawMessage,

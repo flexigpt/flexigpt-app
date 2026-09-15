@@ -189,6 +189,9 @@ func (v MCPDocument) validateFields() error {
 			return err
 		}
 	}
+	if err := validateMCPSource(v); err != nil {
+		return err
+	}
 	if err := validateTransport(v); err != nil {
 		return err
 	}
@@ -257,7 +260,71 @@ func validateMCPURL(
 	)
 }
 
+func validateMCPSource(v MCPDocument) error {
+	commandLocated := v.Locator != nil &&
+		v.Locator.Kind == declaration.LocatorKindCommand
+	if commandLocated {
+		if v.Transport != "" &&
+			v.Transport != TransportStdio {
+			return fmt.Errorf(
+				"%w: command-located MCP must use stdio transport",
+				basespec.ErrInvalid,
+			)
+		}
+		if v.Command != "" {
+			return fmt.Errorf(
+				"%w: command-located MCP cannot also contain command",
+				basespec.ErrInvalid,
+			)
+		}
+		if v.Server != "" ||
+			v.URL != "" ||
+			len(v.Headers) != 0 {
+			return fmt.Errorf(
+				"%w: command-located MCP cannot contain source-selector or HTTP fields",
+				basespec.ErrInvalid,
+			)
+		}
+		return nil
+	}
+
+	if v.Server != "" && v.Locator == nil {
+		return fmt.Errorf(
+			"%w: MCP server selector requires a locator",
+			basespec.ErrInvalid,
+		)
+	}
+	if v.Locator != nil && hasInlineMCPConnection(v) {
+		return fmt.Errorf(
+			"%w: MCP cannot combine a source locator with a complete inline connection",
+			basespec.ErrInvalid,
+		)
+	}
+	if v.Locator == nil && !hasInlineMCPConnection(v) {
+		return fmt.Errorf(
+			"%w: concrete MCP requires a locator or executable connection",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
+}
+
+func hasInlineMCPConnection(v MCPDocument) bool {
+	switch v.Transport {
+	case TransportStdio:
+		return v.Command != ""
+	case TransportStreamableHTTP, TransportSSE:
+		return v.URL != ""
+	default:
+		return false
+	}
+}
+
 func validateTransport(v MCPDocument) error {
+	if v.Locator != nil &&
+		v.Locator.Kind == declaration.LocatorKindCommand {
+		return nil
+	}
 	switch v.Transport {
 	case "":
 		if v.Locator != nil &&

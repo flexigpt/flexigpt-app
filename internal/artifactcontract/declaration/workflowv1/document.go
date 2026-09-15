@@ -148,6 +148,15 @@ func (v WorkflowDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if err := declaration.ValidateDeclarationLocatorExclusivity(
+		"Workflow",
+		v.Locator,
+		v.Start != nil ||
+			v.Nodes != nil ||
+			v.Edges != nil,
+	); err != nil {
+		return err
+	}
 
 	nodes := make(map[string]struct{}, len(v.Nodes))
 	for index, node := range v.Nodes {

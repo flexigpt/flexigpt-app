@@ -24,8 +24,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const collectionDocumentFile basespec.Locator = "collection.yaml"
-
 // PreparedPackage is one embedded canonical MCP Collection package ready for
 // managed Source publication.
 //
@@ -141,7 +139,7 @@ func preparePackage(
 			"%w: embedded MCP package %q lacks %q",
 			basespec.ErrInvalid,
 			packageRoot,
-			collectionDocumentFile,
+			mcpDomain.MCPCollectionDocumentFile,
 		)
 	}
 	expectations, err := canonicalCollectionExpectations(document)
@@ -171,7 +169,7 @@ func preparePackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
-		DocumentFile:        collectionDocumentFile,
+		DocumentFile:        mcpDomain.MCPCollectionDocumentFile,
 		PackageFiles:        files,
 		Expectations:        expectations,
 	}, nil
@@ -181,7 +179,7 @@ func packageDocument(
 	files []source.ManagedPackageFile,
 ) ([]byte, bool) {
 	for _, file := range files {
-		if file.Locator != collectionDocumentFile {
+		if file.Locator != mcpDomain.MCPCollectionDocumentFile {
 			continue
 		}
 		return append([]byte(nil), file.Content...), true
@@ -374,6 +372,9 @@ func PackageFingerprint(
 			Size:    int64(len(item.Content)),
 		})
 	}
+	sort.Slice(files, func(left, right int) bool {
+		return files[left].Locator < files[right].Locator
+	})
 	return cryptoutil.CanonicalDigest(struct {
 		PackageRoot  basespec.Locator                            `json:"packageRoot"`
 		Address      source.ManagedPackageAddress                `json:"address"`

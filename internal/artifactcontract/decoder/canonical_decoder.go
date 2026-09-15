@@ -3,11 +3,13 @@ package decoder
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -124,6 +126,23 @@ func (d *canonicalDecoder) Decode(
 
 	output := make([]providerapi.Decoded, 0, len(entries))
 	for _, named := range entries {
+		claim, claimed, err := artifactResourceClaim(
+			named.Entry,
+			candidate.Locator,
+		)
+		if err != nil {
+			output = append(output, providerapi.Decoded{
+				SubresourceLocator: named.SubresourceLocator,
+				Diagnostics: decodeDiagnosticAt(
+					candidate,
+					named.SubresourceLocator,
+					"artifact.declaration-resource-invalid",
+					err,
+				),
+			})
+			continue
+		}
+
 		value, err := definitionForNamedEntry(named)
 		if err != nil {
 			output = append(output, providerapi.Decoded{
@@ -137,12 +156,64 @@ func (d *canonicalDecoder) Decode(
 			})
 			continue
 		}
-		output = append(output, providerapi.Decoded{
+		decoded := providerapi.Decoded{
 			SubresourceLocator: named.SubresourceLocator,
 			Definition:         value,
-		})
+		}
+		if claimed {
+			decoded.ResourceClaims = []providerapi.ArtifactResourceClaim{
+				claim,
+			}
+		}
+		output = append(output, decoded)
 	}
 	return output, nil
+}
+
+func artifactResourceClaim(
+	entry declaration.Entry,
+	declarationLocator basespec.Locator,
+) (providerapi.ArtifactResourceClaim, bool, error) {
+	header := entry.Header()
+	if header.Locator == nil {
+		return providerapi.ArtifactResourceClaim{}, false, nil
+	}
+
+	recursive := false
+	switch header.Type {
+	case declaration.TypeSkill:
+		// A Skill locator can identify SKILL.md or its package directory.
+		recursive = true
+	case declaration.TypeMCP:
+		// A source-selected MCP points to one source document.
+	default:
+		return providerapi.ArtifactResourceClaim{}, false, nil
+	}
+
+	target, err := declaration.ResolveSourceRelativePathLocator(
+		*header.Locator,
+		declarationLocator,
+	)
+	if errors.Is(err, basespec.ErrLocatorUnresolved) {
+		return providerapi.ArtifactResourceClaim{}, false, nil
+	}
+	if err != nil {
+		return providerapi.ArtifactResourceClaim{}, false, err
+	}
+	if target == declarationLocator {
+		return providerapi.ArtifactResourceClaim{}, false, nil
+	}
+
+	claim := providerapi.ArtifactResourceClaim{
+		Locator:     target,
+		Recursive:   recursive,
+		Kind:        artifact.ArtifactKind(header.Type),
+		LogicalName: basespec.LogicalName(header.Name),
+	}
+	if err := claim.Validate(); err != nil {
+		return providerapi.ArtifactResourceClaim{}, false, err
+	}
+	return claim, true, nil
 }
 
 func decodeDiagnostic(
