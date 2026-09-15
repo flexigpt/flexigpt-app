@@ -314,7 +314,26 @@ func (r *Resolver) resolveSymbolic(
 		}
 		candidates = append(candidates, record)
 	}
-	switch len(candidates) {
+	terminalRefs := make(
+		map[artifact.ArtifactRef]struct{},
+		len(candidates),
+	)
+	for _, candidate := range candidates {
+		terminal, err := r.ResolveDeclarationArtifact(
+			ctx,
+			candidate.Ref(),
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"resolve symbolic candidate Artifact %q: %w",
+				candidate.ID,
+				err,
+			)
+		}
+		terminalRefs[terminal] = struct{}{}
+	}
+
+	switch len(terminalRefs) {
 	case 0:
 		return nil, fmt.Errorf(
 			"%w: %s/%s",
@@ -323,20 +342,25 @@ func (r *Resolver) resolveSymbolic(
 			name,
 		)
 	case 1:
+		var terminal artifact.ArtifactRef
+		for value := range terminalRefs {
+			terminal = value
+		}
 		return r.resolveArtifact(
 			ctx,
 			state,
-			candidates[0].Ref(),
+			terminal,
 			declarationType,
 			depth,
 		)
 	default:
 		return nil, fmt.Errorf(
-			"%w: %s/%s has %d available Artifacts in Root %q",
+			"%w: %s/%s has %d available declarations resolving to %d terminal Artifacts in Root %q",
 			basespec.ErrIdentityConflict,
 			declarationType,
 			name,
 			len(candidates),
+			len(terminalRefs),
 			rootID,
 		)
 	}

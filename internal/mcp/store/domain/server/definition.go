@@ -343,45 +343,16 @@ func overlayLocatedCore(
 	input CoreServer,
 	outer mcpv1.MCPDocument,
 ) (CoreServer, error) {
-	output := cloneCore(input)
-	switch outer.Transport {
-	case "":
-	case mcpv1.TransportStdio:
-		output.Type = ServerTypeStdio
-		output.URL = ""
-		output.Headers = nil
-	case mcpv1.TransportStreamableHTTP:
-		output.Type = ServerTypeHTTP
-		output.Command = ""
-		output.Args = nil
-		output.Env = nil
-	case mcpv1.TransportSSE:
-		output.Type = ServerTypeSSE
-		output.Command = ""
-		output.Args = nil
-		output.Env = nil
-	default:
+	if outer.Transport != "" ||
+		outer.Command != "" ||
+		outer.Args != nil ||
+		outer.Env != nil ||
+		outer.URL != "" ||
+		outer.Headers != nil {
 		return CoreServer{}, fmt.Errorf(
-			"%w: unsupported located MCP transport %q",
+			"%w: source-selected MCP cannot overlay terminal connection fields",
 			basespec.ErrInvalid,
-			outer.Transport,
 		)
 	}
-
-	if outer.Command != "" {
-		output.Command = outer.Command
-	}
-	if outer.Args != nil {
-		output.Args = slices.Clone(outer.Args)
-	}
-	if outer.Env != nil {
-		output.Env = maps.Clone(outer.Env)
-	}
-	if outer.URL != "" {
-		output.URL = outer.URL
-	}
-	if outer.Headers != nil {
-		output.Headers = maps.Clone(outer.Headers)
-	}
-	return NormalizeCoreServer(output), nil
+	return NormalizeCoreServer(input), nil
 }

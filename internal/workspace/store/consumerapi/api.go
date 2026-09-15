@@ -256,23 +256,7 @@ func (a *StoreAPI) GetWorkspace(
 	if err := ref.Validate(); err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return workspaceDomain.Workspace{}, err
-	}
-	if record.Kind != workspaceDomain.WorkspaceArtifactKind {
-		return workspaceDomain.Workspace{}, fmt.Errorf(
-			"%w: Artifact %q has kind %q",
-			workspaceDomain.ErrNotWorkspace,
-			record.ID,
-			record.Kind,
-		)
-	}
-	value, err := a.artifacts.GetDefinition(ctx, ref)
-	if err != nil {
-		return workspaceDomain.Workspace{}, err
-	}
-	return workspaceDomain.NewWorkspace(record, value)
+	return a.workspaceForRef(ctx, ref)
 }
 
 func (a *StoreAPI) ListWorkspaces(
@@ -287,6 +271,7 @@ func (a *StoreAPI) ListWorkspaces(
 		return nil, err
 	}
 	output := make([]workspaceDomain.Workspace, 0)
+	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, value := range values {
 		if value.Kind != workspaceDomain.WorkspaceArtifactKind ||
 			value.State != artifact.StateAvailable ||
@@ -297,6 +282,10 @@ func (a *StoreAPI) ListWorkspaces(
 		if err != nil {
 			return nil, err
 		}
+		if _, duplicate := seen[workspace.Ref()]; duplicate {
+			continue
+		}
+		seen[workspace.Ref()] = struct{}{}
 		output = append(output, workspace)
 	}
 	sort.Slice(output, func(left, right int) bool {

@@ -1238,7 +1238,9 @@ collection/repository-review
   -> mcp/github
 ```
 
-Nested Collection cycles are invalid.
+Nested Collection cycles are rejected during graph resolution. They cannot
+always be rejected during source decoding because symbolic targets may live in
+other source files.
 
 ```text
 collection/a
@@ -1689,76 +1691,77 @@ The Resolver returns a typed graph. It does not execute that graph.
 
 ## Current feature status
 
-| Capability                                           | Status                                                        |
-| ---------------------------------------------------- | ------------------------------------------------------------- |
-| Core artifact type vocabulary                        | Available                                                     |
-| Canonical JSON declarations                          | Available                                                     |
-| Canonical YAML declarations                          | Available                                                     |
-| JSON Schema contract validation                      | Available                                                     |
-| `type` and `apiVersion` schema dispatch              | Available                                                     |
-| Named nested declaration indexing                    | Available                                                     |
-| Named inline declarations                            | Available as source-backed nested Artifacts                   |
-| Stable named nested subresource bindings             | Available                                                     |
-| Located composite entries as reference edges         | Available                                                     |
-| Same-Source Skill and MCP resource claim suppression | Available                                                     |
-| Anonymous declarations                               | Not supported                                                 |
-| Root-scoped symbolic lookup                          | Available                                                     |
-| Duplicate identity detection                         | Available                                                     |
-| Collection resolution                                | Available                                                     |
-| Agent resolution                                     | Available                                                     |
-| Team resolution                                      | Available                                                     |
-| Loop resolution                                      | Available                                                     |
-| Workflow structure and target resolution             | Available                                                     |
-| Workspace resolution                                 | Available                                                     |
-| Local path declaration locators                      | Available                                                     |
-| Filesystem Sources                                   | Available                                                     |
-| Embedded Sources                                     | Available                                                     |
-| Managed Sources                                      | Available                                                     |
-| Source-backed Definition persistence                 | Available                                                     |
-| Source-backed Artifact persistence                   | Available                                                     |
-| Source refresh state                                 | Available                                                     |
-| Definition digest verification                       | Available                                                     |
-| Resource generation verification                     | Available                                                     |
-| `AGENTS.md` support                                  | Available                                                     |
-| `CLAUDE.md` support                                  | Available                                                     |
-| `README.md` support                                  | Available                                                     |
-| `llms.txt` support                                   | Available                                                     |
-| Documentation Context discovery                      | Available                                                     |
-| `SKILL.md` support                                   | Available                                                     |
-| Direct Skill directory registration                  | Available                                                     |
-| Direct `SKILL.md` registration                       | Available                                                     |
-| Managed Skill packages                               | Available                                                     |
-| Built-in Skill packages                              | Available                                                     |
-| Canonical Skill Collection declarations              | Available                                                     |
-| Individual editing of Collection-owned Skills        | Not supported; update the owning Collection package           |
-| `.mcp.json` support                                  | Available                                                     |
-| `mcp.json` support                                   | Available                                                     |
-| Canonical MCP declarations                           | Available                                                     |
-| Source-selected MCP declarations                     | Available                                                     |
-| MCP policy declarations                              | Available                                                     |
-| MCP installation-local data                          | Available                                                     |
-| MCP secret references                                | Available                                                     |
-| MCP runtime configuration                            | Available                                                     |
-| MCP runtime connection management                    | Available                                                     |
-| MCP tool, resource, prompt, and completion support   | Available                                                     |
-| Workspace prompt planning                            | Available for source-backed Instruction and Context Artifacts |
-| Workspace Skill planning                             | Available for source-backed Skill Artifacts                   |
-| Workspace MCP planning                               | Available for source-backed MCP Artifacts                     |
-| User managed Source provisioning                     | Available through the Workspace consumer API                  |
-| Managed declaration publication                      | Available for managed Skills and MCP policies                 |
-| Managed package removal                              | Available                                                     |
-| Cross-Root Workspace imports                         | Not supported                                                 |
-| Automatic built-in visibility in user Workspaces     | Not supported                                                 |
-| Built-in ArtifactRef stability across hydration      | Not guaranteed                                                |
-| Plugin manifests                                     | Support deferred                                              |
-| Git locators                                         | Support deferred                                              |
-| Git archive materialization                          | Support deferred                                              |
-| URL locators                                         | Support deferred                                              |
-| Package locators                                     | Support deferred                                              |
-| Archive and zip Sources                              | Support deferred                                              |
-| Tool execution                                       | Owned by a future Tool consumer                               |
-| Model execution                                      | Owned by a future model consumer                              |
-| Agent execution                                      | Owned by a future Agent runtime                               |
-| Team execution                                       | Owned by a future Team runtime                                |
-| Loop execution                                       | Owned by a future execution runtime                           |
-| Workflow scheduling and execution                    | Owned by a future Workflow runtime                            |
+| Capability                                                | Status                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------- |
+| Core artifact type vocabulary                             | Available                                                     |
+| Canonical JSON declarations                               | Available                                                     |
+| Canonical YAML declarations                               | Available                                                     |
+| JSON Schema contract validation                           | Available                                                     |
+| `type` and `apiVersion` schema dispatch                   | Available                                                     |
+| Named nested declaration indexing                         | Available                                                     |
+| Named inline declarations                                 | Available as source-backed nested Artifacts                   |
+| Stable named nested subresource bindings                  | Available                                                     |
+| Located composite entries as reference edges              | Available                                                     |
+| Same-Source Skill and MCP resource claim suppression      | Available                                                     |
+| Anonymous declarations                                    | Not supported                                                 |
+| Root-scoped symbolic lookup                               | Available                                                     |
+| Duplicate identity detection                              | Available                                                     |
+| Collection resolution                                     | Available                                                     |
+| Agent resolution                                          | Available                                                     |
+| Team resolution                                           | Available                                                     |
+| Loop resolution                                           | Available                                                     |
+| Workflow structure and target resolution                  | Available                                                     |
+| Workspace resolution                                      | Available                                                     |
+| Local path declaration locators                           | Available                                                     |
+| Filesystem Sources                                        | Available                                                     |
+| Embedded Sources                                          | Available                                                     |
+| Managed Sources                                           | Available                                                     |
+| Source-backed Definition persistence                      | Available                                                     |
+| Source-backed Artifact persistence                        | Available                                                     |
+| Source refresh state                                      | Available                                                     |
+| Definition digest verification                            | Available                                                     |
+| Resource generation verification                          | Available                                                     |
+| `AGENTS.md` support                                       | Available                                                     |
+| `CLAUDE.md` support                                       | Available                                                     |
+| `README.md` support                                       | Available                                                     |
+| `llms.txt` support                                        | Available                                                     |
+| Documentation Context discovery                           | Available                                                     |
+| `SKILL.md` support                                        | Available                                                     |
+| Direct Skill directory registration                       | Available                                                     |
+| Direct `SKILL.md` registration                            | Available                                                     |
+| Managed Skill packages                                    | Available                                                     |
+| Built-in Skill packages                                   | Available                                                     |
+| Canonical Skill Collection declarations                   | Available                                                     |
+| Individual editing of Collection-owned Skills             | Not supported; update the owning Collection package           |
+| `.mcp.json` support                                       | Available                                                     |
+| `mcp.json` support                                        | Available                                                     |
+| Canonical MCP declarations                                | Available                                                     |
+| Source-selected MCP declarations                          | Available                                                     |
+| MCP policy declarations                                   | Available                                                     |
+| MCP installation-local data                               | Available                                                     |
+| MCP secret references                                     | Available                                                     |
+| MCP runtime configuration                                 | Available                                                     |
+| MCP runtime connection management                         | Available                                                     |
+| MCP tool, resource, prompt, and completion support        | Available                                                     |
+| Workspace prompt planning                                 | Available for source-backed Instruction and Context Artifacts |
+| Workspace Skill planning                                  | Available for source-backed Skill Artifacts                   |
+| Workspace MCP planning                                    | Available for source-backed MCP Artifacts                     |
+| User managed Source provisioning                          | Available through the Workspace consumer API                  |
+| Managed declaration publication                           | Available for managed Skills and MCP policies                 |
+| Managed package removal                                   | Available                                                     |
+| Cross-Root Workspace imports                              | Not supported                                                 |
+| Automatic built-in visibility in user Workspaces          | Not supported                                                 |
+| Built-in ArtifactRef stability across unchanged hydration | Available                                                     |
+| Built-in ArtifactRef stability across hydration reset     | Not guaranteed; refs are intentionally replaced               |
+| Plugin manifests                                          | Support deferred                                              |
+| Git locators                                              | Support deferred                                              |
+| Git archive materialization                               | Support deferred                                              |
+| URL locators                                              | Support deferred                                              |
+| Package locators                                          | Support deferred                                              |
+| Archive and zip Sources                                   | Support deferred                                              |
+| Tool execution                                            | Owned by a future Tool consumer                               |
+| Model execution                                           | Owned by a future model consumer                              |
+| Agent execution                                           | Owned by a future Agent runtime                               |
+| Team execution                                            | Owned by a future Team runtime                                |
+| Loop execution                                            | Owned by a future execution runtime                           |
+| Workflow scheduling and execution                         | Owned by a future Workflow runtime                            |

@@ -74,6 +74,9 @@ func (a *API) serverDocumentForResolvedArtifact(
 	if err != nil {
 		return mcpDomainServer.ServerDocument{}, err
 	}
+	if err := requireTerminalLocatedMCPDefinition(selected); err != nil {
+		return mcpDomainServer.ServerDocument{}, err
+	}
 	document, err := mcpDomainServer.ServerDocumentFromDefinition(selected)
 	if err != nil {
 		return mcpDomainServer.ServerDocument{}, err
@@ -83,6 +86,24 @@ func (a *API) serverDocumentForResolvedArtifact(
 		resolved.Definition,
 		outer,
 	)
+}
+
+func requireTerminalLocatedMCPDefinition(
+	value definition.Definition,
+) error {
+	document, err := mcpv1.DecodeMCPJSON(value.Body)
+	if err != nil {
+		return err
+	}
+	if document.Locator != nil &&
+		document.Locator.Kind != declaration.LocatorKindCommand {
+		return fmt.Errorf(
+			"%w: source-selected MCP target %q is another source-selected declaration; chained MCP source selection is not supported",
+			basespec.ErrLocatorUnresolved,
+			value.LogicalName,
+		)
+	}
+	return nil
 }
 
 func hasInlineMCPConnection(

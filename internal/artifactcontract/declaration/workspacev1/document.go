@@ -37,8 +37,11 @@ type DeclarationScan struct {
 	Exclude []string            `json:"exclude,omitempty"`
 }
 
-// DeclarationSource is either a Locator, an inline declaration Entry, or an
-// independent Workspace declaration scan.
+// DeclarationSource is either a direct Locator, an inline concrete
+// declaration that becomes a Workspace subresource, or an independent
+// Workspace declaration scan. Symbolic references and located composite
+// declarations are not declaration sources: use Workspace.roots for those
+// graph edges, or use the direct Locator form to add a source file.
 type DeclarationSource struct {
 	raw json.RawMessage
 }
@@ -163,6 +166,18 @@ func (s DeclarationSource) Validate() error {
 		entry, err := declaration.DecodeCanonicalEntryJSON(trimmed)
 		if err != nil {
 			return err
+		}
+		if entry.IsSymbolic() {
+			return fmt.Errorf(
+				"%w: Workspace declaration source cannot be a symbolic reference; use Workspace roots",
+				basespec.ErrInvalid,
+			)
+		}
+		if entry.IsDeclarationLocatorReference() {
+			return fmt.Errorf(
+				"%w: Workspace declaration source cannot be a located composite declaration; use a Locator source or Workspace root",
+				basespec.ErrInvalid,
+			)
 		}
 		return entry.Validate()
 	}

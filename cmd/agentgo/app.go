@@ -339,6 +339,7 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
+		artifactComposition.LocatorResolvers,
 		a.settingStoreAPI.store,
 	)
 	if err != nil {

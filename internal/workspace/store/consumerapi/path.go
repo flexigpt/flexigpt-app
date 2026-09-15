@@ -214,7 +214,9 @@ func (a *StoreAPI) findWorkspaceFromPath(
 		return workspaceDomain.WorkspaceRef{}, err
 	}
 
-	candidates := make([]artifact.Artifact, 0)
+	candidates := make(
+		map[artifact.ArtifactRef]struct{},
+	)
 	for _, record := range records {
 		if record.Kind != workspaceDomain.WorkspaceArtifactKind ||
 			record.State != artifact.StateAvailable ||
@@ -229,7 +231,11 @@ func (a *StoreAPI) findWorkspaceFromPath(
 		if name != "" && record.LogicalName != name {
 			continue
 		}
-		candidates = append(candidates, record)
+		workspace, err := a.GetWorkspace(ctx, record.Ref())
+		if err != nil {
+			return workspaceDomain.WorkspaceRef{}, err
+		}
+		candidates[workspace.Ref()] = struct{}{}
 	}
 
 	switch len(candidates) {
@@ -239,7 +245,13 @@ func (a *StoreAPI) findWorkspaceFromPath(
 			basespec.ErrReferenceUnresolved,
 		)
 	case 1:
-		return candidates[0].Ref(), nil
+		for ref := range candidates {
+			return ref, nil
+		}
+		return workspaceDomain.WorkspaceRef{}, fmt.Errorf(
+			"%w: Workspace candidate set is inconsistent",
+			basespec.ErrInvalid,
+		)
 	default:
 		return workspaceDomain.WorkspaceRef{}, fmt.Errorf(
 			"%w: path contains %d Workspace declarations; provide a Workspace manifest file or workspaceName",

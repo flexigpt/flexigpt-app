@@ -7,6 +7,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -30,9 +31,10 @@ type API struct {
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
 
-	overlays       mcpOverlay.OverlayRepository
-	secretCleaner  mcpDomainServer.SecretCleaner
-	baselinePolicy mcpPolicy.MCPPolicy
+	overlays           mcpOverlay.OverlayRepository
+	secretCleaner      mcpDomainServer.SecretCleaner
+	baselinePolicy     mcpPolicy.MCPPolicy
+	declarationAliases *resolve.Resolver
 }
 
 func New(
@@ -45,6 +47,7 @@ func New(
 	overlays mcpOverlay.OverlayRepository,
 	secretCleaner mcpDomainServer.SecretCleaner,
 	baselinePolicy mcpPolicy.MCPPolicy,
+	options ...Option,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
@@ -61,7 +64,13 @@ func New(
 	if err := baselinePolicy.Validate(); err != nil {
 		return nil, err
 	}
-	return &API{
+	config := apiOptions{}
+	for _, option := range options {
+		if option != nil {
+			option(&config)
+		}
+	}
+	output := &API{
 		sources:          sources,
 		discovery:        discovery,
 		artifacts:        artifacts,
@@ -71,7 +80,25 @@ func New(
 		overlays:         overlays,
 		secretCleaner:    secretCleaner,
 		baselinePolicy:   baselinePolicy,
-	}, nil
+	}
+	locators, err := resolve.NewProviderLocatorResolver(
+		config.locatorResolvers,
+		mcpLocatorRuntime{api: output},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("bind MCP declaration locator resolvers: %w", err)
+	}
+	aliases, err := resolve.New(
+		artifacts,
+		locators,
+		resolve.DefaultLimits(),
+		resolve.Options{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	output.declarationAliases = aliases
+	return output, nil
 }
 
 func (a *API) ListServers(
@@ -846,15 +873,30 @@ func (a *API) policyBodiesByLogicalName(
 	if err != nil {
 		return nil, err
 	}
+	if a.declarationAliases == nil {
+		return nil, basespec.ErrClosed
+	}
 	output := make([]mcpPolicy.MCPPolicy, 0, len(records))
+	seen := make(map[artifact.ArtifactRef]struct{}, len(records))
 	for _, record := range records {
 		if !record.Enabled ||
 			record.State != artifact.StateAvailable {
 			continue
 		}
-		resolved, err := a.resources.ResolveArtifact(
+		terminal, err := a.declarationAliases.ResolveDeclarationArtifact(
 			ctx,
 			record.Ref(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[terminal]; duplicate {
+			continue
+		}
+		seen[terminal] = struct{}{}
+		resolved, err := a.resources.ResolveArtifact(
+			ctx,
+			terminal,
 			resource.ResolveOptions{},
 		)
 		if err != nil {

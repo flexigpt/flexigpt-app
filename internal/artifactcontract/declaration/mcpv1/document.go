@@ -181,12 +181,8 @@ func (v MCPDocument) validateFields() error {
 		return err
 	}
 	if v.Server != "" {
-		if err := basespec.ValidateRequiredText(
-			"MCP server selector",
-			v.Server,
-			basespec.MaxLogicalNameBytes,
-		); err != nil {
-			return err
+		if err := basespec.LogicalName(v.Server).Validate(); err != nil {
+			return fmt.Errorf("MCP server selector: %w", err)
 		}
 	}
 	if err := validateMCPSource(v); err != nil {
@@ -294,9 +290,9 @@ func validateMCPSource(v MCPDocument) error {
 			basespec.ErrInvalid,
 		)
 	}
-	if v.Locator != nil && hasInlineMCPConnection(v) {
+	if v.Locator != nil && hasMCPConnectionFields(v) {
 		return fmt.Errorf(
-			"%w: MCP cannot combine a source locator with a complete inline connection",
+			"%w: source-selected MCP cannot overlay transport or connection fields",
 			basespec.ErrInvalid,
 		)
 	}
@@ -307,6 +303,15 @@ func validateMCPSource(v MCPDocument) error {
 		)
 	}
 	return nil
+}
+
+func hasMCPConnectionFields(v MCPDocument) bool {
+	return v.Transport != "" ||
+		v.Command != "" ||
+		v.Args != nil ||
+		v.Env != nil ||
+		v.URL != "" ||
+		v.Headers != nil
 }
 
 func hasInlineMCPConnection(v MCPDocument) bool {

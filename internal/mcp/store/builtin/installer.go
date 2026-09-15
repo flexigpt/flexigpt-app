@@ -35,7 +35,9 @@ type Installer struct {
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.MCP == nil || dependencies.Packages == nil {
+	if dependencies.MCP == nil ||
+		dependencies.Packages == nil ||
+		dependencies.Overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP built-in installer dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -111,7 +113,11 @@ func (i *Installer) EnsureHydration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if !current && i.overlays != nil {
+
+	// A non-current marker means the shared protected Root was reset. Every
+	// old ArtifactRef is invalid, so overlays keyed by those refs must be
+	// removed before package publication assigns replacement Artifact IDs.
+	if !current {
 		if err := i.overlays.PurgeRoot(
 			ctx,
 			i.builtInTopology.Root.ID,
@@ -119,6 +125,7 @@ func (i *Installer) EnsureHydration(
 			return err
 		}
 	}
+
 	return i.ensurePackages(ctx)
 }
 

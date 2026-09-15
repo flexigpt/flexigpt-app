@@ -3,7 +3,6 @@ package domain
 import (
 	"fmt"
 	"path"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -34,10 +33,7 @@ func SourceDocumentLocator(
 	if err != nil {
 		return "", err
 	}
-	if !strings.EqualFold(
-		path.Base(string(target)),
-		string(SkillDefinitionFileName),
-	) {
+	if path.Base(string(target)) != string(SkillDefinitionFileName) {
 		target = basespec.Locator(path.Join(
 			string(target),
 			string(SkillDefinitionFileName),

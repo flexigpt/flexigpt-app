@@ -62,6 +62,7 @@ type BootstrapRegistry struct {
 	hydrator    topology.HydrationCoordinator
 
 	mu         sync.RWMutex
+	ensureMu   sync.Mutex
 	installers map[string]Installer
 	scopes     map[basespec.Locator]string
 }
@@ -152,6 +153,12 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf("%w: built-in bootstrap context is nil", basespec.ErrInvalid)
 	}
+
+	// One bootstrapper owns one protected topology in this process. Serializing
+	// hydration prevents concurrent callers from racing resets, publication,
+	// final refresh, and hydration-marker commits.
+	r.ensureMu.Lock()
+	defer r.ensureMu.Unlock()
 
 	r.mu.RLock()
 	entries := make([]registeredInstaller, 0, len(r.installers))
