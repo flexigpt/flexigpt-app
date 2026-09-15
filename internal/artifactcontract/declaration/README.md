@@ -52,7 +52,7 @@ schema.
 The portable declaration header is:
 
 ```yaml
-$schema: https://schemas.flexigpt.dev/artifact/agent/v1.json
+$schema: https://schemas.flexigpt.site/artifact/agent/v1.json
 apiVersion: v1
 type: agent
 name: reviewer

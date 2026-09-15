@@ -1,104 +1,104 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.flexigpt.dev/artifact/mcp/v1.json",
-  "title": "FlexiGPT MCP v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["type"],
-  "properties": {
-    "$schema": {"type": "string", "minLength": 1, "maxLength": 16384},
-    "apiVersion": {"type": "string", "minLength": 1, "maxLength": 256},
-    "type": {"const": "mcp"},
-    "name": {"type": "string", "minLength": 1, "maxLength": 256},
-    "description": {"type": "string", "maxLength": 16384},
-    "locator": {"$ref": "#/$defs/locator"},
-    "metadata": {
-      "type": "object",
-      "maxProperties": 64,
-      "additionalProperties": true
-    },
-    "server": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 256
-    },
-    "transport": {
-      "enum": ["stdio", "streamable-http", "sse"]
-    },
-    "command": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 16384
-    },
-    "args": {
-      "type": "array",
-      "maxItems": 4096,
-      "items": {
-        "type": "string",
-        "maxLength": 16384
-      }
-    },
-    "env": {
-      "type": "object",
-      "maxProperties": 4096,
-      "additionalProperties": {
-        "type": "string",
-        "maxLength": 16384
-      }
-    },
-    "url": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 16384
-    },
-    "headers": {
-      "type": "object",
-      "maxProperties": 4096,
-      "additionalProperties": {
-        "type": "string",
-        "maxLength": 16384
-      }
-    },
-    "include": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "tools": {
-          "type": "array",
-          "maxItems": 4096,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 16384
-          }
-        },
-        "resources": {
-          "type": "array",
-          "maxItems": 4096,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 16384
-          }
-        },
-        "prompts": {
-          "type": "array",
-          "maxItems": 4096,
-          "items": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 16384
-          }
-        }
-      }
-    }
-  },
-  "$defs": {
-    "locator": {
-      "oneOf": [
-        {"type": "string", "minLength": 1, "maxLength": 16384},
-        {"type": "object", "required": ["kind"], "additionalProperties": true}
-      ]
-    }
-  }
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.site/artifact/mcp/v1.json",
+	"title": "FlexiGPT MCP v1",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["type", "name"],
+	"properties": {
+		"$schema": { "type": "string", "minLength": 1, "maxLength": 16384 },
+		"apiVersion": { "type": "string", "minLength": 1, "maxLength": 256 },
+		"type": { "const": "mcp" },
+		"name": { "type": "string", "minLength": 1, "maxLength": 256 },
+		"description": { "type": "string", "maxLength": 16384 },
+		"locator": { "$ref": "#/$defs/locator" },
+		"metadata": {
+			"type": "object",
+			"maxProperties": 64,
+			"additionalProperties": true
+		},
+		"server": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"transport": {
+			"enum": ["stdio", "streamable-http", "sse"]
+		},
+		"command": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 16384
+		},
+		"args": {
+			"type": "array",
+			"maxItems": 4096,
+			"items": {
+				"type": "string",
+				"maxLength": 16384
+			}
+		},
+		"env": {
+			"type": "object",
+			"maxProperties": 4096,
+			"additionalProperties": {
+				"type": "string",
+				"maxLength": 16384
+			}
+		},
+		"url": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 16384
+		},
+		"headers": {
+			"type": "object",
+			"maxProperties": 4096,
+			"additionalProperties": {
+				"type": "string",
+				"maxLength": 16384
+			}
+		},
+		"include": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"tools": {
+					"type": "array",
+					"maxItems": 4096,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 16384
+					}
+				},
+				"resources": {
+					"type": "array",
+					"maxItems": 4096,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 16384
+					}
+				},
+				"prompts": {
+					"type": "array",
+					"maxItems": 4096,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 16384
+					}
+				}
+			}
+		}
+	},
+	"$defs": {
+		"locator": {
+			"oneOf": [
+				{ "type": "string", "minLength": 1, "maxLength": 16384 },
+				{ "type": "object", "required": ["kind"], "additionalProperties": true }
+			]
+		}
+	}
 }

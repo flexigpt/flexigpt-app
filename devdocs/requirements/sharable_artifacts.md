@@ -1641,6 +1641,7 @@ The Resolver returns a typed graph. It does not execute that graph.
 | Managed package removal                            | Available                                                     |
 | Plugin manifests                                   | Support deferred                                              |
 | Git locators                                       | Support deferred                                              |
+| Git archive materialization                        | Support deferred                                              |
 | URL locators                                       | Support deferred                                              |
 | Package locators                                   | Support deferred                                              |
 | Archive and zip Sources                            | Support deferred                                              |

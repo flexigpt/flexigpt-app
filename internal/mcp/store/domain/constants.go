@@ -26,7 +26,7 @@ const (
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
 
 	InstallationDataSchemaVersion = "v1"
-	RuntimeExtensionMetadataKey   = "flexigpt.dev/mcp-runtime-v1"
+	RuntimeExtensionMetadataKey   = "flexigpt.site/mcp-runtime-v1"
 	BuiltInInstallerName          = "mcp"
 	BuiltInRegistrySchemaVersion  = "v1"
 	HydrationSchemaVersion        = "mcp.builtin-hydration/v1"

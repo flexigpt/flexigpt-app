@@ -1,37 +1,34 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.flexigpt.dev/artifact/tool/v1.json",
-  "title": "FlexiGPT Tool v1",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["type"],
-  "properties": {
-    "$schema": {"type": "string", "minLength": 1, "maxLength": 16384},
-    "apiVersion": {"type": "string", "minLength": 1, "maxLength": 256},
-    "type": {"const": "tool"},
-    "name": {"type": "string", "minLength": 1, "maxLength": 256},
-    "description": {"type": "string", "maxLength": 16384},
-    "locator": {"$ref": "#/$defs/locator"},
-    "metadata": {
-      "type": "object",
-      "maxProperties": 64,
-      "additionalProperties": true
-    },
-    "inputSchema": {"$ref": "#/$defs/jsonSchema"},
-    "outputSchema": {"$ref": "#/$defs/jsonSchema"}
-  },
-  "$defs": {
-    "locator": {
-      "oneOf": [
-        {"type": "string", "minLength": 1, "maxLength": 16384},
-        {"type": "object", "required": ["kind"], "additionalProperties": true}
-      ]
-    },
-    "jsonSchema": {
-      "oneOf": [
-        {"type": "object"},
-        {"type": "boolean"}
-      ]
-    }
-  }
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.site/artifact/tool/v1.json",
+	"title": "FlexiGPT Tool v1",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["type", "name"],
+	"properties": {
+		"$schema": { "type": "string", "minLength": 1, "maxLength": 16384 },
+		"apiVersion": { "type": "string", "minLength": 1, "maxLength": 256 },
+		"type": { "const": "tool" },
+		"name": { "type": "string", "minLength": 1, "maxLength": 256 },
+		"description": { "type": "string", "maxLength": 16384 },
+		"locator": { "$ref": "#/$defs/locator" },
+		"metadata": {
+			"type": "object",
+			"maxProperties": 64,
+			"additionalProperties": true
+		},
+		"inputSchema": { "$ref": "#/$defs/jsonSchema" },
+		"outputSchema": { "$ref": "#/$defs/jsonSchema" }
+	},
+	"$defs": {
+		"locator": {
+			"oneOf": [
+				{ "type": "string", "minLength": 1, "maxLength": 16384 },
+				{ "type": "object", "required": ["kind"], "additionalProperties": true }
+			]
+		},
+		"jsonSchema": {
+			"oneOf": [{ "type": "object" }, { "type": "boolean" }]
+		}
+	}
 }

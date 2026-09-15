@@ -12,7 +12,7 @@ import (
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
 
-const installationDataNamespace = "flexigpt.dev/mcp-installation-v1"
+const installationDataNamespace = "flexigpt.site/mcp-installation-v1"
 
 type InputBinding struct {
 	Value     *string `json:"value,omitempty"`

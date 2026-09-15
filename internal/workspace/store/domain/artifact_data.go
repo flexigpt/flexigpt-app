@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const artifactDataNamespace = "flexigpt.dev/workspace"
+const artifactDataNamespace = "flexigpt.site/workspace"
 
 // ArtifactData is Workspace-local consumer data stored in Artifact.Data.
 // It contains no source ownership, typed membership, or execution behavior.

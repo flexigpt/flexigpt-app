@@ -12,7 +12,7 @@ import (
 var errInvalid = errors.New("invalid jsonschema")
 
 const (
-	anonymousSchemaID    = "https://schemas.flexigpt.dev/internal/jsonschema/anonymous"
+	anonymousSchemaID    = "https://schemas.flexigpt.site/internal/jsonschema/anonymous"
 	draft202012SchemaURI = "https://json-schema.org/draft/2020-12/schema"
 )
 
