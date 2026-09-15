@@ -6,7 +6,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -33,7 +32,7 @@ func (*Decoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	switch {
-	case sourceformat.IsMCPCollection(candidate.Content):
+	case sourceformat.IsRetiredMCPCollection(candidate.Content):
 		return providerapi.RecognitionPreferred
 	case sourceformat.IsMCPConfig(candidate.Content):
 		return providerapi.RecognitionPreferred
@@ -63,22 +62,15 @@ func (d *Decoder) Decode(
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
 	switch {
-	case sourceformat.IsMCPCollection(candidate.Content):
-		collectionName, err := declaration.DeriveLogicalName(
-			"mcp-collection",
+	case sourceformat.IsRetiredMCPCollection(candidate.Content):
+		return nil, decoderError(
 			candidate.Locator,
+			"",
+			fmt.Errorf(
+				"%w: proprietary MCP collection manifests are retired; use a canonical type: collection declaration",
+				basespec.ErrUnsupported,
+			),
 		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		values, err := sourceformat.DecodeMCPCollectionWithCollection(
-			candidate.Content,
-			collectionName,
-		)
-		if err != nil {
-			return nil, decoderError(candidate.Locator, "", err)
-		}
-		return decodedValues(values), nil
 
 	case sourceformat.IsMCPConfig(candidate.Content):
 		values, err := sourceformat.DecodeMCPConfig(

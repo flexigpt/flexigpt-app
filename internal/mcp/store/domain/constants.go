@@ -20,7 +20,7 @@ const (
 
 	ManagedMCPPackageKind       source.PackageKind = "mcp"
 	ManagedMCPPolicyPackageKind source.PackageKind = "mcp-policy"
-	MCPCollectionPackageKind    source.PackageKind = "mcp-package"
+	MCPCollectionPackageKind    source.PackageKind = "mcp-collection"
 
 	ManagedMCPDocumentFile       basespec.Locator = "mcp.json"
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
@@ -28,7 +28,6 @@ const (
 	InstallationDataSchemaVersion = "v1"
 	RuntimeExtensionMetadataKey   = "flexigpt.site/mcp-runtime-v1"
 	BuiltInInstallerName          = "mcp"
-	BuiltInRegistrySchemaVersion  = "v1"
 	HydrationSchemaVersion        = "mcp.builtin-hydration/v1"
 )
 

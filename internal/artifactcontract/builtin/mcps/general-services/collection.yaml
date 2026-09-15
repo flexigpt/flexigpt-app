@@ -1,0 +1,60 @@
+apiVersion: v1
+type: collection
+name: mcp-general-services
+description: Built-in MCP server definitions for Box, BGPT, and Indeed.
+members:
+  - type: mcp
+    name: bgpt
+    transport: streamable-http
+    url: https://bgpt.pro/mcp/stream
+    headers:
+      Authorization: "Bearer ${BGPT_API_KEY}"
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: BGPT (Scientific Papers)
+        auth: { mode: none }
+        install:
+          note: The free BGPT tier does not require a key. A configured key is sent as a bearer token.
+          inputs:
+            BGPT_API_KEY:
+              kind: secret
+              label: BGPT API Key
+              description: Optional paid BGPT subscription token.
+              required: false
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: box
+    transport: streamable-http
+    url: https://mcp.box.com
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Box
+        auth:
+          mode: oauth
+          clientCredentialsInput: BOX_OAUTH_CLIENT
+        install:
+          note: Box requires Integration Credentials and a registered OAuth redirect URI.
+          inputs:
+            BOX_OAUTH_CLIENT:
+              kind: oauthClientCredentials
+              label: Box OAuth Client
+              description: Client ID and Client Secret from Box Integration Credentials.
+              required: true
+              clientSecretRequired: true
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: indeed
+    transport: streamable-http
+    url: https://mcp.indeed.com/claude/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Indeed
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp.policy
+    name: builtin-auto-read
+  - type: mcp.policy
+    name: builtin-manual-write

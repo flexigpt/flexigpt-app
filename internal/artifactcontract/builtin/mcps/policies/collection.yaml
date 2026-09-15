@@ -1,0 +1,123 @@
+apiVersion: v1
+type: collection
+name: mcp-builtin-policies
+description: Shared policies for application-provided MCP servers.
+members:
+  - type: mcp.policy
+    name: builtin-auto-read
+    description: Trusted automatic read policy.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: auto
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: false
+        requireApprovalForDestructive: false
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-manual-read
+    description: Trusted read policy that requires manual execution.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: manual
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: false
+        requireApprovalForDestructive: false
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-manual-write
+    description: Trusted write policy that requires manual execution.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: manual
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: true
+        requireApprovalForDestructive: true
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-manual-write-no-destructive
+    description: Manual write policy without destructive-risk approval.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: manual
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: true
+        requireApprovalForDestructive: false
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-auto-write
+    description: Trusted automatic write policy.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: auto
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: true
+        requireApprovalForDestructive: true
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-auto-write-apps
+    description: Trusted automatic write policy with MCP Apps support.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: auto
+        requireApprovalForUnknownRisk: true
+        requireApprovalForWrite: true
+        requireApprovalForDestructive: true
+      appsPolicy:
+        enabled: true
+        allowAppInitiatedToolCalls: true
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true
+
+  - type: mcp.policy
+    name: builtin-context7-default
+    description: Context7 default policy.
+    body:
+      trustLevel: trusted
+      defaultPolicy:
+        defaultApprovalRule: allow
+        defaultExecutionMode: auto
+        requireApprovalForUnknownRisk: false
+        requireApprovalForWrite: true
+        requireApprovalForDestructive: true
+      appsPolicy:
+        enabled: false
+        allowAppInitiatedToolCalls: false
+        requireApprovalForOpenLink: true
+        requireApprovalForContextUpdates: true

@@ -131,10 +131,22 @@ func ServerDocumentFromDefinition(
 	if err != nil {
 		return ServerDocument{}, err
 	}
+	logicalVersion := input.LogicalVersion
+	if logicalVersion == "" {
+		logicalVersion = extension.LogicalVersion
+	}
+	displayName := input.DisplayName
+	if extension.DisplayName != "" {
+		// Canonical mcp declarations keep MCP-specific display metadata in
+		// the namespaced metadata extension. Generic Definition metadata
+		// remains derived from the portable declaration header.
+		displayName = extension.DisplayName
+	}
+
 	document, err := NewDocument(
 		input.LogicalName,
-		input.LogicalVersion,
-		input.DisplayName,
+		logicalVersion,
+		displayName,
 		input.Description,
 		input.Labels,
 		core,
@@ -335,6 +347,7 @@ func RebindLocatedDocument(
 	} else {
 		output.Include = cloneInclude(input.Include)
 	}
+	outerExtension := false
 	if _, found := outer.Metadata[mcpDomain.RuntimeExtensionMetadataKey]; found {
 		extension, err := extensionFromDeclaration(
 			outer,
@@ -344,11 +357,15 @@ func RebindLocatedDocument(
 			return ServerDocument{}, err
 		}
 		output.Extension = extension
+		outerExtension = true
 	}
 	output.Extension = withImplicitEnvironmentInputs(
 		output.MCPServer,
 		output.Extension,
 	)
+	if outerExtension && output.Extension.DisplayName != "" {
+		output.DisplayName = output.Extension.DisplayName
+	}
 	if err := output.Validate(); err != nil {
 		return ServerDocument{}, err
 	}

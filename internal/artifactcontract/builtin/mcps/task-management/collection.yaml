@@ -1,0 +1,48 @@
+apiVersion: v1
+type: collection
+name: mcp-task-management
+description: Built-in MCP servers for task management and communication.
+members:
+  - type: mcp
+    name: atlassian
+    transport: streamable-http
+    url: https://mcp.atlassian.com/v1/mcp/authv2
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Atlassian Rovo (Jira + Confluence)
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: notion
+    transport: streamable-http
+    url: https://mcp.notion.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Notion
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: slack
+    transport: streamable-http
+    url: https://mcp.slack.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Slack
+        auth:
+          mode: oauth
+          clientCredentialsInput: SLACK_OAUTH_CLIENT
+        install:
+          note: Slack MCP requires a registered confidential OAuth client.
+          inputs:
+            SLACK_OAUTH_CLIENT:
+              kind: oauthClientCredentials
+              label: Slack OAuth Client
+              description: Client ID and Client Secret for the Slack app.
+              required: true
+              clientSecretRequired: true
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp.policy
+    name: builtin-manual-write

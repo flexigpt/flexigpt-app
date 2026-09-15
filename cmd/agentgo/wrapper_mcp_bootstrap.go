@@ -193,14 +193,13 @@ func NewMCPBuiltInInstaller(
 	if store == nil {
 		return nil, errors.New("MCP built-in Store is required")
 	}
-	registry, packages, err := mcpBuiltin.LoadEmbeddedRegistry()
+	packages, err := builtin.EmbeddedMCPPackages()
 	if err != nil {
 		return nil, err
 	}
 	return mcpBuiltin.NewInstaller(
 		mcpBuiltin.InstallerDependencies{
 			MCP:      store,
-			Registry: registry,
 			Packages: packages,
 			Overlays: overlays,
 		},

@@ -1208,23 +1208,23 @@ The runtime consumer owns:
 
 The declaration system supports the following physical inputs.
 
-| Physical input                  | Produced artifact behavior                              |
-| ------------------------------- | ------------------------------------------------------- |
-| Canonical JSON                  | One top-level declaration and named nested declarations |
-| Canonical YAML                  | One top-level declaration and named nested declarations |
-| `AGENTS.md`                     | One `instruction`                                       |
-| `CLAUDE.md`                     | One `instruction`                                       |
-| `README.md`                     | One `context`                                           |
-| `llms.txt`                      | One `context`                                           |
-| Selected documentation Markdown | One `context` per selected file                         |
-| `SKILL.md`                      | One `skill`                                             |
-| `.mcp.json`                     | One `mcp` Artifact per configured server                |
-| `mcp.json`                      | One `mcp` Artifact per configured server                |
-| `AGENT.md`                      | One `agent` and one generated named body Instruction    |
-| `*.agent.md`                    | One `agent` and one generated named body Instruction    |
-| Skill Collection manifest       | One `collection` plus source-backed Skills              |
-| MCP Collection manifest         | One `collection` plus source-backed MCP declarations    |
-| Workspace manifest              | One `workspace`                                         |
+| Physical input                  | Produced artifact behavior                               |
+| ------------------------------- | -------------------------------------------------------- |
+| Canonical JSON                  | One top-level declaration and named nested declarations  |
+| Canonical YAML                  | One top-level declaration and named nested declarations  |
+| `AGENTS.md`                     | One `instruction`                                        |
+| `CLAUDE.md`                     | One `instruction`                                        |
+| `README.md`                     | One `context`                                            |
+| `llms.txt`                      | One `context`                                            |
+| Selected documentation Markdown | One `context` per selected file                          |
+| `SKILL.md`                      | One `skill`                                              |
+| `.mcp.json`                     | One `mcp` Artifact per configured server                 |
+| `mcp.json`                      | One `mcp` Artifact per configured server                 |
+| `AGENT.md`                      | One `agent` and one generated named body Instruction     |
+| `*.agent.md`                    | One `agent` and one generated named body Instruction     |
+| Skill Collection manifest       | One `collection` plus source-backed Skills               |
+| Canonical MCP Collection        | One `collection` plus canonical MCP and policy Artifacts |
+| Workspace manifest              | One `workspace`                                          |
 
 A single file may emit multiple Artifacts.
 

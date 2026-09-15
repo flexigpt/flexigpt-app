@@ -50,9 +50,7 @@ const (
 	EmbeddedSkillDataRoot         basespec.Locator = "skills"
 	EmbeddedSkillRegistryLocator  basespec.Locator = "skills/skill-registry.json"
 
-	EmbeddedMCPRegistryFileName                  = "mcp_artifact_registry.json"
-	EmbeddedMCPDataRoot         basespec.Locator = "mcps"
-	EmbeddedMCPRegistryLocator  basespec.Locator = "mcps/mcp_artifact_registry.json"
+	EmbeddedMCPDataRoot basespec.Locator = "mcps"
 )
 
 const (

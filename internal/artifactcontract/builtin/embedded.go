@@ -32,17 +32,6 @@ func EmbeddedSkillPackages() (fs.FS, error) {
 	)
 }
 
-// ReadEmbeddedMCPRegistry reads application-owned MCP package registration
-// metadata. It is a physical package index, not a Store Collection.
-func ReadEmbeddedMCPRegistry() ([]byte, error) {
-	return readEmbeddedFile(
-		embeddedMCPFS,
-		EmbeddedMCPRegistryLocator,
-	)
-}
-
-// EmbeddedMCPPackages exposes the embedded MCP package tree to the MCP
-// built-in installer. Artifact Store never imports this package.
 func EmbeddedMCPPackages() (fs.FS, error) {
 	return embeddedSubtree(
 		embeddedMCPFS,

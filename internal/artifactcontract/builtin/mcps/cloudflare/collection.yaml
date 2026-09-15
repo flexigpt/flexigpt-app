@@ -1,0 +1,181 @@
+apiVersion: v1
+type: collection
+name: mcp-cloudflare
+description: Cloudflare fully managed remote MCP servers.
+members:
+  - type: mcp
+    name: agents-docs
+    transport: streamable-http
+    url: https://agents.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Agents SDK Docs
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: ai-gateway
+    transport: streamable-http
+    url: https://ai-gateway.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare AI Gateway
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: api
+    transport: streamable-http
+    url: https://mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare API
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: auditlogs
+    transport: streamable-http
+    url: https://auditlogs.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Audit Logs
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: autorag
+    transport: streamable-http
+    url: https://autorag.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare AI Search / AutoRAG
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: browser-run
+    transport: streamable-http
+    url: https://browser.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Browser Run
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: builds
+    transport: streamable-http
+    url: https://builds.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Builds
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: casb
+    transport: streamable-http
+    url: https://casb.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare One CASB
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: container
+    transport: streamable-http
+    url: https://containers.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Container
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: dex
+    transport: streamable-http
+    url: https://dex.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Digital Experience Monitoring
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: dns-analytics
+    transport: streamable-http
+    url: https://dns-analytics.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare DNS Analytics
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: cloudflare-docs
+    transport: streamable-http
+    url: https://docs.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Docs
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: graphql
+    transport: streamable-http
+    url: https://graphql.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare GraphQL
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: logs
+    transport: streamable-http
+    url: https://logs.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Logs
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: observability
+    transport: streamable-http
+    url: https://observability.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Observability
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-read, required: true }
+
+  - type: mcp
+    name: radar
+    transport: streamable-http
+    url: https://radar.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Radar
+        auth: { mode: oauth }
+        policy: { ref: builtin-auto-read, required: true }
+
+  - type: mcp
+    name: workers
+    transport: streamable-http
+    url: https://bindings.mcp.cloudflare.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Cloudflare Workers and Bindings
+        auth: { mode: oauth }
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp.policy
+    name: builtin-auto-read
+  - type: mcp.policy
+    name: builtin-manual-read
+  - type: mcp.policy
+    name: builtin-manual-write

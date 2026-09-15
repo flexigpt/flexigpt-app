@@ -19,7 +19,6 @@ import (
 
 type InstallerDependencies struct {
 	MCP      mcpConsumerAPI.BuiltinStore
-	Registry Registry
 	Packages fs.FS
 	Overlays mcpOverlay.RootPurger
 }
@@ -46,12 +45,8 @@ func NewInstaller(
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}
-	if err := dependencies.Registry.Validate(); err != nil {
-		return nil, err
-	}
-	prepared, err := PrepareCollections(
+	prepared, err := PreparePackages(
 		context.Background(),
-		dependencies.Registry,
 		dependencies.Packages,
 	)
 	if err != nil {
@@ -175,7 +170,7 @@ func (i *Installer) ensurePackages(
 		); err != nil {
 			return fmt.Errorf(
 				"install built-in MCP package %q: %w",
-				value.Registration.EmbeddedPackageRoot,
+				value.EmbeddedPackageRoot,
 				err,
 			)
 		}
@@ -202,7 +197,7 @@ func hydrationFingerprint(
 			return "", err
 		}
 		values = append(values, packageFingerprint{
-			Root:   value.Registration.EmbeddedPackageRoot,
+			Root:   value.EmbeddedPackageRoot,
 			Digest: digest,
 		})
 	}
@@ -220,6 +215,7 @@ func hydrationFingerprint(
 	})
 }
 
+// packageScopes returns the package roots owned by the MCP built-in installer.
 func packageScopes(
 	prepared []PreparedPackage,
 ) ([]basespec.Locator, error) {

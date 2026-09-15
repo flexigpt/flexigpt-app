@@ -1,0 +1,36 @@
+apiVersion: v1
+type: collection
+name: mcp-design
+description: Built-in MCP server definitions for design tools.
+members:
+  - type: mcp
+    name: canva
+    transport: streamable-http
+    url: https://mcp.canva.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Canva
+        timeoutMS: 60000
+        auth: { mode: oauth }
+        install:
+          note: "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+        policy: { ref: builtin-manual-write, required: true }
+
+  - type: mcp
+    name: figma-remote
+    transport: streamable-http
+    url: https://mcp.figma.com/mcp
+    metadata:
+      "flexigpt.site/mcp-runtime-v1":
+        displayName: Figma (Remote)
+        auth: { mode: oauth }
+        install:
+          note: Official Figma remote MCP server. Figma canvas mutations remain manually approved.
+        policy:
+          ref: builtin-manual-write-no-destructive
+          required: true
+
+  - type: mcp.policy
+    name: builtin-manual-write
+  - type: mcp.policy
+    name: builtin-manual-write-no-destructive

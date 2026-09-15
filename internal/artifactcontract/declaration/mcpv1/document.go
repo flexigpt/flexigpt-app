@@ -4,6 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -37,6 +38,10 @@ var MCPSchemaKey = schema.ArtifactKey(
 	artifact.ArtifactKind(MCPType),
 	schema.SchemaID(MCPSchemaID),
 	MCPSchemaVersion,
+)
+
+var mcpURLTemplatePattern = regexp.MustCompile(
+	`\$\{[A-Za-z_][A-Za-z0-9_]*\}`,
 )
 
 type Include struct {
@@ -197,10 +202,7 @@ func (v MCPDocument) validateFields() error {
 		}
 	}
 	if v.URL != "" {
-		if err := declaration.ValidateAbsoluteURL(
-			"MCP URL",
-			v.URL,
-		); err != nil {
+		if err := validateMCPURL(v.URL); err != nil {
 			return err
 		}
 	}
@@ -237,6 +239,21 @@ func (v MCPDocument) validateFields() error {
 		"MCP include prompts",
 		v.Include.Prompts,
 		basespec.MaxLogicalNameBytes,
+	)
+}
+
+// validateMCPURL accepts a normal absolute MCP URL and the declared runtime
+// placeholder form used by MCP installation inputs. The MCP consumer validates
+// that every placeholder is declared and resolves it before runtime use.
+func validateMCPURL(
+	value string,
+) error {
+	return declaration.ValidateAbsoluteURL(
+		"MCP URL",
+		mcpURLTemplatePattern.ReplaceAllString(
+			value,
+			"placeholder",
+		),
 	)
 }
 

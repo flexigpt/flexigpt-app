@@ -98,15 +98,14 @@ func hasInlineMCPConnection(
 func decodeLocatedMCPDefinitions(
 	content []byte,
 ) ([]definition.Definition, error) {
+	if sourceformat.IsRetiredMCPCollection(content) {
+		return nil, fmt.Errorf(
+			"%w: proprietary MCP collection manifests are retired; use a canonical Collection Artifact",
+			basespec.ErrUnsupported,
+		)
+	}
 	if sourceformat.IsMCPConfig(content) {
 		values, err := sourceformat.DecodeMCPConfig(content)
-		if err != nil {
-			return nil, err
-		}
-		return decodedDefinitions(values), nil
-	}
-	if sourceformat.IsMCPCollection(content) {
-		values, err := sourceformat.DecodeMCPCollection(content)
 		if err != nil {
 			return nil, err
 		}
