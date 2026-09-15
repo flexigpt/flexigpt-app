@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
@@ -74,4 +75,18 @@ func (*Decoder) Decode(
 	return []providerapi.Decoded{{
 		Definition: value,
 	}}, warnings
+}
+
+func expectedSkillName(locator basespec.Locator) string {
+	parent := path.Dir(string(locator))
+	if parent == "." {
+		return ""
+	}
+	if address, err := source.ParseManagedPackageAddressDirectory(
+		basespec.Locator(parent),
+	); err == nil &&
+		address.Kind == skillDomain.ManagedSkillPackageKind {
+		return string(address.Name)
+	}
+	return path.Base(parent)
 }

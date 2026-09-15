@@ -29,19 +29,14 @@ func NewSkillBuiltInInstaller(
 		return nil, errors.New("skill built-in installer dependencies are incomplete")
 	}
 
-	registry, err := skillBuiltin.LoadRegistry()
-	if err != nil {
-		return nil, err
-	}
 	packages, err := builtin.EmbeddedSkillPackages()
 	if err != nil {
 		return nil, err
 	}
 	return skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
-			Skills:        skills,
-			SkillRegistry: registry,
-			Packages:      packages,
+			Skills:   skills,
+			Packages: packages,
 		},
 	)
 }

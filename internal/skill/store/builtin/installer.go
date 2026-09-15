@@ -8,25 +8,25 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
 type InstallerDependencies struct {
-	Skills        skillConsumerAPI.BuiltinStore
-	SkillRegistry Registry
-	Packages      fs.FS
+	Skills   skillConsumerAPI.BuiltinStore
+	Packages fs.FS
 }
 
 type Installer struct {
 	skills          skillConsumerAPI.BuiltinStore
 	builtInTopology topology.Declaration
-	hydrated        HydratedRegistry
+	prepared        []PreparedPackage
 	packageScopes   []basespec.Locator
+	fingerprint     cryptoutil.Digest
 }
 
 func NewInstaller(
@@ -37,9 +37,6 @@ func NewInstaller(
 			"%w: built-in Skill installer dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
-	}
-	if err := dependencies.SkillRegistry.Validate(); err != nil {
-		return nil, err
 	}
 
 	topologyValue := builtin.BuiltinTopologyDeclaration()
@@ -53,14 +50,22 @@ func NewInstaller(
 			basespec.ErrInvalid,
 		)
 	}
-	hydrated, err := dependencies.SkillRegistry.Hydrate(
+
+	prepared, err := PreparePackages(
 		context.Background(),
 		dependencies.Packages,
 	)
 	if err != nil {
 		return nil, err
 	}
-	scopes, err := builtInPackageScopes(hydrated)
+	scopes, err := builtInPackageScopes(prepared)
+	if err != nil {
+		return nil, err
+	}
+	fingerprint, err := hydrationFingerprint(
+		topologyValue,
+		prepared,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -68,8 +73,9 @@ func NewInstaller(
 	return &Installer{
 		skills:          dependencies.Skills,
 		builtInTopology: topologyValue,
-		hydrated:        hydrated,
+		prepared:        prepared,
 		packageScopes:   scopes,
+		fingerprint:     fingerprint,
 	}, nil
 }
 
@@ -85,6 +91,9 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 }
 
 func (i *Installer) Ensure(ctx context.Context) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
@@ -104,103 +113,40 @@ func (i *Installer) EnsureBuiltInArtifacts(
 		return err
 	}
 
-	for _, value := range i.hydrated.OrderedSkills() {
-		record, err := i.skills.InstallBuiltInSkill(
+	for _, value := range i.prepared {
+		if _, err := i.skills.InstallBuiltInSkillPackage(
 			ctx,
-			skillConsumerAPI.BuiltInSkillInstallRequest{
-				RootID:              i.builtInTopology.Root.ID,
-				SourceID:            i.builtInTopology.Sources[0].ID,
-				PackageAddress:      value.PackageAddress,
-				PackageFiles:        value.PackageFiles,
-				ExpectedLogicalName: value.Definition.LogicalName,
-				ExpectedDefinition:  value.Definition.Digest,
-				Enabled:             value.Registration.Enabled,
+			skillConsumerAPI.BuiltInSkillPackageInstallRequest{
+				RootID:         i.builtInTopology.Root.ID,
+				SourceID:       i.builtInTopology.Sources[0].ID,
+				PackageAddress: value.PackageAddress,
+				DocumentFile:   value.DocumentFile,
+				PackageFiles:   value.PackageFiles,
+				Expectations:   value.Expectations,
 			},
-		)
-		if err != nil {
+		); err != nil {
 			return fmt.Errorf(
-				"install built-in Skill %q: %w",
-				value.Definition.LogicalName,
+				"install built-in Skill package %q: %w",
+				value.EmbeddedPackageRoot,
 				err,
 			)
 		}
-		if err := verifyBuiltInArtifact(record, value); err != nil {
-			return err
-		}
 	}
 
-	members := make(
-		[]basespec.LogicalName,
-		0,
-		len(i.hydrated.Skills),
-	)
-	for _, value := range i.hydrated.OrderedSkills() {
-		members = append(members, value.Definition.LogicalName)
-	}
-	collection, err := i.skills.InstallBuiltInSkillCollection(
-		ctx,
-		skillConsumerAPI.BuiltInSkillCollectionInstallRequest{
-			RootID:      i.builtInTopology.Root.ID,
-			SourceID:    i.builtInTopology.Sources[0].ID,
-			Name:        skillDomain.BuiltinSkillCollectionName,
-			Description: skillDomain.BuiltinSkillCollectionDescription,
-			Members:     members,
-			Enabled:     true,
-		},
-	)
-	if err != nil {
-		return fmt.Errorf("install built-in Skill Collection: %w", err)
-	}
-	if collection.State != artifact.StateAvailable {
-		return fmt.Errorf("%w: built-in Skill Collection is unavailable", basespec.ErrReferenceUnresolved)
-	}
-
-	return nil
-}
-
-func verifyBuiltInArtifact(
-	record artifact.Artifact,
-	expected HydratedSkill,
-) error {
-	if record.Kind != skillDomain.SkillArtifactKind ||
-		record.LogicalName != expected.Definition.LogicalName ||
-		record.State != artifact.StateAvailable ||
-		record.ResolvedDefinition == nil ||
-		*record.ResolvedDefinition != expected.Definition.Digest ||
-		record.Enabled != expected.Registration.Enabled {
-		return fmt.Errorf(
-			"%w: built-in Skill Artifact %q does not match embedded registry",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
 	return nil
 }
 
 func builtInPackageScopes(
-	registry HydratedRegistry,
+	prepared []PreparedPackage,
 ) ([]basespec.Locator, error) {
-	output := make([]basespec.Locator, 0, len(registry.Skills))
-	for _, value := range registry.OrderedSkills() {
+	output := make([]basespec.Locator, 0, len(prepared))
+	for _, value := range prepared {
 		directory, err := value.PackageAddress.Directory()
 		if err != nil {
 			return nil, err
 		}
 		output = append(output, directory)
 	}
-	collectionAddress, err := source.NewManagedPackageAddress(
-		skillDomain.BuiltinCollectionPackageKind,
-		skillDomain.BuiltinSkillCollectionName,
-		builtin.UnversionedPackageVersion,
-	)
-	if err != nil {
-		return nil, err
-	}
-	collectionScope, err := collectionAddress.Directory()
-	if err != nil {
-		return nil, err
-	}
-	output = append(output, collectionScope)
 	slices.Sort(output)
 	return output, nil
 }

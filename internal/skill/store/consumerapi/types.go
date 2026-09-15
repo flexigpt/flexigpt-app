@@ -36,26 +36,24 @@ type ManagedSkillCreateRequest struct {
 	Enabled   bool                        `json:"enabled"`
 }
 
-type BuiltInSkillCollectionInstallRequest struct {
-	RootID      root.RootID            `json:"rootID"`
-	SourceID    source.SourceID        `json:"sourceID"`
-	Name        basespec.LogicalName   `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Members     []basespec.LogicalName `json:"members"`
-	Enabled     bool                   `json:"enabled"`
+type BuiltInSkillArtifactExpectation struct {
+	Subresource      basespec.SubresourceLocator `json:"subresource"`
+	Kind             artifact.ArtifactKind       `json:"kind"`
+	LogicalName      basespec.LogicalName        `json:"logicalName"`
+	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
+	Enabled          bool                        `json:"enabled"`
+}
+
+type BuiltInSkillPackageInstallRequest struct {
+	RootID         root.RootID                       `json:"rootID"`
+	SourceID       source.SourceID                   `json:"sourceID"`
+	PackageAddress source.ManagedPackageAddress      `json:"packageAddress"`
+	DocumentFile   basespec.Locator                  `json:"documentFile"`
+	PackageFiles   []source.ManagedPackageFile       `json:"packageFiles"`
+	Expectations   []BuiltInSkillArtifactExpectation `json:"expectations"`
 }
 
 type ManagedSkillCreateResult struct {
 	Artifact artifact.Artifact        `json:"artifact"`
 	Address  artifact.ArtifactAddress `json:"address"`
-}
-
-type BuiltInSkillInstallRequest struct {
-	RootID              root.RootID                  `json:"rootID"`
-	SourceID            source.SourceID              `json:"sourceID"`
-	PackageAddress      source.ManagedPackageAddress `json:"packageAddress"`
-	PackageFiles        []source.ManagedPackageFile  `json:"packageFiles"`
-	ExpectedLogicalName basespec.LogicalName         `json:"expectedLogicalName"`
-	ExpectedDefinition  cryptoutil.Digest            `json:"expectedDefinition"`
-	Enabled             bool                         `json:"enabled"`
 }

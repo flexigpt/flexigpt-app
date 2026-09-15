@@ -1,0 +1,17 @@
+apiVersion: v1
+type: collection
+name: core-instructions
+description: "Builtin instruction-only skills."
+members:
+  - type: skill
+    name: markdown-output
+    description: "Format responses in plain Markdown using simple headings, bullets, and fenced code blocks."
+    locator: ./markdown-output
+  - type: skill
+    name: use-explicit-tools-batched
+    description: "Prefer purpose-built filesystem and text tools, batch independent calls, and use safe edit locators."
+    locator: ./use-explicit-tools-batched
+  - type: skill
+    name: grounded-local-work
+    description: "Use attached and local context first, distinguish observations from inferences, and cite source paths."
+    locator: ./grounded-local-work

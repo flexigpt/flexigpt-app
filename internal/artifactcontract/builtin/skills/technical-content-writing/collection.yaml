@@ -1,0 +1,25 @@
+apiVersion: v1
+type: collection
+name: technical-content-writing
+description: "Skills for software and product documentation, API references, release notes, and troubleshooting guides."
+members:
+  - type: skill
+    name: docs-audit
+    description: "Audit documentation for structural gaps, stale claims, duplication, missing content, and navigation issues."
+    locator: ./docs-audit
+  - type: skill
+    name: docs-authoring
+    description: "Create or update source-grounded READMEs, guides, tutorials, and internal documentation."
+    locator: ./docs-authoring
+  - type: skill
+    name: api-reference-authoring
+    description: "Generate accurate API and SDK reference documentation from code, schemas, and existing documentation."
+    locator: ./api-reference-authoring
+  - type: skill
+    name: release-notes-authoring
+    description: "Create release notes and changelogs from diffs, commits, pull requests, and issue summaries."
+    locator: ./release-notes-authoring
+  - type: skill
+    name: troubleshooting-guide-authoring
+    description: "Create safe, evidence-based troubleshooting and knowledge-base articles from errors and fixes."
+    locator: ./troubleshooting-guide-authoring

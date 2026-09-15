@@ -14,15 +14,6 @@ var embeddedSkillsFS embed.FS
 //go:embed mcps
 var embeddedMCPFS embed.FS
 
-// ReadEmbeddedSkillRegistry reads the application-owned non-portable built-in
-// Skill registration manifest. It is not a portable Artifact declaration.
-func ReadEmbeddedSkillRegistry() ([]byte, error) {
-	return readEmbeddedFile(
-		embeddedSkillsFS,
-		EmbeddedSkillRegistryLocator,
-	)
-}
-
 // EmbeddedSkillPackages exposes the embedded Skill package tree to the Skill
 // built-in installer. Artifact Store itself never imports this package.
 func EmbeddedSkillPackages() (fs.FS, error) {
@@ -37,27 +28,6 @@ func EmbeddedMCPPackages() (fs.FS, error) {
 		embeddedMCPFS,
 		EmbeddedMCPDataRoot,
 	)
-}
-
-func readEmbeddedFile(
-	embedded fs.FS,
-	location basespec.Locator,
-) ([]byte, error) {
-	if embedded == nil || !fs.ValidPath(string(location)) {
-		return nil, fmt.Errorf(
-			"invalid embedded built-in file %q",
-			location,
-		)
-	}
-	value, err := fs.ReadFile(embedded, string(location))
-	if err != nil {
-		return nil, fmt.Errorf(
-			"read embedded built-in file %q: %w",
-			location,
-			err,
-		)
-	}
-	return append([]byte(nil), value...), nil
 }
 
 func embeddedSubtree(

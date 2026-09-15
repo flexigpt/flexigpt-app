@@ -1222,7 +1222,7 @@ The declaration system supports the following physical inputs.
 | `mcp.json`                      | One `mcp` Artifact per configured server                 |
 | `AGENT.md`                      | One `agent` and one generated named body Instruction     |
 | `*.agent.md`                    | One `agent` and one generated named body Instruction     |
-| Skill Collection manifest       | One `collection` plus source-backed Skills               |
+| Canonical Skill Collection YAML | One `collection` plus named located Skill Artifacts      |
 | Canonical MCP Collection        | One `collection` plus canonical MCP and policy Artifacts |
 | Workspace manifest              | One `workspace`                                          |
 
@@ -1619,6 +1619,7 @@ The Resolver returns a typed graph. It does not execute that graph.
 | Direct `SKILL.md` registration                     | Available                                                     |
 | Managed Skill packages                             | Available                                                     |
 | Built-in Skill packages                            | Available                                                     |
+| Canonical Skill Collection declarations            | Available                                                     |
 | `.mcp.json` support                                | Available                                                     |
 | `mcp.json` support                                 | Available                                                     |
 | Canonical MCP declarations                         | Available                                                     |

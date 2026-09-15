@@ -15,21 +15,17 @@ const (
 	SkillSchemaID      schema.SchemaID = skillv1.SkillSchemaID
 	SkillSchemaVersion                 = skillv1.SkillSchemaVersion
 
-	MarkdownDecoderID        basespec.DecoderID = "agent.skill-markdown"
-	SkillCollectionDecoderID basespec.DecoderID = "agent.skill-collection"
+	MarkdownDecoderID basespec.DecoderID = "agent.skill-markdown"
 
-	ManagedSkillPackageKind       source.PackageKind = "skill"
-	SkillDefinitionFileName       basespec.Locator   = "SKILL.md"
-	BuiltinCollectionPackageKind  source.PackageKind = "collection"
-	BuiltinCollectionDocumentFile basespec.Locator   = "collection.json"
+	ManagedSkillPackageKind            source.PackageKind = "skill"
+	SkillDefinitionFileName            basespec.Locator   = "SKILL.md"
+	BuiltinSkillCollectionPackageKind  source.PackageKind = "skill-collection"
+	BuiltinSkillCollectionDocumentFile basespec.Locator   = "collection.yaml"
 
 	InsertLabelKey = "skill.insert"
 
-	BuiltInInstallerName              = "agent.skill"
-	BuiltinSkillCollectionName        = basespec.LogicalName("built-in-skills")
-	BuiltinSkillCollectionDescription = "Application built-in Skill capabilities"
-	HydrationSchemaVersion            = "agent.skill.builtin-hydration/v1"
-	RegistrySchemaVersion             = "v1"
+	BuiltInInstallerName   = "agent.skill"
+	HydrationSchemaVersion = "agent.skill.builtin-hydration/v1"
 )
 
 func IsSkillKind(value artifact.ArtifactKind) bool {

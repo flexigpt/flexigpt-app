@@ -46,11 +46,8 @@ const (
 
 	ExternalGitMetadataDirectoryName = ".git"
 
-	EmbeddedSkillRegistryFileName                  = "skill-registry.json"
-	EmbeddedSkillDataRoot         basespec.Locator = "skills"
-	EmbeddedSkillRegistryLocator  basespec.Locator = "skills/skill-registry.json"
-
-	EmbeddedMCPDataRoot basespec.Locator = "mcps"
+	EmbeddedSkillDataRoot basespec.Locator = "skills"
+	EmbeddedMCPDataRoot   basespec.Locator = "mcps"
 )
 
 const (
@@ -117,15 +114,18 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
-			// Artifact Store remains format-neutral. The managed built-in
-			// Source therefore discovers regular files generically and lets
-			// registered contract decoders decide which files emit
-			// Definitions. Built-in contract installers can later narrow
-			// this scope without changing Source ownership semantics.
+			// Built-in packages use canonical collection.yaml documents as
+			// their declaration entry points. Nested named declarations are
+			// emitted from those documents. SKILL.md files remain package
+			// resources resolved through Skill locators and must not also be
+			// discovered as standalone Skill declarations.
 			Discovery: source.DiscoverySpec{
 				DirectoryRoots: []source.DirectoryRoot{{
 					Root:      RepositoryRootLocator,
 					Recursive: true,
+					IncludePatterns: []string{
+						"**/collection.yaml",
+					},
 				}},
 				Authoritative: true,
 			},

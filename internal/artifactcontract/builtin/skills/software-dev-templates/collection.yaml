@@ -1,0 +1,17 @@
+apiVersion: v1
+type: collection
+name: software-dev-templates
+description: "Builtin software development template skills."
+members:
+  - type: skill
+    name: diagrams-stage
+    description: "Generate one Mermaid diagram followed by concise commentary."
+    locator: ./diagrams-stage
+  - type: skill
+    name: fe-stack-react-vite
+    description: "Provide implementation plans and snippets for the requested React and Vite stack."
+    locator: ./fe-stack-react-vite
+  - type: skill
+    name: go-table-tests
+    description: "Scaffold idiomatic Go table-driven tests for a function."
+    locator: ./go-table-tests
