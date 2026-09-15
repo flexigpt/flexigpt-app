@@ -79,10 +79,6 @@ func (*Installer) BuiltInName() string {
 	return mcpDomain.BuiltInInstallerName
 }
 
-func (*Installer) BuiltInIDs() []string {
-	return nil
-}
-
 func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	if i == nil {
 		return nil

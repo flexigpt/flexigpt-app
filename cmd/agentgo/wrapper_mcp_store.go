@@ -107,6 +107,20 @@ func (w *MCPStoreWrapper) InspectMCPPolicy(
 	})
 }
 
+func (w *MCPStoreWrapper) UpsertManagedMCPPolicy(
+	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
+) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+			return api.UpsertManagedMCPPolicy(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
 func (w *MCPStoreWrapper) close() {
 	if w == nil {
 		return

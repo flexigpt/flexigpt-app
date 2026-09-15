@@ -48,10 +48,14 @@ func DecodeToolEntry(
 	entry declaration.Entry,
 ) (ToolDocument, error) {
 	var value ToolDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledToolSchema,
+		&value,
+	); err != nil {
 		return ToolDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ToolDocument{}, err
 	}
 	return value, nil
@@ -68,7 +72,7 @@ func decodeTool(
 	); err != nil {
 		return ToolDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ToolDocument{}, err
 	}
 	return value, nil
@@ -111,6 +115,10 @@ func (v ToolDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("tool schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v ToolDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ToolType,
 		APIVersion:   ToolSchemaVersion,

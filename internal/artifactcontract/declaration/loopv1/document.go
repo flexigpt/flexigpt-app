@@ -49,14 +49,12 @@ func DecodeLoopEntry(
 	entry declaration.Entry,
 	implicitBody bool,
 ) (LoopDocument, error) {
-	if err := declaration.ValidateEntryDocument(
+	var value LoopDocument
+	if err := declaration.DecodeEntryDocumentInto(
 		entry,
 		compiledLoopSchema,
+		&value,
 	); err != nil {
-		return LoopDocument{}, err
-	}
-	var value LoopDocument
-	if err := entry.DecodeInto(&value); err != nil {
 		return LoopDocument{}, err
 	}
 	if err := value.validateFields(implicitBody); err != nil {

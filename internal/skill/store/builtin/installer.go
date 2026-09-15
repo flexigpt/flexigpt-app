@@ -77,12 +77,6 @@ func (*Installer) BuiltInName() string {
 	return skillDomain.BuiltInInstallerName
 }
 
-// BuiltInIDs - Artifact IDs are Store-owned source synchronization identities. The Skill
-// installer has no static Artifact IDs to reserve in BootstrapRegistry.
-func (*Installer) BuiltInIDs() []string {
-	return nil
-}
-
 func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 	if i == nil {
 		return nil

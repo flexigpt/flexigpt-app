@@ -48,10 +48,14 @@ func DecodeSkillEntry(
 	entry declaration.Entry,
 ) (SkillDocument, error) {
 	var value SkillDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledSkillSchema,
+		&value,
+	); err != nil {
 		return SkillDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return SkillDocument{}, err
 	}
 	return value, nil
@@ -68,7 +72,7 @@ func decodeSkill(
 	); err != nil {
 		return SkillDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return SkillDocument{}, err
 	}
 	return value, nil
@@ -111,6 +115,10 @@ func (v SkillDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("skill schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v SkillDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: SkillType,
 		APIVersion:   SkillSchemaVersion,
@@ -125,13 +133,6 @@ func (v SkillDocument) validate() error {
 		); err != nil {
 			return err
 		}
-	}
-	if len(v.AllowedTools) > basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: Skill allowedTools exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
-		)
 	}
 	return declaration.ValidateEntryTypes(
 		"Skill allowedTools",

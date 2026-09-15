@@ -17,7 +17,6 @@
   - [Symbolic reference](#symbolic-reference)
   - [Located declaration](#located-declaration)
   - [Inline declaration](#inline-declaration)
-  - [Named inline declaration](#named-inline-declaration)
 - [Locator model](#locator-model)
 - [Path pattern model](#path-pattern-model)
 - [Artifact schemas](#artifact-schemas)
@@ -378,15 +377,7 @@ locator: ./skills/code-review
 
 ### Inline declaration
 
-```yaml
-type: model
-name: reasoning
-model: anthropic/claude-sonnet
-parameters:
-  temperature: 0
-```
-
-### Named inline declaration
+All inline declarations are named. Anonymous inline declarations do not exist.
 
 ```yaml
 type: model
@@ -396,7 +387,7 @@ parameters:
   temperature: 0
 ```
 
-Named nested declarations become independently addressable Artifacts when they can be materialized independently. Symbolic references remain references.
+Inline nested declarations become independently addressable Artifacts when they can be materialized independently. Symbolic references remain references.
 
 ## Locator model
 
@@ -1037,6 +1028,10 @@ A Workspace describes:
 
 - Where declarations should be discovered.
 - Which declarations are the entry points for a selected repository experience.
+
+When `declarations` is omitted, the Workspace uses the declaration universe already configured on its containing Source.
+When `declarations` is present, including an empty array, it defines the selected Workspace's declaration scope for that Source.
+Initial broad scanning used to identify a Workspace is not retained as an implicit source of additional declarations.
 
 Example:
 

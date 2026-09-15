@@ -50,10 +50,14 @@ func DecodeContextEntry(
 	entry declaration.Entry,
 ) (ContextDocument, error) {
 	var value ContextDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledContextSchema,
+		&value,
+	); err != nil {
 		return ContextDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ContextDocument{}, err
 	}
 	return value, nil
@@ -70,7 +74,7 @@ func decodeContext(
 	); err != nil {
 		return ContextDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ContextDocument{}, err
 	}
 	return value, nil
@@ -116,6 +120,10 @@ func (v ContextDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("context schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v ContextDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ContextType,
 		APIVersion:   ContextSchemaVersion,

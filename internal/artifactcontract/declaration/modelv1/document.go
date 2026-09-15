@@ -49,10 +49,14 @@ func DecodeModelEntry(
 	entry declaration.Entry,
 ) (ModelDocument, error) {
 	var value ModelDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledModelSchema,
+		&value,
+	); err != nil {
 		return ModelDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ModelDocument{}, err
 	}
 	return value, nil
@@ -69,7 +73,7 @@ func decodeModel(
 	); err != nil {
 		return ModelDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return ModelDocument{}, err
 	}
 	return value, nil
@@ -112,6 +116,10 @@ func (v ModelDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("model schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v ModelDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ModelType,
 		APIVersion:   ModelSchemaVersion,

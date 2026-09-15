@@ -24,13 +24,14 @@ import (
 // canonical declaration document. Exact type/name references are intentionally
 // not decoded as declarations because they are symbolic references.
 func ValidateEntryTree(root declaration.Entry) error {
-	return validateEntryTree(root, false, 0)
+	return validateEntryTree(root, false, 0, false)
 }
 
 func validateEntryTree(
 	entry declaration.Entry,
 	implicitLoopBody bool,
 	depth int,
+	symbolicReferenceAllowed bool,
 ) error {
 	if depth > basespec.MaxDiscoveryDepth {
 		return fmt.Errorf(
@@ -42,7 +43,7 @@ func validateEntryTree(
 	if err := entry.Validate(); err != nil {
 		return err
 	}
-	if entry.IsSymbolic() {
+	if symbolicReferenceAllowed && entry.IsSymbolic() {
 		return nil
 	}
 
@@ -112,6 +113,7 @@ func validateEntryTree(
 			*value.Program,
 			true,
 			depth+1,
+			true,
 		)
 
 	case declaration.TypeTeam:
@@ -133,6 +135,7 @@ func validateEntryTree(
 			*value.Program,
 			true,
 			depth+1,
+			true,
 		)
 
 	case declaration.TypeLoop:
@@ -146,7 +149,12 @@ func validateEntryTree(
 		if value.Body == nil {
 			return nil
 		}
-		return validateEntryTree(*value.Body, false, depth+1)
+		return validateEntryTree(
+			*value.Body,
+			false,
+			depth+1,
+			true,
+		)
 
 	case declaration.TypeWorkflow:
 		value, err := workflowv1.DecodeWorkflowEntry(entry)
@@ -158,6 +166,7 @@ func validateEntryTree(
 				node.Target,
 				false,
 				depth+1,
+				true,
 			); err != nil {
 				return fmt.Errorf(
 					"workflow nodes[%d].target: %w",
@@ -196,6 +205,7 @@ func validateEntryTree(
 				nested,
 				false,
 				depth+1,
+				true,
 			); err != nil {
 				return fmt.Errorf(
 					"workspace declarations[%d]: %w",
@@ -221,7 +231,12 @@ func validateEntryTreeSlice(
 	depth int,
 ) error {
 	for index, entry := range entries {
-		if err := validateEntryTree(entry, false, depth); err != nil {
+		if err := validateEntryTree(
+			entry,
+			false,
+			depth,
+			true,
+		); err != nil {
 			return fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
 	}

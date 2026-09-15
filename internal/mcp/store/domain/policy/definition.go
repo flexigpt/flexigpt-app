@@ -31,6 +31,14 @@ func BodyFromDefinition(
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
 	}
+	return BodyFromDocument(document)
+}
+
+// BodyFromDocument projects an already validated declaration document into
+// the normalized MCP runtime policy model.
+func BodyFromDocument(
+	document mcppolicyv1.MCPPolicyDocument,
+) (mcpPolicy.MCPPolicy, error) {
 	if document.Body == nil {
 		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: MCP Policy declaration has no resolved body",

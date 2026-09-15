@@ -211,10 +211,14 @@ func DecodeWorkspaceEntry(
 	entry declaration.Entry,
 ) (WorkspaceDocument, error) {
 	var value WorkspaceDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledWorkspaceSchema,
+		&value,
+	); err != nil {
 		return WorkspaceDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return WorkspaceDocument{}, err
 	}
 	return value, nil
@@ -231,7 +235,7 @@ func decodeWorkspace(
 	); err != nil {
 		return WorkspaceDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return WorkspaceDocument{}, err
 	}
 	return value, nil
@@ -280,18 +284,15 @@ func (v WorkspaceDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("workspace schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v WorkspaceDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkspaceType,
 		APIVersion:   WorkspaceSchemaVersion,
 	}); err != nil {
 		return err
-	}
-	if len(v.Declarations) > basespec.MaxDefinitionDependencies ||
-		len(v.Roots) > basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: workspace exceeds declaration entry limits",
-			basespec.ErrInvalid,
-		)
 	}
 	for index, declaration := range v.Declarations {
 		if err := declaration.Validate(); err != nil {

@@ -16,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -47,6 +48,7 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 	base, err := a.workspaceDiscoveryBase(
 		sourceValue,
 		workspace.Artifact.Binding.Locator,
+		workspace.Document.Declarations != nil,
 	)
 	if err != nil {
 		return workspaceDomain.Workspace{}, false, err
@@ -88,19 +90,48 @@ func (a *StoreAPI) applyWorkspaceDeclarations(
 	return workspace, false, nil
 }
 
-// workspaceDiscoveryBase augments the Root-owned Source discovery universe.
-// A Source can contain multiple Workspace manifests and can also be configured
-// directly by another Root consumer, so loading one Workspace must not discard
-// existing declaration scopes.
+// workspaceDiscoveryBase retains existing Source discovery when declarations
+// is omitted. When declarations is explicitly present, it replaces bootstrap
+// scanning with the selected Workspace's declaration universe.
 func (a *StoreAPI) workspaceDiscoveryBase(
 	current source.Summary,
 	declarationLocator basespec.Locator,
+	explicitDeclarations bool,
 ) (source.DiscoverySpec, error) {
 	output := current.Discovery.Clone()
+	if explicitDeclarations {
+		output = source.DiscoverySpec{
+			ExplicitLocators: []basespec.Locator{
+				declarationLocator,
+			},
+			AllowedDecoderIDs: append(
+				[]basespec.DecoderID(nil),
+				current.Discovery.AllowedDecoderIDs...,
+			),
+			Authoritative:     true,
+			MaxCandidateBytes: current.Discovery.MaxCandidateBytes,
+			MaxTotalBytes:     current.Discovery.MaxTotalBytes,
+			MaxCandidates:     current.Discovery.MaxCandidates,
+			MaxEntries:        current.Discovery.MaxEntries,
+			MaxDepth:          current.Discovery.MaxDepth,
+		}
+		if expected, found := current.Discovery.
+			ExpectedContentDigests[declarationLocator]; found {
+			output.ExpectedContentDigests = map[basespec.Locator]cryptoutil.Digest{
+				declarationLocator: expected,
+			}
+		}
+	}
 	output.ExplicitLocators = appendUniqueLocator(
 		output.ExplicitLocators,
 		declarationLocator,
 	)
+	for _, hint := range a.config.AdditionalDecoderHints {
+		output.DecoderHints = appendDecoderHint(
+			output.DecoderHints,
+			hint,
+		)
+	}
 	output.DecoderHints = appendCanonicalDeclarationDecoderHint(
 		output.DecoderHints,
 		output.AllowedDecoderIDs,

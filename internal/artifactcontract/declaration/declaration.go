@@ -117,12 +117,6 @@ func (h Header) Validate(
 			options.ExpectedType,
 		)
 	}
-	if h.Name == "" {
-		return fmt.Errorf(
-			"%w: artifact declaration requires name",
-			basespec.ErrInvalid,
-		)
-	}
 	if err := basespec.ValidatePortableName(
 		"artifact declaration name",
 		h.Name,

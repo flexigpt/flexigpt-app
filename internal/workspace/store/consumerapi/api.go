@@ -400,6 +400,8 @@ func (a *StoreAPI) SkillAdapter() *skill.Adapter {
 	return a.skillAdapter
 }
 
+// defaultDiscovery bootstraps Workspace identification. An explicitly
+// present Workspace declarations array is reconciled later by the loader.
 func (a *StoreAPI) defaultDiscovery() (
 	source.DiscoverySpec,
 	error,

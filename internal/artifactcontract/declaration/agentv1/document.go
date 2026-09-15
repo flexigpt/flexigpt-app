@@ -48,10 +48,14 @@ func DecodeAgentEntry(
 	entry declaration.Entry,
 ) (AgentDocument, error) {
 	var value AgentDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledAgentSchema,
+		&value,
+	); err != nil {
 		return AgentDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return AgentDocument{}, err
 	}
 	return value, nil
@@ -68,7 +72,7 @@ func decodeAgent(
 	); err != nil {
 		return AgentDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return AgentDocument{}, err
 	}
 	return value, nil
@@ -111,18 +115,15 @@ func (v AgentDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("agent schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v AgentDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: AgentType,
 		APIVersion:   AgentSchemaVersion,
 	}); err != nil {
 		return err
-	}
-	if len(v.Members) > basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: agent members exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
-		)
 	}
 	if err := declaration.ValidateEntryTypes(
 		"Agent members",

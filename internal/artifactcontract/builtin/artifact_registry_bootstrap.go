@@ -18,7 +18,6 @@ import (
 // artifact definitions, or artifact-specific manifests.
 type Installer interface {
 	BuiltInName() string
-	BuiltInIDs() []string
 	BuiltInPackageScopes() []basespec.Locator
 	Ensure(ctx context.Context) error
 }
@@ -64,7 +63,6 @@ type BootstrapRegistry struct {
 
 	mu         sync.RWMutex
 	installers map[string]Installer
-	ids        map[string]string
 	scopes     map[basespec.Locator]string
 }
 
@@ -82,25 +80,11 @@ func NewBootstrapRegistry(
 	if err := declaration.Validate(); err != nil {
 		return nil, err
 	}
-	ids := map[string]string{
-		string(declaration.Root.ID): "protected built-in Root",
-	}
-	for _, value := range declaration.Sources {
-		if _, duplicate := ids[string(value.ID)]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: built-in topology reuses static ID %q",
-				basespec.ErrConflict,
-				value.ID,
-			)
-		}
-		ids[string(value.ID)] = "protected built-in Source"
-	}
 	return &BootstrapRegistry{
 		declaration: declaration,
 		topology:    ensurer,
 		hydrator:    hydrator,
 		installers:  map[string]Installer{},
-		ids:         ids,
 		scopes:      map[basespec.Locator]string{},
 	}, nil
 }
@@ -117,10 +101,6 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 	if err := topology.ValidateHydrationInstallerName(name); err != nil {
 		return fmt.Errorf("built-in installer name: %w", err)
 	}
-	ids, err := normalizeIDs(inst.BuiltInIDs())
-	if err != nil {
-		return err
-	}
 	scopes, err := normalizePackageScopes(inst.BuiltInPackageScopes())
 	if err != nil {
 		return err
@@ -135,17 +115,6 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 			basespec.ErrConflict,
 			name,
 		)
-	}
-	for _, id := range ids {
-		if owner, exists := r.ids[id]; exists {
-			return fmt.Errorf(
-				"%w: built-in installer %q reuses static ID %q owned by %s",
-				basespec.ErrConflict,
-				name,
-				id,
-				owner,
-			)
-		}
 	}
 
 	existingScopes := make([]basespec.Locator, 0, len(r.scopes))
@@ -170,9 +139,6 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 	}
 
 	r.installers[name] = inst
-	for _, id := range ids {
-		r.ids[id] = name
-	}
 	for _, scope := range scopes {
 		r.scopes[scope] = name
 	}
@@ -345,30 +311,6 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		}
 	}
 	return nil
-}
-
-func normalizeIDs(values []string) ([]string, error) {
-	seen := make(map[string]struct{}, len(values))
-	output := make([]string, 0, len(values))
-	for _, value := range values {
-		if value == "" || value != strings.TrimSpace(value) {
-			return nil, fmt.Errorf(
-				"%w: built-in static ID is required",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, duplicate := seen[value]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: duplicate built-in static ID %q",
-				basespec.ErrConflict,
-				value,
-			)
-		}
-		seen[value] = struct{}{}
-		output = append(output, value)
-	}
-	sort.Strings(output)
-	return output, nil
 }
 
 func normalizePackageScopes(

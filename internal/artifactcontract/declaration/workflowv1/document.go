@@ -68,10 +68,14 @@ func DecodeWorkflowEntry(
 	entry declaration.Entry,
 ) (WorkflowDocument, error) {
 	var value WorkflowDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledWorkflowSchema,
+		&value,
+	); err != nil {
 		return WorkflowDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return WorkflowDocument{}, err
 	}
 	return value, nil
@@ -88,7 +92,7 @@ func decodeWorkflow(
 	); err != nil {
 		return WorkflowDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return WorkflowDocument{}, err
 	}
 	return value, nil
@@ -134,19 +138,15 @@ func (v WorkflowDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("workflow schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v WorkflowDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkflowType,
 		APIVersion:   WorkflowSchemaVersion,
 	}); err != nil {
 		return err
-	}
-	if len(v.Start) > basespec.MaxDefinitionDependencies ||
-		len(v.Nodes) > basespec.MaxDefinitionDependencies ||
-		len(v.Edges) > basespec.MaxDiscoveryEntries {
-		return fmt.Errorf(
-			"%w: workflow exceeds structural entry limits",
-			basespec.ErrInvalid,
-		)
 	}
 
 	nodes := make(map[string]struct{}, len(v.Nodes))

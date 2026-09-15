@@ -54,13 +54,6 @@ func definitionForEntry(
 	}
 
 	header := entry.Header()
-	if header.Name == "" {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: Definition projection requires a named declaration",
-			basespec.ErrInvalid,
-		)
-	}
-
 	body, err := entry.CanonicalJSON()
 	if err != nil {
 		return definition.Definition{}, err

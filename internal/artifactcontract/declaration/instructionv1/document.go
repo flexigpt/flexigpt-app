@@ -49,10 +49,14 @@ func DecodeInstructionEntry(
 	entry declaration.Entry,
 ) (InstructionDocument, error) {
 	var value InstructionDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledInstructionSchema,
+		&value,
+	); err != nil {
 		return InstructionDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return InstructionDocument{}, err
 	}
 	return value, nil
@@ -69,7 +73,7 @@ func decodeInstruction(
 	); err != nil {
 		return InstructionDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return InstructionDocument{}, err
 	}
 	return value, nil
@@ -118,6 +122,10 @@ func (v InstructionDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("instruction schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v InstructionDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: InstructionType,
 		APIVersion:   InstructionSchemaVersion,

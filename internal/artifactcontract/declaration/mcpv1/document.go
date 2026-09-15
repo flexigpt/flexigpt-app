@@ -73,10 +73,14 @@ func DecodeMCPEntry(
 	entry declaration.Entry,
 ) (MCPDocument, error) {
 	var value MCPDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledMCPSchema,
+		&value,
+	); err != nil {
 		return MCPDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return MCPDocument{}, err
 	}
 	return value, nil
@@ -118,7 +122,7 @@ func decodeMCP(
 	); err != nil {
 		return MCPDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return MCPDocument{}, err
 	}
 	return value, nil
@@ -161,6 +165,10 @@ func (v MCPDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("MCP schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v MCPDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPType,
 		APIVersion:   MCPSchemaVersion,

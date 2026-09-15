@@ -17,7 +17,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
-	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
@@ -129,8 +128,9 @@ func (a *API) InspectMCPPolicyForRuntime(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	body, err := mcpDomainPolicy.BodyFromDefinition(
-		resolved.Definition,
+	body, err := a.policyBodyForResolvedArtifact(
+		ctx,
+		resolved,
 	)
 	if err != nil {
 		return PolicyView{}, err
@@ -752,8 +752,9 @@ func (a *API) effectivePolicy(
 				ref.ArtifactID,
 			)
 		}
-		body, err := mcpDomainPolicy.BodyFromDefinition(
-			resolved.Definition,
+		body, err := a.policyBodyForResolvedArtifact(
+			ctx,
+			resolved,
 		)
 		if err != nil {
 			return mcpPolicy.Effective{}, err
@@ -792,8 +793,9 @@ func (a *API) policyBodiesByLogicalName(
 		if err != nil {
 			return nil, err
 		}
-		body, err := mcpDomainPolicy.BodyFromDefinition(
-			resolved.Definition,
+		body, err := a.policyBodyForResolvedArtifact(
+			ctx,
+			resolved,
 		)
 		if err != nil {
 			return nil, err

@@ -48,10 +48,14 @@ func DecodeCollectionEntry(
 	entry declaration.Entry,
 ) (CollectionDocument, error) {
 	var value CollectionDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledCollectionSchema,
+		&value,
+	); err != nil {
 		return CollectionDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return CollectionDocument{}, err
 	}
 	return value, nil
@@ -68,7 +72,7 @@ func decodeCollection(
 	); err != nil {
 		return CollectionDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return CollectionDocument{}, err
 	}
 	return value, nil
@@ -117,6 +121,10 @@ func (v CollectionDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("collection schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v CollectionDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: CollectionType,
 		APIVersion:   CollectionSchemaVersion,
@@ -127,13 +135,6 @@ func (v CollectionDocument) validate() error {
 		if err := basespec.LogicalVersion(v.Version).Validate(false); err != nil {
 			return err
 		}
-	}
-	if len(v.Members) > basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: collection members exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
-		)
 	}
 	for index, member := range v.Members {
 		if err := member.Validate(); err != nil {

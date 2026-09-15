@@ -29,6 +29,17 @@ func withWorkspaceRuntime[T any](
 	})
 }
 
+func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceCapabilities(
+	workspace workspaceConsumerAPI.WorkspaceRef,
+) (workspaceConsumerAPI.WorkspaceCapabilityPlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceCapabilityPlan, error) {
+			return api.ResolveWorkspaceCapabilities(context.Background(), workspace)
+		},
+	)
+}
+
 func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 	workspace workspaceConsumerAPI.WorkspaceRef,
 	artifacts []artifact.ArtifactRef,

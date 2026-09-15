@@ -21,10 +21,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
 
-// ArtifactRegistration is retained only as application-owned physical package
-// metadata. ID is deliberately ignored. Artifact IDs are Store-owned.
+// ArtifactRegistration is application-owned physical package metadata.
+// Artifact IDs are always assigned by Artifact Store synchronization.
 type ArtifactRegistration struct {
-	ID          string                      `json:"id,omitempty"`
 	Subresource basespec.SubresourceLocator `json:"subresource"`
 	Kind        artifact.ArtifactKind       `json:"kind"`
 	Enabled     bool                        `json:"enabled"`

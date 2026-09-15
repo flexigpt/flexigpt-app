@@ -48,10 +48,14 @@ func DecodeTeamEntry(
 	entry declaration.Entry,
 ) (TeamDocument, error) {
 	var value TeamDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledTeamSchema,
+		&value,
+	); err != nil {
 		return TeamDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return TeamDocument{}, err
 	}
 	return value, nil
@@ -68,7 +72,7 @@ func decodeTeam(
 	); err != nil {
 		return TeamDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return TeamDocument{}, err
 	}
 	return value, nil
@@ -111,18 +115,15 @@ func (v TeamDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("team schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v TeamDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: TeamType,
 		APIVersion:   TeamSchemaVersion,
 	}); err != nil {
 		return err
-	}
-	if len(v.Members) > basespec.MaxDefinitionDependencies {
-		return fmt.Errorf(
-			"%w: Team members exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
-		)
 	}
 	if err := declaration.ValidateEntryTypes(
 		"Team members",

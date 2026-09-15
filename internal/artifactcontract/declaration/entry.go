@@ -143,9 +143,6 @@ func (e Entry) IsSymbolic() bool {
 	if err := e.Validate(); err != nil {
 		return false
 	}
-	if e.header.Name == "" {
-		return false
-	}
 	var values map[string]json.RawMessage
 	if err := json.Unmarshal(e.raw, &values); err != nil {
 		return false

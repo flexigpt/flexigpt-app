@@ -77,10 +77,14 @@ func DecodeMCPPolicyEntry(
 	entry declaration.Entry,
 ) (MCPPolicyDocument, error) {
 	var value MCPPolicyDocument
-	if err := entry.DecodeInto(&value); err != nil {
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
+		compiledMCPPolicySchema,
+		&value,
+	); err != nil {
 		return MCPPolicyDocument{}, err
 	}
-	if err := value.ValidateEntry(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return MCPPolicyDocument{}, err
 	}
 	return value, nil
@@ -97,7 +101,7 @@ func decodeMCPPolicy(
 	); err != nil {
 		return MCPPolicyDocument{}, err
 	}
-	if err := value.validate(); err != nil {
+	if err := value.validateFields(); err != nil {
 		return MCPPolicyDocument{}, err
 	}
 	return value, nil
@@ -146,6 +150,10 @@ func (v MCPPolicyDocument) validate() error {
 	); err != nil {
 		return fmt.Errorf("MCP Policy schema: %w", err)
 	}
+	return v.validateFields()
+}
+
+func (v MCPPolicyDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPPolicyType,
 		APIVersion:   MCPPolicySchemaVersion,

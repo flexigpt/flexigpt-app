@@ -11,11 +11,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// DecodeDocumentInto performs common strict canonical JSON and JSON Schema
-// handling for an independently versioned declaration contract.
+// DecodeDocumentInto validates the original canonical document before
+// decoding it. Validating the original bytes preserves field presence, so
+// values hidden by omitempty cannot bypass their schema constraints.
 func DecodeDocumentInto(
 	raw []byte,
-	_ *jsonschema.Schema,
+	compiled *jsonschema.Schema,
 	target any,
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
@@ -25,10 +26,13 @@ func DecodeDocumentInto(
 	if err != nil {
 		return err
 	}
-
-	// Each concrete Decode function validates its decoded document
-	// immediately afterward. Keep schema execution there so direct decoding
-	// and source decoding do not validate the same document twice.
+	if err := jsonutil.ValidateJSONSchema(
+		compiled,
+		json.RawMessage(canonical),
+		basespec.MaxDefinitionBytes,
+	); err != nil {
+		return err
+	}
 	return jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		target,
@@ -36,22 +40,32 @@ func DecodeDocumentInto(
 	)
 }
 
-// ValidateEntryDocument validates the original canonical Entry bytes against
-// a concrete declaration schema. This preserves field presence for nested
-// declarations, including values such as maxIterations: 0 that would be lost
-// when an omitempty Go struct is marshaled again.
-func ValidateEntryDocument(
+// DecodeEntryDocumentInto validates and decodes the Entry's original
+// canonical bytes without first re-marshalling its Go representation.
+func DecodeEntryDocumentInto(
 	entry Entry,
 	compiled *jsonschema.Schema,
+	target any,
 ) error {
-	raw, err := entry.CanonicalJSON()
-	if err != nil {
+	if len(entry.raw) == 0 ||
+		len(entry.raw) > basespec.MaxDefinitionBodyBytes ||
+		entry.raw[0] != '{' {
+		return fmt.Errorf(
+			"%w: canonical declaration entry must be a bounded JSON object",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := jsonutil.ValidateJSONSchema(
+		compiled,
+		entry.raw,
+		basespec.MaxDefinitionBytes,
+	); err != nil {
 		return err
 	}
-	return jsonutil.ValidateJSONSchema(
-		compiled,
-		json.RawMessage(raw),
-		basespec.MaxDefinitionBytes,
+	return jsonutil.DecodeCanonicalObjectBytesInto(
+		entry.raw,
+		target,
+		basespec.MaxDefinitionBodyBytes,
 	)
 }
 
