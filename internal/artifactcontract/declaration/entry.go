@@ -9,12 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// Entry is a heterogeneous nested declaration or symbolic reference.
+// Entry is a named heterogeneous nested declaration or symbolic reference.
 //
-// The shared package validates only the common header. The independently
-// versioned contract selected by Entry.Header().Type validates type-specific
-// fields. This prevents the root utility package from becoming a monolithic
-// declaration schema.
+// Every Entry requires a portable name. An Entry containing exactly type and
+// name is a symbolic reference. Any additional declaration fields make it a
+// named declaration.
 type Entry struct {
 	raw    json.RawMessage
 	header Header
@@ -104,7 +103,7 @@ func (e Entry) Validate() error {
 	if err := e.header.Validate(HeaderValidation{}); err != nil {
 		return err
 	}
-	return e.validateNestedForm()
+	return nil
 }
 
 func (e Entry) Clone() Entry {
@@ -176,39 +175,6 @@ func (e *Entry) UnmarshalJSON(raw []byte) error {
 	}
 	*e = value
 	return nil
-}
-
-func (e Entry) validateNestedForm() error {
-	if e.header.Name != "" || e.header.Locator != nil {
-		return nil
-	}
-
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(e.raw, &fields); err != nil {
-		return fmt.Errorf(
-			"%w: decode declaration entry shape: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	for key := range fields {
-		switch key {
-		case "$schema",
-			"apiVersion",
-			"type",
-			"name",
-			"description",
-			"locator",
-			"metadata":
-			continue
-		default:
-			return nil
-		}
-	}
-	return fmt.Errorf(
-		"%w: nested declaration requires name, locator, or type-specific fields",
-		basespec.ErrInvalid,
-	)
 }
 
 func ValidateEntryType(

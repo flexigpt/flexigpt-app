@@ -41,7 +41,7 @@ func ToolJSONSchema() []byte {
 }
 
 func DecodeToolJSON(raw []byte) (ToolDocument, error) {
-	return decodeTool(raw, true)
+	return decodeTool(raw)
 }
 
 func DecodeToolEntry(
@@ -59,7 +59,6 @@ func DecodeToolEntry(
 
 func decodeTool(
 	raw []byte,
-	requireName bool,
 ) (ToolDocument, error) {
 	var value ToolDocument
 	if err := declaration.DecodeDocumentInto(
@@ -69,7 +68,7 @@ func decodeTool(
 	); err != nil {
 		return ToolDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return ToolDocument{}, err
 	}
 	return value, nil
@@ -98,14 +97,14 @@ func (v ToolDocument) CalculatedDigest() (
 }
 
 func (v ToolDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v ToolDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v ToolDocument) validate(requireName bool) error {
+func (v ToolDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledToolSchema,
 		v,
@@ -115,7 +114,6 @@ func (v ToolDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ToolType,
 		APIVersion:   ToolSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

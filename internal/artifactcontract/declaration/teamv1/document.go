@@ -41,7 +41,7 @@ func TeamJSONSchema() []byte {
 }
 
 func DecodeTeamJSON(raw []byte) (TeamDocument, error) {
-	return decodeTeam(raw, true)
+	return decodeTeam(raw)
 }
 
 func DecodeTeamEntry(
@@ -59,7 +59,6 @@ func DecodeTeamEntry(
 
 func decodeTeam(
 	raw []byte,
-	requireName bool,
 ) (TeamDocument, error) {
 	var value TeamDocument
 	if err := declaration.DecodeDocumentInto(
@@ -69,7 +68,7 @@ func decodeTeam(
 	); err != nil {
 		return TeamDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return TeamDocument{}, err
 	}
 	return value, nil
@@ -98,14 +97,14 @@ func (v TeamDocument) CalculatedDigest() (
 }
 
 func (v TeamDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v TeamDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v TeamDocument) validate(requireName bool) error {
+func (v TeamDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledTeamSchema,
 		v,
@@ -115,7 +114,6 @@ func (v TeamDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: TeamType,
 		APIVersion:   TeamSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

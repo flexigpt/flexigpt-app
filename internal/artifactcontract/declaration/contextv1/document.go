@@ -43,7 +43,7 @@ func ContextJSONSchema() []byte {
 }
 
 func DecodeContextJSON(raw []byte) (ContextDocument, error) {
-	return decodeContext(raw, true)
+	return decodeContext(raw)
 }
 
 func DecodeContextEntry(
@@ -61,7 +61,6 @@ func DecodeContextEntry(
 
 func decodeContext(
 	raw []byte,
-	requireName bool,
 ) (ContextDocument, error) {
 	var value ContextDocument
 	if err := declaration.DecodeDocumentInto(
@@ -71,7 +70,7 @@ func decodeContext(
 	); err != nil {
 		return ContextDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return ContextDocument{}, err
 	}
 	return value, nil
@@ -103,14 +102,14 @@ func (v ContextDocument) CalculatedDigest() (
 }
 
 func (v ContextDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v ContextDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v ContextDocument) validate(requireName bool) error {
+func (v ContextDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledContextSchema,
 		v,
@@ -120,7 +119,6 @@ func (v ContextDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ContextType,
 		APIVersion:   ContextSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

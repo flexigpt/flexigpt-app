@@ -2,7 +2,6 @@ package declaration
 
 import (
 	"encoding/json"
-	"fmt"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -11,8 +10,9 @@ import (
 // NamedEntry is one named declaration reachable from a canonical declaration
 // document. The root entry uses an empty SubresourceLocator.
 //
-// Anonymous inline entries remain in the containing declaration body but do
-// not become standalone source-backed Artifacts.
+// Symbolic entries remain references and do not become standalone
+// source-backed Artifacts. A body-less Loop nested directly under an Agent or
+// Team program remains contextual because its body is the containing owner.
 type NamedEntry struct {
 	SubresourceLocator basespec.SubresourceLocator
 	Entry              Entry
@@ -32,12 +32,6 @@ func (e NamedEntry) Validate() error {
 	if err := e.Entry.Validate(); err != nil {
 		return err
 	}
-	if e.Entry.Header().Name == "" {
-		return fmt.Errorf(
-			"%w: named declaration has no name",
-			basespec.ErrInvalid,
-		)
-	}
 	return nil
 }
 
@@ -45,19 +39,13 @@ func (e NamedEntry) Validate() error {
 // inline or located nested declaration in stable structural order.
 //
 // The walker knows only common structural entry positions. It does not decode
-// or validate type-specific bodies. Concrete contract packages remain the
-// owner of concrete schema validation.
+// type-specific bodies. Concrete contract packages remain the owner of
+// concrete schema validation.
 func WalkNamedEntries(
 	root Entry,
 ) ([]NamedEntry, error) {
 	if err := root.Validate(); err != nil {
 		return nil, err
-	}
-	if root.Header().Name == "" {
-		return nil, fmt.Errorf(
-			"%w: top-level declaration requires name",
-			basespec.ErrInvalid,
-		)
 	}
 
 	output := make([]NamedEntry, 0)
@@ -103,7 +91,7 @@ func walkNamedEntry(
 		*output = append(*output, NamedEntry{
 			Entry: entry.Clone(),
 		})
-	} else if entry.Header().Name != "" && !entry.IsSymbolic() {
+	} else if !entry.IsSymbolic() {
 		if !contextualBodylessLoop {
 			subresource, err := subresourceForPath(path)
 			if err != nil {

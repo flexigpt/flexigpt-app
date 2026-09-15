@@ -42,7 +42,7 @@ func ModelJSONSchema() []byte {
 }
 
 func DecodeModelJSON(raw []byte) (ModelDocument, error) {
-	return decodeModel(raw, true)
+	return decodeModel(raw)
 }
 
 func DecodeModelEntry(
@@ -60,7 +60,6 @@ func DecodeModelEntry(
 
 func decodeModel(
 	raw []byte,
-	requireName bool,
 ) (ModelDocument, error) {
 	var value ModelDocument
 	if err := declaration.DecodeDocumentInto(
@@ -70,7 +69,7 @@ func decodeModel(
 	); err != nil {
 		return ModelDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return ModelDocument{}, err
 	}
 	return value, nil
@@ -99,14 +98,14 @@ func (v ModelDocument) CalculatedDigest() (
 }
 
 func (v ModelDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v ModelDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v ModelDocument) validate(requireName bool) error {
+func (v ModelDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledModelSchema,
 		v,
@@ -116,7 +115,6 @@ func (v ModelDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ModelType,
 		APIVersion:   ModelSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

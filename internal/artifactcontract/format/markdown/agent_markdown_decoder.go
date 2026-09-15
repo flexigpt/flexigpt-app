@@ -21,8 +21,9 @@ import (
 const AgentMarkdownDecoderID basespec.DecoderID = "agent-markdown"
 
 // AgentMarkdownDecoder adapts AGENT.md and *.agent.md files. YAML front
-// matter provides Agent declaration fields. The Markdown body becomes an
-// anonymous inline Instruction in Agent.members.
+// matter provides Agent declaration fields. The Markdown body becomes a named
+// Instruction in Agent.members using the <agent-name>-instructions naming
+// convention.
 type AgentMarkdownDecoder struct{}
 
 func NewAgentMarkdownDecoder() *AgentMarkdownDecoder {
@@ -60,10 +61,21 @@ func (*AgentMarkdownDecoder) Decode(
 	}
 
 	if strings.TrimSpace(body) != "" {
+		instructionName, err := declaration.DeriveNestedLogicalName(
+			basespec.LogicalName(document.Name),
+			"instructions",
+		)
+		if err != nil {
+			return nil, agentMarkdownDiagnostics(
+				candidate.Locator,
+				err,
+			)
+		}
 		instruction, err := declaration.NewEntry(
 			instructionv1.InstructionDocument{
 				APIVersion: instructionv1.InstructionSchemaVersion,
 				Type:       instructionv1.InstructionType,
+				Name:       string(instructionName),
 				Content:    stringPointer(body),
 				MediaType:  markdownMediaType,
 			},

@@ -42,7 +42,7 @@ func LoopJSONSchema() []byte {
 }
 
 func DecodeLoopJSON(raw []byte) (LoopDocument, error) {
-	return decodeLoop(raw, true, false)
+	return decodeLoop(raw, false)
 }
 
 func DecodeLoopEntry(
@@ -59,7 +59,7 @@ func DecodeLoopEntry(
 	if err := entry.DecodeInto(&value); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validateFields(false, implicitBody); err != nil {
+	if err := value.validateFields(implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -67,7 +67,6 @@ func DecodeLoopEntry(
 
 func decodeLoop(
 	raw []byte,
-	requireName bool,
 	implicitBody bool,
 ) (LoopDocument, error) {
 	var value LoopDocument
@@ -78,7 +77,7 @@ func decodeLoop(
 	); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validateFields(requireName, implicitBody); err != nil {
+	if err := value.validateFields(implicitBody); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -107,33 +106,30 @@ func (v LoopDocument) CalculatedDigest() (
 }
 
 func (v LoopDocument) Validate() error {
-	return v.validate(true, false)
+	return v.validate(false)
 }
 
 func (v LoopDocument) ValidateEntry(
 	implicitBody bool,
 ) error {
-	return v.validate(false, implicitBody)
+	return v.validate(implicitBody)
 }
 
 func (v LoopDocument) validate(
-	requireName bool,
 	implicitBody bool,
 ) error {
 	if err := declaration.ValidateDocument(compiledLoopSchema, v); err != nil {
 		return fmt.Errorf("loop schema: %w", err)
 	}
-	return v.validateFields(requireName, implicitBody)
+	return v.validateFields(implicitBody)
 }
 
 func (v LoopDocument) validateFields(
-	requireName bool,
 	implicitBody bool,
 ) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: LoopType,
 		APIVersion:   LoopSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

@@ -41,7 +41,7 @@ func CollectionJSONSchema() []byte {
 }
 
 func DecodeCollectionJSON(raw []byte) (CollectionDocument, error) {
-	return decodeCollection(raw, true)
+	return decodeCollection(raw)
 }
 
 func DecodeCollectionEntry(
@@ -59,7 +59,6 @@ func DecodeCollectionEntry(
 
 func decodeCollection(
 	raw []byte,
-	requireName bool,
 ) (CollectionDocument, error) {
 	var value CollectionDocument
 	if err := declaration.DecodeDocumentInto(
@@ -69,7 +68,7 @@ func decodeCollection(
 	); err != nil {
 		return CollectionDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return CollectionDocument{}, err
 	}
 	return value, nil
@@ -104,14 +103,14 @@ func (v CollectionDocument) CalculatedDigest() (
 }
 
 func (v CollectionDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v CollectionDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v CollectionDocument) validate(requireName bool) error {
+func (v CollectionDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledCollectionSchema,
 		v,
@@ -121,7 +120,6 @@ func (v CollectionDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: CollectionType,
 		APIVersion:   CollectionSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

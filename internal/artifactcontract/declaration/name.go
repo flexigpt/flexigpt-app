@@ -54,6 +54,57 @@ func DeriveLogicalName(
 	return value, nil
 }
 
+const nestedNameDigestLength = 16
+
+// DeriveNestedLogicalName derives a deterministic named declaration identity
+// from a parent declaration name and a relationship label.
+//
+// The normal result is:
+//
+//	<parent>-<relationship>
+//
+// If that value would exceed the portable name limit, the parent is shortened
+// and a digest suffix preserves deterministic uniqueness.
+func DeriveNestedLogicalName(
+	parent basespec.LogicalName,
+	relationship string,
+) (basespec.LogicalName, error) {
+	if err := parent.Validate(); err != nil {
+		return "", err
+	}
+	if err := basespec.ValidateIdentifier(
+		"derived nested declaration relationship",
+		relationship,
+		basespec.MaxKindBytes,
+	); err != nil {
+		return "", err
+	}
+
+	candidate := string(parent) + "-" + relationship
+	if value := basespec.LogicalName(candidate); value.Validate() == nil {
+		return value, nil
+	}
+
+	digest := strings.TrimPrefix(
+		string(cryptoutil.DigestBytes(
+			[]byte(string(parent)+"\x00"+relationship),
+		)),
+		cryptoutil.DigestSHA256Prefix,
+	)
+	suffix := "-" + relationship + "-" + digest[:nestedNameDigestLength]
+	maximumParentBytes := basespec.MaxLogicalNameBytes - len(suffix)
+	shortenedParent := strings.TrimRight(
+		string(parent)[:maximumParentBytes],
+		".-_",
+	)
+
+	value := basespec.LogicalName(shortenedParent + suffix)
+	if err := value.Validate(); err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
 func normalizeLocatorNameSegment(
 	value string,
 ) string {

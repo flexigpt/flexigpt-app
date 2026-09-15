@@ -41,7 +41,7 @@ func SkillJSONSchema() []byte {
 }
 
 func DecodeSkillJSON(raw []byte) (SkillDocument, error) {
-	return decodeSkill(raw, true)
+	return decodeSkill(raw)
 }
 
 func DecodeSkillEntry(
@@ -59,7 +59,6 @@ func DecodeSkillEntry(
 
 func decodeSkill(
 	raw []byte,
-	requireName bool,
 ) (SkillDocument, error) {
 	var value SkillDocument
 	if err := declaration.DecodeDocumentInto(
@@ -69,7 +68,7 @@ func decodeSkill(
 	); err != nil {
 		return SkillDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return SkillDocument{}, err
 	}
 	return value, nil
@@ -98,14 +97,14 @@ func (v SkillDocument) CalculatedDigest() (
 }
 
 func (v SkillDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v SkillDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v SkillDocument) validate(requireName bool) error {
+func (v SkillDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledSkillSchema,
 		v,
@@ -115,7 +114,6 @@ func (v SkillDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: SkillType,
 		APIVersion:   SkillSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

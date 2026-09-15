@@ -10,9 +10,11 @@ The `declaration` package contains shared declaration utilities:
 
 - Common `type`, `name`, `description`, `locator`, and `metadata` header.
 - Portable locator representation and validation.
-- Generic nested `Entry` representation.
+- Named nested `Entry` representation.
 - Shared output matcher representation.
 - Canonical JSON, JSON Schema, cloning, and digest helpers.
+
+Every declaration and every nested `Entry` requires a portable `name`.
 
 Each portable declaration type owns an independent versioned package:
 
@@ -40,9 +42,12 @@ Each package owns:
 
 Nested heterogeneous declarations use `declaration.Entry`.
 
-`Entry` validates the common header only. A consumer or resolver dispatches its
-concrete body through the package matching `Entry.Header().Type`. This keeps
-each declaration contract independent and avoids a root-level union schema.
+`Entry` validates the common header and mandatory name. An Entry containing
+exactly `type` and `name` is a symbolic reference. An Entry containing a
+locator or type-specific fields is a named declaration. A consumer or resolver
+dispatches the concrete body through the package matching `Entry.Header().Type`.
+This keeps each declaration contract independent and avoids a root-level union
+schema.
 
 The portable declaration header is:
 
@@ -59,13 +64,14 @@ metadata:
 
 The portable document does not contain:
 
-- `kind`
 - `schemaID`
 - `schemaVersion`
 - `digest`
 - `logicalName`
 - `logicalVersion`
 - `displayName`
+
+There are no anonymous declarations.
 
 Physical source-format adapters normalize their inputs into these portable
 declarations. They do not introduce alternate portable declaration headers.

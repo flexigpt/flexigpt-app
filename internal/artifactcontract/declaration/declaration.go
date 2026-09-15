@@ -81,7 +81,7 @@ type Header struct {
 	Schema      string                     `json:"$schema,omitempty"`
 	APIVersion  string                     `json:"apiVersion,omitempty"`
 	Type        Type                       `json:"type"`
-	Name        string                     `json:"name,omitempty"`
+	Name        string                     `json:"name"`
 	Description string                     `json:"description,omitempty"`
 	Locator     *Locator                   `json:"locator,omitempty"`
 	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
@@ -90,7 +90,6 @@ type Header struct {
 type HeaderValidation struct {
 	ExpectedType Type
 	APIVersion   string
-	RequireName  bool
 }
 
 func (h Header) Clone() Header {
@@ -118,20 +117,19 @@ func (h Header) Validate(
 			options.ExpectedType,
 		)
 	}
-	if options.RequireName && h.Name == "" {
+	if h.Name == "" {
 		return fmt.Errorf(
-			"%w: top-level declaration requires name",
+			"%w: artifact declaration requires name",
 			basespec.ErrInvalid,
 		)
 	}
-	if h.Name != "" {
-		if err := basespec.ValidatePortableName(
-			"artifact declaration name",
-			h.Name,
-		); err != nil {
-			return err
-		}
+	if err := basespec.ValidatePortableName(
+		"artifact declaration name",
+		h.Name,
+	); err != nil {
+		return err
 	}
+
 	if options.APIVersion != "" &&
 		h.APIVersion != "" &&
 		h.APIVersion != options.APIVersion {

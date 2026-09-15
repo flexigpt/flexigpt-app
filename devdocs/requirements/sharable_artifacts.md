@@ -18,7 +18,6 @@
   - [Located declaration](#located-declaration)
   - [Inline declaration](#inline-declaration)
   - [Named inline declaration](#named-inline-declaration)
-  - [Anonymous inline declaration](#anonymous-inline-declaration)
 - [Locator model](#locator-model)
 - [Path pattern model](#path-pattern-model)
 - [Artifact schemas](#artifact-schemas)
@@ -319,7 +318,7 @@ Header {
   apiVersion?: string
 
   type: CoreType
-  name?: string
+  name: string
   description?: string
   locator?: Locator
   metadata?: map[string, JSONValue]
@@ -347,11 +346,18 @@ description: Reviews repository changes for correctness and security.
 | `apiVersion`  | Portable declaration contract version           |
 | `$schema`     | Optional JSON Schema location                   |
 
-Top-level declarations require `name`. Nested declarations may omit `name` when they are anonymous inline declarations.
+Every declaration requires `name`, including nested declarations.
+
+A nested object containing exactly `type` and `name` is a symbolic reference.
+
+A nested object containing `type`, `name`, and a locator or type-specific
+fields is a named declaration.
+
+The system does not support anonymous declarations.
 
 ## Progressive declaration forms
 
-Each artifact type supports four useful declaration forms.
+Each artifact type supports three useful declaration forms.
 
 ### Symbolic reference
 
@@ -374,6 +380,7 @@ locator: ./skills/code-review
 
 ```yaml
 type: model
+name: reasoning
 model: anthropic/claude-sonnet
 parameters:
   temperature: 0
@@ -389,18 +396,7 @@ parameters:
   temperature: 0
 ```
 
-### Anonymous inline declaration
-
-```yaml
-type: instruction
-mediaType: text/markdown
-content: |
-  Review changes for correctness, security, and maintainability.
-```
-
-Named nested declarations can become independently addressable artifacts.
-
-Anonymous inline declarations remain part of their resolved parent graph.
+Named nested declarations become independently addressable Artifacts when they can be materialized independently. Symbolic references remain references.
 
 ## Locator model
 
@@ -562,6 +558,7 @@ Example inline instruction:
 
 ```yaml
 type: instruction
+name: review-rules
 mediaType: text/markdown
 content: |
   Do not modify generated files.
@@ -805,6 +802,7 @@ description: Reviews repository changes
 
 members:
   - type: instruction
+    name: reviewer-instructions
     content: |
       Review changes for correctness, security, and maintainability.
 
@@ -943,6 +941,8 @@ A Loop ends when:
 - The consumer stops execution for its own runtime reason.
 
 A Loop nested under `Agent.program` or `Team.program` may omit `body`. In that form, the containing Agent or Team is the Loop body.
+
+The Loop still requires a name. A body-less program Loop is a named contextual program node because its body is supplied by its containing Agent or Team.
 
 ## Workflow
 
@@ -1213,25 +1213,28 @@ The runtime consumer owns:
 
 The declaration system supports the following physical inputs.
 
-| Physical input                  | Produced artifact behavior                                       |
-| ------------------------------- | ---------------------------------------------------------------- |
-| Canonical JSON                  | One top-level declaration and named nested declarations          |
-| Canonical YAML                  | One top-level declaration and named nested declarations          |
-| `AGENTS.md`                     | One `instruction`                                                |
-| `CLAUDE.md`                     | One `instruction`                                                |
-| `README.md`                     | One `context`                                                    |
-| `llms.txt`                      | One `context`                                                    |
-| Selected documentation Markdown | One `context` per selected file                                  |
-| `SKILL.md`                      | One `skill`                                                      |
-| `.mcp.json`                     | One `mcp` Artifact per configured server                         |
-| `mcp.json`                      | One `mcp` Artifact per configured server                         |
-| `AGENT.md`                      | One `agent` and a graph-local instruction from the Markdown body |
-| `*.agent.md`                    | One `agent` and a graph-local instruction from the Markdown body |
-| Skill Collection manifest       | One `collection` plus source-backed Skills                       |
-| MCP Collection manifest         | One `collection` plus source-backed MCP declarations             |
-| Workspace manifest              | One `workspace`                                                  |
+| Physical input                  | Produced artifact behavior                              |
+| ------------------------------- | ------------------------------------------------------- |
+| Canonical JSON                  | One top-level declaration and named nested declarations |
+| Canonical YAML                  | One top-level declaration and named nested declarations |
+| `AGENTS.md`                     | One `instruction`                                       |
+| `CLAUDE.md`                     | One `instruction`                                       |
+| `README.md`                     | One `context`                                           |
+| `llms.txt`                      | One `context`                                           |
+| Selected documentation Markdown | One `context` per selected file                         |
+| `SKILL.md`                      | One `skill`                                             |
+| `.mcp.json`                     | One `mcp` Artifact per configured server                |
+| `mcp.json`                      | One `mcp` Artifact per configured server                |
+| `AGENT.md`                      | One `agent` and one generated named body Instruction    |
+| `*.agent.md`                    | One `agent` and one generated named body Instruction    |
+| Skill Collection manifest       | One `collection` plus source-backed Skills              |
+| MCP Collection manifest         | One `collection` plus source-backed MCP declarations    |
+| Workspace manifest              | One `workspace`                                         |
 
 A single file may emit multiple Artifacts.
+
+An Agent Markdown body Instruction uses `<agent-name>-instructions` as its
+generated logical name.
 
 ```text
 .mcp.json
@@ -1592,7 +1595,8 @@ The Resolver returns a typed graph. It does not execute that graph.
 | JSON Schema contract validation                    | Available                                                     |
 | `type` and `apiVersion` schema dispatch            | Available                                                     |
 | Named nested declaration indexing                  | Available                                                     |
-| Anonymous inline graph nodes                       | Available in Resolver graphs                                  |
+| Named inline declarations                          | Available as source-backed nested Artifacts                   |
+| Anonymous declarations                             | Not supported                                                 |
 | Root-scoped symbolic lookup                        | Available                                                     |
 | Duplicate identity detection                       | Available                                                     |
 | Collection resolution                              | Available                                                     |

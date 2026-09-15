@@ -70,7 +70,7 @@ func MCPPolicyJSONSchema() []byte {
 }
 
 func DecodeMCPPolicyJSON(raw []byte) (MCPPolicyDocument, error) {
-	return decodeMCPPolicy(raw, true)
+	return decodeMCPPolicy(raw)
 }
 
 func DecodeMCPPolicyEntry(
@@ -88,7 +88,6 @@ func DecodeMCPPolicyEntry(
 
 func decodeMCPPolicy(
 	raw []byte,
-	requireName bool,
 ) (MCPPolicyDocument, error) {
 	var value MCPPolicyDocument
 	if err := declaration.DecodeDocumentInto(
@@ -98,7 +97,7 @@ func decodeMCPPolicy(
 	); err != nil {
 		return MCPPolicyDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return MCPPolicyDocument{}, err
 	}
 	return value, nil
@@ -133,14 +132,14 @@ func (v MCPPolicyDocument) CalculatedDigest() (
 }
 
 func (v MCPPolicyDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v MCPPolicyDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v MCPPolicyDocument) validate(requireName bool) error {
+func (v MCPPolicyDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledMCPPolicySchema,
 		v,
@@ -150,7 +149,6 @@ func (v MCPPolicyDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPPolicyType,
 		APIVersion:   MCPPolicySchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

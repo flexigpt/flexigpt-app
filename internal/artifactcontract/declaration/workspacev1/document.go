@@ -204,7 +204,7 @@ func (s DeclarationSource) Validate() error {
 }
 
 func DecodeWorkspaceJSON(raw []byte) (WorkspaceDocument, error) {
-	return decodeWorkspace(raw, true)
+	return decodeWorkspace(raw)
 }
 
 func DecodeWorkspaceEntry(
@@ -222,7 +222,6 @@ func DecodeWorkspaceEntry(
 
 func decodeWorkspace(
 	raw []byte,
-	requireName bool,
 ) (WorkspaceDocument, error) {
 	var value WorkspaceDocument
 	if err := declaration.DecodeDocumentInto(
@@ -232,7 +231,7 @@ func decodeWorkspace(
 	); err != nil {
 		return WorkspaceDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return WorkspaceDocument{}, err
 	}
 	return value, nil
@@ -267,14 +266,14 @@ func (v WorkspaceDocument) CalculatedDigest() (
 }
 
 func (v WorkspaceDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v WorkspaceDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v WorkspaceDocument) validate(requireName bool) error {
+func (v WorkspaceDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledWorkspaceSchema,
 		v,
@@ -284,7 +283,6 @@ func (v WorkspaceDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkspaceType,
 		APIVersion:   WorkspaceSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

@@ -42,7 +42,7 @@ func InstructionJSONSchema() []byte {
 func DecodeInstructionJSON(
 	raw []byte,
 ) (InstructionDocument, error) {
-	return decodeInstruction(raw, true)
+	return decodeInstruction(raw)
 }
 
 func DecodeInstructionEntry(
@@ -60,7 +60,6 @@ func DecodeInstructionEntry(
 
 func decodeInstruction(
 	raw []byte,
-	requireName bool,
 ) (InstructionDocument, error) {
 	var value InstructionDocument
 	if err := declaration.DecodeDocumentInto(
@@ -70,7 +69,7 @@ func decodeInstruction(
 	); err != nil {
 		return InstructionDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return InstructionDocument{}, err
 	}
 	return value, nil
@@ -105,16 +104,14 @@ func (v InstructionDocument) CalculatedDigest() (
 }
 
 func (v InstructionDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v InstructionDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v InstructionDocument) validate(
-	requireName bool,
-) error {
+func (v InstructionDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledInstructionSchema,
 		v,
@@ -124,7 +121,6 @@ func (v InstructionDocument) validate(
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: InstructionType,
 		APIVersion:   InstructionSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

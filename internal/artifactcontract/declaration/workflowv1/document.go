@@ -61,7 +61,7 @@ func WorkflowJSONSchema() []byte {
 }
 
 func DecodeWorkflowJSON(raw []byte) (WorkflowDocument, error) {
-	return decodeWorkflow(raw, true)
+	return decodeWorkflow(raw)
 }
 
 func DecodeWorkflowEntry(
@@ -79,7 +79,6 @@ func DecodeWorkflowEntry(
 
 func decodeWorkflow(
 	raw []byte,
-	requireName bool,
 ) (WorkflowDocument, error) {
 	var value WorkflowDocument
 	if err := declaration.DecodeDocumentInto(
@@ -89,7 +88,7 @@ func decodeWorkflow(
 	); err != nil {
 		return WorkflowDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return WorkflowDocument{}, err
 	}
 	return value, nil
@@ -121,14 +120,14 @@ func (v WorkflowDocument) CalculatedDigest() (
 }
 
 func (v WorkflowDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v WorkflowDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v WorkflowDocument) validate(requireName bool) error {
+func (v WorkflowDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledWorkflowSchema,
 		v,
@@ -138,7 +137,6 @@ func (v WorkflowDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkflowType,
 		APIVersion:   WorkflowSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

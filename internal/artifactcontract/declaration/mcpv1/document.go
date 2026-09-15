@@ -66,7 +66,7 @@ func MCPJSONSchema() []byte {
 }
 
 func DecodeMCPJSON(raw []byte) (MCPDocument, error) {
-	return decodeMCP(raw, true)
+	return decodeMCP(raw)
 }
 
 func DecodeMCPEntry(
@@ -109,7 +109,6 @@ func DefinitionForDeclaration(
 
 func decodeMCP(
 	raw []byte,
-	requireName bool,
 ) (MCPDocument, error) {
 	var value MCPDocument
 	if err := declaration.DecodeDocumentInto(
@@ -119,7 +118,7 @@ func decodeMCP(
 	); err != nil {
 		return MCPDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return MCPDocument{}, err
 	}
 	return value, nil
@@ -148,14 +147,14 @@ func (v MCPDocument) CalculatedDigest() (
 }
 
 func (v MCPDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v MCPDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v MCPDocument) validate(requireName bool) error {
+func (v MCPDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledMCPSchema,
 		v,
@@ -165,7 +164,6 @@ func (v MCPDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPType,
 		APIVersion:   MCPSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}

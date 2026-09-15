@@ -41,7 +41,7 @@ func AgentJSONSchema() []byte {
 }
 
 func DecodeAgentJSON(raw []byte) (AgentDocument, error) {
-	return decodeAgent(raw, true)
+	return decodeAgent(raw)
 }
 
 func DecodeAgentEntry(
@@ -59,7 +59,6 @@ func DecodeAgentEntry(
 
 func decodeAgent(
 	raw []byte,
-	requireName bool,
 ) (AgentDocument, error) {
 	var value AgentDocument
 	if err := declaration.DecodeDocumentInto(
@@ -69,7 +68,7 @@ func decodeAgent(
 	); err != nil {
 		return AgentDocument{}, err
 	}
-	if err := value.validate(requireName); err != nil {
+	if err := value.validate(); err != nil {
 		return AgentDocument{}, err
 	}
 	return value, nil
@@ -98,14 +97,14 @@ func (v AgentDocument) CalculatedDigest() (
 }
 
 func (v AgentDocument) Validate() error {
-	return v.validate(true)
+	return v.validate()
 }
 
 func (v AgentDocument) ValidateEntry() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v AgentDocument) validate(requireName bool) error {
+func (v AgentDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledAgentSchema,
 		v,
@@ -115,7 +114,6 @@ func (v AgentDocument) validate(requireName bool) error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: AgentType,
 		APIVersion:   AgentSchemaVersion,
-		RequireName:  requireName,
 	}); err != nil {
 		return err
 	}
