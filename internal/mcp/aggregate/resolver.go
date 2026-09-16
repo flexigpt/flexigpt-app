@@ -47,5 +47,5 @@ func (r *ArtifactServerResolver) InspectMCPServer(
 	if r == nil || r.store == nil {
 		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed
 	}
-	return r.store.InspectMCPServerForRuntime(ctx, ref)
+	return r.store.ResolveMCPServer(ctx, ref)
 }

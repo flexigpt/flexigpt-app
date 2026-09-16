@@ -60,14 +60,6 @@ func (w *MCPAggregateWrapper) ArtifactRefForRuntimeServerID(
 	})
 }
 
-func (w *MCPAggregateWrapper) RuntimeCatalogIDForRoot(
-	rootID root.RootID,
-) (mcpServer.CatalogID, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpServer.CatalogID, error) {
-		return mcpAggregate.RuntimeCatalogIDForRoot(rootID)
-	})
-}
-
 func (w *MCPAggregateWrapper) RootIDForRuntimeCatalogID(
 	id mcpServer.CatalogID,
 ) (root.RootID, error) {

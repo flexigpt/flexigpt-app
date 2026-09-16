@@ -3,7 +3,6 @@ package prompt
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
@@ -96,27 +95,13 @@ func (a *Adapter) ComposeSelected(
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
 ) (Plan, error) {
-	return a.compose(
-		ctx,
-		workspace,
-		refs,
-		false,
-	)
-}
-
-func (a *Adapter) Compose(
-	ctx context.Context,
-	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
-) (Plan, error) {
-	return a.compose(ctx, workspace, refs, true)
+	return a.compose(ctx, workspace, refs)
 }
 
 func (a *Adapter) compose(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
-	useRootDefault bool,
 ) (Plan, error) {
 	if a == nil || a.artifacts == nil || a.engine == nil {
 		return Plan{}, basespec.ErrClosed
@@ -132,7 +117,6 @@ func (a *Adapter) compose(
 		ctx,
 		workspace,
 		refs,
-		useRootDefault,
 	)
 	if err != nil {
 		return Plan{}, err
@@ -274,50 +258,9 @@ func (a *Adapter) selection(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
-	useRootDefault bool,
 ) ([]artifact.Artifact, error) {
 	if len(refs) == 0 {
-		if !useRootDefault {
-			return []artifact.Artifact{}, nil
-		}
-		values, err := a.artifacts.ListByRoot(
-			ctx,
-			workspace.Artifact.RootID,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		output := make([]artifact.Artifact, 0)
-		for _, value := range values {
-			if value.Kind != artifact.ArtifactKind(instructionv1.InstructionType) &&
-				value.Kind != artifact.ArtifactKind(contextv1.ContextType) {
-				continue
-			}
-			if !value.Enabled || value.State != artifact.StateAvailable {
-				continue
-			}
-			output = append(output, value)
-		}
-		sort.Slice(output, func(left, right int) bool {
-			leftInstruction := output[left].Kind ==
-				artifact.ArtifactKind(instructionv1.InstructionType)
-			rightInstruction := output[right].Kind ==
-				artifact.ArtifactKind(instructionv1.InstructionType)
-			if leftInstruction != rightInstruction {
-				return leftInstruction
-			}
-			if output[left].Binding.SourceID != output[right].Binding.SourceID {
-				return output[left].Binding.SourceID <
-					output[right].Binding.SourceID
-			}
-			if output[left].Binding.Locator != output[right].Binding.Locator {
-				return output[left].Binding.Locator <
-					output[right].Binding.Locator
-			}
-			return output[left].ID < output[right].ID
-		})
-		return output, nil
+		return []artifact.Artifact{}, nil
 	}
 
 	output := make([]artifact.Artifact, 0, len(refs))

@@ -199,13 +199,6 @@ func (a *API) ResolveMCPServer(
 	return a.resolveMCPServer(ctx, ref)
 }
 
-func (a *API) InspectMCPServerForRuntime(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpDomainServer.Resolved, error) {
-	return a.resolveMCPServer(ctx, ref)
-}
-
 func (a *API) UpdateServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -457,7 +450,8 @@ func (a *API) InstallBuiltInPackage(
 				Address: request.PackageAddress,
 				Files:   request.PackageFiles,
 			},
-			AllowProtected: true,
+			AllowPackageReplacement: true,
+			AllowProtected:          true,
 		},
 	)
 	if err != nil {

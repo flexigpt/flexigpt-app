@@ -59,6 +59,16 @@ func (a *API) ListMCPCollections(
 	return a.collections.ListDomain(ctx, rootID)
 }
 
+func (a *API) ListMCPCollectionMemberships(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) ([]collection.ArtifactMembershipView, error) {
+	if a == nil || a.collections == nil {
+		return nil, basespec.ErrClosed
+	}
+	return a.collections.ListMembershipsForArtifact(ctx, ref)
+}
+
 func (a *API) UpdateMCPCollection(
 	ctx context.Context,
 	request collection.UpdateRequest,

@@ -7,11 +7,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
 type SkillAggregateWrapper struct {
@@ -52,16 +50,6 @@ func InitSkillAggregateWrapper(
 	}
 	wrapper.service = service
 	return nil
-}
-
-func (w *SkillAggregateWrapper) RuntimeCatalogIDForRoot(
-	rootID root.RootID,
-) (skillRuntime.CatalogID, error) {
-	return middleware.WithRecoveryResp(
-		func() (skillRuntime.CatalogID, error) {
-			return skillAggregate.RootCatalogID(rootID)
-		},
-	)
 }
 
 func (w *SkillAggregateWrapper) ResolveArtifactSkill(

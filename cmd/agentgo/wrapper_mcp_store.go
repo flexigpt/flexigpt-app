@@ -92,14 +92,6 @@ func (w *MCPStoreWrapper) GetMCPServerInstallation(
 	})
 }
 
-func (w *MCPStoreWrapper) InspectMCPServer(
-	ref artifact.ArtifactRef,
-) (mcpConsumerAPI.ServerInstallationView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ServerInstallationView, error) {
-		return api.GetServerInstallation(context.Background(), ref)
-	})
-}
-
 func (w *MCPStoreWrapper) InspectMCPPolicy(
 	ref artifact.ArtifactRef,
 ) (mcpConsumerAPI.PolicyView, error) {
@@ -120,17 +112,6 @@ func (w *MCPStoreWrapper) UpsertManagedMCPPolicy(
 			)
 		},
 	)
-}
-
-func (w *MCPStoreWrapper) EnsureMCPBaselineCollection(
-	rootID root.RootID,
-) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
-		return api.EnsureMCPBaselineCollection(
-			context.Background(),
-			rootID,
-		)
-	})
 }
 
 func (w *MCPStoreWrapper) CreateManagedMCP(
@@ -206,6 +187,20 @@ func (w *MCPStoreWrapper) ListMCPCollections(
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.CollectionView, error) {
 		return api.ListMCPCollections(context.Background(), rootID)
 	})
+}
+
+func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
+	ref artifact.ArtifactRef,
+) ([]collection.ArtifactMembershipView, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) ([]collection.ArtifactMembershipView, error) {
+			return api.ListMCPCollectionMemberships(
+				context.Background(),
+				ref,
+			)
+		},
+	)
 }
 
 func (w *MCPStoreWrapper) UpdateMCPCollection(

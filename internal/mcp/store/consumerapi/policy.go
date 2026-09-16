@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -137,6 +138,7 @@ func (a *API) UpsertManagedMCPPolicy(
 					Content: raw,
 				}},
 			},
+			AllowPackageReplacement: true,
 		},
 	)
 	if err != nil {
@@ -241,6 +243,19 @@ func (a *API) PurgeManagedMCPPolicy(
 		return fmt.Errorf(
 			"%w: removed MCP Policy Artifact is not missing",
 			basespec.ErrConflict,
+		)
+	}
+	if err := manageddiscovery.RemoveLocator(
+		ctx,
+		a.sources,
+		a.discovery,
+		missing.RootID,
+		missing.Binding.SourceID,
+		missing.Binding.Locator,
+	); err != nil {
+		return fmt.Errorf(
+			"MCP Policy package was removed but discovery cleanup remains pending: %w",
+			err,
 		)
 	}
 	return a.artifacts.Purge(ctx, ref, missing.Revision)

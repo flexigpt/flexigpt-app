@@ -67,18 +67,6 @@ func ArtifactRefForRuntimeServerID(
 	return ref, nil
 }
 
-func RuntimeCatalogIDForRoot(
-	rootID root.RootID,
-) (mcpServer.CatalogID, error) {
-	if err := rootID.Validate(); err != nil {
-		return "", err
-	}
-	return mcpServer.CatalogID(
-		artifactCatalogIDPrefix +
-			base64.RawURLEncoding.EncodeToString([]byte(rootID)),
-	), nil
-}
-
 func RootIDForRuntimeCatalogID(
 	id mcpServer.CatalogID,
 ) (root.RootID, error) {

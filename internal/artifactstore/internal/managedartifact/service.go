@@ -62,6 +62,12 @@ type SourceRunner interface {
 		rootID root.RootID,
 		sourceID source.SourceID,
 	) (refresh.RefreshSourceResult, error)
+
+	InspectSource(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) (source.RefreshInspection, error)
 }
 
 type Dependencies struct {
@@ -154,7 +160,8 @@ func (s *Service) Publish(
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
 	}
-	if publication.ExpectedGeneration == "" {
+	if publication.ExpectedGeneration == "" &&
+		request.AllowPackageReplacement {
 		publication.ExpectedGeneration = state.Generation
 	}
 
@@ -179,6 +186,32 @@ func (s *Service) Publish(
 		true,
 	); err != nil {
 		return artifact.PublishArtifactResult{}, err
+	}
+
+	if published.Source.Revision == state.Source.Revision &&
+		published.Generation == state.Generation {
+		inspection, inspectErr := s.dependencies.Refresh.InspectSource(
+			ctx,
+			request.RootID,
+			request.Binding.SourceID,
+		)
+		if inspectErr == nil && inspection.IsCurrent() {
+			resolved, findErr := s.dependencies.Artifacts.FindByOrigin(
+				ctx,
+				request.RootID,
+				request.Binding,
+				request.ExpectedKind,
+			)
+			if findErr == nil &&
+				matchesPublishExpectation(resolved, request) {
+				return artifact.PublishArtifactResult{
+					Artifact:   resolved,
+					Source:     published.Source,
+					Generation: published.Generation,
+					Refreshed:  false,
+				}, nil
+			}
+		}
 	}
 
 	if _, err := s.dependencies.Refresh.RefreshSource(
@@ -212,6 +245,16 @@ func (s *Service) Publish(
 		Generation: published.Generation,
 		Refreshed:  true,
 	}, nil
+}
+
+func matchesPublishExpectation(
+	value artifact.Artifact,
+	request artifact.PublishArtifactRequest,
+) bool {
+	return value.State == artifact.StateAvailable &&
+		value.LogicalName == request.ExpectedLogicalName &&
+		value.ResolvedDefinition != nil &&
+		*value.ResolvedDefinition == request.ExpectedDefinition
 }
 
 func (s *Service) Remove(

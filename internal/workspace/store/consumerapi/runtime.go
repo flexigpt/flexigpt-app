@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -113,6 +114,11 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
 	}
+	if selection.RequireComplete {
+		if err := requireCompleteWorkspaceCapabilities(capabilities); err != nil {
+			return WorkspaceRuntimePlan{}, err
+		}
+	}
 
 	promptArtifacts, err := selectedWorkspaceArtifacts(
 		selection.PromptArtifacts,
@@ -170,6 +176,26 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	}, nil
 }
 
+func requireCompleteWorkspaceCapabilities(
+	value WorkspaceCapabilityPlan,
+) error {
+	for _, occurrence := range value.Occurrences {
+		if occurrence.Status == resolve.ResolutionAvailable {
+			continue
+		}
+		return fmt.Errorf(
+			"%w: Workspace capability %q (%s/%s) is %s: %s",
+			basespec.ErrReferenceUnresolved,
+			occurrence.Path,
+			occurrence.Type,
+			occurrence.Name,
+			occurrence.Status,
+			occurrence.Message,
+		)
+	}
+	return nil
+}
+
 func (a *StoreAPI) loadWorkspaceMCPServers(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
@@ -204,6 +230,7 @@ func selectedWorkspaceArtifacts(
 		}
 
 		output := make([]artifact.ArtifactRef, 0, len(explicit))
+		seen := make(map[artifact.ArtifactRef]struct{}, len(explicit))
 		for _, ref := range explicit {
 			if err := ref.Validate(); err != nil {
 				return nil, err
@@ -215,6 +242,10 @@ func selectedWorkspaceArtifacts(
 					ref.ArtifactID,
 				)
 			}
+			if _, duplicate := seen[ref]; duplicate {
+				continue
+			}
+			seen[ref] = struct{}{}
 			output = append(output, ref)
 		}
 		return output, nil

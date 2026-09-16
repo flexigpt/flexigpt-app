@@ -82,6 +82,7 @@ type WorkspaceRuntimeSelection struct {
 	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts,omitempty"`
 	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts,omitempty"`
 	MCPArtifacts    []artifact.ArtifactRef `json:"mcpArtifacts,omitempty"`
+	RequireComplete bool                   `json:"requireComplete,omitempty"`
 }
 
 // WorkspaceRuntimePlan contains source-verified material ready for existing

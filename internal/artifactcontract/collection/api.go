@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -308,6 +309,7 @@ func (a *API) Update(
 		value.address,
 		value.document,
 		value.generation,
+		false,
 	)
 	if err != nil {
 		return CollectionView{}, err
@@ -388,6 +390,7 @@ func (a *API) RemoveMember(
 		value.address,
 		value.document,
 		value.generation,
+		false,
 	)
 	if err != nil {
 		return CollectionView{}, err
@@ -564,6 +567,19 @@ func (a *API) Delete(
 			basespec.ErrConflict,
 		)
 	}
+	if err := manageddiscovery.RemoveLocator(
+		ctx,
+		a.sources,
+		a.discovery,
+		missing.RootID,
+		missing.Binding.SourceID,
+		missing.Binding.Locator,
+	); err != nil {
+		return fmt.Errorf(
+			"collection package was removed but discovery cleanup remains pending: %w",
+			err,
+		)
+	}
 	return a.artifacts.Purge(
 		ctx,
 		request.Collection,
@@ -671,6 +687,7 @@ func (a *API) create(
 		address,
 		document,
 		"",
+		false,
 	)
 	if err != nil {
 		return CollectionView{}, err
@@ -759,6 +776,7 @@ func (a *API) mutateMember(
 		value.address,
 		value.document,
 		value.generation,
+		false,
 	)
 	if err != nil {
 		return MemberMutationResult{}, err
@@ -810,6 +828,7 @@ func (a *API) publishDocument(
 	address source.ManagedPackageAddress,
 	document collectionv1.CollectionDocument,
 	expectedGeneration string,
+	allowPackageReplacement bool,
 ) (artifact.Artifact, error) {
 	raw, digest, err := collectionDocumentPayload(document)
 	if err != nil {
@@ -849,6 +868,7 @@ func (a *API) publishDocument(
 					Content: raw,
 				}},
 			},
+			AllowPackageReplacement: allowPackageReplacement,
 		},
 	)
 	if err != nil {
@@ -889,6 +909,7 @@ func (a *API) ensureCollectionDiscovery(
 	if !inScope {
 		next.ExplicitLocators = append(next.ExplicitLocators, locator)
 	}
+	next.Authoritative = true
 	if len(next.AllowedDecoderIDs) != 0 &&
 		!slices.Contains(next.AllowedDecoderIDs, decoder.JSONDecoderID) {
 		next.AllowedDecoderIDs = append(

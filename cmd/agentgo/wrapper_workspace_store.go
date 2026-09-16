@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -17,8 +18,9 @@ import (
 )
 
 type WorkspaceStoreWrapper struct {
-	api   *workspaceConsumerAPI.StoreAPI
-	roots compositionapi.RootAPI
+	api                     *workspaceConsumerAPI.StoreAPI
+	roots                   compositionapi.RootAPI
+	ensureArtifactBaselines func(context.Context, root.RootID) error
 }
 
 func InitWorkspaceWrappers(
@@ -32,12 +34,14 @@ func InitWorkspaceWrappers(
 	resources compositionapi.ResourceAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	mcpServers mcp.ServerResolver,
+	ensureArtifactBaselines func(context.Context, root.RootID) error,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil ||
 		roots == nil ||
-		mcpServers == nil {
+		mcpServers == nil ||
+		ensureArtifactBaselines == nil {
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
@@ -59,6 +63,7 @@ func InitWorkspaceWrappers(
 	}
 	storeWrapper.api = api
 	storeWrapper.roots = roots
+	storeWrapper.ensureArtifactBaselines = ensureArtifactBaselines
 	runtimeWrapper.api = api
 	aggregateWrapper.api = api
 	return nil
@@ -87,7 +92,23 @@ func (w *WorkspaceStoreWrapper) CreateWorkspaceRoot(
 			if w == nil || w.roots == nil {
 				return root.Root{}, basespec.ErrClosed
 			}
-			return w.roots.Create(context.Background(), draft)
+			value, err := w.roots.Create(context.Background(), draft)
+			if err != nil {
+				return root.Root{}, err
+			}
+			if w.ensureArtifactBaselines == nil {
+				return value, basespec.ErrClosed
+			}
+			if err := w.ensureArtifactBaselines(
+				context.Background(),
+				value.ID,
+			); err != nil {
+				return value, fmt.Errorf(
+					"root was created but baseline Collection provisioning failed: %w",
+					err,
+				)
+			}
+			return value, nil
 		},
 	)
 }
@@ -194,4 +215,5 @@ func (w *WorkspaceStoreWrapper) close() {
 	}
 	w.api = nil
 	w.roots = nil
+	w.ensureArtifactBaselines = nil
 }

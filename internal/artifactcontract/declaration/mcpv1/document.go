@@ -284,6 +284,12 @@ func validateMCPSource(v MCPDocument) error {
 		return nil
 	}
 
+	if v.Locator != nil && v.Include != nil {
+		return fmt.Errorf(
+			"%w: source-selected MCP cannot override target include rules",
+			basespec.ErrInvalid,
+		)
+	}
 	if v.Server != "" && v.Locator == nil {
 		return fmt.Errorf(
 			"%w: MCP server selector requires a locator",
@@ -332,16 +338,6 @@ func validateTransport(v MCPDocument) error {
 	}
 	switch v.Transport {
 	case "":
-		if v.Locator != nil &&
-			v.Locator.Kind == declaration.LocatorKindCommand {
-			if v.URL != "" || len(v.Headers) != 0 {
-				return fmt.Errorf(
-					"%w: command-located MCP cannot contain HTTP fields",
-					basespec.ErrInvalid,
-				)
-			}
-			return nil
-		}
 		if v.Command != "" ||
 			len(v.Args) != 0 ||
 			len(v.Env) != 0 ||

@@ -13,6 +13,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -603,6 +604,19 @@ func (a *API) PurgeSkill(
 			basespec.ErrConflict,
 		)
 	}
+	if err := manageddiscovery.RemoveLocator(
+		ctx,
+		a.sources,
+		a.discovery,
+		missing.RootID,
+		missing.Binding.SourceID,
+		missing.Binding.Locator,
+	); err != nil {
+		return fmt.Errorf(
+			"skill package was removed but discovery cleanup remains pending: %w",
+			err,
+		)
+	}
 	return a.artifacts.Purge(
 		ctx,
 		ref,
@@ -697,6 +711,7 @@ func (a *API) ensureManagedSkillDiscovery(
 			locator,
 		)
 	}
+	next.Authoritative = true
 	if len(next.AllowedDecoderIDs) != 0 &&
 		!slices.Contains(
 			next.AllowedDecoderIDs,

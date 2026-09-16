@@ -414,20 +414,6 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	return workspaceArtifactViewOf(updated)
 }
 
-func (a *StoreAPI) PromptAdapter() *prompt.Adapter {
-	if a == nil {
-		return nil
-	}
-	return a.promptAdapter
-}
-
-func (a *StoreAPI) SkillAdapter() *skill.Adapter {
-	if a == nil {
-		return nil
-	}
-	return a.skillAdapter
-}
-
 func (a *StoreAPI) isBaselineCollectionArtifact(
 	ctx context.Context,
 	record artifact.Artifact,

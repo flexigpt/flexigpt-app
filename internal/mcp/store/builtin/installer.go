@@ -106,7 +106,6 @@ func (i *Installer) DesiredHydration(
 func (i *Installer) EnsurePackageHydration(
 	ctx context.Context,
 	topologyCurrent bool,
-	current map[topology.PackageHydrationKey]bool,
 	stale []topology.PackageHydration,
 ) error {
 	if i == nil {
@@ -144,7 +143,7 @@ func (i *Installer) EnsurePackageHydration(
 			)
 		}
 	}
-	return i.ensurePackages(ctx, current)
+	return i.ensurePackages(ctx)
 }
 
 func (i *Installer) EnsureHydration(
@@ -159,7 +158,7 @@ func (i *Installer) EnsureHydration(
 			return err
 		}
 	}
-	return i.ensurePackages(ctx, nil)
+	return i.ensurePackages(ctx)
 }
 
 func (i *Installer) Ensure(
@@ -171,7 +170,7 @@ func (i *Installer) Ensure(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if err := i.ensurePackages(ctx, nil); err != nil {
+	if err := i.ensurePackages(ctx); err != nil {
 		return err
 	}
 	return i.FinalizeHydration(ctx)
@@ -227,19 +226,8 @@ func (i *Installer) DesiredPackageHydrations(
 
 func (i *Installer) ensurePackages(
 	ctx context.Context,
-	current map[topology.PackageHydrationKey]bool,
 ) error {
 	for _, value := range i.prepared {
-		scope, err := value.PackageAddress.Directory()
-		if err != nil {
-			return err
-		}
-		if current[topology.PackageHydrationKey{
-			InstallerName: i.BuiltInName(),
-			Scope:         scope,
-		}] {
-			continue
-		}
 		if _, err := i.mcp.InstallBuiltInPackage(
 			ctx,
 			mcpConsumerAPI.BuiltInPackageInstallRequest{

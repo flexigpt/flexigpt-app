@@ -3,7 +3,6 @@ package skill
 import (
 	"context"
 	"fmt"
-	"sort"
 	"strconv"
 
 	"github.com/flexigpt/agentskills-go/document"
@@ -54,66 +53,6 @@ func New(
 		artifacts: artifacts,
 		resources: resources,
 	}, nil
-}
-
-func (a *Adapter) List(
-	ctx context.Context,
-	workspace workspaceDomain.Workspace,
-) ([]WorkspaceSkill, error) {
-	if err := workspace.Validate(); err != nil {
-		return nil, err
-	}
-	records, err := a.artifacts.ListByRoot(
-		ctx,
-		workspace.Artifact.RootID,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]WorkspaceSkill, 0)
-	for _, record := range records {
-		if !skillDomain.IsSkillKind(record.Kind) ||
-			!record.Enabled ||
-			record.State != artifact.StateAvailable {
-			continue
-		}
-		value, err := a.resolve(ctx, workspace, record)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Document.Name != output[right].Document.Name {
-			return output[left].Document.Name <
-				output[right].Document.Name
-		}
-		return output[left].Artifact.ArtifactID <
-			output[right].Artifact.ArtifactID
-	})
-	return output, nil
-}
-
-func (a *Adapter) Load(
-	ctx context.Context,
-	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
-) (LoadPlan, error) {
-	if err := workspace.Validate(); err != nil {
-		return LoadPlan{}, err
-	}
-	if len(refs) == 0 {
-		values, err := a.List(ctx, workspace)
-		if err != nil {
-			return LoadPlan{}, err
-		}
-		return LoadPlan{
-			Workspace: workspace.Ref(),
-			Skills:    values,
-		}, nil
-	}
-	return a.loadSelected(ctx, workspace, refs)
 }
 
 // LoadSelected loads exactly refs in order. An empty list means no Skills,

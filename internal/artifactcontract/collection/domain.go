@@ -144,6 +144,21 @@ func (a *API) EnsureBaseline(
 	if err != nil {
 		return CollectionView{}, err
 	}
+	if err := a.ensureCollectionDiscovery(
+		ctx,
+		rootID,
+		sourceValue.ID,
+		locator,
+	); err != nil {
+		return CollectionView{}, err
+	}
+	if err := a.ensureCollectionSourceCurrent(
+		ctx,
+		rootID,
+		sourceValue.ID,
+	); err != nil {
+		return CollectionView{}, err
+	}
 
 	existing, err := a.artifacts.FindByOrigin(
 		ctx,
@@ -156,7 +171,41 @@ func (a *API) EnsureBaseline(
 	)
 	switch {
 	case err == nil:
-		return a.Read(ctx, existing.Ref())
+		if existing.State == artifact.StateAvailable {
+			if !existing.Enabled {
+				existing, err = a.artifacts.SetEnabled(
+					ctx,
+					existing.Ref(),
+					existing.Revision,
+					true,
+				)
+				if err != nil {
+					return CollectionView{}, err
+				}
+			}
+			return a.Read(ctx, existing.Ref())
+		}
+
+		document := collectionv1.CollectionDocument{
+			APIVersion:  collectionv1.CollectionSchemaVersion,
+			Type:        collectionv1.CollectionType,
+			Name:        string(a.domain.BaselineName),
+			Description: a.domain.BaselineDescription,
+		}
+		record, err := a.publishDocument(
+			ctx,
+			rootID,
+			sourceValue.ID,
+			address,
+			document,
+			"",
+			true,
+		)
+		if err != nil {
+			return CollectionView{}, err
+		}
+		return a.Read(ctx, record.Ref())
+
 	case errors.Is(err, basespec.ErrArtifactNotFound),
 		errors.Is(err, basespec.ErrNotFound):
 	default:
@@ -173,6 +222,23 @@ func (a *API) EnsureBaseline(
 		},
 		true,
 	)
+}
+
+func (a *API) ensureCollectionSourceCurrent(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) error {
+	inspection, err := a.discovery.InspectSource(ctx, rootID, sourceID)
+	if err == nil && inspection.IsCurrent() {
+		return nil
+	}
+	if err != nil &&
+		!errors.Is(err, basespec.ErrRefreshStateNotFound) {
+		return err
+	}
+	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
+	return err
 }
 
 func (a *API) domainManagedSource(
@@ -452,12 +518,6 @@ func (a *API) ListDomain(
 	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
-	}
-	if a.domain != nil {
-		if _, err := a.EnsureBaseline(ctx, rootID); err != nil &&
-			!errors.Is(err, basespec.ErrProtected) {
-			return nil, err
-		}
 	}
 
 	records, err := a.artifacts.ListByRoot(ctx, rootID)

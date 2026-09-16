@@ -132,7 +132,8 @@ func (a *API) InstallBuiltInSkillPackage(
 				Address: request.PackageAddress,
 				Files:   request.PackageFiles,
 			},
-			AllowProtected: true,
+			AllowPackageReplacement: true,
+			AllowProtected:          true,
 		},
 	); err != nil {
 		return nil, err

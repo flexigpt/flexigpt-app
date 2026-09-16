@@ -13,13 +13,14 @@ import (
 // content, refreshes the Source, and verifies that the expected source-backed
 // Artifact exists with the requested identity and Definition digest.
 type PublishArtifactRequest struct {
-	RootID              root.RootID                      `json:"rootID"`
-	Binding             SourceBinding                    `json:"binding"`
-	ExpectedKind        ArtifactKind                     `json:"expectedKind"`
-	ExpectedLogicalName basespec.LogicalName             `json:"expectedLogicalName"`
-	ExpectedDefinition  cryptoutil.Digest                `json:"expectedDefinition"`
-	Package             source.ManagedPackagePublication `json:"package"`
-	AllowProtected      bool                             `json:"allowProtected"`
+	RootID                  root.RootID                      `json:"rootID"`
+	Binding                 SourceBinding                    `json:"binding"`
+	ExpectedKind            ArtifactKind                     `json:"expectedKind"`
+	ExpectedLogicalName     basespec.LogicalName             `json:"expectedLogicalName"`
+	ExpectedDefinition      cryptoutil.Digest                `json:"expectedDefinition"`
+	Package                 source.ManagedPackagePublication `json:"package"`
+	AllowPackageReplacement bool                             `json:"allowPackageReplacement,omitempty"`
+	AllowProtected          bool                             `json:"allowProtected"`
 }
 
 type PublishArtifactResult struct {

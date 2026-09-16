@@ -88,11 +88,6 @@ type ServerStore interface {
 		ref artifact.ArtifactRef,
 	) (mcpDomainServer.Resolved, error)
 
-	InspectMCPServerForRuntime(
-		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (mcpDomainServer.Resolved, error)
-
 	GetServerInstallation(
 		ctx context.Context,
 		ref artifact.ArtifactRef,

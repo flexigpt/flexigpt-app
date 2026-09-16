@@ -49,6 +49,16 @@ func (a *API) ListSkillCollections(
 	return a.collections.ListDomain(ctx, rootID)
 }
 
+func (a *API) ListSkillCollectionMemberships(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) ([]collection.ArtifactMembershipView, error) {
+	if a == nil || a.collections == nil {
+		return nil, basespec.ErrClosed
+	}
+	return a.collections.ListMembershipsForArtifact(ctx, ref)
+}
+
 func (a *API) UpdateSkillCollection(
 	ctx context.Context,
 	request collection.UpdateRequest,

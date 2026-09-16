@@ -52,7 +52,6 @@ type PackageHydrationInstaller interface {
 	EnsurePackageHydration(
 		ctx context.Context,
 		topologyCurrent bool,
-		current map[topology.PackageHydrationKey]bool,
 		stale []topology.PackageHydration,
 	) error
 }
@@ -341,7 +340,6 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			if err := packageInstaller.EnsurePackageHydration(
 				ctx,
 				preparedValue.current,
-				preparedValue.packageCurrent,
 				preparedValue.stale,
 			); err != nil {
 				return fmt.Errorf("ensure built-in installer %q: %w", entry.name, err)

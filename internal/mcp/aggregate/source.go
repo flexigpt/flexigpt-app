@@ -2,11 +2,13 @@ package aggregate
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"maps"
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -106,7 +108,7 @@ func runtimeConfig(
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}
-	catalogID, err := RuntimeCatalogIDForRoot(resolved.Server.RootID)
+	catalogID, err := runtimeCatalogIDForRoot(resolved.Server.RootID)
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}
@@ -165,6 +167,18 @@ func runtimeConfig(
 		return mcpServer.RuntimeConfig{}, err
 	}
 	return output, nil
+}
+
+func runtimeCatalogIDForRoot(
+	rootID root.RootID,
+) (mcpServer.CatalogID, error) {
+	if err := rootID.Validate(); err != nil {
+		return "", err
+	}
+	return mcpServer.CatalogID(
+		artifactCatalogIDPrefix +
+			base64.RawURLEncoding.EncodeToString([]byte(rootID)),
+	), nil
 }
 
 func runtimeInclude(

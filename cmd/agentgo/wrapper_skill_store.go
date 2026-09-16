@@ -129,17 +129,6 @@ func (w *SkillStoreWrapper) RefreshSkillSource(
 	})
 }
 
-func (w *SkillStoreWrapper) EnsureSkillBaselineCollection(
-	rootID root.RootID,
-) (collection.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
-		return api.EnsureSkillBaselineCollection(
-			context.Background(),
-			rootID,
-		)
-	})
-}
-
 func (w *SkillStoreWrapper) ListSkills(
 	rootID root.RootID,
 ) ([]artifact.Artifact, error) {
@@ -271,6 +260,20 @@ func (w *SkillStoreWrapper) ListSkillCollections(
 	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]collection.CollectionView, error) {
 		return api.ListSkillCollections(context.Background(), rootID)
 	})
+}
+
+func (w *SkillStoreWrapper) ListSkillCollectionMemberships(
+	ref artifact.ArtifactRef,
+) ([]collection.ArtifactMembershipView, error) {
+	return withSkillStore(
+		w,
+		func(api *skillConsumerAPI.API) ([]collection.ArtifactMembershipView, error) {
+			return api.ListSkillCollectionMemberships(
+				context.Background(),
+				ref,
+			)
+		},
+	)
 }
 
 func (w *SkillStoreWrapper) UpdateSkillCollection(

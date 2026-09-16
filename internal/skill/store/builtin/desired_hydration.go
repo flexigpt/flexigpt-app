@@ -103,7 +103,6 @@ func (i *Installer) EnsureHydration(
 func (i *Installer) EnsurePackageHydration(
 	ctx context.Context,
 	_ bool,
-	current map[topology.PackageHydrationKey]bool,
 	stale []topology.PackageHydration,
 ) error {
 	if i == nil {
@@ -134,17 +133,6 @@ func (i *Installer) EnsurePackageHydration(
 		}
 	}
 	for _, value := range i.prepared {
-		scope, err := value.PackageAddress.Directory()
-		if err != nil {
-			return err
-		}
-		key := topology.PackageHydrationKey{
-			InstallerName: i.BuiltInName(),
-			Scope:         scope,
-		}
-		if current[key] {
-			continue
-		}
 		if err := i.installPreparedPackage(ctx, value); err != nil {
 			return err
 		}

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
@@ -364,6 +365,14 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.LocatorResolvers,
 		a.mcpStoreAPI.api,
+		func(ctx context.Context, rootID root.RootID) error {
+			return EnsureUserArtifactBaselineCollectionsForRoot(
+				ctx,
+				rootID,
+				a.skillStoreAPI.api,
+				a.mcpStoreAPI.api,
+			)
+		},
 	)
 	if err != nil {
 		slog.Error(
@@ -392,6 +401,26 @@ func (a *App) initManagers() {
 		)
 	}
 	slog.Info("shared built-in artifact topology initialized")
+
+	err = EnsureUserArtifactBaselineCollections(
+		context.Background(),
+		artifactComposition.Roots,
+		artifactComposition.Protection,
+		a.skillStoreAPI.api,
+		a.mcpStoreAPI.api,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't provision user Artifact baseline Collections",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: user Artifact baseline provisioning failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("user Artifact baseline Collections initialized")
 
 	err = InitModelPresetStoreWrapper(
 		a.modelPresetStoreAPI,
