@@ -1967,6 +1967,9 @@ nodes/review/target/agent/reviewer
 
 Reordering an array may change declaration bytes, content digest, and Artifact revision. It does not replace the intended identity of a named contained declaration or introduce composition-order semantics.
 
+Resolution selects a contained Artifact by this exact structural position,
+rather than by logical identity and equal body alone.
+
 ## Resolution and capability plans
 
 ### Resolution scope
@@ -3001,6 +3004,8 @@ The Resolver returns:
 - Target ArtifactRefs.
 - Availability or ambiguity status.
 - Diagnostics needed by capability consumers.
+- A cycle-safe flattened capability plan suitable for frontend transport.
+- A common completeness helper for strict consumers.
 
 It does not execute the graph.
 
@@ -3012,7 +3017,7 @@ Resolution operates against indexed declaration state and remains read-only.
 
 - Computes reachable local locators.
 - Extends or updates applicable Source discovery.
-- Refreshes affected source entries.
+- Refreshes only the Workspace Source and Sources whose reachable local locator closure changed.
 - Rebuilds affected Definitions and Artifacts.
 - Leaves unrelated Source state unchanged.
 
@@ -3103,6 +3108,8 @@ The following decisions are authoritative:
 - Package hydration affects only changed packages unless topology recovery requires a reset.
 - Runtime readiness remains outside declaration resolution.
 - Artifact Store does not own generic composition relationships.
+- Ordinary Artifact purge requires the source-backed Artifact to be missing.
+- Workspace refresh does not refresh unrelated Root Sources.
 
 ## Current implementation status
 
@@ -3145,9 +3152,12 @@ The following decisions are authoritative:
 | Workflow structure and target resolution             | Available with relationship-level partial results; execution runtime is deferred      |
 | Workspace resolution                                 | Available with partial capability reporting and explicit strict runtime selection     |
 | Workspace completeness policy                        | Available through `WorkspaceRuntimeSelection.RequireComplete`                         |
+| Generic direct composition capability plans          | Available through cycle-safe flattened resolver plans                                 |
+| Generic completeness policy                          | Available through the shared resolver completeness helper                             |
 | Source-selected MCP aliases                          | Available as pure aliases; non-command aliases cannot define local `include` rules    |
 | MCP policy declaration contract                      | Available, including concrete policy body validation                                  |
 | Local path declaration locators                      | Available for supported locator targets                                               |
+| Exact contained occurrence resolution                | Available through stable structural subresource selection                             |
 
 ### Sources, persistence, and resource verification
 
@@ -3166,6 +3176,7 @@ The following decisions are authoritative:
 | Equivalent publication refresh skip  | Available when Source and expected Artifact state are current    |
 | Authoritative managed discovery      | Available for managed Collection, Skill, MCP, and policy Sources |
 | Managed declaration locator cleanup  | Available after managed package removal                          |
+| Source-backed Artifact purge guard   | Available; ordinary purge requires a missing Artifact            |
 
 ### Physical format support
 
@@ -3183,6 +3194,8 @@ The following decisions are authoritative:
 | `mcp.json` support                  | Available |
 | Canonical MCP declarations          | Available |
 | Source-selected MCP declarations    | Available |
+| `AGENT.md` support                  | Available |
+| `*.agent.md` support                | Available |
 
 ### Workspace capability planning
 
@@ -3194,6 +3207,8 @@ The following decisions are authoritative:
 | Workspace MCP planning                        | Available with partial capability-occurrence reporting   |
 | Explicit Workspace capability completeness    | Available through `RequireComplete`                      |
 | Consistent explicit ArtifactRef deduplication | Available for prompt, Skill, and MCP selections          |
+| Generic Artifact composition inspection       | Available through a frontend-safe flattened plan         |
+| Source-targeted Workspace refresh             | Available; unrelated Root Sources are not refreshed      |
 
 ### Collections and managed authoring
 
@@ -3255,17 +3270,12 @@ The following decisions are authoritative:
 
 ### Pending completion work
 
-| Capability or concern                              | Status  | Remaining work                                                                                                                |
-| -------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Build and acceptance verification                  | Pending | Run full tests, static analysis, migration coverage, and Wails binding generation                                             |
-| Baseline lifecycle for direct generic Root callers | Pending | Ensure every application path, including future direct `RootAPI.Create` callers, invokes the application baseline provisioner |
-| Generic direct composition capability plans        | Pending | Add frontend-safe flattened plans for standalone Agent, Team, Loop, Workflow, and generic Collection inspection               |
-| Generic completeness policy                        | Pending | Add a resolver-level completeness helper for consumers other than Workspace runtime plans                                     |
-| Managed create operation durability                | Pending | Skill, MCP, and policy membership and package publication remain separate source-side operations                              |
-| Protected Source undeclared content sweep          | Pending | Known packages are repaired, but manually inserted untracked protected packages are not automatically removed                 |
-| Generic Artifact purge lifecycle                   | Pending | Restrict or separate `ArtifactAPI.Purge` so an available source-backed Artifact cannot be removed without source mutation     |
-| Internal runtime API consolidation                 | Pending | Consolidate low-level Skill catalog APIs and the remaining internal MCP inspection alias                                      |
-| Bulk resource verification efficiency              | Pending | Expose bounded verification-session reuse for bulk Skill and Workspace materialization                                        |
+| Capability or concern                     | Status  | Remaining work                                                                                                |
+| ----------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| Build and acceptance verification         | Pending | Run full tests, static analysis, migration coverage, and Wails binding generation                             |
+| Managed create operation durability       | Pending | Skill, MCP, and policy membership and package publication remain separate source-side operations              |
+| Protected Source undeclared content sweep | Pending | Known packages are repaired, but manually inserted untracked protected packages are not automatically removed |
+| Bulk resource verification efficiency     | Pending | Expose bounded verification-session reuse for bulk Skill and Workspace materialization                        |
 
 ### Deferred and unsupported capabilities
 

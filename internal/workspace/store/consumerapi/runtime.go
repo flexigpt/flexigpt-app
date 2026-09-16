@@ -179,21 +179,7 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 func requireCompleteWorkspaceCapabilities(
 	value WorkspaceCapabilityPlan,
 ) error {
-	for _, occurrence := range value.Occurrences {
-		if occurrence.Status == resolve.ResolutionAvailable {
-			continue
-		}
-		return fmt.Errorf(
-			"%w: Workspace capability %q (%s/%s) is %s: %s",
-			basespec.ErrReferenceUnresolved,
-			occurrence.Path,
-			occurrence.Type,
-			occurrence.Name,
-			occurrence.Status,
-			occurrence.Message,
-		)
-	}
-	return nil
+	return resolve.RequireComplete(value.Occurrences)
 }
 
 func (a *StoreAPI) loadWorkspaceMCPServers(

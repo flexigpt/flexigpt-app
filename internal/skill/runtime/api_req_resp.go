@@ -155,15 +155,3 @@ type InvokeSkillToolResponseBody struct {
 type InvokeSkillToolResponse struct {
 	Body *InvokeSkillToolResponseBody
 }
-
-type SyncCatalogRequest struct {
-	CatalogID CatalogID `json:"catalogID"`
-}
-
-type SyncCatalogResponse struct{}
-
-type RemoveCatalogRequest struct {
-	CatalogID CatalogID `json:"catalogID"`
-}
-
-type RemoveCatalogResponse struct{}

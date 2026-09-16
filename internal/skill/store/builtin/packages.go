@@ -271,7 +271,11 @@ func canonicalCollectionPackage(
 			)
 		}
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
-			continue
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Collection references document %q more than once",
+				basespec.ErrIdentityConflict,
+				documentLocator,
+			)
 		}
 
 		definitionValue, _, err := skillDomain.DecodeSkillDocument(

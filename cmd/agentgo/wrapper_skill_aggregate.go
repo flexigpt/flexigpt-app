@@ -1,14 +1,10 @@
 package main
 
 import (
-	"context"
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
 
@@ -50,19 +46,6 @@ func InitSkillAggregateWrapper(
 	}
 	wrapper.service = service
 	return nil
-}
-
-func (w *SkillAggregateWrapper) ResolveArtifactSkill(
-	ref artifact.ArtifactRef,
-) (skillAggregate.ResolvedArtifactSkill, error) {
-	return middleware.WithRecoveryResp(
-		func() (skillAggregate.ResolvedArtifactSkill, error) {
-			if w == nil || w.service == nil {
-				return skillAggregate.ResolvedArtifactSkill{}, basespec.ErrClosed
-			}
-			return w.service.ResolveArtifactSkill(context.Background(), ref)
-		},
-	)
 }
 
 func (w *SkillAggregateWrapper) close() {

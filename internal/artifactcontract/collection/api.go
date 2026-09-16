@@ -30,10 +30,6 @@ const (
 	ManagedCollectionPackageKind  source.PackageKind      = "collection"
 	ManagedCollectionDocumentFile basespec.Locator        = "collection.json"
 	ManagedCollectionVersion      basespec.LogicalVersion = "unversioned"
-
-	UserManagedArtifactSourceStorageKey basespec.StorageKey = "user-artifacts"
-
-	UserManagedArtifactSourceDisplayName = "User-managed artifacts"
 )
 
 type API struct {
@@ -43,23 +39,6 @@ type API struct {
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	domain           *DomainPolicy
 	resolver         *resolve.Resolver
-}
-
-func New(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	domains ...DomainPolicy,
-) (*API, error) {
-	return newAPI(
-		sources,
-		discovery,
-		artifacts,
-		managedArtifacts,
-		nil,
-		domains...,
-	)
 }
 
 func NewWithResolver(
@@ -724,15 +703,15 @@ func (a *API) mutateMember(
 	}
 
 	if ensure {
-		for index, current := range value.document.Members {
+		normalized, err := normalizedMemberIndexes(
+			value.document.Members,
+		)
+		if err != nil {
+			return MemberMutationResult{}, err
+		}
+		for normalizedIndex, sourceIndex := range normalized {
+			current := value.document.Members[sourceIndex]
 			currentRaw, err := current.CanonicalJSON()
-			if err != nil {
-				return MemberMutationResult{}, err
-			}
-			normalizedIndex, err := normalizedMemberIndex(
-				value.document.Members,
-				index,
-			)
 			if err != nil {
 				return MemberMutationResult{}, err
 			}

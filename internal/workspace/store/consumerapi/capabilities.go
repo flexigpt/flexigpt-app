@@ -13,6 +13,19 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
+func (a *StoreAPI) ResolveArtifactCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.resolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.resolver.ResolveCapabilities(
+		ctx,
+		ref,
+	)
+}
+
 func (a *StoreAPI) ResolveWorkspaceCapabilities(
 	ctx context.Context,
 	ref WorkspaceRef,
@@ -71,6 +84,9 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 	sortWorkspaceArtifactRefs(capabilities.PromptArtifacts)
 	sortWorkspaceArtifactRefs(capabilities.SkillArtifacts)
 	sortWorkspaceArtifactRefs(capabilities.MCPArtifacts)
+	capabilities.Complete = resolve.RequireComplete(
+		capabilities.Occurrences,
+	) == nil
 	return workspace, capabilities, nil
 }
 

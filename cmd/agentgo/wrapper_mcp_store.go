@@ -92,11 +92,11 @@ func (w *MCPStoreWrapper) GetMCPServerInstallation(
 	})
 }
 
-func (w *MCPStoreWrapper) InspectMCPPolicy(
+func (w *MCPStoreWrapper) GetMCPPolicy(
 	ref artifact.ArtifactRef,
 ) (mcpConsumerAPI.PolicyView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.PolicyView, error) {
-		return api.InspectMCPPolicyForRuntime(context.Background(), ref)
+		return api.GetMCPPolicy(context.Background(), ref)
 	})
 }
 

@@ -99,6 +99,27 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 		delete(next.ExpectedContentDigests, locator)
 		changed = true
 	}
+
+	inScope, err := next.InScope(locator)
+	if err != nil {
+		return managedartifactimpl.SourceState{}, err
+	}
+	if !inScope {
+		hints := make(
+			[]source.DecoderHint,
+			0,
+			len(next.DecoderHints),
+		)
+		for _, hint := range next.DecoderHints {
+			if hint.Locator == locator && !hint.Recursive {
+				changed = true
+				continue
+			}
+			hints = append(hints, hint.Clone())
+		}
+		next.DecoderHints = hints
+	}
+
 	if !changed {
 		r, err := c.getManagedSourceState(ctx, rootID, sourceID)
 		if err != nil {

@@ -27,9 +27,9 @@ type workspaceClosureSource struct {
 func (a *StoreAPI) expandWorkspaceLocatorClosure(
 	ctx context.Context,
 	graph resolve.Graph,
-) (bool, error) {
+) ([]workspaceClosureSource, error) {
 	if graph.Root == nil {
-		return false, fmt.Errorf(
+		return nil, fmt.Errorf(
 			"%w: Workspace resolution graph has no root",
 			basespec.ErrReferenceUnresolved,
 		)
@@ -37,7 +37,7 @@ func (a *StoreAPI) expandWorkspaceLocatorClosure(
 
 	closure, err := workspaceLocatorClosure(graph.Root)
 	if err != nil {
-		return false, err
+		return nil, err
 	}
 	keys := make([]workspaceClosureSource, 0, len(closure))
 	for key := range closure {
@@ -50,17 +50,17 @@ func (a *StoreAPI) expandWorkspaceLocatorClosure(
 		return keys[left].sourceID < keys[right].sourceID
 	})
 
-	changed := false
+	changed := make([]workspaceClosureSource, 0)
 	for _, key := range keys {
 		current, err := a.sources.Get(ctx, key.rootID, key.sourceID)
 		if err != nil {
-			return false, err
+			return nil, err
 		}
 		next := current.Discovery.Clone()
 		for _, locator := range closure[key] {
 			inScope, err := next.InScope(locator)
 			if err != nil {
-				return false, err
+				return nil, err
 			}
 			if !inScope {
 				next.ExplicitLocators = appendUniqueLocator(
@@ -72,7 +72,7 @@ func (a *StoreAPI) expandWorkspaceLocatorClosure(
 		}
 		next = next.Normalized()
 		if err := next.Validate(); err != nil {
-			return false, err
+			return nil, err
 		}
 		if current.Discovery.Equal(next) {
 			continue
@@ -88,9 +88,9 @@ func (a *StoreAPI) expandWorkspaceLocatorClosure(
 				Discovery:        &next,
 			},
 		); err != nil {
-			return false, err
+			return nil, err
 		}
-		changed = true
+		changed = append(changed, key)
 	}
 	return changed, nil
 }

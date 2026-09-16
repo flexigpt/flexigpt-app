@@ -44,48 +44,6 @@ func InitSkillRuntimeWrapper(
 	return nil
 }
 
-func (w *SkillRuntimeWrapper) SyncSkillCatalog(
-	request *skillRuntime.SyncCatalogRequest,
-) (*skillRuntime.SyncCatalogResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.SyncCatalogResponse, error) {
-			if request == nil {
-				return nil, errors.New(
-					"skill runtime catalog request is required",
-				)
-			}
-			if err := w.service.SyncCatalog(
-				context.Background(),
-				request.CatalogID,
-			); err != nil {
-				return nil, err
-			}
-			return &skillRuntime.SyncCatalogResponse{}, nil
-		},
-	)
-}
-
-func (w *SkillRuntimeWrapper) RemoveSkillCatalog(
-	request *skillRuntime.RemoveCatalogRequest,
-) (*skillRuntime.RemoveCatalogResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.RemoveCatalogResponse, error) {
-			if request == nil {
-				return nil, errors.New(
-					"skill runtime catalog request is required",
-				)
-			}
-			if err := w.service.RemoveCatalog(
-				context.Background(),
-				request.CatalogID,
-			); err != nil {
-				return nil, err
-			}
-			return &skillRuntime.RemoveCatalogResponse{}, nil
-		},
-	)
-}
-
 func (w *SkillRuntimeWrapper) CreateSkillSession(
 	request *skillRuntime.CreateSkillSessionRequest,
 ) (*skillRuntime.CreateSkillSessionResponse, error) {

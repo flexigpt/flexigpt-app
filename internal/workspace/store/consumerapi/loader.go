@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"path"
 	"slices"
+	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -14,6 +15,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -184,20 +187,33 @@ func (a *StoreAPI) refreshWorkspace(
 			err
 	}
 
-	if err := a.ensureWorkspaceDeclarationCandidate(
+	record, err := a.ensureWorkspaceDeclarationCandidate(
 		ctx,
 		ref,
-	); err != nil {
-		return workspaceDomain.Workspace{},
-			refresh.RefreshRootResult{},
-			err
-	}
-	result, err := a.discovery.RefreshRoot(ctx, ref.RootID)
+	)
 	if err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
 			err
 	}
+
+	result := refresh.RefreshRootResult{
+		RootID:  ref.RootID,
+		Sources: make([]refresh.RefreshSourceResult, 0),
+	}
+	if err := a.refreshWorkspaceSources(
+		ctx,
+		[]workspaceClosureSource{{
+			rootID:   record.RootID,
+			sourceID: record.Binding.SourceID,
+		}},
+		&result,
+	); err != nil {
+		return workspaceDomain.Workspace{},
+			refresh.RefreshRootResult{},
+			err
+	}
+
 	workspace, discoveryChanged, err := a.applyWorkspaceDeclarations(
 		ctx,
 		ref,
@@ -208,9 +224,13 @@ func (a *StoreAPI) refreshWorkspace(
 			err
 	}
 	if discoveryChanged {
-		result, err = a.discovery.RefreshRoot(
+		err = a.refreshWorkspaceSources(
 			ctx,
-			workspace.Artifact.RootID,
+			[]workspaceClosureSource{{
+				rootID:   workspace.Artifact.RootID,
+				sourceID: workspace.Artifact.Binding.SourceID,
+			}},
+			&result,
 		)
 		if err != nil {
 			return workspaceDomain.Workspace{},
@@ -226,7 +246,7 @@ func (a *StoreAPI) refreshWorkspace(
 				refresh.RefreshRootResult{},
 				err
 		}
-		changed, err := a.expandWorkspaceLocatorClosure(
+		changedSources, err := a.expandWorkspaceLocatorClosure(
 			ctx,
 			graph,
 		)
@@ -235,17 +255,25 @@ func (a *StoreAPI) refreshWorkspace(
 				refresh.RefreshRootResult{},
 				err
 		}
-		if !changed {
+		if len(changedSources) == 0 {
 			workspace, err = a.GetWorkspace(ctx, ref)
 			if err != nil {
 				return workspaceDomain.Workspace{},
 					refresh.RefreshRootResult{},
 					err
 			}
+			if err := result.Validate(); err != nil {
+				return workspaceDomain.Workspace{},
+					refresh.RefreshRootResult{},
+					err
+			}
 			return workspace, result, nil
 		}
-		result, err = a.discovery.RefreshRoot(ctx, ref.RootID)
-		if err != nil {
+		if err := a.refreshWorkspaceSources(
+			ctx,
+			changedSources,
+			&result,
+		); err != nil {
 			return workspaceDomain.Workspace{},
 				refresh.RefreshRootResult{},
 				err
@@ -299,8 +327,8 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 	return workspace, graph, nil
 }
 
-// ResolveWorkspaceGraph applies local declaration sources, refreshes the
-// Root, and resolves every Workspace root in declaration order.
+// ResolveWorkspaceGraph reads the currently indexed declaration state and
+// resolves every Workspace root in deterministic normalized order.
 //
 // The returned graph is a Go consumer API. It is intentionally not exposed
 // through the Wails wrapper because Loop bodies may create graph cycles.
@@ -318,13 +346,13 @@ func (a *StoreAPI) ResolveWorkspaceGraph(
 func (a *StoreAPI) ensureWorkspaceDeclarationCandidate(
 	ctx context.Context,
 	ref WorkspaceRef,
-) error {
+) (artifact.Artifact, error) {
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	if record.Kind != workspaceDomain.WorkspaceArtifactKind {
-		return fmt.Errorf(
+		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not a Workspace",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
@@ -337,16 +365,16 @@ func (a *StoreAPI) ensureWorkspaceDeclarationCandidate(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	inScope, err := current.Discovery.InScope(
 		record.Binding.Locator,
 	)
 	if err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	if inScope {
-		return nil
+		return record, nil
 	}
 
 	next := current.Discovery.Clone()
@@ -361,7 +389,7 @@ func (a *StoreAPI) ensureWorkspaceDeclarationCandidate(
 	)
 	next = next.Normalized()
 	if err := next.Validate(); err != nil {
-		return err
+		return artifact.Artifact{}, err
 	}
 	_, err = a.sources.Update(
 		ctx,
@@ -374,7 +402,79 @@ func (a *StoreAPI) ensureWorkspaceDeclarationCandidate(
 			Discovery:        &next,
 		},
 	)
-	return err
+	return record, err
+}
+
+func (a *StoreAPI) refreshWorkspaceSources(
+	ctx context.Context,
+	keys []workspaceClosureSource,
+	result *refresh.RefreshRootResult,
+) error {
+	if result == nil {
+		return fmt.Errorf(
+			"%w: Workspace refresh result target is nil",
+			basespec.ErrInvalid,
+		)
+	}
+
+	seen := make(map[workspaceClosureSource]struct{}, len(keys))
+	ordered := make([]workspaceClosureSource, 0, len(keys))
+	for _, key := range keys {
+		if key.rootID != result.RootID {
+			return fmt.Errorf(
+				"%w: Workspace refresh attempted to cross Roots",
+				basespec.ErrInvalid,
+			)
+		}
+		if _, duplicate := seen[key]; duplicate {
+			continue
+		}
+		seen[key] = struct{}{}
+		ordered = append(ordered, key)
+	}
+	sort.Slice(ordered, func(left, right int) bool {
+		if ordered[left].rootID != ordered[right].rootID {
+			return ordered[left].rootID < ordered[right].rootID
+		}
+		return ordered[left].sourceID < ordered[right].sourceID
+	})
+
+	for _, key := range ordered {
+		refreshed, err := a.discovery.RefreshSource(
+			ctx,
+			key.rootID,
+			key.sourceID,
+		)
+		if err != nil {
+			return err
+		}
+
+		replaced := false
+		for index := range result.Sources {
+			if result.Sources[index].State.SourceID != key.sourceID {
+				continue
+			}
+			result.Sources[index] = refreshed.Clone()
+			replaced = true
+			break
+		}
+		if !replaced {
+			result.Sources = append(result.Sources, refreshed.Clone())
+		}
+	}
+
+	sort.Slice(result.Sources, func(left, right int) bool {
+		return result.Sources[left].State.SourceID <
+			result.Sources[right].State.SourceID
+	})
+	result.Diagnostics = nil
+	for _, sourceResult := range result.Sources {
+		result.Diagnostics = diagnostic.Append(
+			result.Diagnostics,
+			sourceResult.Diagnostics...,
+		)
+	}
+	return result.Validate()
 }
 
 func (a *StoreAPI) workspaceDeclarationLocators(

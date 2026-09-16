@@ -31,6 +31,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 )
 
+const membersStr = "members"
+
 type resolutionState struct {
 	nodes  int
 	active map[artifact.ArtifactRef]struct{}
@@ -206,6 +208,7 @@ func (r *Resolver) resolveInlineGraph(
 		0,
 		nil,
 		false,
+		nil,
 	)
 	if err != nil {
 		return Graph{}, err
@@ -431,6 +434,7 @@ func (r *Resolver) resolveEntry(
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
 	compositionEntry bool,
+	expectedSubresource *basespec.SubresourceLocator,
 ) (*ResolvedEntry, error) {
 	if err := entry.Validate(); err != nil {
 		return nil, err
@@ -485,6 +489,7 @@ func (r *Resolver) resolveEntry(
 			from,
 			entry,
 			depth,
+			expectedSubresource,
 		)
 	}
 
@@ -517,6 +522,7 @@ func (r *Resolver) resolveNamedInlineArtifact(
 	from *artifact.Artifact,
 	entry declaration.Entry,
 	depth int,
+	expectedSubresource *basespec.SubresourceLocator,
 ) (*ResolvedEntry, error) {
 	header := entry.Header()
 	raw, err := entry.CanonicalJSON()
@@ -541,6 +547,10 @@ func (r *Resolver) resolveNamedInlineArtifact(
 		}
 		if from != nil &&
 			!isNestedDeclarationOrigin(record, *from) {
+			continue
+		}
+		if expectedSubresource != nil &&
+			record.Binding.SubresourceLocator != *expectedSubresource {
 			continue
 		}
 		definitionValue, err := r.artifacts.GetDefinition(
@@ -602,6 +612,49 @@ func isNestedDeclarationOrigin(
 	)
 }
 
+func containedRelationshipSubresource(
+	from *artifact.Artifact,
+	entry declaration.Entry,
+	relationshipPath ...string,
+) (*basespec.SubresourceLocator, error) {
+	if from == nil {
+		//nolint:nilnil // Explicit.
+		return nil, nil
+	}
+	form, err := entry.CompositionForm()
+	if err != nil {
+		return nil, err
+	}
+	if form != declaration.CompositionEntryContained {
+		//nolint:nilnil // Explicit.
+		return nil, nil
+	}
+
+	header := entry.Header()
+	segments := append([]string(nil), relationshipPath...)
+	segments = append(
+		segments,
+		string(header.Type),
+		header.Name,
+	)
+	relative := strings.Join(segments, "/")
+	if relative == "" {
+		return nil, fmt.Errorf(
+			"%w: contained declaration has no structural path",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value := basespec.SubresourceLocator(relative)
+	if parent := from.Binding.SubresourceLocator; parent != "" {
+		value = parent + "/" + value
+	}
+	if err := value.Validate(); err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
+
 func (r *Resolver) resolveStructure(
 	ctx context.Context,
 	state *resolutionState,
@@ -655,6 +708,7 @@ func (r *Resolver) resolveStructure(
 			from,
 			depth+1,
 			nil,
+			[]string{"allowedTools"},
 		)
 		return err
 
@@ -679,6 +733,7 @@ func (r *Resolver) resolveStructure(
 			from,
 			depth+1,
 			nil,
+			[]string{membersStr},
 		)
 		return err
 
@@ -695,11 +750,20 @@ func (r *Resolver) resolveStructure(
 			from,
 			depth+1,
 			nil,
+			[]string{membersStr},
 		)
 		if err != nil {
 			return err
 		}
 		if value.Program != nil {
+			subresource, err := containedRelationshipSubresource(
+				from,
+				*value.Program,
+				"program",
+			)
+			if err != nil {
+				return err
+			}
 			program, err := r.resolveRelationship(
 				ctx,
 				state,
@@ -708,6 +772,7 @@ func (r *Resolver) resolveStructure(
 				from,
 				depth+1,
 				node,
+				subresource,
 			)
 			if err != nil {
 				return err
@@ -730,11 +795,20 @@ func (r *Resolver) resolveStructure(
 			from,
 			depth+1,
 			nil,
+			[]string{membersStr},
 		)
 		if err != nil {
 			return err
 		}
 		if value.Program != nil {
+			subresource, err := containedRelationshipSubresource(
+				from,
+				*value.Program,
+				"program",
+			)
+			if err != nil {
+				return err
+			}
 			program, err := r.resolveRelationship(
 				ctx,
 				state,
@@ -743,6 +817,7 @@ func (r *Resolver) resolveStructure(
 				from,
 				depth+1,
 				node,
+				subresource,
 			)
 			if err != nil {
 				return err
@@ -770,6 +845,14 @@ func (r *Resolver) resolveStructure(
 		node.Loop = loop
 
 		if value.Body != nil {
+			subresource, err := containedRelationshipSubresource(
+				from,
+				*value.Body,
+				"body",
+			)
+			if err != nil {
+				return err
+			}
 			body, err := r.resolveRelationship(
 				ctx,
 				state,
@@ -778,6 +861,7 @@ func (r *Resolver) resolveStructure(
 				from,
 				depth+1,
 				nil,
+				subresource,
 			)
 			if err != nil {
 				return err
@@ -819,6 +903,16 @@ func (r *Resolver) resolveStructure(
 		}
 		node.Workflow = workflow
 		for _, workflowNode := range nodes {
+			subresource, err := containedRelationshipSubresource(
+				from,
+				workflowNode.Target,
+				"nodes",
+				declaration.StableWorkflowNodeSegment(workflowNode.ID),
+				"target",
+			)
+			if err != nil {
+				return err
+			}
 			target, err := r.resolveRelationship(
 				ctx,
 				state,
@@ -827,6 +921,7 @@ func (r *Resolver) resolveStructure(
 				from,
 				depth+1,
 				nil,
+				subresource,
 			)
 			if err != nil {
 				return err
@@ -873,6 +968,7 @@ func (r *Resolver) resolveStructure(
 			from,
 			depth+1,
 			nil,
+			[]string{"roots"},
 		)
 		return err
 
@@ -893,6 +989,7 @@ func (r *Resolver) resolveEntries(
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
+	relationshipPath []string,
 ) ([]*ResolvedEntry, []ResolvedRelationship, error) {
 	ordered, err := declaration.SortedCompositionEntries(
 		"composition entries",
@@ -904,6 +1001,14 @@ func (r *Resolver) resolveEntries(
 	available := make([]*ResolvedEntry, 0, len(ordered))
 	relationships := make([]ResolvedRelationship, 0, len(ordered))
 	for _, value := range ordered {
+		subresource, err := containedRelationshipSubresource(
+			from,
+			value,
+			relationshipPath...,
+		)
+		if err != nil {
+			return nil, nil, err
+		}
 		relationship, err := r.resolveRelationship(
 			ctx,
 			state,
@@ -912,6 +1017,7 @@ func (r *Resolver) resolveEntries(
 			from,
 			depth,
 			implicitLoopOwner,
+			subresource,
 		)
 		if err != nil {
 			return nil, nil, err
@@ -932,6 +1038,7 @@ func (r *Resolver) resolveRelationship(
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
+	expectedSubresource *basespec.SubresourceLocator,
 ) (ResolvedRelationship, error) {
 	relationship := ResolvedRelationship{
 		Declared: entry.Clone(),
@@ -945,6 +1052,7 @@ func (r *Resolver) resolveRelationship(
 		depth,
 		implicitLoopOwner,
 		true,
+		expectedSubresource,
 	)
 	if err == nil {
 		relationship.Status = ResolutionAvailable

@@ -55,6 +55,28 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	}
 	next.Authoritative = true
 
+	hintFound := false
+	for index := range next.DecoderHints {
+		hint := &next.DecoderHints[index]
+		if hint.Locator != locator || hint.Recursive {
+			continue
+		}
+		hintFound = true
+		if !slices.Contains(hint.DecoderIDs, requiredDecoder) {
+			hint.DecoderIDs = append(
+				hint.DecoderIDs,
+				requiredDecoder,
+			)
+		}
+	}
+	if !hintFound {
+		next.DecoderHints = append(next.DecoderHints, source.DecoderHint{
+			Locator:    locator,
+			Recursive:  false,
+			DecoderIDs: []basespec.DecoderID{requiredDecoder},
+		})
+	}
+
 	if len(next.AllowedDecoderIDs) != 0 &&
 		!slices.Contains(next.AllowedDecoderIDs, requiredDecoder) {
 		next.AllowedDecoderIDs = append(

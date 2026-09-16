@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -27,6 +28,20 @@ func withWorkspaceRuntime[T any](
 		}
 		return fn(w.api)
 	})
+}
+
+func (w *WorkspaceRuntimeWrapper) ResolveArtifactCapabilities(
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (resolve.CapabilityPlan, error) {
+			return api.ResolveArtifactCapabilities(
+				context.Background(),
+				ref,
+			)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceCapabilities(

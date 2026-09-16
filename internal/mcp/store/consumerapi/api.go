@@ -148,7 +148,7 @@ func (a *API) GetServerInstallation(
 	}, nil
 }
 
-func (a *API) InspectMCPPolicyForRuntime(
+func (a *API) GetMCPPolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (PolicyView, error) {
@@ -748,11 +748,10 @@ func (a *API) resolveServerMaterial(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	document, err := a.serverDocumentForResolvedArtifact(ctx, resolved)
+	document, err := mcpDomainServer.ServerDocumentFromDefinition(resolved.Definition)
 	if err != nil {
 		return serverResolutionMaterial{}, err
 	}
-
 	installation, revision, enabled, runtimeEnabled, builtIn, err := a.effectiveInstallation(
 		ctx,
 		resolved.Artifact,
@@ -770,14 +769,6 @@ func (a *API) resolveServerMaterial(
 		RuntimeEnabled:       runtimeEnabled,
 		BuiltIn:              builtIn,
 	}, nil
-}
-
-func (a *API) serverDocumentForResolvedArtifact(
-	ctx context.Context,
-	resolved resource.ResolvedArtifact,
-) (mcpDomainServer.ServerDocument, error) {
-	_ = ctx
-	return mcpDomainServer.ServerDocumentFromDefinition(resolved.Definition)
 }
 
 func (a *API) resolveDeclarationArtifact(

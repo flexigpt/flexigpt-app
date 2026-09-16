@@ -226,14 +226,14 @@ func (s *Service) Purge(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
+	if err := ref.Validate(); err != nil {
+		return err
+	}
 	if err := rootimpl.RequireMutableRoot(
 		ctx,
 		s.policy,
 		ref.RootID,
 	); err != nil {
-		return err
-	}
-	if err := ref.Validate(); err != nil {
 		return err
 	}
 	if expectedRevision == 0 {
@@ -242,6 +242,22 @@ func (s *Service) Purge(
 			basespec.ErrInvalid,
 		)
 	}
+
+	current, err := s.repository.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if current.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+	if current.State != artifact.StateMissing {
+		return fmt.Errorf(
+			"%w: source-backed Artifact %q must be missing before purge",
+			basespec.ErrConflict,
+			current.ID,
+		)
+	}
+
 	return s.repository.Purge(ctx, ref, expectedRevision)
 }
 

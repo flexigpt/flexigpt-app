@@ -280,7 +280,7 @@ func walkWorkflowTargets(
 			node.Target,
 			appendPath(
 				base,
-				stableWorkflowNodeSegment(node.ID),
+				StableWorkflowNodeSegment(node.ID),
 				"target",
 			),
 			false,
@@ -342,7 +342,9 @@ func appendEntryPath(
 	)
 }
 
-func stableWorkflowNodeSegment(value string) string {
+// StableWorkflowNodeSegment returns the structural path segment used for a
+// Workflow node target in source-backed subresource identity.
+func StableWorkflowNodeSegment(value string) string {
 	if basespec.ValidatePortableName(
 		"Workflow node ID",
 		value,
