@@ -2,7 +2,6 @@ package consumerapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -342,19 +341,12 @@ func (a *API) EnsureBuiltInSourceCurrent(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	inspection, err := a.discovery.InspectSource(ctx, rootID, sourceID)
-	if errors.Is(err, basespec.ErrRefreshStateNotFound) {
-		_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
-		return err
-	}
-	if err != nil {
-		return err
-	}
-	if inspection.IsCurrent() {
-		return nil
-	}
-	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
-	return err
+	return compositionapi.EnsureSourceCurrent(
+		ctx,
+		a.discovery,
+		rootID,
+		sourceID,
+	)
 }
 
 func (a *API) InstallBuiltInPackage(

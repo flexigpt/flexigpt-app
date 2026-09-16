@@ -38,7 +38,14 @@ type RemoveArtifactRequest struct {
 	Package            source.ManagedPackageAddress `json:"package"`
 	ExpectedGeneration string                       `json:"expectedGeneration,omitempty"`
 	ExpectedArtifact   *ArtifactRef                 `json:"expectedArtifact,omitempty"`
-	AllowProtected     bool                         `json:"allowProtected"`
+
+	// PruneDiscoveryLocator removes one exact explicit declaration candidate
+	// after source-side package removal and before the final Source refresh.
+	// It is valid only for an authoritative managed Source owned by the
+	// caller's managed authoring flow.
+	PruneDiscoveryLocator *basespec.Locator `json:"pruneDiscoveryLocator,omitempty"`
+
+	AllowProtected bool `json:"allowProtected"`
 }
 
 // ExpectedGeneration optionally prevents removal from replacing a package

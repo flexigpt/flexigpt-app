@@ -36,6 +36,13 @@ type resolutionState struct {
 	active map[artifact.ArtifactRef]struct{}
 }
 
+type loadedDeclarationArtifact struct {
+	record          artifact.Artifact
+	definition      definition.Definition
+	entry           declaration.Entry
+	declarationType declaration.Type
+}
+
 func newResolutionState() resolutionState {
 	return resolutionState{
 		active: make(map[artifact.ArtifactRef]struct{}),
@@ -68,6 +75,114 @@ func (r *Resolver) ResolveArtifact(
 		return Graph{}, err
 	}
 	return Graph{Root: entry}, nil
+}
+
+func (r *Resolver) loadAvailableDeclarationArtifact(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expected declaration.Type,
+) (loadedDeclarationArtifact, error) {
+	if r == nil || r.artifacts == nil {
+		return loadedDeclarationArtifact{}, basespec.ErrClosed
+	}
+	if err := validateResolutionContext(ctx); err != nil {
+		return loadedDeclarationArtifact{}, err
+	}
+	if err := ref.Validate(); err != nil {
+		return loadedDeclarationArtifact{}, err
+	}
+
+	record, err := r.artifacts.Get(ctx, ref)
+	if err != nil {
+		return loadedDeclarationArtifact{}, err
+	}
+	if record.Ref() != ref {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact reader returned another Artifact",
+			basespec.ErrInvalid,
+		)
+	}
+	if record.State != artifact.StateAvailable {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact %q is not available",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+	if !r.options.IncludeDisabled && !record.Enabled {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact %q is disabled",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+
+	declarationType := declaration.Type(record.Kind)
+	if err := declarationType.Validate(); err != nil {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact %q has unsupported declaration type: %w",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+			err,
+		)
+	}
+	if expected != "" && declarationType != expected {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact %q has type %q, expected %q",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+			declarationType,
+			expected,
+		)
+	}
+
+	definitionValue, err := r.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return loadedDeclarationArtifact{}, err
+	}
+	if err := validateDefinitionContract(
+		definitionValue,
+		declarationType,
+	); err != nil {
+		return loadedDeclarationArtifact{}, err
+	}
+	if definitionValue.Kind != record.Kind {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact Definition kind does not match Artifact kind",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	if definitionValue.LogicalName != record.LogicalName ||
+		definitionValue.LogicalVersion != record.LogicalVersion {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact Definition identity does not match Artifact state",
+			basespec.ErrDigestMismatch,
+		)
+	}
+
+	entry, err := declaration.DecodeCanonicalEntryJSON(definitionValue.Body)
+	if err != nil {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact Definition body is not a canonical declaration: %w",
+			basespec.ErrReferenceUnresolved,
+			err,
+		)
+	}
+	header := entry.Header()
+	if header.Type != declarationType ||
+		header.Name != string(definitionValue.LogicalName) {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact Definition declaration identity differs from Artifact state",
+			basespec.ErrDigestMismatch,
+		)
+	}
+
+	return loadedDeclarationArtifact{
+		record:          record,
+		definition:      definitionValue,
+		entry:           entry,
+		declarationType: declarationType,
+	}, nil
 }
 
 func (r *Resolver) resolveInlineGraph(
@@ -176,84 +291,18 @@ func (r *Resolver) resolveArtifact(
 	state.active[ref] = struct{}{}
 	defer delete(state.active, ref)
 
-	record, err := r.artifacts.Get(ctx, ref)
+	loaded, err := r.loadAvailableDeclarationArtifact(
+		ctx,
+		ref,
+		expected,
+	)
 	if err != nil {
 		return nil, err
 	}
-	if record.State != artifact.StateAvailable {
-		return nil, fmt.Errorf(
-			"%w: Artifact %q is not available",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
-	if !r.options.IncludeDisabled && !record.Enabled {
-		return nil, fmt.Errorf(
-			"%w: Artifact %q is disabled",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
-
-	declarationType := declaration.Type(record.Kind)
-	if err := declarationType.Validate(); err != nil {
-		return nil, fmt.Errorf(
-			"%w: Artifact %q has unsupported declaration type: %w",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-			err,
-		)
-	}
-	if expected != "" && declarationType != expected {
-		return nil, fmt.Errorf(
-			"%w: Artifact %q has type %q, expected %q",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-			declarationType,
-			expected,
-		)
-	}
-
-	definitionValue, err := r.artifacts.GetDefinition(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
-		return nil, err
-	}
-	if definitionValue.Kind != record.Kind {
-		return nil, fmt.Errorf(
-			"%w: Artifact Definition kind does not match Artifact kind",
-			basespec.ErrDigestMismatch,
-		)
-	}
-	if definitionValue.LogicalName != record.LogicalName ||
-		definitionValue.LogicalVersion != record.LogicalVersion {
-		return nil, fmt.Errorf(
-			"%w: Artifact Definition identity does not match Artifact state",
-			basespec.ErrDigestMismatch,
-		)
-	}
-	entry, err := declaration.DecodeCanonicalEntryJSON(definitionValue.Body)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"%w: Artifact Definition body is not a canonical declaration: %w",
-			basespec.ErrReferenceUnresolved,
-			err,
-		)
-	}
-	if entry.Header().Type != declarationType {
-		return nil, fmt.Errorf(
-			"%w: Artifact Definition declaration type differs from Artifact kind",
-			basespec.ErrDigestMismatch,
-		)
-	}
-	if entry.Header().Name != string(definitionValue.LogicalName) {
-		return nil, fmt.Errorf(
-			"%w: Artifact Definition declaration name differs from logical name",
-			basespec.ErrDigestMismatch,
-		)
-	}
+	record := loaded.record
+	definitionValue := loaded.definition
+	entry := loaded.entry
+	declarationType := loaded.declarationType
 
 	if shouldResolveDeclarationLocator(
 		entry,

@@ -343,6 +343,7 @@ func Open(
 			},
 			RemovePackage:          components.removeManagedArtifactPackage,
 			RemoveProtectedPackage: components.removeProtectedManagedArtifactPackage,
+			PruneDiscoveryLocator:  components.pruneManagedDeclarationDiscovery,
 		},
 	)
 	if err != nil {

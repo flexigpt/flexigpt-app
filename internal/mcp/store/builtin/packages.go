@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path"
-	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
@@ -65,7 +64,7 @@ func PreparePackages(
 		)
 	}
 
-	roots, err := collectionPackageRoots(packages)
+	roots, err := builtin.DirectPackageRoots(packages)
 	if err != nil {
 		return nil, err
 	}
@@ -82,39 +81,6 @@ func PreparePackages(
 	if err := validatePreparedPackageIdentities(output); err != nil {
 		return nil, err
 	}
-	return output, nil
-}
-
-func collectionPackageRoots(
-	packages fs.FS,
-) ([]basespec.Locator, error) {
-	entries, err := fs.ReadDir(packages, ".")
-	if err != nil {
-		return nil, err
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf(
-			"%w: embedded MCP package filesystem has no packages",
-			basespec.ErrInvalid,
-		)
-	}
-
-	output := make([]basespec.Locator, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			return nil, fmt.Errorf(
-				"%w: embedded MCP package root contains non-directory %q",
-				basespec.ErrInvalid,
-				entry.Name(),
-			)
-		}
-		root := basespec.Locator(entry.Name())
-		if err := root.ValidatePortable(false); err != nil {
-			return nil, err
-		}
-		output = append(output, root)
-	}
-	slices.Sort(output)
 	return output, nil
 }
 
@@ -136,7 +102,10 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	document, found := packageDocument(files)
+	document, found := builtin.PackageFileContent(
+		files,
+		mcpDomain.MCPCollectionDocumentFile,
+	)
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded MCP package %q lacks %q",
@@ -178,18 +147,6 @@ func preparePackage(
 		PackageFiles:        files,
 		Expectations:        expectations,
 	}, nil
-}
-
-func packageDocument(
-	files []source.ManagedPackageFile,
-) ([]byte, bool) {
-	for _, file := range files {
-		if file.Locator != mcpDomain.MCPCollectionDocumentFile {
-			continue
-		}
-		return append([]byte(nil), file.Content...), true
-	}
-	return nil, false
 }
 
 func canonicalCollectionExpectations(

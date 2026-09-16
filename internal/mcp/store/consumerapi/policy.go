@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -111,11 +111,12 @@ func (a *API) UpsertManagedMCPPolicy(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
-	if _, err := a.ensureManagedCanonicalDiscovery(
+	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
+		decoder.JSONDecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -224,15 +225,17 @@ func (a *API) PurgeManagedMCPPolicy(
 	if err != nil {
 		return err
 	}
-	if err := a.managedArtifacts.Remove(
-		ctx,
-		artifact.RemoveArtifactRequest{
-			RootID:           record.RootID,
-			SourceID:         record.Binding.SourceID,
-			Package:          address,
-			ExpectedArtifact: &ref,
-		},
-	); err != nil {
+	removeRequest := artifact.RemoveArtifactRequest{
+		RootID:           record.RootID,
+		SourceID:         record.Binding.SourceID,
+		Package:          address,
+		ExpectedArtifact: &ref,
+	}
+	if sourceValue.StorageKey == collection.MCPManagedSourceStorageKey {
+		locator := record.Binding.Locator
+		removeRequest.PruneDiscoveryLocator = &locator
+	}
+	if err := a.managedArtifacts.Remove(ctx, removeRequest); err != nil {
 		return err
 	}
 	missing, err := a.artifacts.Get(ctx, ref)
@@ -243,19 +246,6 @@ func (a *API) PurgeManagedMCPPolicy(
 		return fmt.Errorf(
 			"%w: removed MCP Policy Artifact is not missing",
 			basespec.ErrConflict,
-		)
-	}
-	if err := manageddiscovery.RemoveLocator(
-		ctx,
-		a.sources,
-		a.discovery,
-		missing.RootID,
-		missing.Binding.SourceID,
-		missing.Binding.Locator,
-	); err != nil {
-		return fmt.Errorf(
-			"MCP Policy package was removed but discovery cleanup remains pending: %w",
-			err,
 		)
 	}
 	return a.artifacts.Purge(ctx, ref, missing.Revision)

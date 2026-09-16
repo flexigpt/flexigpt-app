@@ -3,17 +3,14 @@ package consumerapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -409,11 +406,12 @@ func (a *API) CreateManagedSkill(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
-	if _, err := a.ensureManagedSkillDiscovery(
+	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
+		skillDomain.MarkdownDecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -582,15 +580,17 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	if err := a.managedArtifacts.Remove(
-		ctx,
-		artifact.RemoveArtifactRequest{
-			RootID:           value.RootID,
-			SourceID:         value.Binding.SourceID,
-			Package:          packageAddress,
-			ExpectedArtifact: &ref,
-		},
-	); err != nil {
+	removeRequest := artifact.RemoveArtifactRequest{
+		RootID:           value.RootID,
+		SourceID:         value.Binding.SourceID,
+		Package:          packageAddress,
+		ExpectedArtifact: &ref,
+	}
+	if sourceValue.StorageKey == collection.SkillManagedSourceStorageKey {
+		locator := value.Binding.Locator
+		removeRequest.PruneDiscoveryLocator = &locator
+	}
+	if err := a.managedArtifacts.Remove(ctx, removeRequest); err != nil {
 		return err
 	}
 
@@ -604,19 +604,7 @@ func (a *API) PurgeSkill(
 			basespec.ErrConflict,
 		)
 	}
-	if err := manageddiscovery.RemoveLocator(
-		ctx,
-		a.sources,
-		a.discovery,
-		missing.RootID,
-		missing.Binding.SourceID,
-		missing.Binding.Locator,
-	); err != nil {
-		return fmt.Errorf(
-			"skill package was removed but discovery cleanup remains pending: %w",
-			err,
-		)
-	}
+
 	return a.artifacts.Purge(
 		ctx,
 		ref,
@@ -636,23 +624,12 @@ func (a *API) EnsureBuiltInSkillSourceCurrent(
 		return err
 	}
 
-	inspection, err := a.discovery.InspectSource(
+	return compositionapi.EnsureSourceCurrent(
 		ctx,
+		a.discovery,
 		rootID,
 		sourceID,
 	)
-	if errors.Is(err, basespec.ErrRefreshStateNotFound) {
-		_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
-		return err
-	}
-	if err != nil {
-		return err
-	}
-	if inspection.IsCurrent() {
-		return nil
-	}
-	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
-	return err
 }
 
 func (a *API) requireMutable(
@@ -674,67 +651,4 @@ func (a *API) requireMutable(
 		)
 	}
 	return a.protection.RequirePrivilegedInstaller(ctx)
-}
-
-func (a *API) ensureManagedSkillDiscovery(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) (source.Summary, error) {
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if value.Kind != source.SourceKindManagedDirectory {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed Skill Source must have kind %q",
-			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
-		)
-	}
-	if !value.Enabled {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed Skill Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
-	next := value.Discovery.Clone()
-	inScope, err := next.InScope(locator)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(
-			next.ExplicitLocators,
-			locator,
-		)
-	}
-	next.Authoritative = true
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(
-			next.AllowedDecoderIDs,
-			skillDomain.MarkdownDecoderID,
-		) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			skillDomain.MarkdownDecoderID,
-		)
-	}
-	next = next.Normalized()
-	if value.Discovery.Equal(next) {
-		return value, nil
-	}
-	return a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      value.DisplayName,
-			Enabled:          value.Enabled,
-			Discovery:        &next,
-		},
-	)
 }

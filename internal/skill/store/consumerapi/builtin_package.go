@@ -3,11 +3,9 @@ package consumerapi
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -105,14 +103,6 @@ func (a *API) InstallBuiltInSkillPackage(
 		request.DocumentFile,
 	)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := a.ensureManagedBuiltinSkillCollectionDiscovery(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		documentLocator,
-	); err != nil {
 		return nil, err
 	}
 
@@ -356,73 +346,4 @@ func normalizeBuiltInSkillPackageExpectations(
 		return output[left].Kind < output[right].Kind
 	})
 	return output, r, nil
-}
-
-func (a *API) ensureManagedBuiltinSkillCollectionDiscovery(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) (source.Summary, error) {
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if value.Kind != source.SourceKindManagedDirectory {
-		return source.Summary{}, fmt.Errorf(
-			"%w: built-in Skill Source must have kind %q",
-			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
-		)
-	}
-	if !value.Enabled {
-		return source.Summary{}, fmt.Errorf(
-			"%w: built-in Skill Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
-	next := value.Discovery.Clone()
-	inScope, err := next.InScope(locator)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(
-			next.ExplicitLocators,
-			locator,
-		)
-	}
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(
-			next.AllowedDecoderIDs,
-			decoder.YAMLDecoderID,
-		) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			decoder.YAMLDecoderID,
-		)
-	}
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	if value.Discovery.Equal(next) {
-		return value, nil
-	}
-
-	// Do not add the SKILL.md decoder here. "collection.yaml" is the sole
-	// declaration origin for this package. SKILL.md files are source-backed
-	// resources reached through the nested Skill path locators.
-	return a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      value.DisplayName,
-			Enabled:          value.Enabled,
-			Discovery:        &next,
-		},
-	)
 }

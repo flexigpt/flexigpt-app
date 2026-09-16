@@ -10,10 +10,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -144,16 +146,18 @@ func (a *API) EnsureBaseline(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	if err := a.ensureCollectionDiscovery(
+	if _, err := a.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceValue.ID,
 		locator,
+		decoder.JSONDecoderID,
 	); err != nil {
 		return CollectionView{}, err
 	}
-	if err := a.ensureCollectionSourceCurrent(
+	if err := compositionapi.EnsureSourceCurrent(
 		ctx,
+		a.discovery,
 		rootID,
 		sourceValue.ID,
 	); err != nil {
@@ -222,23 +226,6 @@ func (a *API) EnsureBaseline(
 		},
 		true,
 	)
-}
-
-func (a *API) ensureCollectionSourceCurrent(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) error {
-	inspection, err := a.discovery.InspectSource(ctx, rootID, sourceID)
-	if err == nil && inspection.IsCurrent() {
-		return nil
-	}
-	if err != nil &&
-		!errors.Is(err, basespec.ErrRefreshStateNotFound) {
-		return err
-	}
-	_, err = a.discovery.RefreshSource(ctx, rootID, sourceID)
-	return err
 }
 
 func (a *API) domainManagedSource(

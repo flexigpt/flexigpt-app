@@ -11,14 +11,12 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"slices"
 	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -544,16 +542,18 @@ func (a *API) Delete(
 		)
 	}
 
-	if err := a.managedArtifacts.Remove(
-		ctx,
-		artifact.RemoveArtifactRequest{
-			RootID:             value.artifact.RootID,
-			SourceID:           value.artifact.Binding.SourceID,
-			Package:            value.address,
-			ExpectedArtifact:   &request.Collection,
-			ExpectedGeneration: value.generation,
-		},
-	); err != nil {
+	removeRequest := artifact.RemoveArtifactRequest{
+		RootID:             value.artifact.RootID,
+		SourceID:           value.artifact.Binding.SourceID,
+		Package:            value.address,
+		ExpectedArtifact:   &request.Collection,
+		ExpectedGeneration: value.generation,
+	}
+	if a.domain != nil {
+		locator := value.artifact.Binding.Locator
+		removeRequest.PruneDiscoveryLocator = &locator
+	}
+	if err := a.managedArtifacts.Remove(ctx, removeRequest); err != nil {
 		return err
 	}
 
@@ -567,19 +567,7 @@ func (a *API) Delete(
 			basespec.ErrConflict,
 		)
 	}
-	if err := manageddiscovery.RemoveLocator(
-		ctx,
-		a.sources,
-		a.discovery,
-		missing.RootID,
-		missing.Binding.SourceID,
-		missing.Binding.Locator,
-	); err != nil {
-		return fmt.Errorf(
-			"collection package was removed but discovery cleanup remains pending: %w",
-			err,
-		)
-	}
+
 	return a.artifacts.Purge(
 		ctx,
 		request.Collection,
@@ -838,11 +826,12 @@ func (a *API) publishDocument(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	if err := a.ensureCollectionDiscovery(
+	if _, err := a.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
+		decoder.JSONDecoderID,
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -875,67 +864,6 @@ func (a *API) publishDocument(
 		return artifact.Artifact{}, err
 	}
 	return published.Artifact, nil
-}
-
-func (a *API) ensureCollectionDiscovery(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) error {
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return err
-	}
-	if value.Kind != source.SourceKindManagedDirectory {
-		return fmt.Errorf(
-			"%w: editable Collection Source must have kind %q",
-			basespec.ErrUnsupported,
-			source.SourceKindManagedDirectory,
-		)
-	}
-	if !value.Enabled {
-		return fmt.Errorf(
-			"%w: editable Collection Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
-	next := value.Discovery.Clone()
-	inScope, err := next.InScope(locator)
-	if err != nil {
-		return err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(next.ExplicitLocators, locator)
-	}
-	next.Authoritative = true
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(next.AllowedDecoderIDs, decoder.JSONDecoderID) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			decoder.JSONDecoderID,
-		)
-	}
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
-		return err
-	}
-	if value.Discovery.Equal(next) {
-		return nil
-	}
-	_, err = a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      value.DisplayName,
-			Enabled:          value.Enabled,
-			Discovery:        &next,
-		},
-	)
-	return err
 }
 
 func (a *API) loadEditableCollection(

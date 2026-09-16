@@ -42,6 +42,18 @@ type RemovePackageFunc func(
 	expectedGeneration string,
 ) (SourceState, error)
 
+// PruneDiscoveryLocatorFunc updates managed Source discovery after physical
+// package removal and before the managed Artifact service performs its final
+// refresh. The callback is optional because some packages emit multiple
+// declaration origins or are discovered through directory scopes.
+type PruneDiscoveryLocatorFunc func(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	expectedSourceRevision uint64,
+	locator basespec.Locator,
+) (SourceState, error)
+
 type ArtifactCommands interface {
 	Get(
 		ctx context.Context,
@@ -80,6 +92,7 @@ type Dependencies struct {
 	PublishProtectedPackage PublishPackageFunc
 	RemovePackage           RemovePackageFunc
 	RemoveProtectedPackage  RemovePackageFunc
+	PruneDiscoveryLocator   PruneDiscoveryLocatorFunc
 }
 
 type Service struct {
@@ -289,6 +302,17 @@ func (s *Service) Remove(
 			)
 		}
 	}
+	if request.PruneDiscoveryLocator != nil {
+		if err := request.PruneDiscoveryLocator.Validate(false); err != nil {
+			return err
+		}
+		if s.dependencies.PruneDiscoveryLocator == nil {
+			return fmt.Errorf(
+				"%w: managed discovery locator pruning is unavailable",
+				basespec.ErrUnsupported,
+			)
+		}
+	}
 	if err := s.requireMutable(
 		ctx,
 		request.RootID,
@@ -320,31 +344,73 @@ func (s *Service) Remove(
 		state,
 		request.RootID,
 		request.SourceID,
-		false,
+		true,
 	); err != nil {
 		return err
 	}
+	if request.PruneDiscoveryLocator != nil &&
+		!state.Source.Discovery.Authoritative {
+		return fmt.Errorf(
+			"%w: managed discovery locator pruning requires an authoritative Source",
+			basespec.ErrInvalid,
+		)
+	}
+
 	remove := s.dependencies.RemovePackage
 	if request.AllowProtected {
 		remove = s.dependencies.RemoveProtectedPackage
 	}
-	if _, err := remove(
+	removed, err := remove(
 		ctx,
 		request.RootID,
 		request.SourceID,
 		state.Source.Revision,
 		request.Package,
 		expectedGeneration,
+	)
+	if err != nil {
+		return err
+	}
+	if err := validateManagedSourceState(
+		removed,
+		request.RootID,
+		request.SourceID,
+		true,
 	); err != nil {
 		return err
 	}
+	if request.PruneDiscoveryLocator != nil {
+		removed, err = s.dependencies.PruneDiscoveryLocator(
+			ctx,
+			request.RootID,
+			request.SourceID,
+			removed.Source.Revision,
+			*request.PruneDiscoveryLocator,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"prune managed declaration discovery locator: %w",
+				err,
+			)
+		}
+		if err := validateManagedSourceState(
+			removed,
+			request.RootID,
+			request.SourceID,
+			true,
+		); err != nil {
+			return err
+		}
+	}
 
-	if _, err := s.dependencies.Refresh.RefreshSource(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	); err != nil {
-		return err
+	if !removed.Source.Discovery.Empty() {
+		if _, err := s.dependencies.Refresh.RefreshSource(
+			ctx,
+			request.RootID,
+			request.SourceID,
+		); err != nil {
+			return err
+		}
 	}
 	if request.ExpectedArtifact == nil {
 		return nil

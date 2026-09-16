@@ -3,15 +3,12 @@ package consumerapi
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/manageddiscovery"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -86,11 +83,12 @@ func (a *API) CreateManagedMCP(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
-	if _, err := a.ensureManagedCanonicalDiscovery(
+	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
+		decoder.JSONDecoderID,
 	); err != nil {
 		return result, err
 	}
@@ -200,18 +198,19 @@ func (a *API) PurgeManagedMCP(
 		return err
 	}
 
-	if err := a.managedArtifacts.Remove(
-		ctx,
-		artifact.RemoveArtifactRequest{
-			RootID:           record.RootID,
-			SourceID:         record.Binding.SourceID,
-			Package:          address,
-			ExpectedArtifact: &ref,
-		},
-	); err != nil {
+	removeRequest := artifact.RemoveArtifactRequest{
+		RootID:           record.RootID,
+		SourceID:         record.Binding.SourceID,
+		Package:          address,
+		ExpectedArtifact: &ref,
+	}
+	if sourceValue.StorageKey == collection.MCPManagedSourceStorageKey {
+		locator := record.Binding.Locator
+		removeRequest.PruneDiscoveryLocator = &locator
+	}
+	if err := a.managedArtifacts.Remove(ctx, removeRequest); err != nil {
 		return err
 	}
-
 	missing, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
 		return err
@@ -233,78 +232,6 @@ func (a *API) PurgeManagedMCP(
 	); err != nil {
 		return err
 	}
-	if err := manageddiscovery.RemoveLocator(
-		ctx,
-		a.sources,
-		a.discovery,
-		missing.RootID,
-		missing.Binding.SourceID,
-		missing.Binding.Locator,
-	); err != nil {
-		return fmt.Errorf(
-			"MCP package was removed but discovery cleanup remains pending: %w",
-			err,
-		)
-	}
+
 	return a.artifacts.Purge(ctx, ref, missing.Revision)
-}
-
-func (a *API) ensureManagedCanonicalDiscovery(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) (source.Summary, error) {
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if value.Kind != source.SourceKindManagedDirectory {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed MCP Source must have kind %q",
-			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
-		)
-	}
-	if !value.Enabled {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed MCP Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
-	next := value.Discovery.Clone()
-	inScope, err := next.InScope(locator)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(next.ExplicitLocators, locator)
-	}
-	next.Authoritative = true
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(next.AllowedDecoderIDs, decoder.JSONDecoderID) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			decoder.JSONDecoderID,
-		)
-	}
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	if value.Discovery.Equal(next) {
-		return value, nil
-	}
-	return a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      value.DisplayName,
-			Enabled:          value.Enabled,
-			Discovery:        &next,
-		},
-	)
 }
