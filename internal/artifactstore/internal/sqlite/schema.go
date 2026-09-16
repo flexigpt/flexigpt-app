@@ -1,5 +1,7 @@
 package sqlite
 
+const topologyPackageHydrationTable = "artifact_topology_package_hydrations"
+
 // schema is the complete Artifact Store metadata schema for the direct v3
 // Root-scoped model.
 const sqliteSchema = `
@@ -26,6 +28,16 @@ CREATE TABLE artifact_topology_hydrations (
 	source_id TEXT NOT NULL,
 	fingerprint TEXT NOT NULL,
 	updated_at INTEGER NOT NULL
+);
+
+CREATE TABLE artifact_topology_package_hydrations (
+	installer_name TEXT NOT NULL,
+	package_scope TEXT NOT NULL,
+	root_id TEXT NOT NULL,
+	source_id TEXT NOT NULL,
+	fingerprint TEXT NOT NULL,
+	updated_at INTEGER NOT NULL,
+	PRIMARY KEY (installer_name, package_scope)
 );
 
 CREATE TABLE artifact_sources (

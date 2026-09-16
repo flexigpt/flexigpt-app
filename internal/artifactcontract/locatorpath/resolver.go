@@ -6,7 +6,6 @@ package locatorpath
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"path"
 	"slices"
@@ -14,7 +13,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
@@ -157,12 +155,9 @@ func (r *boundResolver) ResolveLocator(
 		return artifact.ArtifactRef{}, err
 	}
 
-	candidates, err := r.ensureDiscovered(
-		ctx,
-		request.RootID,
-		*request.From,
-		target,
+	candidates, err := r.indexedCandidates(
 		request.ExpectedKind,
+		target,
 	)
 	if err != nil {
 		return artifact.ArtifactRef{}, err
@@ -170,96 +165,15 @@ func (r *boundResolver) ResolveLocator(
 	return r.selectArtifact(ctx, request, candidates)
 }
 
-func (r *boundResolver) ensureDiscovered(
-	ctx context.Context,
-	rootID root.RootID,
-	origin artifact.Artifact,
-	target basespec.Locator,
+// indexedCandidates resolves only against the current Source index. Discovery
+// expansion belongs to an explicit source activation or Workspace refresh.
+func (r *boundResolver) indexedCandidates(
 	expectedKind artifact.ArtifactKind,
+	target basespec.Locator,
 ) ([]basespec.Locator, error) {
-	targets, err := declarationCandidateLocators(
+	return declarationCandidateLocators(
 		target,
 		expectedKind,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	for range 3 {
-		current, err := r.runtime.GetSource(
-			ctx,
-			rootID,
-			origin.Binding.SourceID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if !current.Enabled {
-			return nil, fmt.Errorf(
-				"%w: declaration Source %q is disabled",
-				basespec.ErrSourceUnavailable,
-				current.ID,
-			)
-		}
-
-		next := current.Discovery.Clone()
-		candidates := make([]basespec.Locator, 0, len(targets))
-		for _, candidateTarget := range targets {
-			plannedNext, planned, err := r.planner.PlanPath(
-				candidateTarget,
-				next,
-			)
-			if err != nil {
-				return nil, err
-			}
-			next = plannedNext
-			for _, locator := range planned {
-				if err := locator.Validate(false); err != nil {
-					return nil, err
-				}
-				if !slices.Contains(candidates, locator) {
-					candidates = append(candidates, locator)
-				}
-			}
-		}
-
-		next = next.Normalized()
-		if err := next.Validate(); err != nil {
-			return nil, err
-		}
-
-		if !current.Discovery.Equal(next) {
-			current, err = r.runtime.UpdateSource(
-				ctx,
-				rootID,
-				current.ID,
-				source.Update{
-					ExpectedRevision: current.Revision,
-					DisplayName:      current.DisplayName,
-					Enabled:          current.Enabled,
-					Discovery:        &next,
-				},
-			)
-			if errors.Is(err, basespec.ErrConflict) {
-				continue
-			}
-			if err != nil {
-				return nil, err
-			}
-		}
-
-		if _, err := r.runtime.RefreshSource(
-			ctx,
-			rootID,
-			current.ID,
-		); err != nil {
-			return nil, err
-		}
-		return candidates, nil
-	}
-	return nil, fmt.Errorf(
-		"%w: declaration Source changed during path locator resolution",
-		basespec.ErrConflict,
 	)
 }
 
@@ -300,6 +214,13 @@ func (r *boundResolver) selectArtifact(
 		return artifact.ArtifactRef{}, err
 	}
 
+	serverSubresource, hasServerSelector, err := requestedMCPServerSubresource(
+		request,
+	)
+	if err != nil {
+		return artifact.ArtifactRef{}, err
+	}
+
 	selectedLocators := make(map[basespec.Locator]struct{}, len(locators))
 	for _, locator := range locators {
 		selectedLocators[locator] = struct{}{}
@@ -316,6 +237,10 @@ func (r *boundResolver) selectArtifact(
 		}
 		if request.ExpectedLogicalName != "" &&
 			record.LogicalName != request.ExpectedLogicalName {
+			continue
+		}
+		if hasServerSelector &&
+			record.Binding.SubresourceLocator != serverSubresource {
 			continue
 		}
 		candidates = append(candidates, record)
@@ -339,6 +264,44 @@ func (r *boundResolver) selectArtifact(
 			request.ExpectedKind,
 		)
 	}
+}
+
+func requestedMCPServerSubresource(
+	request providerapi.LocatorResolutionRequest,
+) (basespec.SubresourceLocator, bool, error) {
+	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeMCP) ||
+		len(request.EntryJSON) == 0 {
+		return "", false, nil
+	}
+
+	entry, err := declaration.DecodeEntryJSON(request.EntryJSON)
+	if err != nil {
+		return "", false, err
+	}
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return "", false, err
+	}
+	var selector struct {
+		Server string `json:"server"`
+	}
+	if err := json.Unmarshal(raw, &selector); err != nil {
+		return "", false, err
+	}
+	if selector.Server == "" {
+		return "", false, nil
+	}
+	if err := basespec.LogicalName(selector.Server).Validate(); err != nil {
+		return "", false, err
+	}
+
+	value := basespec.SubresourceLocator(
+		"mcpServers/" + selector.Server,
+	)
+	if err := value.Validate(); err != nil {
+		return "", false, err
+	}
+	return value, true, nil
 }
 
 type canonicalDeclarationPlanner struct{}

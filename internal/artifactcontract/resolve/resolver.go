@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
@@ -89,6 +90,7 @@ func (r *Resolver) resolveInlineGraph(
 		nil,
 		0,
 		nil,
+		false,
 	)
 	if err != nil {
 		return Graph{}, err
@@ -379,6 +381,7 @@ func (r *Resolver) resolveEntry(
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
+	compositionEntry bool,
 ) (*ResolvedEntry, error) {
 	if err := entry.Validate(); err != nil {
 		return nil, err
@@ -389,6 +392,13 @@ func (r *Resolver) resolveEntry(
 		return nil, err
 	}
 	header := entry.Header()
+	if compositionEntry &&
+		header.Type == declaration.TypeWorkspace {
+		return nil, fmt.Errorf(
+			"%w: Workspace declarations cannot be nested in composition",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
 	if form == declaration.CompositionEntryReference {
 		if header.Locator != nil {
 			return r.resolveDeclarationLocator(
@@ -735,21 +745,31 @@ func (r *Resolver) resolveStructure(
 		if err != nil {
 			return err
 		}
+		nodes := append([]workflowv1.Node(nil), value.Nodes...)
+		sort.SliceStable(nodes, func(left, right int) bool {
+			return nodes[left].ID < nodes[right].ID
+		})
+		edges := append([]workflowv1.Edge(nil), value.Edges...)
+		sort.SliceStable(edges, func(left, right int) bool {
+			return workflowEdgeKey(edges[left]) < workflowEdgeKey(edges[right])
+		})
+		start := append([]string(nil), value.Start...)
+		sort.Strings(start)
 		workflow := &ResolvedWorkflow{
-			Start: append([]string(nil), value.Start...),
+			Start: start,
 			Nodes: make(
 				[]ResolvedWorkflowNode,
 				0,
-				len(value.Nodes),
+				len(nodes),
 			),
 			Edges: make(
 				[]ResolvedWorkflowEdge,
 				0,
-				len(value.Edges),
+				len(edges),
 			),
 		}
 		node.Workflow = workflow
-		for _, workflowNode := range value.Nodes {
+		for _, workflowNode := range nodes {
 			target, err := r.resolveRelationship(
 				ctx,
 				state,
@@ -776,7 +796,7 @@ func (r *Resolver) resolveStructure(
 				},
 			)
 		}
-		for _, edge := range value.Edges {
+		for _, edge := range edges {
 			output := ResolvedWorkflowEdge{
 				From: edge.From,
 				To:   edge.To,
@@ -825,9 +845,16 @@ func (r *Resolver) resolveEntries(
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
 ) ([]*ResolvedEntry, []ResolvedRelationship, error) {
-	available := make([]*ResolvedEntry, 0, len(values))
-	relationships := make([]ResolvedRelationship, 0, len(values))
-	for _, value := range values {
+	ordered, err := declaration.SortedCompositionEntries(
+		"composition entries",
+		values,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	available := make([]*ResolvedEntry, 0, len(ordered))
+	relationships := make([]ResolvedRelationship, 0, len(ordered))
+	for _, value := range ordered {
 		relationship, err := r.resolveRelationship(
 			ctx,
 			state,
@@ -868,6 +895,7 @@ func (r *Resolver) resolveRelationship(
 		from,
 		depth,
 		implicitLoopOwner,
+		true,
 	)
 	if err == nil {
 		relationship.Status = ResolutionAvailable
@@ -930,6 +958,16 @@ func resolutionFailure(
 			true
 	}
 	return "", ResolutionIssue{}, false
+}
+
+func workflowEdgeKey(
+	value workflowv1.Edge,
+) string {
+	match := ""
+	if value.Match != nil {
+		match = value.Match.Pointer + "\x00" + string(value.Match.Schema)
+	}
+	return value.From + "\x00" + value.To + "\x00" + match
 }
 
 func (r *Resolver) reserve(

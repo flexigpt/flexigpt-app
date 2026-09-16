@@ -78,6 +78,7 @@ func New(
 		discovery,
 		artifacts,
 		managedArtifacts,
+		collection.MCPDomainPolicy(),
 	)
 	if err != nil {
 		return nil, err

@@ -237,6 +237,12 @@ func validateEntryTreeSlice(
 	entries []declaration.Entry,
 	depth int,
 ) error {
+	if err := declaration.ValidateContainedEntryUniqueness(
+		label,
+		entries,
+	); err != nil {
+		return err
+	}
 	for index, entry := range entries {
 		if err := validateEntryTree(
 			entry,

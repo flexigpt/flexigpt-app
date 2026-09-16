@@ -62,9 +62,8 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	fingerprint, err := hydrationFingerprint(
+	fingerprint, err := topologyHydrationFingerprint(
 		topologyValue,
-		prepared,
 	)
 	if err != nil {
 		return nil, err

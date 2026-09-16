@@ -122,6 +122,17 @@ func (w *MCPStoreWrapper) UpsertManagedMCPPolicy(
 	)
 }
 
+func (w *MCPStoreWrapper) EnsureMCPBaselineCollection(
+	rootID root.RootID,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.EnsureMCPBaselineCollection(
+			context.Background(),
+			rootID,
+		)
+	})
+}
+
 func (w *MCPStoreWrapper) CreateManagedMCP(
 	request mcpConsumerAPI.ManagedMCPCreateRequest,
 ) (mcpConsumerAPI.ManagedMCPCreateResult, error) {

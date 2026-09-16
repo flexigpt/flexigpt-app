@@ -42,10 +42,28 @@ type HydrationInstaller interface {
 	FinalizeHydration(ctx context.Context) error
 }
 
+type PackageHydrationInstaller interface {
+	HydrationInstaller
+
+	DesiredPackageHydrations(
+		ctx context.Context,
+	) ([]topology.PackageHydration, error)
+
+	EnsurePackageHydration(
+		ctx context.Context,
+		topologyCurrent bool,
+		current map[topology.PackageHydrationKey]bool,
+		stale []topology.PackageHydration,
+	) error
+}
+
 type preparedHydration struct {
-	installer string
-	desired   topology.Hydration
-	current   bool
+	installer      string
+	desired        topology.Hydration
+	current        bool
+	packages       []topology.PackageHydration
+	stale          []topology.PackageHydration
+	packageCurrent map[topology.PackageHydrationKey]bool
 }
 
 type registeredInstaller struct {
@@ -204,6 +222,35 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		})
 	}
 
+	packageCoordinator, packageAware := r.hydrator.(topology.PackageHydrationCoordinator)
+	if packageAware {
+		desiredPackages := make([]topology.PackageHydration, 0)
+		for _, entry := range entries {
+			installer, supported := entry.installer.(PackageHydrationInstaller)
+			if !supported {
+				continue
+			}
+			values, err := installer.DesiredPackageHydrations(ctx)
+			if err != nil {
+				return fmt.Errorf(
+					"build package hydration for installer %q: %w",
+					entry.name,
+					err,
+				)
+			}
+			desiredPackages = append(desiredPackages, values...)
+			for index := range prepared {
+				if prepared[index].installer == entry.name {
+					prepared[index].packages = values
+					break
+				}
+			}
+		}
+		if _, err := topology.NormalizePackageHydrations(desiredPackages); err != nil {
+			return err
+		}
+	}
+
 	if len(prepared) != 0 {
 		desiredValues := make([]topology.Hydration, 0, len(prepared))
 		for _, value := range prepared {
@@ -231,6 +278,41 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			prepared[index].current = current
 		}
 	}
+	if packageAware {
+		desiredPackages := make([]topology.PackageHydration, 0)
+		for _, value := range prepared {
+			desiredPackages = append(desiredPackages, value.packages...)
+		}
+		preparation, err := packageCoordinator.PrepareTopologyPackageHydrations(
+			ctx,
+			desiredPackages,
+		)
+		if err != nil {
+			return fmt.Errorf("prepare package hydrations: %w", err)
+		}
+		for index := range prepared {
+			prepared[index].packageCurrent = make(
+				map[topology.PackageHydrationKey]bool,
+			)
+			for _, value := range prepared[index].packages {
+				prepared[index].packageCurrent[value.Key] = preparation.CurrentFor(value.Key)
+			}
+			for _, stale := range preparation.Stale {
+				if stale.Key.InstallerName != prepared[index].installer {
+					continue
+				}
+				prepared[index].stale = append(
+					prepared[index].stale,
+					stale,
+				)
+			}
+			if !prepared[index].current {
+				for key := range prepared[index].packageCurrent {
+					prepared[index].packageCurrent[key] = false
+				}
+			}
+		}
+	}
 
 	if _, err := r.topology.EnsureProtectedTopology(
 		ctx,
@@ -240,6 +322,24 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	}
 	for _, entry := range entries {
 		hydrated, supported := entry.installer.(HydrationInstaller)
+		if packageInstaller, packageSupported := entry.installer.(PackageHydrationInstaller); packageSupported {
+			var preparedValue preparedHydration
+			for _, value := range prepared {
+				if value.installer == entry.name {
+					preparedValue = value
+					break
+				}
+			}
+			if err := packageInstaller.EnsurePackageHydration(
+				ctx,
+				preparedValue.current,
+				preparedValue.packageCurrent,
+				preparedValue.stale,
+			); err != nil {
+				return fmt.Errorf("ensure built-in installer %q: %w", entry.name, err)
+			}
+			continue
+		}
 		if supported {
 			var current bool
 			for _, value := range prepared {
@@ -315,6 +415,31 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 				value.installer,
 				err,
 			)
+		}
+	}
+	if packageAware {
+		for _, value := range prepared {
+			for _, packageValue := range value.packages {
+				if value.packageCurrent[packageValue.Key] {
+					continue
+				}
+				if err := packageCoordinator.CommitTopologyPackageHydration(
+					ctx,
+					packageValue,
+				); err != nil {
+					return fmt.Errorf(
+						"commit package hydration %q/%q: %w",
+						packageValue.Key.InstallerName,
+						packageValue.Key.Scope,
+						err,
+					)
+				}
+			}
+			for _, stale := range value.stale {
+				if err := packageCoordinator.DeleteTopologyPackageHydration(ctx, stale); err != nil {
+					return fmt.Errorf("delete stale package hydration: %w", err)
+				}
+			}
 		}
 	}
 	return nil

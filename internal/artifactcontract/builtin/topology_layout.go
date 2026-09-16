@@ -124,7 +124,6 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 					IncludePatterns: []string{
 						"**/collection.yaml",
 						"**/SKILL.md",
-						"**/declarations/**/*.json",
 					},
 				}},
 				Authoritative: true,

@@ -24,7 +24,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
@@ -42,6 +41,7 @@ type API struct {
 	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
+	domain           *DomainPolicy
 }
 
 func New(
@@ -49,6 +49,7 @@ func New(
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
+	domains ...DomainPolicy,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
@@ -59,12 +60,30 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
-	return &API{
+	if len(domains) > 1 {
+		return nil, fmt.Errorf(
+			"%w: Collection API has multiple domain policies",
+			basespec.ErrInvalid,
+		)
+	}
+	output := &API{
 		sources:          sources,
 		discovery:        discovery,
 		artifacts:        artifacts,
 		managedArtifacts: managedArtifacts,
-	}, nil
+	}
+	if len(domains) == 1 {
+		value := domains[0]
+		if err := value.Validate(); err != nil {
+			return nil, err
+		}
+		value.AllowedMemberTypes = append(
+			[]declaration.Type(nil),
+			value.AllowedMemberTypes...,
+		)
+		output.domain = &value
+	}
+	return output, nil
 }
 
 type CollectionView struct {
@@ -73,6 +92,19 @@ type CollectionView struct {
 	Description string                  `json:"description,omitempty"`
 	Version     basespec.LogicalVersion `json:"version,omitempty"`
 	Members     []MemberReference       `json:"members"`
+	Entries     []CollectionMemberView  `json:"entries"`
+	Editable    bool                    `json:"editable"`
+	Deletable   bool                    `json:"deletable"`
+	Baseline    bool                    `json:"baseline"`
+}
+
+type CollectionMemberView struct {
+	Type        declaration.Type     `json:"type"`
+	Name        basespec.LogicalName `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Locator     *declaration.Locator `json:"locator,omitempty"`
+	Server      basespec.LogicalName `json:"server,omitempty"`
+	Contained   bool                 `json:"contained"`
 }
 
 // MemberReference is an external Collection membership edge. It intentionally
@@ -137,145 +169,11 @@ type editableCollection struct {
 	generation string
 }
 
-func EnsureUserManagedArtifactSource(
-	ctx context.Context,
-	sources compositionapi.SourceAPI,
-	rootID root.RootID,
-	displayName string,
-) (source.Summary, error) {
-	if sources == nil {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed Artifact Source API is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	if displayName == "" {
-		displayName = UserManagedArtifactSourceDisplayName
-	}
-	if err := basespec.ValidateRequiredText(
-		"managed Artifact Source display name",
-		displayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return source.Summary{}, err
-	}
-
-	value, _, err := sources.Ensure(
-		ctx,
-		rootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  UserManagedArtifactSourceStorageKey,
-			Kind:        source.SourceKindManagedDirectory,
-			DisplayName: displayName,
-			Enabled:     true,
-			Config:      json.RawMessage(`{}`),
-			Discovery:   source.DiscoverySpec{},
-		},
-	)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if value.Enabled && value.DisplayName == displayName {
-		return value, nil
-	}
-	return sources.Update(
-		ctx,
-		rootID,
-		value.ID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      displayName,
-			Enabled:          true,
-		},
-	)
-}
-
 func (a *API) Create(
 	ctx context.Context,
 	request CreateRequest,
 ) (CollectionView, error) {
-	if a == nil {
-		return CollectionView{}, basespec.ErrClosed
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return CollectionView{}, err
-	}
-	if err := request.Name.Validate(); err != nil {
-		return CollectionView{}, err
-	}
-
-	sourceValue, err := a.managedSource(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	)
-	if err != nil {
-		return CollectionView{}, err
-	}
-	address, err := managedCollectionAddress(request.Name)
-	if err != nil {
-		return CollectionView{}, err
-	}
-	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
-	if err != nil {
-		return CollectionView{}, err
-	}
-
-	document := collectionv1.CollectionDocument{
-		APIVersion:  collectionv1.CollectionSchemaVersion,
-		Type:        collectionv1.CollectionType,
-		Name:        string(request.Name),
-		Description: request.Description,
-	}
-	_, digest, err := collectionDocumentPayload(document)
-	if err != nil {
-		return CollectionView{}, err
-	}
-
-	existing, err := a.artifacts.FindByOrigin(
-		ctx,
-		request.RootID,
-		artifact.SourceBinding{
-			SourceID: sourceValue.ID,
-			Locator:  locator,
-		},
-		artifact.ArtifactKind(collectionv1.CollectionType),
-	)
-	switch {
-	case err == nil:
-		if existing.State == artifact.StateAvailable &&
-			existing.ResolvedDefinition != nil &&
-			*existing.ResolvedDefinition == digest {
-			return a.Get(ctx, existing.Ref())
-		}
-		return CollectionView{}, fmt.Errorf(
-			"%w: managed Collection %q already exists",
-			basespec.ErrConflict,
-			request.Name,
-		)
-
-	case errors.Is(err, basespec.ErrArtifactNotFound),
-		errors.Is(err, basespec.ErrNotFound):
-	default:
-		return CollectionView{}, err
-	}
-
-	record, err := a.publishDocument(
-		ctx,
-		request.RootID,
-		sourceValue.ID,
-		address,
-		document,
-		"",
-	)
-	if err != nil {
-		return CollectionView{}, err
-	}
-	return collectionViewOf(record, document)
+	return a.create(ctx, request, false)
 }
 
 func (a *API) Get(
@@ -529,6 +427,11 @@ func (a *API) MemberForCollectionSource(
 	if err := declarationType.Validate(); err != nil {
 		return MemberReference{}, err
 	}
+	if err := a.validateDomainMember(MemberReference{
+		Type: declarationType,
+	}); err != nil {
+		return MemberReference{}, err
+	}
 	if err := name.Validate(); err != nil {
 		return MemberReference{}, err
 	}
@@ -576,6 +479,13 @@ func (a *API) Delete(
 	if err != nil {
 		return err
 	}
+	if IsBaselineCollectionArtifact(value.artifact) {
+		return fmt.Errorf(
+			"%w: baseline Collection %q cannot be deleted",
+			basespec.ErrProtected,
+			value.artifact.LogicalName,
+		)
+	}
 	if len(value.document.Members) != 0 {
 		return fmt.Errorf(
 			"%w: Collection %q has %d direct members; detach them before deletion",
@@ -615,6 +525,100 @@ func (a *API) Delete(
 	)
 }
 
+func (a *API) create(
+	ctx context.Context,
+	request CreateRequest,
+	allowBaseline bool,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if err := request.RootID.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+	if err := request.Name.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+	if a.domain != nil &&
+		request.Name == a.domain.BaselineName &&
+		!allowBaseline {
+		return CollectionView{}, fmt.Errorf(
+			"%w: baseline Collection %q is application-provisioned",
+			basespec.ErrProtected,
+			request.Name,
+		)
+	}
+
+	sourceValue, err := a.managedSource(
+		ctx,
+		request.RootID,
+		request.SourceID,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	address, err := managedCollectionAddress(request.Name)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	if err != nil {
+		return CollectionView{}, err
+	}
+
+	document := collectionv1.CollectionDocument{
+		APIVersion:  collectionv1.CollectionSchemaVersion,
+		Type:        collectionv1.CollectionType,
+		Name:        string(request.Name),
+		Description: request.Description,
+	}
+	_, digest, err := collectionDocumentPayload(document)
+	if err != nil {
+		return CollectionView{}, err
+	}
+
+	existing, err := a.artifacts.FindByOrigin(
+		ctx,
+		request.RootID,
+		artifact.SourceBinding{
+			SourceID: sourceValue.ID,
+			Locator:  locator,
+		},
+		artifact.ArtifactKind(collectionv1.CollectionType),
+	)
+	switch {
+	case err == nil:
+		if existing.State == artifact.StateAvailable &&
+			existing.ResolvedDefinition != nil &&
+			*existing.ResolvedDefinition == digest {
+			return a.Get(ctx, existing.Ref())
+		}
+		return CollectionView{}, fmt.Errorf(
+			"%w: managed Collection %q already exists",
+			basespec.ErrConflict,
+			request.Name,
+		)
+
+	case errors.Is(err, basespec.ErrArtifactNotFound),
+		errors.Is(err, basespec.ErrNotFound):
+	default:
+		return CollectionView{}, err
+	}
+
+	record, err := a.publishDocument(
+		ctx,
+		request.RootID,
+		sourceValue.ID,
+		address,
+		document,
+		"",
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return collectionViewOf(record, document)
+}
+
 func (a *API) mutateMember(
 	ctx context.Context,
 	request AddMemberRequest,
@@ -630,6 +634,9 @@ func (a *API) mutateMember(
 		)
 	}
 
+	if err := a.validateDomainMember(request.Member); err != nil {
+		return MemberMutationResult{}, err
+	}
 	member, err := request.Member.entry()
 	if err != nil {
 		return MemberMutationResult{}, err
@@ -699,13 +706,8 @@ func (a *API) managedSource(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) (source.Summary, error) {
-	if sourceID == "" {
-		return EnsureUserManagedArtifactSource(
-			ctx,
-			a.sources,
-			rootID,
-			"",
-		)
+	if a.domain != nil {
+		return a.domainManagedSource(ctx, rootID, sourceID)
 	}
 
 	value, err := a.sources.Get(ctx, rootID, sourceID)
@@ -899,6 +901,13 @@ func (a *API) loadEditableCollection(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
+	if a.domain != nil &&
+		sourceValue.StorageKey != a.domain.SourceStorageKey {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Collection belongs to another managed domain Source",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
 
 	address, err := managedCollectionAddressFromLocator(
 		record.Binding.Locator,
@@ -944,6 +953,17 @@ func (a *API) loadEditableCollection(
 			basespec.ErrInvalid,
 		)
 	}
+	if err := a.validateEditableDomainDocument(document); err != nil {
+		return editableCollection{}, err
+	}
+	members, err := declaration.SortedCompositionEntries(
+		"Collection members",
+		document.Members,
+	)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	document.Members = members
 	return editableCollection{
 		artifact:   record,
 		document:   document,
@@ -1014,8 +1034,15 @@ func collectionViewOf(
 	record artifact.Artifact,
 	document collectionv1.CollectionDocument,
 ) (CollectionView, error) {
-	members := make([]MemberReference, len(document.Members))
-	for index, member := range document.Members {
+	ordered, err := declaration.SortedCompositionEntries(
+		"Collection members",
+		document.Members,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	members := make([]MemberReference, len(ordered))
+	for index, member := range ordered {
 		value, err := memberReferenceFromEntry(member)
 		if err != nil {
 			return CollectionView{}, fmt.Errorf(
@@ -1032,6 +1059,10 @@ func collectionViewOf(
 		Description: document.Description,
 		Version:     basespec.LogicalVersion(document.Version),
 		Members:     members,
+		Entries:     nil,
+		Editable:    true,
+		Deletable:   !IsBaselineCollectionArtifact(record),
+		Baseline:    IsBaselineCollectionArtifact(record),
 	}, nil
 }
 

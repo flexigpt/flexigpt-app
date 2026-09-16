@@ -58,6 +58,7 @@ func New(
 		discovery,
 		artifacts,
 		managedArtifacts,
+		collection.SkillDomainPolicy(),
 	)
 	if err != nil {
 		return nil, err
@@ -215,6 +216,16 @@ func (a *API) RefreshSkillSource(
 	}
 	_, err := a.discovery.RefreshSource(ctx, rootID, sourceID)
 	return err
+}
+
+func (a *API) EnsureSkillBaselineCollection(
+	ctx context.Context,
+	rootID root.RootID,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.EnsureBaseline(ctx, rootID)
 }
 
 func (a *API) ListSkills(

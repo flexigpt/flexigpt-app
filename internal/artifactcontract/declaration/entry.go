@@ -176,7 +176,9 @@ func (e Entry) IsDeclarationLocatorReference() bool {
 		return false
 	}
 	switch header.Type {
-	case TypeCollection,
+	case TypeSkill,
+		TypeMCP,
+		TypeCollection,
 		TypeAgent,
 		TypeTeam,
 		TypeLoop,
@@ -200,6 +202,12 @@ func (e Entry) IsDeclarationLocatorReference() bool {
 			"description",
 			"locator",
 			"metadata":
+			continue
+		case "server":
+			if header.Type == TypeMCP {
+				continue
+			}
+			return false
 		default:
 			return false
 		}

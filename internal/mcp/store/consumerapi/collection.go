@@ -19,6 +19,16 @@ func (a *API) CreateMCPCollection(
 	return a.collections.Create(ctx, request)
 }
 
+func (a *API) EnsureMCPBaselineCollection(
+	ctx context.Context,
+	rootID root.RootID,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.EnsureBaseline(ctx, rootID)
+}
+
 func (a *API) GetMCPCollection(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -26,7 +36,7 @@ func (a *API) GetMCPCollection(
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-	return a.collections.Get(ctx, ref)
+	return a.collections.Read(ctx, ref)
 }
 
 func (a *API) ListMCPCollections(
@@ -36,7 +46,7 @@ func (a *API) ListMCPCollections(
 	if a == nil || a.collections == nil {
 		return nil, basespec.ErrClosed
 	}
-	return a.collections.List(ctx, rootID)
+	return a.collections.ListDomain(ctx, rootID)
 }
 
 func (a *API) UpdateMCPCollection(

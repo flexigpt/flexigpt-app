@@ -26,7 +26,7 @@ func (a *API) GetSkillCollection(
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-	return a.collections.Get(ctx, ref)
+	return a.collections.Read(ctx, ref)
 }
 
 func (a *API) ListSkillCollections(
@@ -36,7 +36,7 @@ func (a *API) ListSkillCollections(
 	if a == nil || a.collections == nil {
 		return nil, basespec.ErrClosed
 	}
-	return a.collections.List(ctx, rootID)
+	return a.collections.ListDomain(ctx, rootID)
 }
 
 func (a *API) UpdateSkillCollection(

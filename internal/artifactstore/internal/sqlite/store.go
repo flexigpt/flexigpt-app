@@ -26,6 +26,7 @@ var schemaV3RequiredTables = []string{
 	"artifact_roots",
 	"artifact_topology_hydrations",
 	"artifact_sources",
+	topologyPackageHydrationTable,
 	"artifact_source_refresh_state",
 	"artifact_definitions",
 	"artifact_artifacts",
@@ -99,6 +100,20 @@ func initializeSchema(
 		return err
 	}
 	if v3Exists {
+		if _, err := tx.ExecContext(
+			ctx,
+			`CREATE TABLE IF NOT EXISTS artifact_topology_package_hydrations (
+				installer_name TEXT NOT NULL,
+				package_scope TEXT NOT NULL,
+				root_id TEXT NOT NULL,
+				source_id TEXT NOT NULL,
+				fingerprint TEXT NOT NULL,
+				updated_at INTEGER NOT NULL,
+				PRIMARY KEY (installer_name, package_scope)
+			)`,
+		); err != nil {
+			return err
+		}
 		if err := verifySchemaV3Tx(ctx, tx); err != nil {
 			return err
 		}

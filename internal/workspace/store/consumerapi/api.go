@@ -114,21 +114,6 @@ func NewStoreAPI(
 	return output, nil
 }
 
-// EnsureUserManagedArtifactSource provisions the shared writable Source used
-// by user-authored managed Skills, MCP policies, and future managed
-// declaration families in one Root.
-func (a *StoreAPI) EnsureUserManagedArtifactSource(
-	ctx context.Context,
-	request ManagedSourceRegistration,
-) (source.Summary, error) {
-	return collection.EnsureUserManagedArtifactSource(
-		ctx,
-		a.sources,
-		request.RootID,
-		request.SourceDisplayName,
-	)
-}
-
 func (a *StoreAPI) RegisterFilesystemSource(
 	ctx context.Context,
 	request FilesystemSourceRegistration,
@@ -260,7 +245,7 @@ func (a *StoreAPI) LoadWorkspace(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (WorkspaceLoad, error) {
-	workspace, _, resolved, err := a.refreshAndResolveWorkspace(ctx, ref)
+	workspace, resolved, err := a.resolveCurrentWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspaceLoad{}, err
 	}
@@ -282,7 +267,7 @@ func (a *StoreAPI) RefreshWorkspace(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (WorkspaceRefresh, error) {
-	workspace, result, _, err := a.refreshAndResolveWorkspace(ctx, ref)
+	workspace, result, err := a.refreshWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspaceRefresh{}, err
 	}
@@ -311,6 +296,19 @@ func (a *StoreAPI) ListWorkspaceArtifacts(
 	for index, value := range artifacts {
 		output[index] = value.Clone()
 	}
+	sort.Slice(output, func(left, right int) bool {
+		leftKey := string(output[left].Kind) + "\x00" +
+			string(output[left].LogicalName) + "\x00" +
+			string(output[left].Binding.SourceID) + "\x00" +
+			string(output[left].Binding.Locator) + "\x00" +
+			string(output[left].ID)
+		rightKey := string(output[right].Kind) + "\x00" +
+			string(output[right].LogicalName) + "\x00" +
+			string(output[right].Binding.SourceID) + "\x00" +
+			string(output[right].Binding.Locator) + "\x00" +
+			string(output[right].ID)
+		return leftKey < rightKey
+	})
 	return output, nil
 }
 
@@ -329,6 +327,16 @@ func (a *StoreAPI) SetWorkspaceArtifactEnabled(
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: Artifact belongs to another Root",
 			workspaceDomain.ErrReferenceUnresolved,
+		)
+	}
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if collection.IsBaselineCollectionArtifact(record) {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: baseline Collections cannot be disabled",
+			basespec.ErrProtected,
 		)
 	}
 
@@ -365,6 +373,12 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
 		return WorkspaceArtifactView{}, err
+	}
+	if collection.IsBaselineCollectionArtifact(record) {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: baseline Collections cannot be runtime-disabled",
+			basespec.ErrProtected,
+		)
 	}
 
 	data, err := workspaceDomain.DecodeArtifactData(record.Data)

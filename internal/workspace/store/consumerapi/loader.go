@@ -165,25 +165,22 @@ func (a *StoreAPI) workspaceDiscoveryBase(
 	return output, nil
 }
 
-func (a *StoreAPI) refreshAndResolveWorkspace(
+func (a *StoreAPI) refreshWorkspace(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (
 	workspaceDomain.Workspace,
 	refresh.RefreshRootResult,
-	resolve.Graph,
 	error,
 ) {
 	if a == nil || a.resolver == nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
-			resolve.Graph{},
 			basespec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
-			resolve.Graph{},
 			err
 	}
 
@@ -193,14 +190,12 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 	); err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
-			resolve.Graph{},
 			err
 	}
 	result, err := a.discovery.RefreshRoot(ctx, ref.RootID)
 	if err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
-			resolve.Graph{},
 			err
 	}
 	workspace, discoveryChanged, err := a.applyWorkspaceDeclarations(
@@ -210,7 +205,6 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 	if err != nil {
 		return workspaceDomain.Workspace{},
 			refresh.RefreshRootResult{},
-			resolve.Graph{},
 			err
 	}
 	if discoveryChanged {
@@ -221,21 +215,73 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 		if err != nil {
 			return workspaceDomain.Workspace{},
 				refresh.RefreshRootResult{},
-				resolve.Graph{},
 				err
 		}
 	}
-	workspace, err = a.GetWorkspace(ctx, ref)
+
+	for range basespec.DefaultMaxDepth {
+		_, graph, err := a.resolveCurrentWorkspace(ctx, ref)
+		if err != nil {
+			return workspaceDomain.Workspace{},
+				refresh.RefreshRootResult{},
+				err
+		}
+		changed, err := a.expandWorkspaceLocatorClosure(
+			ctx,
+			graph,
+		)
+		if err != nil {
+			return workspaceDomain.Workspace{},
+				refresh.RefreshRootResult{},
+				err
+		}
+		if !changed {
+			workspace, err = a.GetWorkspace(ctx, ref)
+			if err != nil {
+				return workspaceDomain.Workspace{},
+					refresh.RefreshRootResult{},
+					err
+			}
+			return workspace, result, nil
+		}
+		result, err = a.discovery.RefreshRoot(ctx, ref.RootID)
+		if err != nil {
+			return workspaceDomain.Workspace{},
+				refresh.RefreshRootResult{},
+				err
+		}
+	}
+	return workspaceDomain.Workspace{},
+		refresh.RefreshRootResult{},
+		fmt.Errorf(
+			"%w: Workspace locator closure exceeds depth %d",
+			basespec.ErrLocatorLimitExceeded,
+			basespec.DefaultMaxDepth,
+		)
+}
+
+func (a *StoreAPI) resolveCurrentWorkspace(
+	ctx context.Context,
+	ref WorkspaceRef,
+) (
+	workspaceDomain.Workspace,
+	resolve.Graph,
+	error,
+) {
+	if a == nil || a.resolver == nil {
+		return workspaceDomain.Workspace{},
+			resolve.Graph{},
+			basespec.ErrClosed
+	}
+	workspace, err := a.GetWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{},
-			refresh.RefreshRootResult{},
 			resolve.Graph{},
 			err
 	}
 	graph, err := a.resolver.ResolveArtifact(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{},
-			refresh.RefreshRootResult{},
 			resolve.Graph{},
 			err
 	}
@@ -243,7 +289,6 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 		graph.Root.Type != declaration.TypeWorkspace ||
 		graph.Root.Workspace == nil {
 		return workspaceDomain.Workspace{},
-			refresh.RefreshRootResult{},
 			resolve.Graph{},
 			fmt.Errorf(
 				"%w: Artifact %q did not resolve as a Workspace",
@@ -251,7 +296,7 @@ func (a *StoreAPI) refreshAndResolveWorkspace(
 				ref.ArtifactID,
 			)
 	}
-	return workspace, result, graph, nil
+	return workspace, graph, nil
 }
 
 // ResolveWorkspaceGraph applies local declaration sources, refreshes the
@@ -263,7 +308,7 @@ func (a *StoreAPI) ResolveWorkspaceGraph(
 	ctx context.Context,
 	ref WorkspaceRef,
 ) (resolve.Graph, error) {
-	_, _, graph, err := a.refreshAndResolveWorkspace(ctx, ref)
+	_, graph, err := a.resolveCurrentWorkspace(ctx, ref)
 	if err != nil {
 		return resolve.Graph{}, err
 	}

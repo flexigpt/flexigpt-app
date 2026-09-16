@@ -104,6 +104,100 @@ func (s *Store) PutTopologyHydration(
 	return sqliteError(err)
 }
 
+func (s *Store) ListTopologyPackageHydrations(
+	ctx context.Context,
+) ([]topology.PackageHydration, error) {
+	if s == nil || s.db == nil {
+		return nil, basespec.ErrClosed
+	}
+	rows, err := s.db.QueryContext(
+		ctx,
+		`SELECT installer_name, package_scope, root_id, source_id, fingerprint
+		 FROM artifact_topology_package_hydrations
+		 ORDER BY installer_name, package_scope`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	output := make([]topology.PackageHydration, 0)
+	for rows.Next() {
+		var installerName, scope, rootID, sourceID, fingerprint string
+		if err := rows.Scan(
+			&installerName,
+			&scope,
+			&rootID,
+			&sourceID,
+			&fingerprint,
+		); err != nil {
+			return nil, err
+		}
+		value := topology.PackageHydration{
+			Key: topology.PackageHydrationKey{
+				InstallerName: installerName,
+				Scope:         basespec.Locator(scope),
+			},
+			RootID:      root.RootID(rootID),
+			SourceID:    source.SourceID(sourceID),
+			Fingerprint: cryptoutil.Digest(fingerprint),
+		}
+		if err := value.Validate(); err != nil {
+			return nil, fmt.Errorf(
+				"%w: invalid persisted package hydration: %w",
+				basespec.ErrInvalid,
+				err,
+			)
+		}
+		output = append(output, value)
+	}
+	return output, rows.Err()
+}
+
+func (s *Store) PutTopologyPackageHydration(
+	ctx context.Context,
+	value topology.PackageHydration,
+) error {
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(
+		ctx,
+		`INSERT INTO artifact_topology_package_hydrations (
+			installer_name, package_scope, root_id, source_id, fingerprint, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?)
+		ON CONFLICT(installer_name, package_scope) DO UPDATE SET
+			root_id = excluded.root_id,
+			source_id = excluded.source_id,
+			fingerprint = excluded.fingerprint,
+			updated_at = excluded.updated_at`,
+		value.Key.InstallerName,
+		string(value.Key.Scope),
+		string(value.RootID),
+		string(value.SourceID),
+		string(value.Fingerprint),
+		time.Now().UTC().UnixNano(),
+	)
+	return sqliteError(err)
+}
+
+func (s *Store) DeleteTopologyPackageHydration(
+	ctx context.Context,
+	key topology.PackageHydrationKey,
+) error {
+	if err := key.Validate(); err != nil {
+		return err
+	}
+	_, err := s.db.ExecContext(
+		ctx,
+		`DELETE FROM artifact_topology_package_hydrations
+		 WHERE installer_name = ? AND package_scope = ?`,
+		key.InstallerName,
+		string(key.Scope),
+	)
+	return sqliteError(err)
+}
+
 // PurgeTopologyRoot removes all metadata owned by one application-owned Root.
 //
 // This deliberately bypasses ordinary lifecycle transitions. It is only
@@ -136,6 +230,7 @@ func (s *Store) PurgeTopologyRoot(
 	defer func() { _ = tx.Rollback() }()
 
 	statements := []string{
+		`DELETE FROM artifact_topology_package_hydrations WHERE root_id = ?`,
 		`DELETE FROM artifact_source_refresh_state WHERE root_id = ?`,
 		`DELETE FROM artifact_artifacts WHERE root_id = ?`,
 		`DELETE FROM artifact_definitions WHERE root_id = ?`,

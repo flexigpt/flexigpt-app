@@ -3,6 +3,7 @@ package declaration
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -203,11 +204,22 @@ func walkEntryArray(
 	if err := json.Unmarshal(raw, &entries); err != nil {
 		return err
 	}
+	decoded := make([]Entry, 0, len(entries))
 	for _, value := range entries {
 		entry, err := DecodeCanonicalEntryJSON(value)
 		if err != nil {
 			return err
 		}
+		decoded = append(decoded, entry)
+	}
+	ordered, err := SortedCompositionEntries(
+		"composition entries",
+		decoded,
+	)
+	if err != nil {
+		return err
+	}
+	for _, entry := range ordered {
 		if err := walkNamedEntry(
 			entry,
 			appendEntryPath(base, entry),
@@ -260,6 +272,9 @@ func walkWorkflowTargets(
 	if err := json.Unmarshal(raw, &nodes); err != nil {
 		return err
 	}
+	sort.SliceStable(nodes, func(left, right int) bool {
+		return nodes[left].ID < nodes[right].ID
+	})
 	for _, node := range nodes {
 		if err := walkSingleEntry(
 			node.Target,

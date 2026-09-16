@@ -10,10 +10,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -23,6 +23,8 @@ import (
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
+
+type artifactDefinition = definition.Definition
 
 // PreparedPackage is one embedded canonical MCP Collection package ready for
 // managed Source publication.
@@ -132,10 +134,6 @@ func preparePackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	files, err = materializeIndependentMCPDeclarations(files)
-	if err != nil {
-		return PreparedPackage{}, err
-	}
 
 	document, found := packageDocument(files)
 	if !found {
@@ -148,7 +146,6 @@ func preparePackage(
 	}
 	expectations, err := canonicalCollectionExpectations(
 		document,
-		files,
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
@@ -194,163 +191,8 @@ func packageDocument(
 	return nil, false
 }
 
-// materializeIndependentMCPDeclarations compiles the embedded package into
-// the published collection-plus-independent-declaration layout.
-//
-// Existing embedded documents may express complete MCP and MCP policy
-// declarations inline. The managed source never receives those as collection
-// child Artifacts. Instead, it receives independent declaration files and a
-// rewritten Collection containing external references to those files.
-func materializeIndependentMCPDeclarations(
-	files []source.ManagedPackageFile,
-) ([]source.ManagedPackageFile, error) {
-	documentIndex := -1
-	for index, file := range files {
-		if file.Locator == mcpDomain.MCPCollectionDocumentFile {
-			documentIndex = index
-			break
-		}
-	}
-	if documentIndex == -1 {
-		return nil, fmt.Errorf(
-			"%w: built-in MCP package lacks %q",
-			basespec.ErrInvalid,
-			mcpDomain.MCPCollectionDocumentFile,
-		)
-	}
-
-	raw, err := yamlutil.CanonicalObjectJSON(
-		files[documentIndex].Content,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	root, err := declaration.DecodeCanonicalEntryJSON(raw)
-	if err != nil {
-		return nil, err
-	}
-	if root.Header().Type != declaration.TypeCollection {
-		return nil, fmt.Errorf(
-			"%w: built-in MCP package root must be a Collection",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := decoder.ValidateEntryTree(root); err != nil {
-		return nil, err
-	}
-
-	collection, err := collectionv1.DecodeCollectionEntry(root)
-	if err != nil {
-		return nil, err
-	}
-	rewritten, err := collection.Clone()
-	if err != nil {
-		return nil, err
-	}
-	rewritten.Members = make([]declaration.Entry, 0, len(collection.Members))
-
-	output := append([]source.ManagedPackageFile(nil), files...)
-	knownFiles := make(map[basespec.Locator]struct{}, len(output))
-	for _, file := range output {
-		knownFiles[file.Locator] = struct{}{}
-	}
-
-	for index, member := range collection.Members {
-		form, err := member.CompositionForm()
-		if err != nil {
-			return nil, err
-		}
-		if form == declaration.CompositionEntryReference {
-			rewritten.Members = append(
-				rewritten.Members,
-				member.Clone(),
-			)
-			continue
-		}
-
-		header := member.Header()
-		switch header.Type {
-		case declaration.TypeMCP, declaration.TypeMCPPolicy:
-		default:
-			return nil, fmt.Errorf(
-				"%w: built-in MCP Collection member %d has unsupported contained type %q",
-				basespec.ErrInvalid,
-				index,
-				header.Type,
-			)
-		}
-
-		definitionValue, err := decoder.DefinitionForEntry(member)
-		if err != nil {
-			return nil, err
-		}
-		locator, err := builtInMCPDeclarationLocator(
-			header.Type,
-			definitionValue.LogicalName,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if _, duplicate := knownFiles[locator]; duplicate {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP package repeats declaration file %q",
-				basespec.ErrConflict,
-				locator,
-			)
-		}
-
-		content, err := member.CanonicalJSON()
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, source.ManagedPackageFile{
-			Locator: locator,
-			Content: content,
-		})
-		knownFiles[locator] = struct{}{}
-
-		referenceLocator := declaration.PathLocator(
-			"./" + string(locator),
-		)
-		reference, err := declaration.NewEntry(declaration.Header{
-			Type:        header.Type,
-			Name:        header.Name,
-			Description: header.Description,
-			Locator:     &referenceLocator,
-		})
-		if err != nil {
-			return nil, err
-		}
-		rewritten.Members = append(rewritten.Members, reference)
-	}
-
-	content, err := rewritten.CanonicalJSON()
-	if err != nil {
-		return nil, err
-	}
-	output[documentIndex].Content = content
-	return source.NormalizeManagedPackageFiles(output)
-}
-
-func builtInMCPDeclarationLocator(
-	declarationType declaration.Type,
-	name basespec.LogicalName,
-) (basespec.Locator, error) {
-	value := basespec.Locator(path.Join(
-		"declarations",
-		string(declarationType),
-		string(name)+".json",
-	))
-	if err := value.ValidatePortable(false); err != nil {
-		return "", err
-	}
-	return value, nil
-}
-
 func canonicalCollectionExpectations(
 	document []byte,
-	files []source.ManagedPackageFile,
 ) ([]mcpConsumerAPI.BuiltInArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
@@ -369,116 +211,30 @@ func canonicalCollectionExpectations(
 			basespec.ErrInvalid,
 		)
 	}
-	if _, err := collectionv1.DecodeCollectionEntry(root); err != nil {
-		return nil, err
-	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
 		return nil, err
 	}
-	collection, err := collectionv1.DecodeCollectionEntry(root)
+	named, err := declaration.WalkNamedEntries(root)
 	if err != nil {
 		return nil, err
 	}
 
-	rootDefinition, err := decoder.DefinitionForEntry(root)
-	if err != nil {
-		return nil, err
-	}
-	filesByLocator := make(map[basespec.Locator][]byte, len(files))
-	for _, file := range files {
-		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
-	}
-
-	output := []mcpConsumerAPI.BuiltInArtifactExpectation{{
-		Locator:          mcpDomain.MCPCollectionDocumentFile,
-		Kind:             rootDefinition.Kind,
-		LogicalName:      rootDefinition.LogicalName,
-		DefinitionDigest: rootDefinition.Digest,
-		Enabled:          true,
-	}}
-	seenLocators := map[basespec.Locator]struct{}{
-		mcpDomain.MCPCollectionDocumentFile: {},
-	}
-
-	for index, member := range collection.Members {
-		form, err := member.CompositionForm()
+	output := make([]mcpConsumerAPI.BuiltInArtifactExpectation, 0, len(named))
+	for _, value := range named {
+		var definitionValue artifactDefinition
+		if value.SubresourceLocator == "" {
+			definitionValue, err = decoder.DefinitionForEntry(value.Entry)
+		} else {
+			definitionValue, err = decoder.DefinitionForNamedEntry(value)
+		}
 		if err != nil {
 			return nil, err
 		}
-		if form != declaration.CompositionEntryReference {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP Collection member %d is still contained",
-				basespec.ErrInvalid,
-				index,
-			)
-		}
-
-		header := member.Header()
-		switch header.Type {
-		case declaration.TypeMCP, declaration.TypeMCPPolicy:
-		default:
-			return nil, fmt.Errorf(
-				"%w: built-in MCP Collection member %d has unsupported type %q",
-				basespec.ErrInvalid,
-				index,
-				header.Type,
-			)
-		}
-		if header.Locator == nil {
-			// Symbolic policy references intentionally target shared policies
-			// published by another built-in MCP package.
-			continue
-		}
-
-		locator, err := declaration.ResolveSourceRelativePathLocator(
-			*header.Locator,
-			mcpDomain.MCPCollectionDocumentFile,
-		)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"resolve built-in MCP member %q: %w",
-				header.Name,
-				err,
-			)
-		}
-		content, found := filesByLocator[locator]
-		if !found {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP member %q target %q is not packaged",
-				basespec.ErrInvalid,
-				header.Name,
-				locator,
-			)
-		}
-
-		targetRaw, err := yamlutil.CanonicalObjectJSON(
-			content,
-			basespec.MaxDefinitionBytes,
-		)
-		if err != nil {
-			return nil, err
-		}
-		target, err := declaration.DecodeCanonicalEntryJSON(targetRaw)
-		if err != nil {
-			return nil, err
-		}
-		targetHeader := target.Header()
-		if targetHeader.Type != header.Type ||
-			targetHeader.Name != header.Name {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP member %q target has identity %q/%q",
-				basespec.ErrInvalid,
-				header.Name,
-				targetHeader.Type,
-				targetHeader.Name,
-			)
-		}
-
-		definitionValue, err := decoder.DefinitionForEntry(target)
-		if err != nil {
-			return nil, err
-		}
-		switch header.Type {
+		switch declaration.Type(definitionValue.Kind) {
+		case declaration.TypeCollection:
+			if value.SubresourceLocator != "" {
+				continue
+			}
 		case declaration.TypeMCP:
 			if _, err := mcpDomainServer.ServerDocumentFromDefinition(
 				definitionValue,
@@ -492,16 +248,13 @@ func canonicalCollectionExpectations(
 				return nil, err
 			}
 		default:
-		}
-
-		if _, duplicate := seenLocators[locator]; duplicate {
 			continue
 		}
-		seenLocators[locator] = struct{}{}
 		output = append(
 			output,
 			mcpConsumerAPI.BuiltInArtifactExpectation{
-				Locator:          locator,
+				Locator:          mcpDomain.MCPCollectionDocumentFile,
+				Subresource:      value.SubresourceLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
 				DefinitionDigest: definitionValue.Digest,

@@ -3,19 +3,14 @@ package builtin
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
-
-type hydrationPackage struct {
-	PackageRoot basespec.Locator  `json:"packageRoot"`
-	Digest      cryptoutil.Digest `json:"digest"`
-}
 
 func (i *Installer) DesiredHydration(
 	ctx context.Context,
@@ -48,39 +43,48 @@ func (i *Installer) DesiredHydration(
 	return value, nil
 }
 
-func hydrationFingerprint(
+func topologyHydrationFingerprint(
 	topologyValue topology.Declaration,
-	prepared []PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	packages := make(
-		[]hydrationPackage,
-		0,
-		len(prepared),
-	)
-	for _, value := range prepared {
-		digest, err := PackageFingerprint(value)
-		if err != nil {
-			return "", err
-		}
-		packages = append(packages, hydrationPackage{
-			PackageRoot: value.EmbeddedPackageRoot,
-			Digest:      digest,
-		})
-	}
-	sort.Slice(packages, func(left, right int) bool {
-		return packages[left].PackageRoot <
-			packages[right].PackageRoot
-	})
-
 	return cryptoutil.CanonicalDigest(struct {
 		SchemaVersion string               `json:"schemaVersion"`
 		Topology      topology.Declaration `json:"topology"`
-		Packages      []hydrationPackage   `json:"packages"`
 	}{
 		SchemaVersion: skillDomain.HydrationSchemaVersion,
 		Topology:      topologyValue,
-		Packages:      packages,
 	})
+}
+
+func (i *Installer) DesiredPackageHydrations(
+	ctx context.Context,
+) ([]topology.PackageHydration, error) {
+	if i == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return nil, err
+	}
+	output := make([]topology.PackageHydration, 0, len(i.prepared))
+	for _, value := range i.prepared {
+		scope, err := value.PackageAddress.Directory()
+		if err != nil {
+			return nil, err
+		}
+		digest, err := PackageFingerprint(value)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, topology.PackageHydration{
+			Key: topology.PackageHydrationKey{
+				InstallerName: i.BuiltInName(),
+				Scope:         scope,
+			},
+			RootID:      i.builtInTopology.Root.ID,
+			SourceID:    i.builtInTopology.Sources[0].ID,
+			Fingerprint: digest,
+		})
+	}
+	return topology.NormalizePackageHydrations(output)
 }
 
 func (i *Installer) EnsureHydration(
@@ -94,6 +98,45 @@ func (i *Installer) EnsureHydration(
 		return err
 	}
 	return i.EnsureBuiltInArtifacts(ctx)
+}
+
+func (i *Installer) EnsurePackageHydration(
+	ctx context.Context,
+	_ bool,
+	current map[topology.PackageHydrationKey]bool,
+	stale []topology.PackageHydration,
+) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return err
+	}
+	for _, value := range stale {
+		address, err := source.ParseManagedPackageAddressDirectory(value.Key.Scope)
+		if err != nil {
+			return err
+		}
+		if address.Kind != skillDomain.BuiltinSkillCollectionPackageKind {
+			continue
+		}
+
+	}
+	for _, value := range i.prepared {
+		scope, err := value.PackageAddress.Directory()
+		if err != nil {
+			return err
+		}
+		key := topology.PackageHydrationKey{
+			InstallerName: i.BuiltInName(),
+			Scope:         scope,
+		}
+		if current[key] {
+			continue
+		}
+
+	}
+	return nil
 }
 
 func (i *Installer) FinalizeHydration(

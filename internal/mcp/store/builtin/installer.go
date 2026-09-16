@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"io/fs"
 	"slices"
-	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -54,7 +54,7 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	fingerprint, err := hydrationFingerprint(topologyValue, prepared)
+	fingerprint, err := topologyHydrationFingerprint(topologyValue)
 	if err != nil {
 		return nil, err
 	}
@@ -103,9 +103,11 @@ func (i *Installer) DesiredHydration(
 	}, nil
 }
 
-func (i *Installer) EnsureHydration(
+func (i *Installer) EnsurePackageHydration(
 	ctx context.Context,
-	current bool,
+	topologyCurrent bool,
+	current map[topology.PackageHydrationKey]bool,
+	stale []topology.PackageHydration,
 ) error {
 	if i == nil {
 		return basespec.ErrClosed
@@ -113,11 +115,7 @@ func (i *Installer) EnsureHydration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-
-	// A non-current marker means the shared protected Root was reset. Every
-	// old ArtifactRef is invalid, so overlays keyed by those refs must be
-	// removed before package publication assigns replacement Artifact IDs.
-	if !current {
+	if !topologyCurrent {
 		if err := i.overlays.PurgeRoot(
 			ctx,
 			i.builtInTopology.Root.ID,
@@ -125,8 +123,23 @@ func (i *Installer) EnsureHydration(
 			return err
 		}
 	}
+	for _, value := range stale {
+		address, err := source.ParseManagedPackageAddressDirectory(value.Key.Scope)
+		if err != nil {
+			return err
+		}
+		if address.Kind != mcpDomain.MCPCollectionPackageKind {
+			continue
+		}
+	}
+	return i.ensurePackages(ctx, current)
+}
 
-	return i.ensurePackages(ctx)
+func (i *Installer) EnsureHydration(
+	ctx context.Context,
+	_ bool,
+) error {
+	return i.ensurePackages(ctx, nil)
 }
 
 func (i *Installer) Ensure(
@@ -138,7 +151,7 @@ func (i *Installer) Ensure(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if err := i.ensurePackages(ctx); err != nil {
+	if err := i.ensurePackages(ctx, nil); err != nil {
 		return err
 	}
 	return i.FinalizeHydration(ctx)
@@ -160,10 +173,53 @@ func (i *Installer) FinalizeHydration(
 	)
 }
 
+func (i *Installer) DesiredPackageHydrations(
+	ctx context.Context,
+) ([]topology.PackageHydration, error) {
+	if i == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return nil, err
+	}
+	output := make([]topology.PackageHydration, 0, len(i.prepared))
+	for _, value := range i.prepared {
+		scope, err := value.PackageAddress.Directory()
+		if err != nil {
+			return nil, err
+		}
+		digest, err := PackageFingerprint(value)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, topology.PackageHydration{
+			Key: topology.PackageHydrationKey{
+				InstallerName: i.BuiltInName(),
+				Scope:         scope,
+			},
+			RootID:      i.builtInTopology.Root.ID,
+			SourceID:    i.builtInTopology.Sources[0].ID,
+			Fingerprint: digest,
+		})
+	}
+	return topology.NormalizePackageHydrations(output)
+}
+
 func (i *Installer) ensurePackages(
 	ctx context.Context,
+	current map[topology.PackageHydrationKey]bool,
 ) error {
 	for _, value := range i.prepared {
+		scope, err := value.PackageAddress.Directory()
+		if err != nil {
+			return err
+		}
+		if current[topology.PackageHydrationKey{
+			InstallerName: i.BuiltInName(),
+			Scope:         scope,
+		}] {
+			continue
+		}
 		if _, err := i.mcp.InstallBuiltInPackage(
 			ctx,
 			mcpConsumerAPI.BuiltInPackageInstallRequest{
@@ -185,40 +241,15 @@ func (i *Installer) ensurePackages(
 	return nil
 }
 
-func hydrationFingerprint(
+func topologyHydrationFingerprint(
 	topologyValue topology.Declaration,
-	prepared []PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	type packageFingerprint struct {
-		Root   basespec.Locator  `json:"root"`
-		Digest cryptoutil.Digest `json:"digest"`
-	}
-	values := make(
-		[]packageFingerprint,
-		0,
-		len(prepared),
-	)
-	for _, value := range prepared {
-		digest, err := PackageFingerprint(value)
-		if err != nil {
-			return "", err
-		}
-		values = append(values, packageFingerprint{
-			Root:   value.EmbeddedPackageRoot,
-			Digest: digest,
-		})
-	}
-	sort.Slice(values, func(left, right int) bool {
-		return values[left].Root < values[right].Root
-	})
 	return cryptoutil.CanonicalDigest(struct {
 		SchemaVersion string               `json:"schemaVersion"`
 		Topology      topology.Declaration `json:"topology"`
-		Collections   []packageFingerprint `json:"collections"`
 	}{
 		SchemaVersion: mcpDomain.HydrationSchemaVersion,
 		Topology:      topologyValue,
-		Collections:   values,
 	})
 }
 

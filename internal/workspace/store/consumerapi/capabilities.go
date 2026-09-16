@@ -3,6 +3,7 @@ package consumerapi
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -31,7 +32,7 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 	WorkspaceCapabilityPlan,
 	error,
 ) {
-	workspace, _, graph, err := a.refreshAndResolveWorkspace(ctx, ref)
+	workspace, graph, err := a.resolveCurrentWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{}, WorkspaceCapabilityPlan{}, err
 	}
@@ -51,6 +52,7 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 	}
 	collector := &workspaceCapabilityCollector{
 		capabilities:     &capabilities,
+		promptSeen:       make(map[artifact.ArtifactRef]struct{}),
 		skillSeen:        make(map[artifact.ArtifactRef]struct{}),
 		mcpSeen:          make(map[artifact.ArtifactRef]struct{}),
 		occurrenceByPath: make(map[string]int),
@@ -66,11 +68,15 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 				err
 		}
 	}
+	sortWorkspaceArtifactRefs(capabilities.PromptArtifacts)
+	sortWorkspaceArtifactRefs(capabilities.SkillArtifacts)
+	sortWorkspaceArtifactRefs(capabilities.MCPArtifacts)
 	return workspace, capabilities, nil
 }
 
 type workspaceCapabilityCollector struct {
 	capabilities     *WorkspaceCapabilityPlan
+	promptSeen       map[artifact.ArtifactRef]struct{}
 	skillSeen        map[artifact.ArtifactRef]struct{}
 	mcpSeen          map[artifact.ArtifactRef]struct{}
 	occurrenceByPath map[string]int
@@ -168,7 +174,11 @@ func (c *workspaceCapabilityCollector) collectEntry(
 			)
 			return nil
 		}
-		c.capabilities.PromptArtifacts = append(c.capabilities.PromptArtifacts, ref)
+		appendUniqueWorkspaceArtifact(
+			&c.capabilities.PromptArtifacts,
+			c.promptSeen,
+			ref,
+		)
 		return nil
 
 	case declaration.TypeSkill:
@@ -304,4 +314,11 @@ func appendUniqueWorkspaceArtifact(
 	}
 	seen[ref] = struct{}{}
 	*values = append(*values, ref)
+}
+
+func sortWorkspaceArtifactRefs(values []artifact.ArtifactRef) {
+	sort.Slice(values, func(left, right int) bool {
+		return string(values[left].RootID)+"\x00"+string(values[left].ArtifactID) <
+			string(values[right].RootID)+"\x00"+string(values[right].ArtifactID)
+	})
 }
