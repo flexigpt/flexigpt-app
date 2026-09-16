@@ -7,7 +7,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
@@ -41,31 +40,12 @@ type BoundLocatorResolver interface {
 	) (artifact.ArtifactRef, error)
 }
 
-// LocatorRuntime is the narrow generic Store lifecycle capability available
-// to a bound declaration locator resolver.
+// LocatorRuntime is the current Source-index read capability available to a
+// bound declaration locator resolver.
 //
-// It deliberately contains no concrete declaration contracts, no consumer
-// runtime behavior, and no Source adapter configuration access.
+// Locator resolution is intentionally read-only. Workspace refresh owns
+// Source discovery expansion and Source refresh.
 type LocatorRuntime interface {
-	GetSource(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) (source.Summary, error)
-
-	UpdateSource(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		update source.Update,
-	) (source.Summary, error)
-
-	RefreshSource(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) (refresh.RefreshSourceResult, error)
-
 	ListArtifactsBySource(
 		ctx context.Context,
 		rootID root.RootID,

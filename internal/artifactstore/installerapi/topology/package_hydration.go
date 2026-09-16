@@ -73,9 +73,14 @@ func (p PackageHydrationPreparation) CurrentFor(
 	return p.Current[key]
 }
 
+// PackageHydrationCoordinator prepares package state for every package-aware
+// installer participating in one bootstrap run. InstallerNames is required so
+// an installer that now declares zero packages can still remove its stale
+// persisted package markers and physical packages.
 type PackageHydrationCoordinator interface {
 	PrepareTopologyPackageHydrations(
 		ctx context.Context,
+		installerNames []string,
 		desired []PackageHydration,
 	) (PackageHydrationPreparation, error)
 

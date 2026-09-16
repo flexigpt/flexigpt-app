@@ -162,6 +162,90 @@ func (a *API) UpsertManagedMCPPolicy(
 	return result, nil
 }
 
+func (a *API) PurgeManagedMCPPolicy(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	if a == nil {
+		return basespec.ErrClosed
+	}
+	if expectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected MCP Policy Artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if record.Kind != mcpDomain.MCPPolicyArtifactKind {
+		return fmt.Errorf(
+			"%w: Artifact is not an MCP Policy",
+			basespec.ErrUnsupported,
+		)
+	}
+	if record.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+	if a.protection.IsProtectedRoot(record.RootID) {
+		return fmt.Errorf(
+			"%w: protected MCP Policy deletion is not allowed",
+			basespec.ErrProtected,
+		)
+	}
+	if record.Binding.SubresourceLocator != "" {
+		return fmt.Errorf(
+			"%w: contained MCP Policies cannot be removed as managed packages",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	sourceValue, err := a.sources.Get(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return fmt.Errorf(
+			"%w: MCP Policy is not backed by a managed Source",
+			basespec.ErrUnsupported,
+		)
+	}
+	address, err := mcpDomain.ManagedPackageAddressFromMCPPolicyLocator(
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return err
+	}
+	if err := a.managedArtifacts.Remove(
+		ctx,
+		artifact.RemoveArtifactRequest{
+			RootID:           record.RootID,
+			SourceID:         record.Binding.SourceID,
+			Package:          address,
+			ExpectedArtifact: &ref,
+		},
+	); err != nil {
+		return err
+	}
+	missing, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if missing.State != artifact.StateMissing {
+		return fmt.Errorf(
+			"%w: removed MCP Policy Artifact is not missing",
+			basespec.ErrConflict,
+		)
+	}
+	return a.artifacts.Purge(ctx, ref, missing.Revision)
+}
+
 func (a *API) policyBodyForResolvedArtifact(
 	ctx context.Context,
 	resolved resource.ResolvedArtifact,

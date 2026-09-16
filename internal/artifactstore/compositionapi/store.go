@@ -166,6 +166,41 @@ func (s *Store) CommitTopologyHydration(
 	return s.components.CommitTopologyHydration(ctx, desired)
 }
 
+func (s *Store) PrepareTopologyPackageHydrations(
+	ctx context.Context,
+	installerNames []string,
+	desired []topology.PackageHydration,
+) (topology.PackageHydrationPreparation, error) {
+	if s == nil || s.components == nil {
+		return topology.PackageHydrationPreparation{}, basespec.ErrClosed
+	}
+	return s.components.PrepareTopologyPackageHydrations(
+		ctx,
+		installerNames,
+		desired,
+	)
+}
+
+func (s *Store) CommitTopologyPackageHydration(
+	ctx context.Context,
+	desired topology.PackageHydration,
+) error {
+	if s == nil || s.components == nil {
+		return basespec.ErrClosed
+	}
+	return s.components.CommitTopologyPackageHydration(ctx, desired)
+}
+
+func (s *Store) DeleteTopologyPackageHydration(
+	ctx context.Context,
+	value topology.PackageHydration,
+) error {
+	if s == nil || s.components == nil {
+		return basespec.ErrClosed
+	}
+	return s.components.DeleteTopologyPackageHydration(ctx, value)
+}
+
 func (s *Store) Close() error {
 	if s == nil {
 		return nil

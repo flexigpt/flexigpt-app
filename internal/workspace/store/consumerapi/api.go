@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -333,7 +334,11 @@ func (a *StoreAPI) SetWorkspaceArtifactEnabled(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	if collection.IsBaselineCollectionArtifact(record) {
+	baseline, err := a.isBaselineCollectionArtifact(ctx, record)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if baseline {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: baseline Collections cannot be disabled",
 			basespec.ErrProtected,
@@ -374,7 +379,11 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	if collection.IsBaselineCollectionArtifact(record) {
+	baseline, err := a.isBaselineCollectionArtifact(ctx, record)
+	if err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if baseline {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: baseline Collections cannot be runtime-disabled",
 			basespec.ErrProtected,
@@ -417,6 +426,29 @@ func (a *StoreAPI) SkillAdapter() *skill.Adapter {
 		return nil
 	}
 	return a.skillAdapter
+}
+
+func (a *StoreAPI) isBaselineCollectionArtifact(
+	ctx context.Context,
+	record artifact.Artifact,
+) (bool, error) {
+	if record.Kind != artifact.ArtifactKind(
+		collectionv1.CollectionType,
+	) {
+		return false, nil
+	}
+	sourceValue, err := a.sources.Get(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return false, err
+	}
+	return collection.IsBaselineCollectionArtifactForSource(
+		record,
+		sourceValue,
+	), nil
 }
 
 // defaultDiscovery bootstraps Workspace identification. An explicitly

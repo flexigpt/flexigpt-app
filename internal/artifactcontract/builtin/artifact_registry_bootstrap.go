@@ -223,13 +223,19 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	}
 
 	packageCoordinator, packageAware := r.hydrator.(topology.PackageHydrationCoordinator)
+	packageInstallerNames := make(
+		[]string,
+		0,
+	)
 	if packageAware {
+
 		desiredPackages := make([]topology.PackageHydration, 0)
 		for _, entry := range entries {
 			installer, supported := entry.installer.(PackageHydrationInstaller)
 			if !supported {
 				continue
 			}
+			packageInstallerNames = append(packageInstallerNames, entry.name)
 			values, err := installer.DesiredPackageHydrations(ctx)
 			if err != nil {
 				return fmt.Errorf(
@@ -285,6 +291,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		}
 		preparation, err := packageCoordinator.PrepareTopologyPackageHydrations(
 			ctx,
+			packageInstallerNames,
 			desiredPackages,
 		)
 		if err != nil {
@@ -322,7 +329,8 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	}
 	for _, entry := range entries {
 		hydrated, supported := entry.installer.(HydrationInstaller)
-		if packageInstaller, packageSupported := entry.installer.(PackageHydrationInstaller); packageSupported {
+		if packageInstaller, packageSupported := entry.installer.(PackageHydrationInstaller); packageSupported &&
+			packageAware {
 			var preparedValue preparedHydration
 			for _, value := range prepared {
 				if value.installer == entry.name {

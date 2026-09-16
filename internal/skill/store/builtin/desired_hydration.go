@@ -120,7 +120,18 @@ func (i *Installer) EnsurePackageHydration(
 		if address.Kind != skillDomain.BuiltinSkillCollectionPackageKind {
 			continue
 		}
-
+		if err := i.skills.RemoveBuiltInSkillPackage(
+			ctx,
+			value.RootID,
+			value.SourceID,
+			address,
+		); err != nil {
+			return fmt.Errorf(
+				"remove stale built-in Skill package %q: %w",
+				value.Key.Scope,
+				err,
+			)
+		}
 	}
 	for _, value := range i.prepared {
 		scope, err := value.PackageAddress.Directory()
@@ -134,7 +145,9 @@ func (i *Installer) EnsurePackageHydration(
 		if current[key] {
 			continue
 		}
-
+		if err := i.installPreparedPackage(ctx, value); err != nil {
+			return err
+		}
 	}
 	return nil
 }

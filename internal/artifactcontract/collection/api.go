@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -42,6 +43,7 @@ type API struct {
 	artifacts        compositionapi.ArtifactAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	domain           *DomainPolicy
+	resolver         *resolve.Resolver
 }
 
 func New(
@@ -49,6 +51,42 @@ func New(
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
+	domains ...DomainPolicy,
+) (*API, error) {
+	return newAPI(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+		nil,
+		domains...,
+	)
+}
+
+func NewWithResolver(
+	sources compositionapi.SourceAPI,
+	discovery compositionapi.DiscoveryAPI,
+	artifacts compositionapi.ArtifactAPI,
+	managedArtifacts compositionapi.ManagedArtifactAPI,
+	resolver *resolve.Resolver,
+	domains ...DomainPolicy,
+) (*API, error) {
+	return newAPI(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+		resolver,
+		domains...,
+	)
+}
+
+func newAPI(
+	sources compositionapi.SourceAPI,
+	discovery compositionapi.DiscoveryAPI,
+	artifacts compositionapi.ArtifactAPI,
+	managedArtifacts compositionapi.ManagedArtifactAPI,
+	resolver *resolve.Resolver,
 	domains ...DomainPolicy,
 ) (*API, error) {
 	if sources == nil ||
@@ -71,6 +109,7 @@ func New(
 		discovery:        discovery,
 		artifacts:        artifacts,
 		managedArtifacts: managedArtifacts,
+		resolver:         resolver,
 	}
 	if len(domains) == 1 {
 		value := domains[0]
@@ -99,22 +138,24 @@ type CollectionView struct {
 }
 
 type CollectionMemberView struct {
-	Type        declaration.Type     `json:"type"`
-	Name        basespec.LogicalName `json:"name"`
-	Description string               `json:"description,omitempty"`
-	Locator     *declaration.Locator `json:"locator,omitempty"`
-	Server      basespec.LogicalName `json:"server,omitempty"`
-	Contained   bool                 `json:"contained"`
+	Type        declaration.Type           `json:"type"`
+	Name        basespec.LogicalName       `json:"name"`
+	Description string                     `json:"description,omitempty"`
+	Locator     *declaration.Locator       `json:"locator,omitempty"`
+	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
+	Server      basespec.LogicalName       `json:"server,omitempty"`
+	Contained   bool                       `json:"contained"`
 }
 
 // MemberReference is an external Collection membership edge. It intentionally
 // cannot express a contained declaration.
 type MemberReference struct {
-	Type        declaration.Type     `json:"type"`
-	Name        basespec.LogicalName `json:"name"`
-	Description string               `json:"description,omitempty"`
-	Locator     *declaration.Locator `json:"locator,omitempty"`
-	Server      basespec.LogicalName `json:"server,omitempty"`
+	Type        declaration.Type           `json:"type"`
+	Name        basespec.LogicalName       `json:"name"`
+	Description string                     `json:"description,omitempty"`
+	Locator     *declaration.Locator       `json:"locator,omitempty"`
+	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
+	Server      basespec.LogicalName       `json:"server,omitempty"`
 }
 
 type CreateRequest struct {
@@ -324,14 +365,19 @@ func (a *API) RemoveMember(
 			request.Index,
 		)
 	}
+	normalized, err := normalizedMemberIndexes(value.document.Members)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	sourceIndex := normalized[request.Index]
 
 	members := append(
 		[]declaration.Entry(nil),
-		value.document.Members[:request.Index]...,
+		value.document.Members[:sourceIndex]...,
 	)
 	members = append(
 		members,
-		value.document.Members[request.Index+1:]...,
+		value.document.Members[sourceIndex+1:]...,
 	)
 	value.document.Members = members
 
@@ -479,7 +525,7 @@ func (a *API) Delete(
 	if err != nil {
 		return err
 	}
-	if IsBaselineCollectionArtifact(value.artifact) {
+	if a.isBaselineEditableCollection(value) {
 		return fmt.Errorf(
 			"%w: baseline Collection %q cannot be deleted",
 			basespec.ErrProtected,
@@ -523,6 +569,19 @@ func (a *API) Delete(
 		request.Collection,
 		missing.Revision,
 	)
+}
+
+func (a *API) resolveCollectionRef(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (artifact.ArtifactRef, error) {
+	if err := ref.Validate(); err != nil {
+		return artifact.ArtifactRef{}, err
+	}
+	if a == nil || a.resolver == nil {
+		return ref, nil
+	}
+	return a.resolver.ResolveDeclarationArtifact(ctx, ref)
 }
 
 func (a *API) create(
@@ -665,10 +724,17 @@ func (a *API) mutateMember(
 			if err != nil {
 				return MemberMutationResult{}, err
 			}
+			normalizedIndex, err := normalizedMemberIndex(
+				value.document.Members,
+				index,
+			)
+			if err != nil {
+				return MemberMutationResult{}, err
+			}
 			if bytes.Equal(currentRaw, memberRaw) {
 				return MemberMutationResult{
 					Collection: view,
-					Index:      index,
+					Index:      normalizedIndex,
 					Created:    false,
 				}, nil
 			}
@@ -679,6 +745,13 @@ func (a *API) mutateMember(
 		append([]declaration.Entry(nil), value.document.Members...),
 		member,
 	)
+	normalizedIndex, err := normalizedMemberIndex(
+		value.document.Members,
+		len(value.document.Members)-1,
+	)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
 	record, err := a.publishDocument(
 		ctx,
 		value.artifact.RootID,
@@ -696,7 +769,7 @@ func (a *API) mutateMember(
 	}
 	return MemberMutationResult{
 		Collection: view,
-		Index:      len(value.document.Members) - 1,
+		Index:      normalizedIndex,
 		Created:    true,
 	}, nil
 }
@@ -953,17 +1026,15 @@ func (a *API) loadEditableCollection(
 			basespec.ErrInvalid,
 		)
 	}
+	if document.Locator != nil {
+		return editableCollection{}, fmt.Errorf(
+			"%w: located Collection aliases are not editable managed Collections",
+			basespec.ErrUnsupported,
+		)
+	}
 	if err := a.validateEditableDomainDocument(document); err != nil {
 		return editableCollection{}, err
 	}
-	members, err := declaration.SortedCompositionEntries(
-		"Collection members",
-		document.Members,
-	)
-	if err != nil {
-		return editableCollection{}, err
-	}
-	document.Members = members
 	return editableCollection{
 		artifact:   record,
 		document:   document,
@@ -1034,36 +1105,14 @@ func collectionViewOf(
 	record artifact.Artifact,
 	document collectionv1.CollectionDocument,
 ) (CollectionView, error) {
-	ordered, err := declaration.SortedCompositionEntries(
-		"Collection members",
-		document.Members,
+	baseline := IsBaselineCollectionArtifact(record)
+	return readCollectionViewOf(
+		record,
+		document,
+		true,
+		!baseline,
+		baseline,
 	)
-	if err != nil {
-		return CollectionView{}, err
-	}
-	members := make([]MemberReference, len(ordered))
-	for index, member := range ordered {
-		value, err := memberReferenceFromEntry(member)
-		if err != nil {
-			return CollectionView{}, fmt.Errorf(
-				"collection members[%d]: %w",
-				index,
-				err,
-			)
-		}
-		members[index] = value
-	}
-	return CollectionView{
-		Artifact:    record.Clone(),
-		Name:        basespec.LogicalName(document.Name),
-		Description: document.Description,
-		Version:     basespec.LogicalVersion(document.Version),
-		Members:     members,
-		Entries:     nil,
-		Editable:    true,
-		Deletable:   !IsBaselineCollectionArtifact(record),
-		Baseline:    IsBaselineCollectionArtifact(record),
-	}, nil
 }
 
 func (m MemberReference) entry() (declaration.Entry, error) {
@@ -1078,6 +1127,7 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 		Type:        m.Type,
 		Name:        string(m.Name),
 		Description: m.Description,
+		Metadata:    declaration.CloneRawMessageMap(m.Metadata),
 	}
 	if m.Locator != nil {
 		locator := m.Locator.Clone()
@@ -1119,6 +1169,7 @@ func memberReferenceFromEntry(
 		Type:        header.Type,
 		Name:        basespec.LogicalName(header.Name),
 		Description: header.Description,
+		Metadata:    declaration.CloneRawMessageMap(header.Metadata),
 	}
 	if header.Locator != nil {
 		locator := header.Locator.Clone()
@@ -1191,4 +1242,59 @@ func locatorParts(value string) []string {
 		return nil
 	}
 	return strings.Split(value, "/")
+}
+
+func (a *API) isBaselineEditableCollection(
+	value editableCollection,
+) bool {
+	return a != nil &&
+		a.domain != nil &&
+		value.artifact.LogicalName == a.domain.BaselineName &&
+		value.address.Name == a.domain.BaselineName
+}
+
+func normalizedMemberIndexes(
+	values []declaration.Entry,
+) ([]int, error) {
+	type member struct {
+		index int
+		raw   []byte
+	}
+
+	ordered := make([]member, 0, len(values))
+	for index, value := range values {
+		raw, err := value.CanonicalJSON()
+		if err != nil {
+			return nil, err
+		}
+		ordered = append(ordered, member{
+			index: index,
+			raw:   raw,
+		})
+	}
+	sort.SliceStable(ordered, func(left, right int) bool {
+		return bytes.Compare(ordered[left].raw, ordered[right].raw) < 0
+	})
+
+	output := make([]int, len(ordered))
+	for index, value := range ordered {
+		output[index] = value.index
+	}
+	return output, nil
+}
+
+func normalizedMemberIndex(
+	values []declaration.Entry,
+	sourceIndex int,
+) (int, error) {
+	ordered, err := normalizedMemberIndexes(values)
+	if err != nil {
+		return 0, err
+	}
+	for index, value := range ordered {
+		if value == sourceIndex {
+			return index, nil
+		}
+	}
+	return 0, fmt.Errorf("%w: Collection member does not exist", basespec.ErrNotFound)
 }

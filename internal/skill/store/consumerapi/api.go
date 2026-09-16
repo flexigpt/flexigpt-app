@@ -13,6 +13,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -41,6 +42,7 @@ func New(
 	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
+	options ...Option,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
@@ -53,25 +55,50 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
-	collections, err := collection.New(
-		sources,
-		discovery,
-		artifacts,
-		managedArtifacts,
-		collection.SkillDomainPolicy(),
-	)
-	if err != nil {
-		return nil, err
+
+	config := apiOptions{}
+	for _, option := range options {
+		if option != nil {
+			option(&config)
+		}
 	}
-	return &API{
+	output := &API{
 		sources:          sources,
 		discovery:        discovery,
 		artifacts:        artifacts,
 		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
-		collections:      collections,
-	}, nil
+	}
+	locators, err := resolve.NewProviderLocatorResolver(
+		config.locatorResolvers,
+		skillLocatorRuntime{api: output},
+	)
+	if err != nil {
+		return nil, err
+	}
+	graphResolver, err := resolve.New(
+		artifacts,
+		locators,
+		resolve.DefaultLimits(),
+		resolve.Options{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	collections, err := collection.NewWithResolver(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+		graphResolver,
+		collection.SkillDomainPolicy(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	output.collections = collections
+	return output, nil
 }
 
 func SkillDiscoverySpec(

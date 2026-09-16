@@ -26,13 +26,7 @@ const (
 	DiagnosticCodeDefinitionInvalid         = "artifact.discovery.definition-invalid"
 	DiagnosticCodeSubresourceDuplicate      = "artifact.discovery.subresource-duplicate"
 	DiagnosticCodeOriginConflict            = "artifact.discovery.origin-conflict"
-	DiagnosticCodeResourceClaimed           = "artifact.discovery.resource-claimed"
 )
-
-type ownedArtifactResourceClaim struct {
-	owner basespec.Locator
-	claim providerapi.ArtifactResourceClaim
-}
 
 type Result struct {
 	Observations []Observation
@@ -228,10 +222,6 @@ func (e *Engine) Discover(
 	seenLocators := make(map[basespec.Locator]struct{}, len(entries))
 	validOrigins := make(map[typedOrigin]Observation)
 	invalidBindings := make(map[artifact.SourceBinding]struct{})
-	resourceClaims := make(
-		[]ownedArtifactResourceClaim,
-		0,
-	)
 	var consumed int64
 
 	for _, entry := range entries {
@@ -492,31 +482,6 @@ func (e *Engine) Discover(
 				continue
 			}
 
-			validatedClaims := make(
-				[]providerapi.ArtifactResourceClaim,
-				0,
-				len(item.ResourceClaims),
-			)
-			for claimIndex, claim := range item.ResourceClaims {
-				if err := claim.Validate(); err != nil {
-					return Result{}, fmt.Errorf(
-						"%w: decoder %q returned invalid resource claim %d: %w",
-						basespec.ErrInvalid,
-						decoder.ID(),
-						claimIndex,
-						err,
-					)
-				}
-				if claim.Kind != canonical.Kind ||
-					claim.LogicalName != canonical.LogicalName {
-					return Result{}, fmt.Errorf(
-						"%w: decoder resource claim does not match emitted Definition identity",
-						basespec.ErrInvalid,
-					)
-				}
-				validatedClaims = append(validatedClaims, claim)
-			}
-
 			key := typedOrigin{
 				Binding: binding,
 				Kind:    canonical.Kind,
@@ -611,33 +576,10 @@ func (e *Engine) Discover(
 				observed,
 			)
 			validOrigins[key] = observed.Clone()
-			for _, claim := range validatedClaims {
-				resourceClaims = append(
-					resourceClaims,
-					ownedArtifactResourceClaim{
-						owner: entry.Locator,
-						claim: claim,
-					},
-				)
-			}
 		}
 	}
 
-	var claimDiagnostics []diagnostic.Diagnostic
-	result.Observations, claimDiagnostics = suppressClaimedArtifactObservations(
-		result.Observations,
-		resourceClaims,
-	)
-	result.Diagnostics = diagnostic.Append(
-		result.Diagnostics,
-		claimDiagnostics...,
-	)
-
-	result.SeenLocators = make(
-		[]basespec.Locator,
-		0,
-		len(seenLocators),
-	)
+	result.SeenLocators = make([]basespec.Locator, 0, len(seenLocators))
 	for locator := range seenLocators {
 		result.SeenLocators = append(result.SeenLocators, locator)
 	}
@@ -663,73 +605,6 @@ func (e *Engine) Discover(
 		return Result{}, err
 	}
 	return result.Clone(), nil
-}
-
-func suppressClaimedArtifactObservations(
-	values []Observation,
-	claims []ownedArtifactResourceClaim,
-) ([]Observation, []diagnostic.Diagnostic) {
-	output := make([]Observation, 0, len(values))
-	diagnostics := make([]diagnostic.Diagnostic, 0)
-
-	for _, value := range values {
-		var owner basespec.Locator
-		if value.State == ObservationValid {
-			for _, candidate := range claims {
-				if candidate.owner == value.Binding.Locator ||
-					candidate.claim.Kind != value.Kind ||
-					candidate.claim.LogicalName != value.LogicalName ||
-					!artifactResourceClaimMatches(
-						candidate.claim,
-						value.Binding.Locator,
-					) {
-					continue
-				}
-				owner = candidate.owner
-				break
-			}
-		}
-		if owner == "" {
-			output = append(output, value)
-			continue
-		}
-
-		diagnostics = diagnostic.Append(
-			diagnostics,
-			diagnostic.Diagnostic{
-				Severity: diagnostic.SeverityInfo,
-				Code:     DiagnosticCodeResourceClaimed,
-				Message: diagnostic.BoundedMessage(fmt.Sprintf(
-					"the matching Artifact identity is declared by %q; this entry is resource material",
-					owner,
-				)),
-				Location: &diagnostic.Location{
-					Locator:            value.Binding.Locator,
-					SubresourceLocator: value.Binding.SubresourceLocator,
-				},
-			},
-		)
-	}
-	return output, diagnostics
-}
-
-func artifactResourceClaimMatches(
-	claim providerapi.ArtifactResourceClaim,
-	locator basespec.Locator,
-) bool {
-	if locator == claim.Locator {
-		return true
-	}
-	if !claim.Recursive {
-		return false
-	}
-	if claim.Locator == "." {
-		return locator != "."
-	}
-	return strings.HasPrefix(
-		string(locator),
-		string(claim.Locator)+"/",
-	)
 }
 
 func removeObservationsForBinding(

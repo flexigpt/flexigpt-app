@@ -131,14 +131,34 @@ func (i *Installer) EnsurePackageHydration(
 		if address.Kind != mcpDomain.MCPCollectionPackageKind {
 			continue
 		}
+		if err := i.mcp.RemoveBuiltInPackage(
+			ctx,
+			value.RootID,
+			value.SourceID,
+			address,
+		); err != nil {
+			return fmt.Errorf(
+				"remove stale built-in MCP package %q: %w",
+				value.Key.Scope,
+				err,
+			)
+		}
 	}
 	return i.ensurePackages(ctx, current)
 }
 
 func (i *Installer) EnsureHydration(
 	ctx context.Context,
-	_ bool,
+	topologyCurrent bool,
 ) error {
+	if !topologyCurrent {
+		if err := i.overlays.PurgeRoot(
+			ctx,
+			i.builtInTopology.Root.ID,
+		); err != nil {
+			return err
+		}
+	}
 	return i.ensurePackages(ctx, nil)
 }
 

@@ -160,6 +160,22 @@ func (w *MCPStoreWrapper) PurgeManagedMCP(
 	})
 }
 
+func (w *MCPStoreWrapper) PurgeManagedMCPPolicy(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return middleware.WithRecovery(func() error {
+		if w == nil || w.api == nil {
+			return basespec.ErrClosed
+		}
+		return w.api.PurgeManagedMCPPolicy(
+			context.Background(),
+			ref,
+			expectedRevision,
+		)
+	})
+}
+
 func (w *MCPStoreWrapper) CreateMCPCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
@@ -173,6 +189,14 @@ func (w *MCPStoreWrapper) GetMCPCollection(
 ) (collection.CollectionView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
 		return api.GetMCPCollection(context.Background(), ref)
+	})
+}
+
+func (w *MCPStoreWrapper) ResolveMCPCollection(
+	ref artifact.ArtifactRef,
+) (collection.CollectionCapabilityPlan, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionCapabilityPlan, error) {
+		return api.ResolveMCPCollection(context.Background(), ref)
 	})
 }
 

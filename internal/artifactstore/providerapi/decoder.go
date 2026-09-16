@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -51,30 +50,6 @@ type SourceEntryReader interface {
 	ReadSourceEntry(ctx context.Context, locator basespec.Locator) (SourceContent, error)
 }
 
-// ArtifactResourceClaim states that a matching independently decoded source
-// entry is resource material for the claiming declaration rather than a
-// second declaration of the same Artifact identity.
-//
-// Claims are Source-local. They suppress only available observations with the
-// exact Kind and LogicalName. Other Artifacts emitted by the target file
-// remain independently discoverable.
-type ArtifactResourceClaim struct {
-	Locator     basespec.Locator
-	Recursive   bool
-	Kind        artifact.ArtifactKind
-	LogicalName basespec.LogicalName
-}
-
-func (c ArtifactResourceClaim) Validate() error {
-	if err := c.Locator.Validate(true); err != nil {
-		return err
-	}
-	if err := c.Kind.Validate(); err != nil {
-		return err
-	}
-	return c.LogicalName.Validate()
-}
-
 func (c Candidate) RequestsDecoder(id basespec.DecoderID) bool {
 	return slices.Contains(c.RequestedDecoderIDs, id)
 }
@@ -92,10 +67,6 @@ type Decoded struct {
 	// one member would attach content evidence to the wrong physical entry.
 	OriginLocator       basespec.Locator
 	OriginContentDigest *cryptoutil.Digest
-
-	// ResourceClaims prevent a separately scanned resource from becoming a
-	// duplicate available Artifact of the same identity.
-	ResourceClaims []ArtifactResourceClaim
 
 	Definition  definition.Definition
 	Diagnostics []diagnostic.Diagnostic

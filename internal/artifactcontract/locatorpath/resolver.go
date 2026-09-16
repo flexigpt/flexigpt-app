@@ -13,40 +13,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
 const locatorKindPath = "path"
 
-// Planner adds the discovery state needed to load a path target and returns
-// the source locators that can emit the requested Artifact.
-type Planner interface {
-	PlanPath(
-		target basespec.Locator,
-		discovery source.DiscoverySpec,
-	) (
-		next source.DiscoverySpec,
-		candidates []basespec.Locator,
-		err error,
-	)
-}
-
 type Factory struct {
 	artifactKinds []artifact.ArtifactKind
-	planner       Planner
 }
 
 func NewFactory(
 	artifactKinds []artifact.ArtifactKind,
-	planner Planner,
 ) *Factory {
 	return &Factory{
 		artifactKinds: append(
 			[]artifact.ArtifactKind(nil),
 			artifactKinds...,
 		),
-		planner: planner,
 	}
 }
 
@@ -65,7 +48,6 @@ func NewCanonicalDeclarationFactory() *Factory {
 	}
 	return NewFactory(
 		artifactKinds,
-		canonicalDeclarationPlanner{},
 	)
 }
 
@@ -87,7 +69,7 @@ func (*Factory) Revision() string {
 func (f *Factory) BindLocatorRuntime(
 	runtime providerapi.LocatorRuntime,
 ) (providerapi.BoundLocatorResolver, error) {
-	if f == nil || f.planner == nil || runtime == nil {
+	if f == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator resolver dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -95,22 +77,22 @@ func (f *Factory) BindLocatorRuntime(
 	}
 	return &boundResolver{
 		artifactKinds: f.ArtifactKinds(),
-		planner:       f.planner,
-		runtime:       runtime,
+
+		runtime: runtime,
 	}, nil
 }
 
 type boundResolver struct {
 	artifactKinds []artifact.ArtifactKind
-	planner       Planner
-	runtime       providerapi.LocatorRuntime
+
+	runtime providerapi.LocatorRuntime
 }
 
 func (r *boundResolver) ResolveLocator(
 	ctx context.Context,
 	request providerapi.LocatorResolutionRequest,
 ) (artifact.ArtifactRef, error) {
-	if r == nil || r.runtime == nil || r.planner == nil {
+	if r == nil || r.runtime == nil {
 		return artifact.ArtifactRef{}, basespec.ErrClosed
 	}
 	if ctx == nil {
@@ -155,31 +137,16 @@ func (r *boundResolver) ResolveLocator(
 		return artifact.ArtifactRef{}, err
 	}
 
-	candidates, err := r.indexedCandidates(
-		request.ExpectedKind,
-		target,
-	)
+	candidates, err := declarationCandidateLocators(request.ExpectedKind, target)
 	if err != nil {
 		return artifact.ArtifactRef{}, err
 	}
 	return r.selectArtifact(ctx, request, candidates)
 }
 
-// indexedCandidates resolves only against the current Source index. Discovery
-// expansion belongs to an explicit source activation or Workspace refresh.
-func (r *boundResolver) indexedCandidates(
-	expectedKind artifact.ArtifactKind,
-	target basespec.Locator,
-) ([]basespec.Locator, error) {
-	return declarationCandidateLocators(
-		target,
-		expectedKind,
-	)
-}
-
 func declarationCandidateLocators(
-	target basespec.Locator,
 	expectedKind artifact.ArtifactKind,
+	target basespec.Locator,
 ) ([]basespec.Locator, error) {
 	output := make([]basespec.Locator, 0, 2)
 	output = append(output, target)
@@ -302,31 +269,4 @@ func requestedMCPServerSubresource(
 		return "", false, err
 	}
 	return value, true, nil
-}
-
-type canonicalDeclarationPlanner struct{}
-
-func (canonicalDeclarationPlanner) PlanPath(
-	target basespec.Locator,
-	discovery source.DiscoverySpec,
-) (source.DiscoverySpec, []basespec.Locator, error) {
-	if target == "." {
-		return source.DiscoverySpec{}, nil, fmt.Errorf(
-			"%w: declaration path locator must identify a file",
-			basespec.ErrInvalid,
-		)
-	}
-
-	output := discovery.Clone()
-	inScope, err := output.InScope(target)
-	if err != nil {
-		return source.DiscoverySpec{}, nil, err
-	}
-	if !inScope {
-		output.ExplicitLocators = append(
-			output.ExplicitLocators,
-			target,
-		)
-	}
-	return output, []basespec.Locator{target}, nil
 }

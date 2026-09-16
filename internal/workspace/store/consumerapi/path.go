@@ -141,6 +141,12 @@ func (a *StoreAPI) AddWorkspacePath(
 	if err != nil {
 		return WorkspacePathRegistrationResult{}, err
 	}
+	if _, err := a.RefreshWorkspace(ctx, ref); err != nil {
+		return WorkspacePathRegistrationResult{}, err
+	}
+
+	// Loading is read-only. RefreshWorkspace above applies declaration sources,
+	// expands local locator closure, and refreshes the selected declaration set.
 	load, err := a.LoadWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspacePathRegistrationResult{}, err

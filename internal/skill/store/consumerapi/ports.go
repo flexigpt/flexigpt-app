@@ -17,5 +17,12 @@ type BuiltinStore interface {
 		request BuiltInSkillPackageInstallRequest,
 	) ([]artifact.Artifact, error)
 
+	RemoveBuiltInSkillPackage(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+		address source.ManagedPackageAddress,
+	) error
+
 	EnsureBuiltInSkillSourceCurrent(ctx context.Context, rootID root.RootID, sourceID source.SourceID) error
 }

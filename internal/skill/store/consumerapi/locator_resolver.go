@@ -27,11 +27,13 @@ func WithLocatorResolvers(
 	}
 }
 
-type mcpLocatorRuntime struct {
+type skillLocatorRuntime struct {
 	api *API
 }
 
-func (r mcpLocatorRuntime) ListArtifactsBySource(
+var _ providerapi.LocatorRuntime = skillLocatorRuntime{}
+
+func (r skillLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,

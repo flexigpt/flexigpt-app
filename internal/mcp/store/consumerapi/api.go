@@ -72,18 +72,6 @@ func New(
 			option(&config)
 		}
 	}
-
-	collections, err := collection.New(
-		sources,
-		discovery,
-		artifacts,
-		managedArtifacts,
-		collection.MCPDomainPolicy(),
-	)
-	if err != nil {
-		return nil, err
-	}
-
 	output := &API{
 		sources:          sources,
 		discovery:        discovery,
@@ -94,7 +82,6 @@ func New(
 		overlays:         overlays,
 		secretCleaner:    secretCleaner,
 		baselinePolicy:   baselinePolicy,
-		collections:      collections,
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
@@ -112,7 +99,19 @@ func New(
 	if err != nil {
 		return nil, err
 	}
+	collections, err := collection.NewWithResolver(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+		aliases,
+		collection.MCPDomainPolicy(),
+	)
+	if err != nil {
+		return nil, err
+	}
 	output.declarationAliases = aliases
+	output.collections = collections
 	return output, nil
 }
 
@@ -157,9 +156,13 @@ func (a *API) InspectMCPPolicyForRuntime(
 	if a == nil {
 		return PolicyView{}, basespec.ErrClosed
 	}
+	terminal, err := a.resolveDeclarationArtifact(ctx, ref)
+	if err != nil {
+		return PolicyView{}, err
+	}
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
-		ref,
+		terminal,
 		resource.ResolveOptions{},
 	)
 	if err != nil {
@@ -429,6 +432,15 @@ func (a *API) InstallBuiltInPackage(
 		return nil, err
 	}
 
+	previousServers, err := a.builtInPackageServers(
+		ctx,
+		request.RootID,
+		request.SourceID,
+		documentLocator,
+	)
+	if err != nil {
+		return nil, err
+	}
 	_, err = a.managedArtifacts.Publish(
 		ctx,
 		artifact.PublishArtifactRequest{
@@ -511,6 +523,13 @@ func (a *API) InstallBuiltInPackage(
 			}
 		}
 		output = append(output, value)
+	}
+	if err := a.cleanupRemovedBuiltInPackageServers(
+		ctx,
+		previousServers,
+		output,
+	); err != nil {
+		return nil, err
 	}
 	return output, nil
 }
@@ -725,9 +744,13 @@ func (a *API) resolveServerMaterial(
 	if a == nil {
 		return serverResolutionMaterial{}, basespec.ErrClosed
 	}
+	terminal, err := a.resolveDeclarationArtifact(ctx, ref)
+	if err != nil {
+		return serverResolutionMaterial{}, err
+	}
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
-		ref,
+		terminal,
 		resource.ResolveOptions{},
 	)
 	if err != nil {
@@ -761,6 +784,24 @@ func (a *API) resolveServerMaterial(
 		RuntimeEnabled:       runtimeEnabled,
 		BuiltIn:              builtIn,
 	}, nil
+}
+
+func (a *API) serverDocumentForResolvedArtifact(
+	ctx context.Context,
+	resolved resource.ResolvedArtifact,
+) (mcpDomainServer.ServerDocument, error) {
+	_ = ctx
+	return mcpDomainServer.ServerDocumentFromDefinition(resolved.Definition)
+}
+
+func (a *API) resolveDeclarationArtifact(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (artifact.ArtifactRef, error) {
+	if a == nil || a.declarationAliases == nil {
+		return artifact.ArtifactRef{}, basespec.ErrClosed
+	}
+	return a.declarationAliases.ResolveDeclarationArtifact(ctx, ref)
 }
 
 func (a *API) effectiveInstallation(
@@ -872,9 +913,13 @@ func (a *API) effectivePolicy(
 				basespec.ErrInvalid,
 			)
 		}
+		terminal, err := a.resolveDeclarationArtifact(ctx, ref)
+		if err != nil {
+			return mcpPolicy.Effective{}, err
+		}
 		resolved, err := a.resources.ResolveArtifact(
 			ctx,
-			ref,
+			terminal,
 			resource.ResolveOptions{},
 		)
 		if err != nil {
@@ -925,7 +970,7 @@ func (a *API) policyBodiesByLogicalName(
 			record.State != artifact.StateAvailable {
 			continue
 		}
-		terminal, err := a.declarationAliases.ResolveDeclarationArtifact(
+		terminal, err := a.resolveDeclarationArtifact(
 			ctx,
 			record.Ref(),
 		)

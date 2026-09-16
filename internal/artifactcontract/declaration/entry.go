@@ -159,25 +159,18 @@ func (e Entry) IsSymbolic() bool {
 
 // IsDeclarationLocatorReference reports a located declaration edge.
 //
-// This predicate is retained for standalone declaration-source alias behavior.
-// Composition positions must use CompositionForm so locator semantics remain
-// uniform across all declaration types.
-//
-// Composite declaration locators identify another declaration Artifact.
-// When nested, this form remains an edge and must not create an unused wrapper
-// Artifact at the containing document's subresource.
+// Standalone Skill locators identify Skill package material, including the
+// `./SKILL.md` locator emitted by the standard Skill decoder. A Skill becomes
+// an external declaration reference only in a composition position, where
+// CompositionForm is used directly.
 func (e Entry) IsDeclarationLocatorReference() bool {
-	if err := e.Validate(); err != nil {
-		return false
-	}
 	header := e.Header()
 	if header.Locator == nil ||
 		header.Locator.Kind == LocatorKindCommand {
 		return false
 	}
 	switch header.Type {
-	case TypeSkill,
-		TypeMCP,
+	case TypeMCP,
 		TypeCollection,
 		TypeAgent,
 		TypeTeam,
@@ -189,30 +182,8 @@ func (e Entry) IsDeclarationLocatorReference() bool {
 		return false
 	}
 
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(e.raw, &fields); err != nil {
-		return false
-	}
-	for key := range fields {
-		switch key {
-		case "$schema",
-			"apiVersion",
-			"type",
-			"name",
-			"description",
-			"locator",
-			"metadata":
-			continue
-		case "server":
-			if header.Type == TypeMCP {
-				continue
-			}
-			return false
-		default:
-			return false
-		}
-	}
-	return true
+	form, err := e.CompositionForm()
+	return err == nil && form == CompositionEntryReference
 }
 
 func (e Entry) MarshalJSON() ([]byte, error) {

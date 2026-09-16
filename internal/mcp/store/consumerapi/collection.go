@@ -39,6 +39,16 @@ func (a *API) GetMCPCollection(
 	return a.collections.Read(ctx, ref)
 }
 
+func (a *API) ResolveMCPCollection(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (collection.CollectionCapabilityPlan, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionCapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.collections.ResolveCapabilities(ctx, ref)
+}
+
 func (a *API) ListMCPCollections(
 	ctx context.Context,
 	rootID root.RootID,

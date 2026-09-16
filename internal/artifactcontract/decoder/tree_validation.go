@@ -168,6 +168,16 @@ func validateEntryTree(
 		if err != nil {
 			return err
 		}
+		targets := make([]declaration.Entry, 0, len(value.Nodes))
+		for _, node := range value.Nodes {
+			targets = append(targets, node.Target)
+		}
+		if err := declaration.ValidateContainedEntryUniqueness(
+			"workflow node targets",
+			targets,
+		); err != nil {
+			return err
+		}
 		for index, node := range value.Nodes {
 			if err := validateEntryTree(
 				node.Target,

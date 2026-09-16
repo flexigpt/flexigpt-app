@@ -19,6 +19,16 @@ func (a *API) CreateSkillCollection(
 	return a.collections.Create(ctx, request)
 }
 
+func (a *API) ResolveSkillCollection(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (collection.CollectionCapabilityPlan, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionCapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.collections.ResolveCapabilities(ctx, ref)
+}
+
 func (a *API) GetSkillCollection(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

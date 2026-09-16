@@ -298,6 +298,30 @@ func IsBaselineCollectionArtifact(
 			address.Name == MCPBaselineCollectionName)
 }
 
+func IsBaselineCollectionArtifactForSource(
+	value artifact.Artifact,
+	sourceValue source.Summary,
+) bool {
+	if value.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+		value.RootID != sourceValue.RootID ||
+		value.Binding.SourceID != sourceValue.ID ||
+		sourceValue.Kind != source.SourceKindManagedDirectory {
+		return false
+	}
+	address, err := managedCollectionAddressFromLocator(
+		value.Binding.Locator,
+	)
+	if err != nil {
+		return false
+	}
+	return (value.LogicalName == SkillBaselineCollectionName &&
+		address.Name == SkillBaselineCollectionName &&
+		sourceValue.StorageKey == SkillManagedSourceStorageKey) ||
+		(value.LogicalName == MCPBaselineCollectionName &&
+			address.Name == MCPBaselineCollectionName &&
+			sourceValue.StorageKey == MCPManagedSourceStorageKey)
+}
+
 func (a *API) readCollectionDocument(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -369,6 +393,10 @@ func (a *API) Read(
 	if a == nil {
 		return CollectionView{}, basespec.ErrClosed
 	}
+	ref, err := a.resolveCollectionRef(ctx, ref)
+	if err != nil {
+		return CollectionView{}, err
+	}
 	record, document, err := a.readCollectionDocument(ctx, ref)
 	if err != nil {
 		return CollectionView{}, err
@@ -405,12 +433,13 @@ func (a *API) Read(
 		}
 	}
 
+	baseline := IsBaselineCollectionArtifactForSource(record, sourceValue)
 	return readCollectionViewOf(
 		record,
 		document,
 		editable,
-		editable && !IsBaselineCollectionArtifact(record),
-		IsBaselineCollectionArtifact(record),
+		editable && !baseline,
+		baseline,
 	)
 }
 
@@ -425,7 +454,8 @@ func (a *API) ListDomain(
 		return nil, err
 	}
 	if a.domain != nil {
-		if _, err := a.EnsureBaseline(ctx, rootID); err != nil {
+		if _, err := a.EnsureBaseline(ctx, rootID); err != nil &&
+			!errors.Is(err, basespec.ErrProtected) {
 			return nil, err
 		}
 	}
@@ -435,6 +465,7 @@ func (a *API) ListDomain(
 		return nil, err
 	}
 	output := make([]CollectionView, 0)
+	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, record := range records {
 		if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
 			record.State != artifact.StateAvailable {
@@ -447,6 +478,10 @@ func (a *API) ListDomain(
 		if err != nil {
 			return nil, err
 		}
+		if _, duplicate := seen[view.Artifact.Ref()]; duplicate {
+			continue
+		}
+		seen[view.Artifact.Ref()] = struct{}{}
 		output = append(output, view)
 	}
 	sort.Slice(output, func(left, right int) bool {
@@ -498,6 +533,7 @@ func readCollectionViewOf(
 			Type:        header.Type,
 			Name:        basespec.LogicalName(header.Name),
 			Description: header.Description,
+			Metadata:    declaration.CloneRawMessageMap(header.Metadata),
 			Contained:   form == declaration.CompositionEntryContained,
 		}
 		if header.Locator != nil {

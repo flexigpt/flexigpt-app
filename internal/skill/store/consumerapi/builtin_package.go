@@ -187,6 +187,54 @@ func (a *API) InstallBuiltInSkillPackage(
 	return output, nil
 }
 
+func (a *API) RemoveBuiltInSkillPackage(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	address source.ManagedPackageAddress,
+) error {
+	if a == nil {
+		return basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return err
+	}
+	if err := rootID.Validate(); err != nil {
+		return err
+	}
+	if err := sourceID.Validate(); err != nil {
+		return err
+	}
+	if err := address.Validate(); err != nil {
+		return err
+	}
+	if address.Kind != skillDomain.BuiltinSkillCollectionPackageKind {
+		return fmt.Errorf(
+			"%w: built-in Skill package kind must be %q",
+			basespec.ErrInvalid,
+			skillDomain.BuiltinSkillCollectionPackageKind,
+		)
+	}
+	if !a.protection.IsProtectedRoot(rootID) {
+		return fmt.Errorf(
+			"%w: built-in Skill Root is not protected",
+			basespec.ErrProtected,
+		)
+	}
+	if err := a.requireMutable(ctx, rootID, true); err != nil {
+		return err
+	}
+	return a.managedArtifacts.Remove(
+		ctx,
+		artifact.RemoveArtifactRequest{
+			RootID:         rootID,
+			SourceID:       sourceID,
+			Package:        address,
+			AllowProtected: true,
+		},
+	)
+}
+
 func normalizeBuiltInSkillPackageExpectations(
 	values []BuiltInSkillArtifactExpectation,
 ) (

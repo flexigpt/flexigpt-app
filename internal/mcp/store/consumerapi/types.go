@@ -105,6 +105,13 @@ type BuiltinStore interface {
 		request BuiltInPackageInstallRequest,
 	) ([]artifact.Artifact, error)
 
+	RemoveBuiltInPackage(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+		address source.ManagedPackageAddress,
+	) error
+
 	EnsureBuiltInSourceCurrent(
 		ctx context.Context,
 		rootID root.RootID,

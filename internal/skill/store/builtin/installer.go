@@ -113,25 +113,35 @@ func (i *Installer) EnsureBuiltInArtifacts(
 	}
 
 	for _, value := range i.prepared {
-		if _, err := i.skills.InstallBuiltInSkillPackage(
-			ctx,
-			skillConsumerAPI.BuiltInSkillPackageInstallRequest{
-				RootID:         i.builtInTopology.Root.ID,
-				SourceID:       i.builtInTopology.Sources[0].ID,
-				PackageAddress: value.PackageAddress,
-				DocumentFile:   value.DocumentFile,
-				PackageFiles:   value.PackageFiles,
-				Expectations:   value.Expectations,
-			},
-		); err != nil {
-			return fmt.Errorf(
-				"install built-in Skill package %q: %w",
-				value.EmbeddedPackageRoot,
-				err,
-			)
+		if err := i.installPreparedPackage(ctx, value); err != nil {
+			return err
 		}
 	}
 
+	return nil
+}
+
+func (i *Installer) installPreparedPackage(
+	ctx context.Context,
+	value PreparedPackage,
+) error {
+	if _, err := i.skills.InstallBuiltInSkillPackage(
+		ctx,
+		skillConsumerAPI.BuiltInSkillPackageInstallRequest{
+			RootID:         i.builtInTopology.Root.ID,
+			SourceID:       i.builtInTopology.Sources[0].ID,
+			PackageAddress: value.PackageAddress,
+			DocumentFile:   value.DocumentFile,
+			PackageFiles:   value.PackageFiles,
+			Expectations:   value.Expectations,
+		},
+	); err != nil {
+		return fmt.Errorf(
+			"install built-in Skill package %q: %w",
+			value.EmbeddedPackageRoot,
+			err,
+		)
+	}
 	return nil
 }
 

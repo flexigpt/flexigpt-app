@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -213,6 +214,22 @@ func canonicalCollectionExpectations(
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
 		return nil, err
+	}
+	collection, err := collectionv1.DecodeCollectionEntry(root)
+	if err != nil {
+		return nil, err
+	}
+	for index, member := range collection.Members {
+		switch member.Header().Type {
+		case declaration.TypeMCP, declaration.TypeMCPPolicy:
+		default:
+			return nil, fmt.Errorf(
+				"%w: built-in MCP Collection member %d has incompatible type %q",
+				basespec.ErrInvalid,
+				index,
+				member.Header().Type,
+			)
+		}
 	}
 	named, err := declaration.WalkNamedEntries(root)
 	if err != nil {
