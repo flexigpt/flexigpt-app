@@ -89,6 +89,7 @@
   - [Portable and managed Collection domains](#portable-and-managed-collection-domains)
   - [Baseline Collections](#baseline-collections)
   - [Managed membership semantics](#managed-membership-semantics)
+  - [Managed publication and replacement](#managed-publication-and-replacement)
   - [Supported Collection operations](#supported-collection-operations)
   - [Collection deletion](#collection-deletion)
   - [Skill creation flow](#skill-creation-flow)
@@ -121,6 +122,7 @@
   - [Built-in packages](#built-in-packages)
   - [Finalized semantic decisions](#finalized-semantic-decisions)
 - [Current implementation status](#current-implementation-status)
+  - [Status interpretation](#status-interpretation)
   - [Declaration platform and resolution](#declaration-platform-and-resolution)
   - [Sources, persistence, and resource verification](#sources-persistence-and-resource-verification)
   - [Physical format support](#physical-format-support)
@@ -128,8 +130,11 @@
   - [Collections and managed authoring](#collections-and-managed-authoring)
   - [Skill and built-in package support](#skill-and-built-in-package-support)
   - [MCP platform and runtime](#mcp-platform-and-runtime)
-  - [Unsupported or deferred source and locator capabilities](#unsupported-or-deferred-source-and-locator-capabilities)
-  - [Execution runtimes](#execution-runtimes)
+  - [Pending completion work](#pending-completion-work)
+  - [Deferred and unsupported capabilities](#deferred-and-unsupported-capabilities)
+    - [Source, locator, and cross-Root capabilities](#source-locator-and-cross-root-capabilities)
+    - [Authoring and frontend scope](#authoring-and-frontend-scope)
+    - [Execution runtimes](#execution-runtimes)
 
 ## Executive summary
 
@@ -413,6 +418,10 @@ A locator-bearing external entry must:
 - Not override target configuration, policy, state, or metadata.
 - Not fall back to another location when its selected location is unavailable.
 
+An `mcp` or `mcp.policy` declaration selected through a non-command locator is
+a pure alias to its selected terminal Artifact. It must not introduce local
+capability selection or policy fields that alter the selected target.
+
 A complete contained declaration must:
 
 - Include the artifact's required type-specific declaration body.
@@ -515,7 +524,17 @@ Baseline Collections must:
 - Never be implicit API defaults or fallbacks.
 - Never be automatically active in a Workspace or runtime session.
 
+Application Root lifecycle, rather than generic Artifact Store Root creation,
+must establish these baselines when a user Root is created and reconcile
+existing user Roots during application startup. Every application path that
+creates a user Root must invoke this application-level provisioner.
+
 Managed Skill, MCP server, and MCP policy creation must receive an explicitly selected compatible editable Collection.
+
+Managed named create operations may be idempotent only for equivalent expected
+package content and Artifact state. They must not replace a different existing
+package unless the caller uses explicit replacement or upsert, or the operation
+is authorized application repair or built-in reconciliation.
 
 ### Built-in content requirements
 
@@ -1387,15 +1406,20 @@ Use the independently declared mcp/github selected from .mcp.json.
 
 The `server` selector participates in source target selection. It does not create a contained MCP declaration.
 
-An absent `include` selects the complete server capability.
+For a concrete MCP declaration, an absent `include` selects the complete server
+capability.
 
-A present `include` selects only the listed tools, resources, or prompts.
+A present `include` limits the declared server capability to the listed tools,
+resources, or prompts.
+
+A non-command source-selected MCP is a pure alias to a terminal Artifact and
+cannot define local `include` rules.
 
 An MCP declaration must use exactly one connection-source model:
 
 - An inline executable connection.
 - A command locator, which implies `stdio`.
-- A non-command locator selecting connection data from another source entry.
+- A non-command locator selecting connection data from another source entry as a pure alias.
 
 A complete inline connection cannot also contain a non-command source locator.
 
@@ -1418,11 +1442,29 @@ mcp/github-write
 
 ### MCP policy
 
-`mcp.policy` is a supported declaration type used by MCP consumers to compose runtime policy.
+`mcp.policy` is a supported declaration type used by MCP consumers to compose
+runtime policy.
 
-It follows the common header, identity, composition, Source, Definition, Artifact, and resolution contracts.
+Concrete MCP policies use a required `body` with the following optional fields:
 
-The current HLD does not define the normative portable type-specific body for `mcp.policy`. That contract remains a documented specification gap even though MCP policy declarations are supported by the implementation.
+| Field                 | Meaning                                                   |
+| --------------------- | --------------------------------------------------------- |
+| `trustLevel`          | Trust classification with `trusted` or `untrusted` values |
+| `defaultPolicy`       | Default approval and execution rules                      |
+| `toolPolicies`        | Per-tool policy overrides                                 |
+| `expectedToolDigests` | Optional expected digests for discovered tools            |
+| `staleDigestPolicy`   | Policy applied when an expected tool digest is stale      |
+| `appsPolicy`          | MCP Apps enablement and approval behavior                 |
+
+Approval rules use `allow`, `ask`, or `deny`. Execution modes use `auto` or
+`manual`.
+
+A concrete MCP policy requires `body`. A non-command source-selected policy may
+use a locator without `body`; it is a pure alias to the selected terminal
+policy Artifact and cannot merge or override the selected policy body.
+
+`mcp.policy` follows the common header, identity, composition, Source,
+Definition, Artifact, and resolution contracts.
 
 ### Collection
 
@@ -1887,28 +1929,33 @@ A contained declaration in `Workspace.roots` is different. It belongs to Workspa
 
 ### Supported physical inputs
 
-| Physical input                  | Produced artifact behavior                                 |
-| ------------------------------- | ---------------------------------------------------------- |
-| Canonical JSON                  | One top-level declaration and named contained declarations |
-| Canonical YAML                  | One top-level declaration and named contained declarations |
-| `AGENTS.md`                     | One `instruction`                                          |
-| `CLAUDE.md`                     | One `instruction`                                          |
-| `README.md`                     | One `context`                                              |
-| `llms.txt`                      | One `context`                                              |
-| Selected documentation Markdown | One `context` per selected file                            |
-| `SKILL.md`                      | One independent `skill`                                    |
-| `.mcp.json`                     | One independent `mcp` Artifact per configured server       |
-| `mcp.json`                      | One independent `mcp` Artifact per configured server       |
-| `AGENT.md`                      | One `agent` and one generated named body Instruction       |
-| `*.agent.md`                    | One `agent` and one generated named body Instruction       |
-| Canonical Collection YAML       | One `collection` plus complete contained declarations      |
-| Workspace manifest              | One `workspace`                                            |
+| Physical input                  | Produced artifact behavior                                                                                       |
+| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Canonical JSON                  | One top-level declaration and named contained declarations                                                       |
+| Canonical YAML                  | One top-level declaration and named contained declarations                                                       |
+| `AGENTS.md`                     | One `instruction`                                                                                                |
+| `CLAUDE.md`                     | One `instruction`                                                                                                |
+| `README.md`                     | One `context`                                                                                                    |
+| `llms.txt`                      | One `context`                                                                                                    |
+| Selected documentation Markdown | One `context` per selected file                                                                                  |
+| `SKILL.md`                      | One independent `skill`                                                                                          |
+| `.mcp.json`                     | One independent `mcp` Artifact per configured server                                                             |
+| `mcp.json`                      | One independent `mcp` Artifact per configured server                                                             |
+| `AGENT.md`                      | One `agent`, an Instruction for a non-empty Markdown body, and complete contained declarations from front matter |
+| `*.agent.md`                    | One `agent`, an Instruction for a non-empty Markdown body, and complete contained declarations from front matter |
+| Canonical Collection YAML       | One `collection` plus complete contained declarations                                                            |
+| Workspace manifest              | One `workspace` plus complete contained root declarations                                                        |
 
 A Collection file does not create another Skill or MCP merely because an external member supplies a locator.
 
 One physical file may emit multiple Artifacts when it contains complete named declarations.
 
-An Agent Markdown body Instruction uses `<agent-name>-instructions` as its generated logical name.
+For Agent Markdown, a generated `<agent-name>-instructions` Instruction is emitted
+only when the Markdown body is non-empty. Complete declarations in front matter
+are emitted at their stable contained-declaration positions.
+
+A Workspace manifest emits contained Artifacts for complete declarations in its
+roots. External Workspace roots remain composition relationship edges.
 
 Contained declarations use stable type and name structural positions, for example:
 
@@ -2001,6 +2048,7 @@ The following rules apply:
 - Multiple aliases resolving to one terminal Artifact count as one symbolic target.
 - Resource claims do not suppress physical declaration targets.
 - Same-Source Skill and MCP targets remain selectable.
+- A source-selected alias cannot merge local capability or policy fields into its terminal Artifact.
 - External composition does not create another Artifact identity.
 - Prompt, Skill, and MCP capability lists use consistent ArtifactRef deduplication.
 
@@ -2219,6 +2267,10 @@ The Workspace capability plan preserves:
 - Unavailable and ambiguous nested relationships.
 - Consumer-specific readiness information.
 
+For Workspace runtime plans, `WorkspaceRuntimeSelection.RequireComplete`
+selects strict completeness behavior. When enabled, unavailable and ambiguous
+required relationships reject the runtime selection with target-level diagnostics.
+
 Nested Workspace references remain visible as declarations but resolve as unavailable.
 
 ### Read-only operations and explicit refresh
@@ -2318,6 +2370,11 @@ Each user Root has:
 - One application-provisioned Skill baseline Collection.
 - One application-provisioned MCP baseline Collection.
 
+Generic Artifact Store Root creation remains domain-neutral and does not infer
+Skill or MCP Collection policy. Application Root lifecycle establishes these
+baselines during user Root creation and reconciles existing user Roots during
+startup.
+
 Baseline Collections have:
 
 - Fixed logical names.
@@ -2365,6 +2422,31 @@ Restoring a matching target makes existing relationships available again.
 
 A contained declaration exists while it remains in the containing Collection document.
 
+### Managed publication and replacement
+
+Managed Collections, Skills, MCP servers, and MCP policies are published as
+independent source-backed packages. Managed discovery is authoritative for
+these package types.
+
+A named create operation may be idempotent only when expected package content
+and expected Artifact state are equivalent. It must not silently replace a
+different existing package. Explicit replacement or `upsert`, application
+repair, and built-in reconciliation may authorize replacement.
+
+Equivalent current Source and expected Artifact state skips unnecessary Source
+refresh. Package removal reconciles managed discovery and cleans up stale
+managed declaration locators.
+
+Current managed Skill, MCP server, and MCP policy creation uses two source-side
+writes:
+
+- Record the selected Collection's external membership.
+- Publish the independently declared package.
+
+If publication fails, the declared member remains valid, visible, and
+unavailable. A retry must re-read the Collection revision. Durable recovery of
+the multi-package operation remains pending.
+
 ### Supported Collection operations
 
 A user can:
@@ -2379,6 +2461,9 @@ A user can:
 - Remove a member without deleting the target.
 - View unavailable or ambiguous members.
 - Attach one independent target to multiple Collections.
+- View direct compatible Collection membership declarations for a selected
+  Artifact, including available, unavailable, and ambiguous direct relationship
+  status.
 
 Portable mixed Collections may include:
 
@@ -2414,7 +2499,6 @@ Deletion flow for an ordinary managed Collection:
 Detach every direct member
   -> re-read the Collection at the expected revision
   -> reject deletion if any direct member remains
-  -> clear or replace any legacy default designation
   -> remove only the Collection declaration package
 ```
 
@@ -2424,10 +2508,12 @@ The user-facing managed Skill creation flow is Collection-oriented.
 
 ```text
 Explicitly select an editable Skill Collection
-  -> create an independent Skill declaration and package
-  -> add an external Skill member to the selected Collection
+  -> record an external Skill membership in the selected Collection
+  -> publish the independent Skill declaration and package
   -> show the Skill and all Collection memberships
 ```
+
+Current failure and retry behavior is defined in [Managed publication and replacement](#managed-publication-and-replacement).
 
 There is no implicit baseline fallback.
 
@@ -2454,8 +2540,8 @@ Managed MCP creation follows the same identity and membership model.
 
 ```text
 Explicitly select an editable MCP Collection
-  -> create an independent MCP server or MCP policy declaration
-  -> add an external member to the selected Collection
+  -> record an external member in the selected Collection
+  -> publish the independent MCP server or MCP policy declaration
   -> configure installation-local inputs where required
   -> enable and connect only when the user chooses
 ```
@@ -2554,9 +2640,21 @@ Explicit cross-Root Workspace imports are not currently supported.
 
 ### Package hydration
 
-Hydration reconciles only the affected built-in package.
+Hydration maintains package-scoped desired state and package fingerprints.
 
-Artifacts, overlays, secrets, and settings outside that package remain stable.
+During bootstrap, each declared built-in package is checked idempotently
+against expected package content and expected Artifacts. A matching hydration
+marker alone is not proof that physical package content still exists.
+
+Equivalent packages with current Source and Artifact state do not trigger an
+unnecessary Source refresh. Changed, incomplete, or corrupted known packages
+are repaired and refreshed. Stale declared packages are removed through
+package hydration reconciliation.
+
+Current reconciliation is authoritative for known declared packages. It does
+not yet sweep manually inserted untracked content from protected Sources.
+
+Artifacts, overlays, secrets, and settings outside a changed or removed package remain stable.
 
 Removing a package purges only overlays and secrets associated with MCP Artifacts removed by that package.
 
@@ -2702,6 +2800,10 @@ It owns:
 - Local Artifact state.
 - Symbolic identity lookup.
 
+Generic Artifact Store Root creation remains domain-neutral. Application Root
+lifecycle owns user-Root baseline establishment and startup reconciliation
+because baseline Collections are application-domain policy.
+
 The semantic lookup key is:
 
 ```text
@@ -2839,6 +2941,9 @@ Artifact Store does not infer:
 - Cascading deletion.
 - Generic composition lifecycle.
 - Runtime activation from Collection membership.
+
+A source-backed Artifact must not be purged while its declaration remains
+available in a Source. Purge must be coupled to source mutation or reconciliation.
 
 For user-managed Collections, editing changes only the source-backed Collection declaration body.
 
@@ -2980,12 +3085,17 @@ The following decisions are authoritative:
 - Collection, Agent, Team, Skill tool, and Workspace arrays have no caller-defined ordering semantics.
 - Capability output uses deterministic normalized ordering.
 - Runtime request order is independent of declaration array order.
+- Managed package replacement requires explicit replacement intent.
 - Managed Skill and MCP authoring always receives an explicit Collection.
 - Baseline Collections are selectable destinations, not defaults or fallbacks.
+- Application Root lifecycle, rather than generic Artifact Store Root creation,
+  provisions and reconciles baseline Collections.
 - Nested Workspace references resolve as unavailable.
 - Located resolution is read-only.
 - `RefreshWorkspace` owns reachable-local-locator discovery updates.
 - MCP `server` participates in source target selection.
+- A non-command source-selected MCP is a pure terminal alias and cannot define
+  local `include` rules.
 - Resource claims do not suppress physical declaration targets.
 - Source-selected aliases resolve to terminal Artifacts.
 - Multiple aliases to one terminal Artifact count as one symbolic target.
@@ -2996,11 +3106,14 @@ The following decisions are authoritative:
 
 ## Current implementation status
 
-This section describes the implementation snapshot represented by this HLD.
+### Status interpretation
 
-The earlier patched status list contained a generic baseline-Collection row marked `Pending` while the concrete Skill and MCP baseline rows were marked `Available`. The concrete rows and finalized baseline behavior are authoritative. There is no separate generic mixed-baseline deliverable.
-
-Duplicate status rows have been consolidated.
+- `Available` means an implementation path exists for the stated scope.
+- `Pending` means approved completion, verification, or API-consolidation work remains.
+- `Deferred` means the capability is intentionally outside current approved scope.
+- `Not supported` means no supported behavior currently exists.
+- `Removed` means the behavior is intentionally no longer exposed.
+- Status does not assert successful build, test, migration, static-analysis, or Wails binding verification.
 
 ### Declaration platform and resolution
 
@@ -3023,29 +3136,36 @@ Duplicate status rows have been consolidated.
 | Located MCP external references                      | Available through composition-entry classification and path resolution                |
 | Uniform locator semantics across composition types   | Available through read-only indexed resolution and explicit refresh-closure discovery |
 | Same-Source Skill and MCP resource-claim suppression | Removed; source-selected declarations use terminal alias behavior                     |
-| Member-level unavailable and ambiguous results       | Available in resolver and Workspace capability plans                                  |
+| Member-level unavailable and ambiguous results       | Available in resolver, Collection capability plans, and Workspace capability plans    |
 | Best-effort Collection display and expansion         | Available                                                                             |
 | Collection resolution                                | Available with partial relationship behavior                                          |
-| Agent resolution                                     | Available; current consumer behavior is strict                                        |
-| Team resolution                                      | Available; current consumer behavior is strict                                        |
-| Loop resolution                                      | Available; current consumer behavior is strict                                        |
-| Workflow structure and target resolution             | Available; current consumer behavior is strict                                        |
-| Workspace resolution                                 | Available; strict consumers coexist with partial capability reporting                 |
+| Agent resolution                                     | Available with relationship-level partial results; execution runtime is deferred      |
+| Team resolution                                      | Available with relationship-level partial results; execution runtime is deferred      |
+| Loop resolution                                      | Available with relationship-level partial results; execution runtime is deferred      |
+| Workflow structure and target resolution             | Available with relationship-level partial results; execution runtime is deferred      |
+| Workspace resolution                                 | Available with partial capability reporting and explicit strict runtime selection     |
+| Workspace completeness policy                        | Available through `WorkspaceRuntimeSelection.RequireComplete`                         |
+| Source-selected MCP aliases                          | Available as pure aliases; non-command aliases cannot define local `include` rules    |
+| MCP policy declaration contract                      | Available, including concrete policy body validation                                  |
 | Local path declaration locators                      | Available for supported locator targets                                               |
 
 ### Sources, persistence, and resource verification
 
-| Capability                           | Status                                       |
-| ------------------------------------ | -------------------------------------------- |
-| Filesystem Sources                   | Available                                    |
-| Embedded Sources                     | Available                                    |
-| Managed Sources                      | Available                                    |
-| Source-backed Definition persistence | Available                                    |
-| Source-backed Artifact persistence   | Available                                    |
-| Source refresh state                 | Available                                    |
-| Definition digest verification       | Available                                    |
-| Resource generation verification     | Available                                    |
-| User-managed Source provisioning     | Available through the Workspace consumer API |
+| Capability                           | Status                                                           |
+| ------------------------------------ | ---------------------------------------------------------------- |
+| Filesystem Sources                   | Available                                                        |
+| Embedded Sources                     | Available                                                        |
+| Managed Sources                      | Available                                                        |
+| Source-backed Definition persistence | Available                                                        |
+| Source-backed Artifact persistence   | Available                                                        |
+| Source refresh state                 | Available                                                        |
+| Definition digest verification       | Available                                                        |
+| Resource generation verification     | Available                                                        |
+| User-managed Source provisioning     | Available through the Workspace consumer API                     |
+| Explicit managed package replacement | Available                                                        |
+| Equivalent publication refresh skip  | Available when Source and expected Artifact state are current    |
+| Authoritative managed discovery      | Available for managed Collection, Skill, MCP, and policy Sources |
+| Managed declaration locator cleanup  | Available after managed package removal                          |
 
 ### Physical format support
 
@@ -3066,36 +3186,41 @@ Duplicate status rows have been consolidated.
 
 ### Workspace capability planning
 
-| Capability                | Status                                                 |
-| ------------------------- | ------------------------------------------------------ |
-| Workspace prompt planning | Available with partial capability-occurrence reporting |
-| Workspace Skill planning  | Available with partial capability-occurrence reporting |
-| Workspace MCP planning    | Available with partial capability-occurrence reporting |
+| Capability                                    | Status                                                   |
+| --------------------------------------------- | -------------------------------------------------------- |
+| Read-only Workspace resolution and planning   | Available; Source mutation remains in `RefreshWorkspace` |
+| Workspace prompt planning                     | Available with partial capability-occurrence reporting   |
+| Workspace Skill planning                      | Available with partial capability-occurrence reporting   |
+| Workspace MCP planning                        | Available with partial capability-occurrence reporting   |
+| Explicit Workspace capability completeness    | Available through `RequireComplete`                      |
+| Consistent explicit ArtifactRef deduplication | Available for prompt, Skill, and MCP selections          |
 
 ### Collections and managed authoring
 
-| Capability                                                         | Status                                                                 |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------- |
-| Editable managed Collections                                       | Available through Skill and MCP Collection APIs                        |
-| User-managed editable Collections                                  | Available                                                              |
-| Collection deletion guard                                          | Available with direct-member protection                                |
-| Canonical Skill Collection declarations                            | Available as external grouping declarations                            |
-| Application-provisioned Skill baseline Collection per user Root    | Available                                                              |
-| Application-provisioned MCP baseline Collection per user Root      | Available                                                              |
-| Baseline rename, disable, runtime-disable, and deletion protection | Available as approved domain behavior                                  |
-| Explicit Collection selection for managed Skill authoring          | Available                                                              |
-| Explicit Collection selection for managed MCP authoring            | Available                                                              |
-| Managed Skill creation in a Collection                             | Available; an explicit editable Collection is required                 |
-| Managed MCP creation in a Collection                               | Available; an explicit editable Collection is required                 |
-| Managed MCP policy creation in a Collection                        | Available; an explicit editable Collection is required                 |
-| Attach an existing Skill or MCP to a Collection through user APIs  | Available                                                              |
-| Detach a member without deleting its target through user APIs      | Available                                                              |
-| User-facing standalone Skill creation                              | Removed from the managed authoring flow                                |
-| Individual editing of contained Skills                             | Not supported; managed Skill APIs create independent package Artifacts |
-| Managed declaration publication                                    | Available for Collections, Skills, MCP servers, and MCP policies       |
-| Managed MCP server publication                                     | Available                                                              |
-| Managed package removal                                            | Available                                                              |
-| Mixed-Collection frontend authoring                                | Deferred                                                               |
+| Capability                                                         | Status                                                                     |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| Portable mixed Collection declarations                             | Available in canonical source documents                                    |
+| Domain-specific editable managed Collections                       | Available through Skill and MCP Collection APIs                            |
+| Collection deletion guard                                          | Available with direct-member protection                                    |
+| Canonical Skill Collection declarations                            | Available as external grouping declarations                                |
+| Application-provisioned Skill baseline Collection per user Root    | Available through application Root provisioning and startup reconciliation |
+| Application-provisioned MCP baseline Collection per user Root      | Available through application Root provisioning and startup reconciliation |
+| Baseline rename, disable, runtime-disable, and deletion protection | Available through application-facing Collection and Workspace APIs         |
+| Explicit Collection selection for managed Skill authoring          | Available                                                                  |
+| Explicit Collection selection for managed MCP authoring            | Available                                                                  |
+| Managed Skill creation in a Collection                             | Available; an explicit editable Collection is required                     |
+| Managed MCP creation in a Collection                               | Available; an explicit editable Collection is required                     |
+| Managed MCP policy creation in a Collection                        | Available; an explicit editable Collection is required                     |
+| Attach an existing Skill or MCP to a Collection through user APIs  | Available                                                                  |
+| Detach a member without deleting its target through user APIs      | Available                                                                  |
+| Direct compatible Artifact membership views                        | Available with direct-member relationship status                           |
+| Explicit replacement protection for managed create flows           | Available                                                                  |
+| User-facing standalone Skill creation                              | Removed from the managed authoring flow                                    |
+| Individual editing of contained Skills                             | Not supported; managed Skill APIs create independent package Artifacts     |
+| Managed declaration publication                                    | Available for Collections, Skills, MCP servers, and MCP policies           |
+| Managed MCP server publication                                     | Available                                                                  |
+| Managed package removal                                            | Available                                                                  |
+| Mixed-Collection frontend authoring                                | Deferred                                                                   |
 
 ### Skill and built-in package support
 
@@ -3104,6 +3229,9 @@ Duplicate status rows have been consolidated.
 | Managed Skill packages                                           | Available                                                         |
 | Built-in Skill packages                                          | Available with independently discovered Skill Artifacts           |
 | Built-in MCP packages                                            | Available with contained MCP and policy declaration Artifacts     |
+| Built-in package-scoped hydration                                | Available                                                         |
+| Known built-in package byte verification and repair              | Available                                                         |
+| Stale known built-in package removal                             | Available                                                         |
 | Built-in ArtifactRef stability across ordinary package hydration | Available for unchanged packages                                  |
 | Built-in ArtifactRef stability across topology migration         | Not guaranteed; affected references may be intentionally replaced |
 
@@ -3125,20 +3253,44 @@ Duplicate status rows have been consolidated.
 | MCP OAuth and client credential flows     | Available |
 | MCP secret redaction                      | Available |
 
-### Unsupported or deferred source and locator capabilities
+### Pending completion work
 
-| Capability                                       | Status           |
-| ------------------------------------------------ | ---------------- |
-| Cross-Root Workspace imports                     | Not supported    |
-| Automatic built-in visibility in user Workspaces | Not supported    |
-| Plugin manifests                                 | Support deferred |
-| Git locators                                     | Support deferred |
-| Git archive materialization                      | Support deferred |
-| URL locators                                     | Support deferred |
-| Package locators                                 | Support deferred |
-| Archive and zip Sources                          | Support deferred |
+| Capability or concern                              | Status  | Remaining work                                                                                                                |
+| -------------------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Build and acceptance verification                  | Pending | Run full tests, static analysis, migration coverage, and Wails binding generation                                             |
+| Baseline lifecycle for direct generic Root callers | Pending | Ensure every application path, including future direct `RootAPI.Create` callers, invokes the application baseline provisioner |
+| Generic direct composition capability plans        | Pending | Add frontend-safe flattened plans for standalone Agent, Team, Loop, Workflow, and generic Collection inspection               |
+| Generic completeness policy                        | Pending | Add a resolver-level completeness helper for consumers other than Workspace runtime plans                                     |
+| Managed create operation durability                | Pending | Skill, MCP, and policy membership and package publication remain separate source-side operations                              |
+| Protected Source undeclared content sweep          | Pending | Known packages are repaired, but manually inserted untracked protected packages are not automatically removed                 |
+| Generic Artifact purge lifecycle                   | Pending | Restrict or separate `ArtifactAPI.Purge` so an available source-backed Artifact cannot be removed without source mutation     |
+| Internal runtime API consolidation                 | Pending | Consolidate low-level Skill catalog APIs and the remaining internal MCP inspection alias                                      |
+| Bulk resource verification efficiency              | Pending | Expose bounded verification-session reuse for bulk Skill and Workspace materialization                                        |
 
-### Execution runtimes
+### Deferred and unsupported capabilities
+
+#### Source, locator, and cross-Root capabilities
+
+| Capability                                                   | Status           |
+| ------------------------------------------------------------ | ---------------- |
+| Cross-Root Workspace imports                                 | Not supported    |
+| Automatic built-in visibility in user Workspaces             | Not supported    |
+| Plugin manifests and external package distribution workflows | Deferred         |
+| Git locators                                                 | Support deferred |
+| Git archive materialization                                  | Support deferred |
+| URL locators                                                 | Support deferred |
+| Package locators                                             | Support deferred |
+| Archive and zip Sources                                      | Support deferred |
+
+#### Authoring and frontend scope
+
+| Capability                                                                                    | Status   |
+| --------------------------------------------------------------------------------------------- | -------- |
+| Mixed-Collection frontend authoring                                                           | Deferred |
+| Managed authoring APIs for Agent, Team, Loop, Workflow, Tool, Model, Instruction, and Context | Deferred |
+| Direct standalone management UI for Agent, Team, Loop, and Workflow composition plans         | Deferred |
+
+#### Execution runtimes
 
 | Capability                        | Status                              |
 | --------------------------------- | ----------------------------------- |
