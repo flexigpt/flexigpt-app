@@ -117,7 +117,6 @@ func (s *Service) UpdateProtectedServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
 	data mcpDomainServer.ServerData,
 ) error {
 	if err := s.ready(); err != nil {
@@ -127,7 +126,6 @@ func (s *Service) UpdateProtectedServerInstallation(
 		ctx,
 		ref,
 		expectedOverlayRevision,
-		runtimeEnabled,
 		data,
 	); err != nil {
 		return err

@@ -191,6 +191,10 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 	if err != nil {
 		return err
 	}
+	canonical, err = stripRetiredOverlayRuntimeEnabled(canonical)
+	if err != nil {
+		return err
+	}
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		target,
@@ -203,6 +207,22 @@ func decodeOverlay(raw json.RawMessage, target any) error {
 		)
 	}
 	return nil
+}
+
+// stripRetiredOverlayRuntimeEnabled accepts pre-change protected MCP overlay
+// records. Runtime enablement is ignored and future writes omit the field.
+func stripRetiredOverlayRuntimeEnabled(
+	raw []byte,
+) ([]byte, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "runtimeEnabled")
+	return jsonutil.MarshalCanonicalObject(
+		fields,
+		basespec.MaxLocalDataBytes,
+	)
 }
 
 func cloneServerOverlay(input ServerOverlay) ServerOverlay {

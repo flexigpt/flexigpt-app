@@ -232,15 +232,9 @@ func (a *mcpContextLookupAdapter) validateMCPServers(
 	mcpContext mcpConversation.MCPConversationContext,
 ) error {
 	for _, ref := range collectMCPServerRefs(mcpContext) {
-		resolved, err := a.resolver.ResolveMCPServer(ctx, ref)
+		_, err := a.resolver.ResolveMCPServer(ctx, ref)
 		if err != nil {
 			return fmt.Errorf("server %q: %w", ref, err)
-		}
-		if !resolved.RuntimeEnabled {
-			return fmt.Errorf(
-				"server %q: referenced MCP server is disabled for this installation",
-				ref,
-			)
 		}
 	}
 	return nil

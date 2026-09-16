@@ -15,6 +15,7 @@
   - [Ordering requirements](#ordering-requirements)
   - [Discovery and Workspace requirements](#discovery-and-workspace-requirements)
   - [Collection and authoring requirements](#collection-and-authoring-requirements)
+  - [Artifact enablement requirements](#artifact-enablement-requirements)
   - [Built-in content requirements](#built-in-content-requirements)
   - [Runtime and resource requirements](#runtime-and-resource-requirements)
 - [Design principles and invariants](#design-principles-and-invariants)
@@ -517,7 +518,6 @@ Baseline Collections must:
 - Have fixed managed package locations.
 - Be editable.
 - Not be renamed.
-- Not be disabled.
 - Not be runtime-disabled.
 - Not be deleted.
 - Be explicit selectable authoring destinations.
@@ -535,6 +535,39 @@ Managed named create operations may be idempotent only for equivalent expected
 package content and Artifact state. They must not replace a different existing
 package unless the caller uses explicit replacement or upsert, or the operation
 is authorized application repair or built-in reconciliation.
+
+### Artifact enablement requirements
+
+Every Artifact has one local `Enabled` metadata value.
+
+- The value is mutable for Artifacts in mutable and protected Roots.
+- The value is stored with the Artifact record and is retained by ordinary
+  Source refresh and ordinary package hydration.
+- The value does not alter Source discovery, Source refresh, Definition
+  persistence, resource verification, graph resolution, managed publication,
+  package replacement, package removal, Collection editing, Collection
+  deletion, Artifact purge eligibility, or protected topology authorization.
+- Artifact Store list APIs remain exhaustive and expose `Enabled`; consumer
+  lists may apply an explicit enabled-only filter when appropriate.
+- A disabled Artifact remains readable, editable when otherwise editable, and
+  addressable by `ArtifactRef`.
+- New Artifacts default to `Enabled=true`.
+- MCP has no additional runtime-enabled, installation-enabled, effective-enabled,
+  or Workspace-specific enablement state.
+- MCP Store and MCP Runtime do not interpret `Artifact.Enabled`; an outer
+  caller may apply it as an explicit catalog or selection filter.
+- MCP policy composition, MCP installation data, materialization, connection,
+  and invocation remain independent of generic Artifact enablement.
+- Built-in installers do not overwrite an existing user's enabled state.
+
+`Source.Enabled` is separate lifecycle state. Disabling a Source affects source
+discovery and resource availability and can make its Artifacts missing. It is
+not Artifact enablement metadata.
+
+An intentional protected topology reset replaces Artifact records and may
+replace ArtifactRefs. It is not ordinary hydration. Preserving local metadata
+across an intentional topology replacement requires a separate migration or
+overlay policy.
 
 ### Built-in content requirements
 
@@ -2032,7 +2065,7 @@ locator: ./skills/code-review
 
 The selected location must resolve to `skill/code-review`.
 
-If the selected declaration is absent, disabled, invalid, incompatible, or has a different type or name, the relationship is unavailable.
+If the selected declaration is absent, invalid, incompatible, or has a different type or name, the relationship is unavailable.
 
 A located reference never falls back to another matching declaration elsewhere in the Root.
 
@@ -2084,7 +2117,6 @@ ambiguous
 A relationship may be unavailable because its target is:
 
 - Missing.
-- Disabled.
 - Invalid.
 - Incompatible.
 - Cyclic on the affected expansion path.
@@ -2388,7 +2420,6 @@ Baseline Collections have:
 A baseline Collection cannot be:
 
 - Renamed.
-- Disabled.
 - Runtime-disabled.
 - Deleted.
 
@@ -2546,7 +2577,8 @@ Explicitly select an editable MCP Collection
   -> record an external member in the selected Collection
   -> publish the independent MCP server or MCP policy declaration
   -> configure installation-local inputs where required
-  -> enable and connect only when the user chooses
+  -> apply any enabled-state filtering outside MCP Store
+  -> connect only when an MCP runtime consumer chooses
 ```
 
 There is no implicit baseline fallback.
@@ -2556,7 +2588,7 @@ Collection membership does not:
 - Configure secrets.
 - Configure OAuth.
 - Configure client credentials.
-- Enable runtime use.
+- Interpret or apply generic Artifact enablement.
 - Connect the server.
 - Change effective MCP policy.
 - Replace installation-local configuration.
@@ -2752,6 +2784,11 @@ MCP runtime behavior includes:
 - Client credential flows.
 - Secret redaction in runtime errors and process output.
 
+MCP has one enablement metadata field: `Artifact.Enabled`.
+
+- An outer catalog, Workspace selection, or future runtime policy may interpret `Artifact.Enabled` explicitly.
+- Generic Artifact enablement does not suppress MCP policy composition,
+
 An MCP included by several Collections retains one MCP identity and one corresponding installation configuration.
 
 ### Workflow consumer
@@ -2916,7 +2953,7 @@ Artifact local state supports:
 - Local enablement.
 - Local display name.
 - Consumer-specific local data.
-- MCP installation settings.
+- User-owned MCP installation settings.
 - Workspace runtime disablement.
 - Other namespaced consumer settings.
 
@@ -2924,7 +2961,10 @@ A contained declaration has a source occurrence within its containing document. 
 
 The structural occurrence identifies where the declaration is written. It does not make its containing Collection, Agent, Team, Workflow, or Workspace an owner.
 
-Protected built-in Artifacts are exceptions to ordinary local mutation. Mutable consumer settings use explicit external overlays.
+Protected built-in Artifacts permit local `Enabled` metadata mutation. Protected
+source packages, generic Artifact data, display metadata, MCP installation
+settings, secrets, and other protected consumer configuration remain subject to
+their existing protected-root or overlay rules.
 
 ### Artifact Store boundary
 
@@ -3092,7 +3132,7 @@ The following decisions are authoritative:
 - Runtime request order is independent of declaration array order.
 - Managed package replacement requires explicit replacement intent.
 - Managed Skill and MCP authoring always receives an explicit Collection.
-- Baseline Collections are selectable destinations, not defaults or fallbacks.
+- Baseline Collections are selectable destinations, not defaults, fallbacks, or forced-enable records.
 - Application Root lifecycle, rather than generic Artifact Store Root creation,
   provisions and reconciles baseline Collections.
 - Nested Workspace references resolve as unavailable.
@@ -3170,6 +3210,7 @@ The following decisions are authoritative:
 | Source-backed Artifact persistence   | Available                                                        |
 | Source refresh state                 | Available                                                        |
 | Definition digest verification       | Available                                                        |
+| Universal Artifact enabled metadata  | Available for mutable and protected Roots                        |
 | Resource generation verification     | Available                                                        |
 | User-managed Source provisioning     | Available through the Workspace consumer API                     |
 | Explicit managed package replacement | Available                                                        |
@@ -3212,30 +3253,30 @@ The following decisions are authoritative:
 
 ### Collections and managed authoring
 
-| Capability                                                         | Status                                                                     |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------------- |
-| Portable mixed Collection declarations                             | Available in canonical source documents                                    |
-| Domain-specific editable managed Collections                       | Available through Skill and MCP Collection APIs                            |
-| Collection deletion guard                                          | Available with direct-member protection                                    |
-| Canonical Skill Collection declarations                            | Available as external grouping declarations                                |
-| Application-provisioned Skill baseline Collection per user Root    | Available through application Root provisioning and startup reconciliation |
-| Application-provisioned MCP baseline Collection per user Root      | Available through application Root provisioning and startup reconciliation |
-| Baseline rename, disable, runtime-disable, and deletion protection | Available through application-facing Collection and Workspace APIs         |
-| Explicit Collection selection for managed Skill authoring          | Available                                                                  |
-| Explicit Collection selection for managed MCP authoring            | Available                                                                  |
-| Managed Skill creation in a Collection                             | Available; an explicit editable Collection is required                     |
-| Managed MCP creation in a Collection                               | Available; an explicit editable Collection is required                     |
-| Managed MCP policy creation in a Collection                        | Available; an explicit editable Collection is required                     |
-| Attach an existing Skill or MCP to a Collection through user APIs  | Available                                                                  |
-| Detach a member without deleting its target through user APIs      | Available                                                                  |
-| Direct compatible Artifact membership views                        | Available with direct-member relationship status                           |
-| Explicit replacement protection for managed create flows           | Available                                                                  |
-| User-facing standalone Skill creation                              | Removed from the managed authoring flow                                    |
-| Individual editing of contained Skills                             | Not supported; managed Skill APIs create independent package Artifacts     |
-| Managed declaration publication                                    | Available for Collections, Skills, MCP servers, and MCP policies           |
-| Managed MCP server publication                                     | Available                                                                  |
-| Managed package removal                                            | Available                                                                  |
-| Mixed-Collection frontend authoring                                | Deferred                                                                   |
+| Capability                                                        | Status                                                                     |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| Portable mixed Collection declarations                            | Available in canonical source documents                                    |
+| Domain-specific editable managed Collections                      | Available through Skill and MCP Collection APIs                            |
+| Collection deletion guard                                         | Available with direct-member protection                                    |
+| Canonical Skill Collection declarations                           | Available as external grouping declarations                                |
+| Application-provisioned Skill baseline Collection per user Root   | Available through application Root provisioning and startup reconciliation |
+| Application-provisioned MCP baseline Collection per user Root     | Available through application Root provisioning and startup reconciliation |
+| Baseline rename, runtime-disable, and deletion protection         | Available through application-facing Collection and Workspace APIs         |
+| Explicit Collection selection for managed Skill authoring         | Available                                                                  |
+| Explicit Collection selection for managed MCP authoring           | Available                                                                  |
+| Managed Skill creation in a Collection                            | Available; an explicit editable Collection is required                     |
+| Managed MCP creation in a Collection                              | Available; an explicit editable Collection is required                     |
+| Managed MCP policy creation in a Collection                       | Available; an explicit editable Collection is required                     |
+| Attach an existing Skill or MCP to a Collection through user APIs | Available                                                                  |
+| Detach a member without deleting its target through user APIs     | Available                                                                  |
+| Direct compatible Artifact membership views                       | Available with direct-member relationship status                           |
+| Explicit replacement protection for managed create flows          | Available                                                                  |
+| User-facing standalone Skill creation                             | Removed from the managed authoring flow                                    |
+| Individual editing of contained Skills                            | Not supported; managed Skill APIs create independent package Artifacts     |
+| Managed declaration publication                                   | Available for Collections, Skills, MCP servers, and MCP policies           |
+| Managed MCP server publication                                    | Available                                                                  |
+| Managed package removal                                           | Available                                                                  |
+| Mixed-Collection frontend authoring                               | Deferred                                                                   |
 
 ### Skill and built-in package support
 

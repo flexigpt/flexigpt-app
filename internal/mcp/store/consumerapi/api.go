@@ -93,7 +93,6 @@ func New(
 		artifacts,
 		locators,
 		resolve.DefaultLimits(),
-		resolve.Options{},
 	)
 	if err != nil {
 		return nil, err
@@ -128,6 +127,57 @@ func (a *API) ListPolicies(
 	return a.listArtifacts(ctx, rootID, mcpDomain.MCPPolicyArtifactKind)
 }
 
+// SetServerEnabled changes only generic Artifact metadata. It is valid for
+// both user-owned and protected built-in MCP Artifacts. Its interpretation is
+// owned by the caller. MCP Store does not use it to gate installation,
+// materialization, connection, or policy composition.
+func (a *API) SetServerEnabled(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (artifact.Artifact, error) {
+	if a == nil {
+		return artifact.Artifact{}, basespec.ErrClosed
+	}
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if record.Kind != mcpDomain.MCPArtifactKind {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: Artifact is not an MCP Server",
+			basespec.ErrUnsupported,
+		)
+	}
+	return a.artifacts.SetEnabled(ctx, ref, expectedRevision, enabled)
+}
+
+// SetPolicyEnabled changes only generic Artifact metadata. Its interpretation
+// is owned by the caller. MCP policy composition remains independent from this
+// catalog state.
+func (a *API) SetPolicyEnabled(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (artifact.Artifact, error) {
+	if a == nil {
+		return artifact.Artifact{}, basespec.ErrClosed
+	}
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if record.Kind != mcpDomain.MCPPolicyArtifactKind {
+		return artifact.Artifact{}, fmt.Errorf(
+			"%w: Artifact is not an MCP Policy",
+			basespec.ErrUnsupported,
+		)
+	}
+	return a.artifacts.SetEnabled(ctx, ref, expectedRevision, enabled)
+}
+
 func (a *API) GetServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -142,8 +192,6 @@ func (a *API) GetServerInstallation(
 		Document:             material.Document,
 		Installation:         material.Installation,
 		InstallationRevision: material.InstallationRevision,
-		InstallationEnabled:  material.InstallationEnabled,
-		RuntimeEnabled:       material.RuntimeEnabled,
 		BuiltIn:              material.BuiltIn,
 	}, nil
 }
@@ -181,10 +229,9 @@ func (a *API) GetMCPPolicy(
 		return PolicyView{}, err
 	}
 	return PolicyView{
-		Artifact:         resolved.Artifact.Clone(),
-		Definition:       resolved.Definition.Clone(),
-		Body:             body,
-		EffectiveEnabled: resolved.Artifact.Enabled,
+		Artifact:   resolved.Artifact.Clone(),
+		Definition: resolved.Definition.Clone(),
+		Body:       body,
 		BuiltIn: a.protection.IsProtectedRoot(
 			resolved.Artifact.RootID,
 		),
@@ -264,7 +311,6 @@ func (a *API) UpdateProtectedServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
 	data mcpDomainServer.ServerData,
 ) error {
 	if a == nil {
@@ -311,10 +357,9 @@ func (a *API) UpdateProtectedServerInstallation(
 		nextRevision = current.Revision + 1
 	}
 	next := mcpOverlay.ServerOverlay{
-		SchemaVersion:  mcpDomain.InstallationDataSchemaVersion,
-		Revision:       nextRevision,
-		RuntimeEnabled: runtimeEnabled,
-		ServerData:     data,
+		SchemaVersion: mcpDomain.InstallationDataSchemaVersion,
+		Revision:      nextRevision,
+		ServerData:    data,
 	}
 	if err := a.overlays.PutServerOverlay(
 		ctx,
@@ -497,17 +542,6 @@ func (a *API) InstallBuiltInPackage(
 				value.ID,
 			)
 		}
-		if value.Enabled != expected.Enabled {
-			value, err = a.artifacts.SetEnabled(
-				ctx,
-				value.Ref(),
-				value.Revision,
-				expected.Enabled,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
 		output = append(output, value)
 	}
 	if err := a.cleanupRemovedBuiltInPackageServers(
@@ -652,8 +686,6 @@ type serverResolutionMaterial struct {
 	Document             mcpDomainServer.ServerDocument
 	Installation         mcpDomainServer.ServerData
 	InstallationRevision uint64
-	InstallationEnabled  bool
-	RuntimeEnabled       bool
 	BuiltIn              bool
 }
 
@@ -713,7 +745,6 @@ func (a *API) resolveMCPServer(
 		Installation:         material.Installation,
 		Policy:               policyValue,
 		InstallationRevision: material.InstallationRevision,
-		RuntimeEnabled:       material.RuntimeEnabled,
 		BuiltIn:              material.BuiltIn,
 		Version:              version,
 	}
@@ -752,7 +783,7 @@ func (a *API) resolveServerMaterial(
 	if err != nil {
 		return serverResolutionMaterial{}, err
 	}
-	installation, revision, enabled, runtimeEnabled, builtIn, err := a.effectiveInstallation(
+	installation, revision, builtIn, err := a.effectiveInstallation(
 		ctx,
 		resolved.Artifact,
 		document,
@@ -765,8 +796,6 @@ func (a *API) resolveServerMaterial(
 		Document:             document,
 		Installation:         installation,
 		InstallationRevision: revision,
-		InstallationEnabled:  enabled,
-		RuntimeEnabled:       runtimeEnabled,
 		BuiltIn:              builtIn,
 	}, nil
 }
@@ -788,8 +817,6 @@ func (a *API) effectiveInstallation(
 ) (
 	installation mcpDomainServer.ServerData,
 	revision uint64,
-	enabled bool,
-	runtimeEnabled bool,
 	builtIn bool,
 	err error,
 ) {
@@ -797,24 +824,17 @@ func (a *API) effectiveInstallation(
 	if !builtIn {
 		data, err := mcpDomainServer.DecodeServerData(record.Data)
 		if err != nil {
-			return mcpDomainServer.ServerData{}, 0, false, false, false, err
+			return mcpDomainServer.ServerData{}, 0, false, err
 		}
 		if err := data.ValidateFor(record.Ref(), document); err != nil {
-			return mcpDomainServer.ServerData{}, 0, false, false, false, err
+			return mcpDomainServer.ServerData{}, 0, false, err
 		}
-		return data,
-			record.Revision,
-			record.Enabled,
-			record.Enabled,
-			false,
-			nil
+		return data, record.Revision, false, nil
 	}
 
 	if a.overlays == nil {
 		return mcpDomainServer.ServerData{},
 			0,
-			false,
-			false,
 			true,
 			fmt.Errorf(
 				"%w: protected MCP installation overlay store is unavailable",
@@ -823,28 +843,18 @@ func (a *API) effectiveInstallation(
 	}
 	overlay, found, err := a.overlays.GetServerOverlay(ctx, record.Ref())
 	if err != nil {
-		return mcpDomainServer.ServerData{}, 0, false, false, true, err
+		return mcpDomainServer.ServerData{}, 0, true, err
 	}
 	if !found {
-		return mcpDomainServer.DefaultServerData(),
-			1,
-			false,
-			false,
-			true,
-			nil
+		return mcpDomainServer.DefaultServerData(), 1, true, nil
 	}
 	if err := overlay.ServerData.ValidateFor(
 		record.Ref(),
 		document,
 	); err != nil {
-		return mcpDomainServer.ServerData{}, 0, false, false, true, err
+		return mcpDomainServer.ServerData{}, 0, true, err
 	}
-	return overlay.ServerData,
-		overlay.Revision,
-		overlay.RuntimeEnabled,
-		record.Enabled && overlay.RuntimeEnabled,
-		true,
-		nil
+	return overlay.ServerData, overlay.Revision, true, nil
 }
 
 func (a *API) effectivePolicy(
@@ -903,7 +913,7 @@ func (a *API) effectivePolicy(
 			return mcpPolicy.Effective{}, err
 		}
 		if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind ||
-			!resolved.Artifact.Enabled {
+			resolved.Artifact.State != artifact.StateAvailable {
 			return mcpPolicy.Effective{}, fmt.Errorf(
 				"%w: additional MCP Policy %q is unavailable",
 				basespec.ErrReferenceUnresolved,
@@ -943,8 +953,7 @@ func (a *API) policyBodiesByLogicalName(
 	output := make([]mcpPolicy.MCPPolicy, 0, len(records))
 	seen := make(map[artifact.ArtifactRef]struct{}, len(records))
 	for _, record := range records {
-		if !record.Enabled ||
-			record.State != artifact.StateAvailable {
+		if record.State != artifact.StateAvailable {
 			continue
 		}
 		terminal, err := a.resolveDeclarationArtifact(

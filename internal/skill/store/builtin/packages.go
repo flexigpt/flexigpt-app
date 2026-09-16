@@ -210,7 +210,6 @@ func canonicalCollectionPackage(
 			Kind:             rootDefinition.Kind,
 			LogicalName:      rootDefinition.LogicalName,
 			DefinitionDigest: rootDefinition.Digest,
-			Enabled:          true,
 		},
 	)
 	for _, file := range files {
@@ -304,7 +303,6 @@ func canonicalCollectionPackage(
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
 				DefinitionDigest: definitionValue.Digest,
-				Enabled:          true,
 			},
 		)
 	}

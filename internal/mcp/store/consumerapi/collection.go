@@ -39,6 +39,23 @@ func (a *API) GetMCPCollection(
 	return a.collections.Read(ctx, ref)
 }
 
+func (a *API) SetMCPCollectionEnabled(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.SetEnabled(
+		ctx,
+		ref,
+		expectedRevision,
+		enabled,
+	)
+}
+
 func (a *API) ResolveMCPCollection(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

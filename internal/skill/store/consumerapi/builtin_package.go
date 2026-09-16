@@ -161,17 +161,6 @@ func (a *API) InstallBuiltInSkillPackage(
 				record.ID,
 			)
 		}
-		if record.Enabled != expected.Enabled {
-			record, err = a.artifacts.SetEnabled(
-				ctx,
-				record.Ref(),
-				record.Revision,
-				expected.Enabled,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
 		output = append(output, record)
 	}
 

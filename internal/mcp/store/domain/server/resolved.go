@@ -53,12 +53,6 @@ func (r Resolved) MaterializeTrusted(
 	secrets SecretResolver,
 	environment EnvironmentResolver,
 ) (MaterializedServer, error) {
-	if !r.RuntimeEnabled {
-		return MaterializedServer{}, fmt.Errorf(
-			"%w: MCP Server is not enabled for runtime use",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
 	return materializeValidated(
 		ctx,
 		r.Server,
@@ -81,6 +75,7 @@ func (r Resolved) Validate() error {
 			basespec.ErrInvalid,
 		)
 	}
+
 	if err := cryptoutil.ValidateDigest(r.DefinitionDigest); err != nil {
 		return err
 	}

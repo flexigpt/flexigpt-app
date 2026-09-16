@@ -79,7 +79,6 @@ func New(
 		artifacts,
 		locators,
 		resolve.DefaultLimits(),
-		resolve.Options{},
 	)
 	if err != nil {
 		return nil, err

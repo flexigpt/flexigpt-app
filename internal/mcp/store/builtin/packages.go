@@ -232,7 +232,6 @@ func canonicalCollectionExpectations(
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
 				DefinitionDigest: definitionValue.Digest,
-				Enabled:          true,
 			},
 		)
 	}

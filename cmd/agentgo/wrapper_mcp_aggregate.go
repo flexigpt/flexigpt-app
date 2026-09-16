@@ -86,7 +86,6 @@ func (w *MCPAggregateWrapper) UpdateMCPServerInstallation(
 func (w *MCPAggregateWrapper) UpdateProtectedMCPServerInstallation(
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
 	data mcpDomainServer.ServerData,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
@@ -94,7 +93,6 @@ func (w *MCPAggregateWrapper) UpdateProtectedMCPServerInstallation(
 			context.Background(),
 			ref,
 			expectedOverlayRevision,
-			runtimeEnabled,
 			data,
 		)
 	})

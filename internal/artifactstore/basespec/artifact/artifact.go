@@ -73,8 +73,10 @@ func (a ArtifactAddress) Validate() error {
 // Binding, kind, logical identity, Definition state, source content state,
 // and diagnostics are synchronized from Source refresh.
 //
-// DisplayName, Enabled, and Data are local Store state retained across
-// source refreshes.
+// DisplayName, Enabled, and Data are local Store state retained across source
+// refreshes. Enabled is mutable for Artifacts in both mutable and protected
+// Roots. Protected Root policy continues to protect source, package, display,
+// generic data, and purge mutation.
 type Artifact struct {
 	ID      ArtifactID    `json:"id"`
 	RootID  root.RootID   `json:"rootID"`
@@ -90,9 +92,12 @@ type Artifact struct {
 	State       State                   `json:"state"`
 	Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 
-	DisplayName string          `json:"displayName"`
-	Enabled     bool            `json:"enabled"`
-	Data        json.RawMessage `json:"-"`
+	DisplayName string `json:"displayName"`
+	// Enabled is universal local Artifact metadata. It is not source-owned and
+	// does not alter source refresh, Definition resolution, package lifecycle,
+	// or Artifact lifecycle behavior.
+	Enabled bool            `json:"enabled"`
+	Data    json.RawMessage `json:"-"`
 
 	Revision   uint64    `json:"revision"`
 	CreatedAt  time.Time `json:"createdAt"`

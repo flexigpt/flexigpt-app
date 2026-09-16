@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
@@ -102,7 +103,6 @@ func NewStoreAPI(
 		artifacts,
 		locators,
 		config.ResolverLimits,
-		config.ResolverOptions,
 	)
 	if err != nil {
 		return nil, err
@@ -330,19 +330,8 @@ func (a *StoreAPI) SetWorkspaceArtifactEnabled(
 			workspaceDomain.ErrReferenceUnresolved,
 		)
 	}
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
+	if _, err := a.artifacts.Get(ctx, ref); err != nil {
 		return WorkspaceArtifactView{}, err
-	}
-	baseline, err := a.isBaselineCollectionArtifact(ctx, record)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	if baseline {
-		return WorkspaceArtifactView{}, fmt.Errorf(
-			"%w: baseline Collections cannot be disabled",
-			basespec.ErrProtected,
-		)
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -379,6 +368,13 @@ func (a *StoreAPI) SetArtifactRuntimeDisabled(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
+	if !workspaceRuntimeDisableSupported(record.Kind) {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: Workspace runtime disablement is not supported for MCP Artifacts",
+			basespec.ErrUnsupported,
+		)
+	}
+
 	baseline, err := a.isBaselineCollectionArtifact(ctx, record)
 	if err != nil {
 		return WorkspaceArtifactView{}, err
@@ -508,6 +504,11 @@ func workspaceArtifactViewOf(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
+	runtimeDisabled := data.RuntimeDisabled
+	if !workspaceRuntimeDisableSupported(value.Kind) {
+		runtimeDisabled = false
+	}
+
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),
 		Revision:           value.Revision,
@@ -520,6 +521,16 @@ func workspaceArtifactViewOf(
 		SourceID:           value.Binding.SourceID,
 		Locator:            value.Binding.Locator,
 		SubresourceLocator: value.Binding.SubresourceLocator,
-		RuntimeDisabled:    data.RuntimeDisabled,
+		RuntimeDisabled:    runtimeDisabled,
 	}, nil
+}
+
+// Workspace runtime disablement remains a Workspace consumer feature for
+// prompt and Skill materialization. MCP server and MCP policy behavior use no
+// Workspace-specific enablement state.
+func workspaceRuntimeDisableSupported(
+	kind artifact.ArtifactKind,
+) bool {
+	return kind != mcpDomain.MCPArtifactKind &&
+		kind != mcpDomain.MCPPolicyArtifactKind
 }

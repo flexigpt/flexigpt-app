@@ -225,8 +225,7 @@ func (a *StoreAPI) findWorkspaceFromPath(
 	)
 	for _, record := range records {
 		if record.Kind != workspaceDomain.WorkspaceArtifactKind ||
-			record.State != artifact.StateAvailable ||
-			!record.Enabled {
+			record.State != artifact.StateAvailable {
 			continue
 		}
 		if hasManifest &&

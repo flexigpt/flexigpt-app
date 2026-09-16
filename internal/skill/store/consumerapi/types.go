@@ -42,7 +42,6 @@ type BuiltInSkillArtifactExpectation struct {
 	Kind             artifact.ArtifactKind       `json:"kind"`
 	LogicalName      basespec.LogicalName        `json:"logicalName"`
 	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
-	Enabled          bool                        `json:"enabled"`
 }
 
 type BuiltInSkillPackageInstallRequest struct {

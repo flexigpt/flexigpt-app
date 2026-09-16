@@ -21,17 +21,14 @@ type ServerInstallationView struct {
 	Document             mcpDomainServer.ServerDocument `json:"document"`
 	Installation         mcpDomainServer.ServerData     `json:"installation"`
 	InstallationRevision uint64                         `json:"installationRevision"`
-	InstallationEnabled  bool                           `json:"installationEnabled"`
-	RuntimeEnabled       bool                           `json:"runtimeEnabled"`
 	BuiltIn              bool                           `json:"builtIn"`
 }
 
 type PolicyView struct {
-	Artifact         artifact.Artifact     `json:"artifact"`
-	Definition       definition.Definition `json:"definition"`
-	Body             mcpPolicy.MCPPolicy   `json:"body"`
-	EffectiveEnabled bool                  `json:"effectiveEnabled"`
-	BuiltIn          bool                  `json:"builtIn"`
+	Artifact   artifact.Artifact     `json:"artifact"`
+	Definition definition.Definition `json:"definition"`
+	Body       mcpPolicy.MCPPolicy   `json:"body"`
+	BuiltIn    bool                  `json:"builtIn"`
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
@@ -70,7 +67,6 @@ type BuiltInArtifactExpectation struct {
 	Kind             artifact.ArtifactKind       `json:"kind"`
 	LogicalName      basespec.LogicalName        `json:"logicalName"`
 	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
-	Enabled          bool                        `json:"enabled"`
 }
 
 type BuiltInPackageInstallRequest struct {

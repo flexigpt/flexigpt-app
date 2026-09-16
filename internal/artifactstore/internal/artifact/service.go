@@ -165,10 +165,15 @@ func (s *Service) SetEnabled(
 	expectedRevision uint64,
 	enabled bool,
 ) (artifact.Artifact, error) {
+	// Enablement is universal local Artifact metadata. In particular, a user
+	// may disable a protected built-in Artifact without receiving write access
+	// to its source package, Definition, display metadata, generic Data, or
+	// lifecycle operations.
 	return s.updateLocal(
 		ctx,
 		ref,
 		expectedRevision,
+		false,
 		func(value *artifact.Artifact) {
 			value.Enabled = enabled
 		},
@@ -192,6 +197,7 @@ func (s *Service) SetDisplayName(
 		ctx,
 		ref,
 		expectedRevision,
+		true,
 		func(value *artifact.Artifact) {
 			value.DisplayName = displayName
 		},
@@ -215,6 +221,7 @@ func (s *Service) UpdateData(
 		ctx,
 		ref,
 		expectedRevision,
+		true,
 		func(value *artifact.Artifact) {
 			value.Data = json.RawMessage(canonical)
 		},
@@ -265,14 +272,17 @@ func (s *Service) updateLocal(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
+	requireMutableRoot bool,
 	mutate func(*artifact.Artifact),
 ) (artifact.Artifact, error) {
-	if err := rootimpl.RequireMutableRoot(
-		ctx,
-		s.policy,
-		ref.RootID,
-	); err != nil {
-		return artifact.Artifact{}, err
+	if requireMutableRoot {
+		if err := rootimpl.RequireMutableRoot(
+			ctx,
+			s.policy,
+			ref.RootID,
+		); err != nil {
+			return artifact.Artifact{}, err
+		}
 	}
 	if err := ref.Validate(); err != nil {
 		return artifact.Artifact{}, err

@@ -172,7 +172,6 @@ type Resolved struct {
 	Installation         ServerData           `json:"installation"`
 	Policy               mcpPolicy.Effective  `json:"policy"`
 	InstallationRevision uint64               `json:"installationRevision"`
-	RuntimeEnabled       bool                 `json:"runtimeEnabled"`
 	BuiltIn              bool                 `json:"builtIn"`
 	Version              cryptoutil.Digest    `json:"version"`
 }

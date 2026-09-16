@@ -254,6 +254,24 @@ func (w *SkillStoreWrapper) GetSkillCollection(
 	})
 }
 
+func (w *SkillStoreWrapper) SetSkillCollectionEnabled(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (collection.CollectionView, error) {
+	return withSkillStore(
+		w,
+		func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+			return api.SetSkillCollectionEnabled(
+				context.Background(),
+				ref,
+				expectedRevision,
+				enabled,
+			)
+		},
+	)
+}
+
 func (w *SkillStoreWrapper) ListSkillCollections(
 	rootID root.RootID,
 ) ([]collection.CollectionView, error) {

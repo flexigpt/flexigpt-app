@@ -176,17 +176,6 @@ func (a *API) EnsureBaseline(
 	switch {
 	case err == nil:
 		if existing.State == artifact.StateAvailable {
-			if !existing.Enabled {
-				existing, err = a.artifacts.SetEnabled(
-					ctx,
-					existing.Ref(),
-					existing.Revision,
-					true,
-				)
-				if err != nil {
-					return CollectionView{}, err
-				}
-			}
 			return a.Read(ctx, existing.Ref())
 		}
 

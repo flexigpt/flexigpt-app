@@ -166,10 +166,9 @@ func (r *ConversationResolver) ResolveConversationSelection(
 			Usage: unresolvedConversationUsage(selection, err),
 		}, err
 	}
-	if !workspace.Artifact.Enabled ||
-		workspace.Artifact.State != artifact.StateAvailable {
+	if workspace.Artifact.State != artifact.StateAvailable {
 		err := fmt.Errorf(
-			"%w: selected Workspace Artifact is disabled or unavailable",
+			"%w: selected Workspace Artifact is unavailable",
 			basespec.ErrReferenceUnresolved,
 		)
 		return ConversationResolution{

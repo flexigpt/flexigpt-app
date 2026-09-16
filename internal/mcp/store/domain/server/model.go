@@ -99,6 +99,11 @@ func decodeServerDataPayload(
 	if string(canonical) == jsonutil.EmptyObject {
 		return DefaultServerData(), nil
 	}
+	canonical, err = stripRetiredRuntimeEnabled(canonical)
+	if err != nil {
+		return ServerData{}, err
+	}
+
 	var value ServerData
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
@@ -187,4 +192,21 @@ func (value ServerData) Validate() error {
 		seen[ref] = struct{}{}
 	}
 	return nil
+}
+
+// stripRetiredRuntimeEnabled accepts persisted installation records produced
+// before MCP runtime enablement was removed. The field is ignored on read and
+// omitted by the next installation-data write.
+func stripRetiredRuntimeEnabled(
+	raw []byte,
+) ([]byte, error) {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	delete(fields, "runtimeEnabled")
+	return jsonutil.MarshalCanonicalObject(
+		fields,
+		basespec.MaxLocalDataBytes,
+	)
 }

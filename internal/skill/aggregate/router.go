@@ -92,7 +92,6 @@ func (r *ArtifactRouter) ListRootSkills(
 	output := make([]ResolvedArtifactSkill, 0, len(records))
 	for _, record := range records {
 		if !skillDomain.IsSkillKind(record.Kind) ||
-			!record.Enabled ||
 			record.State != artifact.StateAvailable {
 			continue
 		}
@@ -118,7 +117,6 @@ func (r *ArtifactRouter) resolveRecord(
 	record artifact.Artifact,
 ) (ResolvedArtifactSkill, error) {
 	if !skillDomain.IsSkillKind(record.Kind) ||
-		!record.Enabled ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {

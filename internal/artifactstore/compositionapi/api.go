@@ -156,6 +156,9 @@ type ArtifactAPI interface {
 		ref artifact.ArtifactRef,
 	) (definition.Definition, error)
 
+	// SetEnabled changes universal local Artifact metadata. Unlike other local
+	// Artifact mutations, it is valid for Artifacts in protected Roots and does
+	// not require installer privilege.
 	SetEnabled(
 		ctx context.Context,
 		ref artifact.ArtifactRef,

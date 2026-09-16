@@ -47,6 +47,42 @@ func (w *MCPStoreWrapper) ListMCPPolicies(
 	})
 }
 
+func (w *MCPStoreWrapper) SetMCPServerEnabled(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (artifact.Artifact, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (artifact.Artifact, error) {
+			return api.SetServerEnabled(
+				context.Background(),
+				ref,
+				expectedRevision,
+				enabled,
+			)
+		},
+	)
+}
+
+func (w *MCPStoreWrapper) SetMCPPolicyEnabled(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (artifact.Artifact, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (artifact.Artifact, error) {
+			return api.SetPolicyEnabled(
+				context.Background(),
+				ref,
+				expectedRevision,
+				enabled,
+			)
+		},
+	)
+}
+
 func (w *MCPStoreWrapper) ListMCPServersForManagement() (
 	[]artifact.Artifact,
 	error,
@@ -171,6 +207,24 @@ func (w *MCPStoreWrapper) GetMCPCollection(
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
 		return api.GetMCPCollection(context.Background(), ref)
 	})
+}
+
+func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (collection.CollectionView, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+			return api.SetMCPCollectionEnabled(
+				context.Background(),
+				ref,
+				expectedRevision,
+				enabled,
+			)
+		},
+	)
 }
 
 func (w *MCPStoreWrapper) ResolveMCPCollection(

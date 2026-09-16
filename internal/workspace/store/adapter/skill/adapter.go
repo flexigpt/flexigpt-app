@@ -117,7 +117,6 @@ func (a *Adapter) resolve(
 ) (WorkspaceSkill, error) {
 	if record.RootID != workspace.Artifact.RootID ||
 		!skillDomain.IsSkillKind(record.Kind) ||
-		!record.Enabled ||
 		record.State != artifact.StateAvailable ||
 		record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {

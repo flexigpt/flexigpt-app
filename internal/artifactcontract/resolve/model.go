@@ -75,22 +75,16 @@ func (l Limits) Validate() error {
 	return nil
 }
 
-type Options struct {
-	IncludeDisabled bool
-}
-
 type Resolver struct {
 	artifacts ArtifactReader
 	locators  LocatorResolver
 	limits    Limits
-	options   Options
 }
 
 func New(
 	artifacts ArtifactReader,
 	locators LocatorResolver,
 	limits Limits,
-	options Options,
 ) (*Resolver, error) {
 	if artifacts == nil {
 		return nil, fmt.Errorf(
@@ -106,7 +100,6 @@ func New(
 		artifacts: artifacts,
 		locators:  locators,
 		limits:    limits,
-		options:   options,
 	}, nil
 }
 

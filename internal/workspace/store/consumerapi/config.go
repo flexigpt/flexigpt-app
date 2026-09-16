@@ -12,7 +12,6 @@ type Config struct {
 	ContextComposition workspaceRuntime.CompositionPolicy
 	LocatorResolvers   []providerapi.LocatorResolverFactory
 	ResolverLimits     resolve.Limits
-	ResolverOptions    resolve.Options
 	MCPServers         mcp.ServerResolver
 
 	// AdditionalDecoderHints lets application composition add dedicated

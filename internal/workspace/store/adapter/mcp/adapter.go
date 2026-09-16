@@ -28,9 +28,8 @@ type ServerResolver interface {
 }
 
 type WorkspaceServer struct {
-	Artifact        artifact.ArtifactRef     `json:"artifact"`
-	Server          mcpDomainServer.Resolved `json:"server"`
-	RuntimeDisabled bool                     `json:"runtimeDisabled"`
+	Artifact artifact.ArtifactRef     `json:"artifact"`
+	Server   mcpDomainServer.Resolved `json:"server"`
 }
 
 type LoadPlan struct {
@@ -99,32 +98,21 @@ func (a *Adapter) Load(
 		if err != nil {
 			return LoadPlan{}, err
 		}
-		if !record.Enabled ||
-			record.State != artifact.StateAvailable {
+		if record.State != artifact.StateAvailable {
 			return LoadPlan{}, fmt.Errorf(
 				"%w: Workspace MCP Artifact %q is unavailable",
 				workspaceDomain.ErrReferenceUnresolved,
 				ref.ArtifactID,
 			)
 		}
-		settings, err := workspaceDomain.DecodeArtifactData(
-			record.Data,
-		)
-		if err != nil {
-			return LoadPlan{}, err
-		}
 
 		server, err := a.servers.ResolveMCPServer(ctx, ref)
 		if err != nil {
 			return LoadPlan{}, err
 		}
-		if settings.RuntimeDisabled {
-			server.RuntimeEnabled = false
-		}
 		output.Servers = append(output.Servers, WorkspaceServer{
-			Artifact:        ref,
-			Server:          server,
-			RuntimeDisabled: settings.RuntimeDisabled,
+			Artifact: ref,
+			Server:   server,
 		})
 	}
 	return output, nil

@@ -40,11 +40,11 @@ type SettingsPrefixValueStore interface {
 	) error
 }
 
+// ServerOverlay stores protected MCP installation configuration only.
 type ServerOverlay struct {
-	SchemaVersion  string                     `json:"schemaVersion"`
-	Revision       uint64                     `json:"revision"`
-	RuntimeEnabled bool                       `json:"runtimeEnabled"`
-	ServerData     mcpDomainServer.ServerData `json:"serverData"`
+	SchemaVersion string                     `json:"schemaVersion"`
+	Revision      uint64                     `json:"revision"`
+	ServerData    mcpDomainServer.ServerData `json:"serverData"`
 }
 
 type OverlayRepository interface {

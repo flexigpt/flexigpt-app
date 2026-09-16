@@ -29,7 +29,6 @@ type Lifecycle struct {
 			ctx context.Context,
 			ref artifact.ArtifactRef,
 			expectedOverlayRevision uint64,
-			runtimeEnabled bool,
 			data mcpDomainServer.ServerData,
 		) error
 	}
@@ -49,7 +48,6 @@ func NewLifecycle(
 			ctx context.Context,
 			ref artifact.ArtifactRef,
 			expectedOverlayRevision uint64,
-			runtimeEnabled bool,
 			data mcpDomainServer.ServerData,
 		) error
 	},
@@ -99,7 +97,6 @@ func (l *Lifecycle) UpdateProtectedServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
-	runtimeEnabled bool,
 	data mcpDomainServer.ServerData,
 ) error {
 	if err := l.InvalidateServer(ctx, ref); err != nil {
@@ -109,7 +106,6 @@ func (l *Lifecycle) UpdateProtectedServerInstallation(
 		ctx,
 		ref,
 		expectedOverlayRevision,
-		runtimeEnabled,
 		data,
 	)
 }

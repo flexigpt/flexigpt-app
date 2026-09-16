@@ -111,13 +111,6 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			record.ID,
 		)
 	}
-	if !r.options.IncludeDisabled && !record.Enabled {
-		return loadedDeclarationArtifact{}, fmt.Errorf(
-			"%w: Artifact %q is disabled",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
 
 	declarationType := declaration.Type(record.Kind)
 	if err := declarationType.Validate(); err != nil {
@@ -365,9 +358,6 @@ func (r *Resolver) resolveSymbolic(
 		if record.State != artifact.StateAvailable {
 			continue
 		}
-		if !r.options.IncludeDisabled && !record.Enabled {
-			continue
-		}
 		candidates = append(candidates, record)
 	}
 	terminalRefs := make(
@@ -541,8 +531,7 @@ func (r *Resolver) resolveNamedInlineArtifact(
 
 	matches := make([]artifact.Artifact, 0, len(records))
 	for _, record := range records {
-		if record.State != artifact.StateAvailable ||
-			(!r.options.IncludeDisabled && !record.Enabled) {
+		if record.State != artifact.StateAvailable {
 			continue
 		}
 		if from != nil &&

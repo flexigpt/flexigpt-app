@@ -209,6 +209,48 @@ func (a *API) Get(
 	return collectionViewOf(value.artifact, value.document)
 }
 
+// SetEnabled changes the generic local enablement metadata of a Collection.
+//
+// It is intentionally independent of Collection editability, membership,
+// deletion eligibility, source ownership, and Root protection. A disabled
+// Collection remains readable and editable when it was otherwise editable.
+func (a *API) SetEnabled(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	enabled bool,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if expectedRevision == 0 {
+		return CollectionView{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	view, err := a.Read(ctx, ref)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	if view.Artifact.Revision != expectedRevision {
+		return CollectionView{}, basespec.ErrConflict
+	}
+
+	updated, err := a.artifacts.SetEnabled(
+		ctx,
+		view.Artifact.Ref(),
+		expectedRevision,
+		enabled,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	view.Artifact = updated.Clone()
+	return view, nil
+}
+
 func (a *API) List(
 	ctx context.Context,
 	rootID root.RootID,
