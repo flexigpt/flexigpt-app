@@ -129,6 +129,35 @@ type Graph struct {
 	Root *ResolvedEntry
 }
 
+// ResolutionStatus describes the declaration-resolution state of one
+// composition edge. It does not represent consumer-specific runtime readiness.
+type ResolutionStatus string
+
+const (
+	ResolutionAvailable   ResolutionStatus = "available"
+	ResolutionUnavailable ResolutionStatus = "unavailable"
+	ResolutionAmbiguous   ResolutionStatus = "ambiguous"
+)
+
+type ResolutionIssue struct {
+	Code    string
+	Message string
+}
+
+// ResolvedRelationship preserves every declared composition occurrence. An
+// unavailable or ambiguous edge does not invalidate its containing
+// Collection, Agent, Team, Workflow, Loop, or Workspace declaration.
+type ResolvedRelationship struct {
+	Declared declaration.Entry
+	Status   ResolutionStatus
+	Resolved *ResolvedEntry
+	Issue    *ResolutionIssue
+}
+
+func (r ResolvedRelationship) IsAvailable() bool {
+	return r.Status == ResolutionAvailable && r.Resolved != nil
+}
+
 type ResolvedEntry struct {
 	Type declaration.Type
 
@@ -139,9 +168,15 @@ type ResolvedEntry struct {
 	Definition *definition.Definition
 	Inline     *declaration.Entry
 
-	Members      []*ResolvedEntry
-	AllowedTools []*ResolvedEntry
-	Program      *ResolvedEntry
+	// Members and AllowedTools are compatibility projections containing only
+	// currently available entries. New consumers must use the corresponding
+	// relationship result fields to preserve partial composition state.
+	Members            []*ResolvedEntry
+	MemberResults      []ResolvedRelationship
+	AllowedTools       []*ResolvedEntry
+	AllowedToolResults []ResolvedRelationship
+	Program            *ResolvedEntry
+	ProgramResult      *ResolvedRelationship
 
 	Loop      *ResolvedLoop
 	Workflow  *ResolvedWorkflow
@@ -149,6 +184,7 @@ type ResolvedEntry struct {
 }
 
 type ResolvedLoop struct {
+	BodyResult    *ResolvedRelationship
 	Body          *ResolvedEntry
 	MaxIterations int
 	Until         *declaration.OutputMatch
@@ -161,9 +197,10 @@ type ResolvedWorkflow struct {
 }
 
 type ResolvedWorkflowNode struct {
-	ID     string
-	Join   string
-	Target *ResolvedEntry
+	ID           string
+	Join         string
+	Target       *ResolvedEntry
+	TargetResult *ResolvedRelationship
 }
 
 type ResolvedWorkflowEdge struct {
@@ -173,7 +210,8 @@ type ResolvedWorkflowEdge struct {
 }
 
 type ResolvedWorkspace struct {
-	Roots []*ResolvedEntry
+	Roots       []*ResolvedEntry
+	RootResults []ResolvedRelationship
 }
 
 func (r *ResolvedEntry) ArtifactRef() (artifact.ArtifactRef, bool) {

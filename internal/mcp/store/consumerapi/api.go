@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -35,6 +36,7 @@ type API struct {
 	secretCleaner      mcpDomainServer.SecretCleaner
 	baselinePolicy     mcpPolicy.MCPPolicy
 	declarationAliases *resolve.Resolver
+	collections        *collection.API
 }
 
 func New(
@@ -70,6 +72,17 @@ func New(
 			option(&config)
 		}
 	}
+
+	collections, err := collection.New(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	output := &API{
 		sources:          sources,
 		discovery:        discovery,
@@ -80,6 +93,7 @@ func New(
 		overlays:         overlays,
 		secretCleaner:    secretCleaner,
 		baselinePolicy:   baselinePolicy,
+		collections:      collections,
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
@@ -439,6 +453,13 @@ func (a *API) InstallBuiltInPackage(
 
 	output := make([]artifact.Artifact, 0, len(expectations))
 	for _, expected := range expectations {
+		originLocator, err := request.PackageAddress.FileLocator(
+			expected.Locator,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		if err := expected.Subresource.Validate(); err != nil {
 			return nil, err
 		}
@@ -459,7 +480,7 @@ func (a *API) InstallBuiltInPackage(
 			request.RootID,
 			artifact.SourceBinding{
 				SourceID:           request.SourceID,
-				Locator:            documentLocator,
+				Locator:            originLocator,
 				SubresourceLocator: expected.Subresource,
 			},
 			expected.Kind,
@@ -508,12 +529,21 @@ func normalizeBuiltInMCPExpectations(
 		)
 	}
 
+	type origin struct {
+		locator     basespec.Locator
+		subresource basespec.SubresourceLocator
+		kind        artifact.ArtifactKind
+	}
+
 	output := append([]BuiltInArtifactExpectation(nil), values...)
-	seen := make(map[basespec.SubresourceLocator]struct{}, len(output))
+	seen := make(map[origin]struct{}, len(output))
 	var rootValue BuiltInArtifactExpectation
 	rootFound := false
 
 	for index, expected := range output {
+		if err := expected.Locator.ValidatePortable(false); err != nil {
+			return nil, BuiltInArtifactExpectation{}, err
+		}
 		if err := expected.Subresource.Validate(); err != nil {
 			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
 				"built-in MCP expectations[%d]: %w",
@@ -532,16 +562,24 @@ func normalizeBuiltInMCPExpectations(
 		); err != nil {
 			return nil, BuiltInArtifactExpectation{}, err
 		}
-		if _, duplicate := seen[expected.Subresource]; duplicate {
+
+		key := origin{
+			locator:     expected.Locator,
+			subresource: expected.Subresource,
+			kind:        expected.Kind,
+		}
+		if _, duplicate := seen[key]; duplicate {
 			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-				"%w: built-in MCP package repeats subresource %q",
+				"%w: built-in MCP package repeats Artifact origin %q/%q",
 				basespec.ErrInvalid,
+				expected.Locator,
 				expected.Subresource,
 			)
 		}
-		seen[expected.Subresource] = struct{}{}
+		seen[key] = struct{}{}
 
-		if expected.Subresource != "" {
+		if expected.Locator != mcpDomain.MCPCollectionDocumentFile ||
+			expected.Subresource != "" {
 			continue
 		}
 		if rootFound ||
@@ -564,6 +602,9 @@ func normalizeBuiltInMCPExpectations(
 	}
 
 	sort.Slice(output, func(left, right int) bool {
+		if output[left].Locator != output[right].Locator {
+			return output[left].Locator < output[right].Locator
+		}
 		return output[left].Subresource < output[right].Subresource
 	})
 	return output, rootValue, nil

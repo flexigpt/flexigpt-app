@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -52,16 +53,20 @@ func NewFactory(
 }
 
 func NewCanonicalDeclarationFactory() *Factory {
+	declarationTypes := declaration.Types()
+	artifactKinds := make(
+		[]artifact.ArtifactKind,
+		0,
+		len(declarationTypes),
+	)
+	for _, declarationType := range declarationTypes {
+		artifactKinds = append(
+			artifactKinds,
+			artifact.ArtifactKind(declarationType),
+		)
+	}
 	return NewFactory(
-		[]artifact.ArtifactKind{
-			artifact.ArtifactKind(declaration.TypeCollection),
-			artifact.ArtifactKind(declaration.TypeAgent),
-			artifact.ArtifactKind(declaration.TypeTeam),
-			artifact.ArtifactKind(declaration.TypeLoop),
-			artifact.ArtifactKind(declaration.TypeWorkflow),
-			artifact.ArtifactKind(declaration.TypeWorkspace),
-			artifact.ArtifactKind(declaration.TypeMCPPolicy),
-		},
+		artifactKinds,
 		canonicalDeclarationPlanner{},
 	)
 }
@@ -157,6 +162,7 @@ func (r *boundResolver) ResolveLocator(
 		request.RootID,
 		*request.From,
 		target,
+		request.ExpectedKind,
 	)
 	if err != nil {
 		return artifact.ArtifactRef{}, err
@@ -169,7 +175,16 @@ func (r *boundResolver) ensureDiscovered(
 	rootID root.RootID,
 	origin artifact.Artifact,
 	target basespec.Locator,
+	expectedKind artifact.ArtifactKind,
 ) ([]basespec.Locator, error) {
+	targets, err := declarationCandidateLocators(
+		target,
+		expectedKind,
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	for range 3 {
 		current, err := r.runtime.GetSource(
 			ctx,
@@ -187,13 +202,27 @@ func (r *boundResolver) ensureDiscovered(
 			)
 		}
 
-		next, candidates, err := r.planner.PlanPath(
-			target,
-			current.Discovery,
-		)
-		if err != nil {
-			return nil, err
+		next := current.Discovery.Clone()
+		candidates := make([]basespec.Locator, 0, len(targets))
+		for _, candidateTarget := range targets {
+			plannedNext, planned, err := r.planner.PlanPath(
+				candidateTarget,
+				next,
+			)
+			if err != nil {
+				return nil, err
+			}
+			next = plannedNext
+			for _, locator := range planned {
+				if err := locator.Validate(false); err != nil {
+					return nil, err
+				}
+				if !slices.Contains(candidates, locator) {
+					candidates = append(candidates, locator)
+				}
+			}
 		}
+
 		next = next.Normalized()
 		if err := next.Validate(); err != nil {
 			return nil, err
@@ -232,6 +261,29 @@ func (r *boundResolver) ensureDiscovered(
 		"%w: declaration Source changed during path locator resolution",
 		basespec.ErrConflict,
 	)
+}
+
+func declarationCandidateLocators(
+	target basespec.Locator,
+	expectedKind artifact.ArtifactKind,
+) ([]basespec.Locator, error) {
+	output := make([]basespec.Locator, 0, 2)
+	output = append(output, target)
+	if expectedKind != artifact.ArtifactKind(declaration.TypeSkill) ||
+		path.Base(string(target)) == "SKILL.md" {
+		return output, nil
+	}
+
+	// A portable Skill locator conventionally identifies the package
+	// directory. The independently declared Artifact originates at SKILL.md.
+	document := basespec.Locator(path.Join(
+		string(target),
+		"SKILL.md",
+	))
+	if err := document.Validate(false); err != nil {
+		return nil, err
+	}
+	return append(output, document), nil
 }
 
 func (r *boundResolver) selectArtifact(

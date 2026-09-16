@@ -3,6 +3,7 @@ package consumerapi
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -34,20 +35,37 @@ type PolicyView struct {
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
-	RootID      root.RootID               `json:"rootID"`
-	SourceID    source.SourceID           `json:"sourceID"`
-	Name        basespec.LogicalName      `json:"name"`
-	Description string                    `json:"description,omitempty"`
-	Body        mcppolicyv1.MCPPolicyBody `json:"body"`
-	Enabled     bool                      `json:"enabled"`
+	Collection                 artifact.ArtifactRef      `json:"collection"`
+	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
+	Name                       basespec.LogicalName      `json:"name"`
+	Description                string                    `json:"description,omitempty"`
+	Body                       mcppolicyv1.MCPPolicyBody `json:"body"`
+	Enabled                    bool                      `json:"enabled"`
 }
 
 type ManagedMCPPolicyUpsertResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact          artifact.Artifact         `json:"artifact"`
+	Address           artifact.ArtifactAddress  `json:"address"`
+	Collection        collection.CollectionView `json:"collection"`
+	MembershipCreated bool                      `json:"membershipCreated"`
+}
+
+type ManagedMCPCreateRequest struct {
+	Collection                 artifact.ArtifactRef           `json:"collection"`
+	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
+	Document                   mcpDomainServer.ServerDocument `json:"document"`
+	Enabled                    bool                           `json:"enabled"`
+}
+
+type ManagedMCPCreateResult struct {
+	Artifact          artifact.Artifact         `json:"artifact"`
+	Address           artifact.ArtifactAddress  `json:"address"`
+	Collection        collection.CollectionView `json:"collection"`
+	MembershipCreated bool                      `json:"membershipCreated"`
 }
 
 type BuiltInArtifactExpectation struct {
+	Locator          basespec.Locator            `json:"locator"`
 	Subresource      basespec.SubresourceLocator `json:"subresource"`
 	Kind             artifact.ArtifactKind       `json:"kind"`
 	LogicalName      basespec.LogicalName        `json:"logicalName"`

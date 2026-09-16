@@ -12,8 +12,10 @@ import (
 // Entry is a named heterogeneous nested declaration or symbolic reference.
 //
 // Every Entry requires a portable name. An Entry containing exactly type and
-// name is a symbolic reference. Any additional declaration fields make it a
-// named declaration.
+// name is an exact symbolic reference. In a composition position,
+// CompositionForm determines whether additional fields remain an external
+// reference or form a contained declaration. A locator alone is not a
+// contained declaration.
 type Entry struct {
 	raw    json.RawMessage
 	header Header
@@ -156,6 +158,10 @@ func (e Entry) IsSymbolic() bool {
 }
 
 // IsDeclarationLocatorReference reports a located declaration edge.
+//
+// This predicate is retained for standalone declaration-source alias behavior.
+// Composition positions must use CompositionForm so locator semantics remain
+// uniform across all declaration types.
 //
 // Composite declaration locators identify another declaration Artifact.
 // When nested, this form remains an edge and must not create an unused wrapper

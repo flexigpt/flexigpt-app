@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -29,6 +31,7 @@ type API struct {
 	resources        compositionapi.ResourceAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
+	collections      *collection.API
 }
 
 func New(
@@ -50,6 +53,15 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
+	collections, err := collection.New(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &API{
 		sources:          sources,
 		discovery:        discovery,
@@ -57,6 +69,7 @@ func New(
 		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
+		collections:      collections,
 	}, nil
 }
 
@@ -271,16 +284,26 @@ func (a *API) CreateManagedSkill(
 	ctx context.Context,
 	request ManagedSkillCreateRequest,
 ) (ManagedSkillCreateResult, error) {
-	if err := request.RootID.Validate(); err != nil {
+	if a == nil || a.collections == nil {
+		return ManagedSkillCreateResult{}, basespec.ErrClosed
+	}
+	if err := request.Collection.Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
-	if err := request.SourceID.Validate(); err != nil {
+	if request.ExpectedCollectionRevision == 0 {
+		return ManagedSkillCreateResult{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := a.requireMutable(
+		ctx,
+		request.Collection.RootID,
+		false,
+	); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
 	if err := basespec.LogicalName(request.SkillName).Validate(); err != nil {
-		return ManagedSkillCreateResult{}, err
-	}
-	if err := a.requireMutable(ctx, request.RootID, false); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
 
@@ -318,21 +341,50 @@ func (a *API) CreateManagedSkill(
 	if err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
+
+	member, err := a.collections.MemberForCollectionSource(
+		ctx,
+		request.Collection,
+		declaration.TypeSkill,
+		definitionValue.LogicalName,
+		locator,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+	membership, err := a.collections.EnsureMember(
+		ctx,
+		collection.AddMemberRequest{
+			Collection:       request.Collection,
+			ExpectedRevision: request.ExpectedCollectionRevision,
+			Member:           member,
+		},
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
+
+	result := ManagedSkillCreateResult{
+		Collection:        membership.Collection,
+		MembershipCreated: membership.Created,
+	}
+	rootID := membership.Collection.Artifact.RootID
+	sourceID := membership.Collection.Artifact.Binding.SourceID
 	if _, err := a.ensureManagedSkillDiscovery(
 		ctx,
-		request.RootID,
-		request.SourceID,
+		rootID,
+		sourceID,
 		locator,
 	); err != nil {
-		return ManagedSkillCreateResult{}, err
+		return result, err
 	}
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
 		artifact.PublishArtifactRequest{
-			RootID: request.RootID,
+			RootID: rootID,
 			Binding: artifact.SourceBinding{
-				SourceID: request.SourceID,
+				SourceID: sourceID,
 				Locator:  locator,
 			},
 			ExpectedKind:        skillDomain.SkillArtifactKind,
@@ -345,10 +397,12 @@ func (a *API) CreateManagedSkill(
 		},
 	)
 	if err != nil {
-		return ManagedSkillCreateResult{}, err
+		return result, err
 	}
 
 	value := published.Artifact
+	result.Artifact = value
+	result.Address = value.Address()
 	if value.Enabled != request.Enabled {
 		value, err = a.artifacts.SetEnabled(
 			ctx,
@@ -357,13 +411,12 @@ func (a *API) CreateManagedSkill(
 			request.Enabled,
 		)
 		if err != nil {
-			return ManagedSkillCreateResult{}, err
+			return result, err
 		}
+		result.Artifact = value
+		result.Address = value.Address()
 	}
-	return ManagedSkillCreateResult{
-		Artifact: value,
-		Address:  value.Address(),
-	}, nil
+	return result, nil
 }
 
 func (a *API) GetManagedSkillDocument(
@@ -392,7 +445,7 @@ func (a *API) GetManagedSkillDocument(
 		path.Base(string(value.Binding.Locator)) !=
 			string(skillDomain.SkillDefinitionFileName) {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: collection-owned Skills must be edited through their owning declaration package",
+			"%w: managed Skill must originate at its package SKILL.md",
 			basespec.ErrUnsupported,
 		)
 	}
@@ -479,7 +532,7 @@ func (a *API) PurgeSkill(
 		path.Base(string(value.Binding.Locator)) !=
 			string(skillDomain.SkillDefinitionFileName) {
 		return fmt.Errorf(
-			"%w: collection-owned Skills must be removed through their owning declaration package",
+			"%w: managed Skill must originate at its package SKILL.md",
 			basespec.ErrUnsupported,
 		)
 	}

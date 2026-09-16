@@ -56,13 +56,26 @@ type WorkspacePathRegistrationResult struct {
 	Load      WorkspaceLoad             `json:"load"`
 }
 
+// WorkspaceCapabilityOccurrence preserves one Workspace root or nested
+// composition occurrence, including an unavailable or ambiguous member.
+type WorkspaceCapabilityOccurrence struct {
+	Path     string                   `json:"path"`
+	Type     declaration.Type         `json:"type"`
+	Name     basespec.LogicalName     `json:"name"`
+	Status   resolve.ResolutionStatus `json:"status"`
+	Artifact *artifact.ArtifactRef    `json:"artifact,omitempty"`
+	Code     string                   `json:"code,omitempty"`
+	Message  string                   `json:"message,omitempty"`
+}
+
 // WorkspaceCapabilityPlan is the ordered Artifact-backed capability projection
 // of resolved Workspace roots. It is a consumer plan, not a Store entity.
 type WorkspaceCapabilityPlan struct {
-	Workspace       WorkspaceRef           `json:"workspace"`
-	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts"`
-	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts"`
-	MCPArtifacts    []artifact.ArtifactRef `json:"mcpArtifacts"`
+	Workspace       WorkspaceRef                    `json:"workspace"`
+	Occurrences     []WorkspaceCapabilityOccurrence `json:"occurrences"`
+	PromptArtifacts []artifact.ArtifactRef          `json:"promptArtifacts"`
+	SkillArtifacts  []artifact.ArtifactRef          `json:"skillArtifacts"`
+	MCPArtifacts    []artifact.ArtifactRef          `json:"mcpArtifacts"`
 }
 
 type WorkspaceRuntimeSelection struct {

@@ -1,6 +1,7 @@
 package consumerapi
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -27,16 +28,16 @@ type SkillPathRegistrationResult struct {
 }
 
 type ManagedSkillCreateRequest struct {
-	RootID   root.RootID     `json:"rootID"`
-	SourceID source.SourceID `json:"sourceID"`
-
-	SkillName string                      `json:"skillName"`
-	SKILLMD   []byte                      `json:"skillMD,omitempty"`
-	Files     []source.ManagedPackageFile `json:"files,omitempty"`
-	Enabled   bool                        `json:"enabled"`
+	Collection                 artifact.ArtifactRef        `json:"collection"`
+	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision"`
+	SkillName                  string                      `json:"skillName"`
+	SKILLMD                    []byte                      `json:"skillMD,omitempty"`
+	Files                      []source.ManagedPackageFile `json:"files,omitempty"`
+	Enabled                    bool                        `json:"enabled"`
 }
 
 type BuiltInSkillArtifactExpectation struct {
+	Locator          basespec.Locator            `json:"locator"`
 	Subresource      basespec.SubresourceLocator `json:"subresource"`
 	Kind             artifact.ArtifactKind       `json:"kind"`
 	LogicalName      basespec.LogicalName        `json:"logicalName"`
@@ -54,6 +55,8 @@ type BuiltInSkillPackageInstallRequest struct {
 }
 
 type ManagedSkillCreateResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact          artifact.Artifact         `json:"artifact"`
+	Address           artifact.ArtifactAddress  `json:"address"`
+	Collection        collection.CollectionView `json:"collection"`
+	MembershipCreated bool                      `json:"membershipCreated"`
 }

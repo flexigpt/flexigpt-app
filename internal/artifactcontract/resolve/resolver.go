@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -25,6 +26,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 )
 
@@ -324,6 +326,9 @@ func (r *Resolver) resolveSymbolic(
 			candidate.Ref(),
 		)
 		if err != nil {
+			if _, _, unavailable := resolutionFailure(err); unavailable {
+				continue
+			}
 			return nil, fmt.Errorf(
 				"resolve symbolic candidate Artifact %q: %w",
 				candidate.ID,
@@ -379,24 +384,28 @@ func (r *Resolver) resolveEntry(
 		return nil, err
 	}
 
+	form, err := entry.CompositionForm()
+	if err != nil {
+		return nil, err
+	}
 	header := entry.Header()
-	if entry.IsSymbolic() {
+	if form == declaration.CompositionEntryReference {
+		if header.Locator != nil {
+			return r.resolveDeclarationLocator(
+				ctx,
+				state,
+				rootID,
+				from,
+				entry,
+				depth,
+			)
+		}
 		return r.resolveSymbolic(
 			ctx,
 			state,
 			rootID,
 			header.Type,
 			basespec.LogicalName(header.Name),
-			depth,
-		)
-	}
-	if shouldResolveDeclarationLocator(entry, header.Locator) {
-		return r.resolveDeclarationLocator(
-			ctx,
-			state,
-			rootID,
-			from,
-			entry,
 			depth,
 		)
 	}
@@ -579,7 +588,7 @@ func (r *Resolver) resolveStructure(
 		if err != nil {
 			return err
 		}
-		node.AllowedTools, err = r.resolveEntries(
+		node.AllowedTools, node.AllowedToolResults, err = r.resolveEntries(
 			ctx,
 			state,
 			rootID,
@@ -603,7 +612,7 @@ func (r *Resolver) resolveStructure(
 		if err != nil {
 			return err
 		}
-		node.Members, err = r.resolveEntries(
+		node.Members, node.MemberResults, err = r.resolveEntries(
 			ctx,
 			state,
 			rootID,
@@ -619,7 +628,7 @@ func (r *Resolver) resolveStructure(
 		if err != nil {
 			return err
 		}
-		node.Members, err = r.resolveEntries(
+		node.Members, node.MemberResults, err = r.resolveEntries(
 			ctx,
 			state,
 			rootID,
@@ -632,7 +641,7 @@ func (r *Resolver) resolveStructure(
 			return err
 		}
 		if value.Program != nil {
-			node.Program, err = r.resolveEntry(
+			program, err := r.resolveRelationship(
 				ctx,
 				state,
 				rootID,
@@ -641,15 +650,20 @@ func (r *Resolver) resolveStructure(
 				depth+1,
 				node,
 			)
+			if err != nil {
+				return err
+			}
+			node.Program = program.Resolved
+			node.ProgramResult = new(program)
 		}
-		return err
+		return nil
 
 	case declaration.TypeTeam:
 		value, err := teamv1.DecodeTeamEntry(entry)
 		if err != nil {
 			return err
 		}
-		node.Members, err = r.resolveEntries(
+		node.Members, node.MemberResults, err = r.resolveEntries(
 			ctx,
 			state,
 			rootID,
@@ -662,7 +676,7 @@ func (r *Resolver) resolveStructure(
 			return err
 		}
 		if value.Program != nil {
-			node.Program, err = r.resolveEntry(
+			program, err := r.resolveRelationship(
 				ctx,
 				state,
 				rootID,
@@ -671,8 +685,13 @@ func (r *Resolver) resolveStructure(
 				depth+1,
 				node,
 			)
+			if err != nil {
+				return err
+			}
+			node.Program = program.Resolved
+			node.ProgramResult = new(program)
 		}
-		return err
+		return nil
 
 	case declaration.TypeLoop:
 		value, err := loopv1.DecodeLoopEntry(
@@ -690,8 +709,9 @@ func (r *Resolver) resolveStructure(
 			loop.Until = &copyValue
 		}
 		node.Loop = loop
+
 		if value.Body != nil {
-			loop.Body, err = r.resolveEntry(
+			body, err := r.resolveRelationship(
 				ctx,
 				state,
 				rootID,
@@ -700,7 +720,12 @@ func (r *Resolver) resolveStructure(
 				depth+1,
 				nil,
 			)
-			return err
+			if err != nil {
+				return err
+			}
+			loop.Body = body.Resolved
+			loop.BodyResult = new(body)
+			return nil
 		}
 		loop.Body = implicitLoopOwner
 		return nil
@@ -725,7 +750,7 @@ func (r *Resolver) resolveStructure(
 		}
 		node.Workflow = workflow
 		for _, workflowNode := range value.Nodes {
-			target, err := r.resolveEntry(
+			target, err := r.resolveRelationship(
 				ctx,
 				state,
 				rootID,
@@ -744,9 +769,10 @@ func (r *Resolver) resolveStructure(
 			workflow.Nodes = append(
 				workflow.Nodes,
 				ResolvedWorkflowNode{
-					ID:     workflowNode.ID,
-					Join:   string(join),
-					Target: target,
+					ID:           workflowNode.ID,
+					Join:         string(join),
+					Target:       target.Resolved,
+					TargetResult: new(target),
 				},
 			)
 		}
@@ -768,26 +794,18 @@ func (r *Resolver) resolveStructure(
 		if err != nil {
 			return err
 		}
-		workspace := &ResolvedWorkspace{
-			Roots: make([]*ResolvedEntry, 0, len(value.Roots)),
-		}
+		workspace := &ResolvedWorkspace{}
 		node.Workspace = workspace
-		for _, rootEntry := range value.Roots {
-			resolved, err := r.resolveEntry(
-				ctx,
-				state,
-				rootID,
-				rootEntry,
-				from,
-				depth+1,
-				nil,
-			)
-			if err != nil {
-				return err
-			}
-			workspace.Roots = append(workspace.Roots, resolved)
-		}
-		return nil
+		workspace.Roots, workspace.RootResults, err = r.resolveEntries(
+			ctx,
+			state,
+			rootID,
+			value.Roots,
+			from,
+			depth+1,
+			nil,
+		)
+		return err
 
 	default:
 		return fmt.Errorf(
@@ -806,10 +824,11 @@ func (r *Resolver) resolveEntries(
 	from *artifact.Artifact,
 	depth int,
 	implicitLoopOwner *ResolvedEntry,
-) ([]*ResolvedEntry, error) {
-	output := make([]*ResolvedEntry, 0, len(values))
+) ([]*ResolvedEntry, []ResolvedRelationship, error) {
+	available := make([]*ResolvedEntry, 0, len(values))
+	relationships := make([]ResolvedRelationship, 0, len(values))
 	for _, value := range values {
-		resolved, err := r.resolveEntry(
+		relationship, err := r.resolveRelationship(
 			ctx,
 			state,
 			rootID,
@@ -819,11 +838,98 @@ func (r *Resolver) resolveEntries(
 			implicitLoopOwner,
 		)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		output = append(output, resolved)
+		relationships = append(relationships, relationship)
+		if relationship.Resolved != nil {
+			available = append(available, relationship.Resolved)
+		}
 	}
-	return output, nil
+	return available, relationships, nil
+}
+
+func (r *Resolver) resolveRelationship(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	entry declaration.Entry,
+	from *artifact.Artifact,
+	depth int,
+	implicitLoopOwner *ResolvedEntry,
+) (ResolvedRelationship, error) {
+	relationship := ResolvedRelationship{
+		Declared: entry.Clone(),
+	}
+	resolved, err := r.resolveEntry(
+		ctx,
+		state,
+		rootID,
+		entry,
+		from,
+		depth,
+		implicitLoopOwner,
+	)
+	if err == nil {
+		relationship.Status = ResolutionAvailable
+		relationship.Resolved = resolved
+		return relationship, nil
+	}
+
+	status, issue, partial := resolutionFailure(err)
+	if !partial {
+		return ResolvedRelationship{}, err
+	}
+	relationship.Status = status
+	relationship.Issue = &issue
+	return relationship, nil
+}
+
+func resolutionFailure(
+	err error,
+) (ResolutionStatus, ResolutionIssue, bool) {
+	issue := func(code string) ResolutionIssue {
+		return ResolutionIssue{
+			Code:    code,
+			Message: diagnostic.BoundedMessage(err.Error()),
+		}
+	}
+
+	switch {
+	case errors.Is(err, basespec.ErrIdentityConflict):
+		return ResolutionAmbiguous,
+			issue("artifact.identity-conflict"),
+			true
+
+	case errors.Is(err, basespec.ErrLocatorLimitExceeded):
+		return ResolutionUnavailable,
+			issue("artifact.locator-limit-exceeded"),
+			true
+
+	case errors.Is(err, basespec.ErrLocatorUnresolved):
+		return ResolutionUnavailable,
+			issue("artifact.locator-unresolved"),
+			true
+
+	case errors.Is(err, basespec.ErrSourceUnavailable):
+		return ResolutionUnavailable,
+			issue("artifact.source-unavailable"),
+			true
+
+	case errors.Is(err, basespec.ErrRefreshRequired):
+		return ResolutionUnavailable,
+			issue("artifact.refresh-required"),
+			true
+
+	case errors.Is(err, basespec.ErrReferenceUnresolved),
+		errors.Is(err, basespec.ErrArtifactNotFound),
+		errors.Is(err, basespec.ErrDefinitionNotFound),
+		errors.Is(err, basespec.ErrSourceNotFound),
+		errors.Is(err, basespec.ErrNotFound):
+		return ResolutionUnavailable,
+			issue("artifact.reference-unresolved"),
+			true
+	}
+	return "", ResolutionIssue{}, false
 }
 
 func (r *Resolver) reserve(

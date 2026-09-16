@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -139,7 +140,10 @@ func preparePackage(
 		)
 	}
 
-	entries, expectations, err := canonicalCollectionPackage(document)
+	collection, expectations, err := canonicalCollectionPackage(
+		document,
+		files,
+	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
 			"decode embedded canonical Skill Collection %q: %w",
@@ -154,16 +158,13 @@ func preparePackage(
 	if err := packageName.Validate(); err != nil {
 		return PreparedPackage{}, err
 	}
-	if entries[0].Entry.Header().Name != string(packageName) {
+	if collection.Name != string(packageName) {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Skill package directory %q does not match Collection name %q",
 			basespec.ErrInvalid,
 			packageRoot,
-			entries[0].Entry.Header().Name,
+			collection.Name,
 		)
-	}
-	if err := validateCollectionSkillResources(entries, files); err != nil {
-		return PreparedPackage{}, err
 	}
 
 	address, err := source.NewManagedPackageAddress(
@@ -200,8 +201,9 @@ func packageDocument(
 
 func canonicalCollectionPackage(
 	document []byte,
+	files []source.ManagedPackageFile,
 ) (
-	[]declaration.NamedEntry,
+	collectionv1.CollectionDocument,
 	[]skillConsumerAPI.BuiltInSkillArtifactExpectation,
 	error,
 ) {
@@ -210,62 +212,135 @@ func canonicalCollectionPackage(
 		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
-		return nil, nil, err
+		return collectionv1.CollectionDocument{}, nil, err
 	}
 	root, err := declaration.DecodeCanonicalEntryJSON(raw)
 	if err != nil {
-		return nil, nil, err
+		return collectionv1.CollectionDocument{}, nil, err
 	}
 	if root.Header().Type != declaration.TypeCollection {
-		return nil, nil, fmt.Errorf(
+		return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
 			"%w: built-in Skill package root must be a Collection",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
-		return nil, nil, err
+		return collectionv1.CollectionDocument{}, nil, err
 	}
 
-	entries, err := declaration.WalkNamedEntries(root)
+	collection, err := collectionv1.DecodeCollectionEntry(root)
 	if err != nil {
-		return nil, nil, err
-	}
-	if len(entries) == 0 ||
-		entries[0].SubresourceLocator != "" ||
-		entries[0].Entry.Header().Type != declaration.TypeCollection {
-		return nil, nil, fmt.Errorf(
-			"%w: built-in Skill package has no root Collection Artifact",
-			basespec.ErrInvalid,
-		)
+		return collectionv1.CollectionDocument{}, nil, err
 	}
 
-	seen := make(
-		map[basespec.SubresourceLocator]struct{},
-		len(entries),
+	rootDefinition, err := decoder.DefinitionForEntry(root)
+	if err != nil {
+		return collectionv1.CollectionDocument{}, nil, err
+	}
+
+	filesByLocator := make(
+		map[basespec.Locator][]byte,
+		len(files),
 	)
 	expectations := make(
 		[]skillConsumerAPI.BuiltInSkillArtifactExpectation,
 		0,
-		len(entries),
+		1+len(collection.Members),
 	)
-	for _, named := range entries {
-		if _, duplicate := seen[named.SubresourceLocator]; duplicate {
-			return nil, nil, fmt.Errorf(
-				"%w: duplicate built-in Skill subresource %q",
+	expectations = append(
+		expectations,
+		skillConsumerAPI.BuiltInSkillArtifactExpectation{
+			Locator:          skillDomain.BuiltinSkillCollectionDocumentFile,
+			Kind:             rootDefinition.Kind,
+			LogicalName:      rootDefinition.LogicalName,
+			DefinitionDigest: rootDefinition.Digest,
+			Enabled:          true,
+		},
+	)
+	for _, file := range files {
+		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
+	}
+
+	seenDocuments := map[basespec.Locator]struct{}{
+		skillDomain.BuiltinSkillCollectionDocumentFile: {},
+	}
+	for index, member := range collection.Members {
+		form, err := member.CompositionForm()
+		if err != nil {
+			return collectionv1.CollectionDocument{}, nil, err
+		}
+		if form != declaration.CompositionEntryReference {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Collection member %d must be an external reference",
 				basespec.ErrInvalid,
-				named.SubresourceLocator,
+				index,
 			)
 		}
-		seen[named.SubresourceLocator] = struct{}{}
 
-		definitionValue, err := decoder.DefinitionForNamedEntry(named)
-		if err != nil {
-			return nil, nil, err
+		header := member.Header()
+		if header.Type != declaration.TypeSkill {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Collection member %d has type %q",
+				basespec.ErrInvalid,
+				index,
+				header.Type,
+			)
 		}
+		if header.Locator == nil {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill %q requires a local package locator",
+				basespec.ErrInvalid,
+				header.Name,
+			)
+		}
+
+		documentLocator, err := skillDomain.SourceDocumentLocator(
+			header.Locator,
+			skillDomain.BuiltinSkillCollectionDocumentFile,
+		)
+		if err != nil {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"built-in Skill %q locator: %w",
+				header.Name,
+				err,
+			)
+		}
+		content, found := filesByLocator[documentLocator]
+		if !found {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill %q locator does not identify packaged %q",
+				basespec.ErrInvalid,
+				header.Name,
+				skillDomain.SkillDefinitionFileName,
+			)
+		}
+		if _, duplicate := seenDocuments[documentLocator]; duplicate {
+			continue
+		}
+
+		definitionValue, _, err := skillDomain.DecodeSkillDocument(
+			content,
+			header.Name,
+		)
+		if err != nil {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"validate built-in Skill %q: %w",
+				header.Name,
+				err,
+			)
+		}
+		if definitionValue.LogicalName != basespec.LogicalName(header.Name) {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill document name differs from Collection member %q",
+				basespec.ErrInvalid,
+				header.Name,
+			)
+		}
+		seenDocuments[documentLocator] = struct{}{}
 		expectations = append(
 			expectations,
 			skillConsumerAPI.BuiltInSkillArtifactExpectation{
-				Subresource:      named.SubresourceLocator,
+				Locator:          documentLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
 				DefinitionDigest: definitionValue.Digest,
@@ -274,7 +349,25 @@ func canonicalCollectionPackage(
 		)
 	}
 
+	for locator := range filesByLocator {
+		if path.Base(string(locator)) !=
+			string(skillDomain.SkillDefinitionFileName) {
+			continue
+		}
+		if _, found := seenDocuments[locator]; !found {
+			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill document %q is not referenced by Collection %q",
+				basespec.ErrInvalid,
+				locator,
+				collection.Name,
+			)
+		}
+	}
+
 	sort.Slice(expectations, func(left, right int) bool {
+		if expectations[left].Locator != expectations[right].Locator {
+			return expectations[left].Locator < expectations[right].Locator
+		}
 		if expectations[left].Subresource !=
 			expectations[right].Subresource {
 			return expectations[left].Subresource <
@@ -283,71 +376,7 @@ func canonicalCollectionPackage(
 		return expectations[left].Kind <
 			expectations[right].Kind
 	})
-	return entries, expectations, nil
-}
-
-func validateCollectionSkillResources(
-	entries []declaration.NamedEntry,
-	files []source.ManagedPackageFile,
-) error {
-	filesByLocator := make(
-		map[basespec.Locator][]byte,
-		len(files),
-	)
-	for _, file := range files {
-		filesByLocator[file.Locator] = file.Content
-	}
-
-	for _, named := range entries {
-		if named.SubresourceLocator == "" ||
-			named.Entry.Header().Type != declaration.TypeSkill {
-			continue
-		}
-
-		header := named.Entry.Header()
-		if header.Locator == nil {
-			return fmt.Errorf(
-				"%w: built-in Skill %q requires a local path locator",
-				basespec.ErrInvalid,
-				header.Name,
-			)
-		}
-
-		// Embedded built-in packages intentionally use only source-relative
-		// paths. Git, URL, package, archive, and zip resolution remain
-		// future locator-resolver work.
-		documentLocator, err := skillDomain.SourceDocumentLocator(
-			header.Locator,
-			skillDomain.BuiltinSkillCollectionDocumentFile,
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"built-in Skill %q locator: %w",
-				header.Name,
-				err,
-			)
-		}
-		content, found := filesByLocator[documentLocator]
-		if !found {
-			return fmt.Errorf(
-				"%w: built-in Skill %q locator does not identify packaged %q",
-				basespec.ErrInvalid,
-				header.Name,
-				skillDomain.SkillDefinitionFileName,
-			)
-		}
-		if _, _, err := skillDomain.ParseSkillDocument(
-			content,
-			header.Name,
-		); err != nil {
-			return fmt.Errorf(
-				"validate built-in Skill %q: %w",
-				header.Name,
-				err,
-			)
-		}
-	}
-	return nil
+	return collection, expectations, nil
 }
 
 type preparedArtifactIdentity struct {
@@ -366,6 +395,9 @@ func validatePreparedPackageIdentities(
 			return err
 		}
 		for _, expected := range packageValue.Expectations {
+			if err := expected.Locator.ValidatePortable(false); err != nil {
+				return err
+			}
 			if err := expected.Subresource.Validate(); err != nil {
 				return err
 			}

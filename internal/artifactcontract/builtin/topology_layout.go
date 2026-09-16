@@ -114,17 +114,17 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
-			// Built-in packages use canonical collection.yaml documents as
-			// their declaration entry points. Nested named declarations are
-			// emitted from those documents. SKILL.md files remain package
-			// resources resolved through Skill locators and must not also be
-			// discovered as standalone Skill declarations.
+			// Built-in collections are grouping declarations only. Skills,
+			// MCP servers, and MCP policies are independently discovered
+			// Artifacts in the same protected Source.
 			Discovery: source.DiscoverySpec{
 				DirectoryRoots: []source.DirectoryRoot{{
 					Root:      RepositoryRootLocator,
 					Recursive: true,
 					IncludePatterns: []string{
 						"**/collection.yaml",
+						"**/SKILL.md",
+						"**/declarations/**/*.json",
 					},
 				}},
 				Authoritative: true,

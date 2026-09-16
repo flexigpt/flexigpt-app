@@ -21,8 +21,9 @@ import (
 )
 
 // ValidateEntryTree validates every concrete nested declaration in a
-// canonical declaration document. Exact type/name references are intentionally
-// not decoded as declarations because they are symbolic references.
+// canonical declaration document. External composition references are
+// validated as edges and intentionally are not decoded as concrete
+// declarations.
 func ValidateEntryTree(root declaration.Entry) error {
 	return validateEntryTree(root, false, 0, false)
 }
@@ -31,7 +32,7 @@ func validateEntryTree(
 	entry declaration.Entry,
 	implicitLoopBody bool,
 	depth int,
-	symbolicReferenceAllowed bool,
+	compositionEntry bool,
 ) error {
 	if depth > basespec.MaxDiscoveryDepth {
 		return fmt.Errorf(
@@ -43,8 +44,14 @@ func validateEntryTree(
 	if err := entry.Validate(); err != nil {
 		return err
 	}
-	if symbolicReferenceAllowed && entry.IsSymbolic() {
-		return nil
+	if compositionEntry {
+		form, err := entry.CompositionForm()
+		if err != nil {
+			return err
+		}
+		if form == declaration.CompositionEntryReference {
+			return nil
+		}
 	}
 
 	switch entry.Header().Type {
@@ -205,7 +212,7 @@ func validateEntryTree(
 				nested,
 				false,
 				depth+1,
-				true,
+				false,
 			); err != nil {
 				return fmt.Errorf(
 					"workspace declarations[%d]: %w",

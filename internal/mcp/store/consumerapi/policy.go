@@ -3,16 +3,14 @@ package consumerapi
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -27,16 +25,22 @@ func (a *API) UpsertManagedMCPPolicy(
 	if a == nil {
 		return ManagedMCPPolicyUpsertResult{}, basespec.ErrClosed
 	}
-	if err := request.RootID.Validate(); err != nil {
+	if a.collections == nil {
+		return ManagedMCPPolicyUpsertResult{}, basespec.ErrClosed
+	}
+	if err := request.Collection.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	if err := request.SourceID.Validate(); err != nil {
-		return ManagedMCPPolicyUpsertResult{}, err
+	if request.ExpectedCollectionRevision == 0 {
+		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := request.Name.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	if a.protection.IsProtectedRoot(request.RootID) {
+	if a.protection.IsProtectedRoot(request.Collection.RootID) {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
 			"%w: managed MCP Policy publication is not allowed in a protected Root",
 			basespec.ErrProtected,
@@ -78,29 +82,49 @@ func (a *API) UpsertManagedMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	sourceValue, err := a.ensureManagedPolicyDiscovery(
+	member, err := a.collections.MemberForCollectionSource(
 		ctx,
-		request.RootID,
-		request.SourceID,
+		request.Collection,
+		mcppolicyv1.MCPPolicyType,
+		request.Name,
 		locator,
 	)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
-			"%w: managed MCP Policy Source must have kind %q",
-			basespec.ErrInvalid,
-			source.SourceKindManagedDirectory,
-		)
+	membership, err := a.collections.EnsureMember(
+		ctx,
+		collection.AddMemberRequest{
+			Collection:       request.Collection,
+			ExpectedRevision: request.ExpectedCollectionRevision,
+			Member:           member,
+		},
+	)
+	if err != nil {
+		return ManagedMCPPolicyUpsertResult{}, err
+	}
+
+	result := ManagedMCPPolicyUpsertResult{
+		Collection:        membership.Collection,
+		MembershipCreated: membership.Created,
+	}
+	rootID := membership.Collection.Artifact.RootID
+	sourceID := membership.Collection.Artifact.Binding.SourceID
+	if _, err := a.ensureManagedCanonicalDiscovery(
+		ctx,
+		rootID,
+		sourceID,
+		locator,
+	); err != nil {
+		return result, err
 	}
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
 		artifact.PublishArtifactRequest{
-			RootID: request.RootID,
+			RootID: rootID,
 			Binding: artifact.SourceBinding{
-				SourceID: request.SourceID,
+				SourceID: sourceID,
 				Locator:  locator,
 			},
 			ExpectedKind:        mcpDomain.MCPPolicyArtifactKind,
@@ -116,10 +140,12 @@ func (a *API) UpsertManagedMCPPolicy(
 		},
 	)
 	if err != nil {
-		return ManagedMCPPolicyUpsertResult{}, err
+		return result, err
 	}
 
 	record := published.Artifact
+	result.Artifact = record
+	result.Address = record.Address()
 	if record.Enabled != request.Enabled {
 		record, err = a.artifacts.SetEnabled(
 			ctx,
@@ -128,13 +154,12 @@ func (a *API) UpsertManagedMCPPolicy(
 			request.Enabled,
 		)
 		if err != nil {
-			return ManagedMCPPolicyUpsertResult{}, err
+			return result, err
 		}
+		result.Artifact = record
+		result.Address = record.Address()
 	}
-	return ManagedMCPPolicyUpsertResult{
-		Artifact: record,
-		Address:  record.Address(),
-	}, nil
+	return result, nil
 }
 
 func (a *API) policyBodyForResolvedArtifact(
@@ -237,57 +262,5 @@ func (a *API) policyBodyForResolvedArtifact(
 		"%w: MCP Policy locator chain exceeds depth %d",
 		basespec.ErrLocatorLimitExceeded,
 		basespec.MaxDiscoveryDepth,
-	)
-}
-
-func (a *API) ensureManagedPolicyDiscovery(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	locator basespec.Locator,
-) (source.Summary, error) {
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !value.Enabled {
-		return source.Summary{}, fmt.Errorf(
-			"%w: managed MCP Policy Source is disabled",
-			basespec.ErrConflict,
-		)
-	}
-
-	next := value.Discovery.Clone()
-	inScope, err := next.InScope(locator)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(next.ExplicitLocators, locator)
-	}
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(next.AllowedDecoderIDs, decoder.JSONDecoderID) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			decoder.JSONDecoderID,
-		)
-	}
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	if value.Discovery.Equal(next) {
-		return value, nil
-	}
-	return a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      value.DisplayName,
-			Enabled:          value.Enabled,
-			Discovery:        &next,
-		},
 	)
 }

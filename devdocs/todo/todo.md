@@ -2,6 +2,8 @@
 
 ## Laundry list
 
+- [ ] in go 1.27 here is some issue related to double escaped strings. you need to clean json first and then decode actually. need to debug deeply
+
 - Testing
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.

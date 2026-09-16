@@ -230,6 +230,11 @@ func (s *Service) Remove(
 	if err := request.Package.Validate(); err != nil {
 		return err
 	}
+	if request.ExpectedGeneration != "" {
+		if err := basespec.ValidateSourceGeneration(request.ExpectedGeneration); err != nil {
+			return err
+		}
+	}
 	if request.ExpectedArtifact != nil {
 		if err := request.ExpectedArtifact.Validate(); err != nil {
 			return err
@@ -257,6 +262,17 @@ func (s *Service) Remove(
 	if err != nil {
 		return err
 	}
+	if request.ExpectedGeneration != "" &&
+		request.ExpectedGeneration != state.Generation {
+		return fmt.Errorf(
+			"%w: managed Source changed before package removal",
+			basespec.ErrConflict,
+		)
+	}
+	expectedGeneration := state.Generation
+	if request.ExpectedGeneration != "" {
+		expectedGeneration = request.ExpectedGeneration
+	}
 	if err := validateManagedSourceState(
 		state,
 		request.RootID,
@@ -275,7 +291,7 @@ func (s *Service) Remove(
 		request.SourceID,
 		state.Source.Revision,
 		request.Package,
-		state.Generation,
+		expectedGeneration,
 	); err != nil {
 		return err
 	}

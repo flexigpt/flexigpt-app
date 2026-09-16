@@ -12,9 +12,10 @@ import (
 // NamedEntry is one named declaration reachable from a canonical declaration
 // document. The root entry uses an empty SubresourceLocator.
 //
-// Symbolic entries remain references and do not become standalone
-// source-backed Artifacts. A body-less Loop nested directly under an Agent or
-// Team program remains contextual because its body is the containing owner.
+// Composition references, including locator-bearing references, remain edges
+// and do not become standalone source-backed Artifacts. A body-less Loop
+// nested directly under an Agent or Team program remains contextual because
+// its body is the containing owner.
 type NamedEntry struct {
 	SubresourceLocator basespec.SubresourceLocator
 	Entry              Entry
@@ -51,7 +52,7 @@ func WalkNamedEntries(
 	}
 
 	output := make([]NamedEntry, 0)
-	if err := walkNamedEntry(root, nil, true, false, &output); err != nil {
+	if err := walkNamedEntry(root, nil, true, false, false, &output); err != nil {
 		return nil, err
 	}
 
@@ -79,12 +80,23 @@ func walkNamedEntry(
 	path []string,
 	topLevel bool,
 	implicitLoopBody bool,
+	compositionEntry bool,
 	output *[]NamedEntry,
 ) error {
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
 		return err
 	}
+	if !topLevel && compositionEntry {
+		form, err := entry.CompositionForm()
+		if err != nil {
+			return err
+		}
+		if form == CompositionEntryReference {
+			return nil
+		}
+	}
+
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return err
@@ -201,6 +213,7 @@ func walkEntryArray(
 			appendEntryPath(base, entry),
 			false,
 			false,
+			true,
 			output,
 		); err != nil {
 			return err
@@ -227,6 +240,7 @@ func walkSingleEntry(
 		appendEntryPath(base, entry),
 		false,
 		implicitLoopBody && entry.Header().Type == TypeLoop,
+		true,
 		output,
 	)
 }
@@ -290,6 +304,7 @@ func walkWorkspaceDeclarationEntries(
 		if err := walkNamedEntry(
 			entry,
 			appendEntryPath(base, entry),
+			false,
 			false,
 			false,
 			output,

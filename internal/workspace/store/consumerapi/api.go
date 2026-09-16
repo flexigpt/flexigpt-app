@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -21,12 +22,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
-)
-
-const (
-	userManagedArtifactSourceStorageKey basespec.StorageKey = "user-artifacts"
-
-	userManagedArtifactSourceName = "User-managed artifacts"
 )
 
 type StoreAPI struct {
@@ -126,49 +121,11 @@ func (a *StoreAPI) EnsureUserManagedArtifactSource(
 	ctx context.Context,
 	request ManagedSourceRegistration,
 ) (source.Summary, error) {
-	if err := request.RootID.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	displayName := request.SourceDisplayName
-	if displayName == "" {
-		displayName = userManagedArtifactSourceName
-	}
-	if err := basespec.ValidateRequiredText(
-		"managed Artifact Source display name",
-		displayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return source.Summary{}, err
-	}
-
-	value, _, err := a.sources.Ensure(
+	return collection.EnsureUserManagedArtifactSource(
 		ctx,
+		a.sources,
 		request.RootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  userManagedArtifactSourceStorageKey,
-			Kind:        source.SourceKindManagedDirectory,
-			DisplayName: displayName,
-			Enabled:     true,
-			Config:      json.RawMessage(`{}`),
-			Discovery:   source.DiscoverySpec{},
-		},
-	)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if value.Enabled && value.DisplayName == displayName {
-		return value, nil
-	}
-	return a.sources.Update(
-		ctx,
-		request.RootID,
-		value.ID,
-		source.Update{
-			ExpectedRevision: value.Revision,
-			DisplayName:      displayName,
-			Enabled:          true,
-		},
+		request.SourceDisplayName,
 	)
 }
 

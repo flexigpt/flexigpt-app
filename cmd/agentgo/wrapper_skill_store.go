@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -221,6 +222,73 @@ func (w *SkillStoreWrapper) PurgeSkill(
 			ref,
 			expectedRevision,
 		)
+	})
+}
+
+func (w *SkillStoreWrapper) CreateSkillCollection(
+	request collection.CreateRequest,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.CreateSkillCollection(context.Background(), request)
+	})
+}
+
+func (w *SkillStoreWrapper) GetSkillCollection(
+	ref artifact.ArtifactRef,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.GetSkillCollection(context.Background(), ref)
+	})
+}
+
+func (w *SkillStoreWrapper) ListSkillCollections(
+	rootID root.RootID,
+) ([]collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]collection.CollectionView, error) {
+		return api.ListSkillCollections(context.Background(), rootID)
+	})
+}
+
+func (w *SkillStoreWrapper) UpdateSkillCollection(
+	request collection.UpdateRequest,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.UpdateSkillCollection(context.Background(), request)
+	})
+}
+
+func (w *SkillStoreWrapper) AddSkillCollectionMember(
+	request collection.AddMemberRequest,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.AddSkillCollectionMember(context.Background(), request)
+	})
+}
+
+func (w *SkillStoreWrapper) AttachSkillArtifactToCollection(
+	request collection.AddArtifactMemberRequest,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.AttachSkillArtifactToCollection(context.Background(), request)
+	})
+}
+
+func (w *SkillStoreWrapper) RemoveSkillCollectionMember(
+	request collection.RemoveMemberRequest,
+) (collection.CollectionView, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
+		return api.RemoveSkillCollectionMember(context.Background(), request)
+	})
+}
+
+func (w *SkillStoreWrapper) DeleteSkillCollection(
+	request collection.DeleteRequest,
+) error {
+	return middleware.WithRecovery(func() error {
+		if w == nil || w.api == nil {
+			return basespec.ErrClosed
+		}
+		return w.api.DeleteSkillCollection(context.Background(), request)
 	})
 }
 

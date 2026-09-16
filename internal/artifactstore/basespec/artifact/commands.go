@@ -32,9 +32,13 @@ type PublishArtifactResult struct {
 // RemoveArtifactRequest removes one managed Source package. The Artifact
 // record remains in the Store as missing local state until explicitly purged.
 type RemoveArtifactRequest struct {
-	RootID           root.RootID                  `json:"rootID"`
-	SourceID         source.SourceID              `json:"sourceID"`
-	Package          source.ManagedPackageAddress `json:"package"`
-	ExpectedArtifact *ArtifactRef                 `json:"expectedArtifact,omitempty"`
-	AllowProtected   bool                         `json:"allowProtected"`
+	RootID             root.RootID                  `json:"rootID"`
+	SourceID           source.SourceID              `json:"sourceID"`
+	Package            source.ManagedPackageAddress `json:"package"`
+	ExpectedGeneration string                       `json:"expectedGeneration,omitempty"`
+	ExpectedArtifact   *ArtifactRef                 `json:"expectedArtifact,omitempty"`
+	AllowProtected     bool                         `json:"allowProtected"`
 }
+
+// ExpectedGeneration optionally prevents removal from replacing a package
+// mutation that occurred after a caller read its source-backed Artifact.

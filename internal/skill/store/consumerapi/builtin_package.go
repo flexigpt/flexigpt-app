@@ -18,11 +18,10 @@ import (
 )
 
 // InstallBuiltInSkillPackage publishes one canonical collection package and
-// verifies every Artifact emitted by its root collection declaration.
+// verifies the root Collection and independently declared Skill Artifacts.
 //
-// A package has one collection.yaml declaration origin. Its named nested
-// Skill declarations become source-backed Artifacts at collection subresources.
-// The referenced SKILL.md directories remain package resources.
+// Collection membership remains external. Each Skill originates at its own
+// SKILL.md source entry and is not a collection subresource Artifact.
 func (a *API) InstallBuiltInSkillPackage(
 	ctx context.Context,
 	request BuiltInSkillPackageInstallRequest,
@@ -141,12 +140,19 @@ func (a *API) InstallBuiltInSkillPackage(
 
 	output := make([]artifact.Artifact, 0, len(expectations))
 	for _, expected := range expectations {
+		originLocator, err := request.PackageAddress.FileLocator(
+			expected.Locator,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		record, err := a.artifacts.FindByOrigin(
 			ctx,
 			request.RootID,
 			artifact.SourceBinding{
 				SourceID:           request.SourceID,
-				Locator:            documentLocator,
+				Locator:            originLocator,
 				SubresourceLocator: expected.Subresource,
 			},
 			expected.Kind,
@@ -197,6 +203,7 @@ func normalizeBuiltInSkillPackageExpectations(
 	}
 
 	type origin struct {
+		locator     basespec.Locator
 		subresource basespec.SubresourceLocator
 		kind        artifact.ArtifactKind
 	}
@@ -212,6 +219,9 @@ func normalizeBuiltInSkillPackageExpectations(
 		rootFound bool
 	)
 	for index, expected := range output {
+		if err := expected.Locator.ValidatePortable(false); err != nil {
+			return nil, BuiltInSkillArtifactExpectation{}, err
+		}
 		if err := expected.Subresource.Validate(); err != nil {
 			return nil, BuiltInSkillArtifactExpectation{}, fmt.Errorf(
 				"built-in Skill package expectations[%d]: %w",
@@ -244,6 +254,7 @@ func normalizeBuiltInSkillPackageExpectations(
 		}
 
 		key := origin{
+			locator:     expected.Locator,
 			subresource: expected.Subresource,
 			kind:        expected.Kind,
 		}
@@ -257,7 +268,8 @@ func normalizeBuiltInSkillPackageExpectations(
 		}
 		seen[key] = struct{}{}
 
-		if expected.Subresource != "" {
+		if expected.Locator != skillDomain.BuiltinSkillCollectionDocumentFile ||
+			expected.Subresource != "" {
 			continue
 		}
 		if rootFound {
@@ -285,6 +297,9 @@ func normalizeBuiltInSkillPackageExpectations(
 	}
 
 	sort.Slice(output, func(left, right int) bool {
+		if output[left].Locator != output[right].Locator {
+			return output[left].Locator < output[right].Locator
+		}
 		if output[left].Subresource != output[right].Subresource {
 			return output[left].Subresource <
 				output[right].Subresource

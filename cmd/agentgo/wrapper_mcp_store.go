@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -119,6 +120,100 @@ func (w *MCPStoreWrapper) UpsertManagedMCPPolicy(
 			)
 		},
 	)
+}
+
+func (w *MCPStoreWrapper) CreateManagedMCP(
+	request mcpConsumerAPI.ManagedMCPCreateRequest,
+) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+			return api.CreateManagedMCP(context.Background(), request)
+		},
+	)
+}
+
+func (w *MCPStoreWrapper) PurgeManagedMCP(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return middleware.WithRecovery(func() error {
+		if w == nil || w.api == nil {
+			return basespec.ErrClosed
+		}
+		return w.api.PurgeManagedMCP(
+			context.Background(),
+			ref,
+			expectedRevision,
+		)
+	})
+}
+
+func (w *MCPStoreWrapper) CreateMCPCollection(
+	request collection.CreateRequest,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.CreateMCPCollection(context.Background(), request)
+	})
+}
+
+func (w *MCPStoreWrapper) GetMCPCollection(
+	ref artifact.ArtifactRef,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.GetMCPCollection(context.Background(), ref)
+	})
+}
+
+func (w *MCPStoreWrapper) ListMCPCollections(
+	rootID root.RootID,
+) ([]collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.CollectionView, error) {
+		return api.ListMCPCollections(context.Background(), rootID)
+	})
+}
+
+func (w *MCPStoreWrapper) UpdateMCPCollection(
+	request collection.UpdateRequest,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.UpdateMCPCollection(context.Background(), request)
+	})
+}
+
+func (w *MCPStoreWrapper) AddMCPCollectionMember(
+	request collection.AddMemberRequest,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.AddMCPCollectionMember(context.Background(), request)
+	})
+}
+
+func (w *MCPStoreWrapper) AttachMCPArtifactToCollection(
+	request collection.AddArtifactMemberRequest,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.AttachMCPArtifactToCollection(context.Background(), request)
+	})
+}
+
+func (w *MCPStoreWrapper) RemoveMCPCollectionMember(
+	request collection.RemoveMemberRequest,
+) (collection.CollectionView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
+		return api.RemoveMCPCollectionMember(context.Background(), request)
+	})
+}
+
+func (w *MCPStoreWrapper) DeleteMCPCollection(
+	request collection.DeleteRequest,
+) error {
+	return middleware.WithRecovery(func() error {
+		if w == nil || w.api == nil {
+			return basespec.ErrClosed
+		}
+		return w.api.DeleteMCPCollection(context.Background(), request)
+	})
 }
 
 func (w *MCPStoreWrapper) close() {

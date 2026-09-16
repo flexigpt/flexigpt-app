@@ -3,6 +3,7 @@ package consumerapi
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -43,17 +44,23 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 
 	capabilities := WorkspaceCapabilityPlan{
 		Workspace:       workspace.Ref(),
+		Occurrences:     make([]WorkspaceCapabilityOccurrence, 0),
 		PromptArtifacts: make([]artifact.ArtifactRef, 0),
 		SkillArtifacts:  make([]artifact.ArtifactRef, 0),
 		MCPArtifacts:    make([]artifact.ArtifactRef, 0),
 	}
-	collector := workspaceCapabilityCollector{
-		capabilities: &capabilities,
-		skillSeen:    make(map[artifact.ArtifactRef]struct{}),
-		mcpSeen:      make(map[artifact.ArtifactRef]struct{}),
+	collector := &workspaceCapabilityCollector{
+		capabilities:     &capabilities,
+		skillSeen:        make(map[artifact.ArtifactRef]struct{}),
+		mcpSeen:          make(map[artifact.ArtifactRef]struct{}),
+		occurrenceByPath: make(map[string]int),
 	}
-	for _, entry := range graph.Root.Workspace.Roots {
-		if err := collector.collect(entry); err != nil {
+	for index, relationship := range graph.Root.Workspace.RootResults {
+		if err := collector.collectRelationship(
+			capabilityPath("roots", index),
+			relationship,
+			true,
+		); err != nil {
 			return workspaceDomain.Workspace{},
 				WorkspaceCapabilityPlan{},
 				err
@@ -63,13 +70,59 @@ func (a *StoreAPI) resolveWorkspaceCapabilities(
 }
 
 type workspaceCapabilityCollector struct {
-	capabilities *WorkspaceCapabilityPlan
-	skillSeen    map[artifact.ArtifactRef]struct{}
-	mcpSeen      map[artifact.ArtifactRef]struct{}
+	capabilities     *WorkspaceCapabilityPlan
+	skillSeen        map[artifact.ArtifactRef]struct{}
+	mcpSeen          map[artifact.ArtifactRef]struct{}
+	occurrenceByPath map[string]int
 }
 
-func (c workspaceCapabilityCollector) collect(
+func (c *workspaceCapabilityCollector) collectRelationship(
+	path string,
+	relationship resolve.ResolvedRelationship,
+	ambient bool,
+) error {
+	header := relationship.Declared.Header()
+	occurrence := WorkspaceCapabilityOccurrence{
+		Path:   path,
+		Type:   header.Type,
+		Name:   basespec.LogicalName(header.Name),
+		Status: relationship.Status,
+	}
+	if relationship.Issue != nil {
+		occurrence.Code = relationship.Issue.Code
+		occurrence.Message = relationship.Issue.Message
+	}
+	if relationship.Resolved != nil {
+		if ref, found := relationship.Resolved.ArtifactRef(); found {
+			value := ref
+			occurrence.Artifact = &value
+		}
+	}
+
+	c.occurrenceByPath[path] = len(c.capabilities.Occurrences)
+	c.capabilities.Occurrences = append(
+		c.capabilities.Occurrences,
+		occurrence,
+	)
+
+	if !relationship.IsAvailable() {
+		return nil
+	}
+	if relationship.Resolved == nil {
+		c.markUnavailable(
+			path,
+			"workspace.artifact.unresolved",
+			"resolved Workspace relationship has no Artifact entry",
+		)
+		return nil
+	}
+	return c.collectEntry(path, relationship.Resolved, ambient)
+}
+
+func (c *workspaceCapabilityCollector) collectEntry(
+	path string,
 	entry *resolve.ResolvedEntry,
+	ambient bool,
 ) error {
 	if entry == nil {
 		return fmt.Errorf(
@@ -82,25 +135,54 @@ func (c workspaceCapabilityCollector) collect(
 	case declaration.TypeCollection,
 		declaration.TypeAgent,
 		declaration.TypeTeam:
-		for _, member := range entry.Members {
-			if err := c.collect(member); err != nil {
+		for index, member := range entry.MemberResults {
+			if err := c.collectRelationship(
+				capabilityPath(path+"/members", index),
+				member,
+				ambient,
+			); err != nil {
+				return err
+			}
+		}
+		if entry.ProgramResult != nil {
+			if err := c.collectRelationship(
+				path+"/program",
+				*entry.ProgramResult,
+				false,
+			); err != nil {
 				return err
 			}
 		}
 		return nil
 
 	case declaration.TypeInstruction, declaration.TypeContext:
+		if !ambient {
+			return nil
+		}
 		ref, err := workspaceArtifactRef(entry)
 		if err != nil {
-			return err
+			c.markUnavailable(
+				path,
+				workspaceDomain.DiagnosticCodeArtifactUnresolved,
+				err.Error(),
+			)
+			return nil
 		}
 		c.capabilities.PromptArtifacts = append(c.capabilities.PromptArtifacts, ref)
 		return nil
 
 	case declaration.TypeSkill:
+		if !ambient {
+			return nil
+		}
 		ref, err := workspaceArtifactRef(entry)
 		if err != nil {
-			return err
+			c.markUnavailable(
+				path,
+				workspaceDomain.DiagnosticCodeArtifactUnresolved,
+				err.Error(),
+			)
+			return nil
 		}
 		appendUniqueWorkspaceArtifact(
 			&c.capabilities.SkillArtifacts,
@@ -110,9 +192,17 @@ func (c workspaceCapabilityCollector) collect(
 		return nil
 
 	case declaration.TypeMCP:
+		if !ambient {
+			return nil
+		}
 		ref, err := workspaceArtifactRef(entry)
 		if err != nil {
-			return err
+			c.markUnavailable(
+				path,
+				workspaceDomain.DiagnosticCodeArtifactUnresolved,
+				err.Error(),
+			)
+			return nil
 		}
 		appendUniqueWorkspaceArtifact(
 			&c.capabilities.MCPArtifacts,
@@ -121,12 +211,73 @@ func (c workspaceCapabilityCollector) collect(
 		)
 		return nil
 
+	case declaration.TypeLoop:
+		if entry.Loop != nil && entry.Loop.BodyResult != nil {
+			return c.collectRelationship(
+				path+"/body",
+				*entry.Loop.BodyResult,
+				false,
+			)
+		}
+		return nil
+
+	case declaration.TypeWorkflow:
+		if entry.Workflow == nil {
+			return nil
+		}
+		for index, node := range entry.Workflow.Nodes {
+			if node.TargetResult == nil {
+				continue
+			}
+			if err := c.collectRelationship(
+				capabilityPath(path+"/nodes", index)+"/target",
+				*node.TargetResult,
+				false,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+
+	case declaration.TypeWorkspace:
+		if entry.Workspace == nil {
+			return nil
+		}
+		for index, root := range entry.Workspace.RootResults {
+			if err := c.collectRelationship(
+				capabilityPath(path+"/roots", index),
+				root,
+				ambient,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+
 	default:
-		// Workflows and Loops are executable graph structure. They are not
-		// ambient Workspace prompt, Skill, or MCP capabilities. Their future
-		// consumer receives the original resolved graph.
 		return nil
 	}
+}
+
+func (c *workspaceCapabilityCollector) markUnavailable(
+	path string,
+	code string,
+	message string,
+) {
+	index, found := c.occurrenceByPath[path]
+	if !found {
+		return
+	}
+	c.capabilities.Occurrences[index].Status = resolve.ResolutionUnavailable
+	c.capabilities.Occurrences[index].Code = code
+	c.capabilities.Occurrences[index].Message = message
+}
+
+func capabilityPath(
+	parent string,
+	index int,
+) string {
+	return parent + "/" + strconv.Itoa(index)
 }
 
 func workspaceArtifactRef(

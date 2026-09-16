@@ -42,12 +42,16 @@ Each package owns:
 
 Nested heterogeneous declarations use `declaration.Entry`.
 
-`Entry` validates the common header and mandatory name. An Entry containing
-exactly `type` and `name` is a symbolic reference. An Entry containing a
-locator or type-specific fields is a named declaration. A consumer or resolver
-dispatches the concrete body through the package matching `Entry.Header().Type`.
-This keeps each declaration contract independent and avoids a root-level union
-schema.
+`Entry` validates the common header and mandatory name. In a composition
+position, `Entry.CompositionForm` distinguishes an external reference from a
+contained declaration. A header-only entry with `type`, `name`, an optional
+non-command locator, and an optional MCP `server` selector is an external
+reference. Header annotations remain membership-local and do not modify the
+target Artifact. Type-specific body fields make an entry contained.
+
+Contained declarations are emitted as source-backed subresources. External
+references are graph edges only and do not create another Artifact. This keeps
+each declaration contract independent and avoids a root-level union schema.
 
 The portable declaration header is:
 

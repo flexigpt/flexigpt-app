@@ -1,0 +1,1163 @@
+// Package collection implements editable managed Collection declarations.
+//
+// Collection membership remains declaration content. This package does not
+// create Artifact Store ownership, foreign keys, or lifecycle relationships.
+package collection
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"path"
+	"slices"
+	"sort"
+	"strings"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
+)
+
+const (
+	ManagedCollectionPackageKind  source.PackageKind      = "collection"
+	ManagedCollectionDocumentFile basespec.Locator        = "collection.json"
+	ManagedCollectionVersion      basespec.LogicalVersion = "unversioned"
+
+	UserManagedArtifactSourceStorageKey basespec.StorageKey = "user-artifacts"
+
+	UserManagedArtifactSourceDisplayName = "User-managed artifacts"
+)
+
+type API struct {
+	sources          compositionapi.SourceAPI
+	discovery        compositionapi.DiscoveryAPI
+	artifacts        compositionapi.ArtifactAPI
+	managedArtifacts compositionapi.ManagedArtifactAPI
+}
+
+func New(
+	sources compositionapi.SourceAPI,
+	discovery compositionapi.DiscoveryAPI,
+	artifacts compositionapi.ArtifactAPI,
+	managedArtifacts compositionapi.ManagedArtifactAPI,
+) (*API, error) {
+	if sources == nil ||
+		discovery == nil ||
+		artifacts == nil ||
+		managedArtifacts == nil {
+		return nil, fmt.Errorf(
+			"%w: managed Collection dependencies are incomplete",
+			basespec.ErrInvalid,
+		)
+	}
+	return &API{
+		sources:          sources,
+		discovery:        discovery,
+		artifacts:        artifacts,
+		managedArtifacts: managedArtifacts,
+	}, nil
+}
+
+type CollectionView struct {
+	Artifact    artifact.Artifact       `json:"artifact"`
+	Name        basespec.LogicalName    `json:"name"`
+	Description string                  `json:"description,omitempty"`
+	Version     basespec.LogicalVersion `json:"version,omitempty"`
+	Members     []MemberReference       `json:"members"`
+}
+
+// MemberReference is an external Collection membership edge. It intentionally
+// cannot express a contained declaration.
+type MemberReference struct {
+	Type        declaration.Type     `json:"type"`
+	Name        basespec.LogicalName `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Locator     *declaration.Locator `json:"locator,omitempty"`
+	Server      basespec.LogicalName `json:"server,omitempty"`
+}
+
+type CreateRequest struct {
+	RootID      root.RootID          `json:"rootID"`
+	SourceID    source.SourceID      `json:"sourceID,omitempty"`
+	Name        basespec.LogicalName `json:"name"`
+	Description string               `json:"description,omitempty"`
+}
+
+type UpdateRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Description      string               `json:"description,omitempty"`
+}
+
+type AddMemberRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Member           MemberReference      `json:"member"`
+}
+
+type AddArtifactMemberRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Artifact         artifact.ArtifactRef `json:"artifact"`
+}
+
+type RemoveMemberRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Index            int                  `json:"index"`
+}
+
+type DeleteRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+}
+
+// MemberMutationResult is used by managed Skill, MCP, and policy creation.
+// Created reports whether this call appended the member rather than finding an
+// identical existing membership.
+type MemberMutationResult struct {
+	Collection CollectionView `json:"collection"`
+	Index      int            `json:"index"`
+	Created    bool           `json:"created"`
+}
+
+type editableCollection struct {
+	artifact   artifact.Artifact
+	document   collectionv1.CollectionDocument
+	address    source.ManagedPackageAddress
+	generation string
+}
+
+func EnsureUserManagedArtifactSource(
+	ctx context.Context,
+	sources compositionapi.SourceAPI,
+	rootID root.RootID,
+	displayName string,
+) (source.Summary, error) {
+	if sources == nil {
+		return source.Summary{}, fmt.Errorf(
+			"%w: managed Artifact Source API is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := rootID.Validate(); err != nil {
+		return source.Summary{}, err
+	}
+	if displayName == "" {
+		displayName = UserManagedArtifactSourceDisplayName
+	}
+	if err := basespec.ValidateRequiredText(
+		"managed Artifact Source display name",
+		displayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return source.Summary{}, err
+	}
+
+	value, _, err := sources.Ensure(
+		ctx,
+		rootID,
+		source.Draft{
+			ID:          source.SourceID(uuidutil.NewUUIDv7()),
+			StorageKey:  UserManagedArtifactSourceStorageKey,
+			Kind:        source.SourceKindManagedDirectory,
+			DisplayName: displayName,
+			Enabled:     true,
+			Config:      json.RawMessage(`{}`),
+			Discovery:   source.DiscoverySpec{},
+		},
+	)
+	if err != nil {
+		return source.Summary{}, err
+	}
+	if value.Enabled && value.DisplayName == displayName {
+		return value, nil
+	}
+	return sources.Update(
+		ctx,
+		rootID,
+		value.ID,
+		source.Update{
+			ExpectedRevision: value.Revision,
+			DisplayName:      displayName,
+			Enabled:          true,
+		},
+	)
+}
+
+func (a *API) Create(
+	ctx context.Context,
+	request CreateRequest,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if err := request.RootID.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+	if err := request.Name.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+
+	sourceValue, err := a.managedSource(
+		ctx,
+		request.RootID,
+		request.SourceID,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	address, err := managedCollectionAddress(request.Name)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	if err != nil {
+		return CollectionView{}, err
+	}
+
+	document := collectionv1.CollectionDocument{
+		APIVersion:  collectionv1.CollectionSchemaVersion,
+		Type:        collectionv1.CollectionType,
+		Name:        string(request.Name),
+		Description: request.Description,
+	}
+	_, digest, err := collectionDocumentPayload(document)
+	if err != nil {
+		return CollectionView{}, err
+	}
+
+	existing, err := a.artifacts.FindByOrigin(
+		ctx,
+		request.RootID,
+		artifact.SourceBinding{
+			SourceID: sourceValue.ID,
+			Locator:  locator,
+		},
+		artifact.ArtifactKind(collectionv1.CollectionType),
+	)
+	switch {
+	case err == nil:
+		if existing.State == artifact.StateAvailable &&
+			existing.ResolvedDefinition != nil &&
+			*existing.ResolvedDefinition == digest {
+			return a.Get(ctx, existing.Ref())
+		}
+		return CollectionView{}, fmt.Errorf(
+			"%w: managed Collection %q already exists",
+			basespec.ErrConflict,
+			request.Name,
+		)
+
+	case errors.Is(err, basespec.ErrArtifactNotFound),
+		errors.Is(err, basespec.ErrNotFound):
+	default:
+		return CollectionView{}, err
+	}
+
+	record, err := a.publishDocument(
+		ctx,
+		request.RootID,
+		sourceValue.ID,
+		address,
+		document,
+		"",
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return collectionViewOf(record, document)
+}
+
+func (a *API) Get(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	value, err := a.loadEditableCollection(ctx, ref, 0)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return collectionViewOf(value.artifact, value.document)
+}
+
+func (a *API) List(
+	ctx context.Context,
+	rootID root.RootID,
+) ([]CollectionView, error) {
+	if a == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := rootID.Validate(); err != nil {
+		return nil, err
+	}
+
+	records, err := a.artifacts.ListByRoot(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]CollectionView, 0)
+	for _, record := range records {
+		if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+			record.State != artifact.StateAvailable ||
+			record.Binding.SubresourceLocator != "" {
+			continue
+		}
+
+		view, err := a.Get(ctx, record.Ref())
+		if errors.Is(err, basespec.ErrUnsupported) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, view)
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Name != output[right].Name {
+			return output[left].Name < output[right].Name
+		}
+		return output[left].Artifact.ID < output[right].Artifact.ID
+	})
+	return output, nil
+}
+
+func (a *API) Update(
+	ctx context.Context,
+	request UpdateRequest,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if request.ExpectedRevision == 0 {
+		return CollectionView{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value, err := a.loadEditableCollection(
+		ctx,
+		request.Collection,
+		request.ExpectedRevision,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	if _, err := collectionViewOf(value.artifact, value.document); err != nil {
+		return CollectionView{}, err
+	}
+
+	value.document.Description = request.Description
+	record, err := a.publishDocument(
+		ctx,
+		value.artifact.RootID,
+		value.artifact.Binding.SourceID,
+		value.address,
+		value.document,
+		value.generation,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return collectionViewOf(record, value.document)
+}
+
+func (a *API) AddMember(
+	ctx context.Context,
+	request AddMemberRequest,
+) (CollectionView, error) {
+	result, err := a.mutateMember(ctx, request, false)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return result.Collection, nil
+}
+
+func (a *API) EnsureMember(
+	ctx context.Context,
+	request AddMemberRequest,
+) (MemberMutationResult, error) {
+	return a.mutateMember(ctx, request, true)
+}
+
+func (a *API) RemoveMember(
+	ctx context.Context,
+	request RemoveMemberRequest,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if request.ExpectedRevision == 0 {
+		return CollectionView{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value, err := a.loadEditableCollection(
+		ctx,
+		request.Collection,
+		request.ExpectedRevision,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	if _, err := collectionViewOf(value.artifact, value.document); err != nil {
+		return CollectionView{}, err
+	}
+	if request.Index < 0 || request.Index >= len(value.document.Members) {
+		return CollectionView{}, fmt.Errorf(
+			"%w: Collection member index %d is out of range",
+			basespec.ErrNotFound,
+			request.Index,
+		)
+	}
+
+	members := append(
+		[]declaration.Entry(nil),
+		value.document.Members[:request.Index]...,
+	)
+	members = append(
+		members,
+		value.document.Members[request.Index+1:]...,
+	)
+	value.document.Members = members
+
+	record, err := a.publishDocument(
+		ctx,
+		value.artifact.RootID,
+		value.artifact.Binding.SourceID,
+		value.address,
+		value.document,
+		value.generation,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return collectionViewOf(record, value.document)
+}
+
+func (a *API) AddArtifactMember(
+	ctx context.Context,
+	request AddArtifactMemberRequest,
+) (CollectionView, error) {
+	if a == nil {
+		return CollectionView{}, basespec.ErrClosed
+	}
+	if err := request.Collection.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+	if err := request.Artifact.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+	if request.Collection.RootID != request.Artifact.RootID {
+		return CollectionView{}, fmt.Errorf(
+			"%w: Collection member Artifact belongs to another Root",
+			basespec.ErrInvalid,
+		)
+	}
+
+	target, err := a.artifacts.Get(ctx, request.Artifact)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	declarationType := declaration.Type(target.Kind)
+	if err := declarationType.Validate(); err != nil {
+		return CollectionView{}, err
+	}
+
+	member := MemberReference{
+		Type: declarationType,
+		Name: target.LogicalName,
+	}
+	collectionValue, err := a.loadEditableCollection(
+		ctx,
+		request.Collection,
+		request.ExpectedRevision,
+	)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	if target.Binding.SourceID == collectionValue.artifact.Binding.SourceID {
+		locator, err := relativeSourceLocator(
+			collectionValue.artifact.Binding.Locator,
+			target.Binding.Locator,
+		)
+		if err != nil {
+			return CollectionView{}, err
+		}
+		member.Locator = &locator
+	}
+
+	return a.AddMember(
+		ctx,
+		AddMemberRequest{
+			Collection:       request.Collection,
+			ExpectedRevision: request.ExpectedRevision,
+			Member:           member,
+		},
+	)
+}
+
+// MemberForCollectionSource builds a location-constrained external reference
+// for a declaration that will be published into the same managed Source as
+// the Collection.
+func (a *API) MemberForCollectionSource(
+	ctx context.Context,
+	collectionRef artifact.ArtifactRef,
+	declarationType declaration.Type,
+	name basespec.LogicalName,
+	target basespec.Locator,
+) (MemberReference, error) {
+	if a == nil {
+		return MemberReference{}, basespec.ErrClosed
+	}
+	if err := declarationType.Validate(); err != nil {
+		return MemberReference{}, err
+	}
+	if err := name.Validate(); err != nil {
+		return MemberReference{}, err
+	}
+	if err := target.Validate(false); err != nil {
+		return MemberReference{}, err
+	}
+
+	value, err := a.loadEditableCollection(ctx, collectionRef, 0)
+	if err != nil {
+		return MemberReference{}, err
+	}
+	locator, err := relativeSourceLocator(
+		value.artifact.Binding.Locator,
+		target,
+	)
+	if err != nil {
+		return MemberReference{}, err
+	}
+	return MemberReference{
+		Type:    declarationType,
+		Name:    name,
+		Locator: &locator,
+	}, nil
+}
+
+func (a *API) Delete(
+	ctx context.Context,
+	request DeleteRequest,
+) error {
+	if a == nil {
+		return basespec.ErrClosed
+	}
+	if request.ExpectedRevision == 0 {
+		return fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value, err := a.loadEditableCollection(
+		ctx,
+		request.Collection,
+		request.ExpectedRevision,
+	)
+	if err != nil {
+		return err
+	}
+	if len(value.document.Members) != 0 {
+		return fmt.Errorf(
+			"%w: Collection %q has %d direct members; detach them before deletion",
+			basespec.ErrConflict,
+			value.artifact.LogicalName,
+			len(value.document.Members),
+		)
+	}
+
+	if err := a.managedArtifacts.Remove(
+		ctx,
+		artifact.RemoveArtifactRequest{
+			RootID:             value.artifact.RootID,
+			SourceID:           value.artifact.Binding.SourceID,
+			Package:            value.address,
+			ExpectedArtifact:   &request.Collection,
+			ExpectedGeneration: value.generation,
+		},
+	); err != nil {
+		return err
+	}
+
+	missing, err := a.artifacts.Get(ctx, request.Collection)
+	if err != nil {
+		return err
+	}
+	if missing.State != artifact.StateMissing {
+		return fmt.Errorf(
+			"%w: removed Collection Artifact is not missing",
+			basespec.ErrConflict,
+		)
+	}
+	return a.artifacts.Purge(
+		ctx,
+		request.Collection,
+		missing.Revision,
+	)
+}
+
+func (a *API) mutateMember(
+	ctx context.Context,
+	request AddMemberRequest,
+	ensure bool,
+) (MemberMutationResult, error) {
+	if a == nil {
+		return MemberMutationResult{}, basespec.ErrClosed
+	}
+	if request.ExpectedRevision == 0 {
+		return MemberMutationResult{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	member, err := request.Member.entry()
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	memberRaw, err := member.CanonicalJSON()
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+
+	value, err := a.loadEditableCollection(
+		ctx,
+		request.Collection,
+		request.ExpectedRevision,
+	)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	view, err := collectionViewOf(value.artifact, value.document)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+
+	if ensure {
+		for index, current := range value.document.Members {
+			currentRaw, err := current.CanonicalJSON()
+			if err != nil {
+				return MemberMutationResult{}, err
+			}
+			if bytes.Equal(currentRaw, memberRaw) {
+				return MemberMutationResult{
+					Collection: view,
+					Index:      index,
+					Created:    false,
+				}, nil
+			}
+		}
+	}
+
+	value.document.Members = append(
+		append([]declaration.Entry(nil), value.document.Members...),
+		member,
+	)
+	record, err := a.publishDocument(
+		ctx,
+		value.artifact.RootID,
+		value.artifact.Binding.SourceID,
+		value.address,
+		value.document,
+		value.generation,
+	)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	view, err = collectionViewOf(record, value.document)
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	return MemberMutationResult{
+		Collection: view,
+		Index:      len(value.document.Members) - 1,
+		Created:    true,
+	}, nil
+}
+
+func (a *API) managedSource(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) (source.Summary, error) {
+	if sourceID == "" {
+		return EnsureUserManagedArtifactSource(
+			ctx,
+			a.sources,
+			rootID,
+			"",
+		)
+	}
+
+	value, err := a.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return source.Summary{}, err
+	}
+	if value.Kind != source.SourceKindManagedDirectory {
+		return source.Summary{}, fmt.Errorf(
+			"%w: editable Collection Source must have kind %q",
+			basespec.ErrUnsupported,
+			source.SourceKindManagedDirectory,
+		)
+	}
+	if !value.Enabled {
+		return source.Summary{}, fmt.Errorf(
+			"%w: editable Collection Source is disabled",
+			basespec.ErrConflict,
+		)
+	}
+	return value, nil
+}
+
+func (a *API) publishDocument(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	address source.ManagedPackageAddress,
+	document collectionv1.CollectionDocument,
+	expectedGeneration string,
+) (artifact.Artifact, error) {
+	raw, digest, err := collectionDocumentPayload(document)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	if err := a.ensureCollectionDiscovery(
+		ctx,
+		rootID,
+		sourceID,
+		locator,
+	); err != nil {
+		return artifact.Artifact{}, err
+	}
+
+	published, err := a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: rootID,
+			Binding: artifact.SourceBinding{
+				SourceID: sourceID,
+				Locator:  locator,
+			},
+			ExpectedKind: artifact.ArtifactKind(
+				collectionv1.CollectionType,
+			),
+			ExpectedLogicalName: basespec.LogicalName(document.Name),
+			ExpectedDefinition:  digest,
+			Package: source.ManagedPackagePublication{
+				Address:            address,
+				ExpectedGeneration: expectedGeneration,
+				Files: []source.ManagedPackageFile{{
+					Locator: ManagedCollectionDocumentFile,
+					Content: raw,
+				}},
+			},
+		},
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+	return published.Artifact, nil
+}
+
+func (a *API) ensureCollectionDiscovery(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	locator basespec.Locator,
+) error {
+	value, err := a.sources.Get(ctx, rootID, sourceID)
+	if err != nil {
+		return err
+	}
+	if value.Kind != source.SourceKindManagedDirectory {
+		return fmt.Errorf(
+			"%w: editable Collection Source must have kind %q",
+			basespec.ErrUnsupported,
+			source.SourceKindManagedDirectory,
+		)
+	}
+	if !value.Enabled {
+		return fmt.Errorf(
+			"%w: editable Collection Source is disabled",
+			basespec.ErrConflict,
+		)
+	}
+
+	next := value.Discovery.Clone()
+	inScope, err := next.InScope(locator)
+	if err != nil {
+		return err
+	}
+	if !inScope {
+		next.ExplicitLocators = append(next.ExplicitLocators, locator)
+	}
+	if len(next.AllowedDecoderIDs) != 0 &&
+		!slices.Contains(next.AllowedDecoderIDs, decoder.JSONDecoderID) {
+		next.AllowedDecoderIDs = append(
+			next.AllowedDecoderIDs,
+			decoder.JSONDecoderID,
+		)
+	}
+	next = next.Normalized()
+	if err := next.Validate(); err != nil {
+		return err
+	}
+	if value.Discovery.Equal(next) {
+		return nil
+	}
+	_, err = a.sources.Update(
+		ctx,
+		rootID,
+		sourceID,
+		source.Update{
+			ExpectedRevision: value.Revision,
+			DisplayName:      value.DisplayName,
+			Enabled:          value.Enabled,
+			Discovery:        &next,
+		},
+	)
+	return err
+}
+
+func (a *API) loadEditableCollection(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) (editableCollection, error) {
+	if err := ref.Validate(); err != nil {
+		return editableCollection{}, err
+	}
+
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Artifact %q is not a Collection",
+			basespec.ErrUnsupported,
+			record.ID,
+		)
+	}
+	if expectedRevision != 0 && record.Revision != expectedRevision {
+		return editableCollection{}, basespec.ErrConflict
+	}
+	if record.State != artifact.StateAvailable {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Collection Artifact %q is unavailable",
+			basespec.ErrReferenceUnresolved,
+			record.ID,
+		)
+	}
+	if record.Binding.SubresourceLocator != "" {
+		return editableCollection{}, fmt.Errorf(
+			"%w: contained Collection declarations are not editable managed Collections",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	sourceValue, err := a.sources.Get(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Collection is not backed by a managed Source",
+			basespec.ErrUnsupported,
+		)
+	}
+	if !sourceValue.Enabled {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Collection Source is disabled",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+
+	address, err := managedCollectionAddressFromLocator(
+		record.Binding.Locator,
+	)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	if address.Name != record.LogicalName {
+		return editableCollection{}, fmt.Errorf(
+			"%w: managed Collection package name does not match Artifact identity",
+			basespec.ErrInvalid,
+		)
+	}
+
+	inspection, err := a.discovery.InspectSource(
+		ctx,
+		record.RootID,
+		record.Binding.SourceID,
+	)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	if !inspection.IsCurrent() {
+		return editableCollection{}, fmt.Errorf(
+			"%w: managed Collection Source requires refresh",
+			basespec.ErrRefreshRequired,
+		)
+	}
+
+	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	document, err := collectionv1.DecodeCollectionJSON(
+		definitionValue.Body,
+	)
+	if err != nil {
+		return editableCollection{}, err
+	}
+	if document.Name != string(record.LogicalName) {
+		return editableCollection{}, fmt.Errorf(
+			"%w: Collection declaration name differs from Artifact identity",
+			basespec.ErrInvalid,
+		)
+	}
+	return editableCollection{
+		artifact:   record,
+		document:   document,
+		address:    address,
+		generation: inspection.State.SourceGeneration,
+	}, nil
+}
+
+func managedCollectionAddress(
+	name basespec.LogicalName,
+) (source.ManagedPackageAddress, error) {
+	return source.NewManagedPackageAddress(
+		ManagedCollectionPackageKind,
+		name,
+		ManagedCollectionVersion,
+	)
+}
+
+func managedCollectionAddressFromLocator(
+	locator basespec.Locator,
+) (source.ManagedPackageAddress, error) {
+	if err := locator.ValidatePortable(false); err != nil {
+		return source.ManagedPackageAddress{}, err
+	}
+	if path.Base(string(locator)) != string(ManagedCollectionDocumentFile) {
+		return source.ManagedPackageAddress{}, fmt.Errorf(
+			"%w: Collection locator %q is not %q",
+			basespec.ErrUnsupported,
+			locator,
+			ManagedCollectionDocumentFile,
+		)
+	}
+	address, err := source.ParseManagedPackageAddressDirectory(
+		basespec.Locator(path.Dir(string(locator))),
+	)
+	if err != nil {
+		return source.ManagedPackageAddress{}, err
+	}
+	if address.Kind != ManagedCollectionPackageKind {
+		return source.ManagedPackageAddress{}, fmt.Errorf(
+			"%w: managed Collection package kind must be %q",
+			basespec.ErrUnsupported,
+			ManagedCollectionPackageKind,
+		)
+	}
+	return address, nil
+}
+
+func collectionDocumentPayload(
+	document collectionv1.CollectionDocument,
+) ([]byte, cryptoutil.Digest, error) {
+	raw, err := document.CanonicalJSON()
+	if err != nil {
+		return nil, "", err
+	}
+	entry, err := declaration.NewEntry(document)
+	if err != nil {
+		return nil, "", err
+	}
+	value, err := decoder.DefinitionForEntry(entry)
+	if err != nil {
+		return nil, "", err
+	}
+	return raw, value.Digest, nil
+}
+
+func collectionViewOf(
+	record artifact.Artifact,
+	document collectionv1.CollectionDocument,
+) (CollectionView, error) {
+	members := make([]MemberReference, len(document.Members))
+	for index, member := range document.Members {
+		value, err := memberReferenceFromEntry(member)
+		if err != nil {
+			return CollectionView{}, fmt.Errorf(
+				"collection members[%d]: %w",
+				index,
+				err,
+			)
+		}
+		members[index] = value
+	}
+	return CollectionView{
+		Artifact:    record.Clone(),
+		Name:        basespec.LogicalName(document.Name),
+		Description: document.Description,
+		Version:     basespec.LogicalVersion(document.Version),
+		Members:     members,
+	}, nil
+}
+
+func (m MemberReference) entry() (declaration.Entry, error) {
+	if err := m.Type.Validate(); err != nil {
+		return declaration.Entry{}, err
+	}
+	if err := m.Name.Validate(); err != nil {
+		return declaration.Entry{}, err
+	}
+
+	header := declaration.Header{
+		Type:        m.Type,
+		Name:        string(m.Name),
+		Description: m.Description,
+	}
+	if m.Locator != nil {
+		locator := m.Locator.Clone()
+		header.Locator = &locator
+	}
+	entry, err := declaration.NewEntry(struct {
+		declaration.Header
+
+		Server string `json:"server,omitempty"`
+	}{
+		Header: header,
+		Server: string(m.Server),
+	})
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+	if err := entry.ValidateCompositionReference(); err != nil {
+		return declaration.Entry{}, err
+	}
+	return entry, nil
+}
+
+func memberReferenceFromEntry(
+	entry declaration.Entry,
+) (MemberReference, error) {
+	form, err := entry.CompositionForm()
+	if err != nil {
+		return MemberReference{}, err
+	}
+	if form != declaration.CompositionEntryReference {
+		return MemberReference{}, fmt.Errorf(
+			"%w: editable Collection members must be external references",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	header := entry.Header()
+	output := MemberReference{
+		Type:        header.Type,
+		Name:        basespec.LogicalName(header.Name),
+		Description: header.Description,
+	}
+	if header.Locator != nil {
+		locator := header.Locator.Clone()
+		output.Locator = &locator
+	}
+
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return MemberReference{}, err
+	}
+	var selector struct {
+		Server string `json:"server"`
+	}
+	if err := json.Unmarshal(raw, &selector); err != nil {
+		return MemberReference{}, err
+	}
+	if selector.Server != "" {
+		output.Server = basespec.LogicalName(selector.Server)
+		if err := output.Server.Validate(); err != nil {
+			return MemberReference{}, err
+		}
+	}
+	return output, nil
+}
+
+func relativeSourceLocator(
+	from basespec.Locator,
+	target basespec.Locator,
+) (declaration.Locator, error) {
+	if err := from.Validate(false); err != nil {
+		return declaration.Locator{}, err
+	}
+	if err := target.Validate(false); err != nil {
+		return declaration.Locator{}, err
+	}
+
+	fromDirectory := path.Dir(string(from))
+	fromParts := locatorParts(fromDirectory)
+	targetParts := locatorParts(string(target))
+
+	common := 0
+	for common < len(fromParts) &&
+		common < len(targetParts) &&
+		fromParts[common] == targetParts[common] {
+		common++
+	}
+
+	relativeParts := make(
+		[]string,
+		0,
+		len(fromParts)-common+len(targetParts)-common,
+	)
+	for index := common; index < len(fromParts); index++ {
+		relativeParts = append(relativeParts, "..")
+	}
+	relativeParts = append(relativeParts, targetParts[common:]...)
+	if len(relativeParts) == 0 {
+		relativeParts = []string{path.Base(string(target))}
+	}
+
+	value := declaration.PathLocator(strings.Join(relativeParts, "/"))
+	if err := value.Validate(); err != nil {
+		return declaration.Locator{}, err
+	}
+	return value, nil
+}
+
+func locatorParts(value string) []string {
+	if value == "" || value == "." {
+		return nil
+	}
+	return strings.Split(value, "/")
+}
