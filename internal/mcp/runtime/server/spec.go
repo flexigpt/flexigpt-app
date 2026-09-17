@@ -125,7 +125,7 @@ const (
 type MCPTransportType string
 
 const (
-	MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
+	MCPTransportStreamableHTTP MCPTransportType = "streamableHTTP"
 	MCPTransportStdio          MCPTransportType = "stdio"
 )
 

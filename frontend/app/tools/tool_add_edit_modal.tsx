@@ -98,7 +98,7 @@ const EMPTY_FORM_DATA = {
 
 	userCallable: true,
 	llmCallable: true,
-	autoExecReco: false,
+	autoExecute: false,
 
 	type: ToolImplType.HTTP as ToolImplType,
 	argSchema: '{}',
@@ -162,7 +162,7 @@ function buildInitialFormData(
 
 		userCallable: t.userCallable,
 		llmCallable: t.llmCallable,
-		autoExecReco: t.autoExecReco,
+		autoExecute: t.autoExecute,
 
 		type: t.type,
 		argSchema: JSON.stringify(t.argSchema ?? {}, null, 2),
@@ -605,7 +605,7 @@ function AddEditToolModalContent({
 			isEnabled: formData.isEnabled,
 			userCallable: formData.userCallable,
 			llmCallable: formData.llmCallable,
-			autoExecReco: formData.autoExecReco,
+			autoExecute: formData.autoExecute,
 			tags: tagsArr.length > 0 ? tagsArr : undefined,
 			type: formData.type,
 			argSchema: parsedArgSchema,
@@ -663,7 +663,7 @@ function AddEditToolModalContent({
 							</div>
 						)}
 
-						{formData.autoExecReco && !isViewMode && (
+						{formData.autoExecute && !isViewMode && (
 							<div className="border-warning/40 bg-warning/10 rounded-2xl border p-2 text-sm">
 								<div className="flex items-start gap-2">
 									<FiAlertTriangle className="mt-0.5 shrink-0" size={16} />
@@ -882,8 +882,8 @@ function AddEditToolModalContent({
 								<input
 									id="tool-auto-execute"
 									type="checkbox"
-									name="autoExecReco"
-									checked={formData.autoExecReco}
+									name="autoExecute"
+									checked={formData.autoExecute}
 									onChange={handleInput}
 									className="toggle toggle-accent disabled:opacity-80"
 									disabled={isViewMode}

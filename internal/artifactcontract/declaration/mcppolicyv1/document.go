@@ -15,7 +15,7 @@ import (
 const (
 	MCPPolicyType          = declaration.TypeMCPPolicy
 	MCPPolicySchemaID      = "artifact.mcp-policy.v1"
-	MCPPolicySchemaVersion = declaration.APIVersionV1
+	MCPPolicySchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed mcp-policy-v1.schema.json
@@ -32,10 +32,6 @@ var MCPPolicySchemaKey = schema.ArtifactKey(
 type MCPPolicyDocument struct {
 	declaration.Header
 
-	Body *MCPPolicyBody `json:"body"`
-}
-
-type MCPPolicyBody struct {
 	TrustLevel    string                                 `json:"trustLevel,omitempty"`
 	DefaultPolicy *MCPPolicyDefaultPolicy                `json:"defaultPolicy,omitempty"`
 	ToolPolicies  map[string]MCPPolicyToolPolicyOverride `json:"toolPolicies,omitempty"`
@@ -43,7 +39,6 @@ type MCPPolicyBody struct {
 }
 
 type MCPPolicyToolPolicyOverride struct {
-	ToolName         string `json:"toolName,omitempty"`
 	ApprovalRule     string `json:"approvalRule,omitempty"`
 	ExecutionMode    string `json:"executionMode,omitempty"`
 	AllowStaleDigest *bool  `json:"allowStaleDigest,omitempty"`
@@ -156,30 +151,21 @@ func (v MCPPolicyDocument) validate() error {
 func (v MCPPolicyDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPPolicyType,
-		APIVersion:   MCPPolicySchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
 	if err := declaration.ValidateDeclarationLocatorExclusivity(
 		"MCP Policy",
 		v.Locator,
-		v.Body != nil,
+		v.hasPolicyFields(),
 	); err != nil {
 		return err
 	}
-	if v.Body == nil {
-		if v.Locator != nil {
-			return nil
-		}
-		return fmt.Errorf(
-			"%w: MCP Policy requires body or locator",
-			basespec.ErrInvalid,
-		)
-	}
-	return v.Body.Validate()
+	return v.validatePolicy()
 }
 
-func (v MCPPolicyBody) Validate() error {
+func (v MCPPolicyDocument) validatePolicy() error {
 	switch v.TrustLevel {
 	case "", "trusted", "untrusted":
 	default:
@@ -203,15 +189,6 @@ func (v MCPPolicyBody) Validate() error {
 			basespec.MaxLogicalNameBytes,
 		); err != nil {
 			return err
-		}
-		if policy.ToolName != "" &&
-			policy.ToolName != name {
-			return fmt.Errorf(
-				"%w: MCP policy tool key %q differs from toolName %q",
-				basespec.ErrInvalid,
-				name,
-				policy.ToolName,
-			)
 		}
 		if err := validateApprovalRule(
 			"MCP policy approval rule",
@@ -248,6 +225,13 @@ func (v MCPPolicyBody) Validate() error {
 		}
 	}
 	return nil
+}
+
+func (v MCPPolicyDocument) hasPolicyFields() bool {
+	return v.TrustLevel != "" ||
+		v.DefaultPolicy != nil ||
+		v.ToolPolicies != nil ||
+		v.AppsPolicy != nil
 }
 
 func validateApprovalRule(

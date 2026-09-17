@@ -4,8 +4,8 @@ import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 
 const providerName = "artifact-markdown"
 
-// Provider registers physical Markdown source-format adapters. It emits
-// ordinary instruction, context, and agent Artifacts for any Store Root.
+// Provider registers physical Markdown source-format adapters. It emits Text
+// and Agent Artifacts for any Store Root.
 type Provider struct {
 	descriptor providerapi.Descriptor
 }
@@ -15,8 +15,7 @@ func NewProvider() (*Provider, error) {
 		Name: providerName,
 		Decoders: []providerapi.Decoder{
 			NewAgentMarkdownDecoder(),
-			NewInstructionDecoder(),
-			NewContextDecoder(),
+			NewTextDecoder(),
 		},
 	}
 	if err := descriptor.Validate(); err != nil {
@@ -37,7 +36,6 @@ func (p *Provider) Descriptor() providerapi.Descriptor {
 func DefaultDecoderIDs() []string {
 	return []string{
 		string(AgentMarkdownDecoderID),
-		string(InstructionMarkdownDecoderID),
-		string(ContextMarkdownDecoderID),
+		string(TextMarkdownDecoderID),
 	}
 }

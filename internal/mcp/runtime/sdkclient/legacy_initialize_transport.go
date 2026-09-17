@@ -21,7 +21,7 @@ const sdkMethodServerDiscover = "server/discover"
 // for this purpose. The streamable HTTP transport's concrete connection type
 // receives an SDK-internal sessionUpdated callback after initialize. Wrapping
 // it hides that private interface from the SDK, preventing protocol-version
-// headers and standalone SSE setup from being initialized.
+// headers and SSE setup from being initialized.
 func preferLegacyInitializeClient(client *mcpSDK.Client) {
 	if client == nil {
 		return

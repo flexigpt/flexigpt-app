@@ -1,0 +1,47 @@
+type: mcp
+name: github
+displayName: GitHub
+description: GitHub MCP server.
+labels:
+  category: source-control
+  owner: platform
+metadata:
+  acme.example/owner: platform
+transport: streamableHTTP
+url: https://api.githubcopilot.com/mcp/
+headers:
+  X-Client-Mode: default
+include:
+  tools:
+    - create_issue
+    - get_issue
+  resources:
+    - repository://issues
+  prompts:
+    - issue-summary
+timeoutMS: 60000
+auth:
+  mode: oauth
+  clientCredentialsInput: github_oauth_client
+  clientIDMetadataDocumentURL: https://app.example.com/mcp-client.json
+install:
+  note: GitHub OAuth client credentials may be configured locally.
+  inputs:
+    github_oauth_client:
+      kind: oauthClientCredentials
+      label: GitHub OAuth Client
+      required: false
+      clientSecretRequired: false
+  allowEnvironment:
+    - GITHUB_TOKEN
+connectionProfiles:
+  local:
+    platforms:
+      - linux
+      - darwin
+    http:
+      headers:
+        X-Client-Mode: local
+policy:
+  name: builtin-manual-write
+  required: true

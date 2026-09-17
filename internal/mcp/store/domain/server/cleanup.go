@@ -89,7 +89,7 @@ func CleanupUnboundServerSecrets(
 		}
 		candidates[ref] = struct{}{}
 	}
-	for _, declaration := range document.Extension.Install.Inputs {
+	for _, declaration := range document.Configuration.Install.Inputs {
 		if declaration.Kind != InputOAuthClientCredentials {
 			continue
 		}

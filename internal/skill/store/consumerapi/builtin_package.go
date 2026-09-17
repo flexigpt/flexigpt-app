@@ -57,11 +57,11 @@ func (a *API) InstallBuiltInSkillPackage(
 		)
 	}
 	if request.DocumentFile !=
-		skillDomain.BuiltinSkillCollectionDocumentFile {
+		skillDomain.BuiltinSkillPluginDocumentFile {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill document file must be %q",
 			basespec.ErrInvalid,
-			skillDomain.BuiltinSkillCollectionDocumentFile,
+			skillDomain.BuiltinSkillPluginDocumentFile,
 		)
 	}
 	if err := request.DocumentFile.ValidatePortable(false); err != nil {
@@ -296,7 +296,7 @@ func normalizeBuiltInSkillPackageExpectations(
 		}
 		seen[key] = struct{}{}
 
-		if expected.Locator != skillDomain.BuiltinSkillCollectionDocumentFile ||
+		if expected.Locator != skillDomain.BuiltinSkillPluginDocumentFile ||
 			expected.Subresource != "" {
 			continue
 		}
@@ -307,7 +307,7 @@ func normalizeBuiltInSkillPackageExpectations(
 			)
 		}
 		if expected.Kind != artifact.ArtifactKind(
-			declaration.TypeCollection,
+			declaration.TypePlugin,
 		) {
 			return nil, BuiltInSkillArtifactExpectation{}, fmt.Errorf(
 				"%w: built-in Skill package root must be a Collection",

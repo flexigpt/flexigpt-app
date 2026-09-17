@@ -6,10 +6,10 @@ import (
 	"maps"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type Decoded struct {
@@ -92,31 +92,25 @@ func DecodeMCPConfig(
 		}
 
 		input := config.MCPServers[name]
-		core := mcpDomainServer.CoreServer{
-			Command: input.Command,
-			Args:    append([]string(nil), input.Args...),
-			Env:     maps.Clone(input.Env),
-			URL:     input.URL,
-			Headers: maps.Clone(input.Headers),
-		}
 
 		transport := input.Transport
 		if input.Type != "" {
 			transport = input.Type
 		}
+		var t mcpv1.Transport
 		switch transport {
 		case "":
 			if input.URL != "" {
-				core.Type = mcpDomainServer.ServerTypeHTTP
+				t = mcpv1.TransportStreamableHTTP
 			} else {
-				core.Type = mcpDomainServer.ServerTypeStdio
+				t = mcpv1.TransportStdio
 			}
 		case "stdio":
-			core.Type = mcpDomainServer.ServerTypeStdio
-		case "http", "streamable-http", "streamableHttp":
-			core.Type = mcpDomainServer.ServerTypeHTTP
-		case "sse":
-			core.Type = mcpDomainServer.ServerTypeSSE
+			t = mcpv1.TransportStdio
+
+		case "http", "streamableHTTP":
+			t = mcpv1.TransportStreamableHTTP
+
 		default:
 			return nil, fmt.Errorf(
 				"%w: MCP config server %q has unsupported type %q",
@@ -126,21 +120,21 @@ func DecodeMCPConfig(
 			)
 		}
 
-		document, err := mcpDomainServer.NewDocument(
-			logicalName,
-			"",
-			name,
-			"",
-			nil,
-			core,
-			mcpDomainServer.ServerExtension{},
-		)
-		if err != nil {
+		document := mcpv1.MCPDocument{
+			Type:        mcpv1.MCPType,
+			Name:        string(logicalName),
+			DisplayName: name,
+			Transport:   t,
+			Command:     input.Command,
+			Args:        append([]string(nil), input.Args...),
+			Env:         maps.Clone(input.Env),
+			URL:         input.URL,
+			Headers:     maps.Clone(input.Headers),
+		}
+		if err := document.Validate(); err != nil {
 			return nil, err
 		}
-		definitionValue, err := mcpDomainServer.DefinitionForDocument(
-			document,
-		)
+		definitionValue, err := mcpv1.DefinitionForDeclaration(document)
 		if err != nil {
 			return nil, err
 		}

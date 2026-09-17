@@ -119,8 +119,8 @@ The official MCP Go SDK supports Client ID Metadata Document registration.
 Server config:
 
     {
-      "transport": "streamableHttp",
-      "streamableHttp": {
+      "transport": "streamableHTTP",
+      "streamableHTTP": {
         "url": "https://example.com/mcp",
         "authMode": "oauth",
         "clientIDMetadataDocumentURL": "https://client.example.com/flexigpt-mcp-client.json"

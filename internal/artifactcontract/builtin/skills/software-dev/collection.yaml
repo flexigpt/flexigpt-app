@@ -1,37 +1,28 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: software-dev
 description: "Software Development Lifecycle Skills"
 members:
   - type: skill
     name: designing-system-architecture
-    description: "Design system architecture, ownership boundaries, and event-driven choices using the simplest viable option."
     locator: ./designing-system-architecture
   - type: skill
     name: refactoring-code
-    description: "Plan and apply bounded behavior-preserving refactors that reduce complexity and change risk."
     locator: ./refactoring-code
   - type: skill
     name: reviewing-code
-    description: "Review code, diffs, pull requests, and interfaces for concrete defects, risks, and misuse-enabling designs."
     locator: ./reviewing-code
   - type: skill
     name: spec-driven-dev
-    description: "Plan, scope, implement, and verify bounded software changes with explicit requirements and evidence."
     locator: ./spec-driven-dev
   - type: skill
     name: codebase-exploration
-    description: "Map unfamiliar repositories by identifying entry points, modules, flows, configuration, tests, and risks."
     locator: ./codebase-exploration
   - type: skill
     name: test-case-design
-    description: "Design traceable happy-path, boundary, negative, and regression test cases without writing test code."
     locator: ./test-case-design
   - type: skill
     name: bug-investigation
-    description: "Diagnose likely root causes from evidence and produce a verification plan without applying a fix."
     locator: ./bug-investigation
   - type: skill
     name: test-implementation
-    description: "Write focused unit, integration, and regression tests using the existing project test style."
     locator: ./test-implementation

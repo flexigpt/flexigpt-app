@@ -1,0 +1,18 @@
+type: loop
+name: reviewer-loop
+displayName: Reviewer Loop
+description: Repeats review until the result is complete.
+labels:
+  category: review
+  owner: platform
+metadata:
+  acme.example/owner: platform
+body:
+  type: agent
+  name: code-reviewer
+  locator: ./agents/code-reviewer.agent.yaml
+maxIterations: 12
+until:
+  pointer: /complete
+  schema:
+    const: true

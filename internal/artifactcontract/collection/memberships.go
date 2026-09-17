@@ -54,46 +54,42 @@ func (a *API) ListMembershipsForArtifact(
 	}
 
 	targetTerminal := ref
-	if terminal, resolveErr := a.resolver.ResolveDeclarationArtifact(
+	if terminal, resolveErr := a.resolver.ResolveTerminalArtifact(
 		ctx,
 		ref,
 	); resolveErr == nil {
 		targetTerminal = terminal
 	}
 
-	collections, err := a.ListDomain(ctx, ref.RootID)
+	plugins, err := a.ListDomain(ctx, ref.RootID)
 	if err != nil {
 		return nil, err
 	}
 	output := make([]ArtifactMembershipView, 0)
-	for _, collectionValue := range collections {
-		graph, err := a.resolver.ResolveArtifact(
-			ctx,
-			collectionValue.Artifact.Ref(),
-		)
+	for _, collectionValue := range plugins {
+		plugin, err := a.resolver.ResolvePlugin(ctx, collectionValue.Artifact.Ref())
 		if err != nil {
 			return nil, err
 		}
-		if graph.Root == nil ||
-			graph.Root.Type != declaration.TypeCollection {
+		if plugin == nil || plugin.Type != declaration.TypePlugin {
 			return nil, fmt.Errorf(
-				"%w: Collection %q did not resolve as a Collection",
+				"%w: Plugin %q did not resolve as a Plugin",
 				basespec.ErrReferenceUnresolved,
 				collectionValue.Artifact.ID,
 			)
 		}
 
-		for index, relationship := range graph.Root.MemberResults {
+		for index, relationship := range plugin.MemberResults {
 			header := relationship.Declared.Header()
 			if header.Type != targetType ||
 				header.Name != string(target.LogicalName) {
 				continue
 			}
-			form, err := relationship.Declared.CompositionForm()
+			form, err := relationship.Declared.MemberForm()
 			if err != nil {
 				return nil, err
 			}
-			if form != declaration.CompositionEntryReference {
+			if form != declaration.MemberNamed {
 				continue
 			}
 			member, err := memberReferenceFromEntry(
@@ -118,7 +114,7 @@ func (a *API) ListMembershipsForArtifact(
 			if relationship.Resolved != nil {
 				if resolvedRef, found := relationship.Resolved.ArtifactRef(); found {
 					terminal := resolvedRef
-					if value, resolveErr := a.resolver.ResolveDeclarationArtifact(
+					if value, resolveErr := a.resolver.ResolveTerminalArtifact(
 						ctx,
 						resolvedRef,
 					); resolveErr == nil {

@@ -9,7 +9,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -171,17 +171,15 @@ func (a *API) EnsureBaseline(
 			SourceID: sourceValue.ID,
 			Locator:  locator,
 		},
-		artifact.ArtifactKind(collectionv1.CollectionType),
+		artifact.ArtifactKind(pluginv1.PluginType),
 	)
 	switch {
 	case err == nil:
 		if existing.State == artifact.StateAvailable {
 			return a.Read(ctx, existing.Ref())
 		}
-
-		document := collectionv1.CollectionDocument{
-			APIVersion:  collectionv1.CollectionSchemaVersion,
-			Type:        collectionv1.CollectionType,
+		document := pluginv1.PluginDocument{
+			Type:        pluginv1.PluginType,
 			Name:        string(a.domain.BaselineName),
 			Description: a.domain.BaselineDescription,
 		}
@@ -295,16 +293,16 @@ func (a *API) validateDomainMember(
 }
 
 func (a *API) validateEditableDomainDocument(
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 ) error {
 	for index, member := range document.Members {
-		form, err := member.CompositionForm()
+		form, err := member.MemberForm()
 		if err != nil {
 			return fmt.Errorf("collection members[%d]: %w", index, err)
 		}
-		if form != declaration.CompositionEntryReference {
+		if form != declaration.MemberNamed {
 			return fmt.Errorf(
-				"%w: editable collection cannot contain declarations",
+				"%w: editable Plugin cannot contain contained or selector members",
 				basespec.ErrUnsupported,
 			)
 		}
@@ -325,7 +323,7 @@ func (a *API) validateEditableDomainDocument(
 func IsBaselineCollectionArtifact(
 	value artifact.Artifact,
 ) bool {
-	if value.Kind != artifact.ArtifactKind(collectionv1.CollectionType) {
+	if value.Kind != artifact.ArtifactKind(pluginv1.PluginType) {
 		return false
 	}
 	address, err := managedCollectionAddressFromLocator(
@@ -344,7 +342,7 @@ func IsBaselineCollectionArtifactForSource(
 	value artifact.Artifact,
 	sourceValue source.Summary,
 ) bool {
-	if value.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+	if value.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
 		value.RootID != sourceValue.RootID ||
 		value.Binding.SourceID != sourceValue.ID ||
 		sourceValue.Kind != source.SourceKindManagedDirectory {
@@ -367,30 +365,30 @@ func IsBaselineCollectionArtifactForSource(
 func (a *API) readCollectionDocument(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (artifact.Artifact, collectionv1.CollectionDocument, error) {
+) (artifact.Artifact, pluginv1.PluginDocument, error) {
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, collectionv1.CollectionDocument{}, err
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
-	if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+	if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
 		record.State != artifact.StateAvailable {
-		return artifact.Artifact{}, collectionv1.CollectionDocument{}, fmt.Errorf(
-			"%w: Artifact %q is not an available Collection",
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+			"%w: Artifact %q is not an available Plugin",
 			basespec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, collectionv1.CollectionDocument{}, err
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
-	document, err := collectionv1.DecodeCollectionJSON(definitionValue.Body)
+	document, err := pluginv1.DecodePluginJSON(definitionValue.Body)
 	if err != nil {
-		return artifact.Artifact{}, collectionv1.CollectionDocument{}, err
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
 	if document.Name != string(record.LogicalName) {
-		return artifact.Artifact{}, collectionv1.CollectionDocument{}, fmt.Errorf(
-			"%w: Collection declaration name differs from Artifact identity",
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+			"%w: Plugin declaration name differs from Artifact identity",
 			basespec.ErrInvalid,
 		)
 	}
@@ -400,7 +398,7 @@ func (a *API) readCollectionDocument(
 func (a *API) domainCollectionVisible(
 	ctx context.Context,
 	record artifact.Artifact,
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 ) (bool, error) {
 	if a.domain == nil {
 		return true, nil
@@ -503,7 +501,7 @@ func (a *API) ListDomain(
 	output := make([]CollectionView, 0)
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, record := range records {
-		if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
 			record.State != artifact.StateAvailable {
 			continue
 		}
@@ -531,12 +529,12 @@ func (a *API) ListDomain(
 
 func readCollectionViewOf(
 	record artifact.Artifact,
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 	editable bool,
 	deletable bool,
 	baseline bool,
 ) (CollectionView, error) {
-	ordered, err := declaration.SortedCompositionEntries(
+	ordered, err := declaration.SortedMembers(
 		"Collection members",
 		document.Members,
 	)
@@ -548,7 +546,6 @@ func readCollectionViewOf(
 		Artifact:    record.Clone(),
 		Name:        basespec.LogicalName(document.Name),
 		Description: document.Description,
-		Version:     basespec.LogicalVersion(document.Version),
 		Editable:    editable,
 		Deletable:   deletable,
 		Baseline:    baseline,
@@ -556,7 +553,7 @@ func readCollectionViewOf(
 		Entries:     make([]CollectionMemberView, 0, len(ordered)),
 	}
 	for index, entry := range ordered {
-		form, err := entry.CompositionForm()
+		form, err := entry.MemberForm()
 		if err != nil {
 			return CollectionView{}, fmt.Errorf(
 				"collection members[%d]: %w",
@@ -566,17 +563,23 @@ func readCollectionViewOf(
 		}
 		header := entry.Header()
 		member := CollectionMemberView{
-			Type:        header.Type,
-			Name:        basespec.LogicalName(header.Name),
-			Description: header.Description,
-			Metadata:    declaration.CloneRawMessageMap(header.Metadata),
-			Contained:   form == declaration.CompositionEntryContained,
+			Type:      header.Type,
+			Name:      basespec.LogicalName(header.Name),
+			Contained: form == declaration.MemberContained,
+			Selector:  form == declaration.MemberSelector,
 		}
 		if header.Locator != nil {
 			locator := header.Locator.Clone()
 			member.Locator = &locator
 		}
-		if form == declaration.CompositionEntryReference {
+		if header.Type == declaration.TypeText {
+			insert, err := entry.TextInsert()
+			if err != nil {
+				return CollectionView{}, err
+			}
+			member.Insert = insert
+		}
+		if form == declaration.MemberNamed {
 			reference, err := memberReferenceFromEntry(entry)
 			if err != nil {
 				return CollectionView{}, err

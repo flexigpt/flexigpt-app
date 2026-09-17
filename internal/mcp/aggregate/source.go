@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -142,7 +143,7 @@ func runtimeConfig(
 			StartupTimeoutMS: input.TimeoutMS,
 		}
 
-	case mcpDomainServer.ServerTypeHTTP, mcpDomainServer.ServerTypeSSE:
+	case mcpDomainServer.ServerTypeHTTP:
 		authMode, err := runtimeHTTPAuthMode(input.Auth.Mode)
 		if err != nil {
 			return mcpServer.RuntimeConfig{}, err
@@ -195,16 +196,16 @@ func runtimeInclude(
 }
 
 func runtimeHTTPAuthMode(
-	input mcpDomainServer.MCPHTTPAuthMode,
+	input mcpv1.HTTPAuthMode,
 ) (mcpServer.MCPHTTPAuthMode, error) {
 	switch input {
-	case mcpDomainServer.MCPHTTPAuthNone:
+	case mcpv1.HTTPAuthModeNone:
 		return mcpServer.MCPHTTPAuthNone, nil
-	case mcpDomainServer.MCPHTTPAuthAPIKey:
+	case mcpv1.HTTPAuthModeAPIKey:
 		return mcpServer.MCPHTTPAuthAPIKey, nil
-	case mcpDomainServer.MCPHTTPAuthOAuth:
+	case mcpv1.HTTPAuthModeOAuth:
 		return mcpServer.MCPHTTPAuthOAuth, nil
-	case mcpDomainServer.MCPHTTPAuthClientCredentials:
+	case mcpv1.HTTPAuthModeClientCredentials:
 		return mcpServer.MCPHTTPAuthClientCredentials, nil
 	default:
 		return "", errors.New("unsupported materialized MCP authentication mode")

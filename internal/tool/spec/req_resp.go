@@ -68,7 +68,7 @@ type PutToolRequestBody struct {
 
 	UserCallable bool `json:"userCallable" required:"true"`
 	LLMCallable  bool `json:"llmCallable"  required:"true"`
-	AutoExecReco bool `json:"autoExecReco" required:"true"`
+	AutoExecReco bool `json:"autoExecute"  required:"true"`
 
 	// Take inputs as strings that we can then validate as a json object and put a tool.
 	ArgSchema jsonutil.JSONRawString `json:"argSchema" required:"true"`

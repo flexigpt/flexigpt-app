@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -174,12 +173,6 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 		Skills:       skillPlan,
 		MCPServers:   mcpPlan,
 	}, nil
-}
-
-func requireCompleteWorkspaceCapabilities(
-	value WorkspaceCapabilityPlan,
-) error {
-	return resolve.RequireComplete(value.Occurrences)
 }
 
 func (a *StoreAPI) loadWorkspaceMCPServers(

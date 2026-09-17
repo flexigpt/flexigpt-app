@@ -18,15 +18,26 @@ import (
 const (
 	MCPType          = declaration.TypeMCP
 	MCPSchemaID      = "artifact.mcp.v1"
-	MCPSchemaVersion = declaration.APIVersionV1
+	MCPSchemaVersion = declaration.SchemaVersionV1
+
+	//nolint:gosec // Str.
+	secretOAuthClientCredentials = "oauthClientCredentials"
 )
 
 type Transport string
 
 const (
 	TransportStdio          Transport = "stdio"
-	TransportStreamableHTTP Transport = "streamable-http"
-	TransportSSE            Transport = "sse"
+	TransportStreamableHTTP Transport = "streamableHTTP"
+)
+
+type HTTPAuthMode string
+
+const (
+	HTTPAuthModeNone              HTTPAuthMode = "none"
+	HTTPAuthModeAPIKey            HTTPAuthMode = "apiKey"
+	HTTPAuthModeOAuth             HTTPAuthMode = "oauth"
+	HTTPAuthModeClientCredentials HTTPAuthMode = "clientCredentials"
 )
 
 //go:embed mcp-v1.schema.json
@@ -50,6 +61,53 @@ type Include struct {
 	Prompts   []string `json:"prompts,omitempty"`
 }
 
+type Auth struct {
+	Mode                        HTTPAuthMode `json:"mode"`
+	ClientCredentialsInput      string       `json:"clientCredentialsInput,omitempty"`
+	ClientIDMetadataDocumentURL string       `json:"clientIDMetadataDocumentURL,omitempty"`
+}
+
+type Install struct {
+	Note             string                  `json:"note,omitempty"`
+	Inputs           map[string]InstallInput `json:"inputs,omitempty"`
+	AllowEnvironment []string                `json:"allowEnvironment,omitempty"`
+}
+
+type InstallInput struct {
+	Kind                 string           `json:"kind"`
+	Label                string           `json:"label,omitempty"`
+	Description          string           `json:"description,omitempty"`
+	Note                 string           `json:"note,omitempty"`
+	Placeholder          string           `json:"placeholder,omitempty"`
+	Required             *bool            `json:"required,omitempty"`
+	Default              *json.RawMessage `json:"default,omitempty"`
+	ClientSecretRequired *bool            `json:"clientSecretRequired,omitempty"`
+}
+
+type ConnectionProfile struct {
+	Platforms []string      `json:"platforms,omitempty"`
+	Stdio     *StdioProfile `json:"stdio,omitempty"`
+	HTTP      *HTTPProfile  `json:"http,omitempty"`
+}
+
+type StdioProfile struct {
+	Command   string            `json:"command,omitempty"`
+	Args      []string          `json:"args,omitempty"`
+	Env       map[string]string `json:"env,omitempty"`
+	RemoveEnv []string          `json:"removeEnv,omitempty"`
+}
+
+type HTTPProfile struct {
+	URL           string            `json:"url,omitempty"`
+	Headers       map[string]string `json:"headers,omitempty"`
+	RemoveHeaders []string          `json:"removeHeaders,omitempty"`
+}
+
+type PolicyReference struct {
+	Name     basespec.LogicalName `json:"name"`
+	Required *bool                `json:"required,omitempty"`
+}
+
 type MCPDocument struct {
 	declaration.Header
 
@@ -63,7 +121,12 @@ type MCPDocument struct {
 	URL     string            `json:"url,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`
 
-	Include *Include `json:"include,omitempty"`
+	Include            *Include                     `json:"include,omitempty"`
+	TimeoutMS          int                          `json:"timeoutMS,omitempty"`
+	Auth               *Auth                        `json:"auth,omitempty"`
+	Install            *Install                     `json:"install,omitempty"`
+	ConnectionProfiles map[string]ConnectionProfile `json:"connectionProfiles,omitempty"`
+	Policy             *PolicyReference             `json:"policy,omitempty"`
 }
 
 func MCPJSONSchema() []byte {
@@ -105,13 +168,19 @@ func DefinitionForDeclaration(
 		return definition.Definition{}, err
 	}
 
+	name := input.DisplayName
+	if name == "" {
+		name = input.Name
+	}
+
 	return definition.Canonicalize(definition.Definition{
 		Kind:          artifact.ArtifactKind(MCPType),
 		SchemaID:      MCPSchemaKey.SchemaID,
 		SchemaVersion: MCPSchemaKey.SchemaVersion,
 		LogicalName:   basespec.LogicalName(input.Name),
-		DisplayName:   input.Name,
+		DisplayName:   name,
 		Description:   input.Description,
+		Labels:        declaration.CloneStringMap(input.Labels),
 		Body:          json.RawMessage(body),
 	})
 }
@@ -176,7 +245,7 @@ func (v MCPDocument) validate() error {
 func (v MCPDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: MCPType,
-		APIVersion:   MCPSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
@@ -216,6 +285,35 @@ func (v MCPDocument) validateFields() error {
 		v.Headers,
 	); err != nil {
 		return err
+	}
+	if v.TimeoutMS < 0 {
+		return fmt.Errorf(
+			"%w: MCP timeoutMS cannot be negative",
+			basespec.ErrInvalid,
+		)
+	}
+	if v.Auth != nil {
+		if err := v.Auth.Validate(); err != nil {
+			return err
+		}
+	}
+	if v.Install != nil {
+		if err := v.Install.Validate(); err != nil {
+			return err
+		}
+	}
+	for name, profile := range v.ConnectionProfiles {
+		if err := basespec.LogicalName(name).Validate(); err != nil {
+			return fmt.Errorf("MCP connection profile name: %w", err)
+		}
+		if err := profile.Validate(); err != nil {
+			return fmt.Errorf("MCP connection profile %q: %w", name, err)
+		}
+	}
+	if v.Policy != nil {
+		if err := v.Policy.Name.Validate(); err != nil {
+			return fmt.Errorf("MCP policy reference: %w", err)
+		}
 	}
 	if v.Include == nil {
 		return nil
@@ -257,36 +355,9 @@ func validateMCPURL(
 }
 
 func validateMCPSource(v MCPDocument) error {
-	commandLocated := v.Locator != nil &&
-		v.Locator.Kind == declaration.LocatorKindCommand
-	if commandLocated {
-		if v.Transport != "" &&
-			v.Transport != TransportStdio {
-			return fmt.Errorf(
-				"%w: command-located MCP must use stdio transport",
-				basespec.ErrInvalid,
-			)
-		}
-		if v.Command != "" {
-			return fmt.Errorf(
-				"%w: command-located MCP cannot also contain command",
-				basespec.ErrInvalid,
-			)
-		}
-		if v.Server != "" ||
-			v.URL != "" ||
-			len(v.Headers) != 0 {
-			return fmt.Errorf(
-				"%w: command-located MCP cannot contain source-selector or HTTP fields",
-				basespec.ErrInvalid,
-			)
-		}
-		return nil
-	}
-
-	if v.Locator != nil && v.Include != nil {
+	if v.Locator != nil && v.hasSourceSelectedOverrides() {
 		return fmt.Errorf(
-			"%w: source-selected MCP cannot override target include rules",
+			"%w: source-selected MCP cannot contain local MCP configuration",
 			basespec.ErrInvalid,
 		)
 	}
@@ -311,6 +382,16 @@ func validateMCPSource(v MCPDocument) error {
 	return nil
 }
 
+func (v MCPDocument) hasSourceSelectedOverrides() bool {
+	return v.Include != nil ||
+		v.TimeoutMS != 0 ||
+		v.Auth != nil ||
+		v.Install != nil ||
+		v.ConnectionProfiles != nil ||
+		v.Policy != nil ||
+		hasMCPConnectionFields(v)
+}
+
 func hasMCPConnectionFields(v MCPDocument) bool {
 	return v.Transport != "" ||
 		v.Command != "" ||
@@ -324,7 +405,7 @@ func hasInlineMCPConnection(v MCPDocument) bool {
 	switch v.Transport {
 	case TransportStdio:
 		return v.Command != ""
-	case TransportStreamableHTTP, TransportSSE:
+	case TransportStreamableHTTP:
 		return v.URL != ""
 	default:
 		return false
@@ -332,10 +413,6 @@ func hasInlineMCPConnection(v MCPDocument) bool {
 }
 
 func validateTransport(v MCPDocument) error {
-	if v.Locator != nil &&
-		v.Locator.Kind == declaration.LocatorKindCommand {
-		return nil
-	}
 	switch v.Transport {
 	case "":
 		if v.Command != "" ||
@@ -365,7 +442,7 @@ func validateTransport(v MCPDocument) error {
 		}
 		return nil
 
-	case TransportStreamableHTTP, TransportSSE:
+	case TransportStreamableHTTP:
 		if v.Locator == nil && v.URL == "" {
 			return fmt.Errorf(
 				"%w: inline HTTP MCP requires url",
@@ -387,4 +464,184 @@ func validateTransport(v MCPDocument) error {
 			v.Transport,
 		)
 	}
+}
+
+func (v Auth) Validate() error {
+	m := v.Mode
+	switch m {
+	case HTTPAuthModeNone, HTTPAuthModeAPIKey, HTTPAuthModeOAuth, HTTPAuthModeClientCredentials:
+	default:
+		return fmt.Errorf(
+			"%w: unsupported MCP auth mode %q",
+			basespec.ErrInvalid,
+			v.Mode,
+		)
+	}
+	if v.ClientCredentialsInput != "" {
+		if err := basespec.LogicalName(v.ClientCredentialsInput).Validate(); err != nil {
+			return fmt.Errorf("MCP auth clientCredentialsInput: %w", err)
+		}
+		if v.Mode != HTTPAuthModeOAuth && v.Mode != HTTPAuthModeClientCredentials {
+			return fmt.Errorf(
+				"%w: MCP clientCredentialsInput requires oauth or clientCredentials mode",
+				basespec.ErrInvalid,
+			)
+		}
+	}
+	if v.ClientIDMetadataDocumentURL != "" {
+		if err := declaration.ValidateAbsoluteURL(
+			"MCP client ID metadata document URL",
+			v.ClientIDMetadataDocumentURL,
+		); err != nil {
+			return err
+		}
+		if v.Mode != HTTPAuthModeOAuth {
+			return fmt.Errorf(
+				"%w: MCP client ID metadata document requires oauth mode",
+				basespec.ErrInvalid,
+			)
+		}
+	}
+	return nil
+}
+
+func (v Install) Validate() error {
+	if err := basespec.ValidateOptionalText(
+		"MCP install note",
+		v.Note,
+		basespec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	for name, input := range v.Inputs {
+		if err := basespec.LogicalName(name).Validate(); err != nil {
+			return fmt.Errorf("MCP installation input name: %w", err)
+		}
+		if err := input.Validate(); err != nil {
+			return fmt.Errorf("MCP installation input %q: %w", name, err)
+		}
+	}
+	return declaration.ValidateTextSlice(
+		"MCP install allowEnvironment",
+		v.AllowEnvironment,
+		basespec.MaxLogicalNameBytes,
+	)
+}
+
+func (v InstallInput) Validate() error {
+	switch v.Kind {
+	case "text", "secret", "path", secretOAuthClientCredentials:
+	default:
+		return fmt.Errorf(
+			"%w: unsupported MCP installation input kind %q",
+			basespec.ErrInvalid,
+			v.Kind,
+		)
+	}
+	for label, value := range map[string]string{
+		"label":       v.Label,
+		"description": v.Description,
+		"note":        v.Note,
+		"placeholder": v.Placeholder,
+	} {
+		if err := basespec.ValidateOptionalText(
+			"MCP installation input "+label,
+			value,
+			basespec.MaxDescriptionBytes,
+		); err != nil {
+			return err
+		}
+	}
+	if v.Default != nil {
+		if v.Kind == "secret" || v.Kind == secretOAuthClientCredentials {
+			return fmt.Errorf(
+				"%w: secret MCP installation inputs cannot declare defaults",
+				basespec.ErrInvalid,
+			)
+		}
+		if err := declaration.ValidateJSONValue(
+			"MCP installation input default",
+			*v.Default,
+			basespec.MaxLocalDataBytes,
+		); err != nil {
+			return err
+		}
+	}
+	if v.ClientSecretRequired != nil &&
+		v.Kind != secretOAuthClientCredentials {
+		return fmt.Errorf(
+			"%w: clientSecretRequired is valid only for oauthClientCredentials",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
+}
+
+func (v ConnectionProfile) Validate() error {
+	switch {
+	case v.Stdio == nil && v.HTTP == nil:
+		return fmt.Errorf(
+			"%w: MCP connection profile requires stdio or http",
+			basespec.ErrInvalid,
+		)
+	case v.Stdio != nil && v.HTTP != nil:
+		return fmt.Errorf(
+			"%w: MCP connection profile cannot contain both stdio and http",
+			basespec.ErrInvalid,
+		)
+	}
+	for _, platform := range v.Platforms {
+		switch platform {
+		case "linux", "darwin", "windows":
+		default:
+			return fmt.Errorf(
+				"%w: unsupported MCP connection profile platform %q",
+				basespec.ErrInvalid,
+				platform,
+			)
+		}
+	}
+	if v.Stdio != nil {
+		if err := declaration.ValidateTextSlice(
+			"MCP profile stdio args",
+			v.Stdio.Args,
+			basespec.MaxURIBytes,
+		); err != nil {
+			return err
+		}
+		if err := declaration.ValidateStringMap(
+			"MCP profile stdio env",
+			v.Stdio.Env,
+		); err != nil {
+			return err
+		}
+		if err := declaration.ValidateTextSlice(
+			"MCP profile removeEnv",
+			v.Stdio.RemoveEnv,
+			basespec.MaxLogicalNameBytes,
+		); err != nil {
+			return err
+		}
+	}
+	if v.HTTP != nil {
+		if v.HTTP.URL != "" {
+			if err := validateMCPURL(v.HTTP.URL); err != nil {
+				return err
+			}
+		}
+		if err := declaration.ValidateStringMap(
+			"MCP profile HTTP headers",
+			v.HTTP.Headers,
+		); err != nil {
+			return err
+		}
+		if err := declaration.ValidateTextSlice(
+			"MCP profile removeHeaders",
+			v.HTTP.RemoveHeaders,
+			basespec.MaxURIBytes,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }

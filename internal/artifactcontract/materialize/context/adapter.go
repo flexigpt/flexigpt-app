@@ -1,17 +1,13 @@
 package context
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"strings"
-	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/text"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 )
 
@@ -26,7 +22,7 @@ type Document struct {
 }
 
 type Adapter struct {
-	resources compositionapi.ResourceAPI
+	text *text.Adapter
 }
 
 func New(
@@ -38,7 +34,11 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
-	return &Adapter{resources: resources}, nil
+	t, err := text.New(resources)
+	if err != nil {
+		return nil, err
+	}
+	return &Adapter{text: t}, nil
 }
 
 func (a *Adapter) Resolve(
@@ -48,144 +48,24 @@ func (a *Adapter) Resolve(
 	if err := ref.Validate(); err != nil {
 		return Document{}, err
 	}
-	resolved, err := a.resources.ResolveArtifact(
-		ctx,
-		ref,
-		resource.ResolveOptions{},
-	)
+	value, err := a.text.Resolve(ctx, ref)
 	if err != nil {
 		return Document{}, err
 	}
-	return a.documentFromResolved(ctx, resolved)
-}
-
-func (a *Adapter) documentFromResolved(
-	ctx context.Context,
-	resolved resource.ResolvedArtifact,
-) (Document, error) {
-	if err := resolved.Validate(); err != nil {
-		return Document{}, err
-	}
-	if resolved.Artifact.Kind != artifact.ArtifactKind(
-		contextv1.ContextType,
-	) {
+	if value.Insert != declaration.InsertUserMessage {
 		return Document{}, fmt.Errorf(
-			"%w: Artifact %q is not Context",
+			"%w: Text Artifact %q is not user-message Text",
 			basespec.ErrReferenceUnresolved,
-			resolved.Artifact.ID,
+			ref.ArtifactID,
 		)
 	}
-	if resolved.Definition.SchemaID != contextv1.ContextSchemaKey.SchemaID ||
-		resolved.Definition.SchemaVersion != contextv1.ContextSchemaKey.SchemaVersion {
-		return Document{}, fmt.Errorf(
-			"%w: Context Artifact has unsupported schema",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	document, err := contextv1.DecodeContextJSON(
-		resolved.Definition.Body,
-	)
-	if err != nil {
-		return Document{}, err
-	}
-
-	content, err := a.contentForDocument(ctx, resolved, document)
-	if err != nil {
-		return Document{}, err
-	}
-
 	return Document{
-		Artifact:         resolved.Artifact.Ref(),
-		ArtifactRevision: resolved.Artifact.Revision,
-		DefinitionDigest: string(resolved.Definition.Digest),
-		Name:             document.Name,
-		MediaType:        document.MediaType,
-		Content:          content,
-		Locator:          resolved.Artifact.Binding.Locator,
+		Artifact:         value.Artifact,
+		ArtifactRevision: value.ArtifactRevision,
+		DefinitionDigest: value.DefinitionDigest,
+		Name:             value.Name,
+		MediaType:        value.MediaType,
+		Content:          value.Content,
+		Locator:          value.Locator,
 	}, nil
-}
-
-func (a *Adapter) contentForDocument(
-	ctx context.Context,
-	resolved resource.ResolvedArtifact,
-	document contextv1.ContextDocument,
-) (string, error) {
-	if document.Content != nil {
-		return *document.Content, nil
-	}
-	if document.Locator == nil {
-		return "", fmt.Errorf(
-			"%w: Context has neither inline content nor a locator",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	base, err := declarationRelativeSourceLocator(
-		*document.Locator,
-		resolved.Artifact.Binding.Locator,
-	)
-	if err != nil {
-		return "", err
-	}
-	entries, err := a.resources.ReadSourceTree(
-		ctx,
-		resolved.Artifact.RootID,
-		resolved.Artifact.Binding.SourceID,
-		base,
-		document.Include,
-		document.Exclude,
-		basespec.DefaultMaxEntries,
-		basespec.MaxScanBytes,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	var output strings.Builder
-	for index, entry := range entries {
-		if entry.SourceRevision !=
-			resolved.RefreshState.SourceRevision ||
-			entry.SourceGeneration !=
-				resolved.RefreshState.SourceGeneration {
-			return "", fmt.Errorf(
-				"%w: Context Source changed during selection",
-				basespec.ErrRefreshRequired,
-			)
-		}
-		if !utf8.Valid(entry.Content) {
-			return "", fmt.Errorf(
-				"%w: Context source %q is not valid UTF-8",
-				basespec.ErrInvalid,
-				entry.Locator,
-			)
-		}
-		if bytes.ContainsRune(entry.Content, 0) {
-			return "", fmt.Errorf(
-				"%w: Context source %q contains a NUL byte",
-				basespec.ErrInvalid,
-				entry.Locator,
-			)
-		}
-		if index != 0 {
-			output.WriteString("\n\n")
-		}
-		if len(entries) > 1 {
-			output.WriteString("--- ")
-			output.WriteString(string(entry.Locator))
-			output.WriteString(" ---\n")
-		}
-		output.Write(entry.Content)
-	}
-
-	return output.String(), nil
-}
-
-func declarationRelativeSourceLocator(
-	locator declaration.Locator,
-	declarationLocator basespec.Locator,
-) (basespec.Locator, error) {
-	return declaration.ResolveSourceRelativePathLocator(
-		locator, declarationLocator,
-	)
 }

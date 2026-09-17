@@ -1,112 +1,119 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-zoom
 description: Official Zoom-hosted remote MCP servers.
 members:
   - type: mcp
     name: zoom-docs
-    transport: streamable-http
-    url: https://mcp.zoom.us/mcp/docs/streamable
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Zoom Docs
-        auth:
-          mode: oauth
-          clientCredentialsInput: ZOOM_OAUTH_CLIENT
-        install:
-          note: Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.
-          inputs:
-            ZOOM_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Zoom OAuth Client
-              description: Client ID and Client Secret from a Zoom Marketplace app.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mcp.zoom.us/mcp/docs/streamable
+      displayName: Zoom Docs
+      auth:
+        mode: oauth
+        clientCredentialsInput: ZOOM_OAUTH_CLIENT
+      install:
+        note:
+          Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT
+          redirect URI.
+        inputs:
+          ZOOM_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Zoom OAuth Client
+            description: Client ID and Client Secret from a Zoom Marketplace app.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: meetings
-    transport: streamable-http
-    url: https://zoom.us/mcp/meeting/streamable
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Zoom Meetings
-        auth:
-          mode: oauth
-          clientCredentialsInput: ZOOM_OAUTH_CLIENT
-        install:
-          note: Zoom requires a Marketplace OAuth client and a registered FlexiGPT redirect URI.
-          inputs:
-            ZOOM_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Zoom OAuth Client
-              description: Client ID and Client Secret from a Zoom Marketplace app.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://zoom.us/mcp/meeting/streamable
+      displayName: Zoom Meetings
+      auth:
+        mode: oauth
+        clientCredentialsInput: ZOOM_OAUTH_CLIENT
+      install:
+        note: Zoom requires a Marketplace OAuth client and a registered FlexiGPT redirect URI.
+        inputs:
+          ZOOM_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Zoom OAuth Client
+            description: Client ID and Client Secret from a Zoom Marketplace app.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: team-chat
-    transport: streamable-http
-    url: https://mcp.zoom.us/mcp/team_chat/streamable
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Zoom Team Chat
-        auth:
-          mode: oauth
-          clientCredentialsInput: ZOOM_OAUTH_CLIENT
-        install:
-          note: Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.
-          inputs:
-            ZOOM_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Zoom OAuth Client
-              description: Client ID and Client Secret from a Zoom Marketplace app.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mcp.zoom.us/mcp/team_chat/streamable
+      displayName: Zoom Team Chat
+      auth:
+        mode: oauth
+        clientCredentialsInput: ZOOM_OAUTH_CLIENT
+      install:
+        note:
+          Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT
+          redirect URI.
+        inputs:
+          ZOOM_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Zoom OAuth Client
+            description: Client ID and Client Secret from a Zoom Marketplace app.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: whiteboard
-    transport: streamable-http
-    url: https://mcp.zoom.us/mcp/whiteboard/streamable
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Zoom Whiteboard
-        auth:
-          mode: oauth
-          clientCredentialsInput: ZOOM_OAUTH_CLIENT
-        install:
-          note: Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.
-          inputs:
-            ZOOM_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Zoom OAuth Client
-              description: Client ID and Client Secret from a Zoom Marketplace app.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mcp.zoom.us/mcp/whiteboard/streamable
+      displayName: Zoom Whiteboard
+      auth:
+        mode: oauth
+        clientCredentialsInput: ZOOM_OAUTH_CLIENT
+      install:
+        note:
+          Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT
+          redirect URI.
+        inputs:
+          ZOOM_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Zoom OAuth Client
+            description: Client ID and Client Secret from a Zoom Marketplace app.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: workspace
-    transport: streamable-http
-    url: https://mcp.zoom.us/mcp/zoom/streamable
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Zoom Workspace
-        auth:
-          mode: oauth
-          clientCredentialsInput: ZOOM_OAUTH_CLIENT
-        install:
-          note: Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI.
-          inputs:
-            ZOOM_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Zoom OAuth Client
-              description: Client ID and Client Secret from a Zoom Marketplace app.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mcp.zoom.us/mcp/zoom/streamable
+      displayName: Zoom Workspace
+      auth:
+        mode: oauth
+        clientCredentialsInput: ZOOM_OAUTH_CLIENT
+      install:
+        note:
+          Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT
+          redirect URI.
+        inputs:
+          ZOOM_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Zoom OAuth Client
+            description: Client ID and Client Secret from a Zoom Marketplace app.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp.policy
     name: builtin-manual-write

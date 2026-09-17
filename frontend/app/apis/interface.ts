@@ -233,7 +233,7 @@ export interface IToolStoreAPI {
 		isEnabled: boolean,
 		userCallable: boolean,
 		llmCallable: boolean,
-		autoExecReco: boolean,
+		autoExecute: boolean,
 		argSchema: JSONSchema,
 		type: ToolImplType,
 		httpImpl?: HTTPToolImpl,

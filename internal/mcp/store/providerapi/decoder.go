@@ -67,7 +67,7 @@ func (d *Decoder) Decode(
 			candidate.Locator,
 			"",
 			fmt.Errorf(
-				"%w: proprietary MCP collection manifests are retired; use a canonical type: collection declaration",
+				"%w: proprietary MCP collection manifests are retired; use a canonical type: plugin declaration",
 				basespec.ErrUnsupported,
 			),
 		)

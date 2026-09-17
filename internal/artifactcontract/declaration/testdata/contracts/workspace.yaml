@@ -1,0 +1,48 @@
+type: workspace
+name: checkout-service
+displayName: Checkout Service
+description: Workspace declaration for the checkout service repository.
+labels:
+  category: repository
+  owner: platform
+metadata:
+  acme.example/owner: platform
+members:
+  - type: text
+    name: repository-rules
+    insert: instructions
+    locator: ./AGENTS.md
+    parameters:
+      displayName: Repository Rules
+      description: Rules for changes in this repository.
+      mediaType: text/markdown
+
+  - type: text
+    name: application-source
+    insert: user-message
+    parameters:
+      displayName: Application Source
+      description: Checkout service implementation source.
+      mediaType: text/plain
+      content: |
+        package checkout
+
+  - type: skill
+    base: ./skills
+    include:
+      - "**/SKILL.md"
+    exclude:
+      - "**/experimental/**"
+    nameInclude:
+      - "checkout-*"
+      - "review-*"
+
+  - type: plugin
+    base: ./plugins
+    include:
+      - "**/*.yaml"
+      - "**/*.yml"
+
+  - type: workflow
+    name: change-workflow
+    locator: ./workflows/change-workflow.yaml

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 )
@@ -33,14 +34,14 @@ func materializeValidated(
 
 	core, err := selectProfile(
 		document.MCPServer,
-		document.Extension.ConnectionProfiles,
+		document.Configuration.ConnectionProfiles,
 		data.SelectedConnectionProfile,
 	)
 	if err != nil {
 		return MaterializedServer{}, err
 	}
 
-	timeoutMS := document.Extension.TimeoutMS
+	timeoutMS := document.Configuration.TimeoutMS
 	if timeoutMS == 0 {
 		timeoutMS = DefaultConnectionTimeoutMS
 	}
@@ -50,7 +51,7 @@ func materializeValidated(
 	unboundOptional := make(map[string]struct{})
 	clientCredentialRef := ""
 
-	for name, declaration := range document.Extension.Install.Inputs {
+	for name, declaration := range document.Configuration.Install.Inputs {
 		binding, bound := data.Inputs[name]
 
 		switch declaration.Kind {
@@ -102,7 +103,7 @@ func materializeValidated(
 				unboundOptional[name] = struct{}{}
 				continue
 			}
-			if document.Extension.Auth.ClientCredentialsInput == name {
+			if document.Configuration.Auth.ClientCredentialsInput == name {
 				clientCredentialRef = binding.SecretRef
 			}
 			if !resolveSecrets {
@@ -152,7 +153,7 @@ func materializeValidated(
 		}
 	}
 
-	for _, name := range document.Extension.Install.AllowEnvironment {
+	for _, name := range document.Configuration.Install.AllowEnvironment {
 		if _, present := values[name]; present {
 			continue
 		}
@@ -173,7 +174,7 @@ func materializeValidated(
 	if err != nil {
 		return MaterializedServer{}, err
 	}
-	auth := document.Extension.Auth
+	auth := document.Configuration.Auth
 	auth.ClientIDMetadataDocumentURL, err = substituteOptionalScalar(
 		auth.ClientIDMetadataDocumentURL,
 		values,
@@ -185,7 +186,7 @@ func materializeValidated(
 
 	if auth.ClientCredentialsInput != "" &&
 		clientCredentialRef == "" &&
-		auth.Mode == MCPHTTPAuthClientCredentials {
+		auth.Mode == mcpv1.HTTPAuthModeClientCredentials {
 		return MaterializedServer{}, fmt.Errorf(
 			"%w: required OAuth client credentials are not configured",
 			basespec.ErrReferenceUnresolved,
@@ -287,8 +288,7 @@ func selectProfile(
 		}
 
 	case profile.HTTP != nil:
-		if output.Type != ServerTypeHTTP &&
-			output.Type != ServerTypeSSE {
+		if output.Type != ServerTypeHTTP {
 			if profile.HTTP.URL == nil {
 				return CoreServer{}, fmt.Errorf(
 					"%w: transport-changing HTTP profile requires URL",

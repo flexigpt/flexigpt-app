@@ -1,13 +1,10 @@
 package workspacev1
 
 import (
-	"bytes"
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -17,7 +14,7 @@ import (
 const (
 	WorkspaceType          = declaration.TypeWorkspace
 	WorkspaceSchemaID      = "artifact.workspace.v1"
-	WorkspaceSchemaVersion = declaration.APIVersionV1
+	WorkspaceSchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed workspace-v1.schema.json
@@ -31,191 +28,14 @@ var WorkspaceSchemaKey = schema.ArtifactKey(
 	WorkspaceSchemaVersion,
 )
 
-type DeclarationScan struct {
-	Base    declaration.Locator `json:"base"`
-	Include []string            `json:"include"`
-	Exclude []string            `json:"exclude,omitempty"`
-}
-
-// DeclarationSource is either a direct Locator, an inline concrete
-// declaration that becomes a Workspace subresource, or an independent
-// Workspace declaration scan. Symbolic references and located composite
-// declarations are not declaration sources: use Workspace.roots for those
-// graph edges, or use the direct Locator form to add a source file.
-type DeclarationSource struct {
-	raw json.RawMessage
-}
-
 type WorkspaceDocument struct {
 	declaration.Header
 
-	Declarations []DeclarationSource `json:"declarations,omitempty"`
-	Roots        []declaration.Entry `json:"roots,omitempty"`
+	Members []declaration.Entry `json:"members,omitempty"`
 }
 
 func WorkspaceJSONSchema() []byte {
 	return append([]byte(nil), schemaJSON...)
-}
-
-func NewLocatorDeclarationSource(
-	value declaration.Locator,
-) (DeclarationSource, error) {
-	raw, err := json.Marshal(value)
-	if err != nil {
-		return DeclarationSource{}, err
-	}
-	return newCanonicalDeclarationSource(raw)
-}
-
-func NewEntryDeclarationSource(
-	value declaration.Entry,
-) (DeclarationSource, error) {
-	raw, err := value.CanonicalJSON()
-	if err != nil {
-		return DeclarationSource{}, err
-	}
-	return newCanonicalDeclarationSource(raw)
-}
-
-func NewScanDeclarationSource(
-	value DeclarationScan,
-) (DeclarationSource, error) {
-	raw, err := jsonutil.MarshalCanonicalObject(
-		value,
-		basespec.MaxDefinitionBodyBytes,
-	)
-	if err != nil {
-		return DeclarationSource{}, err
-	}
-	return newCanonicalDeclarationSource(raw)
-}
-
-func newCanonicalDeclarationSource(
-	raw []byte,
-) (DeclarationSource, error) {
-	value := DeclarationSource{
-		raw: append(json.RawMessage(nil), raw...),
-	}
-	if err := value.Validate(); err != nil {
-		return DeclarationSource{}, err
-	}
-	return value, nil
-}
-
-func (s DeclarationSource) Clone() DeclarationSource {
-	return DeclarationSource{
-		raw: append(json.RawMessage(nil), s.raw...),
-	}
-}
-
-func (s DeclarationSource) CanonicalJSON() ([]byte, error) {
-	if err := s.Validate(); err != nil {
-		return nil, err
-	}
-	return append([]byte(nil), s.raw...), nil
-}
-
-func (s DeclarationSource) MarshalJSON() ([]byte, error) {
-	return s.CanonicalJSON()
-}
-
-func (s *DeclarationSource) UnmarshalJSON(raw []byte) error {
-	if s == nil {
-		return fmt.Errorf(
-			"%w: declaration source target is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return err
-	}
-	value, err := newCanonicalDeclarationSource(canonical)
-	if err != nil {
-		return err
-	}
-
-	*s = value
-	return nil
-}
-
-func (s DeclarationSource) Validate() error {
-	trimmed := bytes.TrimSpace(s.raw)
-	if len(trimmed) == 0 {
-		return fmt.Errorf(
-			"%w: declaration source is empty",
-			basespec.ErrInvalid,
-		)
-	}
-	if trimmed[0] == '"' {
-		var locator declaration.Locator
-		if err := json.Unmarshal(trimmed, &locator); err != nil {
-			return err
-		}
-		return locator.Validate()
-	}
-
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(trimmed, &fields); err != nil {
-		return fmt.Errorf(
-			"%w: declaration source must be a Locator, declaration, or scan",
-			basespec.ErrInvalid,
-		)
-	}
-	if _, found := fields["type"]; found {
-		entry, err := declaration.DecodeCanonicalEntryJSON(trimmed)
-		if err != nil {
-			return err
-		}
-		if entry.IsSymbolic() {
-			return fmt.Errorf(
-				"%w: Workspace declaration source cannot be a symbolic reference; use Workspace roots",
-				basespec.ErrInvalid,
-			)
-		}
-		if entry.IsDeclarationLocatorReference() {
-			return fmt.Errorf(
-				"%w: Workspace declaration source cannot be a located composite declaration; use a Locator source or Workspace root",
-				basespec.ErrInvalid,
-			)
-		}
-		return entry.Validate()
-	}
-	if _, found := fields["kind"]; found {
-		var locator declaration.Locator
-		if err := json.Unmarshal(trimmed, &locator); err != nil {
-			return err
-		}
-		return locator.Validate()
-	}
-
-	var scan DeclarationScan
-	if err := jsonutil.DecodeCanonicalObjectBytesInto(
-		trimmed,
-		&scan,
-		basespec.MaxDefinitionBodyBytes,
-	); err != nil {
-		return err
-	}
-	if err := scan.Base.Validate(); err != nil {
-		return fmt.Errorf("declaration scan base: %w", err)
-	}
-	if len(scan.Include) == 0 {
-		return fmt.Errorf(
-			"%w: declaration scan requires include patterns",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := basespec.ValidatePathPatterns(
-		"declaration scan include",
-		scan.Include,
-	); err != nil {
-		return err
-	}
-	return basespec.ValidatePathPatterns(
-		"declaration scan exclude",
-		scan.Exclude,
-	)
 }
 
 func DecodeWorkspaceJSON(raw []byte) (WorkspaceDocument, error) {
@@ -305,34 +125,19 @@ func (v WorkspaceDocument) validate() error {
 func (v WorkspaceDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkspaceType,
-		APIVersion:   WorkspaceSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
 	if err := declaration.ValidateDeclarationLocatorExclusivity(
 		"Workspace",
 		v.Locator,
-		v.Declarations != nil || v.Roots != nil,
+		v.Members != nil,
 	); err != nil {
 		return err
 	}
-	for index, declaration := range v.Declarations {
-		if err := declaration.Validate(); err != nil {
-			return fmt.Errorf(
-				"workspace declarations[%d]: %w",
-				index,
-				err,
-			)
-		}
-	}
-	for index, rootEntry := range v.Roots {
-		if err := rootEntry.Validate(); err != nil {
-			return fmt.Errorf(
-				"workspace roots[%d]: %w",
-				index,
-				err,
-			)
-		}
-	}
-	return nil
+	return declaration.ValidateMemberUniqueness(
+		"Workspace members",
+		v.Members,
+	)
 }

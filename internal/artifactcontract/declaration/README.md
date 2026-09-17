@@ -8,29 +8,30 @@ verified resources.
 
 The `declaration` package contains shared declaration utilities:
 
-- Common `type`, `name`, `description`, `locator`, and `metadata` header.
+- Common `type`, `name`, `displayName`, `description`, `labels`, `locator`, and
+  `metadata` header.
 - Portable locator representation and validation.
-- Named nested `Entry` representation.
+- Flat named, contained, and selector member representations.
 - Shared output matcher representation.
 - Canonical JSON, JSON Schema, cloning, and digest helpers.
 
-Every declaration and every nested `Entry` requires a portable `name`.
+Standalone declarations require a portable `name`. Member selectors require
+`type` and `base` and intentionally do not contain `name`.
 
 Each portable declaration type owns an independent versioned package:
 
-- `instructionv1`
-- `contextv1`
-- `toolv1`
+- `textv1`
 - `modelv1`
+- `toolv1`
 - `skillv1`
 - `mcpv1`
-- `collectionv1`
+- `mcppolicyv1`
+- `pluginv1`
 - `agentv1`
 - `teamv1`
 - `loopv1`
 - `workflowv1`
 - `workspacev1`
-- `mcppolicyv1`, a supported MCP policy-domain Artifact contract with portable type `mcp.policy`
 
 Each package owns:
 
@@ -40,40 +41,57 @@ Each package owns:
 - Strict canonical JSON decoding.
 - Structural validation for that specific declaration type.
 
-Nested heterogeneous declarations use `declaration.Entry`.
+Heterogeneous relationship fields use `declaration.Entry`. The wire format is
+flat:
 
-`Entry` validates the common header and mandatory name. In a composition
-position, `Entry.CompositionForm` distinguishes an external reference from a
-contained declaration. A header-only entry with `type`, `name`, an optional
-non-command locator, and an optional MCP `server` selector is an external
-reference. Header annotations remain membership-local and do not modify the
-target Artifact. Type-specific body fields make an entry contained.
+```yaml
+- type: skill
+  name: reviewing-code
+  locator: ./skills/reviewing-code
+
+- type: text
+  name: repository-rules
+  insert: instructions
+  parameters:
+    mediaType: text/markdown
+    content: Keep changes focused.
+
+- type: skill
+  base: ./skills
+  include:
+    - "**/SKILL.md"
+```
+
+Presence of `parameters` identifies a contained declaration. Target-owned
+common and type-specific fields belong inside `parameters`. Relationship-owned
+`type`, `name`, `locator`, `overrides`, and `use` remain outside it.
 
 Contained declarations are emitted as source-backed subresources. External
-references are graph edges only and do not create another Artifact. This keeps
-each declaration contract independent and avoids a root-level union schema.
+references and selectors remain graph relationships.
 
 The portable declaration header is:
 
 ```yaml
-$schema: https://schemas.flexigpt.site/artifact/agent/v1.json
-apiVersion: v1
 type: agent
 name: reviewer
+displayName: Repository Reviewer
 description: Reviews repository changes
 locator: ./agents/reviewer.yaml
+labels:
+  category: engineering
 metadata:
   acme.example/owner: platform
 ```
 
 The portable document does not contain:
 
+- `$schema`
+- `apiVersion`
 - `schemaID`
 - `schemaVersion`
 - `digest`
 - `logicalName`
 - `logicalVersion`
-- `displayName`
 
 There are no anonymous declarations.
 

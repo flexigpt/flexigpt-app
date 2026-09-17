@@ -36,7 +36,7 @@ export enum MCPServerType {
 }
 
 export enum MCPTransportType {
-	StreamableHTTP = 'streamableHttp',
+	StreamableHTTP = 'streamableHTTP',
 	Stdio = 'stdio',
 }
 

@@ -3,15 +3,14 @@ package codec
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
@@ -20,14 +19,13 @@ import (
 )
 
 var orderedSchemaKeys = []schema.Key{
-	instructionv1.InstructionSchemaKey,
-	contextv1.ContextSchemaKey,
-	toolv1.ToolSchemaKey,
+	textv1.TextSchemaKey,
 	modelv1.ModelSchemaKey,
+	toolv1.ToolSchemaKey,
 	skillv1.SkillSchemaKey,
 	mcpv1.MCPSchemaKey,
 	mcppolicyv1.MCPPolicySchemaKey,
-	collectionv1.CollectionSchemaKey,
+	pluginv1.PluginSchemaKey,
 	agentv1.AgentSchemaKey,
 	teamv1.TeamSchemaKey,
 	loopv1.LoopSchemaKey,
@@ -36,32 +34,24 @@ var orderedSchemaKeys = []schema.Key{
 }
 
 var schemaKeysByType = map[declaration.Type]schema.Key{
-	declaration.TypeInstruction: instructionv1.InstructionSchemaKey,
-	declaration.TypeContext:     contextv1.ContextSchemaKey,
-	declaration.TypeTool:        toolv1.ToolSchemaKey,
-	declaration.TypeModel:       modelv1.ModelSchemaKey,
-	declaration.TypeSkill:       skillv1.SkillSchemaKey,
-	declaration.TypeMCP:         mcpv1.MCPSchemaKey,
-	declaration.TypeMCPPolicy:   mcppolicyv1.MCPPolicySchemaKey,
-	declaration.TypeCollection:  collectionv1.CollectionSchemaKey,
-	declaration.TypeAgent:       agentv1.AgentSchemaKey,
-	declaration.TypeTeam:        teamv1.TeamSchemaKey,
-	declaration.TypeLoop:        loopv1.LoopSchemaKey,
-	declaration.TypeWorkflow:    workflowv1.WorkflowSchemaKey,
-	declaration.TypeWorkspace:   workspacev1.WorkspaceSchemaKey,
+	declaration.TypeText:      textv1.TextSchemaKey,
+	declaration.TypeModel:     modelv1.ModelSchemaKey,
+	declaration.TypeTool:      toolv1.ToolSchemaKey,
+	declaration.TypeSkill:     skillv1.SkillSchemaKey,
+	declaration.TypeMCP:       mcpv1.MCPSchemaKey,
+	declaration.TypeMCPPolicy: mcppolicyv1.MCPPolicySchemaKey,
+	declaration.TypePlugin:    pluginv1.PluginSchemaKey,
+	declaration.TypeAgent:     agentv1.AgentSchemaKey,
+	declaration.TypeTeam:      teamv1.TeamSchemaKey,
+	declaration.TypeLoop:      loopv1.LoopSchemaKey,
+	declaration.TypeWorkflow:  workflowv1.WorkflowSchemaKey,
+	declaration.TypeWorkspace: workspacev1.WorkspaceSchemaKey,
 }
 
-func NewInstructionV1SchemaCodec() providerapi.SchemaCodec {
+func NewTextV1SchemaCodec() providerapi.SchemaCodec {
 	return NewPassthrough(
-		instructionv1.InstructionSchemaKey,
-		instructionv1.InstructionJSONSchema(),
-	)
-}
-
-func NewContextV1SchemaCodec() providerapi.SchemaCodec {
-	return NewPassthrough(
-		contextv1.ContextSchemaKey,
-		contextv1.ContextJSONSchema(),
+		textv1.TextSchemaKey,
+		textv1.TextJSONSchema(),
 	)
 }
 
@@ -100,10 +90,10 @@ func NewMCPPolicyV1SchemaCodec() providerapi.SchemaCodec {
 	)
 }
 
-func NewCollectionV1SchemaCodec() providerapi.SchemaCodec {
+func NewPluginV1SchemaCodec() providerapi.SchemaCodec {
 	return NewPassthrough(
-		collectionv1.CollectionSchemaKey,
-		collectionv1.CollectionJSONSchema(),
+		pluginv1.PluginSchemaKey,
+		pluginv1.PluginJSONSchema(),
 	)
 }
 
@@ -144,14 +134,13 @@ func NewWorkspaceV1SchemaCodec() providerapi.SchemaCodec {
 
 func AllSchemaCodecs() []providerapi.SchemaCodec {
 	return []providerapi.SchemaCodec{
-		NewInstructionV1SchemaCodec(),
-		NewContextV1SchemaCodec(),
-		NewToolV1SchemaCodec(),
+		NewTextV1SchemaCodec(),
 		NewModelV1SchemaCodec(),
+		NewToolV1SchemaCodec(),
 		NewSkillV1SchemaCodec(),
 		NewMCPV1SchemaCodec(),
 		NewMCPPolicyV1SchemaCodec(),
-		NewCollectionV1SchemaCodec(),
+		NewPluginV1SchemaCodec(),
 		NewAgentV1SchemaCodec(),
 		NewTeamV1SchemaCodec(),
 		NewLoopV1SchemaCodec(),

@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -99,10 +99,15 @@ func NewStoreAPI(
 	if err != nil {
 		return nil, err
 	}
-	resolver, err := resolve.New(
-		artifacts,
-		locators,
-		config.ResolverLimits,
+	resolver, err := resolve.NewWithOptions(
+		resolve.ResolverOptions{
+			Artifacts:            artifacts,
+			SourceArtifacts:      artifacts,
+			Locators:             locators,
+			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			Refresh:              output,
+			Limits:               config.ResolverLimits,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -242,42 +247,6 @@ func (a *StoreAPI) ListWorkspaces(
 	return output, nil
 }
 
-func (a *StoreAPI) LoadWorkspace(
-	ctx context.Context,
-	ref WorkspaceRef,
-) (WorkspaceLoad, error) {
-	workspace, resolved, err := a.resolveCurrentWorkspace(ctx, ref)
-	if err != nil {
-		return WorkspaceLoad{}, err
-	}
-	roots := make(
-		[]declaration.Entry,
-		len(workspace.Document.Roots),
-	)
-	for index, value := range workspace.Document.Roots {
-		roots[index] = value.Clone()
-	}
-	return WorkspaceLoad{
-		Workspace: workspace,
-		Roots:     roots,
-		resolved:  resolved.Root.Workspace,
-	}, nil
-}
-
-func (a *StoreAPI) RefreshWorkspace(
-	ctx context.Context,
-	ref WorkspaceRef,
-) (WorkspaceRefresh, error) {
-	workspace, result, err := a.refreshWorkspace(ctx, ref)
-	if err != nil {
-		return WorkspaceRefresh{}, err
-	}
-	return WorkspaceRefresh{
-		Workspace: workspace.Ref(),
-		Result:    result,
-	}, nil
-}
-
 func (a *StoreAPI) ListWorkspaceArtifacts(
 	ctx context.Context,
 	workspace WorkspaceRef,
@@ -415,7 +384,7 @@ func (a *StoreAPI) isBaselineCollectionArtifact(
 	record artifact.Artifact,
 ) (bool, error) {
 	if record.Kind != artifact.ArtifactKind(
-		collectionv1.CollectionType,
+		pluginv1.PluginType,
 	) {
 		return false, nil
 	}
@@ -465,7 +434,7 @@ func (a *StoreAPI) defaultDiscovery() (
 		Locator:   ".",
 		Recursive: true,
 		DecoderIDs: []basespec.DecoderID{
-			markdown.ContextMarkdownDecoderID,
+			markdown.TextMarkdownDecoderID,
 		},
 	})
 	for _, hint := range a.config.AdditionalDecoderHints {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
@@ -71,19 +71,23 @@ func (*AgentMarkdownDecoder) Decode(
 				err,
 			)
 		}
-		instruction, err := declaration.NewEntry(
-			instructionv1.InstructionDocument{
-				APIVersion: instructionv1.InstructionSchemaVersion,
-				Type:       instructionv1.InstructionType,
-				Name:       string(instructionName),
-				Content:    stringPointer(body),
-				MediaType:  markdownMediaType,
+		text, err := declaration.NewEntry(
+			textv1.TextDocument{
+				Type:      textv1.TextType,
+				Name:      string(instructionName),
+				Insert:    declaration.InsertInstructions,
+				Content:   stringPointer(body),
+				MediaType: markdownMediaType,
 			},
 		)
 		if err != nil {
 			return nil, agentMarkdownDiagnostics(candidate.Locator, err)
 		}
-		document.Members = append(document.Members, instruction)
+		member, err := declaration.NewContainedMember(text)
+		if err != nil {
+			return nil, agentMarkdownDiagnostics(candidate.Locator, err)
+		}
+		document.Members = append(document.Members, member)
 	}
 
 	entry, err := declaration.NewEntry(document)

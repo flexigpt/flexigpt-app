@@ -15,7 +15,7 @@ import (
 const (
 	TeamType          = declaration.TypeTeam
 	TeamSchemaID      = "artifact.team.v1"
-	TeamSchemaVersion = declaration.APIVersionV1
+	TeamSchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed team-v1.schema.json
@@ -32,8 +32,9 @@ var TeamSchemaKey = schema.ArtifactKey(
 type TeamDocument struct {
 	declaration.Header
 
-	Members []declaration.Entry `json:"members,omitempty"`
-	Program *declaration.Entry  `json:"program,omitempty"`
+	Members  []declaration.Entry `json:"members,omitempty"`
+	Loop     *declaration.Entry  `json:"loop,omitempty"`
+	Workflow *declaration.Entry  `json:"workflow,omitempty"`
 }
 
 func TeamJSONSchema() []byte {
@@ -121,46 +122,65 @@ func (v TeamDocument) validate() error {
 func (v TeamDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: TeamType,
-		APIVersion:   TeamSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
 	if err := declaration.ValidateDeclarationLocatorExclusivity(
 		"Team",
 		v.Locator,
-		v.Members != nil || v.Program != nil,
+		v.Members != nil || v.Loop != nil || v.Workflow != nil,
 	); err != nil {
 		return err
 	}
-	if err := declaration.ValidateEntryTypes(
+	if err := declaration.ValidateMemberTypes(
 		"Team members",
 		v.Members,
-		declaration.TypeInstruction,
-		declaration.TypeContext,
-		declaration.TypeModel,
-		declaration.TypeSkill,
-		declaration.TypeTool,
-		declaration.TypeMCP,
-		declaration.TypeMCPPolicy,
-		declaration.TypeCollection,
 		declaration.TypeAgent,
+		declaration.TypePlugin,
 	); err != nil {
 		return err
 	}
-	if v.Program == nil {
-		return nil
-	}
-	if err := v.Program.Validate(); err != nil {
-		return fmt.Errorf("team program: %w", err)
-	}
-	switch v.Program.Header().Type {
-	case declaration.TypeLoop, declaration.TypeWorkflow:
-		return nil
-	default:
+	if v.Loop != nil && v.Workflow != nil {
 		return fmt.Errorf(
-			"%w: Team program has incompatible type %q",
+			"%w: Team cannot contain both loop and workflow",
 			basespec.ErrInvalid,
-			v.Program.Header().Type,
 		)
 	}
+	if v.Loop != nil {
+		if err := validateProgramMember("Team loop", *v.Loop, declaration.TypeLoop); err != nil {
+			return err
+		}
+	}
+	if v.Workflow != nil {
+		if err := validateProgramMember(
+			"Team workflow",
+			*v.Workflow,
+			declaration.TypeWorkflow,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateProgramMember(
+	label string,
+	value declaration.Entry,
+	expected declaration.Type,
+) error {
+	form, err := value.MemberForm()
+	if err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	if form == declaration.MemberSelector ||
+		value.Header().Type != expected {
+		return fmt.Errorf(
+			"%w: %s must be one named or contained %q member",
+			basespec.ErrInvalid,
+			label,
+			expected,
+		)
+	}
+	return nil
 }

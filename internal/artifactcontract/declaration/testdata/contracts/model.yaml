@@ -1,0 +1,14 @@
+type: model
+name: reasoning
+displayName: Reasoning Model
+description: General-purpose reasoning model.
+labels:
+  category: reasoning
+  provider: anthropic
+metadata:
+  acme.example/owner: platform
+model: anthropic/claude-sonnet
+systemPrompt: |
+  Be precise, grounded, and concise.
+temperature: 0.2
+maxOutputTokens: 12000

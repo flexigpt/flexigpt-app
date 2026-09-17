@@ -15,7 +15,7 @@ import (
 const (
 	SkillType          = declaration.TypeSkill
 	SkillSchemaID      = "artifact.skill.v1"
-	SkillSchemaVersion = declaration.APIVersionV1
+	SkillSchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed skill-v1.schema.json
@@ -32,8 +32,9 @@ var SkillSchemaKey = schema.ArtifactKey(
 type SkillDocument struct {
 	declaration.Header
 
-	License      string              `json:"license,omitempty"`
-	AllowedTools []declaration.Entry `json:"allowedTools,omitempty"`
+	License      string                   `json:"license,omitempty"`
+	Insert       declaration.InsertTarget `json:"insert,omitempty"`
+	AllowedTools []declaration.Entry      `json:"allowedTools,omitempty"`
 }
 
 func SkillJSONSchema() []byte {
@@ -121,7 +122,7 @@ func (v SkillDocument) validate() error {
 func (v SkillDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: SkillType,
-		APIVersion:   SkillSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
@@ -140,7 +141,12 @@ func (v SkillDocument) validateFields() error {
 			return err
 		}
 	}
-	return declaration.ValidateEntryTypes(
+	if v.Insert != "" {
+		if err := v.Insert.Validate(); err != nil {
+			return err
+		}
+	}
+	return declaration.ValidateMemberTypes(
 		"Skill allowedTools",
 		v.AllowedTools,
 		declaration.TypeTool,

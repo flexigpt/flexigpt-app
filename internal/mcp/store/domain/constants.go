@@ -24,10 +24,9 @@ const (
 
 	ManagedMCPDocumentFile       basespec.Locator = "mcp.json"
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
-	MCPCollectionDocumentFile    basespec.Locator = "collection.yaml"
+	MCPPluginDocumentFile        basespec.Locator = "collection.yaml"
 
 	InstallationDataSchemaVersion = "v1"
-	RuntimeExtensionMetadataKey   = "flexigpt.site/mcp-runtime-v1"
 	BuiltInInstallerName          = "mcp"
 	HydrationSchemaVersion        = "mcp.builtin-hydration/v1"
 )

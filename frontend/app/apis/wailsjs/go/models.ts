@@ -11653,7 +11653,7 @@ export namespace spec {
 	    tags?: string[];
 	    userCallable: boolean;
 	    llmCallable: boolean;
-	    autoExecReco: boolean;
+	    autoExecute: boolean;
 	    argSchema: number[];
 	    userArgSchema?: number[];
 	    llmToolType: string;
@@ -11683,7 +11683,7 @@ export namespace spec {
 	        this.tags = source["tags"];
 	        this.userCallable = source["userCallable"];
 	        this.llmCallable = source["llmCallable"];
-	        this.autoExecReco = source["autoExecReco"];
+	        this.autoExecute = source["autoExecute"];
 	        this.argSchema = source["argSchema"];
 	        this.userArgSchema = source["userArgSchema"];
 	        this.llmToolType = source["llmToolType"];
@@ -13661,7 +13661,7 @@ export namespace spec {
 	    isEnabled: boolean;
 	    userCallable: boolean;
 	    llmCallable: boolean;
-	    autoExecReco: boolean;
+	    autoExecute: boolean;
 	    argSchema: string;
 	    type: string;
 	    httpImpl?: HTTPToolImpl;
@@ -13678,7 +13678,7 @@ export namespace spec {
 	        this.isEnabled = source["isEnabled"];
 	        this.userCallable = source["userCallable"];
 	        this.llmCallable = source["llmCallable"];
-	        this.autoExecReco = source["autoExecReco"];
+	        this.autoExecute = source["autoExecute"];
 	        this.argSchema = source["argSchema"];
 	        this.type = source["type"];
 	        this.httpImpl = this.convertValues(source["httpImpl"], HTTPToolImpl);

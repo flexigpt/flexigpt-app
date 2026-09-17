@@ -79,13 +79,18 @@ func DefinitionForSkillDeclaration(
 	if err != nil {
 		return definition.Definition{}, err
 	}
+	displayName := doc.DisplayName
+	if displayName == "" {
+		displayName = doc.Name
+	}
 	value := definition.Definition{
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
 		LogicalName:   basespec.LogicalName(doc.Name),
-		DisplayName:   doc.Name,
+		DisplayName:   displayName,
 		Description:   doc.Description,
+		Labels:        declaration.CloneStringMap(doc.Labels),
 		Body:          body,
 		Dependencies:  nil,
 	}
@@ -165,12 +170,15 @@ func definitionForSkillDocument(
 	sourceLocator := declaration.ScalarLocator(
 		"./" + string(SkillDefinitionFileName),
 	)
+	insert := portableSkillInsert(doc.Insert)
 	decl := skillv1.SkillDocument{
-		APIVersion:  SkillSchemaVersion,
 		Type:        declaration.TypeSkill,
 		Name:        doc.Name,
+		DisplayName: doc.DisplayName,
 		Description: doc.Description,
 		Locator:     &sourceLocator,
+
+		Insert: insert,
 	}
 	body, err := decl.CanonicalJSON()
 	if err != nil {
@@ -189,6 +197,20 @@ func definitionForSkillDocument(
 		},
 		Body: body,
 	}, nil
+}
+
+func portableSkillInsert(
+	value document.SkillInsert,
+) declaration.InsertTarget {
+	normalized, supported := document.NormalizeSkillInsert(value)
+	if !supported {
+		return ""
+	}
+	target := declaration.InsertTarget(normalized)
+	if target.Validate() != nil {
+		return ""
+	}
+	return target
 }
 
 func warningDiagnostics(

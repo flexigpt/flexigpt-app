@@ -9,13 +9,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// Entry is a named heterogeneous nested declaration or symbolic reference.
-//
-// Every Entry requires a portable name. An Entry containing exactly type and
-// name is an exact symbolic reference. In a composition position,
-// CompositionForm determines whether additional fields remain an external
-// reference or form a contained declaration. A locator alone is not a
-// contained declaration.
+// Entry preserves one canonical standalone declaration or flat member wire
+// object. Concrete standalone schemas and containing-field member schemas
+// provide the strict contextual validation.
 type Entry struct {
 	raw    json.RawMessage
 	header Header
@@ -102,8 +98,22 @@ func (e Entry) Validate() error {
 			basespec.ErrInvalid,
 		)
 	}
-	if err := e.header.Validate(HeaderValidation{}); err != nil {
+	if err := e.header.Type.Validate(); err != nil {
 		return err
+	}
+	if e.header.Name != "" {
+		if err := basespec.ValidatePortableName(
+			"artifact declaration name",
+			e.header.Name,
+		); err != nil {
+			return err
+		}
+	}
+	if e.header.Name == "" && !e.hasField("base") {
+		return fmt.Errorf(
+			"%w: declaration entry requires name or selector base",
+			basespec.ErrInvalid,
+		)
 	}
 	return nil
 }
@@ -157,35 +167,6 @@ func (e Entry) IsSymbolic() bool {
 	return hasType && hasName
 }
 
-// IsDeclarationLocatorReference reports a located declaration edge.
-//
-// Standalone Skill locators identify Skill package material, including the
-// `./SKILL.md` locator emitted by the standard Skill decoder. A Skill becomes
-// an external declaration reference only in a composition position, where
-// CompositionForm is used directly.
-func (e Entry) IsDeclarationLocatorReference() bool {
-	header := e.Header()
-	if header.Locator == nil ||
-		header.Locator.Kind == LocatorKindCommand {
-		return false
-	}
-	switch header.Type {
-	case TypeMCP,
-		TypeCollection,
-		TypeAgent,
-		TypeTeam,
-		TypeLoop,
-		TypeWorkflow,
-		TypeWorkspace,
-		TypeMCPPolicy:
-	default:
-		return false
-	}
-
-	form, err := e.CompositionForm()
-	return err == nil && form == CompositionEntryReference
-}
-
 func (e Entry) MarshalJSON() ([]byte, error) {
 	return e.CanonicalJSON()
 }
@@ -203,6 +184,18 @@ func (e *Entry) UnmarshalJSON(raw []byte) error {
 	}
 	*e = value
 	return nil
+}
+
+func (e Entry) hasField(name string) bool {
+	if len(e.raw) == 0 {
+		return false
+	}
+	var values map[string]json.RawMessage
+	if err := json.Unmarshal(e.raw, &values); err != nil {
+		return false
+	}
+	_, found := values[name]
+	return found
 }
 
 func ValidateEntryType(

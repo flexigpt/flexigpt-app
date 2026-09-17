@@ -93,7 +93,7 @@ export function insertToolSelectionNode(
 		toolVersion: item.toolVersion,
 
 		toolType: opts?.toolType ?? toolSnapshot?.llmToolType ?? ToolStoreChoiceType.Function,
-		autoExecute: opts?.autoExecute ?? toolSnapshot?.autoExecReco ?? false,
+		autoExecute: opts?.autoExecute ?? toolSnapshot?.autoExecute ?? false,
 		userArgSchemaInstance: opts?.userArgSchemaInstance,
 
 		selectionID,

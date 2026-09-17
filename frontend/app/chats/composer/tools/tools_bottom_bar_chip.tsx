@@ -304,7 +304,7 @@ export function ToolsBottomBarChip({
 			if (typeof override === 'boolean') {
 				return override;
 			}
-			return item.toolDefinition.autoExecReco ?? false;
+			return item.toolDefinition.autoExecute ?? false;
 		};
 	}, [attachedAutoExecByKey, toolAutoExecOverrides]);
 

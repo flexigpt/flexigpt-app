@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -163,8 +164,8 @@ func (s *Service) PutServerSecret(
 	}
 
 	if kind == mcpDomainSecret.MCPSecretKindOAuthClientCredentials {
-		switch installation.Document.Extension.Auth.Mode {
-		case mcpDomainServer.MCPHTTPAuthNone, mcpDomainServer.MCPHTTPAuthClientCredentials:
+		switch installation.Document.Configuration.Auth.Mode {
+		case mcpv1.HTTPAuthModeNone, mcpv1.HTTPAuthModeClientCredentials:
 		default:
 			return SecretWriteResult{}, fmt.Errorf(
 				"%w: MCP server does not declare OAuth client credentials",
@@ -262,9 +263,13 @@ func (s *Service) GetServerAuthHealth(
 	if idErr != nil {
 		return mcpAuth.MCPAuthHealth{}, idErr
 	}
+	m, err := runtimeHTTPAuthMode(resolved.Document.Configuration.Auth.Mode)
+	if err != nil {
+		return mcpAuth.MCPAuthHealth{}, err
+	}
 	return mcpAuth.MCPAuthHealth{
 		Server:     serverID,
-		AuthMode:   resolved.Document.Extension.Auth.Mode,
+		AuthMode:   m,
 		State:      mcpAuth.MCPAuthHealthStateNotConfigured,
 		Configured: false,
 		LastError:  "required MCP installation input is not configured",

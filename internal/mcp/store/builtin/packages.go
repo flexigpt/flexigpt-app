@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -26,7 +26,7 @@ import (
 
 type artifactDefinition = definition.Definition
 
-// PreparedPackage is one embedded canonical MCP Collection package ready for
+// PreparedPackage is one embedded canonical MCP Plugin package ready for
 // managed Source publication.
 //
 // Artifact IDs are intentionally absent. Artifact Store assigns them while
@@ -40,7 +40,7 @@ type PreparedPackage struct {
 }
 
 // PreparePackages discovers every direct embedded MCP package directory and
-// derives every expected Artifact from its canonical Collection declaration.
+// derives every expected Artifact from its canonical Plugin declaration.
 //
 // There is deliberately no built-in MCP registry. The canonical declaration
 // files are the sole source of package membership and Artifact identity.
@@ -104,14 +104,14 @@ func preparePackage(
 
 	document, found := builtin.PackageFileContent(
 		files,
-		mcpDomain.MCPCollectionDocumentFile,
+		mcpDomain.MCPPluginDocumentFile,
 	)
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded MCP package %q lacks %q",
 			basespec.ErrInvalid,
 			packageRoot,
-			mcpDomain.MCPCollectionDocumentFile,
+			mcpDomain.MCPPluginDocumentFile,
 		)
 	}
 	expectations, err := canonicalCollectionExpectations(
@@ -119,7 +119,7 @@ func preparePackage(
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
-			"decode embedded canonical MCP Collection %q: %w",
+			"decode embedded canonical MCP Plugin %q: %w",
 			packageRoot,
 			err,
 		)
@@ -143,7 +143,7 @@ func preparePackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
-		DocumentFile:        mcpDomain.MCPCollectionDocumentFile,
+		DocumentFile:        mcpDomain.MCPPluginDocumentFile,
 		PackageFiles:        files,
 		Expectations:        expectations,
 	}, nil
@@ -163,16 +163,16 @@ func canonicalCollectionExpectations(
 	if err != nil {
 		return nil, err
 	}
-	if root.Header().Type != declaration.TypeCollection {
+	if root.Header().Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
-			"%w: built-in MCP package root must be a Collection",
+			"%w: built-in MCP package root must be a Plugin",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
 		return nil, err
 	}
-	collection, err := collectionv1.DecodeCollectionEntry(root)
+	collection, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func canonicalCollectionExpectations(
 		case declaration.TypeMCP, declaration.TypeMCPPolicy:
 		default:
 			return nil, fmt.Errorf(
-				"%w: built-in MCP Collection member %d has incompatible type %q",
+				"%w: built-in MCP Plugin member %d has incompatible type %q",
 				basespec.ErrInvalid,
 				index,
 				member.Header().Type,
@@ -205,7 +205,7 @@ func canonicalCollectionExpectations(
 			return nil, err
 		}
 		switch declaration.Type(definitionValue.Kind) {
-		case declaration.TypeCollection:
+		case declaration.TypePlugin:
 			if value.SubresourceLocator != "" {
 				continue
 			}
@@ -227,7 +227,7 @@ func canonicalCollectionExpectations(
 		output = append(
 			output,
 			mcpConsumerAPI.BuiltInArtifactExpectation{
-				Locator:          mcpDomain.MCPCollectionDocumentFile,
+				Locator:          mcpDomain.MCPPluginDocumentFile,
 				Subresource:      value.SubresourceLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -32,12 +31,12 @@ type PolicyView struct {
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
-	Collection                 artifact.ArtifactRef      `json:"collection"`
-	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
-	Name                       basespec.LogicalName      `json:"name"`
-	Description                string                    `json:"description,omitempty"`
-	Body                       mcppolicyv1.MCPPolicyBody `json:"body"`
-	Enabled                    bool                      `json:"enabled"`
+	Collection                 artifact.ArtifactRef `json:"collection"`
+	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
+	Name                       basespec.LogicalName `json:"name"`
+	Description                string               `json:"description,omitempty"`
+	Policy                     mcpPolicy.MCPPolicy  `json:"policy"`
+	Enabled                    bool                 `json:"enabled"`
 }
 
 type ManagedMCPPolicyUpsertResult struct {

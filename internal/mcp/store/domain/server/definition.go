@@ -6,11 +6,9 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
@@ -21,16 +19,13 @@ func NewDocument(
 	description string,
 	labels map[string]string,
 	core CoreServer,
-	extension ServerExtension,
+	configuration ServerConfiguration,
 ) (ServerDocument, error) {
 	normalizedCore := NormalizeCoreServer(core)
-	normalizedExtension := NormalizeServerExtension(
-		string(name),
-		extension,
-	)
-	normalizedExtension = withImplicitEnvironmentInputs(
+	normalizedConfiguration := NormalizeServerConfiguration(configuration)
+	normalizedConfiguration = withImplicitEnvironmentInputs(
 		normalizedCore,
-		normalizedExtension,
+		normalizedConfiguration,
 	)
 	value := ServerDocument{
 		LogicalName:    name,
@@ -39,7 +34,7 @@ func NewDocument(
 		Description:    description,
 		Labels:         maps.Clone(labels),
 		MCPServer:      normalizedCore,
-		Extension:      normalizedExtension,
+		Configuration:  normalizedConfiguration,
 	}
 	if err := value.Validate(); err != nil {
 		return ServerDocument{}, err
@@ -92,33 +87,22 @@ func ServerDocumentFromDefinition(
 	if err != nil {
 		return ServerDocument{}, err
 	}
-	extension, err := extensionFromDeclaration(
+	configuration, err := configurationFromDeclaration(
 		decl,
-		input.LogicalName,
 	)
 	if err != nil {
 		return ServerDocument{}, err
 	}
-	logicalVersion := input.LogicalVersion
-	if logicalVersion == "" {
-		logicalVersion = extension.LogicalVersion
-	}
-	displayName := input.DisplayName
-	if extension.DisplayName != "" {
-		// Canonical mcp declarations keep MCP-specific display metadata in
-		// the namespaced metadata extension. Generic Definition metadata
-		// remains derived from the portable declaration header.
-		displayName = extension.DisplayName
-	}
 
+	logicalVersion := input.LogicalVersion
 	document, err := NewDocument(
 		input.LogicalName,
 		logicalVersion,
-		displayName,
+		input.DisplayName,
 		input.Description,
 		input.Labels,
 		core,
-		extension,
+		configuration,
 	)
 	if err != nil {
 		return ServerDocument{}, err
@@ -139,36 +123,30 @@ func DefinitionForMCPDeclaration(
 func declarationForDocument(
 	input ServerDocument,
 ) (mcpv1.MCPDocument, error) {
-	extensionRaw, err := jsonutil.MarshalCanonicalObject(
-		input.Extension,
-		basespec.MaxDefinitionBodyBytes,
-	)
-	if err != nil {
-		return mcpv1.MCPDocument{}, err
-	}
-
 	decl := mcpv1.MCPDocument{
-		APIVersion:  mcpv1.MCPSchemaVersion,
-		Type:        mcpv1.MCPType,
-		Name:        string(input.LogicalName),
-		Description: input.Description,
-		Metadata: map[string]json.RawMessage{
-			mcpDomain.RuntimeExtensionMetadataKey: extensionRaw,
-		},
-		Command: input.MCPServer.Command,
-		Args:    append([]string(nil), input.MCPServer.Args...),
-		Env:     maps.Clone(input.MCPServer.Env),
-		URL:     input.MCPServer.URL,
-		Headers: maps.Clone(input.MCPServer.Headers),
-		Include: includeToDeclaration(input.Include),
+		Type:               mcpv1.MCPType,
+		Name:               string(input.LogicalName),
+		DisplayName:        input.DisplayName,
+		Description:        input.Description,
+		Labels:             maps.Clone(input.Labels),
+		Command:            input.MCPServer.Command,
+		Args:               append([]string(nil), input.MCPServer.Args...),
+		Env:                maps.Clone(input.MCPServer.Env),
+		URL:                input.MCPServer.URL,
+		Headers:            maps.Clone(input.MCPServer.Headers),
+		Include:            includeToDeclaration(input.Include),
+		TimeoutMS:          input.Configuration.TimeoutMS,
+		Auth:               authenticationToDeclaration(input.Configuration.Auth),
+		Install:            installToDeclaration(input.Configuration.Install),
+		ConnectionProfiles: profilesToDeclaration(input.Configuration.ConnectionProfiles),
+		Policy:             policyToDeclaration(input.Configuration.Policy),
 	}
 	switch input.MCPServer.Type {
 	case ServerTypeStdio:
 		decl.Transport = mcpv1.TransportStdio
 	case ServerTypeHTTP:
 		decl.Transport = mcpv1.TransportStreamableHTTP
-	case ServerTypeSSE:
-		decl.Transport = mcpv1.TransportSSE
+
 	default:
 		return mcpv1.MCPDocument{}, fmt.Errorf(
 			"%w: unsupported MCP server transport %q",
@@ -192,22 +170,12 @@ func coreFromDeclaration(
 		URL:     input.URL,
 		Headers: maps.Clone(input.Headers),
 	}
-	if input.Locator != nil &&
-		input.Locator.Kind == declaration.LocatorKindCommand {
-		output.Type = ServerTypeStdio
-		output.Command = input.Locator.Command
-		return output, validateCoreServer(output)
-	}
 	switch input.Transport {
 	case mcpv1.TransportStdio:
 		output.Type = ServerTypeStdio
 	case mcpv1.TransportStreamableHTTP:
 		output.Type = ServerTypeHTTP
-	case mcpv1.TransportSSE:
-		// The configured SDK transport supports standalone SSE fallback when
-		// DisableStandaloneSSE is false. Preserve the semantic transport for
-		// round-trip declaration serialization.
-		output.Type = ServerTypeSSE
+
 	default:
 		return CoreServer{}, fmt.Errorf(
 			"%w: MCP declaration has no executable transport",
@@ -220,27 +188,16 @@ func coreFromDeclaration(
 	return output, nil
 }
 
-func extensionFromDeclaration(
+func configurationFromDeclaration(
 	input mcpv1.MCPDocument,
-	name basespec.LogicalName,
-) (ServerExtension, error) {
-	value := ServerExtension{}
-	raw, found := input.Metadata[mcpDomain.RuntimeExtensionMetadataKey]
-	if found {
-		if err := jsonutil.DecodeCanonicalObjectInto(
-			raw,
-			&value,
-			basespec.MaxDefinitionBodyBytes,
-		); err != nil {
-			return ServerExtension{}, fmt.Errorf(
-				"MCP runtime metadata extension: %w",
-				err,
-			)
-		}
+) (ServerConfiguration, error) {
+	value, err := serverConfigurationFromDeclaration(input)
+	if err != nil {
+		return ServerConfiguration{}, err
 	}
-	value = NormalizeServerExtension(string(name), value)
-	if err := validateExtension(string(name), value); err != nil {
-		return ServerExtension{}, err
+	value = NormalizeServerConfiguration(value)
+	if err := validateExtension("", value); err != nil {
+		return ServerConfiguration{}, err
 	}
 	return value, nil
 }
@@ -276,83 +233,224 @@ func includeToDeclaration(input *Include) *mcpv1.Include {
 	}
 }
 
-func cloneInclude(input *Include) *Include {
-	if input == nil {
+func authenticationToDeclaration(
+	input AuthenticationDeclaration,
+) *mcpv1.Auth {
+	if input.Mode == "" {
 		return nil
 	}
-	return &Include{
-		Tools:     slices.Clone(input.Tools),
-		Resources: slices.Clone(input.Resources),
-		Prompts:   slices.Clone(input.Prompts),
+	return &mcpv1.Auth{
+		Mode:                        input.Mode,
+		ClientCredentialsInput:      input.ClientCredentialsInput,
+		ClientIDMetadataDocumentURL: input.ClientIDMetadataDocumentURL,
 	}
 }
 
-// RebindLocatedDocument applies a local MCP declaration identity and optional
-// include/runtime extension data to one server decoded from a local source.
-func RebindLocatedDocument(
-	input ServerDocument,
-	identity definition.Definition,
-	outer mcpv1.MCPDocument,
-) (ServerDocument, error) {
-	output, err := CanonicalizeServer(input)
-	if err != nil {
-		return ServerDocument{}, err
+func installToDeclaration(
+	input InstallationDeclaration,
+) *mcpv1.Install {
+	if input.Note == "" &&
+		len(input.Inputs) == 0 &&
+		len(input.AllowEnvironment) == 0 {
+		return nil
 	}
-	output.LogicalName = identity.LogicalName
-	output.LogicalVersion = identity.LogicalVersion
-	output.DisplayName = identity.DisplayName
-	output.Description = identity.Description
-	if output.DisplayName == "" {
-		output.DisplayName = string(identity.LogicalName)
+	output := &mcpv1.Install{
+		Note:             input.Note,
+		Inputs:           make(map[string]mcpv1.InstallInput, len(input.Inputs)),
+		AllowEnvironment: append([]string(nil), input.AllowEnvironment...),
 	}
-	output.MCPServer, err = overlayLocatedCore(output.MCPServer, outer)
-	if err != nil {
-		return ServerDocument{}, err
-	}
-	if outer.Include != nil {
-		output.Include = includeFromDeclaration(outer.Include)
-	} else {
-		output.Include = cloneInclude(input.Include)
-	}
-	outerExtension := false
-	if _, found := outer.Metadata[mcpDomain.RuntimeExtensionMetadataKey]; found {
-		extension, err := extensionFromDeclaration(
-			outer,
-			identity.LogicalName,
-		)
-		if err != nil {
-			return ServerDocument{}, err
+	for name, value := range input.Inputs {
+		output.Inputs[name] = mcpv1.InstallInput{
+			Kind:                 string(value.Kind),
+			Label:                value.Label,
+			Description:          value.Description,
+			Note:                 value.Note,
+			Placeholder:          value.Placeholder,
+			Required:             pointerBool(value.Required),
+			Default:              stringDefaultToJSON(value.Default),
+			ClientSecretRequired: pointerBool(value.ClientSecretRequired),
 		}
-		output.Extension = extension
-		outerExtension = true
 	}
-	output.Extension = withImplicitEnvironmentInputs(
-		output.MCPServer,
-		output.Extension,
-	)
-	if outerExtension && output.Extension.DisplayName != "" {
-		output.DisplayName = output.Extension.DisplayName
+	return output
+}
+
+func profilesToDeclaration(
+	input map[string]ConnectionProfile,
+) map[string]mcpv1.ConnectionProfile {
+	if input == nil {
+		return nil
 	}
-	if err := output.Validate(); err != nil {
-		return ServerDocument{}, err
+	output := make(map[string]mcpv1.ConnectionProfile, len(input))
+	for name, profile := range input {
+		value := mcpv1.ConnectionProfile{
+			Platforms: append([]string(nil), profile.Platforms...),
+		}
+		if profile.Stdio != nil {
+			stdio := &mcpv1.StdioProfile{
+				Env:       maps.Clone(profile.Stdio.Env),
+				RemoveEnv: append([]string(nil), profile.Stdio.RemoveEnv...),
+			}
+			if profile.Stdio.Command != nil {
+				stdio.Command = *profile.Stdio.Command
+			}
+			if profile.Stdio.Args != nil {
+				stdio.Args = append([]string(nil), (*profile.Stdio.Args)...)
+			}
+			value.Stdio = stdio
+		}
+		if profile.HTTP != nil {
+			http := &mcpv1.HTTPProfile{
+				Headers:       maps.Clone(profile.HTTP.Headers),
+				RemoveHeaders: append([]string(nil), profile.HTTP.RemoveHeaders...),
+			}
+			if profile.HTTP.URL != nil {
+				http.URL = *profile.HTTP.URL
+			}
+			value.HTTP = http
+		}
+		output[name] = value
+	}
+	return output
+}
+
+func policyToDeclaration(
+	input *PolicyReference,
+) *mcpv1.PolicyReference {
+	if input == nil {
+		return nil
+	}
+	required := input.Required
+	return &mcpv1.PolicyReference{
+		Name:     input.Name,
+		Required: &required,
+	}
+}
+
+func serverConfigurationFromDeclaration(
+	input mcpv1.MCPDocument,
+) (ServerConfiguration, error) {
+	output := ServerConfiguration{
+		TimeoutMS: input.TimeoutMS,
+		Auth: AuthenticationDeclaration{
+			Mode: mcpv1.HTTPAuthModeNone,
+		},
+		Install: InstallationDeclaration{
+			Inputs: map[string]InputDeclaration{},
+		},
+	}
+	if input.Auth != nil {
+		output.Auth = AuthenticationDeclaration{
+			Mode:                        input.Auth.Mode,
+			ClientCredentialsInput:      input.Auth.ClientCredentialsInput,
+			ClientIDMetadataDocumentURL: input.Auth.ClientIDMetadataDocumentURL,
+		}
+	}
+	if input.Install != nil {
+		output.Install.Note = input.Install.Note
+		output.Install.AllowEnvironment = append(
+			[]string(nil),
+			input.Install.AllowEnvironment...,
+		)
+		for name, value := range input.Install.Inputs {
+			defaultValue, err := jsonDefaultToString(value.Default)
+			if err != nil {
+				return ServerConfiguration{}, fmt.Errorf(
+					"MCP installation input %q default: %w",
+					name,
+					err,
+				)
+			}
+			output.Install.Inputs[name] = InputDeclaration{
+				Kind:                 InputKind(value.Kind),
+				Label:                value.Label,
+				Description:          value.Description,
+				Note:                 value.Note,
+				Placeholder:          value.Placeholder,
+				Required:             dereferenceBool(value.Required),
+				Default:              defaultValue,
+				ClientSecretRequired: dereferenceBool(value.ClientSecretRequired),
+			}
+		}
+	}
+	if input.ConnectionProfiles != nil {
+		output.ConnectionProfiles = make(
+			map[string]ConnectionProfile,
+			len(input.ConnectionProfiles),
+		)
+		for name, value := range input.ConnectionProfiles {
+			profile := ConnectionProfile{
+				Platforms: append([]string(nil), value.Platforms...),
+			}
+			if value.Stdio != nil {
+				stdio := &StdioProfile{
+					Env:       maps.Clone(value.Stdio.Env),
+					RemoveEnv: append([]string(nil), value.Stdio.RemoveEnv...),
+				}
+				if value.Stdio.Command != "" {
+					command := value.Stdio.Command
+					stdio.Command = &command
+				}
+				if value.Stdio.Args != nil {
+					args := append([]string(nil), value.Stdio.Args...)
+					stdio.Args = &args
+				}
+				profile.Stdio = stdio
+			}
+			if value.HTTP != nil {
+				http := &HTTPProfile{
+					Headers:       maps.Clone(value.HTTP.Headers),
+					RemoveHeaders: append([]string(nil), value.HTTP.RemoveHeaders...),
+				}
+				if value.HTTP.URL != "" {
+					url := value.HTTP.URL
+					http.URL = &url
+				}
+				profile.HTTP = http
+			}
+			output.ConnectionProfiles[name] = profile
+		}
+	}
+	if input.Policy != nil {
+		output.Policy = &PolicyReference{
+			Name:     input.Policy.Name,
+			Required: input.Policy.Required == nil || *input.Policy.Required,
+		}
 	}
 	return output, nil
 }
 
-func overlayLocatedCore(
-	input CoreServer,
-	outer mcpv1.MCPDocument,
-) (CoreServer, error) {
-	if outer.Transport != "" ||
-		outer.Command != "" ||
-		outer.Args != nil ||
-		outer.Env != nil ||
-		outer.URL != "" ||
-		outer.Headers != nil {
-		return CoreServer{}, fmt.Errorf(
-			"%w: source-selected MCP cannot overlay terminal connection fields",
-			basespec.ErrInvalid,
+func pointerBool(value bool) *bool {
+	output := value
+	return &output
+}
+
+func dereferenceBool(value *bool) bool {
+	return value != nil && *value
+}
+
+func stringDefaultToJSON(value *string) *json.RawMessage {
+	if value == nil {
+		return nil
+	}
+	raw, err := json.Marshal(*value)
+	if err != nil {
+		panic(err)
+	}
+	output := json.RawMessage(raw)
+	return &output
+}
+
+func jsonDefaultToString(value *json.RawMessage) (*string, error) {
+	if value == nil {
+		//nolint:nilnil // Nil to nil conversion.
+		return nil, nil
+	}
+	var output string
+	if err := json.Unmarshal(*value, &output); err != nil {
+		return nil, fmt.Errorf(
+			"%w: MCP runtime supports string installation defaults only",
+			basespec.ErrUnsupported,
 		)
 	}
-	return NormalizeCoreServer(input), nil
+	return &output, nil
 }

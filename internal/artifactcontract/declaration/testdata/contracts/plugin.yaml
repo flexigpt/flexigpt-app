@@ -1,0 +1,37 @@
+type: plugin
+name: crud-harness
+displayName: CRUD Harness
+description: Shared CRUD implementation and review capabilities.
+labels:
+  category: harness
+  owner: platform
+metadata:
+  acme.example/owner: platform
+members:
+  - type: text
+    name: crud-source
+    insert: user-message
+    parameters:
+      displayName: CRUD Source
+      description: Application source relevant to CRUD behavior.
+      mediaType: text/plain
+      content: |
+        Package checkout implements CRUD behavior.
+
+  - type: skill
+    name: reviewing-code
+    locator: ./skills/reviewing-code
+
+  - type: skill
+    base: ./skills
+    include:
+      - "**/SKILL.md"
+    exclude:
+      - "**/experimental/**"
+    nameInclude:
+      - "crud-*"
+
+  - type: mcp
+    name: github
+    locator: ./.mcp.json
+    server: github

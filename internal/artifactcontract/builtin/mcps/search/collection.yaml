@@ -1,50 +1,52 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-search
 description: Built-in MCP servers for web and documentation search.
 members:
   - type: mcp
     name: context7
-    description: Context7 documentation MCP server.
-    transport: streamable-http
-    url: https://mcp.context7.com/mcp/oauth
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Context7
-        auth: { mode: oauth }
-        policy: { ref: builtin-context7-default, required: true }
-
+    parameters:
+      description: Context7 documentation MCP server.
+      transport: streamableHTTP
+      url: https://mcp.context7.com/mcp/oauth
+      displayName: Context7
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-context7-default
   - type: mcp
     name: exa
-    description: Exa web and research search MCP server.
-    transport: streamable-http
-    url: https://mcp.exa.ai/mcp
-    headers:
-      x-api-key: "${EXA_API_KEY}"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Exa Search
-        auth: { mode: none }
-        install:
-          inputs:
-            EXA_API_KEY:
-              kind: secret
-              label: Exa API Key
-              description: Optional Exa API key for higher limits and Agent tools.
-              required: false
-        policy: { ref: builtin-auto-read, required: true }
-
+    parameters:
+      description: Exa web and research search MCP server.
+      transport: streamableHTTP
+      url: https://mcp.exa.ai/mcp
+      headers:
+        x-api-key: ${EXA_API_KEY}
+      displayName: Exa Search
+      auth:
+        mode: none
+      install:
+        inputs:
+          EXA_API_KEY:
+            kind: secret
+            label: Exa API Key
+            description: Optional Exa API key for higher limits and Agent tools.
+            required: false
+      policy:
+        required: true
+        name: builtin-auto-read
   - type: mcp
     name: stack-overflow
-    description: Stack Overflow MCP server.
-    transport: streamable-http
-    url: https://mcp.stackoverflow.com
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Stack Overflow
-        auth: { mode: oauth }
-        policy: { ref: builtin-auto-read, required: true }
-
+    parameters:
+      description: Stack Overflow MCP server.
+      transport: streamableHTTP
+      url: https://mcp.stackoverflow.com
+      displayName: Stack Overflow
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-auto-read
   - type: mcp.policy
     name: builtin-context7-default
   - type: mcp.policy

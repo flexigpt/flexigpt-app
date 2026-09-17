@@ -59,7 +59,7 @@
   - [Client capabilities advertised initially](#client-capabilities-advertised-initially)
   - [Session manager responsibilities](#session-manager-responsibilities)
   - [Stdio transport rules](#stdio-transport-rules)
-  - [Streamable HTTP transport rules](#streamable-http-transport-rules)
+  - [Streamable HTTP transport rules](#streamableHTTP-transport-rules)
   - [Workflow: connect server](#workflow-connect-server)
   - [Workflow: disconnect server](#workflow-disconnect-server)
   - [Workflow: shutdown](#workflow-shutdown)
@@ -631,7 +631,7 @@ frontend/app/apis/interface.ts
 type MCPTransportType string
 
 const (
-  MCPTransportStreamableHTTP MCPTransportType = "streamableHttp"
+  MCPTransportStreamableHTTP MCPTransportType = "streamableHTTP"
   MCPTransportStdio          MCPTransportType = "stdio"
 )
 
@@ -659,7 +659,7 @@ type MCPServerConfig struct {
   Transport     MCPTransportType      `json:"transport"`
 
   Stdio          *MCPStdioConfig      `json:"stdio,omitempty"`
-  StreamableHTTP *MCPStreamableHTTPConfig `json:"streamableHttp,omitempty"`
+  StreamableHTTP *MCPStreamableHTTPConfig `json:"streamableHTTP,omitempty"`
 
   Availability  MCPServerAvailability `json:"availability"`
   TrustLevel    MCPTrustLevel         `json:"trustLevel"`
@@ -705,7 +705,7 @@ type MCPStreamableHTTPConfig struct {
 ### Core frontend models
 
 ```ts
-export type MCPTransportType = "streamableHttp" | "stdio";
+export type MCPTransportType = "streamableHTTP" | "stdio";
 export type MCPServerAvailability = "manual" | "autoAttach";
 export type MCPTrustLevel = "untrusted" | "trusted";
 
@@ -717,7 +717,7 @@ export interface MCPServerConfig {
   transport: MCPTransportType;
 
   stdio?: MCPStdioConfig;
-  streamableHttp?: MCPStreamableHTTPConfig;
+  streamableHTTP?: MCPStreamableHTTPConfig;
 
   availability: MCPServerAvailability;
   trustLevel: MCPTrustLevel;

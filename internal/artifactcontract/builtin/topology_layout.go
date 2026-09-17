@@ -114,7 +114,7 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
-			// Built-in collections are grouping declarations only. Skills,
+			// Built-in Plugins are grouping declarations only. Skills,
 			// MCP servers, and MCP policies are independently discovered
 			// Artifacts in the same protected Source.
 			Discovery: source.DiscoverySpec{

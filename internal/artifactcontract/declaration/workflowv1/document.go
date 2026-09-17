@@ -2,6 +2,7 @@ package workflowv1
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -15,7 +16,7 @@ import (
 const (
 	WorkflowType          = declaration.TypeWorkflow
 	WorkflowSchemaID      = "artifact.workflow.v1"
-	WorkflowSchemaVersion = declaration.APIVersionV1
+	WorkflowSchemaVersion = declaration.SchemaVersionV1
 )
 
 type Join string
@@ -37,9 +38,64 @@ var WorkflowSchemaKey = schema.ArtifactKey(
 )
 
 type Node struct {
-	ID     string            `json:"id"`
-	Target declaration.Entry `json:"target"`
-	Join   Join              `json:"join,omitempty"`
+	ID     string            `json:"-"`
+	Join   Join              `json:"-"`
+	Member declaration.Entry `json:"-"`
+}
+
+func (n Node) MarshalJSON() ([]byte, error) {
+	raw, err := n.Member.CanonicalJSON()
+	if err != nil {
+		return nil, err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return nil, err
+	}
+	fields["id"], _ = json.Marshal(n.ID)
+	if n.Join != "" {
+		fields["join"], _ = json.Marshal(n.Join)
+	}
+	return jsonutil.MarshalCanonicalObject(
+		fields,
+		basespec.MaxDefinitionBodyBytes,
+	)
+}
+
+func (n *Node) UnmarshalJSON(raw []byte) error {
+	if n == nil {
+		return fmt.Errorf("%w: Workflow node target is nil", basespec.ErrInvalid)
+	}
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(canonical, &fields); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(fields["id"], &n.ID); err != nil {
+		return err
+	}
+	if joinRaw, found := fields["join"]; found {
+		if err := json.Unmarshal(joinRaw, &n.Join); err != nil {
+			return err
+		}
+	}
+	delete(fields, "id")
+	delete(fields, "join")
+	memberRaw, err := jsonutil.MarshalCanonicalObject(
+		fields,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return err
+	}
+	n.Member, err = declaration.DecodeCanonicalEntryJSON(memberRaw)
+	return err
 }
 
 type Edge struct {
@@ -144,7 +200,7 @@ func (v WorkflowDocument) validate() error {
 func (v WorkflowDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: WorkflowType,
-		APIVersion:   WorkflowSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
@@ -174,11 +230,19 @@ func (v WorkflowDocument) validateFields() error {
 			)
 		}
 		nodes[node.ID] = struct{}{}
-		if err := node.Target.Validate(); err != nil {
+		form, err := node.Member.MemberForm()
+		if err != nil {
 			return fmt.Errorf(
-				"workflow nodes[%d] target: %w",
+				"workflow nodes[%d] member: %w",
 				index,
 				err,
+			)
+		}
+		if form == declaration.MemberSelector {
+			return fmt.Errorf(
+				"%w: Workflow node %q cannot contain a member selector",
+				basespec.ErrInvalid,
+				node.ID,
 			)
 		}
 		switch node.Join {
@@ -193,7 +257,17 @@ func (v WorkflowDocument) validateFields() error {
 		}
 	}
 
+	starts := make(map[string]int, len(v.Start))
 	for index, start := range v.Start {
+		if previous, duplicate := starts[start]; duplicate {
+			return fmt.Errorf(
+				"%w: Workflow start[%d] duplicates start[%d]",
+				basespec.ErrIdentityConflict,
+				index,
+				previous,
+			)
+		}
+		starts[start] = index
 		if _, found := nodes[start]; !found {
 			return fmt.Errorf(
 				"%w: workflow start[%d] identifies unknown node %q",
@@ -204,7 +278,26 @@ func (v WorkflowDocument) validateFields() error {
 		}
 	}
 
+	edges := make(map[string]int, len(v.Edges))
 	for index, edge := range v.Edges {
+		match := ""
+		if edge.Match != nil {
+			raw, err := declaration.CanonicalDocumentJSON(edge.Match)
+			if err != nil {
+				return err
+			}
+			match = string(raw)
+		}
+		key := edge.From + "\x00" + edge.To + "\x00" + match
+		if previous, duplicate := edges[key]; duplicate {
+			return fmt.Errorf(
+				"%w: Workflow edges[%d] duplicates edges[%d]",
+				basespec.ErrIdentityConflict,
+				index,
+				previous,
+			)
+		}
+		edges[key] = index
 		if _, found := nodes[edge.From]; !found {
 			return fmt.Errorf(
 				"%w: workflow edges[%d].from identifies unknown node %q",

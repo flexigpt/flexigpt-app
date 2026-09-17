@@ -39,15 +39,18 @@ func BodyFromDefinition(
 func BodyFromDocument(
 	document mcppolicyv1.MCPPolicyDocument,
 ) (mcpPolicy.MCPPolicy, error) {
-	if document.Body == nil {
-		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-			"%w: MCP Policy declaration has no resolved body",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
 	raw, err := jsonutil.MarshalCanonicalObject(
-		*document.Body,
+		struct {
+			TrustLevel    string                                             `json:"trustLevel,omitempty"`
+			DefaultPolicy *mcppolicyv1.MCPPolicyDefaultPolicy                `json:"defaultPolicy,omitempty"`
+			ToolPolicies  map[string]mcppolicyv1.MCPPolicyToolPolicyOverride `json:"toolPolicies,omitempty"`
+			AppsPolicy    *mcppolicyv1.MCPPolicyAppsPolicy                   `json:"appsPolicy,omitempty"`
+		}{
+			TrustLevel:    document.TrustLevel,
+			DefaultPolicy: document.DefaultPolicy,
+			ToolPolicies:  document.ToolPolicies,
+			AppsPolicy:    document.AppsPolicy,
+		},
 		basespec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
@@ -85,23 +88,42 @@ func DefinitionForDocument(
 		LogicalName:   basespec.LogicalName(input.Name),
 		DisplayName:   input.Name,
 		Description:   input.Description,
+		Labels:        input.Labels,
 		Body:          body,
 		Dependencies:  nil,
 	}
 	return definition.Canonicalize(value)
 }
 
-func DocumentFromSourceBody(
+func DocumentFromPolicy(
 	name basespec.LogicalName,
 	description string,
-	body mcppolicyv1.MCPPolicyBody,
+	body mcpPolicy.MCPPolicy,
 ) (mcppolicyv1.MCPPolicyDocument, error) {
+	raw, err := jsonutil.MarshalCanonicalObject(
+		body,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return mcppolicyv1.MCPPolicyDocument{}, err
+	}
+	var fields struct {
+		TrustLevel    string                                             `json:"trustLevel,omitempty"`
+		DefaultPolicy *mcppolicyv1.MCPPolicyDefaultPolicy                `json:"defaultPolicy,omitempty"`
+		ToolPolicies  map[string]mcppolicyv1.MCPPolicyToolPolicyOverride `json:"toolPolicies,omitempty"`
+		AppsPolicy    *mcppolicyv1.MCPPolicyAppsPolicy                   `json:"appsPolicy,omitempty"`
+	}
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return mcppolicyv1.MCPPolicyDocument{}, err
+	}
 	value := mcppolicyv1.MCPPolicyDocument{
-		APIVersion:  mcppolicyv1.MCPPolicySchemaVersion,
-		Type:        mcppolicyv1.MCPPolicyType,
-		Name:        string(name),
-		Description: description,
-		Body:        &body,
+		Type:          mcppolicyv1.MCPPolicyType,
+		Name:          string(name),
+		Description:   description,
+		TrustLevel:    fields.TrustLevel,
+		DefaultPolicy: fields.DefaultPolicy,
+		ToolPolicies:  fields.ToolPolicies,
+		AppsPolicy:    fields.AppsPolicy,
 	}
 	if err := value.Validate(); err != nil {
 		return mcppolicyv1.MCPPolicyDocument{}, err

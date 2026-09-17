@@ -2,7 +2,6 @@ package modelv1
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -16,7 +15,7 @@ import (
 const (
 	ModelType          = declaration.TypeModel
 	ModelSchemaID      = "artifact.model.v1"
-	ModelSchemaVersion = declaration.APIVersionV1
+	ModelSchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed model-v1.schema.json
@@ -33,8 +32,10 @@ var ModelSchemaKey = schema.ArtifactKey(
 type ModelDocument struct {
 	declaration.Header
 
-	Model      string                     `json:"model,omitempty"`
-	Parameters map[string]json.RawMessage `json:"parameters,omitempty"`
+	Model           string   `json:"model"`
+	SystemPrompt    *string  `json:"systemPrompt,omitempty"`
+	Temperature     *float64 `json:"temperature,omitempty"`
+	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
 }
 
 func ModelJSONSchema() []byte {
@@ -122,21 +123,32 @@ func (v ModelDocument) validate() error {
 func (v ModelDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ModelType,
-		APIVersion:   ModelSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
-	if v.Model != "" {
-		if err := basespec.ValidateRequiredText(
-			"Model provider-qualified name",
-			v.Model,
-			basespec.MaxURIBytes,
-		); err != nil {
-			return err
-		}
+	if err := basespec.ValidateRequiredText(
+		"Model provider-qualified name",
+		v.Model,
+		basespec.MaxURIBytes,
+	); err != nil {
+		return err
 	}
-	return declaration.ValidateRawMessageMap(
-		"Model parameters",
-		v.Parameters,
-	)
+	if err := declaration.ValidateOptionalContent(v.SystemPrompt); err != nil {
+		return err
+	}
+	if v.Temperature != nil &&
+		(*v.Temperature < 0 || *v.Temperature > 2) {
+		return fmt.Errorf(
+			"%w: Model temperature must be between 0 and 2",
+			basespec.ErrInvalid,
+		)
+	}
+	if v.MaxOutputTokens != nil && *v.MaxOutputTokens <= 0 {
+		return fmt.Errorf(
+			"%w: Model maxOutputTokens must be positive",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
 }

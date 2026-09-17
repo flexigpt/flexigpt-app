@@ -1,12 +1,11 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-builtin-policies
 description: Shared policies for application-provided MCP servers.
 members:
   - type: mcp.policy
     name: builtin-auto-read
-    description: Trusted automatic read policy.
-    body:
+    parameters:
+      description: Trusted automatic read policy.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -22,8 +21,8 @@ members:
 
   - type: mcp.policy
     name: builtin-manual-read
-    description: Trusted read policy that requires manual execution.
-    body:
+    parameters:
+      description: Trusted read policy that requires manual execution.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -39,8 +38,8 @@ members:
 
   - type: mcp.policy
     name: builtin-manual-write
-    description: Trusted write policy that requires manual execution.
-    body:
+    parameters:
+      description: Trusted write policy that requires manual execution.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -56,8 +55,8 @@ members:
 
   - type: mcp.policy
     name: builtin-manual-write-no-destructive
-    description: Manual write policy without destructive-risk approval.
-    body:
+    parameters:
+      description: Manual write policy without destructive-risk approval.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -73,8 +72,8 @@ members:
 
   - type: mcp.policy
     name: builtin-auto-write
-    description: Trusted automatic write policy.
-    body:
+    parameters:
+      description: Trusted automatic write policy.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -90,8 +89,8 @@ members:
 
   - type: mcp.policy
     name: builtin-auto-write-apps
-    description: Trusted automatic write policy with MCP Apps support.
-    body:
+    parameters:
+      description: Trusted automatic write policy with MCP Apps support.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow
@@ -107,8 +106,8 @@ members:
 
   - type: mcp.policy
     name: builtin-context7-default
-    description: Context7 default policy.
-    body:
+    parameters:
+      description: Context7 default policy.
       trustLevel: trusted
       defaultPolicy:
         defaultApprovalRule: allow

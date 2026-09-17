@@ -1,9 +1,7 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: research-analysis
 description: "Skills for research briefs based on local or attached source material."
 members:
   - type: skill
     name: research-brief-authoring
-    description: "Turn local and attached source material into evidence-based research briefs with findings and uncertainty."
     locator: ./research-brief-authoring

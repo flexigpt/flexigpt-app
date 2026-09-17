@@ -17,10 +17,10 @@ const (
 
 	MarkdownDecoderID basespec.DecoderID = "agent.skill-markdown"
 
-	ManagedSkillPackageKind            source.PackageKind = "skill"
-	SkillDefinitionFileName            basespec.Locator   = "SKILL.md"
-	BuiltinSkillCollectionPackageKind  source.PackageKind = "skill-collection"
-	BuiltinSkillCollectionDocumentFile basespec.Locator   = "collection.yaml"
+	ManagedSkillPackageKind           source.PackageKind = "skill"
+	SkillDefinitionFileName           basespec.Locator   = "SKILL.md"
+	BuiltinSkillCollectionPackageKind source.PackageKind = "skill-collection"
+	BuiltinSkillPluginDocumentFile    basespec.Locator   = "collection.yaml"
 
 	InsertLabelKey = "skill.insert"
 

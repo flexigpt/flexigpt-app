@@ -3,12 +3,10 @@ package prompt
 import (
 	"context"
 	"fmt"
-	"strconv"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
-	contextAdapter "github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/context"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/instruction"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/text"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
@@ -23,6 +21,7 @@ type Contribution struct {
 	DefinitionDigest string
 	Kind             artifact.ArtifactKind
 	Name             string
+	Insert           declaration.InsertTarget
 	MediaType        string
 	Locator          basespec.Locator
 	Content          string
@@ -48,11 +47,10 @@ type Plan struct {
 }
 
 type Adapter struct {
-	artifacts    compositionapi.ArtifactAPI
-	instructions *instruction.Adapter
-	contexts     *contextAdapter.Adapter
-	engine       *workspaceRuntime.Engine
-	policy       workspaceRuntime.CompositionPolicy
+	artifacts compositionapi.ArtifactAPI
+	text      *text.Adapter
+	engine    *workspaceRuntime.Engine
+	policy    workspaceRuntime.CompositionPolicy
 }
 
 func New(
@@ -70,20 +68,15 @@ func New(
 	if err := policy.Validate(); err != nil {
 		return nil, err
 	}
-	instructions, err := instruction.New(resources)
-	if err != nil {
-		return nil, err
-	}
-	contexts, err := contextAdapter.New(resources)
+	t, err := text.New(resources)
 	if err != nil {
 		return nil, err
 	}
 	return &Adapter{
-		artifacts:    artifacts,
-		instructions: instructions,
-		contexts:     contexts,
-		engine:       workspaceRuntime.NewEngine(),
-		policy:       policy,
+		artifacts: artifacts,
+		text:      t,
+		engine:    workspaceRuntime.NewEngine(),
+		policy:    policy,
 	}, nil
 }
 
@@ -135,7 +128,7 @@ func (a *Adapter) compose(
 	)
 	contributionsByID := make(map[string]int)
 
-	for occurrence, record := range selected {
+	for _, record := range selected {
 		settings, err := workspaceDomain.DecodeArtifactData(record.Data)
 		if err != nil {
 			output.Diagnostics = diagnostic.Append(
@@ -188,12 +181,12 @@ func (a *Adapter) compose(
 			continue
 		}
 
-		id := contributionID(contribution.Artifact, occurrence)
+		id := contributionID(contribution.Artifact)
 		contributionsByID[id] = len(output.Contributions)
 		output.Contributions = append(output.Contributions, contribution)
 		runtimeValues = append(runtimeValues, workspaceRuntime.ContextContribution{
 			ID:      id,
-			Kind:    string(contribution.Kind),
+			Kind:    string(contribution.Insert),
 			Name:    contribution.Name,
 			Locator: string(contribution.Locator),
 			Content: contribution.Content,
@@ -288,8 +281,8 @@ func (a *Adapter) resolveContribution(
 	record artifact.Artifact,
 ) (Contribution, error) {
 	switch record.Kind {
-	case artifact.ArtifactKind(instructionv1.InstructionType):
-		value, err := a.instructions.Resolve(ctx, record.Ref())
+	case artifact.ArtifactKind(textv1.TextType):
+		value, err := a.text.Resolve(ctx, record.Ref())
 		if err != nil {
 			return Contribution{}, err
 		}
@@ -299,22 +292,7 @@ func (a *Adapter) resolveContribution(
 			DefinitionDigest: value.DefinitionDigest,
 			Kind:             record.Kind,
 			Name:             value.Name,
-			MediaType:        value.MediaType,
-			Locator:          value.Locator,
-			Content:          value.Content,
-		}, nil
-
-	case artifact.ArtifactKind(contextv1.ContextType):
-		value, err := a.contexts.Resolve(ctx, record.Ref())
-		if err != nil {
-			return Contribution{}, err
-		}
-		return Contribution{
-			Artifact:         value.Artifact,
-			ArtifactRevision: value.ArtifactRevision,
-			DefinitionDigest: value.DefinitionDigest,
-			Kind:             record.Kind,
-			Name:             value.Name,
+			Insert:           value.Insert,
 			MediaType:        value.MediaType,
 			Locator:          value.Locator,
 			Content:          value.Content,
@@ -346,9 +324,8 @@ func selectedArtifact(
 
 func contributionID(
 	ref artifact.ArtifactRef,
-	occurrence int,
 ) string {
-	return string(ref.RootID) + "\x00" + string(ref.ArtifactID) + "\x00" + strconv.Itoa(occurrence)
+	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }
 
 func artifactDiagnostic(

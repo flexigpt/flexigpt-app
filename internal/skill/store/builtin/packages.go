@@ -9,7 +9,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -31,9 +31,9 @@ type PreparedPackage struct {
 	Expectations        []skillConsumerAPI.BuiltInSkillArtifactExpectation
 }
 
-// PreparePackages discovers direct embedded Skill Collection package
+// PreparePackages discovers direct embedded Skill Plugin package
 // directories. The canonical collection.yaml document is the only registry:
-// it declares collection identity and named nested Artifact membership.
+// it declares Plugin identity and named Artifact membership.
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
@@ -98,14 +98,14 @@ func preparePackage(
 
 	document, found := builtin.PackageFileContent(
 		files,
-		skillDomain.BuiltinSkillCollectionDocumentFile,
+		skillDomain.BuiltinSkillPluginDocumentFile,
 	)
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Skill package %q lacks %q",
 			basespec.ErrInvalid,
 			packageRoot,
-			skillDomain.BuiltinSkillCollectionDocumentFile,
+			skillDomain.BuiltinSkillPluginDocumentFile,
 		)
 	}
 
@@ -115,7 +115,7 @@ func preparePackage(
 	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
-			"decode embedded canonical Skill Collection %q: %w",
+			"decode embedded canonical Skill Plugin %q: %w",
 			packageRoot,
 			err,
 		)
@@ -129,7 +129,7 @@ func preparePackage(
 	}
 	if collection.Name != string(packageName) {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded Skill package directory %q does not match Collection name %q",
+			"%w: embedded Skill package directory %q does not match Plugin name %q",
 			basespec.ErrInvalid,
 			packageRoot,
 			collection.Name,
@@ -149,7 +149,7 @@ func preparePackage(
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
 		DocumentFile: skillDomain.
-			BuiltinSkillCollectionDocumentFile,
+			BuiltinSkillPluginDocumentFile,
 		PackageFiles: files,
 		Expectations: expectations,
 	}, nil
@@ -159,7 +159,7 @@ func canonicalCollectionPackage(
 	document []byte,
 	files []source.ManagedPackageFile,
 ) (
-	collectionv1.CollectionDocument,
+	pluginv1.PluginDocument,
 	[]skillConsumerAPI.BuiltInSkillArtifactExpectation,
 	error,
 ) {
@@ -168,30 +168,30 @@ func canonicalCollectionPackage(
 		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
-		return collectionv1.CollectionDocument{}, nil, err
+		return pluginv1.PluginDocument{}, nil, err
 	}
 	root, err := declaration.DecodeCanonicalEntryJSON(raw)
 	if err != nil {
-		return collectionv1.CollectionDocument{}, nil, err
+		return pluginv1.PluginDocument{}, nil, err
 	}
-	if root.Header().Type != declaration.TypeCollection {
-		return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-			"%w: built-in Skill package root must be a Collection",
+	if root.Header().Type != declaration.TypePlugin {
+		return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+			"%w: built-in Skill package root must be a Plugin",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
-		return collectionv1.CollectionDocument{}, nil, err
+		return pluginv1.PluginDocument{}, nil, err
 	}
 
-	collection, err := collectionv1.DecodeCollectionEntry(root)
+	collection, err := pluginv1.DecodePluginEntry(root)
 	if err != nil {
-		return collectionv1.CollectionDocument{}, nil, err
+		return pluginv1.PluginDocument{}, nil, err
 	}
 
 	rootDefinition, err := decoder.DefinitionForEntry(root)
 	if err != nil {
-		return collectionv1.CollectionDocument{}, nil, err
+		return pluginv1.PluginDocument{}, nil, err
 	}
 
 	filesByLocator := make(
@@ -206,7 +206,7 @@ func canonicalCollectionPackage(
 	expectations = append(
 		expectations,
 		skillConsumerAPI.BuiltInSkillArtifactExpectation{
-			Locator:          skillDomain.BuiltinSkillCollectionDocumentFile,
+			Locator:          skillDomain.BuiltinSkillPluginDocumentFile,
 			Kind:             rootDefinition.Kind,
 			LogicalName:      rootDefinition.LogicalName,
 			DefinitionDigest: rootDefinition.Digest,
@@ -217,16 +217,16 @@ func canonicalCollectionPackage(
 	}
 
 	seenDocuments := map[basespec.Locator]struct{}{
-		skillDomain.BuiltinSkillCollectionDocumentFile: {},
+		skillDomain.BuiltinSkillPluginDocumentFile: {},
 	}
 	for index, member := range collection.Members {
-		form, err := member.CompositionForm()
+		form, err := member.MemberForm()
 		if err != nil {
-			return collectionv1.CollectionDocument{}, nil, err
+			return pluginv1.PluginDocument{}, nil, err
 		}
-		if form != declaration.CompositionEntryReference {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-				"%w: built-in Skill Collection member %d must be an external reference",
+		if form != declaration.MemberNamed {
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Plugin member %d must be a named external reference",
 				basespec.ErrInvalid,
 				index,
 			)
@@ -234,15 +234,15 @@ func canonicalCollectionPackage(
 
 		header := member.Header()
 		if header.Type != declaration.TypeSkill {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-				"%w: built-in Skill Collection member %d has type %q",
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Plugin member %d has type %q",
 				basespec.ErrInvalid,
 				index,
 				header.Type,
 			)
 		}
 		if header.Locator == nil {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill %q requires a local package locator",
 				basespec.ErrInvalid,
 				header.Name,
@@ -251,10 +251,10 @@ func canonicalCollectionPackage(
 
 		documentLocator, err := skillDomain.SourceDocumentLocator(
 			header.Locator,
-			skillDomain.BuiltinSkillCollectionDocumentFile,
+			skillDomain.BuiltinSkillPluginDocumentFile,
 		)
 		if err != nil {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"built-in Skill %q locator: %w",
 				header.Name,
 				err,
@@ -262,7 +262,7 @@ func canonicalCollectionPackage(
 		}
 		content, found := filesByLocator[documentLocator]
 		if !found {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill %q locator does not identify packaged %q",
 				basespec.ErrInvalid,
 				header.Name,
@@ -270,8 +270,8 @@ func canonicalCollectionPackage(
 			)
 		}
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-				"%w: built-in Skill Collection references document %q more than once",
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill Plugin references document %q more than once",
 				basespec.ErrIdentityConflict,
 				documentLocator,
 			)
@@ -282,15 +282,15 @@ func canonicalCollectionPackage(
 			header.Name,
 		)
 		if err != nil {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"validate built-in Skill %q: %w",
 				header.Name,
 				err,
 			)
 		}
 		if definitionValue.LogicalName != basespec.LogicalName(header.Name) {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-				"%w: built-in Skill document name differs from Collection member %q",
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill document name differs from Plugin member %q",
 				basespec.ErrInvalid,
 				header.Name,
 			)
@@ -313,8 +313,8 @@ func canonicalCollectionPackage(
 			continue
 		}
 		if _, found := seenDocuments[locator]; !found {
-			return collectionv1.CollectionDocument{}, nil, fmt.Errorf(
-				"%w: built-in Skill document %q is not referenced by Collection %q",
+			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
+				"%w: built-in Skill document %q is not referenced by Plugin %q",
 				basespec.ErrInvalid,
 				locator,
 				collection.Name,

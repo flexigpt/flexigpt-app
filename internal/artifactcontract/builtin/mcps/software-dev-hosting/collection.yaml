@@ -1,72 +1,74 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-software-dev-hosting
 description: Built-in MCP servers for GitHub, Vercel, Netlify, and Hugging Face.
 members:
   - type: mcp
     name: github-oauth
-    transport: streamable-http
-    url: https://api.githubcopilot.com/mcp/
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: GitHub
-        auth: { mode: oauth }
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://api.githubcopilot.com/mcp/
+      displayName: GitHub
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: github-pat
-    transport: streamable-http
-    url: https://api.githubcopilot.com/mcp/
-    headers:
-      Authorization: "Bearer ${GITHUB_PAT}"
-      X-MCP-Insiders: "true"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: GitHub (PAT)
-        auth: { mode: apiKey }
-        install:
-          note: Use a minimally scoped GitHub personal access token. OAuth remains preferred when available.
-          inputs:
-            GITHUB_PAT:
-              kind: secret
-              label: GitHub Personal Access Token
-              description: Sent as an Authorization bearer token.
-              placeholder: github_pat_... or ghp_...
-              required: true
-        policy: { ref: builtin-auto-write-apps, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://api.githubcopilot.com/mcp/
+      headers:
+        Authorization: Bearer ${GITHUB_PAT}
+        X-MCP-Insiders: "true"
+      displayName: GitHub (PAT)
+      auth:
+        mode: apiKey
+      install:
+        note: Use a minimally scoped GitHub personal access token. OAuth remains preferred when available.
+        inputs:
+          GITHUB_PAT:
+            kind: secret
+            label: GitHub Personal Access Token
+            description: Sent as an Authorization bearer token.
+            placeholder: github_pat_... or ghp_...
+            required: true
+      policy:
+        required: true
+        name: builtin-auto-write-apps
   - type: mcp
     name: huggingface
-    transport: streamable-http
-    url: https://huggingface.co/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Hugging Face
-        auth: { mode: oauth }
-        policy:
-          ref: builtin-manual-write-no-destructive
-          required: true
-
+    parameters:
+      transport: streamableHTTP
+      url: https://huggingface.co/mcp
+      displayName: Hugging Face
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write-no-destructive
   - type: mcp
     name: netlify
-    transport: streamable-http
-    url: https://netlify-mcp.netlify.app/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Netlify
-        auth: { mode: oauth }
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://netlify-mcp.netlify.app/mcp
+      displayName: Netlify
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: vercel
-    transport: streamable-http
-    url: https://mcp.vercel.com
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Vercel
-        auth: { mode: oauth }
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mcp.vercel.com
+      displayName: Vercel
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp.policy
     name: builtin-manual-write
   - type: mcp.policy

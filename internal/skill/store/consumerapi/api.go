@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -75,10 +76,14 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	graphResolver, err := resolve.New(
-		artifacts,
-		locators,
-		resolve.DefaultLimits(),
+	graphResolver, err := resolve.NewWithOptions(
+		resolve.ResolverOptions{
+			Artifacts:            artifacts,
+			SourceArtifacts:      artifacts,
+			Locators:             locators,
+			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			Limits:               resolve.DefaultLimits(),
+		},
 	)
 	if err != nil {
 		return nil, err

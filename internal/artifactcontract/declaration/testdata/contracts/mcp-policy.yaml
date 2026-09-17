@@ -1,0 +1,27 @@
+type: mcp.policy
+name: builtin-manual-write
+displayName: Built-in Manual Write Policy
+description: Trusted write policy requiring manual execution.
+labels:
+  category: mcp-policy
+  owner: platform
+metadata:
+  acme.example/owner: platform
+trustLevel: trusted
+defaultPolicy:
+  defaultApprovalRule: allow
+  defaultExecutionMode: manual
+  requireApprovalForUnknownRisk: true
+  requireApprovalForWrite: true
+  requireApprovalForDestructive: true
+toolPolicies:
+  delete_issue:
+    approvalRule: ask
+    executionMode: manual
+    allowStaleDigest: false
+    expectedDigest: sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+appsPolicy:
+  enabled: false
+  allowAppInitiatedToolCalls: false
+  requireApprovalForOpenLink: true
+  requireApprovalForContextUpdates: true

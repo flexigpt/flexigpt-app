@@ -1,0 +1,63 @@
+type: workflow
+name: change-workflow
+displayName: Change Workflow
+description: Plans, implements, and reviews a repository change.
+labels:
+  category: engineering
+  owner: platform
+metadata:
+  acme.example/owner: platform
+start:
+  - plan
+nodes:
+  - id: plan
+    type: agent
+    name: planner
+    locator: ./agents/planner.agent.yaml
+
+  - id: implement
+    join: any
+    type: agent
+    name: implementer
+    locator: ./agents/implementer.agent.yaml
+
+  - id: review
+    type: agent
+    name: reviewer
+    locator: ./agents/reviewer.agent.yaml
+
+  - id: final-check
+    type: tool
+    name: validate-change
+    parameters:
+      displayName: Validate Change
+      description: Validates the final repository state.
+      userCallable: false
+      llmCallable: true
+      autoExecute: false
+      llmToolType: function
+      inputSchema:
+        type: object
+      implementation:
+        kind: go
+        function: github.com/flexigpt/flexigpt/tools.ValidateChange
+edges:
+  - from: plan
+    to: implement
+
+  - from: implement
+    to: review
+
+  - from: review
+    to: implement
+    match:
+      pointer: /decision
+      schema:
+        const: changes-requested
+
+  - from: review
+    to: final-check
+    match:
+      pointer: /decision
+      schema:
+        const: approved

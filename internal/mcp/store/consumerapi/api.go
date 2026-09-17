@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -31,11 +32,11 @@ type API struct {
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
 
-	overlays           mcpOverlay.OverlayRepository
-	secretCleaner      mcpDomainServer.SecretCleaner
-	baselinePolicy     mcpPolicy.MCPPolicy
-	declarationAliases *resolve.Resolver
-	collections        *collection.API
+	overlays            mcpOverlay.OverlayRepository
+	secretCleaner       mcpDomainServer.SecretCleaner
+	baselinePolicy      mcpPolicy.MCPPolicy
+	declarationResolver *resolve.Resolver
+	collections         *collection.API
 }
 
 func New(
@@ -89,10 +90,14 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf("bind MCP declaration locator resolvers: %w", err)
 	}
-	aliases, err := resolve.New(
-		artifacts,
-		locators,
-		resolve.DefaultLimits(),
+	aliases, err := resolve.NewWithOptions(
+		resolve.ResolverOptions{
+			Artifacts:            artifacts,
+			SourceArtifacts:      artifacts,
+			Locators:             locators,
+			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			Limits:               resolve.DefaultLimits(),
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -108,7 +113,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	output.declarationAliases = aliases
+	output.declarationResolver = aliases
 	output.collections = collections
 	return output, nil
 }
@@ -420,11 +425,11 @@ func (a *API) InstallBuiltInPackage(
 			mcpDomain.MCPCollectionPackageKind,
 		)
 	}
-	if request.DocumentFile != mcpDomain.MCPCollectionDocumentFile {
+	if request.DocumentFile != mcpDomain.MCPPluginDocumentFile {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP document file must be %q",
 			basespec.ErrInvalid,
-			mcpDomain.MCPCollectionDocumentFile,
+			mcpDomain.MCPPluginDocumentFile,
 		)
 	}
 	if !a.protection.IsProtectedRoot(request.RootID) {
@@ -618,13 +623,13 @@ func normalizeBuiltInMCPExpectations(
 		}
 		seen[key] = struct{}{}
 
-		if expected.Locator != mcpDomain.MCPCollectionDocumentFile ||
+		if expected.Locator != mcpDomain.MCPPluginDocumentFile ||
 			expected.Subresource != "" {
 			continue
 		}
 		if rootFound ||
 			expected.Kind != artifact.ArtifactKind(
-				declaration.TypeCollection,
+				declaration.TypePlugin,
 			) {
 			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
 				"%w: built-in MCP package requires exactly one root Collection",
@@ -706,7 +711,7 @@ func (a *API) resolveMCPServer(
 
 	policyValue, err := a.effectivePolicy(
 		ctx,
-		material.Resource.Artifact.RootID,
+		material.Resource.Artifact.Ref(),
 		material.Document,
 		material.Installation.AdditionalPolicies,
 	)
@@ -804,10 +809,10 @@ func (a *API) resolveDeclarationArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (artifact.ArtifactRef, error) {
-	if a == nil || a.declarationAliases == nil {
+	if a == nil || a.declarationResolver == nil {
 		return artifact.ArtifactRef{}, basespec.ErrClosed
 	}
-	return a.declarationAliases.ResolveDeclarationArtifact(ctx, ref)
+	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)
 }
 
 func (a *API) effectiveInstallation(
@@ -859,42 +864,59 @@ func (a *API) effectiveInstallation(
 
 func (a *API) effectivePolicy(
 	ctx context.Context,
-	rootID root.RootID,
+	serverRef artifact.ArtifactRef,
 	server mcpDomainServer.ServerDocument,
 	additional []artifact.ArtifactRef,
 ) (mcpPolicy.Effective, error) {
 	values := make([]mcpPolicy.MCPPolicy, 0, 1+len(additional))
-	if reference := server.Extension.Policy; reference != nil {
-		matches, err := a.policyBodiesByLogicalName(
+	if reference := server.Configuration.Policy; reference != nil {
+		resolvedServer, err := a.declarationResolver.ResolveMCP(
 			ctx,
-			rootID,
-			reference.Ref,
+			serverRef,
 		)
 		if err != nil {
 			return mcpPolicy.Effective{}, err
 		}
-		switch len(matches) {
-		case 0:
+		if resolvedServer.MCP == nil ||
+			resolvedServer.MCP.PolicyResult == nil {
 			if reference.Required {
 				return mcpPolicy.Effective{}, fmt.Errorf(
-					"%w: required MCP Policy %q is unavailable",
+					"%w: required MCP Policy %q did not resolve",
 					basespec.ErrReferenceUnresolved,
-					reference.Ref,
+					reference.Name,
 				)
 			}
-		case 1:
-			values = append(values, matches[0])
-		default:
-			return mcpPolicy.Effective{}, fmt.Errorf(
-				"%w: MCP Policy %q is ambiguous in Root",
-				basespec.ErrIdentityConflict,
-				reference.Ref,
-			)
+		} else {
+			policyResult := resolvedServer.MCP.PolicyResult
+			if !policyResult.IsAvailable() {
+				if reference.Required {
+					return mcpPolicy.Effective{}, fmt.Errorf(
+						"%w: required MCP Policy %q is %s",
+						basespec.ErrReferenceUnresolved,
+						reference.Name,
+						policyResult.Status,
+					)
+				}
+			} else {
+				policyRef, found := policyResult.Resolved.ArtifactRef()
+				if !found {
+					return mcpPolicy.Effective{}, fmt.Errorf(
+						"%w: MCP Policy %q did not resolve to an Artifact",
+						basespec.ErrReferenceUnresolved,
+						reference.Name,
+					)
+				}
+				policy, err := a.policyBodyForArtifact(ctx, policyRef)
+				if err != nil {
+					return mcpPolicy.Effective{}, err
+				}
+				values = append(values, policy)
+			}
 		}
 	}
 
 	for _, ref := range additional {
-		if ref.RootID != rootID {
+		if ref.RootID != serverRef.RootID {
 			return mcpPolicy.Effective{}, fmt.Errorf(
 				"%w: additional MCP Policy belongs to another Root",
 				basespec.ErrInvalid,
@@ -904,85 +926,38 @@ func (a *API) effectivePolicy(
 		if err != nil {
 			return mcpPolicy.Effective{}, err
 		}
-		resolved, err := a.resources.ResolveArtifact(
-			ctx,
-			terminal,
-			resource.ResolveOptions{},
-		)
+		policy, err := a.policyBodyForArtifact(ctx, terminal)
 		if err != nil {
-			return mcpPolicy.Effective{}, err
-		}
-		if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind ||
-			resolved.Artifact.State != artifact.StateAvailable {
 			return mcpPolicy.Effective{}, fmt.Errorf(
-				"%w: additional MCP Policy %q is unavailable",
-				basespec.ErrReferenceUnresolved,
+				"resolve additional MCP Policy %q: %w",
 				ref.ArtifactID,
+				err,
 			)
 		}
-		body, err := a.policyBodyForResolvedArtifact(
-			ctx,
-			resolved,
-		)
-		if err != nil {
-			return mcpPolicy.Effective{}, err
-		}
-		values = append(values, body)
+		values = append(values, policy)
 	}
 
 	return mcpPolicy.Compose(a.baselinePolicy, values...)
 }
 
-func (a *API) policyBodiesByLogicalName(
+func (a *API) policyBodyForArtifact(
 	ctx context.Context,
-	rootID root.RootID,
-	name basespec.LogicalName,
-) ([]mcpPolicy.MCPPolicy, error) {
-	records, err := a.artifacts.FindByIdentity(
+	ref artifact.ArtifactRef,
+) (mcpPolicy.MCPPolicy, error) {
+	resolved, err := a.resources.ResolveArtifact(
 		ctx,
-		rootID,
-		mcpDomain.MCPPolicyArtifactKind,
-		name,
+		ref,
+		resource.ResolveOptions{},
 	)
 	if err != nil {
-		return nil, err
+		return mcpPolicy.MCPPolicy{}, err
 	}
-	if a.declarationAliases == nil {
-		return nil, basespec.ErrClosed
+	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
+		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
+			"%w: Artifact %q is not an MCP Policy",
+			basespec.ErrReferenceUnresolved,
+			ref.ArtifactID,
+		)
 	}
-	output := make([]mcpPolicy.MCPPolicy, 0, len(records))
-	seen := make(map[artifact.ArtifactRef]struct{}, len(records))
-	for _, record := range records {
-		if record.State != artifact.StateAvailable {
-			continue
-		}
-		terminal, err := a.resolveDeclarationArtifact(
-			ctx,
-			record.Ref(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if _, duplicate := seen[terminal]; duplicate {
-			continue
-		}
-		seen[terminal] = struct{}{}
-		resolved, err := a.resources.ResolveArtifact(
-			ctx,
-			terminal,
-			resource.ResolveOptions{},
-		)
-		if err != nil {
-			return nil, err
-		}
-		body, err := a.policyBodyForResolvedArtifact(
-			ctx,
-			resolved,
-		)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, body)
-	}
-	return output, nil
+	return a.policyBodyForResolvedArtifact(ctx, resolved)
 }

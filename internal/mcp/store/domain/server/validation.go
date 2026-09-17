@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -39,7 +40,7 @@ func (value ServerData) ValidateFor(
 	}
 
 	if value.SelectedConnectionProfile != "" {
-		if _, found := document.Extension.ConnectionProfiles[value.SelectedConnectionProfile]; !found {
+		if _, found := document.Configuration.ConnectionProfiles[value.SelectedConnectionProfile]; !found {
 			return fmt.Errorf(
 				"%w: selected MCP connection profile %q does not exist",
 				basespec.ErrReferenceUnresolved,
@@ -57,7 +58,7 @@ func (value ServerData) ValidateFor(
 			)
 		}
 
-		declaration, declared := document.Extension.Install.Inputs[name]
+		declaration, declared := document.Configuration.Install.Inputs[name]
 		if !declared {
 			return fmt.Errorf(
 				"%w: MCP installation input %q is not declared by the server",
@@ -185,10 +186,10 @@ func CanonicalizeServer(input ServerDocument) (ServerDocument, error) {
 	}
 	value.Labels = maps.Clone(value.Labels)
 	value.MCPServer = NormalizeCoreServer(value.MCPServer)
-	value.Extension = NormalizeServerExtension(
-		string(value.LogicalName),
-		value.Extension,
-	)
+	value.Configuration = NormalizeServerConfiguration(value.Configuration)
+	if value.DisplayName == "" {
+		value.DisplayName = string(value.LogicalName)
+	}
 	if err := value.Validate(); err != nil {
 		return ServerDocument{}, err
 	}
@@ -205,20 +206,15 @@ func NormalizeCoreServer(value CoreServer) CoreServer {
 	return value
 }
 
-func NormalizeServerExtension(
-	name string,
-	value ServerExtension,
-) ServerExtension {
-	value.Labels = maps.Clone(value.Labels)
+func NormalizeServerConfiguration(
+	value ServerConfiguration,
+) ServerConfiguration {
 	value.Install.Inputs = maps.Clone(value.Install.Inputs)
 	value.Install.AllowEnvironment = slices.Clone(
 		value.Install.AllowEnvironment,
 	)
 	value.ConnectionProfiles = maps.Clone(value.ConnectionProfiles)
 	value.Auth = normalizeAuthentication(value.Auth)
-	if value.DisplayName == "" {
-		value.DisplayName = name
-	}
 	return value
 }
 
@@ -228,8 +224,8 @@ func NormalizeServerExtension(
 // declared behavior.
 func withImplicitEnvironmentInputs(
 	core CoreServer,
-	value ServerExtension,
-) ServerExtension {
+	value ServerConfiguration,
+) ServerConfiguration {
 	output := value
 	output.Install.AllowEnvironment = slices.Clone(
 		value.Install.AllowEnvironment,
@@ -263,7 +259,7 @@ func normalizeAuthentication(
 	value AuthenticationDeclaration,
 ) AuthenticationDeclaration {
 	if value.Mode == "" {
-		value.Mode = MCPHTTPAuthNone
+		value.Mode = mcpv1.HTTPAuthModeNone
 	}
 	return value
 }
@@ -301,14 +297,14 @@ func (value ServerDocument) Validate() error {
 	return validateParts(
 		string(value.LogicalName),
 		value.MCPServer,
-		value.Extension,
+		value.Configuration,
 	)
 }
 
 func validateParts(
 	name string,
 	core CoreServer,
-	extension ServerExtension,
+	extension ServerConfiguration,
 ) error {
 	if err := validateCoreServer(core); err != nil {
 		return err
@@ -418,7 +414,7 @@ func validateParts(
 	}
 
 	switch extension.Auth.Mode {
-	case MCPHTTPAuthNone:
+	case mcpv1.HTTPAuthModeNone:
 		if extension.Auth.ClientCredentialsInput != "" {
 			return fmt.Errorf(
 				"%w: no-auth server cannot declare OAuth credentials",
@@ -426,7 +422,7 @@ func validateParts(
 			)
 		}
 
-	case MCPHTTPAuthAPIKey:
+	case mcpv1.HTTPAuthModeAPIKey:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: API-key authentication requires HTTP transport",
@@ -444,7 +440,7 @@ func validateParts(
 			)
 		}
 
-	case MCPHTTPAuthOAuth:
+	case mcpv1.HTTPAuthModeOAuth:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: OAuth requires HTTP transport",
@@ -463,7 +459,7 @@ func validateParts(
 			}
 		}
 
-	case MCPHTTPAuthClientCredentials:
+	case mcpv1.HTTPAuthModeClientCredentials:
 		if core.Type != ServerTypeHTTP {
 			return fmt.Errorf(
 				"%w: client credentials requires HTTP transport",
@@ -493,7 +489,7 @@ func validateParts(
 	if extension.Policy != nil {
 		if err := basespec.ValidatePortableName(
 			"MCP policy reference",
-			string(extension.Policy.Ref),
+			string(extension.Policy.Name),
 		); err != nil {
 			return err
 		}
@@ -688,7 +684,7 @@ func validateCoreServer(value CoreServer) error {
 			}
 		}
 
-	case ServerTypeHTTP, ServerTypeSSE:
+	case ServerTypeHTTP:
 		if value.Command != "" ||
 			len(value.Args) != 0 ||
 			len(value.Env) != 0 {
@@ -780,43 +776,11 @@ func validateConnectionTimeoutMS(value int) error {
 }
 
 func validateExtension(
-	name string,
-	value ServerExtension,
+	_ string,
+	value ServerConfiguration,
 ) error {
-	if value.LogicalVersion != "" {
-		if err := basespec.ValidatePortableName(
-			"MCP server logical version",
-			string(value.LogicalVersion),
-		); err != nil {
-			return err
-		}
-	}
-	if err := basespec.ValidateRequiredText(
-		"MCP server display name",
-		value.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"MCP server description",
-		value.Description,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
-		return err
-	}
 	if err := validateConnectionTimeoutMS(value.TimeoutMS); err != nil {
 		return err
-	}
-	if err := basespec.ValidateLabels("", value.Labels); err != nil {
-		return err
-	}
-	if value.DisplayName == "" {
-		return fmt.Errorf(
-			"%w: MCP server %q has no display name",
-			basespec.ErrInvalid,
-			name,
-		)
 	}
 	return nil
 }

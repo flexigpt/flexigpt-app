@@ -1,13 +1,12 @@
 package instruction
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/text"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -26,7 +25,7 @@ type Document struct {
 }
 
 type Adapter struct {
-	resources compositionapi.ResourceAPI
+	text *text.Adapter
 }
 
 func New(
@@ -38,9 +37,11 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
-	return &Adapter{
-		resources: resources,
-	}, nil
+	t, err := text.New(resources)
+	if err != nil {
+		return nil, err
+	}
+	return &Adapter{text: t}, nil
 }
 
 func (a *Adapter) Resolve(
@@ -50,112 +51,26 @@ func (a *Adapter) Resolve(
 	if err := ref.Validate(); err != nil {
 		return Document{}, err
 	}
-	resolved, err := a.resources.ResolveArtifact(
-		ctx,
-		ref,
-		resource.ResolveOptions{},
-	)
+	value, err := a.text.Resolve(ctx, ref)
 	if err != nil {
 		return Document{}, err
 	}
-	return a.documentFromResolved(ctx, resolved)
-}
-
-func (a *Adapter) documentFromResolved(
-	ctx context.Context,
-	resolved resource.ResolvedArtifact,
-) (Document, error) {
-	if err := resolved.Validate(); err != nil {
-		return Document{}, err
-	}
-	if resolved.Artifact.Kind != artifact.ArtifactKind(
-		instructionv1.InstructionType,
-	) {
+	if value.Insert != declaration.InsertInstructions {
 		return Document{}, fmt.Errorf(
-			"%w: Artifact %q is not an Instruction",
+			"%w: Text Artifact %q is not instruction Text",
 			basespec.ErrReferenceUnresolved,
-			resolved.Artifact.ID,
+			ref.ArtifactID,
 		)
 	}
-	if resolved.Definition.SchemaID != instructionv1.InstructionSchemaKey.SchemaID ||
-		resolved.Definition.SchemaVersion != instructionv1.InstructionSchemaKey.SchemaVersion {
-		return Document{}, fmt.Errorf(
-			"%w: Instruction Artifact has unsupported schema",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	document, err := instructionv1.DecodeInstructionJSON(
-		resolved.Definition.Body,
-	)
-	if err != nil {
-		return Document{}, err
-	}
-	content, err := a.contentForDocument(ctx, resolved, document)
-	if err != nil {
-		return Document{}, err
-	}
-
 	return Document{
-		Artifact:         resolved.Artifact.Ref(),
-		ArtifactRevision: resolved.Artifact.Revision,
-		DefinitionDigest: string(resolved.Definition.Digest),
-		Name:             document.Name,
-		MediaType:        document.MediaType,
-		Content:          content,
-		Locator:          resolved.Artifact.Binding.Locator,
+		Artifact:         value.Artifact,
+		ArtifactRevision: value.ArtifactRevision,
+		DefinitionDigest: value.DefinitionDigest,
+		Name:             value.Name,
+		MediaType:        value.MediaType,
+		Content:          value.Content,
+		Locator:          value.Locator,
 	}, nil
-}
-
-func (a *Adapter) contentForDocument(
-	ctx context.Context,
-	resolved resource.ResolvedArtifact,
-	document instructionv1.InstructionDocument,
-) (string, error) {
-	if document.Content != nil {
-		return *document.Content, nil
-	}
-	if document.Locator == nil {
-		return "", fmt.Errorf(
-			"%w: Instruction has neither inline content nor a locator",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	locator, err := declaration.ResolveSourceRelativePathLocator(
-		*document.Locator,
-		resolved.Artifact.Binding.Locator,
-	)
-	if err != nil {
-		return "", err
-	}
-	entry, err := a.resources.ReadSourceEntry(
-		ctx,
-		resolved.Artifact.RootID,
-		resolved.Artifact.Binding.SourceID,
-		locator,
-		basespec.MaxCandidateBytes,
-	)
-	if err != nil {
-		return "", err
-	}
-	if entry.SourceRevision !=
-		resolved.RefreshState.SourceRevision ||
-		entry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
-		return "", fmt.Errorf(
-			"%w: Instruction Source changed during resolution",
-			basespec.ErrRefreshRequired,
-		)
-	}
-	if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
-		return "", fmt.Errorf(
-			"%w: Instruction source %q is not valid text",
-			basespec.ErrInvalid,
-			entry.Locator,
-		)
-	}
-	return string(entry.Content), nil
 }
 
 func Definition(
@@ -164,11 +79,19 @@ func Definition(
 	if err := value.Validate(); err != nil {
 		return definition.Definition{}, err
 	}
-	if value.Definition.Kind != artifact.ArtifactKind(
-		instructionv1.InstructionType,
-	) {
+	if value.Definition.Kind != artifact.ArtifactKind(textv1.TextType) {
 		return definition.Definition{}, fmt.Errorf(
-			"%w: Artifact is not an Instruction",
+			"%w: Artifact is not Text",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	t, err := textv1.DecodeTextJSON(value.Definition.Body)
+	if err != nil {
+		return definition.Definition{}, err
+	}
+	if t.Insert != declaration.InsertInstructions {
+		return definition.Definition{}, fmt.Errorf(
+			"%w: Text Artifact is not instruction Text",
 			basespec.ErrReferenceUnresolved,
 		)
 	}

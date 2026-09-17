@@ -1,0 +1,23 @@
+type: skill
+name: reviewing-code
+displayName: Reviewing Code
+description: Reviews code changes for correctness and risk.
+labels:
+  category: software-development
+  owner: platform
+metadata:
+  acme.example/owner: platform
+locator: ./skills/reviewing-code
+license: Apache-2.0
+insert: instructions
+allowedTools:
+  - type: tool
+    name: searchfiles
+
+  - type: tool
+    base: ./tools
+    include:
+      - "**/*.tool.yaml"
+      - "**/*.tool.yml"
+    nameInclude:
+      - "repository-*"

@@ -109,7 +109,7 @@ type Tool struct {
 	LLMCallable bool `json:"llmCallable"`
 	// AutoExecReco indicates whether the host/UI should consider it safe enough
 	// to auto-execute this tool without additional confirmation. Default: false.
-	AutoExecReco bool `json:"autoExecReco"`
+	AutoExecReco bool `json:"autoExecute"`
 
 	// ArgSchema describes the JSON arguments that are passed when the tool is invoked (by the LLM or via InvokeTool).
 	// This is primarily used for Go/HTTP tools.

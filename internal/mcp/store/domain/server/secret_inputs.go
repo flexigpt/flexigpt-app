@@ -36,7 +36,7 @@ func (value ServerDocument) SecretInputTargets() (
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}
-	return secretInputTargets(value.MCPServer, value.Extension)
+	return secretInputTargets(value.MCPServer, value.Configuration)
 }
 
 func (value ServerDocument) AcceptsSecretTarget(
@@ -53,8 +53,8 @@ func (value ServerDocument) AcceptsSecretTarget(
 
 	switch kind {
 	case mcpDomainSecret.MCPSecretKindOAuthClientCredentials:
-		input := value.Extension.Auth.ClientCredentialsInput
-		declaration, found := value.Extension.Install.Inputs[input]
+		input := value.Configuration.Auth.ClientCredentialsInput
+		declaration, found := value.Configuration.Install.Inputs[input]
 		if input == "" ||
 			!found ||
 			declaration.Kind != InputOAuthClientCredentials {
@@ -119,11 +119,11 @@ func (target SecretInputTarget) matches(
 
 func secretInputTargets(
 	core CoreServer,
-	extension ServerExtension,
+	configuration ServerConfiguration,
 ) (map[string]SecretInputTarget, error) {
 	targets := make(map[string]SecretInputTarget)
 	targetOwners := make(map[string]string)
-	inputs := extension.Install.Inputs
+	inputs := configuration.Install.Inputs
 
 	record := func(
 		inputName string,
@@ -240,8 +240,8 @@ func secretInputTargets(
 		return nil, err
 	}
 	if err := rejectSecret(
-		extension.Auth.ClientIDMetadataDocumentURL,
-		"extension.auth.clientIDMetadataDocumentURL",
+		configuration.Auth.ClientIDMetadataDocumentURL,
+		"auth.clientIDMetadataDocumentURL",
 	); err != nil {
 		return nil, err
 	}
@@ -252,9 +252,9 @@ func secretInputTargets(
 		return nil, err
 	}
 
-	profileNames := sortedStringKeys(extension.ConnectionProfiles)
+	profileNames := sortedStringKeys(configuration.ConnectionProfiles)
 	for _, profileName := range profileNames {
-		profile := extension.ConnectionProfiles[profileName]
+		profile := configuration.ConnectionProfiles[profileName]
 		if profile.Stdio != nil {
 			if profile.Stdio.Command != nil {
 				if err := rejectSecret(

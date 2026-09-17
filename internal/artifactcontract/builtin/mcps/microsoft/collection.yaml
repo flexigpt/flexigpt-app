@@ -1,127 +1,126 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-microsoft
 description: Microsoft-hosted remote MCP servers.
 members:
   - type: mcp
     name: m365-copilot
-    transport: streamable-http
-    url: "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Microsoft 365 Copilot
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
-        install:
-          inputs:
-            MICROSOFT_TENANT_ID:
-              kind: text
-              label: Microsoft Entra Tenant ID
-              required: true
-            MICROSOFT_ENTRA_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Microsoft Entra OAuth Client
-              description: Client ID and optional client secret for a public PKCE or confidential Entra application.
-              required: true
-              clientSecretRequired: false
-        policy: { ref: builtin-manual-read, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot
+      displayName: Microsoft 365 Copilot
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
+      install:
+        inputs:
+          MICROSOFT_TENANT_ID:
+            kind: text
+            label: Microsoft Entra Tenant ID
+            required: true
+          MICROSOFT_ENTRA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Microsoft Entra OAuth Client
+            description: Client ID and optional client secret for a public PKCE or confidential Entra application.
+            required: true
+            clientSecretRequired: false
+      policy:
+        required: true
+        name: builtin-manual-read
   - type: mcp
     name: onedrive
-    transport: streamable-http
-    url: "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Microsoft OneDrive
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
-        install:
-          inputs:
-            MICROSOFT_TENANT_ID:
-              kind: text
-              label: Microsoft Entra Tenant ID
-              required: true
-            MICROSOFT_ENTRA_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Microsoft Entra OAuth Client
-              required: true
-              clientSecretRequired: false
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer
+      displayName: Microsoft OneDrive
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
+      install:
+        inputs:
+          MICROSOFT_TENANT_ID:
+            kind: text
+            label: Microsoft Entra Tenant ID
+            required: true
+          MICROSOFT_ENTRA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Microsoft Entra OAuth Client
+            required: true
+            clientSecretRequired: false
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: sharepoint
-    transport: streamable-http
-    url: "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Microsoft SharePoint
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
-        install:
-          inputs:
-            MICROSOFT_TENANT_ID:
-              kind: text
-              label: Microsoft Entra Tenant ID
-              required: true
-            MICROSOFT_ENTRA_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Microsoft Entra OAuth Client
-              required: true
-              clientSecretRequired: false
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer
+      displayName: Microsoft SharePoint
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
+      install:
+        inputs:
+          MICROSOFT_TENANT_ID:
+            kind: text
+            label: Microsoft Entra Tenant ID
+            required: true
+          MICROSOFT_ENTRA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Microsoft Entra OAuth Client
+            required: true
+            clientSecretRequired: false
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: teams
-    transport: streamable-http
-    url: "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Microsoft Teams
-        auth:
-          mode: oauth
-          clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
-        install:
-          inputs:
-            MICROSOFT_TENANT_ID:
-              kind: text
-              label: Microsoft Entra Tenant ID
-              required: true
-            MICROSOFT_ENTRA_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Microsoft Entra OAuth Client
-              required: true
-              clientSecretRequired: false
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer
+      displayName: Microsoft Teams
+      auth:
+        mode: oauth
+        clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
+      install:
+        inputs:
+          MICROSOFT_TENANT_ID:
+            kind: text
+            label: Microsoft Entra Tenant ID
+            required: true
+          MICROSOFT_ENTRA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Microsoft Entra OAuth Client
+            required: true
+            clientSecretRequired: false
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: user
-    transport: streamable-http
-    url: "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer"
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Microsoft User Profile
-        auth:
-          mode: oauth
-          clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
-        install:
-          inputs:
-            MICROSOFT_TENANT_ID:
-              kind: text
-              label: Microsoft Entra Tenant ID
-              required: true
-            MICROSOFT_ENTRA_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Microsoft Entra OAuth Client
-              required: true
-              clientSecretRequired: false
-        policy: { ref: builtin-auto-read, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer
+      displayName: Microsoft User Profile
+      auth:
+        mode: oauth
+        clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
+      install:
+        inputs:
+          MICROSOFT_TENANT_ID:
+            kind: text
+            label: Microsoft Entra Tenant ID
+            required: true
+          MICROSOFT_ENTRA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Microsoft Entra OAuth Client
+            required: true
+            clientSecretRequired: false
+      policy:
+        required: true
+        name: builtin-auto-read
   - type: mcp.policy
     name: builtin-manual-read
   - type: mcp.policy

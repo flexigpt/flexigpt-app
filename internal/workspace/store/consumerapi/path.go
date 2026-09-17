@@ -69,11 +69,6 @@ func (a *StoreAPI) AddWorkspacePath(
 			discovery.ExplicitLocators,
 			manifest,
 		)
-		discovery.DecoderHints = appendCanonicalDeclarationDecoderHint(
-			discovery.DecoderHints,
-			discovery.AllowedDecoderIDs,
-			manifest,
-		)
 		discovery = discovery.Normalized()
 	}
 
@@ -145,8 +140,8 @@ func (a *StoreAPI) AddWorkspacePath(
 		return WorkspacePathRegistrationResult{}, err
 	}
 
-	// Loading is read-only. RefreshWorkspace above applies declaration sources,
-	// expands local locator closure, and refreshes the selected declaration set.
+	// Loading is read-only. RefreshWorkspace above expands selector and local
+	// locator closure through the typed Artifact resolver.
 	load, err := a.LoadWorkspace(ctx, ref)
 	if err != nil {
 		return WorkspacePathRegistrationResult{}, err

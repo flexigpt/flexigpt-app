@@ -292,7 +292,7 @@ export function ToolBundleCard({
 											<MetadataPill label="Type">{tool.type}</MetadataPill>
 											<MetadataPill label="User callable">{tool.userCallable ? 'Yes' : 'No'}</MetadataPill>
 											<MetadataPill label="Model callable">{tool.llmCallable ? 'Yes' : 'No'}</MetadataPill>
-											<MetadataPill label="Auto execute">{tool.autoExecReco ? 'Recommended' : 'No'}</MetadataPill>
+											<MetadataPill label="Auto execute">{tool.autoExecute ? 'Recommended' : 'No'}</MetadataPill>
 										</>
 									}
 								>

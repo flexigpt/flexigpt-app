@@ -1,103 +1,105 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: mcp-google
 description: Google managed remote MCP servers.
 members:
   - type: mcp
     name: bigquery
-    transport: streamable-http
-    url: https://bigquery.googleapis.com/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google BigQuery
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: GOOGLE_OAUTH_CLIENT
-        install:
-          inputs:
-            GOOGLE_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Google OAuth Client
-              description: OAuth client ID and client secret from Google Auth Platform.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://bigquery.googleapis.com/mcp
+      displayName: Google BigQuery
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: GOOGLE_OAUTH_CLIENT
+      install:
+        inputs:
+          GOOGLE_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Google OAuth Client
+            description: OAuth client ID and client secret from Google Auth Platform.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: calendar
-    transport: streamable-http
-    url: https://calendarmcp.googleapis.com/mcp/v1
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google Calendar
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: GOOGLE_OAUTH_CLIENT
-        install:
-          inputs:
-            GOOGLE_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Google OAuth Client
-              description: OAuth client ID and client secret from Google Auth Platform.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://calendarmcp.googleapis.com/mcp/v1
+      displayName: Google Calendar
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: GOOGLE_OAUTH_CLIENT
+      install:
+        inputs:
+          GOOGLE_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Google OAuth Client
+            description: OAuth client ID and client secret from Google Auth Platform.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: compute
-    transport: streamable-http
-    url: https://compute.googleapis.com/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google Compute Engine
-        timeoutMS: 60000
-        auth: { mode: oauth }
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://compute.googleapis.com/mcp
+      displayName: Google Compute Engine
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: gke
-    transport: streamable-http
-    url: https://container.googleapis.com/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google Kubernetes Engine
-        timeoutMS: 60000
-        auth: { mode: oauth }
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://container.googleapis.com/mcp
+      displayName: Google Kubernetes Engine
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: gmail
-    transport: streamable-http
-    url: https://gmailmcp.googleapis.com/mcp/v1
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google Gmail
-        timeoutMS: 60000
-        auth:
-          mode: oauth
-          clientCredentialsInput: GOOGLE_OAUTH_CLIENT
-        install:
-          inputs:
-            GOOGLE_OAUTH_CLIENT:
-              kind: oauthClientCredentials
-              label: Google OAuth Client
-              description: OAuth client ID and client secret from Google Auth Platform.
-              required: true
-              clientSecretRequired: true
-        policy: { ref: builtin-manual-write, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://gmailmcp.googleapis.com/mcp/v1
+      displayName: Google Gmail
+      timeoutMS: 60000
+      auth:
+        mode: oauth
+        clientCredentialsInput: GOOGLE_OAUTH_CLIENT
+      install:
+        inputs:
+          GOOGLE_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Google OAuth Client
+            description: OAuth client ID and client secret from Google Auth Platform.
+            required: true
+            clientSecretRequired: true
+      policy:
+        required: true
+        name: builtin-manual-write
   - type: mcp
     name: maps
-    transport: streamable-http
-    url: https://mapstools.googleapis.com/mcp
-    metadata:
-      "flexigpt.site/mcp-runtime-v1":
-        displayName: Google Maps
-        auth: { mode: oauth }
-        policy: { ref: builtin-auto-read, required: true }
-
+    parameters:
+      transport: streamableHTTP
+      url: https://mapstools.googleapis.com/mcp
+      displayName: Google Maps
+      auth:
+        mode: oauth
+      policy:
+        required: true
+        name: builtin-auto-read
   - type: mcp.policy
     name: builtin-manual-write
   - type: mcp.policy

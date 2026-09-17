@@ -1,6 +1,6 @@
 // Package locatorpath implements portable source-relative path declaration
 // loading. It intentionally does not resolve URL, Git, package, archive, or
-// command locators.
+// other non-path locators.
 package locatorpath
 
 import (
@@ -188,6 +188,11 @@ func (r *boundResolver) selectArtifact(
 		return artifact.ArtifactRef{}, err
 	}
 
+	expectedTextVersion, hasTextVersion, err := requestedTextLogicalVersion(request)
+	if err != nil {
+		return artifact.ArtifactRef{}, err
+	}
+
 	selectedLocators := make(map[basespec.Locator]struct{}, len(locators))
 	for _, locator := range locators {
 		selectedLocators[locator] = struct{}{}
@@ -204,6 +209,9 @@ func (r *boundResolver) selectArtifact(
 		}
 		if request.ExpectedLogicalName != "" &&
 			record.LogicalName != request.ExpectedLogicalName {
+			continue
+		}
+		if hasTextVersion && record.LogicalVersion != expectedTextVersion {
 			continue
 		}
 		if hasServerSelector &&
@@ -231,6 +239,25 @@ func (r *boundResolver) selectArtifact(
 			request.ExpectedKind,
 		)
 	}
+}
+
+func requestedTextLogicalVersion(
+	request providerapi.LocatorResolutionRequest,
+) (basespec.LogicalVersion, bool, error) {
+	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeText) ||
+		len(request.EntryJSON) == 0 {
+		return "", false, nil
+	}
+
+	entry, err := declaration.DecodeEntryJSON(request.EntryJSON)
+	if err != nil {
+		return "", false, err
+	}
+	insert, err := entry.TextInsert()
+	if err != nil {
+		return "", false, err
+	}
+	return basespec.LogicalVersion(insert), true, nil
 }
 
 func requestedMCPServerSubresource(

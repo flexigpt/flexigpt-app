@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -75,18 +76,15 @@ func definitionForEntry(
 	}
 
 	var logicalVersion basespec.LogicalVersion
-	if header.Type == declaration.TypeCollection {
-		var fields struct {
-			Version string `json:"version"`
+	if header.Type == declaration.TypeText {
+		text, err := textv1.DecodeTextEntry(entry)
+		if err != nil {
+			return definition.Definition{}, err
 		}
-		if err := json.Unmarshal(body, &fields); err != nil {
-			return definition.Definition{}, fmt.Errorf(
-				"%w: decode Collection version: %w",
-				basespec.ErrInvalid,
-				err,
-			)
-		}
-		logicalVersion = basespec.LogicalVersion(fields.Version)
+		// Artifact Store's generic identity includes LogicalVersion. Text uses
+		// that internal slot to index its contract identity tuple
+		// (text, name, insert) without adding a declaration version field.
+		logicalVersion = basespec.LogicalVersion(text.Insert)
 	}
 
 	return definitionForDocument(
@@ -109,9 +107,13 @@ func definitionForDocument(
 		SchemaVersion:  key.SchemaVersion,
 		LogicalName:    basespec.LogicalName(header.Name),
 		LogicalVersion: logicalVersion,
-		DisplayName:    header.Name,
+		DisplayName:    header.DisplayName,
 		Description:    header.Description,
+		Labels:         declaration.CloneStringMap(header.Labels),
 		Body:           json.RawMessage(body),
+	}
+	if value.DisplayName == "" {
+		value.DisplayName = header.Name
 	}
 	return definition.Canonicalize(value)
 }

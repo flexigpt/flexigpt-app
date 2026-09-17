@@ -1,29 +1,22 @@
-apiVersion: v1
-type: collection
+type: plugin
 name: product-leadership
 description: "Skills for PRDs, MRDs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates."
 members:
   - type: skill
     name: prd-mrd-authoring
-    description: "Turn goals, research, constraints, and stakeholder input into source-grounded PRD, MRD, or requirements artifacts."
     locator: ./prd-mrd-authoring
   - type: skill
     name: decision-record-authoring
-    description: "Write decision records with options, evidence, trade-offs, recommendations, and revisit triggers."
     locator: ./decision-record-authoring
   - type: skill
     name: user-feedback-analysis
-    description: "Analyze customer feedback into traceable themes, pain points, needs, opportunities, and uncertainty."
     locator: ./user-feedback-analysis
   - type: skill
     name: roadmap-prioritization
-    description: "Prioritize ideas and work against goals, impact, effort, risks, and dependencies."
     locator: ./roadmap-prioritization
   - type: skill
     name: delivery-risk-review
-    description: "Review plans and delivery material for blockers, risks, dependencies, owners, and mitigations."
     locator: ./delivery-risk-review
   - type: skill
     name: status-update-authoring
-    description: "Convert project material into concise stakeholder-ready status updates."
     locator: ./status-update-authoring

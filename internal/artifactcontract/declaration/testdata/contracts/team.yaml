@@ -1,0 +1,33 @@
+type: team
+name: change-team
+displayName: Change Team
+description: Plans, implements, and reviews repository changes.
+labels:
+  category: engineering
+  owner: platform
+metadata:
+  acme.example/owner: platform
+members:
+  - type: agent
+    name: reviewer
+    locator: ./agents/reviewer.agent.yaml
+
+  - type: plugin
+    name: repository-common
+    locator: ./plugins/repository-common.yaml
+
+  - type: agent
+    base: ./agents
+    include:
+      - "**/*.agent.yaml"
+      - "**/*.agent.yml"
+      - "**/*.agent.md"
+    nameInclude:
+      - "change-*"
+    nameExclude:
+      - "experimental-*"
+
+workflow:
+  type: workflow
+  name: change-workflow
+  locator: ./workflows/change-workflow.yaml

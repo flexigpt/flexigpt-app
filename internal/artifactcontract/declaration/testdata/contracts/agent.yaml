@@ -1,0 +1,56 @@
+type: agent
+name: code-reviewer
+displayName: Code Reviewer
+description: Reviews requested code changes.
+labels:
+  category: engineering
+  owner: platform
+metadata:
+  acme.example/owner: platform
+prompt:
+  mediaType: text/markdown
+  content: |
+    Review the requested change for defects, regressions, and risk.
+members:
+  - type: text
+    name: reviewer-rules
+    insert: instructions
+    parameters:
+      displayName: Reviewer Rules
+      mediaType: text/markdown
+      content: |
+        Review correctness, security, and maintainability.
+
+  - type: model
+    name: reasoning
+    overrides:
+      includeSystemPrompt: true
+
+  - type: tool
+    name: searchfiles
+    overrides:
+      autoExecute: true
+
+  - type: skill
+    name: reviewing-code
+    use:
+      mode: active
+
+  - type: skill
+    base: ./skills
+    include:
+      - "**/SKILL.md"
+    nameInclude:
+      - "review-*"
+    use:
+      mode: active
+
+  - type: mcp
+    name: github
+    locator: ./.mcp.json
+    server: github
+
+loop:
+  type: loop
+  name: reviewer-loop
+  locator: ./loops/reviewer-loop.yaml

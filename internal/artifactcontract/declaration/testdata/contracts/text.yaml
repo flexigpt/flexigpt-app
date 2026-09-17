@@ -1,0 +1,15 @@
+type: text
+name: repository-rules
+displayName: Repository Rules
+description: Rules for repository changes.
+labels:
+  category: repository
+  owner: platform
+metadata:
+  acme.example/owner: platform
+insert: instructions
+mediaType: text/markdown
+content: |
+  Do not modify generated files.
+  Keep changes focused.
+  Run the relevant validation before completion.

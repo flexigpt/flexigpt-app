@@ -4,68 +4,80 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"net/url"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-const APIVersionV1 = "v1"
+const SchemaVersionV1 = "v1"
 
 type Type string
 
 const (
-	TypeInstruction Type = "instruction"
-	TypeContext     Type = "context"
-	TypeTool        Type = "tool"
-	TypeModel       Type = "model"
-	TypeSkill       Type = "skill"
-	TypeMCP         Type = "mcp"
-	TypeCollection  Type = "collection"
-	TypeAgent       Type = "agent"
-	TypeTeam        Type = "team"
-	TypeLoop        Type = "loop"
-	TypeWorkflow    Type = "workflow"
-	TypeWorkspace   Type = "workspace"
+	TypeText      Type = "text"
+	TypeTool      Type = "tool"
+	TypeModel     Type = "model"
+	TypeSkill     Type = "skill"
+	TypeMCP       Type = "mcp"
+	TypeMCPPolicy Type = "mcp.policy"
+	TypePlugin    Type = "plugin"
+	TypeAgent     Type = "agent"
+	TypeTeam      Type = "team"
+	TypeLoop      Type = "loop"
+	TypeWorkflow  Type = "workflow"
+	TypeWorkspace Type = "workspace"
 )
 
-// TypeMCPPolicy is a supported contract-domain extension type. It is not
-// part of the portable CoreType vocabulary because MCP policy is an optional
-// policy domain rather than a universally executable capability.
-const TypeMCPPolicy Type = "mcp.policy"
+type InsertTarget string
+
+const (
+	InsertInstructions InsertTarget = "instructions"
+	InsertUserMessage  InsertTarget = "user-message"
+)
+
+func (i InsertTarget) Validate() error {
+	switch i {
+	case InsertInstructions, InsertUserMessage:
+		return nil
+	default:
+		return fmt.Errorf(
+			"%w: unsupported Text insertion target %q",
+			basespec.ErrInvalid,
+			i,
+		)
+	}
+}
 
 func Types() []Type {
 	return []Type{
-		TypeInstruction,
-		TypeContext,
-		TypeTool,
+		TypeText,
 		TypeModel,
+		TypeTool,
 		TypeSkill,
 		TypeMCP,
-		TypeCollection,
+		TypeMCPPolicy,
+		TypePlugin,
 		TypeAgent,
 		TypeTeam,
 		TypeLoop,
 		TypeWorkflow,
 		TypeWorkspace,
-		TypeMCPPolicy,
 	}
 }
 
 func (t Type) Validate() error {
 	switch t {
-	case TypeInstruction,
-		TypeContext,
-		TypeTool,
+	case TypeText,
 		TypeModel,
+		TypeTool,
 		TypeSkill,
 		TypeMCP,
-		TypeCollection,
+		TypeMCPPolicy,
+		TypePlugin,
 		TypeAgent,
 		TypeTeam,
 		TypeLoop,
 		TypeWorkflow,
-		TypeMCPPolicy,
 		TypeWorkspace:
 		return nil
 	default:
@@ -77,19 +89,21 @@ func (t Type) Validate() error {
 	}
 }
 
+const RetiredMCPRuntimeMetadataKey = "flexigpt.site/mcp-runtime-v1"
+
 type Header struct {
-	Schema      string                     `json:"$schema,omitempty"`
-	APIVersion  string                     `json:"apiVersion,omitempty"`
 	Type        Type                       `json:"type"`
 	Name        string                     `json:"name"`
+	DisplayName string                     `json:"displayName,omitempty"`
 	Description string                     `json:"description,omitempty"`
+	Labels      map[string]string          `json:"labels,omitempty"`
 	Locator     *Locator                   `json:"locator,omitempty"`
 	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
 }
 
 type HeaderValidation struct {
 	ExpectedType Type
-	APIVersion   string
+	RequireName  bool
 }
 
 func (h Header) Clone() Header {
@@ -98,6 +112,7 @@ func (h Header) Clone() Header {
 		value := h.Locator.Clone()
 		output.Locator = &value
 	}
+	output.Labels = CloneStringMap(h.Labels)
 	output.Metadata = CloneRawMessageMap(h.Metadata)
 	return output
 }
@@ -117,36 +132,27 @@ func (h Header) Validate(
 			options.ExpectedType,
 		)
 	}
-	if err := basespec.ValidatePortableName(
-		"artifact declaration name",
-		h.Name,
-	); err != nil {
-		return err
-	}
-
-	if options.APIVersion != "" &&
-		h.APIVersion != "" &&
-		h.APIVersion != options.APIVersion {
-		return fmt.Errorf(
-			"%w: declaration apiVersion %q, expected %q",
-			basespec.ErrInvalid,
-			h.APIVersion,
-			options.APIVersion,
-		)
-	}
-	if h.APIVersion != "" {
-		if err := basespec.ValidateRequiredText(
-			"artifact declaration apiVersion",
-			h.APIVersion,
-			basespec.MaxVersionBytes,
+	if h.Name == "" {
+		if options.RequireName || options.ExpectedType != "" {
+			return fmt.Errorf(
+				"%w: artifact declaration name is required",
+				basespec.ErrInvalid,
+			)
+		}
+	} else {
+		if err := basespec.ValidatePortableName(
+			"artifact declaration name",
+			h.Name,
 		); err != nil {
 			return err
 		}
 	}
-	if h.Schema != "" {
-		if err := validateSchemaURI(h.Schema); err != nil {
-			return err
-		}
+	if err := basespec.ValidateOptionalText(
+		"artifact declaration display name",
+		h.DisplayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
 	}
 	if err := basespec.ValidateOptionalText(
 		"artifact declaration description",
@@ -155,20 +161,12 @@ func (h Header) Validate(
 	); err != nil {
 		return err
 	}
+	if err := basespec.ValidateLabels("headers", h.Labels); err != nil {
+		return fmt.Errorf("artifact declaration labels: %w", err)
+	}
 	if h.Locator != nil {
 		if err := h.Locator.Validate(); err != nil {
 			return fmt.Errorf("artifact declaration locator: %w", err)
-		}
-		if options.ExpectedType != "" &&
-			h.Locator.Kind == LocatorKindCommand {
-			switch options.ExpectedType {
-			case TypeTool, TypeMCP:
-			default:
-				return fmt.Errorf(
-					"%w: command Locator is valid only for Tool and MCP declarations",
-					basespec.ErrInvalid,
-				)
-			}
 		}
 	}
 	if len(h.Metadata) > basespec.MaxLabels {
@@ -179,6 +177,13 @@ func (h Header) Validate(
 		)
 	}
 	for key, value := range h.Metadata {
+		if key == RetiredMCPRuntimeMetadataKey {
+			return fmt.Errorf(
+				"%w: metadata key %q is retired; use direct typed MCP fields",
+				basespec.ErrInvalid,
+				key,
+			)
+		}
 		if err := basespec.ValidateRequiredText(
 			"artifact declaration metadata key",
 			key,
@@ -206,24 +211,6 @@ func (m OutputMatch) Clone() OutputMatch {
 	output := m
 	output.Schema = append(json.RawMessage(nil), m.Schema...)
 	return output
-}
-
-func validateSchemaURI(value string) error {
-	if err := basespec.ValidateRequiredText(
-		"Artifact declaration $schema",
-		value,
-		basespec.MaxURIBytes,
-	); err != nil {
-		return err
-	}
-	parsed, err := url.ParseRequestURI(value)
-	if err != nil || !parsed.IsAbs() {
-		return fmt.Errorf(
-			"%w: Artifact declaration $schema must be an absolute URI",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
 }
 
 func CloneStrings(values []string) []string {

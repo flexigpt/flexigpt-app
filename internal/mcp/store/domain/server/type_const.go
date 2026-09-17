@@ -3,11 +3,11 @@ package server
 import (
 	"regexp"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
-	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
 var placeholderPattern = regexp.MustCompile(
@@ -27,16 +27,6 @@ type ServerType string
 const (
 	ServerTypeStdio ServerType = "stdio"
 	ServerTypeHTTP  ServerType = "http"
-	ServerTypeSSE   ServerType = "sse"
-)
-
-type MCPHTTPAuthMode = mcpServer.MCPHTTPAuthMode
-
-const (
-	MCPHTTPAuthNone              = mcpServer.MCPHTTPAuthNone
-	MCPHTTPAuthAPIKey            = mcpServer.MCPHTTPAuthAPIKey
-	MCPHTTPAuthOAuth             = mcpServer.MCPHTTPAuthOAuth
-	MCPHTTPAuthClientCredentials = mcpServer.MCPHTTPAuthClientCredentials
 )
 
 type CoreServer struct {
@@ -78,7 +68,7 @@ type InstallationDeclaration struct {
 }
 
 type AuthenticationDeclaration struct {
-	Mode MCPHTTPAuthMode `json:"mode"`
+	Mode mcpv1.HTTPAuthMode `json:"mode"`
 
 	ClientCredentialsInput      string `json:"clientCredentialsInput,omitempty"`
 	ClientIDMetadataDocumentURL string `json:"clientIDMetadataDocumentURL,omitempty"`
@@ -104,20 +94,14 @@ type ConnectionProfile struct {
 }
 
 type PolicyReference struct {
-	Ref      basespec.LogicalName `json:"ref"`
+	Name     basespec.LogicalName `json:"name"`
 	Required bool                 `json:"required"`
 }
 
-// ServerExtension is consumer-specific MCP runtime metadata. It is encoded
-// under the namespaced canonical mcpv1 metadata extension key rather than
-// becoming Artifact Store state.
-type ServerExtension struct {
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string                  `json:"displayName,omitempty"`
-	Description    string                  `json:"description,omitempty"`
-	TimeoutMS      int                     `json:"timeoutMS,omitempty"`
-	Labels         map[string]string       `json:"labels,omitempty"`
-
+// ServerConfiguration is the runtime projection of direct MCP declaration
+// fields. It is not encoded in metadata and is not Artifact-local state.
+type ServerConfiguration struct {
+	TimeoutMS          int                          `json:"timeoutMS,omitempty"`
 	Auth               AuthenticationDeclaration    `json:"auth"`
 	Install            InstallationDeclaration      `json:"install"`
 	ConnectionProfiles map[string]ConnectionProfile `json:"connectionProfiles,omitempty"`
@@ -130,7 +114,7 @@ type Include struct {
 	Prompts   []string `json:"prompts,omitempty"`
 }
 
-// ServerDocument is the MCP consumer projection of one canonical mcpv1
+// ServerDocument is the MCP consumer projection of one direct canonical mcpv1
 // declaration. It is not itself a portable document format.
 type ServerDocument struct {
 	LogicalName    basespec.LogicalName    `json:"logicalName"`
@@ -139,18 +123,18 @@ type ServerDocument struct {
 	Description    string                  `json:"description,omitempty"`
 	Labels         map[string]string       `json:"labels,omitempty"`
 
-	MCPServer CoreServer      `json:"mcpServer"`
-	Include   *Include        `json:"include,omitempty"`
-	Extension ServerExtension `json:"extension"`
+	MCPServer     CoreServer          `json:"mcpServer"`
+	Include       *Include            `json:"include,omitempty"`
+	Configuration ServerConfiguration `json:"configuration"`
 }
 
 func (d ServerDocument) OAuthClientSecretRequired() bool {
-	if d.Extension.Auth.Mode == MCPHTTPAuthClientCredentials {
+	if d.Configuration.Auth.Mode == mcpv1.HTTPAuthModeClientCredentials {
 		return true
 	}
-	input := d.Extension.Auth.ClientCredentialsInput
+	input := d.Configuration.Auth.ClientCredentialsInput
 	return input != "" &&
-		d.Extension.Install.Inputs[input].ClientSecretRequired
+		d.Configuration.Install.Inputs[input].ClientSecretRequired
 }
 
 type MaterializedServer struct {

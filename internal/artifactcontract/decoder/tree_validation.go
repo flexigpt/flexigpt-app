@@ -5,15 +5,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/contextv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/instructionv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
@@ -25,14 +24,12 @@ import (
 // validated as edges and intentionally are not decoded as concrete
 // declarations.
 func ValidateEntryTree(root declaration.Entry) error {
-	return validateEntryTree(root, false, 0, false)
+	return validateEntryTree(root, 0)
 }
 
 func validateEntryTree(
 	entry declaration.Entry,
-	implicitLoopBody bool,
 	depth int,
-	compositionEntry bool,
 ) error {
 	if depth > basespec.MaxDiscoveryDepth {
 		return fmt.Errorf(
@@ -44,23 +41,10 @@ func validateEntryTree(
 	if err := entry.Validate(); err != nil {
 		return err
 	}
-	if compositionEntry {
-		form, err := entry.CompositionForm()
-		if err != nil {
-			return err
-		}
-		if form == declaration.CompositionEntryReference {
-			return nil
-		}
-	}
 
 	switch entry.Header().Type {
-	case declaration.TypeInstruction:
-		_, err := instructionv1.DecodeInstructionEntry(entry)
-		return err
-
-	case declaration.TypeContext:
-		_, err := contextv1.DecodeContextEntry(entry)
+	case declaration.TypeText:
+		_, err := textv1.DecodeTextEntry(entry)
 		return err
 
 	case declaration.TypeTool:
@@ -76,10 +60,11 @@ func validateEntryTree(
 		if err != nil {
 			return err
 		}
-		return validateEntryTreeSlice(
+		return validateMemberTreeSlice(
 			"skill allowedTools",
 			value.AllowedTools,
 			depth+1,
+			true,
 		)
 
 	case declaration.TypeMCP:
@@ -90,15 +75,16 @@ func validateEntryTree(
 		_, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
 		return err
 
-	case declaration.TypeCollection:
-		value, err := collectionv1.DecodeCollectionEntry(entry)
+	case declaration.TypePlugin:
+		value, err := pluginv1.DecodePluginEntry(entry)
 		if err != nil {
 			return err
 		}
-		return validateEntryTreeSlice(
-			"collection members",
+		return validateMemberTreeSlice(
+			"plugin members",
 			value.Members,
 			depth+1,
+			true,
 		)
 
 	case declaration.TypeAgent:
@@ -106,87 +92,77 @@ func validateEntryTree(
 		if err != nil {
 			return err
 		}
-		if err := validateEntryTreeSlice(
+		if err := validateMemberTreeSlice(
 			"agent members",
 			value.Members,
 			depth+1,
+			true,
 		); err != nil {
 			return err
 		}
-		if value.Program == nil {
-			return nil
+		for label, program := range map[string]*declaration.Entry{
+			"agent loop":     value.Loop,
+			"agent workflow": value.Workflow,
+		} {
+			if program == nil {
+				continue
+			}
+			if err := validateMemberTree(label, *program, depth+1, false); err != nil {
+				return err
+			}
 		}
-		return validateEntryTree(
-			*value.Program,
-			true,
-			depth+1,
-			true,
-		)
+		return nil
 
 	case declaration.TypeTeam:
 		value, err := teamv1.DecodeTeamEntry(entry)
 		if err != nil {
 			return err
 		}
-		if err := validateEntryTreeSlice(
+		if err := validateMemberTreeSlice(
 			"team members",
 			value.Members,
 			depth+1,
+			true,
 		); err != nil {
 			return err
 		}
-		if value.Program == nil {
-			return nil
+		for label, program := range map[string]*declaration.Entry{
+			"team loop":     value.Loop,
+			"team workflow": value.Workflow,
+		} {
+			if program == nil {
+				continue
+			}
+			if err := validateMemberTree(label, *program, depth+1, false); err != nil {
+				return err
+			}
 		}
-		return validateEntryTree(
-			*value.Program,
-			true,
-			depth+1,
-			true,
-		)
+		return nil
 
 	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopEntry(
-			entry,
-			implicitLoopBody,
-		)
+		value, err := loopv1.DecodeLoopEntry(entry)
 		if err != nil {
 			return err
 		}
 		if value.Body == nil {
 			return nil
 		}
-		return validateEntryTree(
-			*value.Body,
-			false,
-			depth+1,
-			true,
-		)
+		return validateMemberTree("loop body", *value.Body, depth+1, false)
 
 	case declaration.TypeWorkflow:
 		value, err := workflowv1.DecodeWorkflowEntry(entry)
 		if err != nil {
 			return err
 		}
-		targets := make([]declaration.Entry, 0, len(value.Nodes))
-		for _, node := range value.Nodes {
-			targets = append(targets, node.Target)
-		}
-		if err := declaration.ValidateContainedEntryUniqueness(
-			"workflow node targets",
-			targets,
-		); err != nil {
-			return err
-		}
 		for index, node := range value.Nodes {
-			if err := validateEntryTree(
-				node.Target,
-				false,
+			if err := validateMemberTree(
+				"workflow node",
+				node.Member,
 				depth+1,
-				true,
+				false,
 			); err != nil {
 				return fmt.Errorf(
-					"workflow nodes[%d].target: %w",
+					"workflow nodes[%d]: %w",
 					index,
 					err,
 				)
@@ -199,39 +175,12 @@ func validateEntryTree(
 		if err != nil {
 			return err
 		}
-		if err := validateEntryTreeSlice(
-			"workspace roots",
-			value.Roots,
+		return validateMemberTreeSlice(
+			"workspace members",
+			value.Members,
 			depth+1,
-		); err != nil {
-			return err
-		}
-		for index, source := range value.Declarations {
-			nested, found, err := source.AsEntry()
-			if err != nil {
-				return fmt.Errorf(
-					"workspace declarations[%d]: %w",
-					index,
-					err,
-				)
-			}
-			if !found {
-				continue
-			}
-			if err := validateEntryTree(
-				nested,
-				false,
-				depth+1,
-				false,
-			); err != nil {
-				return fmt.Errorf(
-					"workspace declarations[%d]: %w",
-					index,
-					err,
-				)
-			}
-		}
-		return nil
+			true,
+		)
 
 	default:
 		return fmt.Errorf(
@@ -242,26 +191,60 @@ func validateEntryTree(
 	}
 }
 
-func validateEntryTreeSlice(
+func validateMemberTreeSlice(
 	label string,
 	entries []declaration.Entry,
 	depth int,
+	allowSelectors bool,
 ) error {
-	if err := declaration.ValidateContainedEntryUniqueness(
+	if err := declaration.ValidateMemberUniqueness(
 		label,
 		entries,
 	); err != nil {
 		return err
 	}
 	for index, entry := range entries {
-		if err := validateEntryTree(
+		if err := validateMemberTree(
+			label,
 			entry,
-			false,
 			depth,
-			true,
+			allowSelectors,
 		); err != nil {
 			return fmt.Errorf("%s[%d]: %w", label, index, err)
 		}
 	}
 	return nil
+}
+
+func validateMemberTree(
+	label string,
+	member declaration.Entry,
+	depth int,
+	allowSelector bool,
+) error {
+	form, err := member.MemberForm()
+	if err != nil {
+		return err
+	}
+	switch form {
+	case declaration.MemberNamed:
+		return nil
+	case declaration.MemberSelector:
+		if allowSelector {
+			return nil
+		}
+		return fmt.Errorf(
+			"%w: %s does not allow member selectors",
+			basespec.ErrInvalid,
+			label,
+		)
+	case declaration.MemberContained:
+		target, err := member.ContainedDeclaration()
+		if err != nil {
+			return err
+		}
+		return validateEntryTree(target, depth)
+	default:
+		return fmt.Errorf("%w: unknown member form", basespec.ErrInvalid)
+	}
 }

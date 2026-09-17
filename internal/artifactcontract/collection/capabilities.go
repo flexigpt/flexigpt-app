@@ -29,13 +29,13 @@ func (a *API) ResolveCapabilities(
 		)
 	}
 
-	generic, err := a.resolver.ResolveCapabilities(ctx, ref)
+	generic, err := a.resolver.ResolvePluginCapabilities(ctx, ref)
 	if err != nil {
 		return CollectionCapabilityPlan{}, err
 	}
-	if generic.RootType != declaration.TypeCollection {
+	if generic.RootType != declaration.TypePlugin {
 		return CollectionCapabilityPlan{}, fmt.Errorf(
-			"%w: Artifact %q is not a Collection",
+			"%w: Artifact %q is not a Plugin",
 			basespec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)

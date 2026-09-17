@@ -6,7 +6,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/collection"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -16,7 +15,6 @@ import (
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
-	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
 func (a *API) UpsertManagedMCPPolicy(
@@ -48,15 +46,12 @@ func (a *API) UpsertManagedMCPPolicy(
 		)
 	}
 
-	body := request.Body
-	document := mcppolicyv1.MCPPolicyDocument{
-		APIVersion:  mcppolicyv1.MCPPolicySchemaVersion,
-		Type:        mcppolicyv1.MCPPolicyType,
-		Name:        string(request.Name),
-		Description: request.Description,
-		Body:        &body,
-	}
-	if err := document.Validate(); err != nil {
+	document, err := mcpDomainPolicy.DocumentFromPolicy(
+		request.Name,
+		request.Description,
+		request.Policy,
+	)
+	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 	definitionValue, err := mcpDomainPolicy.DefinitionForDocument(document)
@@ -255,101 +250,6 @@ func (a *API) policyBodyForResolvedArtifact(
 	ctx context.Context,
 	resolved resource.ResolvedArtifact,
 ) (mcpPolicy.MCPPolicy, error) {
-	if resolved.Definition.Kind != mcpDomain.MCPPolicyArtifactKind ||
-		resolved.Definition.SchemaID !=
-			mcppolicyv1.MCPPolicySchemaKey.SchemaID ||
-		resolved.Definition.SchemaVersion !=
-			mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {
-		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-			"%w: Definition is not an MCP Policy",
-			basespec.ErrInvalid,
-		)
-	}
-
-	document, err := mcppolicyv1.DecodeMCPPolicyJSON(
-		resolved.Definition.Body,
-	)
-	if err != nil {
-		return mcpPolicy.MCPPolicy{}, err
-	}
-
-	expectedName := resolved.Definition.LogicalName
-	declarationLocator := resolved.Artifact.Binding.Locator
-	seen := map[basespec.Locator]struct{}{
-		declarationLocator: {},
-	}
-
-	for range basespec.MaxDiscoveryDepth {
-		if document.Name != string(expectedName) {
-			return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-				"%w: located MCP Policy name %q differs from %q",
-				basespec.ErrReferenceUnresolved,
-				document.Name,
-				expectedName,
-			)
-		}
-		if document.Body != nil {
-			return mcpDomainPolicy.BodyFromDocument(document)
-		}
-		if document.Locator == nil {
-			return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-				"%w: MCP Policy %q has no body or locator",
-				basespec.ErrReferenceUnresolved,
-				expectedName,
-			)
-		}
-
-		target, err := declaration.ResolveSourceRelativePathLocator(
-			*document.Locator,
-			declarationLocator,
-		)
-		if err != nil {
-			return mcpPolicy.MCPPolicy{}, err
-		}
-		if _, duplicate := seen[target]; duplicate {
-			return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-				"%w: MCP Policy locator cycle at %q",
-				basespec.ErrReferenceUnresolved,
-				target,
-			)
-		}
-		seen[target] = struct{}{}
-
-		entry, err := a.resources.ReadSourceEntry(
-			ctx,
-			resolved.Artifact.RootID,
-			resolved.Artifact.Binding.SourceID,
-			target,
-			basespec.MaxCandidateBytes,
-		)
-		if err != nil {
-			return mcpPolicy.MCPPolicy{}, err
-		}
-		if entry.SourceRevision != resolved.RefreshState.SourceRevision ||
-			entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
-			return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-				"%w: located MCP Policy source changed during resolution",
-				basespec.ErrRefreshRequired,
-			)
-		}
-
-		raw, err := yamlutil.CanonicalObjectJSON(
-			entry.Content,
-			basespec.MaxDefinitionBytes,
-		)
-		if err != nil {
-			return mcpPolicy.MCPPolicy{}, err
-		}
-		document, err = mcppolicyv1.DecodeMCPPolicyJSON(raw)
-		if err != nil {
-			return mcpPolicy.MCPPolicy{}, err
-		}
-		declarationLocator = target
-	}
-
-	return mcpPolicy.MCPPolicy{}, fmt.Errorf(
-		"%w: MCP Policy locator chain exceeds depth %d",
-		basespec.ErrLocatorLimitExceeded,
-		basespec.MaxDiscoveryDepth,
-	)
+	_ = ctx
+	return mcpDomainPolicy.BodyFromDefinition(resolved.Definition)
 }

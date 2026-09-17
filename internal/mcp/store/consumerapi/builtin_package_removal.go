@@ -51,7 +51,7 @@ func (a *API) RemoveBuiltInPackage(
 	}
 
 	documentLocator, err := address.FileLocator(
-		mcpDomain.MCPCollectionDocumentFile,
+		mcpDomain.MCPPluginDocumentFile,
 	)
 	if err != nil {
 		return err

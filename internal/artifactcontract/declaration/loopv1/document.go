@@ -15,7 +15,7 @@ import (
 const (
 	LoopType          = declaration.TypeLoop
 	LoopSchemaID      = "artifact.loop.v1"
-	LoopSchemaVersion = declaration.APIVersionV1
+	LoopSchemaVersion = declaration.SchemaVersionV1
 )
 
 //go:embed loop-v1.schema.json
@@ -42,12 +42,11 @@ func LoopJSONSchema() []byte {
 }
 
 func DecodeLoopJSON(raw []byte) (LoopDocument, error) {
-	return decodeLoop(raw, false)
+	return decodeLoop(raw)
 }
 
 func DecodeLoopEntry(
 	entry declaration.Entry,
-	implicitBody bool,
 ) (LoopDocument, error) {
 	var value LoopDocument
 	if err := declaration.DecodeEntryDocumentInto(
@@ -57,7 +56,7 @@ func DecodeLoopEntry(
 	); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validateFields(implicitBody); err != nil {
+	if err := value.validateFields(); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -65,7 +64,6 @@ func DecodeLoopEntry(
 
 func decodeLoop(
 	raw []byte,
-	implicitBody bool,
 ) (LoopDocument, error) {
 	var value LoopDocument
 	if err := declaration.DecodeDocumentInto(
@@ -75,7 +73,7 @@ func decodeLoop(
 	); err != nil {
 		return LoopDocument{}, err
 	}
-	if err := value.validateFields(implicitBody); err != nil {
+	if err := value.validateFields(); err != nil {
 		return LoopDocument{}, err
 	}
 	return value, nil
@@ -104,30 +102,24 @@ func (v LoopDocument) CalculatedDigest() (
 }
 
 func (v LoopDocument) Validate() error {
-	return v.validate(false)
+	return v.validate()
 }
 
-func (v LoopDocument) ValidateEntry(
-	implicitBody bool,
-) error {
-	return v.validate(implicitBody)
+func (v LoopDocument) ValidateEntry() error {
+	return v.validate()
 }
 
-func (v LoopDocument) validate(
-	implicitBody bool,
-) error {
+func (v LoopDocument) validate() error {
 	if err := declaration.ValidateDocument(compiledLoopSchema, v); err != nil {
 		return fmt.Errorf("loop schema: %w", err)
 	}
-	return v.validateFields(implicitBody)
+	return v.validateFields()
 }
 
-func (v LoopDocument) validateFields(
-	implicitBody bool,
-) error {
+func (v LoopDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: LoopType,
-		APIVersion:   LoopSchemaVersion,
+		RequireName:  true,
 	}); err != nil {
 		return err
 	}
@@ -142,8 +134,15 @@ func (v LoopDocument) validateFields(
 	}
 
 	if v.Body != nil {
-		if err := v.Body.Validate(); err != nil {
+		form, err := v.Body.MemberForm()
+		if err != nil {
 			return fmt.Errorf("loop body: %w", err)
+		}
+		if form == declaration.MemberSelector {
+			return fmt.Errorf(
+				"%w: Loop body cannot be a member selector",
+				basespec.ErrInvalid,
+			)
 		}
 	}
 	if v.Until != nil {
@@ -156,7 +155,7 @@ func (v LoopDocument) validateFields(
 	}
 	if v.Body == nil &&
 		v.Locator == nil &&
-		!implicitBody {
+		v.Name != "" {
 		return fmt.Errorf(
 			"%w: inline standalone Loop requires body",
 			basespec.ErrInvalid,

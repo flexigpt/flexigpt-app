@@ -1,6 +1,6 @@
-// Package collection implements editable managed Collection declarations.
+// Package collection temporarily implements editable managed Plugin declarations.
 //
-// Collection membership remains declaration content. This package does not
+// Plugin membership remains declaration content. This package does not
 // create Artifact Store ownership, foreign keys, or lifecycle relationships.
 package collection
 
@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/collectionv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	ManagedCollectionPackageKind  source.PackageKind      = "collection"
-	ManagedCollectionDocumentFile basespec.Locator        = "collection.json"
+	ManagedCollectionPackageKind  source.PackageKind      = "plugin"
+	ManagedCollectionDocumentFile basespec.Locator        = "plugin.json"
 	ManagedCollectionVersion      basespec.LogicalVersion = "unversioned"
 )
 
@@ -104,36 +104,35 @@ func newAPI(
 }
 
 type CollectionView struct {
-	Artifact    artifact.Artifact       `json:"artifact"`
-	Name        basespec.LogicalName    `json:"name"`
-	Description string                  `json:"description,omitempty"`
-	Version     basespec.LogicalVersion `json:"version,omitempty"`
-	Members     []MemberReference       `json:"members"`
-	Entries     []CollectionMemberView  `json:"entries"`
-	Editable    bool                    `json:"editable"`
-	Deletable   bool                    `json:"deletable"`
-	Baseline    bool                    `json:"baseline"`
+	Artifact    artifact.Artifact      `json:"artifact"`
+	Name        basespec.LogicalName   `json:"name"`
+	Description string                 `json:"description,omitempty"`
+	Members     []MemberReference      `json:"members"`
+	Entries     []CollectionMemberView `json:"entries"`
+	Editable    bool                   `json:"editable"`
+	Deletable   bool                   `json:"deletable"`
+	Baseline    bool                   `json:"baseline"`
 }
 
 type CollectionMemberView struct {
-	Type        declaration.Type           `json:"type"`
-	Name        basespec.LogicalName       `json:"name"`
-	Description string                     `json:"description,omitempty"`
-	Locator     *declaration.Locator       `json:"locator,omitempty"`
-	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
-	Server      basespec.LogicalName       `json:"server,omitempty"`
-	Contained   bool                       `json:"contained"`
+	Type      declaration.Type         `json:"type"`
+	Name      basespec.LogicalName     `json:"name,omitempty"`
+	Insert    declaration.InsertTarget `json:"insert,omitempty"`
+	Locator   *declaration.Locator     `json:"locator,omitempty"`
+	Server    basespec.LogicalName     `json:"server,omitempty"`
+	Contained bool                     `json:"contained"`
+	Selector  bool                     `json:"selector"`
 }
 
-// MemberReference is an external Collection membership edge. It intentionally
+// MemberReference is an external Plugin membership edge. It intentionally
 // cannot express a contained declaration.
 type MemberReference struct {
-	Type        declaration.Type           `json:"type"`
-	Name        basespec.LogicalName       `json:"name"`
-	Description string                     `json:"description,omitempty"`
-	Locator     *declaration.Locator       `json:"locator,omitempty"`
-	Metadata    map[string]json.RawMessage `json:"metadata,omitempty"`
-	Server      basespec.LogicalName       `json:"server,omitempty"`
+	Type    declaration.Type         `json:"type"`
+	Name    basespec.LogicalName     `json:"name"`
+	Insert  declaration.InsertTarget `json:"insert,omitempty"`
+	Locator *declaration.Locator     `json:"locator,omitempty"`
+	Scope   declaration.LookupScope  `json:"scope,omitempty"`
+	Server  basespec.LogicalName     `json:"server,omitempty"`
 }
 
 type CreateRequest struct {
@@ -183,7 +182,7 @@ type MemberMutationResult struct {
 
 type editableCollection struct {
 	artifact   artifact.Artifact
-	document   collectionv1.CollectionDocument
+	document   pluginv1.PluginDocument
 	address    source.ManagedPackageAddress
 	generation string
 }
@@ -269,7 +268,7 @@ func (a *API) List(
 
 	output := make([]CollectionView, 0)
 	for _, record := range records {
-		if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) ||
+		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
 			record.State != artifact.StateAvailable ||
 			record.Binding.SubresourceLocator != "" {
 			continue
@@ -606,7 +605,18 @@ func (a *API) resolveCollectionRef(
 	if a == nil || a.resolver == nil {
 		return ref, nil
 	}
-	return a.resolver.ResolveDeclarationArtifact(ctx, ref)
+	resolved, err := a.resolver.ResolvePlugin(ctx, ref)
+	if err != nil {
+		return artifact.ArtifactRef{}, err
+	}
+	terminal, found := resolved.ArtifactRef()
+	if !found {
+		return artifact.ArtifactRef{}, fmt.Errorf(
+			"%w: plugin did not resolve to a source-backed Artifact",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	return terminal, nil
 }
 
 func (a *API) create(
@@ -650,9 +660,8 @@ func (a *API) create(
 		return CollectionView{}, err
 	}
 
-	document := collectionv1.CollectionDocument{
-		APIVersion:  collectionv1.CollectionSchemaVersion,
-		Type:        collectionv1.CollectionType,
+	document := pluginv1.PluginDocument{
+		Type:        pluginv1.PluginType,
 		Name:        string(request.Name),
 		Description: request.Description,
 	}
@@ -668,7 +677,7 @@ func (a *API) create(
 			SourceID: sourceValue.ID,
 			Locator:  locator,
 		},
-		artifact.ArtifactKind(collectionv1.CollectionType),
+		artifact.ArtifactKind(pluginv1.PluginType),
 	)
 	switch {
 	case err == nil:
@@ -835,7 +844,7 @@ func (a *API) publishDocument(
 	rootID root.RootID,
 	sourceID source.SourceID,
 	address source.ManagedPackageAddress,
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 	expectedGeneration string,
 	allowPackageReplacement bool,
 ) (artifact.Artifact, error) {
@@ -866,7 +875,7 @@ func (a *API) publishDocument(
 				Locator:  locator,
 			},
 			ExpectedKind: artifact.ArtifactKind(
-				collectionv1.CollectionType,
+				pluginv1.PluginType,
 			),
 			ExpectedLogicalName: basespec.LogicalName(document.Name),
 			ExpectedDefinition:  digest,
@@ -900,9 +909,9 @@ func (a *API) loadEditableCollection(
 	if err != nil {
 		return editableCollection{}, err
 	}
-	if record.Kind != artifact.ArtifactKind(collectionv1.CollectionType) {
+	if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) {
 		return editableCollection{}, fmt.Errorf(
-			"%w: Artifact %q is not a Collection",
+			"%w: Artifact %q is not a Plugin",
 			basespec.ErrUnsupported,
 			record.ID,
 		)
@@ -984,7 +993,7 @@ func (a *API) loadEditableCollection(
 	if err != nil {
 		return editableCollection{}, err
 	}
-	document, err := collectionv1.DecodeCollectionJSON(
+	document, err := pluginv1.DecodePluginJSON(
 		definitionValue.Body,
 	)
 	if err != nil {
@@ -1054,7 +1063,7 @@ func managedCollectionAddressFromLocator(
 }
 
 func collectionDocumentPayload(
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 ) ([]byte, cryptoutil.Digest, error) {
 	raw, err := document.CanonicalJSON()
 	if err != nil {
@@ -1073,7 +1082,7 @@ func collectionDocumentPayload(
 
 func collectionViewOf(
 	record artifact.Artifact,
-	document collectionv1.CollectionDocument,
+	document pluginv1.PluginDocument,
 ) (CollectionView, error) {
 	baseline := IsBaselineCollectionArtifact(record)
 	return readCollectionViewOf(
@@ -1092,30 +1101,36 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 	if err := m.Name.Validate(); err != nil {
 		return declaration.Entry{}, err
 	}
-
-	header := declaration.Header{
-		Type:        m.Type,
-		Name:        string(m.Name),
-		Description: m.Description,
-		Metadata:    declaration.CloneRawMessageMap(m.Metadata),
-	}
 	if m.Locator != nil {
 		locator := m.Locator.Clone()
-		header.Locator = &locator
+		m.Locator = &locator
 	}
 	entry, err := declaration.NewEntry(struct {
 		declaration.Header
 
-		Server string `json:"server,omitempty"`
+		Insert declaration.InsertTarget `json:"insert,omitempty"`
+		Scope  declaration.LookupScope  `json:"scope,omitempty"`
+		Server string                   `json:"server,omitempty"`
 	}{
-		Header: header,
-		Server: string(m.Server),
+		Type:    m.Type,
+		Name:    string(m.Name),
+		Locator: m.Locator,
+		Insert:  m.Insert,
+		Scope:   m.Scope,
+		Server:  string(m.Server),
 	})
 	if err != nil {
 		return declaration.Entry{}, err
 	}
-	if err := entry.ValidateCompositionReference(); err != nil {
+	form, err := entry.MemberForm()
+	if err != nil {
 		return declaration.Entry{}, err
+	}
+	if form != declaration.MemberNamed {
+		return declaration.Entry{}, fmt.Errorf(
+			"%w: managed Plugin member must be a named external member",
+			basespec.ErrUnsupported,
+		)
 	}
 	return entry, nil
 }
@@ -1123,28 +1138,38 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 func memberReferenceFromEntry(
 	entry declaration.Entry,
 ) (MemberReference, error) {
-	form, err := entry.CompositionForm()
+	form, err := entry.MemberForm()
 	if err != nil {
 		return MemberReference{}, err
 	}
-	if form != declaration.CompositionEntryReference {
+	if form != declaration.MemberNamed {
 		return MemberReference{}, fmt.Errorf(
-			"%w: editable Collection members must be external references",
+			"%w: editable Plugin members must be named external references",
 			basespec.ErrUnsupported,
 		)
 	}
 
 	header := entry.Header()
 	output := MemberReference{
-		Type:        header.Type,
-		Name:        basespec.LogicalName(header.Name),
-		Description: header.Description,
-		Metadata:    declaration.CloneRawMessageMap(header.Metadata),
+		Type: header.Type,
+		Name: basespec.LogicalName(header.Name),
 	}
 	if header.Locator != nil {
 		locator := header.Locator.Clone()
 		output.Locator = &locator
 	}
+	if header.Type == declaration.TypeText {
+		insert, err := entry.TextInsert()
+		if err != nil {
+			return MemberReference{}, err
+		}
+		output.Insert = insert
+	}
+	relationship, err := entry.Relationship()
+	if err != nil {
+		return MemberReference{}, err
+	}
+	output.Scope = relationship.Scope
 
 	raw, err := entry.CanonicalJSON()
 	if err != nil {

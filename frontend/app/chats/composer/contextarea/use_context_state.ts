@@ -671,7 +671,7 @@ export function useAssistantContextState(): AssistantContextController {
 						toolType: toolDefinition.llmToolType,
 						displayName: toolDefinition.displayName,
 						description: toolDefinition.description,
-						autoExecute: selection.toolChoicePatch?.autoExecute ?? toolDefinition.autoExecReco,
+						autoExecute: selection.toolChoicePatch?.autoExecute ?? toolDefinition.autoExecute,
 						userArgSchemaInstance: rawUserArgs || undefined,
 					};
 

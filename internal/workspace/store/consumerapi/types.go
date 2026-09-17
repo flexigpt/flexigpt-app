@@ -5,7 +5,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -36,7 +35,7 @@ type WorkspacePathRegistration struct {
 
 type WorkspaceLoad struct {
 	Workspace workspaceDomain.Workspace
-	Roots     []declaration.Entry
+	Members   []declaration.Entry
 
 	resolved *resolve.ResolvedWorkspace
 }
@@ -47,7 +46,6 @@ func (v WorkspaceLoad) ResolvedWorkspace() *resolve.ResolvedWorkspace {
 
 type WorkspaceRefresh struct {
 	Workspace WorkspaceRef
-	Result    refresh.RefreshRootResult
 }
 
 type WorkspacePathRegistrationResult struct {
@@ -56,12 +54,12 @@ type WorkspacePathRegistrationResult struct {
 	Load      WorkspaceLoad             `json:"load"`
 }
 
-// WorkspaceCapabilityOccurrence preserves one Workspace root or nested
-// composition occurrence, including an unavailable or ambiguous member.
+// WorkspaceCapabilityOccurrence preserves one Workspace member or nested
+// composition occurrence, including unavailable and ambiguous relationships.
 type WorkspaceCapabilityOccurrence = resolve.CapabilityOccurrence
 
-// WorkspaceCapabilityPlan is the ordered Artifact-backed capability projection
-// of resolved Workspace roots. It is a consumer plan, not a Store entity.
+// WorkspaceCapabilityPlan is the Artifact-backed projection of resolved
+// Workspace members. It is a consumer plan, not a Store entity.
 type WorkspaceCapabilityPlan struct {
 	Workspace       WorkspaceRef                    `json:"workspace"`
 	Occurrences     []WorkspaceCapabilityOccurrence `json:"occurrences"`
