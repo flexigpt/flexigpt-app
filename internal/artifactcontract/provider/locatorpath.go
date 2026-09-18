@@ -1,7 +1,4 @@
-// Package locatorpath implements portable source-relative path declaration
-// loading. It intentionally does not resolve URL, Git, package, archive, or
-// other non-path locators.
-package locatorpath
+package provider
 
 import (
 	"context"
@@ -16,24 +13,17 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
+// Package locatorpath implements portable source-relative path declaration
+// loading. It intentionally does not resolve URL, Git, package, archive, or
+// other non-path locators.
+
 const locatorKindPath = "path"
 
-type Factory struct {
+type locatorpathFactory struct {
 	artifactKinds []artifact.ArtifactKind
 }
 
-func NewFactory(
-	artifactKinds []artifact.ArtifactKind,
-) *Factory {
-	return &Factory{
-		artifactKinds: append(
-			[]artifact.ArtifactKind(nil),
-			artifactKinds...,
-		),
-	}
-}
-
-func NewCanonicalDeclarationFactory() *Factory {
+func newLocatorpathFactory() *locatorpathFactory {
 	declarationTypes := declaration.Types()
 	artifactKinds := make(
 		[]artifact.ArtifactKind,
@@ -46,27 +36,27 @@ func NewCanonicalDeclarationFactory() *Factory {
 			artifact.ArtifactKind(declarationType),
 		)
 	}
-	return NewFactory(
-		artifactKinds,
-	)
+	return &locatorpathFactory{
+		artifactKinds: artifactKinds,
+	}
 }
 
-func (*Factory) LocatorKind() string {
+func (*locatorpathFactory) LocatorKind() string {
 	return locatorKindPath
 }
 
-func (f *Factory) ArtifactKinds() []artifact.ArtifactKind {
+func (f *locatorpathFactory) ArtifactKinds() []artifact.ArtifactKind {
 	if f == nil {
 		return nil
 	}
 	return append([]artifact.ArtifactKind(nil), f.artifactKinds...)
 }
 
-func (*Factory) Revision() string {
+func (*locatorpathFactory) Revision() string {
 	return "artifact-declaration-path/v1"
 }
 
-func (f *Factory) BindLocatorRuntime(
+func (f *locatorpathFactory) BindLocatorRuntime(
 	runtime providerapi.LocatorRuntime,
 ) (providerapi.BoundLocatorResolver, error) {
 	if f == nil || runtime == nil {

@@ -1,11 +1,13 @@
 package markdown
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"path"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
@@ -19,6 +21,8 @@ import (
 )
 
 const AgentMarkdownDecoderID basespec.DecoderID = "agent-markdown"
+
+const markdownMediaType = "text/markdown"
 
 // AgentMarkdownDecoder adapts AGENT.md and *.agent.md files. YAML front
 // matter provides Agent declaration fields. The Markdown body becomes a named
@@ -76,7 +80,7 @@ func (*AgentMarkdownDecoder) Decode(
 				Type:      textv1.TextType,
 				Name:      string(instructionName),
 				Insert:    declaration.InsertInstructions,
-				Content:   stringPointer(body),
+				Content:   new(body),
 				MediaType: markdownMediaType,
 			},
 		)
@@ -228,4 +232,40 @@ func agentMarkdownDiagnostics(
 			Locator: locator,
 		},
 	}}
+}
+
+func normalizeMarkdownOptional(
+	content []byte,
+) (string, error) {
+	if !utf8.Valid(content) {
+		return "", fmt.Errorf(
+			"%w: Markdown source must contain valid UTF-8",
+			basespec.ErrInvalid,
+		)
+	}
+	if bytes.ContainsRune(content, 0) {
+		return "", fmt.Errorf(
+			"%w: Markdown source contains a NUL byte",
+			basespec.ErrInvalid,
+		)
+	}
+
+	value := strings.ReplaceAll(
+		strings.ReplaceAll(string(content), "\r\n", "\n"),
+		"\r",
+		"\n",
+	)
+	return value, nil
+}
+
+// sourceEntryDeclarationLocator points back to the physical source entry
+// containing a source-format declaration. It keeps source material out of
+// Definition.Body while preserving declaration-relative locator semantics.
+func sourceEntryDeclarationLocator(
+	locator basespec.Locator,
+) *declaration.Locator {
+	value := declaration.ScalarLocator(
+		"./" + path.Base(string(locator)),
+	)
+	return &value
 }
