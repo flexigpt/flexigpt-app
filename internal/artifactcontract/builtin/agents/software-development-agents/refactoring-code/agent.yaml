@@ -1,0 +1,93 @@
+type: agent
+name: refactoring-code
+displayName: Refactoring Code
+description: Perform bounded, behavior-preserving refactors with file, text, and shell tooling.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: refactoring-code-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Plan a bounded, behavior-preserving refactor.
+        Inspect existing structure and tests before editing.
+        Keep changes focused, preserve observable behavior unless explicitly requested otherwise, and verify with focused commands.
+
+  - type: text
+    name: refactoring-code-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Replace this line with the repo/file path and the refactoring goal. Example: `/absolute/path/to/repo/pkg/foo`>
+
+        Plan a bounded, behavior-preserving refactor using the available repository evidence.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: shellcommand
+    scope: builtin
+    overrides:
+      autoExecute: false

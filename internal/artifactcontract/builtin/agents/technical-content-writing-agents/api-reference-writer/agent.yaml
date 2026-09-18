@@ -1,0 +1,86 @@
+type: agent
+name: api-reference-writer
+displayName: API Reference Writer
+description: Generate or update API and SDK reference material and examples from code, schemas, OpenAPI, proto files, or existing documentation.
+labels:
+  category: technical-content-writing
+
+members:
+  - type: text
+    name: api-reference-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Create accurate API reference content grounded in supplied source material.
+        Cover endpoints or functions, parameters, defaults, constraints, responses or returns, errors, examples, edge cases, and versioning notes.
+
+  - type: text
+    name: api-reference-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach code/schema/OpenAPI/proto/existing docs or replace this line with absolute paths to the API/SDK surface, for example `/absolute/path/to/repo/api/docs`. Include the target audience or doc location if known.>
+
+        Generate or update accurate API reference content with endpoints/functions, parameters, defaults, constraints, responses/returns, errors, examples, edge cases, and versioning notes.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

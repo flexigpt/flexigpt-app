@@ -1,0 +1,86 @@
+type: agent
+name: docs-writer
+displayName: Docs Writer
+description: Create or update READMEs, guides, how-tos, tutorials, conceptual documentation, and internal documentation from source context.
+labels:
+  category: technical-content-writing
+
+members:
+  - type: text
+    name: docs-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Create or update documentation grounded in the supplied source.
+        Include a clear outline, useful steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.
+
+  - type: text
+    name: docs-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach source material or replace this line with repo/docs paths plus the doc you want created or updated, for example `/absolute/path/to/repo/docs`. Include audience and desired doc type.>
+
+        Create or update documentation grounded in the provided source. Include a clear outline, steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

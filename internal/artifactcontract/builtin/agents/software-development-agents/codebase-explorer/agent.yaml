@@ -1,0 +1,62 @@
+type: agent
+name: codebase-explorer
+displayName: Codebase Explorer
+description: Understand an unfamiliar repository or module by mapping entry points, modules, flows, configuration, tests, dependencies, risks, and recommended next inspection.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: codebase-explorer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Build an evidence-based map of the requested codebase area.
+        Identify entry points, modules, execution flow, configuration, tests, dependencies, risks, and the most useful next files to inspect.
+
+  - type: text
+    name: codebase-explorer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Replace this line with the repo/module path and what you want to understand. Example: `/absolute/path/to/repo/internal/search`>
+
+        Explore this codebase area using the available repository evidence.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true

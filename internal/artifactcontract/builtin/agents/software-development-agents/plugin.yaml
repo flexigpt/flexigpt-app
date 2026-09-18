@@ -1,0 +1,39 @@
+type: plugin
+name: software-development-agents
+displayName: Software Development Agents
+description: Built-in Agents for repository investigation, architecture, implementation, review, refactoring, and test work.
+labels:
+  category: software-development
+
+members:
+  - type: agent
+    name: bug-investigator
+    locator: ./bug-investigator/agent.yaml
+
+  - type: agent
+    name: codebase-explorer
+    locator: ./codebase-explorer/agent.yaml
+
+  - type: agent
+    name: designing-system-architecture
+    locator: ./designing-system-architecture/agent.yaml
+
+  - type: agent
+    name: refactoring-code
+    locator: ./refactoring-code/agent.yaml
+
+  - type: agent
+    name: reviewing-code
+    locator: ./reviewing-code/agent.yaml
+
+  - type: agent
+    name: spec-driven-dev
+    locator: ./spec-driven-dev/agent.yaml
+
+  - type: agent
+    name: test-case-designer
+    locator: ./test-case-designer/agent.yaml
+
+  - type: agent
+    name: test-implementer
+    locator: ./test-implementer/agent.yaml

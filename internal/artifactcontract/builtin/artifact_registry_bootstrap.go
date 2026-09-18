@@ -34,11 +34,11 @@ type HydrationInstaller interface {
 	// topology and package state. It may publish managed Source content.
 	EnsureHydration(ctx context.Context, current bool) error
 
-	// FinalizeHydration runs after package publication has completed. The
-	// bootstrapper may coalesce calls for installers sharing one Source. It
-	// must refresh source-backed Artifact state against
-	// the final shared Source generation. It must not mutate
-	// managed package content or topology.
+	// FinalizeHydration runs after package publication has completed for every
+	// registered installer. It must refresh or verify source-backed Artifact
+	// state against the final shared Source generation. Shared source refresh
+	// work must be idempotent. It must not mutate managed package content or
+	// topology.
 	FinalizeHydration(ctx context.Context) error
 }
 
@@ -371,11 +371,11 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			)
 		}
 	}
-
-	// Installers can share a protected managed Source. A later installer may
-	// advance the shared Source revision after an earlier installer refreshed
-	// its Artifact state. Refresh every hydration-aware installer only after
-	// all package publication has completed.
+	// Installers can share a protected managed Source. A later installer can
+	// advance the shared Source revision after an earlier installer publishes
+	// content. Every hydration-aware installer therefore finalizes only after
+	// all package publication completes. Finalizers must make shared refresh
+	// work idempotent through EnsureSourceCurrent or an equivalent operation.
 	desiredByInstaller := make(
 		map[string]topology.Hydration,
 		len(prepared),
@@ -383,24 +383,20 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	for _, value := range prepared {
 		desiredByInstaller[value.installer] = value.desired
 	}
-	finalizedSources := make(map[string]struct{}, len(prepared))
+
 	for _, entry := range entries {
 		hydrated, supported := entry.installer.(HydrationInstaller)
 		if !supported {
 			continue
 		}
-		desired, found := desiredByInstaller[entry.name]
-		if !found {
+		if _, found := desiredByInstaller[entry.name]; !found {
 			return fmt.Errorf(
 				"%w: hydration installer %q has no desired Source",
 				basespec.ErrInvalid,
 				entry.name,
 			)
 		}
-		sourceKey := string(desired.RootID) + "\x00" + string(desired.SourceID)
-		if _, finalized := finalizedSources[sourceKey]; finalized {
-			continue
-		}
+
 		if err := hydrated.FinalizeHydration(ctx); err != nil {
 			return fmt.Errorf(
 				"finalize built-in installer %q: %w",
@@ -408,7 +404,6 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 				err,
 			)
 		}
-		finalizedSources[sourceKey] = struct{}{}
 	}
 
 	for _, value := range prepared {

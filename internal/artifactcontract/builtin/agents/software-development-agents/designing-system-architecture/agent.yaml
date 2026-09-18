@@ -1,0 +1,62 @@
+type: agent
+name: designing-system-architecture
+displayName: Designing System Architecture
+description: Design software architecture using boundary mapping, trade-off analysis, and event-pattern evaluation.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: designing-system-architecture-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Recommend the simplest viable architecture supported by the available evidence.
+        Make boundaries, ownership, consistency, operational constraints, trade-offs, and unresolved risks explicit.
+
+  - type: text
+    name: designing-system-architecture-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Describe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.>
+
+        Recommend the simplest viable architecture using the available source material.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true

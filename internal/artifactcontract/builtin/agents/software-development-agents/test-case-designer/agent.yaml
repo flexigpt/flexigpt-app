@@ -1,0 +1,62 @@
+type: agent
+name: test-case-designer
+displayName: Test Case Designer
+description: Design test scenarios from specifications, requirements, bug reports, or code paths and produce a test plan rather than test code.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: test-case-designer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Design a traceable test plan rather than implementation code.
+        Cover normal behavior, boundaries, failure modes, regressions, dependencies, setup needs, and observable acceptance criteria.
+
+  - type: text
+    name: test-case-designer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach a spec/bug report/code path or replace this line with the relevant repo/file path and behavior to test.>
+
+        Design a traceable test plan using the available repository evidence.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true

@@ -26,6 +26,8 @@ type App struct {
 	modelPresetStoreAPI     *ModelPresetStoreWrapper
 	toolStoreAPI            *ToolStoreWrapper
 	toolRuntimeAPI          *ToolRuntimeWrapper
+	agentStoreAPI           *AgentStoreWrapper
+	agentBuiltInInstaller   builtin.HydrationInstaller
 	skillStoreAPI           *SkillStoreWrapper
 	skillBuiltInInstaller   builtin.HydrationInstaller
 	skillAggregateAPI       *SkillAggregateWrapper
@@ -124,6 +126,7 @@ func NewApp() *App {
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
+	app.agentStoreAPI = &AgentStoreWrapper{}
 	app.skillRuntimeAPI = &SkillRuntimeWrapper{}
 	app.mcpStoreAPI = &MCPStoreWrapper{}
 	app.mcpRuntimeAPI = &MCPRuntimeWrapper{}
@@ -333,6 +336,43 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill built-in installer initialized")
 
+	err = InitAgentStoreWrapper(
+		a.agentStoreAPI,
+		artifactComposition.Roots,
+		artifactComposition.Sources,
+		artifactComposition.Discovery,
+		artifactComposition.Artifacts,
+		artifactComposition.Resources,
+		artifactComposition.ManagedArtifacts,
+		artifactComposition.Protection,
+		fallbackProviders,
+		artifactComposition.LocatorResolvers...,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize agent Store consumer API",
+			"error",
+			err,
+		)
+		panic("failed to initialize managers: agent Store initialization failed\n" + err.Error())
+	}
+	slog.Info("agent store consumer API initialized")
+	a.agentBuiltInInstaller, err = NewAgentBuiltInInstaller(
+		a.agentStoreAPI.api,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize agent built-in installer",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: agent built-in installer initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("agent built-in installer initialized")
+
 	err = InitSkillAggregateWrapper(
 		a.skillAggregateAPI,
 		artifactComposition.Artifacts,
@@ -406,6 +446,7 @@ func (a *App) initManagers() {
 				rootID,
 				a.skillStoreAPI.api,
 				a.mcpStoreAPI.api,
+				a.agentStoreAPI.api,
 			)
 		},
 	)
@@ -423,6 +464,7 @@ func (a *App) initManagers() {
 		a.artifactStoreComposition.Topology,
 		a.skillBuiltInInstaller,
 		a.mcpBuiltInInstaller,
+		a.agentBuiltInInstaller,
 	)
 	if err != nil {
 		slog.Error(
@@ -443,6 +485,7 @@ func (a *App) initManagers() {
 		artifactComposition.Protection,
 		a.skillStoreAPI.api,
 		a.mcpStoreAPI.api,
+		a.agentStoreAPI.api,
 	)
 	if err != nil {
 		slog.Error(
@@ -548,6 +591,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.skillRuntimeAPI != nil {
 		a.skillRuntimeAPI.close()
 	}
+	if a.agentStoreAPI != nil {
+		a.agentStoreAPI.close()
+	}
 	if a.workspaceAggregateAPI != nil {
 		a.workspaceAggregateAPI.close()
 	}
@@ -562,7 +608,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	a.skillBuiltInInstaller = nil
 	a.mcpBuiltInInstaller = nil
-
+	a.agentBuiltInInstaller = nil
 	if a.artifactStoreComposition != nil {
 		if err := a.artifactStoreComposition.Close(); err != nil {
 			slog.Error(

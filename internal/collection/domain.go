@@ -5,12 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path"
 	"slices"
 	"sort"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -32,8 +33,12 @@ type DomainPolicy struct {
 	SourceStorageKey    basespec.StorageKey
 	SourceDisplayName   string
 	BaselineName        basespec.LogicalName
+	BaselineDisplayName string
 	BaselineDescription string
+	PackageKind         source.PackageKind
+	DocumentFile        basespec.Locator
 	AllowedMemberTypes  []declaration.Type
+	AllowedMemberForms  []declaration.MemberForm
 }
 
 func SkillDomainPolicy() DomainPolicy {
@@ -42,6 +47,7 @@ func SkillDomainPolicy() DomainPolicy {
 		SourceStorageKey:    SkillManagedSourceStorageKey,
 		SourceDisplayName:   "User-managed Skills",
 		BaselineName:        SkillBaselineCollectionName,
+		BaselineDisplayName: "Skill Baseline",
 		BaselineDescription: "Application-provisioned editable Skill Collection.",
 		AllowedMemberTypes: []declaration.Type{
 			declaration.TypeSkill,
@@ -55,6 +61,7 @@ func MCPDomainPolicy() DomainPolicy {
 		SourceStorageKey:    MCPManagedSourceStorageKey,
 		SourceDisplayName:   "User-managed MCP artifacts",
 		BaselineName:        MCPBaselineCollectionName,
+		BaselineDisplayName: "MCP Baseline",
 		BaselineDescription: "Application-provisioned editable MCP Collection.",
 		AllowedMemberTypes: []declaration.Type{
 			declaration.TypeMCP,
@@ -84,12 +91,41 @@ func (p DomainPolicy) Validate() error {
 	if err := p.BaselineName.Validate(); err != nil {
 		return err
 	}
+	if err := basespec.ValidateOptionalText(
+		"Collection baseline display name",
+		p.BaselineDisplayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
 	if err := basespec.ValidateRequiredText(
 		"Collection baseline description",
 		p.BaselineDescription,
 		basespec.MaxDescriptionBytes,
 	); err != nil {
 		return err
+	}
+	if err := p.managedCollectionPackageKind().Validate(); err != nil {
+		return err
+	}
+	documentFile := p.managedCollectionDocumentFile()
+	if err := documentFile.ValidatePortable(false); err != nil {
+		return err
+	}
+	if path.Base(string(documentFile)) != string(documentFile) {
+		return fmt.Errorf(
+			"%w: Collection domain document file must be a package-root file",
+			basespec.ErrInvalid,
+		)
+	}
+	switch strings.ToLower(path.Ext(string(documentFile))) {
+	case ".json", ".yaml", ".yml":
+	default:
+		return fmt.Errorf(
+			"%w: Collection domain document file %q has an unsupported extension",
+			basespec.ErrInvalid,
+			documentFile,
+		)
 	}
 	if len(p.AllowedMemberTypes) == 0 {
 		return fmt.Errorf(
@@ -113,7 +149,64 @@ func (p DomainPolicy) Validate() error {
 		}
 		seen[value] = struct{}{}
 	}
+	seenForms := make(
+		map[declaration.MemberForm]struct{},
+		len(p.AllowedMemberForms),
+	)
+	for _, form := range p.AllowedMemberForms {
+		switch form {
+		case declaration.MemberNamed,
+			declaration.MemberContained,
+			declaration.MemberSelector:
+		default:
+			return fmt.Errorf(
+				"%w: Collection domain %q has unsupported member form %q",
+				basespec.ErrInvalid,
+				p.Name,
+				form,
+			)
+		}
+		if _, duplicate := seenForms[form]; duplicate {
+			return fmt.Errorf(
+				"%w: Collection domain %q repeats member form %q",
+				basespec.ErrInvalid,
+				p.Name,
+				form,
+			)
+		}
+		seenForms[form] = struct{}{}
+	}
 	return nil
+}
+
+func (p DomainPolicy) allowsMemberForm(
+	value declaration.MemberForm,
+) bool {
+	if len(p.AllowedMemberForms) == 0 {
+		return value == declaration.MemberNamed
+	}
+	return slices.Contains(p.AllowedMemberForms, value)
+}
+
+func (p DomainPolicy) managedCollectionPackageKind() source.PackageKind {
+	if p.PackageKind != "" {
+		return p.PackageKind
+	}
+	return ManagedCollectionPackageKind
+}
+
+func (p DomainPolicy) managedCollectionDocumentFile() basespec.Locator {
+	if p.DocumentFile != "" {
+		return p.DocumentFile
+	}
+	return ManagedCollectionDocumentFile
+}
+
+func (p DomainPolicy) managedCollectionBaselineDisplayName() string {
+	if p.BaselineDisplayName != "" {
+		return p.BaselineDisplayName
+	}
+	return string(p.BaselineName)
 }
 
 func (p DomainPolicy) allows(value declaration.Type) bool {
@@ -138,11 +231,16 @@ func (a *API) EnsureBaseline(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	address, err := managedCollectionAddress(a.domain.BaselineName)
+	address, err := a.managedCollectionAddress(a.domain.BaselineName)
 	if err != nil {
 		return CollectionView{}, err
 	}
-	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	documentFile := a.managedCollectionDocumentFile()
+	locator, err := address.FileLocator(documentFile)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	decoderID, err := a.managedCollectionDecoderID()
 	if err != nil {
 		return CollectionView{}, err
 	}
@@ -151,7 +249,7 @@ func (a *API) EnsureBaseline(
 		rootID,
 		sourceValue.ID,
 		locator,
-		decoder.JSONDecoderID,
+		decoderID,
 	); err != nil {
 		return CollectionView{}, err
 	}
@@ -181,6 +279,7 @@ func (a *API) EnsureBaseline(
 		document := pluginv1.PluginDocument{
 			Type:        pluginv1.PluginType,
 			Name:        string(a.domain.BaselineName),
+			DisplayName: a.domain.managedCollectionBaselineDisplayName(),
 			Description: a.domain.BaselineDescription,
 		}
 		record, err := a.publishDocument(
@@ -209,6 +308,7 @@ func (a *API) EnsureBaseline(
 			RootID:      rootID,
 			SourceID:    sourceValue.ID,
 			Name:        a.domain.BaselineName,
+			DisplayName: a.domain.managedCollectionBaselineDisplayName(),
 			Description: a.domain.BaselineDescription,
 		},
 		true,
@@ -289,6 +389,42 @@ func (a *API) validateDomainMember(
 			member.Type,
 		)
 	}
+	if !a.domain.allowsMemberForm(declaration.MemberNamed) {
+		return fmt.Errorf(
+			"%w: %s Collection does not support named external members",
+			basespec.ErrUnsupported,
+			a.domain.Name,
+		)
+	}
+	return nil
+}
+
+func (a *API) validateDomainEntry(
+	member declaration.Entry,
+) error {
+	form, err := member.MemberForm()
+	if err != nil {
+		return err
+	}
+	if a == nil || a.domain == nil {
+		return nil
+	}
+	if !a.domain.allows(member.Header().Type) {
+		return fmt.Errorf(
+			"%w: %s Collection cannot contain %q members",
+			basespec.ErrUnsupported,
+			a.domain.Name,
+			member.Header().Type,
+		)
+	}
+	if !a.domain.allowsMemberForm(form) {
+		return fmt.Errorf(
+			"%w: %s Collection cannot contain %q members",
+			basespec.ErrUnsupported,
+			a.domain.Name,
+			form,
+		)
+	}
 	return nil
 }
 
@@ -306,15 +442,8 @@ func (a *API) validateEditableDomainDocument(
 				basespec.ErrUnsupported,
 			)
 		}
-		if a.domain != nil &&
-			!a.domain.allows(member.Header().Type) {
-			return fmt.Errorf(
-				"%w: %s collection member %q has incompatible type %q",
-				basespec.ErrUnsupported,
-				a.domain.Name,
-				member.Header().Name,
-				member.Header().Type,
-			)
+		if err := a.validateDomainEntry(member); err != nil {
+			return fmt.Errorf("collection members[%d]: %w", index, err)
 		}
 	}
 	return nil
@@ -465,7 +594,7 @@ func (a *API) Read(
 		sourceValue.Kind == source.SourceKindManagedDirectory &&
 		(a.domain == nil ||
 			sourceValue.StorageKey == a.domain.SourceStorageKey) {
-		if _, err := managedCollectionAddressFromLocator(
+		if _, err := a.managedCollectionAddressFromLocator(
 			record.Binding.Locator,
 		); err == nil &&
 			a.validateEditableDomainDocument(document) == nil {

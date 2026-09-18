@@ -1,0 +1,86 @@
+type: agent
+name: decision-record-writer
+displayName: Decision Record Writer
+description: Write a decision record from context, options, constraints, evidence, and trade-offs.
+labels:
+  category: product-leadership
+
+members:
+  - type: text
+    name: decision-record-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Write a concise decision record with a recommendation, rationale, options considered, accepted trade-offs, risks, next steps, and concrete revisit triggers.
+        Distinguish evidence from assumptions.
+
+  - type: text
+    name: decision-record-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Describe the decision to make, options considered, constraints, evidence, stakeholders, and any deadline. Attach supporting notes if available.>
+
+        Write a decision record with a clear recommendation, rationale, trade-offs accepted, risks, next steps, and concrete revisit triggers.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

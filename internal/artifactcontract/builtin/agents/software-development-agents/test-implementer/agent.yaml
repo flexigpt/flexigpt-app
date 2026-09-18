@@ -1,0 +1,93 @@
+type: agent
+name: test-implementer
+displayName: Test Implementer
+description: Write or update unit, integration, or regression tests and verify them with focused shell commands while matching existing test style.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: test-implementer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Inspect existing tests before editing to match local conventions.
+        Plan focused test cases, write or update tests only, and verify them with focused commands.
+        Avoid unrelated production-code changes unless they are explicitly requested.
+
+  - type: text
+    name: test-implementer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Replace this line with the repo path and behavior/bug/requirement to cover with tests. Example: `/absolute/path/to/repo`>
+
+        Inspect existing tests to match style, plan the focused cases, write or update tests only, and verify them with focused shell commands.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: shellcommand
+    scope: builtin
+    overrides:
+      autoExecute: false

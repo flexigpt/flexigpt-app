@@ -114,6 +114,7 @@ func main() {
 			app.mcpAggregateAPI,
 			app.aggregateAPI,
 			app.assistantPresetStoreAPI,
+			app.agentStoreAPI,
 		},
 
 		Windows: &windows.Options{

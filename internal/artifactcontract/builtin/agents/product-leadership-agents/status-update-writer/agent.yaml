@@ -1,0 +1,87 @@
+type: agent
+name: status-update-writer
+displayName: Status Update Writer
+description: Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready updates.
+labels:
+  category: product-leadership
+
+members:
+  - type: text
+    name: status-update-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Turn source material into a stakeholder-ready status update.
+        Include overall status, progress, shipped changes, risks, blockers, decisions needed, and next steps.
+        Clearly distinguish confirmed facts from assumptions.
+
+  - type: text
+    name: status-update-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.>
+
+        Turn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

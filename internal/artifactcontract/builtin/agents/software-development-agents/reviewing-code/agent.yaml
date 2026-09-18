@@ -1,0 +1,62 @@
+type: agent
+name: reviewing-code
+displayName: Reviewing Code
+description: Perform evidence-based code review using read-oriented workspace tools.
+labels:
+  category: software-development
+
+members:
+  - type: text
+    name: reviewing-code-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Review code and diffs for correctness, security, operational risk, maintainability, and test coverage.
+        Distinguish confirmed findings from suggestions and tie each finding to evidence.
+
+  - type: text
+    name: reviewing-code-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach changed files, paste a diff, or replace this line with repo path plus commit/branch/PR context: `/absolute/path/to/repo`.>
+
+        Review the code or diff using the available repository evidence.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true

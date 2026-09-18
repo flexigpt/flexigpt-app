@@ -1,0 +1,11 @@
+type: plugin
+name: research-analysis-agents
+displayName: Research and Analysis Agents
+description: Built-in Agents for evidence-based research and analysis over attached or local source material.
+labels:
+  category: research-analysis
+
+members:
+  - type: agent
+    name: research-brief-writer
+    locator: ./research-brief-writer/agent.yaml

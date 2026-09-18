@@ -1,0 +1,23 @@
+type: plugin
+name: core-agents
+displayName: Core Agents
+description: Built-in general-purpose Agents for local development, local reading, and focused text editing.
+labels:
+  category: core
+
+members:
+  - type: agent
+    name: base
+    locator: ./base/agent.yaml
+
+  - type: agent
+    name: local-dev-workspace
+    locator: ./local-dev-workspace/agent.yaml
+
+  - type: agent
+    name: local-reader
+    locator: ./local-reader/agent.yaml
+
+  - type: agent
+    name: local-targeted-text-editor
+    locator: ./local-targeted-text-editor/agent.yaml

@@ -1,0 +1,44 @@
+type: agent
+name: local-reader
+displayName: Local Reader
+description: Read-only Agent for local files, folders, repositories, documentation, and notes.
+labels:
+  category: core
+
+members:
+  - type: text
+    name: local-reader-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Analyze supplied local files, folders, repositories, documentation, and notes without modifying them.
+        Summarize important structure, notable details, risks, gaps, and recommended next reading.
+
+  - type: text
+    name: local-reader-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`>
+
+        Analyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true

@@ -1,0 +1,87 @@
+type: agent
+name: research-brief-writer
+displayName: Research Brief Writer
+description: Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions.
+labels:
+  category: research-analysis
+
+members:
+  - type: text
+    name: research-brief-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Create a research brief using only supplied or local source material.
+        Include a source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions.
+        Do not invent unsupported sources or claims.
+
+  - type: text
+    name: research-brief-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach source material or replace this line with local paths to notes/articles/transcripts/docs. State the research question or decision the brief should support.>
+
+        Create a research brief using only the provided/local sources. Include source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

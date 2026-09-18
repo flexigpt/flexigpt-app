@@ -1,0 +1,62 @@
+type: agent
+name: docs-auditor
+displayName: Docs Auditor
+description: Perform a read-only audit of documentation or README files for structural gaps, stale claims, duplication, missing content, and navigation issues.
+labels:
+  category: technical-content-writing
+
+members:
+  - type: text
+    name: docs-auditor-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Audit supplied documentation without rewriting it.
+        Evaluate audience fit, structure, missing content, stale or unsupported claims, duplication, navigation, severity, and a recommended rewrite plan.
+
+  - type: text
+    name: docs-auditor-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach docs or replace this line with docs/README paths to audit, for example `/absolute/path/to/repo/docs`. Include intended audience if known.>
+
+        Audit these docs read-only for audience fit, structure, missing content, stale or unsupported claims, duplication, navigation issues, severity, and a recommended rewrite plan. Do not rewrite files.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true

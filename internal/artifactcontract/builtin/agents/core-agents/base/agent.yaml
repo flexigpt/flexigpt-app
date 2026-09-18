@@ -1,0 +1,16 @@
+type: agent
+name: base
+displayName: Base Assistant
+description: Built-in default Agent with plain Markdown response formatting.
+labels:
+  category: core
+
+members:
+  - type: text
+    name: base-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Respond in plain Markdown.
+        Be clear, direct, and appropriately concise.

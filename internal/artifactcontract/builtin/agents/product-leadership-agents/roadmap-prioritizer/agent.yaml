@@ -1,0 +1,86 @@
+type: agent
+name: roadmap-prioritizer
+displayName: Roadmap Prioritizer
+description: Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies.
+labels:
+  category: product-leadership
+
+members:
+  - type: text
+    name: roadmap-prioritizer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Prioritize work against stated goals using evidence-aware impact, effort, risk, and dependency analysis.
+        Call out missing information, explain trade-offs, and recommend a clear order.
+
+  - type: text
+    name: roadmap-prioritizer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach or paste the backlog/opportunity list plus goals, constraints, time horizon, known effort/impact data, and dependencies.>
+
+        Prioritize these items against the stated goals. Use evidence-aware impact/effort/risk ranking, respect dependencies, call out missing inputs, and recommend an order.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

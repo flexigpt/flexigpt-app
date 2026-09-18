@@ -29,15 +29,24 @@ type mcpBaselineEnsurer interface {
 	) (collection.CollectionView, error)
 }
 
+type agentBaselineEnsurer interface {
+	EnsureAgentBaselineCollection(
+		ctx context.Context,
+		rootID root.RootID,
+	) (collection.CollectionView, error)
+}
+
 func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installerapi.API,
 	skills builtin.HydrationInstaller,
 	mcp builtin.HydrationInstaller,
+	agents builtin.HydrationInstaller,
 ) error {
 	if topologyAPI == nil ||
 		skills == nil ||
-		mcp == nil {
+		mcp == nil ||
+		agents == nil {
 		return errors.New("built-in topology dependencies are incomplete")
 	}
 	if err := builtin.ValidateApplicationTopology(); err != nil {
@@ -58,6 +67,9 @@ func EnsureBuiltinArtifactTopology(
 	if err := bootstrap.Register(mcp); err != nil {
 		return err
 	}
+	if err := bootstrap.Register(agents); err != nil {
+		return err
+	}
 	return bootstrap.Ensure(ctx)
 }
 
@@ -66,8 +78,9 @@ func EnsureUserArtifactBaselineCollectionsForRoot(
 	rootID root.RootID,
 	skills skillBaselineEnsurer,
 	mcp mcpBaselineEnsurer,
+	agents agentBaselineEnsurer,
 ) error {
-	if skills == nil || mcp == nil {
+	if skills == nil || mcp == nil || agents == nil {
 		return errors.New("user Artifact baseline dependencies are incomplete")
 	}
 	if _, err := skills.EnsureSkillBaselineCollection(ctx, rootID); err != nil {
@@ -75,6 +88,9 @@ func EnsureUserArtifactBaselineCollectionsForRoot(
 	}
 	if _, err := mcp.EnsureMCPBaselineCollection(ctx, rootID); err != nil {
 		return fmt.Errorf("ensure MCP baseline Collection: %w", err)
+	}
+	if _, err := agents.EnsureAgentBaselineCollection(ctx, rootID); err != nil {
+		return fmt.Errorf("ensure Agent baseline Collection: %w", err)
 	}
 	return nil
 }
@@ -85,6 +101,7 @@ func EnsureUserArtifactBaselineCollections(
 	protection compositionapi.ProtectionAPI,
 	skills skillBaselineEnsurer,
 	mcp mcpBaselineEnsurer,
+	agents agentBaselineEnsurer,
 ) error {
 	if roots == nil || protection == nil {
 		return errors.New("user Artifact Root lifecycle dependencies are incomplete")
@@ -105,6 +122,7 @@ func EnsureUserArtifactBaselineCollections(
 			value.ID,
 			skills,
 			mcp,
+			agents,
 		); err != nil {
 			return fmt.Errorf(
 				"ensure user Artifact baselines for Root %q: %w",

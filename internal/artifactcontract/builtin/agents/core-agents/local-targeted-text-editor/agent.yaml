@@ -1,0 +1,82 @@
+type: agent
+name: local-targeted-text-editor
+displayName: Local Targeted Text Editor
+description: Local editing workspace with unified diff, direct text edit tools, and shell command access.
+labels:
+  category: core
+
+members:
+  - type: text
+    name: local-targeted-text-editor-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Inspect relevant files before editing.
+        Prefer unified diffs for normal edits.
+        Use direct text insertion, replacement, or deletion only when it is the safest precise operation.
+        Verify with focused shell commands when useful and keep all actions scoped.
+
+  - type: text
+    name: local-targeted-text-editor-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Replace this line with the local path(s) and the exact edit you want. Example: `/absolute/path/to/repo-or-docs`>
+
+        Inspect relevant files first, prefer unified diffs for normal edits, use direct text insert/replace/delete only when they are the safest precise operation, and verify with focused shell commands when useful. Keep changes scoped.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: applyunifieddiff
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: shellcommand
+    scope: builtin
+    overrides:
+      autoExecute: false

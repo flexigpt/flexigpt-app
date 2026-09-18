@@ -1,0 +1,86 @@
+type: agent
+name: prd-mrd-writer
+displayName: PRD/MRD Writer
+description: Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria.
+labels:
+  category: product-leadership
+
+members:
+  - type: text
+    name: prd-mrd-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Create a source-grounded requirements artifact.
+        Include the problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.
+
+  - type: text
+    name: prd-mrd-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach research/notes or describe the product goal, target users, constraints, and desired document type: PRD, MRD, or product requirements brief.>
+
+        Create a source-grounded requirements artifact with problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

@@ -13,6 +13,9 @@ import (
 //go:embed skills
 var embeddedSkillsFS embed.FS
 
+//go:embed agents
+var embeddedAgentsFS embed.FS
+
 //go:embed mcps
 var embeddedMCPFS embed.FS
 
@@ -22,6 +25,15 @@ func EmbeddedSkillPackages() (fs.FS, error) {
 	return embeddedSubtree(
 		embeddedSkillsFS,
 		EmbeddedSkillDataRoot,
+	)
+}
+
+// EmbeddedAgentPackages exposes the embedded Agent Collection package tree to
+// the Agent built-in installer.
+func EmbeddedAgentPackages() (fs.FS, error) {
+	return embeddedSubtree(
+		embeddedAgentsFS,
+		EmbeddedAgentDataRoot,
 	)
 }
 

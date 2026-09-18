@@ -1,0 +1,86 @@
+type: agent
+name: troubleshooting-guide-writer
+displayName: Troubleshooting Guide Writer
+description: Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles.
+labels:
+  category: technical-content-writing
+
+members:
+  - type: text
+    name: troubleshooting-guide-writer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Write a troubleshooting or knowledge-base article grounded in supplied evidence.
+        Include symptoms, confirmed and possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.
+
+  - type: text
+    name: troubleshooting-guide-writer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach or paste errors, logs, bug reports, support notes, or confirmed fixes. Include the intended audience and product/version if known.>
+
+        Write a troubleshooting/KB article with symptom, confirmed vs possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

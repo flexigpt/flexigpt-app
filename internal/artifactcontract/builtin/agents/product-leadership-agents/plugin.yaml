@@ -1,0 +1,31 @@
+type: plugin
+name: product-leadership-agents
+displayName: Product and Leadership Agents
+description: Built-in Agents for requirements, decisions, feedback analysis, prioritization, delivery risk, and status communication.
+labels:
+  category: product-leadership
+
+members:
+  - type: agent
+    name: decision-record-writer
+    locator: ./decision-record-writer/agent.yaml
+
+  - type: agent
+    name: delivery-risk-reviewer
+    locator: ./delivery-risk-reviewer/agent.yaml
+
+  - type: agent
+    name: prd-mrd-writer
+    locator: ./prd-mrd-writer/agent.yaml
+
+  - type: agent
+    name: roadmap-prioritizer
+    locator: ./roadmap-prioritizer/agent.yaml
+
+  - type: agent
+    name: status-update-writer
+    locator: ./status-update-writer/agent.yaml
+
+  - type: agent
+    name: user-feedback-analyzer
+    locator: ./user-feedback-analyzer/agent.yaml

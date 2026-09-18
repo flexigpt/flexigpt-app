@@ -98,6 +98,10 @@ func newAPI(
 			[]declaration.Type(nil),
 			value.AllowedMemberTypes...,
 		)
+		value.AllowedMemberForms = append(
+			[]declaration.MemberForm(nil),
+			value.AllowedMemberForms...,
+		)
 		output.domain = &value
 	}
 	return output, nil
@@ -106,6 +110,7 @@ func newAPI(
 type CollectionView struct {
 	Artifact    artifact.Artifact      `json:"artifact"`
 	Name        basespec.LogicalName   `json:"name"`
+	DisplayName string                 `json:"displayName"`
 	Description string                 `json:"description,omitempty"`
 	Members     []MemberReference      `json:"members"`
 	Entries     []CollectionMemberView `json:"entries"`
@@ -139,6 +144,7 @@ type CreateRequest struct {
 	RootID      root.RootID          `json:"rootID"`
 	SourceID    source.SourceID      `json:"sourceID,omitempty"`
 	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName,omitempty"`
 	Description string               `json:"description,omitempty"`
 }
 
@@ -146,12 +152,19 @@ type UpdateRequest struct {
 	Collection       artifact.ArtifactRef `json:"collection"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
 	Description      string               `json:"description,omitempty"`
+	DisplayName      string               `json:"displayName,omitempty"`
 }
 
 type AddMemberRequest struct {
 	Collection       artifact.ArtifactRef `json:"collection"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
 	Member           MemberReference      `json:"member"`
+}
+
+type AddEntryRequest struct {
+	Collection       artifact.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Entry            declaration.Entry    `json:"entry"`
 }
 
 type AddArtifactMemberRequest struct {
@@ -205,7 +218,7 @@ func (a *API) Get(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	return collectionViewOf(value.artifact, value.document)
+	return a.collectionViewOf(value.artifact, value.document)
 }
 
 // SetEnabled changes the generic local enablement metadata of a Collection.
@@ -315,8 +328,12 @@ func (a *API) Update(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	if _, err := collectionViewOf(value.artifact, value.document); err != nil {
+	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
 		return CollectionView{}, err
+	}
+
+	if request.DisplayName != "" {
+		value.document.DisplayName = request.DisplayName
 	}
 
 	value.document.Description = request.Description
@@ -332,7 +349,7 @@ func (a *API) Update(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	return collectionViewOf(record, value.document)
+	return a.collectionViewOf(record, value.document)
 }
 
 func (a *API) AddMember(
@@ -375,7 +392,7 @@ func (a *API) RemoveMember(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	if _, err := collectionViewOf(value.artifact, value.document); err != nil {
+	if _, err := a.collectionViewOf(value.artifact, value.document); err != nil {
 		return CollectionView{}, err
 	}
 	if request.Index < 0 || request.Index >= len(value.document.Members) {
@@ -413,7 +430,25 @@ func (a *API) RemoveMember(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	return collectionViewOf(record, value.document)
+	return a.collectionViewOf(record, value.document)
+}
+
+func (a *API) AddEntry(
+	ctx context.Context,
+	request AddEntryRequest,
+) (CollectionView, error) {
+	result, err := a.mutateEntry(ctx, request, false)
+	if err != nil {
+		return CollectionView{}, err
+	}
+	return result.Collection, nil
+}
+
+func (a *API) EnsureEntry(
+	ctx context.Context,
+	request AddEntryRequest,
+) (MemberMutationResult, error) {
+	return a.mutateEntry(ctx, request, true)
 }
 
 func (a *API) AddArtifactMember(
@@ -651,7 +686,7 @@ func (a *API) create(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	address, err := managedCollectionAddress(request.Name)
+	address, err := a.managedCollectionAddress(request.Name)
 	if err != nil {
 		return CollectionView{}, err
 	}
@@ -663,6 +698,7 @@ func (a *API) create(
 	document := pluginv1.PluginDocument{
 		Type:        pluginv1.PluginType,
 		Name:        string(request.Name),
+		DisplayName: request.DisplayName,
 		Description: request.Description,
 	}
 	_, digest, err := collectionDocumentPayload(document)
@@ -710,12 +746,39 @@ func (a *API) create(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	return collectionViewOf(record, document)
+	return a.collectionViewOf(record, document)
 }
 
 func (a *API) mutateMember(
 	ctx context.Context,
 	request AddMemberRequest,
+	ensure bool,
+) (MemberMutationResult, error) {
+	if a == nil {
+		return MemberMutationResult{}, basespec.ErrClosed
+	}
+
+	if err := a.validateDomainMember(request.Member); err != nil {
+		return MemberMutationResult{}, err
+	}
+	member, err := request.Member.entry()
+	if err != nil {
+		return MemberMutationResult{}, err
+	}
+	return a.mutateEntry(
+		ctx,
+		AddEntryRequest{
+			Collection:       request.Collection,
+			ExpectedRevision: request.ExpectedRevision,
+			Entry:            member,
+		},
+		ensure,
+	)
+}
+
+func (a *API) mutateEntry(
+	ctx context.Context,
+	request AddEntryRequest,
 	ensure bool,
 ) (MemberMutationResult, error) {
 	if a == nil {
@@ -727,14 +790,10 @@ func (a *API) mutateMember(
 			basespec.ErrInvalid,
 		)
 	}
-
-	if err := a.validateDomainMember(request.Member); err != nil {
+	if err := a.validateDomainEntry(request.Entry); err != nil {
 		return MemberMutationResult{}, err
 	}
-	member, err := request.Member.entry()
-	if err != nil {
-		return MemberMutationResult{}, err
-	}
+	member := request.Entry.Clone()
 	memberRaw, err := member.CanonicalJSON()
 	if err != nil {
 		return MemberMutationResult{}, err
@@ -748,7 +807,7 @@ func (a *API) mutateMember(
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
-	view, err := collectionViewOf(value.artifact, value.document)
+	view, err := a.collectionViewOf(value.artifact, value.document)
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
@@ -799,7 +858,7 @@ func (a *API) mutateMember(
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
-	view, err = collectionViewOf(record, value.document)
+	view, err = a.collectionViewOf(record, value.document)
 	if err != nil {
 		return MemberMutationResult{}, err
 	}
@@ -848,11 +907,17 @@ func (a *API) publishDocument(
 	expectedGeneration string,
 	allowPackageReplacement bool,
 ) (artifact.Artifact, error) {
+	documentFile := a.managedCollectionDocumentFile()
+	decoderID, err := a.managedCollectionDecoderID()
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
+
 	raw, digest, err := collectionDocumentPayload(document)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
-	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	locator, err := address.FileLocator(documentFile)
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -861,7 +926,7 @@ func (a *API) publishDocument(
 		rootID,
 		sourceID,
 		locator,
-		decoder.JSONDecoderID,
+		decoderID,
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -883,7 +948,7 @@ func (a *API) publishDocument(
 				Address:            address,
 				ExpectedGeneration: expectedGeneration,
 				Files: []source.ManagedPackageFile{{
-					Locator: ManagedCollectionDocumentFile,
+					Locator: documentFile,
 					Content: raw,
 				}},
 			},
@@ -961,7 +1026,7 @@ func (a *API) loadEditableCollection(
 		)
 	}
 
-	address, err := managedCollectionAddressFromLocator(
+	address, err := a.managedCollectionAddressFromLocator(
 		record.Binding.Locator,
 	)
 	if err != nil {
@@ -1022,28 +1087,100 @@ func (a *API) loadEditableCollection(
 	}, nil
 }
 
-func managedCollectionAddress(
+func (a *API) managedCollectionAddress(
+	name basespec.LogicalName,
+) (source.ManagedPackageAddress, error) {
+	return managedCollectionAddressFor(
+		a.managedCollectionPackageKind(),
+		name,
+	)
+}
+
+func managedCollectionAddressFor(
+	packageKind source.PackageKind,
 	name basespec.LogicalName,
 ) (source.ManagedPackageAddress, error) {
 	return source.NewManagedPackageAddress(
-		ManagedCollectionPackageKind,
+		packageKind,
 		name,
 		ManagedCollectionVersion,
 	)
 }
 
+func (a *API) managedCollectionAddressFromLocator(
+	locator basespec.Locator,
+) (source.ManagedPackageAddress, error) {
+	return managedCollectionAddressFromLocatorFor(
+		a.managedCollectionPackageKind(),
+		a.managedCollectionDocumentFile(),
+		locator,
+	)
+}
+
+func (a *API) managedCollectionPackageKind() source.PackageKind {
+	if a != nil && a.domain != nil && a.domain.PackageKind != "" {
+		return a.domain.PackageKind
+	}
+	return ManagedCollectionPackageKind
+}
+
+func (a *API) managedCollectionDocumentFile() basespec.Locator {
+	if a != nil && a.domain != nil && a.domain.DocumentFile != "" {
+		return a.domain.DocumentFile
+	}
+	return ManagedCollectionDocumentFile
+}
+
+func (a *API) managedCollectionDecoderID() (
+	basespec.DecoderID,
+	error,
+) {
+	switch strings.ToLower(
+		path.Ext(string(a.managedCollectionDocumentFile())),
+	) {
+	case ".json":
+		return decoder.JSONDecoderID, nil
+	case ".yaml", ".yml":
+		return decoder.YAMLDecoderID, nil
+	default:
+		return "", fmt.Errorf(
+			"%w: managed Collection document file %q has no supported decoder",
+			basespec.ErrInvalid,
+			a.managedCollectionDocumentFile(),
+		)
+	}
+}
+
 func managedCollectionAddressFromLocator(
+	locator basespec.Locator,
+) (source.ManagedPackageAddress, error) {
+	return managedCollectionAddressFromLocatorFor(
+		ManagedCollectionPackageKind,
+		ManagedCollectionDocumentFile,
+		locator,
+	)
+}
+
+func managedCollectionAddressFromLocatorFor(
+	packageKind source.PackageKind,
+	documentFile basespec.Locator,
 	locator basespec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(ManagedCollectionDocumentFile) {
+	if err := packageKind.Validate(); err != nil {
+		return source.ManagedPackageAddress{}, err
+	}
+	if err := documentFile.ValidatePortable(false); err != nil {
+		return source.ManagedPackageAddress{}, err
+	}
+	if path.Base(string(locator)) != string(documentFile) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Collection locator %q is not %q",
 			basespec.ErrUnsupported,
 			locator,
-			ManagedCollectionDocumentFile,
+			documentFile,
 		)
 	}
 	address, err := source.ParseManagedPackageAddressDirectory(
@@ -1052,11 +1189,11 @@ func managedCollectionAddressFromLocator(
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if address.Kind != ManagedCollectionPackageKind {
+	if address.Kind != packageKind {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Collection package kind must be %q",
 			basespec.ErrUnsupported,
-			ManagedCollectionPackageKind,
+			packageKind,
 		)
 	}
 	return address, nil
@@ -1080,11 +1217,21 @@ func collectionDocumentPayload(
 	return raw, value.Digest, nil
 }
 
-func collectionViewOf(
+func (a *API) collectionViewOf(
 	record artifact.Artifact,
 	document pluginv1.PluginDocument,
 ) (CollectionView, error) {
 	baseline := IsBaselineCollectionArtifact(record)
+	if a != nil && a.domain != nil {
+		address, err := a.managedCollectionAddressFromLocator(
+			record.Binding.Locator,
+		)
+		if err == nil &&
+			record.LogicalName == a.domain.BaselineName &&
+			address.Name == a.domain.BaselineName {
+			baseline = true
+		}
+	}
 	return readCollectionViewOf(
 		record,
 		document,

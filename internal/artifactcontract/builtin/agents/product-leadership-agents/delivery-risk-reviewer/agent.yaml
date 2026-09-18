@@ -1,0 +1,86 @@
+type: agent
+name: delivery-risk-reviewer
+displayName: Delivery Risk Reviewer
+description: Review plans, specifications, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear ownership, and mitigations.
+labels:
+  category: product-leadership
+
+members:
+  - type: text
+    name: delivery-risk-reviewer-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Review delivery plans for blockers, dependencies, unclear ownership, schedule risk, scope risk, missing decisions, and weak mitigations.
+        Prioritize findings and identify practical next actions.
+
+  - type: text
+    name: delivery-risk-reviewer-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Attach or paste the plan, milestone list, issue summary, status notes, or delivery commitment to review.>
+
+        Review delivery risk using the supplied source material.
+
+  - type: tool
+    name: statpath
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: readtextrange
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: findtext
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: inserttext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: replacetext
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: deletetext
+    scope: builtin
+    overrides:
+      autoExecute: false

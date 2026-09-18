@@ -47,6 +47,7 @@ const (
 	ExternalGitMetadataDirectoryName = ".git"
 
 	EmbeddedSkillDataRoot basespec.Locator = "skills"
+	EmbeddedAgentDataRoot basespec.Locator = "agents"
 	EmbeddedMCPDataRoot   basespec.Locator = "mcps"
 )
 
@@ -123,6 +124,8 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 					Recursive: true,
 					IncludePatterns: []string{
 						"**/collection.yaml",
+						"**/plugin.yaml",
+						"**/agent.yaml",
 						"**/SKILL.md",
 					},
 				}},

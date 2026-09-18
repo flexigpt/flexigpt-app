@@ -1,0 +1,64 @@
+type: agent
+name: local-dev-workspace
+displayName: Local Dev Workspace
+description: Local development workspace with file read, write, unified diff, and shell command access.
+labels:
+  category: core
+
+members:
+  - type: text
+    name: local-dev-workspace-instructions
+    insert: instructions
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        Work only within user-provided local paths and attached source material.
+        Inspect relevant files before editing.
+        Prefer unified diffs for normal edits, use whole-file writes only for create or replacement cases, and verify with focused shell commands when useful.
+        Keep write and shell actions scoped.
+
+  - type: text
+    name: local-dev-workspace-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |-
+        <Replace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`>
+
+        Inspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.
+
+  - type: tool
+    name: readfile
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: searchfiles
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: listdirectory
+    scope: builtin
+    overrides:
+      autoExecute: true
+
+  - type: tool
+    name: writefile
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: applyunifieddiff
+    scope: builtin
+    overrides:
+      autoExecute: false
+
+  - type: tool
+    name: shellcommand
+    scope: builtin
+    overrides:
+      autoExecute: false

@@ -1,0 +1,27 @@
+type: plugin
+name: technical-content-writing-agents
+displayName: Technical Content Writing Agents
+description: Built-in Agents for documentation, API reference, release notes, and troubleshooting content.
+labels:
+  category: technical-content-writing
+
+members:
+  - type: agent
+    name: api-reference-writer
+    locator: ./api-reference-writer/agent.yaml
+
+  - type: agent
+    name: docs-auditor
+    locator: ./docs-auditor/agent.yaml
+
+  - type: agent
+    name: docs-writer
+    locator: ./docs-writer/agent.yaml
+
+  - type: agent
+    name: release-notes-writer
+    locator: ./release-notes-writer/agent.yaml
+
+  - type: agent
+    name: troubleshooting-guide-writer
+    locator: ./troubleshooting-guide-writer/agent.yaml
