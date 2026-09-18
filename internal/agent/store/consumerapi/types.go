@@ -1,7 +1,6 @@
 package consumerapi
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -39,46 +38,10 @@ type ListAgentsRequest struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-type CreateAgentCollectionRequest struct {
-	RootID root.RootID `json:"rootID"`
-
-	// SourceID is optional. When supplied, it must identify this Root's
-	// managed Agent domain Source.
-	SourceID source.SourceID `json:"sourceID,omitempty"`
-
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
-}
-
-type UpdateAgentCollectionRequest struct {
-	Collection       artifact.ArtifactRef `json:"collection"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-
-	// An empty value preserves the existing display name.
-	DisplayName string `json:"displayName,omitempty"`
-	Description string `json:"description,omitempty"`
-}
-
-type AddAgentCollectionEntryRequest struct {
-	Collection       artifact.ArtifactRef `json:"collection"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-	Entry            declaration.Entry    `json:"entry"`
-}
-
 type AttachAgentToCollectionRequest struct {
 	Collection       artifact.ArtifactRef `json:"collection"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
 	Agent            artifact.ArtifactRef `json:"agent"`
-}
-
-type DetachAgentFromCollectionRequest struct {
-	Collection       artifact.ArtifactRef `json:"collection"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-
-	// Index is the deterministic canonical member index exposed by
-	// CollectionView.Entries.
-	Index int `json:"index"`
 }
 
 type ManagedAgentCreateRequest struct {

@@ -15,7 +15,7 @@ import (
 
 func (a *StoreAPI) ComposeWorkspacePrompt(
 	ctx context.Context,
-	workspace WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (prompt.Plan, error) {
 	value, capabilities, err := a.resolveWorkspaceCapabilities(
@@ -44,7 +44,7 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 
 func (a *StoreAPI) LoadWorkspaceSkills(
 	ctx context.Context,
-	workspace WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (skill.LoadPlan, error) {
 	value, capabilities, err := a.resolveWorkspaceCapabilities(
@@ -73,7 +73,7 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 
 func (a *StoreAPI) ListWorkspaceSkills(
 	ctx context.Context,
-	workspace WorkspaceRef,
+	workspace artifact.ArtifactRef,
 ) ([]skill.WorkspaceSkill, error) {
 	plan, err := a.LoadWorkspaceSkills(ctx, workspace, nil)
 	if err != nil {
@@ -84,7 +84,7 @@ func (a *StoreAPI) ListWorkspaceSkills(
 
 func (a *StoreAPI) LoadWorkspaceMCPServers(
 	ctx context.Context,
-	workspace WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (mcp.LoadPlan, error) {
 	value, capabilities, err := a.resolveWorkspaceCapabilities(
@@ -113,7 +113,7 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 
 func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	ctx context.Context,
-	workspace WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	selection WorkspaceRuntimeSelection,
 ) (WorkspaceRuntimePlan, error) {
 	value, capabilities, err := a.resolveWorkspaceCapabilities(

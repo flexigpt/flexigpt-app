@@ -4,12 +4,12 @@ import (
 	"context"
 	"net/url"
 	"path"
-	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 )
 
 func (a *StoreAPI) PrepareSelectorDiscovery(
@@ -45,7 +45,7 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 			"mcp.json",
 		}
 	}
-	next.DirectoryRoots = appendWorkspaceDirectoryRoot(
+	next.DirectoryRoots = consumerutil.AppendDirectoryRoot(
 		next.DirectoryRoots,
 		source.DirectoryRoot{
 			Root:            base,
@@ -94,7 +94,7 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 			return nil, err
 		}
 		if !inScope {
-			next.ExplicitLocators = appendUniqueLocator(
+			next.ExplicitLocators = consumerutil.AppendUniqueLocator(
 				next.ExplicitLocators,
 				candidate,
 			)
@@ -197,54 +197,4 @@ func locatedRefreshCandidates(
 		target,
 		basespec.Locator(path.Join(string(target), "SKILL.md")),
 	}
-}
-
-func appendWorkspaceDirectoryRoot(
-	values []source.DirectoryRoot,
-	value source.DirectoryRoot,
-) []source.DirectoryRoot {
-	for _, current := range values {
-		if current.Root != value.Root ||
-			current.Recursive != value.Recursive ||
-			!slices.Equal(current.IncludePatterns, value.IncludePatterns) ||
-			!slices.Equal(current.ExcludePatterns, value.ExcludePatterns) {
-			continue
-		}
-		return values
-	}
-	return append(values, value.Clone())
-}
-
-func appendDecoderHint(
-	values []source.DecoderHint,
-	value source.DecoderHint,
-) []source.DecoderHint {
-	for index := range values {
-		if values[index].Locator != value.Locator ||
-			values[index].Recursive != value.Recursive {
-			continue
-		}
-
-		for _, decoderID := range value.DecoderIDs {
-			if slices.Contains(values[index].DecoderIDs, decoderID) {
-				continue
-			}
-			values[index].DecoderIDs = append(
-				values[index].DecoderIDs,
-				decoderID,
-			)
-		}
-		return values
-	}
-	return append(values, value.Clone())
-}
-
-func appendUniqueLocator(
-	values []basespec.Locator,
-	value basespec.Locator,
-) []basespec.Locator {
-	if slices.Contains(values, value) {
-		return values
-	}
-	return append(values, value)
 }

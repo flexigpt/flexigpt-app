@@ -13,8 +13,6 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
-type WorkspaceRef = workspaceDomain.WorkspaceRef
-
 type FilesystemSourceRegistration struct {
 	RootID            root.RootID `json:"rootID"`
 	RootPath          string      `json:"rootPath"`
@@ -46,7 +44,7 @@ func (v WorkspaceLoad) ResolvedWorkspace() *resolve.ResolvedWorkspace {
 }
 
 type WorkspaceRefresh struct {
-	Workspace WorkspaceRef
+	Workspace artifact.ArtifactRef
 }
 
 type WorkspacePathRegistrationResult struct {

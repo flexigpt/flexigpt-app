@@ -56,23 +56,14 @@ func (a *API) CreateManagedAgent(
 		return ManagedAgentCreateResult{}, err
 	}
 
-	member, err := a.collections.MemberForCollectionSource(
+	membership, err := a.collections.EnsureMemberForCollectionSource(
 		ctx,
-		request.Collection,
-		declaration.TypeAgent,
-		definitionValue.LogicalName,
-		locator,
-	)
-	if err != nil {
-		return ManagedAgentCreateResult{}, err
-	}
-
-	membership, err := a.collections.EnsureMember(
-		ctx,
-		collection.AddMemberRequest{
+		collection.EnsureMemberForCollectionSourceRequest{
 			Collection:       request.Collection,
 			ExpectedRevision: request.ExpectedCollectionRevision,
-			Member:           member,
+			Type:             declaration.TypeAgent,
+			Name:             definitionValue.LogicalName,
+			Locator:          locator,
 		},
 	)
 	if err != nil {

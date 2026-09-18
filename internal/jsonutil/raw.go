@@ -8,8 +8,6 @@ import (
 	"io"
 )
 
-type JSONSchema = json.RawMessage
-
 type JSONRawString string
 
 func (value JSONRawString) MarshalJSON() ([]byte, error) {

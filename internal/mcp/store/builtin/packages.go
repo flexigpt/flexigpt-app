@@ -24,8 +24,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-type artifactDefinition = definition.Definition
-
 // PreparedPackage is one embedded canonical MCP Plugin package ready for
 // managed Source publication.
 //
@@ -195,7 +193,7 @@ func canonicalCollectionExpectations(
 
 	output := make([]mcpConsumerAPI.BuiltInArtifactExpectation, 0, len(named))
 	for _, value := range named {
-		var definitionValue artifactDefinition
+		var definitionValue definition.Definition
 		if value.SubresourceLocator == "" {
 			definitionValue, err = decoder.DefinitionForEntry(value.Entry)
 		} else {
@@ -236,15 +234,7 @@ func canonicalCollectionExpectations(
 		)
 	}
 
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Locator != output[right].Locator {
-			return output[left].Locator < output[right].Locator
-		}
-		if output[left].Subresource != output[right].Subresource {
-			return output[left].Subresource < output[right].Subresource
-		}
-		return output[left].Kind < output[right].Kind
-	})
+	sortMCPExpectations(output)
 	return output, nil
 }
 
@@ -300,34 +290,42 @@ func validatePreparedPackageIdentities(
 func PackageFingerprint(
 	value PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	type file struct {
-		Locator basespec.Locator  `json:"locator"`
-		Digest  cryptoutil.Digest `json:"digest"`
-		Size    int64             `json:"size"`
+	if value.DocumentFile != mcpDomain.MCPPluginDocumentFile {
+		return "", fmt.Errorf(
+			"%w: built-in MCP Plugin document must be %q",
+			basespec.ErrInvalid,
+			mcpDomain.MCPPluginDocumentFile,
+		)
 	}
 
-	files := make([]file, 0, len(value.PackageFiles))
-	for _, item := range value.PackageFiles {
-		files = append(files, file{
-			Locator: item.Locator,
-			Digest:  cryptoutil.DigestBytes(item.Content),
-			Size:    int64(len(item.Content)),
-		})
-	}
-	sort.Slice(files, func(left, right int) bool {
-		return files[left].Locator < files[right].Locator
-	})
-	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot  basespec.Locator                            `json:"packageRoot"`
-		Address      source.ManagedPackageAddress                `json:"address"`
-		DocumentFile basespec.Locator                            `json:"documentFile"`
-		Expectations []mcpConsumerAPI.BuiltInArtifactExpectation `json:"expectations"`
-		Files        []file                                      `json:"files"`
-	}{
-		PackageRoot:  value.EmbeddedPackageRoot,
-		Address:      value.PackageAddress,
-		DocumentFile: value.DocumentFile,
-		Expectations: value.Expectations,
-		Files:        files,
+	expectations := append(
+		[]mcpConsumerAPI.BuiltInArtifactExpectation(nil),
+		value.Expectations...,
+	)
+	sortMCPExpectations(expectations)
+
+	return topology.PackageFingerprint(
+		value.EmbeddedPackageRoot,
+		value.PackageAddress,
+		value.DocumentFile,
+		expectations,
+		value.PackageFiles,
+	)
+}
+
+func sortMCPExpectations(
+	values []mcpConsumerAPI.BuiltInArtifactExpectation,
+) {
+	sort.Slice(values, func(left, right int) bool {
+		if values[left].Locator != values[right].Locator {
+			return values[left].Locator < values[right].Locator
+		}
+		if values[left].Subresource != values[right].Subresource {
+			return values[left].Subresource < values[right].Subresource
+		}
+		if values[left].Kind != values[right].Kind {
+			return values[left].Kind < values[right].Kind
+		}
+		return values[left].LogicalName < values[right].LogicalName
 	})
 }

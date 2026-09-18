@@ -307,10 +307,6 @@ func (a *API) agentView(
 	}
 
 	view.Description = document.Description
-	if document.DisplayName != "" {
-		view.DisplayName = document.DisplayName
-	}
-
 	sourceValue, err := a.sources.Get(
 		ctx,
 		record.RootID,

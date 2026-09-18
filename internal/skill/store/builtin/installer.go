@@ -62,7 +62,8 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	fingerprint, err := topologyHydrationFingerprint(
+	fingerprint, err := topology.HydrationFingerprint(
+		skillDomain.HydrationSchemaVersion,
 		topologyValue,
 	)
 	if err != nil {

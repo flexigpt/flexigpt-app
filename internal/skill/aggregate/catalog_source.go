@@ -12,7 +12,7 @@ import (
 
 const artifactRootCatalogPrefix = "artifact-root:"
 
-// CatalogSource maps one Root's currently enabled Skill Artifacts into the
+// CatalogSource maps one Root's currently available Skill Artifacts into the
 // runtime-owned CatalogSource contract. The runtime treats CatalogID as opaque.
 type CatalogSource struct {
 	router *ArtifactRouter

@@ -51,6 +51,59 @@ func DecodeCanonicalObject[T any](raw []byte, maximumBytes int) (T, error) {
 	return output, nil
 }
 
+// DecodeCanonicalObjectExact decodes one already-canonical JSON object.
+//
+// Unlike DecodeCanonicalObject, it rejects whitespace, alternate key ordering,
+// duplicate-key normalization, and other valid-but-noncanonical encodings.
+func DecodeCanonicalObjectExact[T any](
+	raw []byte,
+	maximumBytes int,
+) (T, error) {
+	var output T
+	if err := DecodeCanonicalObjectExactInto(
+		raw,
+		&output,
+		maximumBytes,
+	); err != nil {
+		return output, err
+	}
+	return output, nil
+}
+
+// DecodeCanonicalObjectExactInto is the non-generic exact canonical-object
+// decoder for polymorphic callers.
+func DecodeCanonicalObjectExactInto(
+	raw []byte,
+	target any,
+	maximumBytes int,
+) error {
+	if target == nil {
+		return errors.New(
+			"decode exact canonical JSON object target is nil",
+		)
+	}
+	canonical, err := CanonicalizeObject(raw, maximumBytes)
+	if err != nil {
+		return fmt.Errorf(
+			"canonicalize exact JSON object: %w",
+			err,
+		)
+	}
+	if !bytes.Equal(raw, canonical) {
+		return errors.New(
+			"canonical JSON object bytes are not canonical",
+		)
+	}
+	if err := DecodeCanonicalObjectBytesInto(
+		canonical,
+		target,
+		maximumBytes,
+	); err != nil {
+		return err
+	}
+	return nil
+}
+
 // DecodeCanonicalObjectInto validates raw as one JSON object, canonicalizes
 // it, and strictly decodes it into target. It is the non-generic counterpart
 // to DecodeCanonicalObject for polymorphic contract values.

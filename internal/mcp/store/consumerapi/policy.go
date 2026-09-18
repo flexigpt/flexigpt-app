@@ -78,22 +78,14 @@ func (a *API) UpsertManagedMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	member, err := a.collections.MemberForCollectionSource(
+	membership, err := a.collections.EnsureMemberForCollectionSource(
 		ctx,
-		request.Collection,
-		mcppolicyv1.MCPPolicyType,
-		request.Name,
-		locator,
-	)
-	if err != nil {
-		return ManagedMCPPolicyUpsertResult{}, err
-	}
-	membership, err := a.collections.EnsureMember(
-		ctx,
-		collection.AddMemberRequest{
+		collection.EnsureMemberForCollectionSourceRequest{
 			Collection:       request.Collection,
 			ExpectedRevision: request.ExpectedCollectionRevision,
-			Member:           member,
+			Type:             mcppolicyv1.MCPPolicyType,
+			Name:             request.Name,
+			Locator:          locator,
 		},
 	)
 	if err != nil {

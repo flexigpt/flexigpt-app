@@ -3,16 +3,14 @@ package skill
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/flexigpt/agentskills-go/document"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -30,7 +28,7 @@ type WorkspaceSkill struct {
 }
 
 type LoadPlan struct {
-	Workspace workspaceDomain.WorkspaceRef
+	Workspace artifact.ArtifactRef
 	Skills    []WorkspaceSkill
 }
 
@@ -62,6 +60,9 @@ func (a *Adapter) LoadSelected(
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
 ) (LoadPlan, error) {
+	if a == nil || a.artifacts == nil || a.resources == nil {
+		return LoadPlan{}, basespec.ErrClosed
+	}
 	if err := workspace.Validate(); err != nil {
 		return LoadPlan{}, err
 	}
@@ -115,116 +116,24 @@ func (a *Adapter) resolve(
 	workspace workspaceDomain.Workspace,
 	record artifact.Artifact,
 ) (WorkspaceSkill, error) {
-	if record.RootID != workspace.Artifact.RootID ||
-		!skillDomain.IsSkillKind(record.Kind) ||
-		record.State != artifact.StateAvailable ||
-		record.ResolvedDefinition == nil ||
-		record.SourceContentDigest == nil {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: Skill Artifact %q is unavailable",
-			workspaceDomain.ErrReferenceUnresolved,
-			record.ID,
-		)
+	value, err := materialize.Resolve(ctx, a.resources, record)
+	if err != nil {
+		return WorkspaceSkill{}, err
 	}
-
 	settings, err := workspaceDomain.DecodeArtifactData(record.Data)
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
-	resolved, err := a.resources.ResolveArtifact(
-		ctx,
-		record.Ref(),
-		resource.ResolveOptions{},
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	if err := skillDomain.ValidateDefinition(resolved.Definition); err != nil {
-		return WorkspaceSkill{}, err
-	}
-	declarationValue, err := skillDomain.SkillDeclarationFromDefinition(
-		resolved.Definition,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	documentLocator, err := skillDomain.SourceDocumentLocator(
-		declarationValue.Locator,
-		record.Binding.Locator,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-
-	sourceEntry, err := a.resources.ReadSourceEntry(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-		documentLocator,
-		basespec.MaxCandidateBytes,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	if sourceEntry.SourceRevision !=
-		resolved.RefreshState.SourceRevision ||
-		sourceEntry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: Skill Source changed during Workspace resolution",
-			basespec.ErrRefreshRequired,
-		)
-	}
-	if documentLocator == record.Binding.Locator &&
-		sourceEntry.Digest != *record.SourceContentDigest {
-		return WorkspaceSkill{}, fmt.Errorf(
-			"%w: Skill Source changed during Workspace resolution",
-			basespec.ErrRefreshRequired,
-		)
-	}
-	documentValue, _, err := skillDomain.ParseSkillDocument(
-		sourceEntry.Content,
-		string(record.LogicalName),
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-
-	subresource := record.Binding.SubresourceLocator
-	if documentLocator != record.Binding.Locator {
-		subresource = ""
-	}
-	packageLocator, err := skillDomain.RuntimePackageLocator(
-		documentLocator,
-		subresource,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-	location, err := a.resources.ResolveVerifiedLocalPath(
-		ctx,
-		resolved,
-		packageLocator,
-	)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
-
-	versionInput := string(resolved.Definition.Digest) + "\x00" +
-		string(sourceEntry.Digest) + "\x00" +
-		resolved.RefreshState.SourceGeneration + "\x00" +
-		strconv.FormatUint(record.Revision, 10)
-
 	return WorkspaceSkill{
-		Artifact:         record.Ref(),
-		ArtifactRevision: record.Revision,
-		DefinitionDigest: resolved.Definition.Digest,
-		SourceID:         string(record.Binding.SourceID),
-		Locator:          documentLocator,
-		Document:         documentValue,
-		RuntimeLocation:  location,
+		Artifact:         value.Artifact,
+		ArtifactRevision: value.ArtifactRevision,
+		DefinitionDigest: value.DefinitionDigest,
+		SourceID:         string(value.SourceID),
+		Locator:          value.Locator,
+		Document:         value.Document,
+		RuntimeLocation:  value.RuntimeLocation,
 		Version: "workspace-skill:" + string(
-			cryptoutil.DigestBytes([]byte(versionInput)),
+			value.VersionDigest,
 		),
 		RuntimeDisabled: settings.RuntimeDisabled,
 	}, nil

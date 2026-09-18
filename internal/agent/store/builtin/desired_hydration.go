@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func (i *Installer) DesiredHydration(
@@ -41,18 +40,6 @@ func (i *Installer) DesiredHydration(
 		return topology.Hydration{}, err
 	}
 	return value, nil
-}
-
-func topologyHydrationFingerprint(
-	topologyValue topology.Declaration,
-) (cryptoutil.Digest, error) {
-	return cryptoutil.CanonicalDigest(struct {
-		SchemaVersion string               `json:"schemaVersion"`
-		Topology      topology.Declaration `json:"topology"`
-	}{
-		SchemaVersion: agentDomain.HydrationSchemaVersion,
-		Topology:      topologyValue,
-	})
 }
 
 func (i *Installer) DesiredPackageHydrations(

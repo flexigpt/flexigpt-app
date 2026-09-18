@@ -8,8 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 )
 
-type WorkspaceRef = artifact.ArtifactRef
-
 const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
 	workspacev1.WorkspaceType,
 )
@@ -89,7 +87,7 @@ func NewWorkspace(
 	return output, nil
 }
 
-func (w Workspace) Ref() WorkspaceRef {
+func (w Workspace) Ref() artifact.ArtifactRef {
 	return w.Artifact.Ref()
 }
 

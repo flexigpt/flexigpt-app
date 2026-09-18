@@ -507,12 +507,6 @@ func validatePreparedPackageIdentities(
 func PackageFingerprint(
 	value PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	type file struct {
-		Locator basespec.Locator  `json:"locator"`
-		Digest  cryptoutil.Digest `json:"digest"`
-		Size    int64             `json:"size"`
-	}
-
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
@@ -524,44 +518,19 @@ func PackageFingerprint(
 		)
 	}
 
-	packageFiles, err := source.NormalizeManagedPackageFiles(
-		value.PackageFiles,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	files := make([]file, 0, len(packageFiles))
-	for _, item := range packageFiles {
-		files = append(files, file{
-			Locator: item.Locator,
-			Digest:  cryptoutil.DigestBytes(item.Content),
-			Size:    int64(len(item.Content)),
-		})
-	}
-	sort.Slice(files, func(left, right int) bool {
-		return files[left].Locator < files[right].Locator
-	})
-
 	expectations := append(
 		[]agentConsumerAPI.BuiltInAgentArtifactExpectation(nil),
 		value.Expectations...,
 	)
 	sortExpectations(expectations)
 
-	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot        basespec.Locator                                   `json:"packageRoot"`
-		Address            source.ManagedPackageAddress                       `json:"address"`
-		PluginDocumentFile basespec.Locator                                   `json:"pluginDocumentFile"`
-		Expectations       []agentConsumerAPI.BuiltInAgentArtifactExpectation `json:"expectations"`
-		Files              []file                                             `json:"files"`
-	}{
-		PackageRoot:        value.EmbeddedPackageRoot,
-		Address:            value.PackageAddress,
-		PluginDocumentFile: value.PluginDocumentFile,
-		Expectations:       expectations,
-		Files:              files,
-	})
+	return topology.PackageFingerprint(
+		value.EmbeddedPackageRoot,
+		value.PackageAddress,
+		value.PluginDocumentFile,
+		expectations,
+		value.PackageFiles,
+	)
 }
 
 func sortExpectations(

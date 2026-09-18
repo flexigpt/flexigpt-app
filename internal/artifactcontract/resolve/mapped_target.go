@@ -1,11 +1,8 @@
 package resolve
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -167,51 +164,17 @@ func DecodeMappedIdentifier[T any](
 		)
 	}
 
-	canonical, err := jsonutil.CanonicalizeObject(
+	value, err := jsonutil.DecodeCanonicalObjectExact[T](
 		raw,
 		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
-		return zero, fmt.Errorf(
-			"%w: mapped identifier payload: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if !bytes.Equal(raw, canonical) {
-		return zero, fmt.Errorf(
-			"%w: mapped identifier payload is not canonical",
-			basespec.ErrInvalid,
-		)
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(canonical))
-	decoder.DisallowUnknownFields()
-
-	var value T
-	if err := decoder.Decode(&value); err != nil {
 		return zero, fmt.Errorf(
 			"%w: decode mapped identifier payload: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
-
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return zero, fmt.Errorf(
-				"%w: mapped identifier has multiple JSON values",
-				basespec.ErrInvalid,
-			)
-		}
-		return zero, fmt.Errorf(
-			"%w: mapped identifier trailing JSON: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-
 	return value, nil
 }
 

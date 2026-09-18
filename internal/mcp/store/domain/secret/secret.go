@@ -1,12 +1,9 @@
 package secret
 
 import (
-	"bytes"
 	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -14,6 +11,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
+
+type mcpSecretRefWire struct {
+	Server artifact.ArtifactRef `json:"server"`
+	Kind   MCPSecretKind        `json:"kind"`
+	Slot   string               `json:"slot"`
+}
 
 func NewMCPSecretRefString(
 	server artifact.ArtifactRef,
@@ -68,26 +71,12 @@ func ParseMCPSecretRef(raw string) (MCPSecretRef, error) {
 		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid base64: %w", raw, err)
 	}
 
-	var wire struct {
-		Server artifact.ArtifactRef `json:"server"`
-		Kind   MCPSecretKind        `json:"kind"`
-		Slot   string               `json:"slot"`
-	}
-	decoder := json.NewDecoder(bytes.NewReader(b))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&wire); err != nil {
+	wire, err := jsonutil.DecodeCanonicalObjectExact[mcpSecretRefWire](
+		b,
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
 		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
-		if err == nil {
-			err = errors.New("secret ref contains trailing JSON")
-		}
-		return MCPSecretRef{}, fmt.Errorf(
-			"secret ref %q is not valid json: %w",
-			raw,
-			err,
-		)
 	}
 
 	ref := MCPSecretRef{

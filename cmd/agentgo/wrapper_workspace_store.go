@@ -151,7 +151,7 @@ func (w *WorkspaceStoreWrapper) AddWorkspacePath(
 }
 
 func (w *WorkspaceStoreWrapper) GetWorkspace(
-	ref workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
 	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceDomain.Workspace, error) {
 		return api.GetWorkspace(context.Background(), ref)
@@ -167,7 +167,7 @@ func (w *WorkspaceStoreWrapper) ListWorkspaces(
 }
 
 func (w *WorkspaceStoreWrapper) LoadWorkspace(
-	ref workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (workspaceConsumerAPI.WorkspaceLoad, error) {
 	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceLoad, error) {
 		return api.LoadWorkspace(context.Background(), ref)
@@ -175,7 +175,7 @@ func (w *WorkspaceStoreWrapper) LoadWorkspace(
 }
 
 func (w *WorkspaceStoreWrapper) ResolveWorkspaceCapabilities(
-	ref workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (resolve.CapabilityPlan, error) {
 	return withWorkspaceStore(
 		w,
@@ -194,7 +194,7 @@ func (w *WorkspaceStoreWrapper) ResolveWorkspaceArtifactCapabilities(
 }
 
 func (w *WorkspaceStoreWrapper) RefreshWorkspace(
-	ref workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (workspaceConsumerAPI.WorkspaceRefresh, error) {
 	return withWorkspaceStore(
 		w,
@@ -205,7 +205,7 @@ func (w *WorkspaceStoreWrapper) RefreshWorkspace(
 }
 
 func (w *WorkspaceStoreWrapper) ListWorkspaceArtifacts(
-	ref workspaceConsumerAPI.WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) ([]artifact.Artifact, error) {
 	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) ([]artifact.Artifact, error) {
 		return api.ListWorkspaceArtifacts(context.Background(), ref)
@@ -213,7 +213,7 @@ func (w *WorkspaceStoreWrapper) ListWorkspaceArtifacts(
 }
 
 func (w *WorkspaceStoreWrapper) SetWorkspaceArtifactEnabled(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,

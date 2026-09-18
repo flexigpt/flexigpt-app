@@ -55,22 +55,14 @@ func (a *API) CreateManagedMCP(
 		return ManagedMCPCreateResult{}, err
 	}
 
-	member, err := a.collections.MemberForCollectionSource(
+	membership, err := a.collections.EnsureMemberForCollectionSource(
 		ctx,
-		request.Collection,
-		declaration.TypeMCP,
-		request.Document.LogicalName,
-		locator,
-	)
-	if err != nil {
-		return ManagedMCPCreateResult{}, err
-	}
-	membership, err := a.collections.EnsureMember(
-		ctx,
-		collection.AddMemberRequest{
+		collection.EnsureMemberForCollectionSourceRequest{
 			Collection:       request.Collection,
 			ExpectedRevision: request.ExpectedCollectionRevision,
-			Member:           member,
+			Type:             declaration.TypeMCP,
+			Name:             request.Document.LogicalName,
+			Locator:          locator,
 		},
 	)
 	if err != nil {

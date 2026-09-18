@@ -37,4 +37,5 @@ type ResolvedArtifactSkill struct {
 	Artifact   artifact.ArtifactRef
 	Definition provider.SkillDef
 	Version    string
+	Enabled    bool
 }

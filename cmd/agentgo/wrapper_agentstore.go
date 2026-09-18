@@ -207,7 +207,7 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 }
 
 func (w *AgentStoreWrapper) CreateAgentCollection(
-	request agentConsumerAPI.CreateAgentCollectionRequest,
+	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
 	return withAgentStore(
 		w,
@@ -240,7 +240,7 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 }
 
 func (w *AgentStoreWrapper) UpdateAgentCollection(
-	request agentConsumerAPI.UpdateAgentCollectionRequest,
+	request collection.UpdateRequest,
 ) (collection.CollectionView, error) {
 	return withAgentStore(
 		w,
@@ -285,7 +285,7 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 }
 
 func (w *AgentStoreWrapper) AddAgentCollectionEntry(
-	request agentConsumerAPI.AddAgentCollectionEntryRequest,
+	request collection.AddEntryRequest,
 ) (collection.CollectionView, error) {
 	return withAgentStore(
 		w,
@@ -307,7 +307,7 @@ func (w *AgentStoreWrapper) AttachAgentToCollection(
 }
 
 func (w *AgentStoreWrapper) DetachAgentFromCollection(
-	request agentConsumerAPI.DetachAgentFromCollectionRequest,
+	request collection.RemoveMemberRequest,
 ) (collection.CollectionView, error) {
 	return withAgentStore(
 		w,

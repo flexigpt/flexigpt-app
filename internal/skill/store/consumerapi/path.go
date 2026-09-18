@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -59,46 +59,27 @@ func (a *API) AddSkillPath(
 		return SkillPathRegistrationResult{}, err
 	}
 
-	summary, _, err := a.sources.Ensure(
+	summary, err := consumerutil.EnsureAndRefreshSource(
 		ctx,
-		request.RootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  skillPathStorageKey(rootPath),
-			Kind:        source.SourceKindFilesystemDirectory,
-			DisplayName: displayName,
-			Enabled:     true,
-			Config:      config,
-			Discovery:   discovery,
+		a.sources,
+		a.discovery,
+		consumerutil.EnsureAndRefreshSourceRequest{
+			RootID: request.RootID,
+			Draft: source.Draft{
+				ID: source.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey: consumerutil.FilesystemSourceStorageKey(
+					"skill-path",
+					rootPath,
+				),
+				Kind:        source.SourceKindFilesystemDirectory,
+				DisplayName: displayName,
+				Enabled:     true,
+				Config:      config,
+				Discovery:   discovery,
+			},
 		},
 	)
 	if err != nil {
-		return SkillPathRegistrationResult{}, err
-	}
-	if !summary.Enabled ||
-		summary.DisplayName != displayName ||
-		!summary.Discovery.Equal(discovery) {
-		summary, err = a.sources.Update(
-			ctx,
-			request.RootID,
-			summary.ID,
-			source.Update{
-				ExpectedRevision: summary.Revision,
-				DisplayName:      displayName,
-				Enabled:          true,
-				Discovery:        &discovery,
-			},
-		)
-		if err != nil {
-			return SkillPathRegistrationResult{}, err
-		}
-	}
-
-	if _, err := a.discovery.RefreshSource(
-		ctx,
-		request.RootID,
-		summary.ID,
-	); err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
 
@@ -211,14 +192,4 @@ func skillFileDiscovery(
 		return source.DiscoverySpec{}, err
 	}
 	return value, nil
-}
-
-func skillPathStorageKey(
-	rootPath string,
-) basespec.StorageKey {
-	digest := strings.TrimPrefix(
-		string(cryptoutil.DigestBytes([]byte(rootPath))),
-		cryptoutil.DigestSHA256Prefix,
-	)
-	return basespec.StorageKey("skill-path-" + digest[:24])
 }

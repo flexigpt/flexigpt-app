@@ -3,7 +3,6 @@ package resolve
 import (
 	"context"
 	"fmt"
-	"path"
 	"sort"
 	"strings"
 
@@ -93,6 +92,21 @@ func (r *Resolver) expandSelector(
 		)
 	}
 
+	sourceSelection, err := basespec.NewPathSelection(
+		selector.Include,
+		selector.Exclude,
+	)
+	if err != nil {
+		return ResolvedSelector{}, err
+	}
+	nameSelection, err := basespec.NewPathSelection(
+		selector.NameInclude,
+		selector.NameExclude,
+	)
+	if err != nil {
+		return ResolvedSelector{}, err
+	}
+
 	records, err := r.sourceArtifacts.ListBySource(
 		ctx,
 		rootID,
@@ -126,13 +140,24 @@ func (r *Resolver) expandSelector(
 		}
 
 		relative, inside := selectorRelativePath(base, record.Binding.Locator)
-		if !inside ||
-			!matchesSelectorPatterns(relative, selector.Include, selector.Exclude) ||
-			!matchesSelectorPatterns(
-				string(record.LogicalName),
-				selector.NameInclude,
-				selector.NameExclude,
-			) {
+		if !inside {
+			continue
+		}
+
+		sourceMatched, err := sourceSelection.Match(relative)
+		if err != nil {
+			return ResolvedSelector{}, err
+		}
+		if !sourceMatched {
+			continue
+		}
+		nameMatched, err := nameSelection.Match(
+			string(record.LogicalName),
+		)
+		if err != nil {
+			return ResolvedSelector{}, err
+		}
+		if !nameMatched {
 			continue
 		}
 
@@ -191,61 +216,4 @@ func selectorRelativePath(
 		string(base)+"/",
 	)
 	return relative, found && relative != ""
-}
-
-func matchesSelectorPatterns(
-	value string,
-	include []string,
-	exclude []string,
-) bool {
-	if len(include) != 0 && !matchesAnyGlob(include, value) {
-		return false
-	}
-	return !matchesAnyGlob(exclude, value)
-}
-
-func matchesAnyGlob(patterns []string, value string) bool {
-	for _, pattern := range patterns {
-		if globMatchesPath(pattern, value) {
-			return true
-		}
-	}
-	return false
-}
-
-func globMatchesPath(pattern, value string) bool {
-	pattern = strings.TrimPrefix(path.Clean(pattern), "./")
-	value = strings.TrimPrefix(path.Clean(value), "./")
-	if pattern == "." {
-		return value == "."
-	}
-	return globSegmentsMatch(
-		strings.Split(pattern, "/"),
-		strings.Split(value, "/"),
-	)
-}
-
-func globSegmentsMatch(
-	pattern []string,
-	value []string,
-) bool {
-	if len(pattern) == 0 {
-		return len(value) == 0
-	}
-	if pattern[0] == "**" {
-		for index := 0; index <= len(value); index++ {
-			if globSegmentsMatch(pattern[1:], value[index:]) {
-				return true
-			}
-		}
-		return false
-	}
-	if len(value) == 0 {
-		return false
-	}
-	matched, err := path.Match(pattern[0], value[0])
-	if err != nil || !matched {
-		return false
-	}
-	return globSegmentsMatch(pattern[1:], value[1:])
 }

@@ -13,7 +13,7 @@ import (
 
 func (a *StoreAPI) LoadWorkspace(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (WorkspaceLoad, error) {
 	workspace, resolved, err := a.resolveCurrentWorkspace(ctx, ref)
 	if err != nil {
@@ -39,7 +39,7 @@ func (a *StoreAPI) LoadWorkspace(
 
 func (a *StoreAPI) RefreshWorkspace(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (WorkspaceRefresh, error) {
 	if a == nil || a.resolver == nil {
 		return WorkspaceRefresh{}, basespec.ErrClosed
@@ -61,7 +61,7 @@ func (a *StoreAPI) RefreshWorkspace(
 
 func (a *StoreAPI) resolveCurrentWorkspace(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (
 	workspaceDomain.Workspace,
 	*resolve.ResolvedEntry,
@@ -94,7 +94,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 
 func (a *StoreAPI) workspaceForRef(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
 	return a.workspaceAt(ctx, ref)
 }

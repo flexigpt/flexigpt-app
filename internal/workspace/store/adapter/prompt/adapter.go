@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
@@ -18,7 +19,7 @@ import (
 type Contribution struct {
 	Artifact         artifact.ArtifactRef
 	ArtifactRevision uint64
-	DefinitionDigest string
+	DefinitionDigest cryptoutil.Digest
 	Kind             artifact.ArtifactKind
 	Name             string
 	Insert           declaration.InsertTarget
@@ -39,7 +40,7 @@ type Decision struct {
 }
 
 type Plan struct {
-	Workspace     workspaceDomain.WorkspaceRef
+	Workspace     artifact.ArtifactRef
 	Contributions []Contribution
 	Prompt        string
 	Diagnostics   []diagnostic.Diagnostic
@@ -126,7 +127,10 @@ func (a *Adapter) compose(
 		0,
 		len(selected),
 	)
-	contributionsByID := make(map[string]int)
+	contributionsByID := make(
+		map[string]Contribution,
+		len(selected),
+	)
 
 	for _, record := range selected {
 		settings, err := workspaceDomain.DecodeArtifactData(record.Data)
@@ -182,8 +186,7 @@ func (a *Adapter) compose(
 		}
 
 		id := contributionID(contribution.Artifact)
-		contributionsByID[id] = len(output.Contributions)
-		output.Contributions = append(output.Contributions, contribution)
+		contributionsByID[id] = contribution
 		runtimeValues = append(runtimeValues, workspaceRuntime.ContextContribution{
 			ID:      id,
 			Kind:    string(contribution.Insert),
@@ -197,21 +200,27 @@ func (a *Adapter) compose(
 	if err != nil {
 		return Plan{}, err
 	}
+	output.Contributions = make(
+		[]Contribution,
+		0,
+		len(result.Contributions),
+	)
 	for _, value := range result.Contributions {
-		index, found := contributionsByID[value.ID]
+		contribution, found := contributionsByID[value.ID]
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: prompt engine returned an unknown contribution",
 				workspaceDomain.ErrInvalidWorkspace,
 			)
 		}
-		output.Contributions[index].Content = value.Content
-		output.Contributions[index].OriginalBytes = value.OriginalBytes
-		output.Contributions[index].IncludedBytes = value.IncludedBytes
-		output.Contributions[index].Truncated = value.Truncated
+		contribution.Content = value.Content
+		contribution.OriginalBytes = value.OriginalBytes
+		contribution.IncludedBytes = value.IncludedBytes
+		contribution.Truncated = value.Truncated
+		output.Contributions = append(output.Contributions, contribution)
 	}
 	for _, value := range result.Decisions {
-		index, found := contributionsByID[value.ID]
+		contribution, found := contributionsByID[value.ID]
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: prompt engine returned an unknown decision",
@@ -219,7 +228,7 @@ func (a *Adapter) compose(
 			)
 		}
 		output.Decisions = append(output.Decisions, Decision{
-			Artifact:      output.Contributions[index].Artifact,
+			Artifact:      contribution.Artifact,
 			Status:        value.Status,
 			Code:          value.Code,
 			OriginalBytes: value.OriginalBytes,
@@ -227,7 +236,7 @@ func (a *Adapter) compose(
 		})
 	}
 	for _, value := range result.Diagnostics {
-		index, found := contributionsByID[value.ID]
+		contribution, found := contributionsByID[value.ID]
 		if !found {
 			return Plan{}, fmt.Errorf(
 				"%w: prompt engine returned an unknown diagnostic",
@@ -237,7 +246,7 @@ func (a *Adapter) compose(
 		output.Diagnostics = diagnostic.Append(
 			output.Diagnostics,
 			artifactDiagnostic(
-				selectedArtifact(output.Contributions[index].Artifact, selected),
+				selectedArtifact(contribution.Artifact, selected),
 				value.Code,
 				value.Message,
 			),

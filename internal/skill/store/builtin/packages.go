@@ -322,18 +322,7 @@ func canonicalCollectionPackage(
 		}
 	}
 
-	sort.Slice(expectations, func(left, right int) bool {
-		if expectations[left].Locator != expectations[right].Locator {
-			return expectations[left].Locator < expectations[right].Locator
-		}
-		if expectations[left].Subresource !=
-			expectations[right].Subresource {
-			return expectations[left].Subresource <
-				expectations[right].Subresource
-		}
-		return expectations[left].Kind <
-			expectations[right].Kind
-	})
+	sortSkillExpectations(expectations)
 	return collection, expectations, nil
 }
 
@@ -394,42 +383,41 @@ func validatePreparedPackageIdentities(
 func PackageFingerprint(
 	value PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	type file struct {
-		Locator basespec.Locator  `json:"locator"`
-		Digest  cryptoutil.Digest `json:"digest"`
-		Size    int64             `json:"size"`
-	}
-
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
-	if err := value.DocumentFile.ValidatePortable(false); err != nil {
-		return "", err
+	if value.DocumentFile != skillDomain.BuiltinSkillPluginDocumentFile {
+		return "", fmt.Errorf(
+			"%w: built-in Skill Plugin document must be %q",
+			basespec.ErrInvalid,
+			skillDomain.BuiltinSkillPluginDocumentFile,
+		)
 	}
+	expectations := append(
+		[]skillConsumerAPI.BuiltInSkillArtifactExpectation(nil),
+		value.Expectations...,
+	)
+	sortSkillExpectations(expectations)
 
-	files := make([]file, 0, len(value.PackageFiles))
-	for _, item := range value.PackageFiles {
-		files = append(files, file{
-			Locator: item.Locator,
-			Digest:  cryptoutil.DigestBytes(item.Content),
-			Size:    int64(len(item.Content)),
-		})
-	}
-	sort.Slice(files, func(left, right int) bool {
-		return files[left].Locator < files[right].Locator
-	})
+	return topology.PackageFingerprint(
+		value.EmbeddedPackageRoot,
+		value.PackageAddress,
+		value.DocumentFile,
+		expectations,
+		value.PackageFiles,
+	)
+}
 
-	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot  basespec.Locator                                   `json:"packageRoot"`
-		Address      source.ManagedPackageAddress                       `json:"address"`
-		DocumentFile basespec.Locator                                   `json:"documentFile"`
-		Expectations []skillConsumerAPI.BuiltInSkillArtifactExpectation `json:"expectations"`
-		Files        []file                                             `json:"files"`
-	}{
-		PackageRoot:  value.EmbeddedPackageRoot,
-		Address:      value.PackageAddress,
-		DocumentFile: value.DocumentFile,
-		Expectations: value.Expectations,
-		Files:        files,
+func sortSkillExpectations(
+	values []skillConsumerAPI.BuiltInSkillArtifactExpectation,
+) {
+	sort.Slice(values, func(left, right int) bool {
+		if values[left].Locator != values[right].Locator {
+			return values[left].Locator < values[right].Locator
+		}
+		if values[left].Subresource != values[right].Subresource {
+			return values[left].Subresource < values[right].Subresource
+		}
+		return values[left].Kind < values[right].Kind
 	})
 }

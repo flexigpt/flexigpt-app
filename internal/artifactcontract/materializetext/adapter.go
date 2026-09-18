@@ -14,12 +14,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Document struct {
 	Artifact         artifact.ArtifactRef
 	ArtifactRevision uint64
-	DefinitionDigest string
+	DefinitionDigest cryptoutil.Digest
 	Name             string
 	Insert           declaration.InsertTarget
 	MediaType        string
@@ -89,7 +90,7 @@ func (a *Adapter) Resolve(
 	return Document{
 		Artifact:         resolved.Artifact.Ref(),
 		ArtifactRevision: resolved.Artifact.Revision,
-		DefinitionDigest: string(resolved.Definition.Digest),
+		DefinitionDigest: resolved.Definition.Digest,
 		Name:             declarationValue.Name,
 		Insert:           declarationValue.Insert,
 		MediaType:        declarationValue.MediaType,

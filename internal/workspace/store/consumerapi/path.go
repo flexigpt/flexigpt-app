@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
@@ -65,7 +65,7 @@ func (a *StoreAPI) AddWorkspacePath(
 		return WorkspacePathRegistrationResult{}, err
 	}
 	if hasManifest {
-		discovery.ExplicitLocators = appendUniqueLocator(
+		discovery.ExplicitLocators = consumerutil.AppendUniqueLocator(
 			discovery.ExplicitLocators,
 			manifest,
 		)
@@ -81,47 +81,28 @@ func (a *StoreAPI) AddWorkspacePath(
 		return WorkspacePathRegistrationResult{}, err
 	}
 
-	summary, _, err := a.sources.Ensure(
+	summary, err := consumerutil.EnsureAndRefreshSource(
 		ctx,
-		request.RootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  workspacePathStorageKey(rootPath),
-			Kind:        source.SourceKindFilesystemDirectory,
-			DisplayName: displayName,
-			Enabled:     true,
-			Config:      config,
-			Discovery:   discovery,
+		a.sources,
+		a.discovery,
+		consumerutil.EnsureAndRefreshSourceRequest{
+			RootID: request.RootID,
+			Draft: source.Draft{
+				ID: source.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey: consumerutil.FilesystemSourceStorageKey(
+					"workspace-path",
+					rootPath,
+				),
+				Kind:        source.SourceKindFilesystemDirectory,
+				DisplayName: displayName,
+				Enabled:     true,
+				Config:      config,
+				Discovery:   discovery,
+			},
+			ReconcileDiscovery: consumerutil.MergeDiscoveryScopes,
 		},
 	)
 	if err != nil {
-		return WorkspacePathRegistrationResult{}, err
-	}
-
-	if !summary.Enabled ||
-		summary.DisplayName != displayName ||
-		!summary.Discovery.Equal(discovery) {
-		summary, err = a.sources.Update(
-			ctx,
-			request.RootID,
-			summary.ID,
-			source.Update{
-				ExpectedRevision: summary.Revision,
-				DisplayName:      displayName,
-				Enabled:          true,
-				Discovery:        &discovery,
-			},
-		)
-		if err != nil {
-			return WorkspacePathRegistrationResult{}, err
-		}
-	}
-
-	if _, err := a.discovery.RefreshSource(
-		ctx,
-		request.RootID,
-		summary.ID,
-	); err != nil {
 		return WorkspacePathRegistrationResult{}, err
 	}
 
@@ -209,10 +190,10 @@ func (a *StoreAPI) findWorkspaceFromPath(
 	manifest basespec.Locator,
 	hasManifest bool,
 	name basespec.LogicalName,
-) (workspaceDomain.WorkspaceRef, error) {
+) (artifact.ArtifactRef, error) {
 	records, err := a.artifacts.ListBySource(ctx, rootID, sourceID)
 	if err != nil {
-		return workspaceDomain.WorkspaceRef{}, err
+		return artifact.ArtifactRef{}, err
 	}
 
 	candidates := make(
@@ -233,14 +214,14 @@ func (a *StoreAPI) findWorkspaceFromPath(
 		}
 		workspace, err := a.GetWorkspace(ctx, record.Ref())
 		if err != nil {
-			return workspaceDomain.WorkspaceRef{}, err
+			return artifact.ArtifactRef{}, err
 		}
 		candidates[workspace.Ref()] = struct{}{}
 	}
 
 	switch len(candidates) {
 	case 0:
-		return workspaceDomain.WorkspaceRef{}, fmt.Errorf(
+		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: no available Workspace declaration was discovered",
 			basespec.ErrReferenceUnresolved,
 		)
@@ -248,25 +229,15 @@ func (a *StoreAPI) findWorkspaceFromPath(
 		for ref := range candidates {
 			return ref, nil
 		}
-		return workspaceDomain.WorkspaceRef{}, fmt.Errorf(
+		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: Workspace candidate set is inconsistent",
 			basespec.ErrInvalid,
 		)
 	default:
-		return workspaceDomain.WorkspaceRef{}, fmt.Errorf(
+		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path contains %d Workspace declarations; provide a Workspace manifest file or workspaceName",
 			basespec.ErrIdentityConflict,
 			len(candidates),
 		)
 	}
-}
-
-func workspacePathStorageKey(
-	rootPath string,
-) basespec.StorageKey {
-	digest := strings.TrimPrefix(
-		string(cryptoutil.DigestBytes([]byte(rootPath))),
-		cryptoutil.DigestSHA256Prefix,
-	)
-	return basespec.StorageKey("workspace-path-" + digest[:24])
 }

@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path"
-	"path/filepath"
 	"sort"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -18,6 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -159,7 +158,10 @@ func (a *API) RegisterSkillDirectory(
 		return source.Summary{}, err
 	}
 
-	rootPath, err := normalizeSkillDirectoryRoot(request.RootPath)
+	rootPath, err := consumerutil.NormalizeFilesystemSourceRoot(
+		request.RootPath,
+		"Skill Source root path",
+	)
 	if err != nil {
 		return source.Summary{}, err
 	}
@@ -177,64 +179,26 @@ func (a *API) RegisterSkillDirectory(
 		return source.Summary{}, err
 	}
 
-	value, _, err := a.sources.Ensure(
+	return consumerutil.EnsureAndRefreshSource(
 		ctx,
-		request.RootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
-			StorageKey:  skillPathStorageKey(rootPath),
-			Kind:        source.SourceKindFilesystemDirectory,
-			DisplayName: request.SourceDisplayName,
-			Enabled:     true,
-			Config:      config,
-			Discovery:   discovery,
+		a.sources,
+		a.discovery,
+		consumerutil.EnsureAndRefreshSourceRequest{
+			RootID: request.RootID,
+			Draft: source.Draft{
+				ID: source.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey: consumerutil.FilesystemSourceStorageKey(
+					"skill-path",
+					rootPath,
+				),
+				Kind:        source.SourceKindFilesystemDirectory,
+				DisplayName: request.SourceDisplayName,
+				Enabled:     true,
+				Config:      config,
+				Discovery:   discovery,
+			},
 		},
 	)
-	if err != nil {
-		return source.Summary{}, err
-	}
-	if !value.Enabled ||
-		value.DisplayName != request.SourceDisplayName ||
-		!value.Discovery.Equal(discovery) {
-		value, err = a.sources.Update(
-			ctx,
-			request.RootID,
-			value.ID,
-			source.Update{
-				ExpectedRevision: value.Revision,
-				DisplayName:      request.SourceDisplayName,
-				Enabled:          true,
-				Discovery:        &discovery,
-			},
-		)
-		if err != nil {
-			return source.Summary{}, err
-		}
-	}
-	if _, err := a.discovery.RefreshSource(
-		ctx,
-		request.RootID,
-		value.ID,
-	); err != nil {
-		return source.Summary{}, err
-	}
-	return value, nil
-}
-
-func normalizeSkillDirectoryRoot(
-	raw string,
-) (string, error) {
-	if raw == "" || strings.TrimSpace(raw) != raw {
-		return "", fmt.Errorf(
-			"%w: Skill Source root path is required",
-			basespec.ErrInvalid,
-		)
-	}
-	absolute, err := filepath.Abs(raw)
-	if err != nil {
-		return "", err
-	}
-	return filepath.Clean(absolute), nil
 }
 
 func (a *API) RefreshSkillSource(
@@ -387,22 +351,14 @@ func (a *API) CreateManagedSkill(
 		return ManagedSkillCreateResult{}, err
 	}
 
-	member, err := a.collections.MemberForCollectionSource(
+	membership, err := a.collections.EnsureMemberForCollectionSource(
 		ctx,
-		request.Collection,
-		declaration.TypeSkill,
-		definitionValue.LogicalName,
-		locator,
-	)
-	if err != nil {
-		return ManagedSkillCreateResult{}, err
-	}
-	membership, err := a.collections.EnsureMember(
-		ctx,
-		collection.AddMemberRequest{
+		collection.EnsureMemberForCollectionSourceRequest{
 			Collection:       request.Collection,
 			ExpectedRevision: request.ExpectedCollectionRevision,
-			Member:           member,
+			Type:             declaration.TypeSkill,
+			Name:             definitionValue.LogicalName,
+			Locator:          locator,
 		},
 	)
 	if err != nil {

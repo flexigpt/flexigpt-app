@@ -513,21 +513,6 @@ func (a *API) InstallBuiltInPackage(
 			return nil, err
 		}
 
-		if err := expected.Subresource.Validate(); err != nil {
-			return nil, err
-		}
-		if err := expected.Kind.Validate(); err != nil {
-			return nil, err
-		}
-		if err := expected.LogicalName.Validate(); err != nil {
-			return nil, err
-		}
-		if err := cryptoutil.ValidateDigest(
-			expected.DefinitionDigest,
-		); err != nil {
-			return nil, err
-		}
-
 		value, err := a.artifacts.FindByOrigin(
 			ctx,
 			request.RootID,
@@ -666,7 +651,11 @@ func normalizeBuiltInMCPExpectations(
 		if output[left].Locator != output[right].Locator {
 			return output[left].Locator < output[right].Locator
 		}
-		return output[left].Subresource < output[right].Subresource
+		if output[left].Kind != output[right].Kind {
+			return output[left].Kind < output[right].Kind
+		}
+		return output[left].LogicalName <
+			output[right].LogicalName
 	})
 	return output, rootValue, nil
 }

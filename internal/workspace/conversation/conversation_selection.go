@@ -55,7 +55,7 @@ type ConversationResourceSelectionRef struct {
 // explicitly selected Root-scoped Artifact resources for one conversation
 // turn. No Collection or Catalog identity is persisted.
 type ConversationSelection struct {
-	Workspace         workspaceDomain.WorkspaceRef       `json:"workspace"`
+	Workspace         artifact.ArtifactRef               `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	ContextRefs       []ConversationResourceSelectionRef `json:"contextRefs,omitempty"`
@@ -94,13 +94,13 @@ type ConversationSkillUsage struct {
 }
 
 type ConversationUsage struct {
-	Workspace         workspaceDomain.WorkspaceRef `json:"workspace"`
-	DisplayName       string                       `json:"displayName,omitempty"`
-	WorkspaceRevision uint64                       `json:"workspaceRevision,omitempty"`
-	Status            ConversationSelectionStatus  `json:"status"`
-	Contexts          []ConversationContextUsage   `json:"contexts,omitempty"`
-	Skills            []ConversationSkillUsage     `json:"skills,omitempty"`
-	Diagnostics       []diagnostic.Diagnostic      `json:"diagnostics,omitempty"`
+	Workspace         artifact.ArtifactRef        `json:"workspace"`
+	DisplayName       string                      `json:"displayName,omitempty"`
+	WorkspaceRevision uint64                      `json:"workspaceRevision,omitempty"`
+	Status            ConversationSelectionStatus `json:"status"`
+	Contexts          []ConversationContextUsage  `json:"contexts,omitempty"`
+	Skills            []ConversationSkillUsage    `json:"skills,omitempty"`
+	Diagnostics       []diagnostic.Diagnostic     `json:"diagnostics,omitempty"`
 }
 
 type ConversationResolution struct {
@@ -113,18 +113,18 @@ type ConversationResolution struct {
 type WorkspaceSource interface {
 	GetWorkspace(
 		ctx context.Context,
-		ref workspaceDomain.WorkspaceRef,
+		ref artifact.ArtifactRef,
 	) (workspaceDomain.Workspace, error)
 
 	ComposeWorkspacePrompt(
 		ctx context.Context,
-		workspace workspaceDomain.WorkspaceRef,
+		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
 	) (prompt.Plan, error)
 
 	LoadWorkspaceSkills(
 		ctx context.Context,
-		workspace workspaceDomain.WorkspaceRef,
+		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
 	) (skill.LoadPlan, error)
 }
@@ -357,9 +357,7 @@ func applyContextPlan(
 		current := &usage.Contexts[position]
 		current.Name = contribution.Name
 		current.Locator = contribution.Locator
-		current.UsedDefinitionDigest = cryptoutil.Digest(
-			contribution.DefinitionDigest,
-		)
+		current.UsedDefinitionDigest = contribution.DefinitionDigest
 		current.UsedArtifactRevision = contribution.ArtifactRevision
 		current.OriginalBytes = contribution.OriginalBytes
 		current.IncludedBytes = contribution.IncludedBytes

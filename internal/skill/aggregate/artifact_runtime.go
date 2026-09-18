@@ -197,7 +197,7 @@ func (s *Service) DescribeArtifactSkill(
 		}
 		return ArtifactSkillSummary{
 			Artifact:     ref,
-			IsEnabled:    true,
+			IsEnabled:    resolved.Enabled,
 			Insert:       record.Insert,
 			HasArguments: len(record.Arguments) != 0,
 			HasResources: record.Resources.HasResources,

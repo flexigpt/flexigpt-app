@@ -33,8 +33,8 @@ type WorkspaceServer struct {
 }
 
 type LoadPlan struct {
-	Workspace workspaceDomain.WorkspaceRef `json:"workspace"`
-	Servers   []WorkspaceServer            `json:"servers"`
+	Workspace artifact.ArtifactRef `json:"workspace"`
+	Servers   []WorkspaceServer    `json:"servers"`
 }
 
 type Adapter struct {

@@ -30,7 +30,7 @@ func withWorkspaceRuntime[T any](
 }
 
 func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (prompt.Plan, error) {
 	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (prompt.Plan, error) {
@@ -43,7 +43,7 @@ func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 }
 
 func (w *WorkspaceRuntimeWrapper) ListWorkspaceSkills(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 ) ([]skill.WorkspaceSkill, error) {
 	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) ([]skill.WorkspaceSkill, error) {
 		return api.ListWorkspaceSkills(context.Background(), workspace)
@@ -51,7 +51,7 @@ func (w *WorkspaceRuntimeWrapper) ListWorkspaceSkills(
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (skill.LoadPlan, error) {
 	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (skill.LoadPlan, error) {
@@ -64,7 +64,7 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (mcp.LoadPlan, error) {
 	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (mcp.LoadPlan, error) {
@@ -77,7 +77,7 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
 }
 
 func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceRuntimePlan(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	selection workspaceConsumerAPI.WorkspaceRuntimeSelection,
 ) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
 	return withWorkspaceRuntime(

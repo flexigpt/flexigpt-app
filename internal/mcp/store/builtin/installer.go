@@ -47,6 +47,13 @@ func NewInstaller(
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}
+	if len(topologyValue.Sources) != 1 ||
+		topologyValue.Sources[0].Kind != source.SourceKindManagedDirectory {
+		return nil, fmt.Errorf(
+			"%w: built-in MCP Source must be managed",
+			basespec.ErrInvalid,
+		)
+	}
 	prepared, err := PreparePackages(
 		context.Background(),
 		dependencies.Packages,
@@ -54,7 +61,10 @@ func NewInstaller(
 	if err != nil {
 		return nil, err
 	}
-	fingerprint, err := topologyHydrationFingerprint(topologyValue)
+	fingerprint, err := topology.HydrationFingerprint(
+		mcpDomain.HydrationSchemaVersion,
+		topologyValue,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -89,18 +99,29 @@ func (i *Installer) DesiredHydration(
 	if i == nil {
 		return topology.Hydration{}, basespec.ErrClosed
 	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return topology.Hydration{}, err
+	if ctx == nil {
+		return topology.Hydration{}, fmt.Errorf(
+			"%w: built-in MCP hydration context is nil",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := ctx.Err(); err != nil {
 		return topology.Hydration{}, err
 	}
-	return topology.Hydration{
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return topology.Hydration{}, err
+	}
+
+	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.builtInTopology.Root.ID,
 		SourceID:      i.builtInTopology.Sources[0].ID,
 		Fingerprint:   i.fingerprint,
-	}, nil
+	}
+	if err := value.Validate(); err != nil {
+		return topology.Hydration{}, err
+	}
+	return value, nil
 }
 
 func (i *Installer) EnsurePackageHydration(
@@ -150,6 +171,12 @@ func (i *Installer) EnsureHydration(
 	ctx context.Context,
 	topologyCurrent bool,
 ) error {
+	if i == nil {
+		return basespec.ErrClosed
+	}
+	if err := installerapi.RequirePrivileged(ctx); err != nil {
+		return err
+	}
 	if !topologyCurrent {
 		if err := i.overlays.PurgeRoot(
 			ctx,
@@ -247,18 +274,6 @@ func (i *Installer) ensurePackages(
 		}
 	}
 	return nil
-}
-
-func topologyHydrationFingerprint(
-	topologyValue topology.Declaration,
-) (cryptoutil.Digest, error) {
-	return cryptoutil.CanonicalDigest(struct {
-		SchemaVersion string               `json:"schemaVersion"`
-		Topology      topology.Declaration `json:"topology"`
-	}{
-		SchemaVersion: mcpDomain.HydrationSchemaVersion,
-		Topology:      topologyValue,
-	})
 }
 
 // packageScopes returns the package roots owned by the MCP built-in installer.

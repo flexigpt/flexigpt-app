@@ -16,51 +16,12 @@ import (
 
 func (a *API) CreateAgentCollection(
 	ctx context.Context,
-	request CreateAgentCollectionRequest,
+	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-	if err := request.RootID.Validate(); err != nil {
-		return collection.CollectionView{}, err
-	}
-	if request.SourceID != "" {
-		if err := request.SourceID.Validate(); err != nil {
-			return collection.CollectionView{}, err
-		}
-	}
-	if err := request.Name.Validate(); err != nil {
-		return collection.CollectionView{}, err
-	}
-	if err := basespec.ValidateRequiredText(
-		"Agent Collection display name",
-		request.DisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return collection.CollectionView{}, err
-	}
-	if err := basespec.ValidateOptionalText(
-		"Agent Collection description",
-		request.Description,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
-		return collection.CollectionView{}, err
-	}
-
-	created, err := a.collections.Create(
-		ctx,
-		collection.CreateRequest{
-			RootID:      request.RootID,
-			SourceID:    request.SourceID,
-			Name:        request.Name,
-			DisplayName: request.DisplayName,
-			Description: request.Description,
-		},
-	)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, created.Artifact.Ref())
+	return a.collections.Create(ctx, request)
 }
 
 func (a *API) EnsureAgentBaselineCollection(
@@ -70,12 +31,7 @@ func (a *API) EnsureAgentBaselineCollection(
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-
-	value, err := a.collections.EnsureBaseline(ctx, rootID)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, value.Artifact.Ref())
+	return a.collections.EnsureBaseline(ctx, rootID)
 }
 
 func (a *API) GetAgentCollection(
@@ -100,41 +56,12 @@ func (a *API) ListAgentCollections(
 
 func (a *API) UpdateAgentCollection(
 	ctx context.Context,
-	request UpdateAgentCollectionRequest,
+	request collection.UpdateRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-	if request.DisplayName != "" {
-		if err := basespec.ValidateRequiredText(
-			"Agent Collection display name",
-			request.DisplayName,
-			basespec.MaxDisplayNameBytes,
-		); err != nil {
-			return collection.CollectionView{}, err
-		}
-	}
-	if err := basespec.ValidateOptionalText(
-		"Agent Collection description",
-		request.Description,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
-		return collection.CollectionView{}, err
-	}
-
-	updated, err := a.collections.Update(
-		ctx,
-		collection.UpdateRequest{
-			Collection:       request.Collection,
-			ExpectedRevision: request.ExpectedRevision,
-			DisplayName:      request.DisplayName,
-			Description:      request.Description,
-		},
-	)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, updated.Artifact.Ref())
+	return a.collections.Update(ctx, request)
 }
 
 func (a *API) SetAgentCollectionEnabled(
@@ -146,17 +73,12 @@ func (a *API) SetAgentCollectionEnabled(
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-
-	updated, err := a.collections.SetEnabled(
+	return a.collections.SetEnabled(
 		ctx,
 		ref,
 		expectedRevision,
 		enabled,
 	)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, updated.Artifact.Ref())
 }
 
 func (a *API) DeleteAgentCollection(
@@ -178,52 +100,22 @@ func (a *API) DeleteAgentCollection(
 
 func (a *API) AddAgentCollectionEntry(
 	ctx context.Context,
-	request AddAgentCollectionEntryRequest,
+	request collection.AddEntryRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-
-	value, err := a.collections.AddEntry(
-		ctx,
-		collection.AddEntryRequest{
-			Collection:       request.Collection,
-			ExpectedRevision: request.ExpectedRevision,
-			Entry:            request.Entry,
-		},
-	)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, value.Artifact.Ref())
+	return a.collections.AddEntry(ctx, request)
 }
 
 func (a *API) EnsureAgentCollectionEntry(
 	ctx context.Context,
-	request AddAgentCollectionEntryRequest,
+	request collection.AddEntryRequest,
 ) (collection.MemberMutationResult, error) {
 	if a == nil || a.collections == nil {
 		return collection.MemberMutationResult{}, basespec.ErrClosed
 	}
-
-	result, err := a.collections.EnsureEntry(
-		ctx,
-		collection.AddEntryRequest{
-			Collection:       request.Collection,
-			ExpectedRevision: request.ExpectedRevision,
-			Entry:            request.Entry,
-		},
-	)
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-
-	view, err := a.GetAgentCollection(ctx, result.Collection.Artifact.Ref())
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-	result.Collection = view
-	return result, nil
+	return a.collections.EnsureEntry(ctx, request)
 }
 
 func (a *API) AttachAgentToCollection(
@@ -311,34 +203,17 @@ func (a *API) AttachAgentToCollection(
 		return collection.MemberMutationResult{}, err
 	}
 
-	view, err := a.GetAgentCollection(ctx, result.Collection.Artifact.Ref())
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-	result.Collection = view
 	return result, nil
 }
 
 func (a *API) DetachAgentFromCollection(
 	ctx context.Context,
-	request DetachAgentFromCollectionRequest,
+	request collection.RemoveMemberRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
-
-	value, err := a.collections.RemoveMember(
-		ctx,
-		collection.RemoveMemberRequest{
-			Collection:       request.Collection,
-			ExpectedRevision: request.ExpectedRevision,
-			Index:            request.Index,
-		},
-	)
-	if err != nil {
-		return collection.CollectionView{}, err
-	}
-	return a.GetAgentCollection(ctx, value.Artifact.Ref())
+	return a.collections.RemoveMember(ctx, request)
 }
 
 func (a *API) ResolveAgentCollection(

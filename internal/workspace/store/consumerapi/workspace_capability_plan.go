@@ -26,7 +26,7 @@ func (a *StoreAPI) ResolveArtifactCapabilities(
 
 func (a *StoreAPI) ResolveWorkspaceCapabilities(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (resolve.CapabilityPlan, error) {
 	_, plan, err := a.resolveWorkspaceCapabilities(ctx, ref)
 	return plan, err
@@ -34,7 +34,7 @@ func (a *StoreAPI) ResolveWorkspaceCapabilities(
 
 func (a *StoreAPI) resolveWorkspaceCapabilities(
 	ctx context.Context,
-	ref WorkspaceRef,
+	ref artifact.ArtifactRef,
 ) (
 	workspaceDomain.Workspace,
 	resolve.CapabilityPlan,

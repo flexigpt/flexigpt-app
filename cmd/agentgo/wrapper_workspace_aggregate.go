@@ -14,7 +14,7 @@ type WorkspaceAggregateWrapper struct {
 }
 
 func (w *WorkspaceAggregateWrapper) SetWorkspaceArtifactRuntimeDisabled(
-	workspace workspaceConsumerAPI.WorkspaceRef,
+	workspace artifact.ArtifactRef,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	runtimeDisabled bool,
