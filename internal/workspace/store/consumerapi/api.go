@@ -10,7 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -434,7 +434,7 @@ func (a *StoreAPI) defaultDiscovery() (
 		Locator:   ".",
 		Recursive: true,
 		DecoderIDs: []basespec.DecoderID{
-			markdown.TextMarkdownDecoderID,
+			providermarkdown.TextMarkdownDecoderID,
 		},
 	})
 	for _, hint := range a.config.AdditionalDecoderHints {

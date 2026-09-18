@@ -1,4 +1,4 @@
-package markdown
+package providermarkdown
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 

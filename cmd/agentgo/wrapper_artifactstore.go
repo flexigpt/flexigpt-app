@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/format/markdown"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -20,12 +20,12 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	canonicalProvider, err := provider.New()
+	canonicalProvider, err := providercanonical.New()
 	if err != nil {
 		return nil, err
 	}
 
-	markdownProvider, err := markdown.NewProvider()
+	markdownProvider, err := providermarkdown.NewProvider()
 	if err != nil {
 		return nil, err
 	}

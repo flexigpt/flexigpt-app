@@ -1,5 +1,5 @@
-// Package text materializes verified Text Artifact content.
-package text
+// Package materializetext materializes verified Text Artifact content.
+package materializetext
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ type Adapter struct {
 	resources compositionapi.ResourceAPI
 }
 
-func New(resources compositionapi.ResourceAPI) (*Adapter, error) {
+func NewAdapter(resources compositionapi.ResourceAPI) (*Adapter, error) {
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Text materializer ResourceAPI is nil",

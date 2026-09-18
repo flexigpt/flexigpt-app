@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materialize/text"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
@@ -48,7 +48,7 @@ type Plan struct {
 
 type Adapter struct {
 	artifacts compositionapi.ArtifactAPI
-	text      *text.Adapter
+	text      *materializetext.Adapter
 	engine    *workspaceRuntime.Engine
 	policy    workspaceRuntime.CompositionPolicy
 }
@@ -68,7 +68,7 @@ func New(
 	if err := policy.Validate(); err != nil {
 		return nil, err
 	}
-	t, err := text.New(resources)
+	t, err := materializetext.NewAdapter(resources)
 	if err != nil {
 		return nil, err
 	}

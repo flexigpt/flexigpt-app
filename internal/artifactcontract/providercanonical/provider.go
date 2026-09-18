@@ -1,4 +1,4 @@
-package provider
+package providercanonical
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
