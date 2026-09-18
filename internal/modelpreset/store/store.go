@@ -99,6 +99,36 @@ func (s *ModelPresetStore) Close() error {
 	return nil
 }
 
+// ListBuiltInProviderPresets returns snapshots of every built-in provider,
+// including disabled providers and disabled Model Presets.
+func (s *ModelPresetStore) ListBuiltInProviderPresets(
+	ctx context.Context,
+) ([]spec.ProviderPreset, error) {
+	if s == nil || s.builtinData == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in Model Preset data is unavailable",
+			spec.ErrBuiltInProviderAbsent,
+		)
+	}
+
+	providers, _, err := s.builtinData.ListBuiltInPresets(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	names := make([]inferenceSpec.ProviderName, 0, len(providers))
+	for name := range providers {
+		names = append(names, name)
+	}
+	slices.Sort(names)
+
+	output := make([]spec.ProviderPreset, 0, len(names))
+	for _, name := range names {
+		output = append(output, providers[name])
+	}
+	return output, nil
+}
+
 func (s *ModelPresetStore) GetDefaultProvider(
 	ctx context.Context, req *spec.GetDefaultProviderRequest,
 ) (*spec.GetDefaultProviderResponse, error) {

@@ -2,7 +2,10 @@ package consumerapi
 
 import (
 	"context"
+	"maps"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -11,7 +14,8 @@ import (
 )
 
 type apiOptions struct {
-	locatorResolvers []providerapi.LocatorResolverFactory
+	locatorResolvers  []providerapi.LocatorResolverFactory
+	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 }
 
 type Option func(*apiOptions)
@@ -27,11 +31,26 @@ func WithLocatorResolvers(
 	}
 }
 
+func WithFallbackProviders(
+	values map[declaration.Type]resolve.FallbackProvider,
+) Option {
+	return func(options *apiOptions) {
+		if values == nil {
+			options.fallbackProviders = nil
+			return
+		}
+
+		options.fallbackProviders = make(
+			map[declaration.Type]resolve.FallbackProvider,
+			len(values),
+		)
+		maps.Copy(options.fallbackProviders, values)
+	}
+}
+
 type skillLocatorRuntime struct {
 	api *API
 }
-
-var _ providerapi.LocatorRuntime = skillLocatorRuntime{}
 
 func (r skillLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,

@@ -96,6 +96,7 @@ func New(
 			SourceArtifacts:      artifacts,
 			SourceEntries:        resources,
 			Locators:             locators,
+			FallbackProviders:    config.fallbackProviders,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Limits:               resolve.DefaultLimits(),
 		},
@@ -560,6 +561,18 @@ func (a *API) InstallBuiltInPackage(
 		return nil, err
 	}
 	return output, nil
+}
+
+// ResolveArtifactCapabilities exposes the complete contract capability plan
+// for a declaration Artifact visible to the MCP consumer.
+func (a *API) ResolveArtifactCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.declarationResolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.declarationResolver.ResolveCapabilities(ctx, ref)
 }
 
 func normalizeBuiltInMCPExpectations(

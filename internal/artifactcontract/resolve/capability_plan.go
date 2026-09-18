@@ -40,6 +40,63 @@ type CapabilityPlan struct {
 	Complete     bool                   `json:"complete"`
 }
 
+// ResolveCapabilities resolves any supported declaration Artifact and returns
+// its complete capability plan. This is the generic entry point for consumer
+// APIs that accept Plugin, Agent, Team, Loop, Workflow, Workspace, Skill, or
+// other declaration roots.
+func (r *Resolver) ResolveCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (CapabilityPlan, error) {
+	if r == nil || r.artifacts == nil {
+		return CapabilityPlan{}, basespec.ErrClosed
+	}
+	if err := validateResolutionContext(ctx); err != nil {
+		return CapabilityPlan{}, err
+	}
+	if err := ref.Validate(); err != nil {
+		return CapabilityPlan{}, err
+	}
+
+	terminal, err := r.ResolveTerminalArtifact(ctx, ref)
+	if err != nil {
+		return CapabilityPlan{}, err
+	}
+	record, err := r.artifacts.Get(ctx, terminal)
+	if err != nil {
+		return CapabilityPlan{}, err
+	}
+
+	declarationType := declaration.Type(record.Kind)
+	if err := declarationType.Validate(); err != nil {
+		return CapabilityPlan{}, fmt.Errorf(
+			"%w: Artifact %q has unsupported declaration type %q",
+			basespec.ErrUnsupported,
+			record.ID,
+			record.Kind,
+		)
+	}
+
+	resolved, err := r.resolveTyped(ctx, terminal, declarationType)
+	if err != nil {
+		return CapabilityPlan{}, err
+	}
+	return capabilityPlanFor(resolved)
+}
+
+// ResolveSkillCapabilities resolves a Skill and its allowed Tool
+// relationships, including mapped Tool fallback targets.
+func (r *Resolver) ResolveSkillCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (CapabilityPlan, error) {
+	value, err := r.ResolveSkill(ctx, ref)
+	if err != nil {
+		return CapabilityPlan{}, err
+	}
+	return capabilityPlanFor(value)
+}
+
 func (r *Resolver) ResolvePluginCapabilities(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -104,6 +161,14 @@ func (r *Resolver) ResolveWorkspaceCapabilities(
 		return CapabilityPlan{}, err
 	}
 	return capabilityPlanFor(value)
+}
+
+// CapabilityPlanForResolvedEntry projects a previously resolved declaration
+// tree into a capability plan without resolving the Artifact graph again.
+func CapabilityPlanForResolvedEntry(
+	root *ResolvedEntry,
+) (CapabilityPlan, error) {
+	return capabilityPlanFor(root)
 }
 
 func capabilityPlanFor(root *ResolvedEntry) (CapabilityPlan, error) {

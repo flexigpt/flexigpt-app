@@ -198,27 +198,11 @@ type ResolutionIssue struct {
 	Message string `json:"message"`
 }
 
-// MappedTarget is a non-Artifact target returned by a registered fallback
-// provider. It has no ArtifactRef, Definition, Source binding, local data, or
-// lifecycle state.
-type MappedTarget struct {
-	Provider   string               `json:"provider"`
-	Identifier string               `json:"identifier"`
-	Type       declaration.Type     `json:"type"`
-	Name       basespec.LogicalName `json:"name"`
-	Builtin    bool                 `json:"builtin"`
-}
-
 type FallbackRequest struct {
 	RootID root.RootID
 	Type   declaration.Type
 	Name   basespec.LogicalName
 	Scope  declaration.LookupScope
-}
-
-type FallbackTarget struct {
-	Artifact *artifact.ArtifactRef
-	Mapped   *MappedTarget
 }
 
 // FallbackProvider is called only for a named external relationship after the

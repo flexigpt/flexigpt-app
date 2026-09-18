@@ -34,8 +34,9 @@ type WorkspacePathRegistration struct {
 }
 
 type WorkspaceLoad struct {
-	Workspace workspaceDomain.Workspace
-	Members   []declaration.Entry
+	Workspace    workspaceDomain.Workspace
+	Members      []declaration.Entry
+	Capabilities resolve.CapabilityPlan `json:"capabilities"`
 
 	resolved *resolve.ResolvedWorkspace
 }
@@ -54,21 +55,6 @@ type WorkspacePathRegistrationResult struct {
 	Load      WorkspaceLoad             `json:"load"`
 }
 
-// WorkspaceCapabilityOccurrence preserves one Workspace member or nested
-// composition occurrence, including unavailable and ambiguous relationships.
-type WorkspaceCapabilityOccurrence = resolve.CapabilityOccurrence
-
-// WorkspaceCapabilityPlan is the Artifact-backed projection of resolved
-// Workspace members. It is a consumer plan, not a Store entity.
-type WorkspaceCapabilityPlan struct {
-	Workspace       WorkspaceRef                    `json:"workspace"`
-	Occurrences     []WorkspaceCapabilityOccurrence `json:"occurrences"`
-	PromptArtifacts []artifact.ArtifactRef          `json:"promptArtifacts"`
-	SkillArtifacts  []artifact.ArtifactRef          `json:"skillArtifacts"`
-	MCPArtifacts    []artifact.ArtifactRef          `json:"mcpArtifacts"`
-	Complete        bool                            `json:"complete"`
-}
-
 type WorkspaceRuntimeSelection struct {
 	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts,omitempty"`
 	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts,omitempty"`
@@ -81,7 +67,7 @@ type WorkspaceRuntimeSelection struct {
 // plan and outside Artifact Store.
 type WorkspaceRuntimePlan struct {
 	Workspace    workspaceDomain.Workspace `json:"workspace"`
-	Capabilities WorkspaceCapabilityPlan   `json:"capabilities"`
+	Capabilities resolve.CapabilityPlan    `json:"capabilities"`
 	Prompt       prompt.Plan               `json:"prompt"`
 	Skills       skill.LoadPlan            `json:"skills"`
 	MCPServers   mcp.LoadPlan              `json:"mcpServers"`

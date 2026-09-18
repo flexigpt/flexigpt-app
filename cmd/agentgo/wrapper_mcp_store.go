@@ -4,6 +4,7 @@ import (
 	"context"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -133,6 +134,14 @@ func (w *MCPStoreWrapper) GetMCPPolicy(
 ) (mcpConsumerAPI.PolicyView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.PolicyView, error) {
 		return api.GetMCPPolicy(context.Background(), ref)
+	})
+}
+
+func (w *MCPStoreWrapper) ResolveMCPArtifactCapabilities(
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (resolve.CapabilityPlan, error) {
+		return api.ResolveArtifactCapabilities(context.Background(), ref)
 	})
 }
 

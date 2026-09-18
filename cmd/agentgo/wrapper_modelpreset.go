@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/artifactfallback"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 )
 
 type ModelPresetStoreWrapper struct {
-	store *modelpresetStore.ModelPresetStore
+	store            *modelpresetStore.ModelPresetStore
+	artifactFallback *artifactfallback.Service
 }
 
 // InitModelPresetStoreWrapper initialises the wrapped store in `baseDir`.
@@ -24,7 +27,18 @@ func InitModelPresetStoreWrapper(
 	if err != nil {
 		return err
 	}
+
+	fallback, err := artifactfallback.NewService(
+		context.Background(),
+		s,
+		artifactfallback.DefaultBindings()...,
+	)
+	if err != nil {
+		_ = s.Close()
+		return err
+	}
 	m.store = s
+	m.artifactFallback = fallback
 	return nil
 }
 
@@ -92,9 +106,39 @@ func (w *ModelPresetStoreWrapper) GetModelPreset(
 	})
 }
 
+func (w *ModelPresetStoreWrapper) ResolveMappedModelTarget(
+	req *artifactfallback.ResolveTargetRequest,
+) (*artifactfallback.ResolveTargetResponse, error) {
+	return middleware.WithRecoveryResp(
+		func() (*artifactfallback.ResolveTargetResponse, error) {
+			if w == nil || w.artifactFallback == nil {
+				return nil, errors.New("model Preset artifact fallback is not initialized")
+			}
+			if req == nil {
+				return nil, errors.New("mapped model target request is nil")
+			}
+
+			ref, err := w.artifactFallback.ResolveTarget(
+				context.Background(),
+				req.Target,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			return &artifactfallback.ResolveTargetResponse{
+				Body: &artifactfallback.ResolveTargetResponseBody{
+					ModelPresetRef: ref,
+				},
+			}, nil
+		},
+	)
+}
+
 func (s *ModelPresetStoreWrapper) close() {
 	if s == nil || s.store == nil {
 		return
 	}
 	s.store.Close()
+	s.artifactFallback = nil
 }

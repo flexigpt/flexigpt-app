@@ -1,6 +1,9 @@
 package consumerapi
 
 import (
+	"maps"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -12,6 +15,7 @@ type Config struct {
 	ContextComposition workspaceRuntime.CompositionPolicy
 	LocatorResolvers   []providerapi.LocatorResolverFactory
 	ResolverLimits     resolve.Limits
+	FallbackProviders  map[declaration.Type]resolve.FallbackProvider
 	MCPServers         mcp.ServerResolver
 
 	// AdditionalDecoderHints lets application composition add dedicated
@@ -27,6 +31,13 @@ func (c Config) normalized() Config {
 		[]providerapi.LocatorResolverFactory(nil),
 		c.LocatorResolvers...,
 	)
+	if c.FallbackProviders != nil {
+		output.FallbackProviders = make(
+			map[declaration.Type]resolve.FallbackProvider,
+			len(c.FallbackProviders),
+		)
+		maps.Copy(output.FallbackProviders, c.FallbackProviders)
+	}
 	output.AdditionalDecoderHints = make(
 		[]source.DecoderHint,
 		len(c.AdditionalDecoderHints),

@@ -19,6 +19,10 @@ func (a *StoreAPI) LoadWorkspace(
 	if err != nil {
 		return WorkspaceLoad{}, err
 	}
+	capabilities, err := resolve.CapabilityPlanForResolvedEntry(resolved)
+	if err != nil {
+		return WorkspaceLoad{}, err
+	}
 
 	members := make([]declaration.Entry, len(workspace.Document.Members))
 	for index, value := range workspace.Document.Members {
@@ -26,9 +30,10 @@ func (a *StoreAPI) LoadWorkspace(
 	}
 
 	return WorkspaceLoad{
-		Workspace: workspace,
-		Members:   members,
-		resolved:  resolved.Workspace,
+		Workspace:    workspace,
+		Members:      members,
+		Capabilities: capabilities,
+		resolved:     resolved.Workspace,
 	}, nil
 }
 

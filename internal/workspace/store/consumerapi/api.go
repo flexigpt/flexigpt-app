@@ -105,6 +105,7 @@ func NewStoreAPI(
 			SourceArtifacts:      artifacts,
 			SourceEntries:        resources,
 			Locators:             locators,
+			FallbackProviders:    config.FallbackProviders,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Refresh:              output,
 			Limits:               config.ResolverLimits,

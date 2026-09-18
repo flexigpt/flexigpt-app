@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -26,7 +27,10 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	}
 	selected, err := selectedWorkspaceArtifacts(
 		artifacts,
-		capabilities.PromptArtifacts,
+		workspaceArtifactRefs(
+			capabilities,
+			declaration.TypeText,
+		),
 	)
 	if err != nil {
 		return prompt.Plan{}, err
@@ -52,7 +56,10 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	}
 	selected, err := selectedWorkspaceArtifacts(
 		artifacts,
-		capabilities.SkillArtifacts,
+		workspaceArtifactRefs(
+			capabilities,
+			declaration.TypeSkill,
+		),
 	)
 	if err != nil {
 		return skill.LoadPlan{}, err
@@ -89,7 +96,10 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	}
 	selected, err := selectedWorkspaceArtifacts(
 		artifacts,
-		capabilities.MCPArtifacts,
+		workspaceArtifactRefs(
+			capabilities,
+			declaration.TypeMCP,
+		),
 	)
 	if err != nil {
 		return mcp.LoadPlan{}, err
@@ -119,23 +129,36 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 		}
 	}
 
+	availablePromptArtifacts := workspaceArtifactRefs(
+		capabilities,
+		declaration.TypeText,
+	)
+	availableSkillArtifacts := workspaceArtifactRefs(
+		capabilities,
+		declaration.TypeSkill,
+	)
+	availableMCPArtifacts := workspaceArtifactRefs(
+		capabilities,
+		declaration.TypeMCP,
+	)
+
 	promptArtifacts, err := selectedWorkspaceArtifacts(
 		selection.PromptArtifacts,
-		capabilities.PromptArtifacts,
+		availablePromptArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
 	}
 	skillArtifacts, err := selectedWorkspaceArtifacts(
 		selection.SkillArtifacts,
-		capabilities.SkillArtifacts,
+		availableSkillArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err
 	}
 	mcpArtifacts, err := selectedWorkspaceArtifacts(
 		selection.MCPArtifacts,
-		capabilities.MCPArtifacts,
+		availableMCPArtifacts,
 	)
 	if err != nil {
 		return WorkspaceRuntimePlan{}, err

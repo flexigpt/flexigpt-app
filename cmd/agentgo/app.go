@@ -249,6 +249,38 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: tool runtime initialization failed\n" + err.Error())
 	}
 
+	err = InitModelPresetStoreWrapper(
+		a.modelPresetStoreAPI,
+		a.modelPresetsDirPath,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize model presets store",
+			"dir",
+			a.modelPresetsDirPath,
+			"error",
+			err,
+		)
+		panic("failed to initialize managers: model presets store initialization failed\n" + err.Error())
+	}
+	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
+
+	fallbackProviders, err := artifactFallbackProviders(
+		a.toolStoreAPI,
+		a.modelPresetStoreAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Artifact fallback providers",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Artifact fallback providers failed\n" +
+				err.Error(),
+		)
+	}
+
 	artifactComposition, err := composeArtifactStore(
 		context.Background(),
 		a.artifactStoreDirPath,
@@ -277,6 +309,7 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
+		fallbackProviders,
 		artifactComposition.LocatorResolvers...,
 	)
 	if err != nil {
@@ -342,6 +375,7 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		artifactComposition.LocatorResolvers,
+		fallbackProviders,
 		a.settingStoreAPI.store,
 	)
 	if err != nil {
@@ -364,6 +398,7 @@ func (a *App) initManagers() {
 		artifactComposition.Artifacts,
 		artifactComposition.Resources,
 		artifactComposition.LocatorResolvers,
+		fallbackProviders,
 		a.mcpStoreAPI.api,
 		func(ctx context.Context, rootID root.RootID) error {
 			return EnsureUserArtifactBaselineCollectionsForRoot(
@@ -421,20 +456,6 @@ func (a *App) initManagers() {
 		)
 	}
 	slog.Info("user Artifact baseline Collections initialized")
-
-	err = InitModelPresetStoreWrapper(
-		a.modelPresetStoreAPI,
-		a.modelPresetsDirPath,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize model presets store",
-			"dir", a.modelPresetsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: model presets store initialization failed\n" + err.Error())
-	}
-	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 
 	err = InitAssistantPresetStoreWrapper(
 		a.assistantPresetStoreAPI,
@@ -509,9 +530,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.assistantPresetStoreAPI != nil {
 		a.assistantPresetStoreAPI.close()
 	}
-	if a.modelPresetStoreAPI != nil {
-		a.modelPresetStoreAPI.close()
-	}
 	if a.mcpAggregateAPI != nil {
 		a.mcpAggregateAPI.close()
 	}
@@ -554,6 +572,9 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 			)
 		}
 		a.artifactStoreComposition = nil
+	}
+	if a.modelPresetStoreAPI != nil {
+		a.modelPresetStoreAPI.close()
 	}
 	if a.toolStoreAPI != nil {
 		a.toolStoreAPI.close()

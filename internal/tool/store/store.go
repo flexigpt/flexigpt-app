@@ -153,6 +153,65 @@ func (ts *ToolStore) Close() {
 	}
 }
 
+// ListBuiltInTools returns every built-in Tool snapshot, including disabled
+// bundles and Tools. The returned values are independent copies.
+func (ts *ToolStore) ListBuiltInTools(
+	ctx context.Context,
+) ([]spec.ToolListItem, error) {
+	if ts == nil || ts.builtinData == nil {
+		return nil, fmt.Errorf(
+			"%w: built-in Tool data is unavailable",
+			errToolNotFound,
+		)
+	}
+
+	bundles, tools, err := ts.builtinData.ListBuiltInToolData(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	bundleIDs := make([]bundleitemutils.BundleID, 0, len(bundles))
+	for bundleID := range bundles {
+		bundleIDs = append(bundleIDs, bundleID)
+	}
+	slices.Sort(bundleIDs)
+
+	output := make([]spec.ToolListItem, 0)
+	for _, bundleID := range bundleIDs {
+		bundle := bundles[bundleID]
+		if !bundle.IsBuiltIn {
+			continue
+		}
+
+		toolIDs := make([]bundleitemutils.ItemID, 0, len(tools[bundleID]))
+		for toolID := range tools[bundleID] {
+			toolIDs = append(toolIDs, toolID)
+		}
+		slices.SortFunc(toolIDs, func(
+			left bundleitemutils.ItemID,
+			right bundleitemutils.ItemID,
+		) int {
+			return strings.Compare(string(left), string(right))
+		})
+
+		for _, toolID := range toolIDs {
+			tool := tools[bundleID][toolID]
+			if !tool.IsBuiltIn {
+				continue
+			}
+			output = append(output, spec.ToolListItem{
+				BundleID:       bundle.ID,
+				BundleSlug:     bundle.Slug,
+				ToolSlug:       tool.Slug,
+				ToolVersion:    tool.Version,
+				IsBuiltIn:      true,
+				ToolDefinition: tool,
+			})
+		}
+	}
+	return output, nil
+}
+
 // PutToolBundle creates or replaces a bundle.
 func (ts *ToolStore) PutToolBundle(
 	ctx context.Context, req *spec.PutToolBundleRequest,

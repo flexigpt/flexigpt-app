@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
@@ -34,6 +36,7 @@ func InitMCPWrappers(
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
+	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	settingsStore mcpAuthKeyStore,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil ||
@@ -73,6 +76,7 @@ func InitMCPWrappers(
 		secrets,
 		mcpPolicy.Baseline(),
 		mcpConsumerAPI.WithLocatorResolvers(locatorResolvers),
+		mcpConsumerAPI.WithFallbackProviders(fallbackProviders),
 	)
 	if err != nil {
 		return nil, err

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -33,6 +35,7 @@ func InitWorkspaceWrappers(
 	artifacts compositionapi.ArtifactAPI,
 	resources compositionapi.ResourceAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
+	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	mcpServers mcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, root.RootID) error,
 ) error {
@@ -50,6 +53,7 @@ func InitWorkspaceWrappers(
 		[]providerapi.LocatorResolverFactory(nil),
 		locatorResolvers...,
 	)
+	config.FallbackProviders = fallbackProviders
 	config.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,
@@ -167,6 +171,25 @@ func (w *WorkspaceStoreWrapper) LoadWorkspace(
 ) (workspaceConsumerAPI.WorkspaceLoad, error) {
 	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceLoad, error) {
 		return api.LoadWorkspace(context.Background(), ref)
+	})
+}
+
+func (w *WorkspaceStoreWrapper) ResolveWorkspaceCapabilities(
+	ref workspaceConsumerAPI.WorkspaceRef,
+) (resolve.CapabilityPlan, error) {
+	return withWorkspaceStore(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (resolve.CapabilityPlan, error) {
+			return api.ResolveWorkspaceCapabilities(context.Background(), ref)
+		},
+	)
+}
+
+func (w *WorkspaceStoreWrapper) ResolveWorkspaceArtifactCapabilities(
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (resolve.CapabilityPlan, error) {
+		return api.ResolveArtifactCapabilities(context.Background(), ref)
 	})
 }
 

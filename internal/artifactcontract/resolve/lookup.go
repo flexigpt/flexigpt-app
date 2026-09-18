@@ -366,17 +366,8 @@ func (r *Resolver) resolveFallback(
 			name,
 		)
 	}
-	if target.Artifact == nil && target.Mapped == nil {
-		return nil, fmt.Errorf(
-			"%w: fallback provider returned an empty target",
-			basespec.ErrInvalid,
-		)
-	}
-	if target.Artifact != nil && target.Mapped != nil {
-		return nil, fmt.Errorf(
-			"%w: fallback provider returned both target forms",
-			basespec.ErrInvalid,
-		)
+	if err := target.Validate(); err != nil {
+		return nil, err
 	}
 
 	if target.Artifact != nil {
@@ -402,12 +393,6 @@ func (r *Resolver) resolveFallback(
 			basespec.ErrUnsupported,
 			declarationType,
 		)
-	}
-	if err := target.Mapped.Type.Validate(); err != nil {
-		return nil, err
-	}
-	if err := target.Mapped.Name.Validate(); err != nil {
-		return nil, err
 	}
 	if target.Mapped.Type != declarationType ||
 		target.Mapped.Name != name ||

@@ -7,6 +7,8 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
@@ -112,4 +114,23 @@ func EnsureUserArtifactBaselineCollections(
 		}
 	}
 	return nil
+}
+
+// artifactFallbackProviders returns the fallback registrations that must be
+// supplied to every Artifact contract resolver used by application consumers.
+func artifactFallbackProviders(
+	tools *ToolStoreWrapper,
+	models *ModelPresetStoreWrapper,
+) (map[declaration.Type]resolve.FallbackProvider, error) {
+	if tools == nil || tools.artifactFallback == nil {
+		return nil, errors.New("tool artifact fallback is not initialized")
+	}
+	if models == nil || models.artifactFallback == nil {
+		return nil, errors.New("model Preset artifact fallback is not initialized")
+	}
+
+	return map[declaration.Type]resolve.FallbackProvider{
+		declaration.TypeTool:  tools.artifactFallback,
+		declaration.TypeModel: models.artifactFallback,
+	}, nil
 }

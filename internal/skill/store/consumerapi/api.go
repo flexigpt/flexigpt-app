@@ -32,6 +32,8 @@ type API struct {
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
 	collections      *collection.API
+
+	declarationResolver *resolve.Resolver
 }
 
 func New(
@@ -82,6 +84,7 @@ func New(
 			SourceArtifacts:      artifacts,
 			SourceEntries:        resources,
 			Locators:             locators,
+			FallbackProviders:    config.fallbackProviders,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Limits:               resolve.DefaultLimits(),
 		},
@@ -101,6 +104,7 @@ func New(
 		return nil, err
 	}
 	output.collections = collections
+	output.declarationResolver = graphResolver
 	return output, nil
 }
 
@@ -635,6 +639,30 @@ func (a *API) EnsureBuiltInSkillSourceCurrent(
 		rootID,
 		sourceID,
 	)
+}
+
+// ResolveArtifactCapabilities returns the complete capability tree for any
+// declaration Artifact visible through the Skill consumer.
+func (a *API) ResolveArtifactCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.declarationResolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.declarationResolver.ResolveCapabilities(ctx, ref)
+}
+
+// ResolveSkillCapabilities resolves a Skill and preserves mapped Tool
+// fallback occurrences from Skill.allowedTools.
+func (a *API) ResolveSkillCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.declarationResolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.declarationResolver.ResolveSkillCapabilities(ctx, ref)
 }
 
 func (a *API) requireMutable(

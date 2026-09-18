@@ -12,8 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
-var _ resolve.RefreshCoordinator = (*StoreAPI)(nil)
-
 func (a *StoreAPI) PrepareSelectorDiscovery(
 	ctx context.Context,
 	request resolve.SelectorRefreshRequest,

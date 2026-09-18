@@ -6,6 +6,8 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -52,6 +54,7 @@ func InitSkillStoreWrapper(
 	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
+	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	locatorResolvers ...providerapi.LocatorResolverFactory,
 ) error {
 	if wrapper == nil ||
@@ -74,6 +77,9 @@ func InitSkillStoreWrapper(
 		protection,
 		skillConsumerAPI.WithLocatorResolvers(
 			locatorResolvers,
+		),
+		skillConsumerAPI.WithFallbackProviders(
+			fallbackProviders,
 		),
 	)
 	if err != nil {
@@ -180,6 +186,22 @@ func (w *SkillStoreWrapper) GetSkill(
 ) (artifact.Artifact, error) {
 	return withSkillStore(w, func(api *skillConsumerAPI.API) (artifact.Artifact, error) {
 		return api.GetSkill(context.Background(), ref)
+	})
+}
+
+func (w *SkillStoreWrapper) ResolveSkillCapabilities(
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (resolve.CapabilityPlan, error) {
+		return api.ResolveSkillCapabilities(context.Background(), ref)
+	})
+}
+
+func (w *SkillStoreWrapper) ResolveSkillArtifactCapabilities(
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) (resolve.CapabilityPlan, error) {
+		return api.ResolveArtifactCapabilities(context.Background(), ref)
 	})
 }
 
