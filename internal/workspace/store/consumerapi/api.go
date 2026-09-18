@@ -103,6 +103,7 @@ func NewStoreAPI(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
 			SourceArtifacts:      artifacts,
+			SourceEntries:        resources,
 			Locators:             locators,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Refresh:              output,

@@ -44,6 +44,19 @@ type SourceArtifactReader interface {
 	) ([]artifact.Artifact, error)
 }
 
+// SourceEntryInspector confirms physical Source entry metadata without
+// exposing Source configuration or native filesystem paths. Selector
+// resolution uses it only to verify that a local selector base is a
+// directory.
+type SourceEntryInspector interface {
+	StatSourceEntry(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+		locator basespec.Locator,
+	) (source.Entry, error)
+}
+
 type RefreshTarget struct {
 	RootID   root.RootID
 	SourceID source.SourceID

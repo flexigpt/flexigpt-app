@@ -1,236 +1,367 @@
-# Shareable and Composable AI Artifact Declarations
+# Artifact Store, Resolution, and Ecosystem HLD
 
-- [Executive summary](#executive-summary)
-- [Motivation and desired user outcome](#motivation-and-desired-user-outcome)
-  - [Why this is needed](#why-this-is-needed)
-  - [Desired repository experience](#desired-repository-experience)
-- [Goals, scope, and non-goals](#goals-scope-and-non-goals)
-  - [Goals](#goals)
-  - [In scope](#in-scope)
-  - [Non-goals](#non-goals)
-- [Requirements](#requirements)
-  - [Declaration requirements](#declaration-requirements)
-  - [Composition requirements](#composition-requirements)
-  - [Resolution requirements](#resolution-requirements)
-  - [Ordering requirements](#ordering-requirements)
-  - [Discovery and Workspace requirements](#discovery-and-workspace-requirements)
-  - [Collection and authoring requirements](#collection-and-authoring-requirements)
-  - [Artifact enablement requirements](#artifact-enablement-requirements)
-  - [Built-in content requirements](#built-in-content-requirements)
-  - [Runtime and resource requirements](#runtime-and-resource-requirements)
-- [Design principles and invariants](#design-principles-and-invariants)
-  - [One declaration has one semantic type](#one-declaration-has-one-semantic-type)
-  - [Composition is explicit and uniform](#composition-is-explicit-and-uniform)
-  - [Existing file formats remain useful](#existing-file-formats-remain-useful)
-  - [Source material remains source-backed](#source-material-remains-source-backed)
-  - [Composition is separate from execution](#composition-is-separate-from-execution)
-  - [Names are reusable in independent scopes](#names-are-reusable-in-independent-scopes)
-  - [Physical and semantic identity are different](#physical-and-semantic-identity-are-different)
-  - [Collections are groups, not owners](#collections-are-groups-not-owners)
-  - [Resolution is observational](#resolution-is-observational)
-  - [Declaration status and runtime readiness are separate](#declaration-status-and-runtime-readiness-are-separate)
-- [Conceptual model](#conceptual-model)
-  - [Concern boundaries](#concern-boundaries)
-  - [Terminology](#terminology)
-  - [Artifact vocabulary](#artifact-vocabulary)
-- [Portable declaration model](#portable-declaration-model)
-  - [Common declaration header](#common-declaration-header)
-  - [Semantic identity and declaration occurrence](#semantic-identity-and-declaration-occurrence)
-  - [Composition-entry forms](#composition-entry-forms)
-    - [Symbolic reference](#symbolic-reference)
-    - [Located reference](#located-reference)
-    - [Contained declaration](#contained-declaration)
-    - [Entry classification](#entry-classification)
-  - [Ordering and occurrence semantics](#ordering-and-occurrence-semantics)
-  - [Locator model](#locator-model)
-    - [Path locator](#path-locator)
-    - [URL locator](#url-locator)
-    - [Git locator](#git-locator)
-    - [Package locator](#package-locator)
-    - [Command locator](#command-locator)
-  - [Path pattern model](#path-pattern-model)
-- [Artifact contracts](#artifact-contracts)
-  - [Model](#model)
-  - [Instruction](#instruction)
-  - [Context](#context)
-  - [Tool](#tool)
-  - [Skill](#skill)
-  - [MCP](#mcp)
-  - [MCP policy](#mcp-policy)
-  - [Collection](#collection)
-  - [Agent](#agent)
-  - [Team](#team)
-  - [Output matching](#output-matching)
-  - [Loop](#loop)
-  - [Workflow](#workflow)
-  - [Workspace](#workspace)
-- [Declaration discovery and physical formats](#declaration-discovery-and-physical-formats)
-  - [Declaration sources](#declaration-sources)
-  - [Supported physical inputs](#supported-physical-inputs)
-- [Resolution and capability plans](#resolution-and-capability-plans)
-  - [Resolution scope](#resolution-scope)
-  - [Unlocated external resolution](#unlocated-external-resolution)
-  - [Located external resolution](#located-external-resolution)
-  - [Aliases and terminal Artifacts](#aliases-and-terminal-artifacts)
-  - [Contained declarations](#contained-declarations)
-  - [Relationship status and declaration validity](#relationship-status-and-declaration-validity)
-  - [Consumer completeness policy](#consumer-completeness-policy)
-  - [Collection expansion](#collection-expansion)
-  - [Agent and Team expansion](#agent-and-team-expansion)
-  - [Loop and Workflow resolution](#loop-and-workflow-resolution)
-  - [Resolver limits](#resolver-limits)
-- [Workspace behavior](#workspace-behavior)
-  - [Workspace declaration universe](#workspace-declaration-universe)
-  - [Workspace roots and capabilities](#workspace-roots-and-capabilities)
-  - [Read-only operations and explicit refresh](#read-only-operations-and-explicit-refresh)
-  - [Catalog and capability views](#catalog-and-capability-views)
-  - [Workspace user flow](#workspace-user-flow)
-- [Managed Collection authoring and lifecycle](#managed-collection-authoring-and-lifecycle)
-  - [Storage boundary](#storage-boundary)
-  - [Portable and managed Collection domains](#portable-and-managed-collection-domains)
-  - [Baseline Collections](#baseline-collections)
-  - [Managed membership semantics](#managed-membership-semantics)
-  - [Managed publication and replacement](#managed-publication-and-replacement)
-  - [Supported Collection operations](#supported-collection-operations)
-  - [Collection deletion](#collection-deletion)
-  - [Skill creation flow](#skill-creation-flow)
-  - [MCP server and policy creation flow](#mcp-server-and-policy-creation-flow)
-- [Built-in and user-owned artifacts](#built-in-and-user-owned-artifacts)
-  - [Built-in package composition](#built-in-package-composition)
-  - [Protected Root behavior](#protected-root-behavior)
-  - [Package hydration](#package-hydration)
-  - [Skill package identity](#skill-package-identity)
-- [Runtime consumer model](#runtime-consumer-model)
-  - [Prompt and Context consumer](#prompt-and-context-consumer)
-  - [Skill consumer](#skill-consumer)
-  - [MCP consumer](#mcp-consumer)
-  - [Workflow consumer](#workflow-consumer)
-  - [Runtime implementation boundaries](#runtime-implementation-boundaries)
-- [Technical architecture](#technical-architecture)
-  - [Root](#root)
-  - [Source](#source)
-  - [Definition](#definition)
-  - [Artifact](#artifact)
-  - [Artifact Store boundary](#artifact-store-boundary)
-  - [Resource verification](#resource-verification)
-  - [Resolver](#resolver)
-  - [Workspace refresh architecture](#workspace-refresh-architecture)
-- [Implementation consequences and finalized decisions](#implementation-consequences-and-finalized-decisions)
-  - [External references versus contained declarations](#external-references-versus-contained-declarations)
-  - [Member-level resolution](#member-level-resolution)
-  - [Managed authoring](#managed-authoring)
-  - [MCP identity and local configuration](#mcp-identity-and-local-configuration)
-  - [Built-in packages](#built-in-packages)
-  - [Finalized semantic decisions](#finalized-semantic-decisions)
-- [Current implementation status](#current-implementation-status)
-  - [Status interpretation](#status-interpretation)
-  - [Declaration platform and resolution](#declaration-platform-and-resolution)
-  - [Sources, persistence, and resource verification](#sources-persistence-and-resource-verification)
-  - [Physical format support](#physical-format-support)
-  - [Workspace capability planning](#workspace-capability-planning)
-  - [Collections and managed authoring](#collections-and-managed-authoring)
-  - [Skill and built-in package support](#skill-and-built-in-package-support)
-  - [MCP platform and runtime](#mcp-platform-and-runtime)
-  - [Pending completion work](#pending-completion-work)
-  - [Deferred and unsupported capabilities](#deferred-and-unsupported-capabilities)
-    - [Source, locator, and cross-Root capabilities](#source-locator-and-cross-root-capabilities)
-    - [Authoring and frontend scope](#authoring-and-frontend-scope)
+- [1. Purpose](#1-purpose)
+- [2. Goals and scope](#2-goals-and-scope)
+  - [2.1 Goals](#21-goals)
+  - [2.2 In scope](#22-in-scope)
+  - [2.3 Boundary](#23-boundary)
+- [3. Requirements](#3-requirements)
+  - [3.1 Store requirements](#31-store-requirements)
+  - [3.2 Source requirements](#32-source-requirements)
+  - [3.3 Resolution requirements](#33-resolution-requirements)
+  - [3.4 Composition requirements](#34-composition-requirements)
+  - [3.5 Managed authoring requirements](#35-managed-authoring-requirements)
+  - [3.6 Consumer requirements](#36-consumer-requirements)
+- [4. Design principles and invariants](#4-design-principles-and-invariants)
+  - [4.1 Store records occurrences, not composition ownership](#41-store-records-occurrences-not-composition-ownership)
+  - [4.2 Resolution is observational](#42-resolution-is-observational)
+  - [4.3 Declaration availability is not runtime readiness](#43-declaration-availability-is-not-runtime-readiness)
+  - [4.4 Physical and semantic identity remain separate](#44-physical-and-semantic-identity-remain-separate)
+  - [4.5 Built-in fallback is selection, not activation](#45-built-in-fallback-is-selection-not-activation)
+  - [4.6 Source order has no semantic authority](#46-source-order-has-no-semantic-authority)
+  - [4.7 Locator representation and materialization are separate](#47-locator-representation-and-materialization-are-separate)
+- [5. Desired user experience](#5-desired-user-experience)
+- [6. Primary workflows](#6-primary-workflows)
+  - [6.1 Repository onboarding](#61-repository-onboarding)
+  - [6.2 Ordinary capability read](#62-ordinary-capability-read)
+  - [6.3 Explicit refresh](#63-explicit-refresh)
+  - [6.4 Managed Skill or MCP creation](#64-managed-skill-or-mcp-creation)
+  - [6.5 Built-in bootstrap](#65-built-in-bootstrap)
+- [7. Conceptual architecture](#7-conceptual-architecture)
+  - [7.1 Terminology](#71-terminology)
+- [8. Root model](#8-root-model)
+- [9. Source model](#9-source-model)
+  - [9.1 Source responsibilities](#91-source-responsibilities)
+  - [9.2 Source registration](#92-source-registration)
+  - [9.3 Source refresh](#93-source-refresh)
+- [10. Physical-format adapters](#10-physical-format-adapters)
+- [11. Definition model](#11-definition-model)
+- [12. Artifact model](#12-artifact-model)
+- [13. Resource verification](#13-resource-verification)
+- [14. Locator resolution architecture](#14-locator-resolution-architecture)
+  - [14.1 Local path resolution](#141-local-path-resolution)
+  - [14.2 External locator resolution](#142-external-locator-resolution)
+  - [14.3 Context-dependent commands](#143-context-dependent-commands)
+- [15. Resolver architecture](#15-resolver-architecture)
+  - [15.1 Per-type registration](#151-per-type-registration)
+  - [15.2 Public typed APIs](#152-public-typed-apis)
+  - [15.3 Private shared core](#153-private-shared-core)
+- [16. Named lookup and fallback](#16-named-lookup-and-fallback)
+  - [16.1 Default named lookup](#161-default-named-lookup)
+  - [16.2 Explicit built-in lookup](#162-explicit-built-in-lookup)
+  - [16.3 Generic fallback providers](#163-generic-fallback-providers)
+  - [16.4 Fallback restrictions](#164-fallback-restrictions)
+- [17. Relationship resolution](#17-relationship-resolution)
+  - [17.1 Relationship result](#171-relationship-result)
+  - [17.2 Named relationships](#172-named-relationships)
+  - [17.3 Located relationships](#173-located-relationships)
+  - [17.4 Contained relationships](#174-contained-relationships)
+  - [17.5 Source-selected aliases](#175-source-selected-aliases)
+- [18. Member selectors and discovery](#18-member-selectors-and-discovery)
+  - [18.1 Eligibility](#181-eligibility)
+  - [18.2 Selector meaning](#182-selector-meaning)
+  - [18.3 Selector scope](#183-selector-scope)
+  - [18.4 Selector results](#184-selector-results)
+  - [18.5 Selector refresh](#185-selector-refresh)
+- [19. Composition expansion](#19-composition-expansion)
+  - [19.1 Plugin expansion](#191-plugin-expansion)
+  - [19.2 Agent expansion](#192-agent-expansion)
+  - [19.3 Team expansion](#193-team-expansion)
+  - [19.4 Loop expansion](#194-loop-expansion)
+  - [19.5 Workflow expansion](#195-workflow-expansion)
+  - [19.6 Workspace expansion](#196-workspace-expansion)
+- [20. Cycles, limits, and partial validity](#20-cycles-limits-and-partial-validity)
+- [21. Ordering and structural identity](#21-ordering-and-structural-identity)
+  - [21.1 Non-positional relationships](#211-non-positional-relationships)
+  - [21.2 Stable identity](#212-stable-identity)
+  - [21.3 Duplicate relationships](#213-duplicate-relationships)
+  - [21.4 Source revisions](#214-source-revisions)
+- [22. Capability plans and completeness](#22-capability-plans-and-completeness)
+- [23. Workspace behavior](#23-workspace-behavior)
+  - [23.1 Explicit capability selection](#231-explicit-capability-selection)
+  - [23.2 Catalog and capability views](#232-catalog-and-capability-views)
+  - [23.3 Completeness](#233-completeness)
+  - [23.4 Read-only planning](#234-read-only-planning)
+- [24. Consumer integration](#24-consumer-integration)
+  - [24.1 Common requirements](#241-common-requirements)
+  - [24.2 Text and prompt consumers](#242-text-and-prompt-consumers)
+  - [24.3 Tool and Model consumers](#243-tool-and-model-consumers)
+  - [24.4 Skill consumer](#244-skill-consumer)
+  - [24.5 MCP consumer](#245-mcp-consumer)
+  - [24.6 Workflow consumer](#246-workflow-consumer)
+- [25. Artifact Store boundaries](#25-artifact-store-boundaries)
+  - [25.1 Persisted state](#251-persisted-state)
+  - [25.2 Derived state](#252-derived-state)
+  - [25.3 Purge behavior](#253-purge-behavior)
+- [26. Artifact enablement and local state](#26-artifact-enablement-and-local-state)
+  - [26.1 Artifact enablement](#261-artifact-enablement)
+  - [26.2 Local state ownership](#262-local-state-ownership)
+- [27. Managed Plugin authoring](#27-managed-plugin-authoring)
+  - [27.1 Storage model](#271-storage-model)
+  - [27.2 Portable and managed domains](#272-portable-and-managed-domains)
+  - [27.3 Baseline Plugins](#273-baseline-plugins)
+  - [27.4 Membership semantics](#274-membership-semantics)
+  - [27.5 Publication and replacement](#275-publication-and-replacement)
+  - [27.6 Multi-package creation behavior](#276-multi-package-creation-behavior)
+  - [27.7 Supported operations](#277-supported-operations)
+  - [27.8 Plugin deletion](#278-plugin-deletion)
+- [28. Managed Skill and MCP workflows](#28-managed-skill-and-mcp-workflows)
+  - [28.1 Managed Skill](#281-managed-skill)
+  - [28.2 Managed MCP server or policy](#282-managed-mcp-server-or-policy)
+- [29. Built-in content and protected Roots](#29-built-in-content-and-protected-roots)
+  - [29.1 Common declaration behavior](#291-common-declaration-behavior)
+  - [29.2 Built-in package composition](#292-built-in-package-composition)
+  - [29.3 Protected Root behavior](#293-protected-root-behavior)
+  - [29.4 Package hydration](#294-package-hydration)
+- [30. Implementation requirements](#30-implementation-requirements)
+  - [30.1 Store and Source](#301-store-and-source)
+  - [30.2 Resolver](#302-resolver)
+  - [30.3 Discovery](#303-discovery)
+  - [30.4 Consumers](#304-consumers)
+- [31. Current implementation status](#31-current-implementation-status)
+  - [31.1 Status interpretation](#311-status-interpretation)
+  - [31.2 Sources, persistence, and verification](#312-sources-persistence-and-verification)
+  - [31.3 Resolver and discovery](#313-resolver-and-discovery)
+  - [31.4 Physical formats](#314-physical-formats)
+  - [31.5 Workspace and capability planning](#315-workspace-and-capability-planning)
+  - [31.6 Managed Plugins and authoring](#316-managed-plugins-and-authoring)
+  - [31.7 Built-in packages](#317-built-in-packages)
+  - [31.8 MCP platform and runtime](#318-mcp-platform-and-runtime)
+  - [31.9 Pending completion work](#319-pending-completion-work)
+  - [31.10 Deferred or unsupported ecosystem capabilities](#3110-deferred-or-unsupported-ecosystem-capabilities)
+    - [Source and locator capabilities](#source-and-locator-capabilities)
+    - [Authoring and frontend](#authoring-and-frontend)
     - [Execution runtimes](#execution-runtimes)
 
-## Executive summary
+## 1. Purpose
 
-This design provides one declaration system for AI and LLM-related artifacts.
+This HLD defines how portable declarations become source-backed Artifacts and resolved capability graphs.
 
-The system allows artifacts to be:
+Portable declaration syntax is defined in [Portable Artifact Declaration Contracts HLD](./artifact_contracts_hld.md).
 
-- Authored in repositories or application-managed storage.
-- Discovered from familiar files and directories.
-- Shared between repositories and applications.
-- Referred to by semantic identity or by a specific location.
-- Composed into larger capabilities.
-- Materialized from verified source-backed resources.
-- Consumed by prompt, Skill, MCP, Agent, Team, Workflow, and future runtime systems.
-
-The declaration system separates four responsibilities:
-
-- A declaration describes an artifact.
-- A composition declaration selects, groups, or contains artifacts.
-- A resolver produces a typed graph and relationship-level status.
-- A runtime consumer decides how to materialize or execute that graph.
+The complete platform flow is:
 
 ```text
-Repository files and managed packages
-  -> normalized artifact declarations
-  -> resolved composition graph
-  -> runtime-specific capability plan
-  -> runtime consumers
+Physical Sources
+  -> source entries
+  -> physical-format decoders
+  -> normalized Definitions
+  -> source-backed Artifacts
+  -> typed resolution graph
+  -> consumer capability plan
+  -> runtime or management consumer
 ```
 
-Composition artifacts such as Collections, Agents, Teams, Loops, Workflows, and Workspaces are ordinary artifacts. They are not alternate stores, ownership databases, or lifecycle parents.
+The ecosystem must support repository-authored content, managed packages, protected built-in content, explicit dynamic discovery, partial resolution, and consumer-specific readiness without turning composition into Store ownership.
 
-In particular, a Collection is a declaration containing membership relationships. Artifact Store persists the Collection declaration as an ordinary source-backed Artifact. It does not persist Collection membership as a generic Store relationship.
+## 2. Goals and scope
 
-There must be no generic:
+### 2.1 Goals
 
-- Collection foreign key on an Artifact.
-- Collection membership table in Artifact Store.
-- Cascading deletion from Collection to member.
-- Collection-specific Artifact identity.
-- Collection-specific member lifecycle behavior in Artifact Store.
+The ecosystem must provide:
 
-User-facing Collection editing is an application-domain operation above Artifact Store. It updates a managed Collection declaration document.
+- Root-scoped semantic identity.
+- Source-backed immutable Definitions.
+- Stable Artifact occurrences.
+- Verified source resources.
+- Per-type resolver registration.
+- Per-type public resolver APIs.
+- A shared private resolution core.
+- Named, located, contained, and selector relationship resolution.
+- Current Root lookup with protected built-in fallback.
+- Explicit built-in-only lookup.
+- Generic fallback providers.
+- Source-selected alias traversal.
+- Explicit source refresh.
+- Read-only normal resolution.
+- Relationship-level availability and diagnostics.
+- Stable non-positional relationship identity.
+- Partial and strict capability plans.
+- Workspace-driven explicit capability selection.
+- Managed Plugin authoring without Store ownership.
+- Package-scoped built-in hydration.
+- Clear separation between declaration availability and runtime readiness.
 
-## Motivation and desired user outcome
+### 2.2 In scope
 
-### Why this is needed
+This HLD defines:
 
-AI capabilities are commonly distributed across unrelated formats:
+- Root, Source, Definition, Artifact, and Resource responsibilities.
+- Source registration, discovery, refresh, and verification.
+- Physical-format adapters.
+- Locator-resolution boundaries.
+- Resolver architecture and lookup behavior.
+- Member-selector discovery and expansion.
+- Alias and terminal Artifact behavior.
+- Composition expansion.
+- Capability plans.
+- Workspace behavior.
+- Managed Plugin, Skill, MCP, and policy authoring.
+- Built-in package behavior.
+- Artifact enablement.
+- Runtime-consumer boundaries.
+- Current implementation and deferred capabilities.
 
-- Repository instructions in `AGENTS.md` and `CLAUDE.md`.
-- Documentation files that provide useful Context.
-- Skills stored in `SKILL.md` directories.
-- MCP server configuration in `.mcp.json`.
-- Agent Markdown files.
-- Canonical YAML and JSON configuration files.
-- Application-managed packages.
-- Reusable bundles of prompts, Skills, MCP servers, and Workflows.
+### 2.3 Boundary
 
-Without a common declaration model, these formats cannot be composed consistently.
+This document does not redefine portable wire schemas, and resolution itself does not execute Models, Tools, Agents, Teams, Loops, or Workflows.
 
-Typical problems include:
+## 3. Requirements
 
-- A Skill can be discovered but cannot be referenced uniformly from an Agent.
-- A Workspace can load files but cannot express a reusable capability set.
-- MCP servers and Skills use unrelated identity models.
-- A Workflow cannot refer to an Agent using the same mechanism as a Collection.
-- Repository instructions are treated differently from inline instructions.
-- Source-backed files are loaded without a common freshness or integrity model.
-- Runtime consumers need to understand physical repository layouts.
-- A Collection can accidentally become a hidden ownership and lifecycle layer.
-- Missing or ambiguous members can invalidate an entire composition instead of being reported at the affected relationship.
+### 3.1 Store requirements
 
-The design addresses these problems by separating:
+Artifact Store must persist:
 
-- Declaration:
-  - What an artifact means.
+- Roots.
+- Sources.
+- Source discovery and refresh state.
+- Immutable Definitions.
+- Source-backed Artifact occurrences.
+- Source bindings.
+- Verified resource metadata.
+- Artifact-local data.
 
-- Discovery:
-  - Where declarations are found.
+Artifact Store must not persist generic:
 
-- Resolution:
-  - How declarations identify and compose other declarations.
+- Plugin membership rows.
+- Selector-match rows.
+- Parent ownership.
+- Reverse composition membership.
+- Relationship array positions.
+- Composition cascade rules.
+- Runtime activation inferred from composition.
 
-- Resource access:
-  - How source material is verified and opened.
+### 3.2 Source requirements
 
-- Runtime:
-  - How a resolved graph is materialized or executed.
+Sources must own:
 
-### Desired repository experience
+- Physical content access.
+- Candidate enumeration.
+- Decoder registration and hints.
+- Explicit refresh.
+- Source integrity and generation.
+- Path safety.
+- Discovery limits.
+- Resource verification.
 
-A user should be able to place declarations and familiar artifact files in a repository, select a Workspace, and receive a resolved capability graph.
+Ordinary resolver and capability-plan reads must not mutate Source discovery or refresh Sources.
 
-Example repository:
+### 3.3 Resolution requirements
+
+The resolver must:
+
+- Return a typed graph without executing it.
+- Preserve every declared relationship occurrence.
+- Report each relationship as `available`, `unavailable`, or `ambiguous`.
+- Never use source order to break ambiguity.
+- Resolve located references strictly.
+- Resolve contained declarations through stable structural occurrences.
+- Expand selectors against indexed Source state.
+- Follow source-selected aliases to terminal targets.
+- Detect alias and composition cycles.
+- Enforce depth and node limits.
+- Preserve relationship behavior and provenance.
+- Keep unavailable external relationships visible.
+- Keep runtime readiness separate from declaration availability.
+
+### 3.4 Composition requirements
+
+- Composition must not mutate target definitions or local state.
+- Composition arrays must not define precedence or execution order.
+- Exact duplicate normalized relationships must be rejected.
+- Distinct relationships to one terminal target must remain distinct in the graph.
+- Consumer deduplication must not erase relationship occurrence diagnostics.
+- Nested Workspace relationships must remain visible but resolve as unavailable.
+
+### 3.5 Managed authoring requirements
+
+Managed authoring must:
+
+- Store Plugins and independently authored targets as source-backed packages.
+- Require explicit compatible Plugin selection for managed Skill, MCP server, and MCP policy creation.
+- Create external membership by default.
+- Preserve dangling membership when a target is absent.
+- Allow one target to belong to multiple Plugins.
+- Never delete an independent target merely because membership is removed.
+- Protect baseline Plugins through application-level policy.
+- Require explicit replacement intent before replacing non-equivalent package content.
+
+### 3.6 Consumer requirements
+
+Consumers must:
+
+- Use typed resolver APIs.
+- Preserve diagnostics.
+- Distinguish Artifact-backed and mapped fallback targets.
+- Apply relationship behavior only where defined.
+- Decide runtime readiness independently.
+- Materialize verified resources rather than opening arbitrary paths.
+- Choose strict or partial completeness explicitly.
+
+## 4. Design principles and invariants
+
+### 4.1 Store records occurrences, not composition ownership
+
+An Artifact represents one declaration occurrence.
+
+A Plugin, Workspace, Agent, or other composition is persisted as an ordinary Definition and Artifact. Its relationships remain declaration content interpreted by resolvers.
+
+### 4.2 Resolution is observational
+
+Normal resolution observes indexed state.
+
+```text
+Resolve
+  -> read indexed Sources, Definitions, and Artifacts
+  -> produce graph
+  -> no Source mutation
+```
+
+Discovery updates occur only through explicit registration or refresh.
+
+### 4.3 Declaration availability is not runtime readiness
+
+Resolution answers:
+
+```text
+Can this relationship identify one target?
+```
+
+A runtime answers:
+
+```text
+Can this target be used now with the required resources,
+credentials, installation values, and runtime support?
+```
+
+### 4.4 Physical and semantic identity remain separate
+
+A locator selects a declaration occurrence. It does not alter the selected target's semantic name.
+
+Aliases may provide multiple physical paths to one terminal Artifact.
+
+### 4.5 Built-in fallback is selection, not activation
+
+Protected built-in lookup occurs only for a declared named relationship. It does not automatically add all built-in capabilities to a Workspace or runtime session.
+
+### 4.6 Source order has no semantic authority
+
+Source order cannot:
+
+- Resolve ambiguity.
+- Establish member precedence.
+- Define execution order.
+- Define contained declaration identity.
+- Define selector identity.
+- Define ownership.
+
+### 4.7 Locator representation and materialization are separate
+
+Portable declarations may retain URL, Git, package, command, and other supported locator kinds even when the current installation has only local path Source adapters.
+
+## 5. Desired user experience
+
+A repository can combine familiar files and canonical declarations.
 
 ```text
 checkout-service/
@@ -242,7 +373,7 @@ checkout-service/
     reviewer.agent.yaml
     security-reviewer.agent.md
 
-  collections/
+  plugins/
     repository-review.yaml
 
   workflows/
@@ -258,1855 +389,559 @@ checkout-service/
   workspace.yaml
 ```
 
-The repository can provide declarations with identities such as:
+The Source may produce Artifacts such as:
 
 ```text
-instruction/repository-rules
-context/readme
+text/repository-rules/instructions
+text/readme/user-message
 skill/code-review
 mcp/github
 agent/reviewer
-agent/security-reviewer
-collection/repository-review
+plugin/repository-review
 workflow/change-workflow
 workspace/checkout-service
 ```
 
-A Collection can group independently declared artifacts:
-
-```yaml
-type: collection
-name: repository-review
-description: Repository review capabilities
-
-members:
-  - type: instruction
-    name: repository-rules
-
-  - type: skill
-    name: code-review
-
-  - type: mcp
-    name: github
-    locator: ../.mcp.json
-    server: github
-```
-
-From the user's perspective, this means:
+The expected user flow is:
 
 ```text
-Use instruction/repository-rules from the active Root.
-Use skill/code-review from the active Root.
-Use mcp/github from the stated MCP configuration.
+Select repository or Workspace
+  -> register or reuse repository Source
+  -> discover Workspace and declaration candidates
+  -> explicitly refresh reachable declaration closure
+  -> resolve Workspace members
+  -> build capability plan
+  -> let consumers materialize or execute selected capabilities
 ```
 
-The locator narrows where the intended MCP declaration is found. It does not create a Collection-specific copy of the MCP server.
+Unavailable and ambiguous relationships remain visible rather than disappearing from the experience.
 
-A composition document can also contain a complete declaration when there is no separate declaration to find:
+## 6. Primary workflows
 
-```yaml
-type: collection
-name: local-development
+### 6.1 Repository onboarding
 
-members:
-  - type: mcp
-    name: local-files
-    transport: stdio
-    command: npx
-    args:
-      - -y
-      - "@modelcontextprotocol/server-filesystem"
-      - .
-```
+1. The application registers a filesystem Source for the repository.
+2. Initial Source discovery locates supported declarations and Workspace candidates.
+3. The user or application selects a Workspace.
+4. `RefreshWorkspace` computes the reachable local locator and selector closure.
+5. Affected Source discovery is updated.
+6. Affected Sources are refreshed.
+7. The Workspace is resolved from indexed state.
+8. Consumer-specific capability plans are produced.
 
-Here, `mcp/local-files` is declared inside the Collection document. The Collection document is its declaration source.
+Independent concurrently active declaration universes should use separate Sources.
 
-## Goals, scope, and non-goals
-
-### Goals
-
-The system must provide:
-
-- One portable declaration vocabulary for supported AI artifacts.
-- Uniform identity and reference semantics across composition fields.
-- Support for familiar repository formats without requiring complete conversion to canonical YAML or JSON.
-- Source-backed resource verification.
-- Explicit resolution of missing and ambiguous relationships.
-- Reusable, Root-scoped names.
-- Composition across Collections, Agents, Teams, Loops, Workflows, and Workspaces.
-- Partial capability plans that preserve unavailable relationships.
-- Strict runtime behavior when a consumer requires a complete capability set.
-- Editable managed Collections without introducing Store-level ownership.
-- Equivalent declaration semantics for built-in and user-owned content.
-- A clear boundary between declaration resolution and runtime execution.
-
-### In scope
-
-This HLD defines:
-
-- Artifact vocabulary and common declaration fields.
-- Composition-entry forms.
-- Identity, locator, and occurrence semantics.
-- Type-specific declaration contracts.
-- Discovery and physical-format normalization.
-- Root-scoped resolution.
-- Workspace declaration scope.
-- Managed Collection authoring and lifecycle.
-- Built-in package behavior.
-- Runtime consumer boundaries.
-- Source-backed storage and resource verification.
-- Current implementation status.
-
-### Non-goals
-
-The declaration layer does not itself provide:
-
-- Model execution.
-- Tool execution.
-- Agent or Team execution.
-- Loop execution.
-- Workflow scheduling or execution.
-- Runtime retries, cancellation, timeouts, or state persistence.
-- MCP secret, OAuth, enablement, connection, or policy changes through Collection membership.
-- Implicit cross-Root imports.
-- Automatic activation of all artifacts discovered in a Root.
-- Automatic activation of baseline Collections.
-- Source mutation during ordinary resolution or capability reads.
-- Generic Artifact Store ownership or lifecycle behavior for composition relationships.
-
-Git, URL, package, archive, and plugin support are represented where relevant in the model, but some remain deferred in the current implementation.
-
-## Requirements
-
-The terms `must`, `should`, and `may` in this section describe target behavior. Current implementation status is documented separately.
-
-### Declaration requirements
-
-- Every canonical declaration must have one semantic `type`.
-- Every declaration, including a contained declaration, must have a `name`.
-- Portable declarations must not require a second discriminator such as `kind`, `category`, or `role`.
-- The default semantic identity must be `(type, name)`.
-- Semantic identity must be scoped to a Root.
-- Release or compatibility version information must not be part of default symbolic identity.
-- The system must preserve both semantic identity and physical declaration-occurrence identity.
-- Familiar physical formats must normalize into the same declaration vocabulary.
-- Source-backed artifacts must retain verifiable links to their source material.
-
-### Composition requirements
-
-The same entry model must apply to:
-
-- Collection members.
-- Agent and Team members.
-- Agent and Team programs.
-- Loop bodies.
-- Workflow node targets.
-- Workspace roots.
-- Skill `allowedTools`.
-- Other declaration fields that accept named artifacts.
-
-Every composition position must support:
-
-- An unlocated external reference by `(type, name)`.
-- A located external reference by `(type, name, locator)`.
-- A complete contained declaration.
-
-A locator-bearing external entry must:
-
-- Select an existing declaration occurrence.
-- Preserve the target's semantic identity.
-- Not create a copy of the target.
-- Not override target configuration, policy, state, or metadata.
-- Not fall back to another location when its selected location is unavailable.
-
-An `mcp` or `mcp.policy` declaration selected through a non-command locator is
-a pure alias to its selected terminal Artifact. It must not introduce local
-capability selection or policy fields that alter the selected target.
-
-A complete contained declaration must:
-
-- Include the artifact's required type-specific declaration body.
-- Produce a declaration occurrence within its containing document.
-- Remain distinct from an external reference with only identity, locator, and selectors.
-
-### Resolution requirements
-
-The resolver must:
-
-- Require exactly one available target for an unlocated symbolic reference.
-- Report ambiguity when multiple matching declaration occurrences are available.
-- Verify the expected type and name for a located reference.
-- Report a located reference as unavailable if the selected location does not provide the expected target.
-- Never use source order as an ambiguity tie-breaker.
-- Detect composition cycles.
-- Apply resolution-depth and resolution-node limits.
-- Preserve every declared relationship occurrence.
-- Report relationship-level `available`, `unavailable`, or `ambiguous` status.
-- Keep the containing composition declaration valid when an external relationship is unavailable or ambiguous.
-- Return a typed graph without executing it.
-
-A consumer must be able to:
-
-- Reject a capability plan when it requires all selected relationships.
-- Use available portions of a capability plan when partial operation is supported.
-- Report unavailable or ambiguous relationships without silently dropping them.
-
-### Ordering requirements
-
-The following arrays must not have caller-defined execution or precedence semantics:
-
-- `Collection.members`.
-- `Agent.members`.
-- `Team.members`.
-- `Skill.allowedTools`.
-- `Workspace.roots`.
-
-Workflow node, edge, and start arrays describe graph structure rather than source-array execution order.
-
-Resolution and flattened capability output must use deterministic normalized ordering.
-
-Reordering source arrays may still change:
-
-- Raw source bytes.
-- Source content digest.
-- Artifact revision.
-
-It must not, by itself, change composition behavior.
-
-Explicit runtime request ordering is separate from declaration composition ordering.
-
-### Discovery and Workspace requirements
-
-The system must support:
-
-- Exact declaration sources.
-- Scanned declaration sources.
-- Inline declaration sources.
-- Slash-separated include and exclude patterns.
-- Workspace-selected declaration universes.
-- Explicit refresh of local locator closure.
-- Read-only resolution and capability operations.
-- Discovery of Workspace candidates independently of the selected Workspace's non-Workspace declaration scope.
-- Separate Sources when concurrently active independent declaration universes are required.
-
-When a Workspace provides `declarations`, including an empty array, that field must define the selected Workspace's non-Workspace declaration universe for its Source.
-
-Nested Workspace references must remain declared but resolve as unavailable.
-
-### Collection and authoring requirements
-
-The system must support:
-
-- Editable user-managed Collections.
-- External members that remain declared when their target is missing, invalid, disabled, deleted, or ambiguous.
-- Detaching a member without deleting its target.
-- Deleting a target without silently deleting Collection membership.
-- Restoring a target without rewriting the Collection.
-- Complete contained declarations in portable Collection documents.
-- Managed Collection APIs that create external membership entries by default.
-- Deletion protection for managed Collections with direct members.
-- No recursive ownership or deletion semantics.
-
-Each supported user Root must have:
-
-- One application-provisioned Skill baseline Collection.
-- One application-provisioned MCP baseline Collection.
-
-Baseline Collections must:
-
-- Have fixed logical names.
-- Have fixed managed package locations.
-- Be editable.
-- Not be renamed.
-- Not be runtime-disabled.
-- Not be deleted.
-- Be explicit selectable authoring destinations.
-- Never be implicit API defaults or fallbacks.
-- Never be automatically active in a Workspace or runtime session.
-
-Application Root lifecycle, rather than generic Artifact Store Root creation,
-must establish these baselines when a user Root is created and reconcile
-existing user Roots during application startup. Every application path that
-creates a user Root must invoke this application-level provisioner.
-
-Managed Skill, MCP server, and MCP policy creation must receive an explicitly selected compatible editable Collection.
-
-Managed named create operations may be idempotent only for equivalent expected
-package content and Artifact state. They must not replace a different existing
-package unless the caller uses explicit replacement or upsert, or the operation
-is authorized application repair or built-in reconciliation.
-
-### Artifact enablement requirements
-
-Every Artifact has one local `Enabled` metadata value.
-
-- The value is mutable for Artifacts in mutable and protected Roots.
-- The value is stored with the Artifact record and is retained by ordinary
-  Source refresh and ordinary package hydration.
-- The value does not alter Source discovery, Source refresh, Definition
-  persistence, resource verification, graph resolution, managed publication,
-  package replacement, package removal, Collection editing, Collection
-  deletion, Artifact purge eligibility, or protected topology authorization.
-- Artifact Store list APIs remain exhaustive and expose `Enabled`; consumer
-  lists may apply an explicit enabled-only filter when appropriate.
-- A disabled Artifact remains readable, editable when otherwise editable, and
-  addressable by `ArtifactRef`.
-- New Artifacts default to `Enabled=true`.
-- MCP has no additional runtime-enabled, installation-enabled, effective-enabled,
-  or Workspace-specific enablement state.
-- MCP Store and MCP Runtime do not interpret `Artifact.Enabled`; an outer
-  caller may apply it as an explicit catalog or selection filter.
-- MCP policy composition, MCP installation data, materialization, connection,
-  and invocation remain independent of generic Artifact enablement.
-- Built-in installers do not overwrite an existing user's enabled state.
-
-`Source.Enabled` is separate lifecycle state. Disabling a Source affects source
-discovery and resource availability and can make its Artifacts missing. It is
-not Artifact enablement metadata.
-
-An intentional protected topology reset replaces Artifact records and may
-replace ArtifactRefs. It is not ordinary hydration. Preserving local metadata
-across an intentional topology replacement requires a separate migration or
-overlay policy.
-
-### Built-in content requirements
-
-Built-in and user-owned declarations must use the same:
-
-- Identity semantics.
-- Composition-entry semantics.
-- Locator semantics.
-- Contained-declaration semantics.
-- Resolution behavior.
-
-Differences may exist only in:
-
-- Edit authority.
-- Distribution.
-- Protected Root behavior.
-- Placement of mutable local overlays.
-
-Package hydration must reconcile only affected built-in packages unless a topology or Root migration requires a complete reset.
-
-### Runtime and resource requirements
-
-Consumers must receive verified resources rather than arbitrary unverified filesystem paths.
-
-Declaration resolution must remain separate from:
-
-- Runtime readiness.
-- Resource materialization.
-- Installation-local configuration.
-- Secret substitution.
-- Connection management.
-- Scheduling and execution.
-
-## Design principles and invariants
-
-### One declaration has one semantic type
-
-Each declaration has one portable `type`.
-
-```yaml
-type: skill
-name: code-review
-```
-
-There is no secondary portable discriminator such as `kind`, `category`, or `role`.
-
-### Composition is explicit and uniform
-
-Composition relationships are represented by typed entries.
-
-```yaml
-type: collection
-name: repository-review
-
-members:
-  - type: instruction
-    name: repository-rules
-
-  - type: skill
-    name: code-review
-
-  - type: mcp
-    name: github
-```
-
-The same symbolic, located, and contained forms apply across composition fields.
-
-### Existing file formats remain useful
-
-Users should not need to rewrite every repository convention into a new format.
-
-Supported inputs include:
+### 6.2 Ordinary capability read
 
 ```text
-AGENTS.md
-CLAUDE.md
-README.md
-llms.txt
-SKILL.md
-.mcp.json
-mcp.json
-AGENT.md
-*.agent.md
-canonical JSON
-canonical YAML
+ResolveWorkspace
+  -> load indexed Workspace Artifact
+  -> resolve declared members
+  -> recursively expand relationships
+  -> preserve partial status
+  -> produce capability plan
 ```
 
-Physical-format adapters normalize these inputs into the common artifact vocabulary.
+This operation does not scan the filesystem or refresh a Source.
 
-### Source material remains source-backed
+The same read-only rule applies to:
 
-A declaration may refer to:
+- Plugin resolution.
+- Agent resolution.
+- Team resolution.
+- Workflow resolution.
+- Prompt planning.
+- Skill planning.
+- MCP planning.
+- Runtime-plan generation.
 
-- A physical file.
-- A directory.
-- An MCP configuration entry.
-- A package resource.
-- A command.
-- An external source.
-
-Consumers receive verified source material rather than arbitrary paths.
-
-### Composition is separate from execution
-
-The declaration system can describe:
+### 6.3 Explicit refresh
 
 ```text
-Collection
-Agent
-Team
-Loop
-Workflow
-Workspace
+Selected composition root
+  -> inspect reachable selectors and located relationships
+  -> calculate local discovery closure
+  -> update only affected Source discovery
+  -> refresh affected Sources
+  -> repeat within bounded limits
 ```
 
-It does not execute them. Execution belongs to the applicable runtime consumer.
+Refresh is explicit because source mutation must not be hidden inside reads.
 
-### Names are reusable in independent scopes
-
-Unrelated Roots may each define:
+### 6.4 Managed Skill or MCP creation
 
 ```text
-skill/code-review
-mcp/github
-collection/repository-review
+Explicitly select compatible editable Plugin
+  -> add external membership to Plugin declaration
+  -> publish independent target package
+  -> refresh affected managed Sources
+  -> resolve membership and target
 ```
 
-without conflict.
+If target publication fails after membership publication, the relationship remains declared and unavailable. A retry re-reads the Plugin revision.
 
-A conflict occurs only when more than one available target with the same semantic identity participates in one resolution scope and cannot be reduced to the same terminal Artifact.
-
-### Physical and semantic identity are different
-
-The system preserves:
-
-- Physical origin:
-  - Where a declaration occurrence came from.
-
-- Semantic identity:
-  - Which artifact type and logical name it declares.
-
-A locator selects a physical declaration occurrence. It does not change the selected artifact's semantic identity.
-
-### Collections are groups, not owners
-
-Collection membership is declaration content interpreted by the resolver.
-
-Adding or removing a Collection member must not create generic ownership, parentage, or lifecycle coupling in Artifact Store.
-
-### Resolution is observational
-
-Ordinary resolution and capability-plan reads do not change Source discovery or refresh Sources.
-
-Discovery changes are performed through explicit registration or refresh operations.
-
-### Declaration status and runtime readiness are separate
-
-The resolver reports whether a declaration relationship can be identified.
-
-A runtime consumer determines whether the resolved target has all resources, configuration, credentials, or runtime support needed for use.
-
-## Conceptual model
-
-### Concern boundaries
-
-The complete flow is:
+### 6.5 Built-in bootstrap
 
 ```text
-Physical Sources
-  -> source entries
-  -> physical-format decoders
-  -> normalized Definitions
-  -> source-backed Artifacts
-  -> typed declaration resolution
-  -> capability plans
-  -> runtime consumers
+Application startup
+  -> inspect declared built-in packages and fingerprints
+  -> verify package bytes and expected Artifacts
+  -> repair changed or incomplete packages
+  -> remove stale known packages
+  -> preserve unaffected package ArtifactRefs and local state
 ```
 
-Storage and typed composition have separate responsibilities:
+A hydration marker alone is not sufficient evidence that package content remains present.
+
+## 7. Conceptual architecture
 
 ```text
 Root
   -> Source
-  -> source entry
-  -> Decoder
-  -> Definition
-  -> Artifact
-  -> Resource
+    -> source entry
+      -> Decoder
+        -> Definition
+          -> Artifact
+            -> verified Resource
 
 Artifact + Definition
-  -> Artifact Resolver
-  -> resolved declaration graph
-  -> runtime consumer
+  -> registered type resolver
+    -> relationship graph
+      -> capability plan
+        -> consumer
 ```
 
-### Terminology
+### 7.1 Terminology
 
-| Term                   | Meaning                                                                                       |
-| ---------------------- | --------------------------------------------------------------------------------------------- |
-| Root                   | The identity and resolution boundary for a repository or application domain                   |
-| Source                 | A registered physical content origin                                                          |
-| Source entry           | One discoverable file, directory, or managed source item                                      |
-| Definition             | Immutable normalized semantic content decoded from a source declaration                       |
-| Artifact               | A local addressable record for one declaration occurrence                                     |
-| Resource               | Verified source material associated with an Artifact                                          |
-| Declaration            | The semantic description of an artifact                                                       |
-| Declaration occurrence | The physical or structural place where a declaration is written                               |
-| Semantic identity      | The Root-scoped pair `(type, name)`                                                           |
-| Composition entry      | A reference to or contained declaration of another artifact                                   |
-| Composition occurrence | One relationship position in a containing declaration                                         |
-| Capability plan        | A resolved graph with relationship-level status and consumer-specific readiness               |
-| Terminal Artifact      | The final independently addressable Artifact reached after resolving source-selection aliases |
-| ArtifactRef            | The stable local reference used to identify an Artifact occurrence                            |
+| Term                    | Meaning                                                               |
+| ----------------------- | --------------------------------------------------------------------- |
+| Root                    | Identity, authorization, and default symbolic resolution boundary     |
+| Source                  | Registered physical or managed content origin                         |
+| Source entry            | Discoverable file, directory, or managed source item                  |
+| Decoder                 | Adapter that converts a physical format into portable declarations    |
+| Definition              | Immutable normalized semantic content                                 |
+| Artifact                | Local addressable record for one declaration occurrence               |
+| Resource                | Verified source material associated with an Artifact                  |
+| ArtifactRef             | Stable local reference to an Artifact occurrence                      |
+| Declaration occurrence  | Physical or structural place where a declaration is written           |
+| Relationship occurrence | One declared member, selector, node target, or singular relationship  |
+| Terminal Artifact       | Final Artifact reached after following source-selection aliases       |
+| Mapped target           | Non-Artifact target returned by a fallback provider                   |
+| Capability plan         | Resolved consumer-safe graph with status, provenance, and diagnostics |
 
-### Artifact vocabulary
+## 8. Root model
 
-The core artifact vocabulary is:
+A Root owns:
+
+- Registered Sources.
+- Indexed Definitions and Artifacts.
+- Artifact-local state.
+- Symbolic lookup scope.
+- Source authorization boundary.
+
+The default semantic lookup key is:
 
 ```text
-model
-instruction
-context
-tool
-skill
-mcp
-collection
-agent
-team
-loop
-workflow
-workspace
+(type, logical name)
 ```
 
-The implementation also supports:
+Text additionally uses insertion identity.
+
+Multiple Roots may independently contain the same name.
+
+A Root may also contain several occurrences of the same semantic identity. An unlocated relationship becomes ambiguous unless those occurrences reduce to the same terminal Artifact.
+
+Arbitrary cross-Root imports are not supported.
+
+The protected built-in Root is a special authorized fallback scope. It is not an arbitrary cross-Root import mechanism.
+
+## 9. Source model
+
+### 9.1 Source responsibilities
+
+A Source separates physical configuration from declaration discovery.
 
 ```text
-mcp.policy
+Source.Config
+  -> filesystem path
+  -> embedded provider and root
+  -> managed storage location
+
+Source.Discovery
+  -> exact entries
+  -> directory roots
+  -> include and exclude patterns
+  -> decoder hints
+  -> allowed decoders
+  -> expected digests
+  -> scan limits
 ```
 
-| Type          | Purpose                                                                 |
-| ------------- | ----------------------------------------------------------------------- |
-| `instruction` | Behavioral, task-oriented, or prompt text                               |
-| `context`     | Repository, documentation, or inline information supplied to a consumer |
-| `tool`        | A named operation or facility                                           |
-| `model`       | A provider-qualified model declaration and parameters                   |
-| `skill`       | A path-backed reusable Skill capability                                 |
-| `mcp`         | One MCP server capability                                               |
-| `mcp.policy`  | MCP runtime policy composed by MCP consumers                            |
-| `collection`  | A reusable group of declarations                                        |
-| `agent`       | A composed AI Agent declaration                                         |
-| `team`        | A multi-Agent composition                                               |
-| `loop`        | Repeated application of an entry                                        |
-| `workflow`    | An explicit graph of entry applications                                 |
-| `workspace`   | A repository declaration manifest and root-selection document           |
-
-## Portable declaration model
-
-### Common declaration header
-
-Every canonical declaration has the same conceptual header.
+Current Source kinds are:
 
 ```text
-Header {
-  $schema?: string
-  apiVersion?: string
+fs-directory
+embedded-directory
+managed-directory
+```
 
-  type: ArtifactType
-  name: string
-  description?: string
-  locator?: Locator
-  metadata?: map[string, JSONValue]
+### 9.2 Source registration
+
+Source registration may establish:
+
+- Exact declaration files.
+- Scanned directory roots.
+- Decoder restrictions.
+- Expected content digests.
+- Initial Workspace candidate discovery.
+- Managed package locations.
+
+Portable Workspace declarations do not own this Source configuration.
+
+### 9.3 Source refresh
+
+A Source refresh:
+
+- Enumerates configured candidates.
+- Validates path boundaries.
+- Selects physical-format decoders.
+- Produces normalized Definitions.
+- Reconciles source-backed Artifacts.
+- Updates Source generation and diagnostics.
+- Preserves ordinary Artifact-local state for continuing occurrences.
+
+A disabled Source affects discovery and resource availability. It is separate from Artifact enablement.
+
+## 10. Physical-format adapters
+
+Supported physical inputs normalize as follows.
+
+| Physical input                  | Produced behavior                                                                            |
+| ------------------------------- | -------------------------------------------------------------------------------------------- |
+| Canonical JSON                  | One root declaration and any named contained declarations                                    |
+| Canonical YAML                  | One root declaration and any named contained declarations                                    |
+| `AGENTS.md`                     | Text with `insert=instructions`                                                              |
+| `CLAUDE.md`                     | Text with `insert=instructions`                                                              |
+| `README.md`                     | Text with `insert=user-message`                                                              |
+| `llms.txt`                      | Text with `insert=user-message`                                                              |
+| Selected documentation Markdown | Source-backed Text                                                                           |
+| `SKILL.md`                      | One independent Skill                                                                        |
+| Direct Skill directory          | One Skill rooted at the package                                                              |
+| `.mcp.json`                     | One independent MCP Artifact per configured server                                           |
+| `mcp.json`                      | One independent MCP Artifact per configured server                                           |
+| `AGENT.md`                      | Agent, optional instruction Text for non-empty body, and contained front-matter declarations |
+| `*.agent.md`                    | Agent, optional instruction Text for non-empty body, and contained front-matter declarations |
+| Canonical Plugin YAML or JSON   | Plugin plus contained declarations                                                           |
+| Workspace manifest              | Workspace plus contained declarations                                                        |
+
+One physical file may emit multiple Artifacts.
+
+A locator-bearing external member does not emit a new contained Artifact merely because it has a locator.
+
+A standard `SKILL.md` adapter emits an explicit declaration-relative locator for its source and treats the containing directory as the verified Skill package root.
+
+Physical adapters may derive names deterministically when the source format has no explicit portable name.
+
+## 11. Definition model
+
+A Definition is the immutable normalized result of decoding one declaration occurrence.
+
+Conceptually:
+
+```text
+Definition {
+  Digest
+  Kind
+  SchemaID
+  SchemaVersion
+  LogicalName
+  DisplayName
+  Description
+  Labels
+  Body
+  Dependencies
 }
 ```
 
-Example:
+Schema identity in this structure is internal Store registration data. It is not copied into portable declaration instances.
 
-```yaml
-$schema: https://schemas.flexigpt.site/artifact/agent/v1.json
-apiVersion: v1
+Definition digests support:
 
-type: agent
-name: reviewer
-description: Reviews repository changes for correctness and security.
-```
+- Integrity verification.
+- Equality.
+- Change detection.
+- Immutable persistence.
+- Managed package verification.
+- Runtime version tracking.
 
-| Field         | Meaning                                         |
-| ------------- | ----------------------------------------------- |
-| `type`        | Concrete semantic artifact type                 |
-| `name`        | Portable symbolic identity                      |
-| `description` | Human-readable discovery information            |
-| `locator`     | Declaration-relative or external source address |
-| `metadata`    | Namespaced annotation data                      |
-| `apiVersion`  | Portable declaration contract version           |
-| `$schema`     | Optional JSON Schema location                   |
+Reordering an unordered source array may change Definition bytes and digest without changing composition behavior.
 
-Every declaration requires `name`, including nested and contained declarations.
+## 12. Artifact model
 
-### Semantic identity and declaration occurrence
+An Artifact is a local addressable record for one declaration occurrence.
 
-The logical identity of a declaration is:
+Conceptually:
 
 ```text
-(type, name)
-```
-
-Examples:
-
-```text
-skill/code-review
-mcp/github
-agent/reviewer
-collection/repository-review
-workflow/change-workflow
-```
-
-Logical identity is Root-scoped.
-
-A declaration occurrence identifies where one declaration is defined:
-
-```text
-Root
-  -> Source
-    -> declaration location
-      -> optional named structural position
-```
-
-The following rules apply:
-
-- Multiple Roots may contain the same `(type, name)` without conflict.
-- One Root may contain multiple declaration occurrences with the same `(type, name)`.
-- An unlocated symbolic reference requires exactly one available terminal target.
-- Multiple available terminal targets make an unlocated reference ambiguous.
-- Multiple aliases resolving to the same terminal Artifact count as one symbolic target.
-- A located reference selects the occurrence at the stated location.
-- The selected target must confirm the requested type and name.
-- Source order is never an ambiguity tie-breaker.
-- A contained declaration is selected through its containing document and named structural position.
-- A contained declaration may have the same semantic identity as another declaration occurrence.
-- Duplicate contained sibling declarations with the same type and name are invalid.
-- A version may describe release or compatibility information, but is not part of default symbolic lookup identity.
-
-### Composition-entry forms
-
-A composition field accepts a `CompositionEntry`.
-
-```text
-CompositionEntry =
-  SymbolicReference
-  | LocatedReference
-  | ContainedDeclaration
-```
-
-The containing field establishes that the object is a composition entry. A separate `ref` wrapper is not required.
-
-#### Symbolic reference
-
-```yaml
-type: skill
-name: code-review
-```
-
-Meaning:
-
-```text
-Use skill/code-review.
-Find exactly one available matching target in the active Root scope.
-```
-
-The entry identifies a target only by semantic identity.
-
-#### Located reference
-
-```yaml
-type: skill
-name: code-review
-locator: ./skills/code-review
-```
-
-Meaning:
-
-```text
-Use skill/code-review.
-Find the expected declaration at ./skills/code-review.
-```
-
-A located reference is still an external relationship. The locator narrows target selection.
-
-The target must confirm the requested `type` and `name`.
-
-A located reference does not:
-
-- Create another declaration.
-- Create a composition-specific copy.
-- Override the selected target.
-- Fall back to an unlocated match.
-- Change the target's semantic identity.
-
-A type-specific selector may be used when one location contains multiple declarations.
-
-```yaml
-type: mcp
-name: github
-locator: ./.mcp.json
-server: github
-```
-
-The `server` field selects one server from a multi-server MCP configuration. It does not make the containing document declare another `mcp/github`.
-
-#### Contained declaration
-
-A contained declaration is complete within the containing document.
-
-```yaml
-type: mcp
-name: local-files
-transport: stdio
-command: npx
-args:
-  - -y
-  - "@modelcontextprotocol/server-filesystem"
-  - .
-```
-
-The containing document is the declaration source for `mcp/local-files`.
-
-A contained declaration:
-
-- Has a required `type` and `name`.
-- Includes the type-specific body needed to declare the artifact.
-- May refer to ordinary resources where its artifact contract permits that.
-- Produces a stable declaration occurrence in the containing document.
-- Does not obtain omitted declaration data from another declaration merely because it has a locator.
-
-A locator alone does not make an entry contained.
-
-```yaml
-type: skill
-name: code-review
-locator: ./skills/code-review
-```
-
-This is a located reference to a standard Skill package. It is not a contained Skill declaration.
-
-An inline Instruction, by contrast, includes declaration content:
-
-```yaml
-type: instruction
-name: review-rules
-mediaType: text/markdown
-content: |
-  Do not modify generated files.
-  Prefer small, reviewable changes.
-```
-
-#### Entry classification
-
-An entry with only the following information is external:
-
-- `type`.
-- `name`.
-- An optional non-command locator.
-- An optional type-specific source selector such as MCP `server`.
-- Optional relationship-local presentation annotations.
-
-Relationship-local annotations do not override the selected target's:
-
-- Metadata.
-- Runtime configuration.
-- Policy.
-- Local state.
-- Enablement.
-- Installation data.
-
-Metadata differences may still distinguish separate external composition occurrences.
-
-An entry becomes contained when it includes a complete type-specific declaration body according to its artifact contract.
-
-A command locator is executable Tool or MCP declaration data. It is not a source-selection locator and therefore contributes to a contained or independent concrete declaration.
-
-An external entry does not emit a source subresource Artifact. A contained declaration does.
-
-A declaration that is valid with only `type` and `name`, such as a minimal Agent, is interpreted as an external reference when it appears in a composition-entry position. A contained form must include actual local composition or program data.
-
-### Ordering and occurrence semantics
-
-Composition arrays do not provide caller-defined precedence or execution order.
-
-The resolver must:
-
-- Preserve every declared composition occurrence.
-- Preserve relationship-local metadata.
-- Produce deterministic normalized output ordering.
-- Preserve status for unavailable and ambiguous occurrences.
-
-Flattened prompt, Skill, and MCP capability lists use consistent ArtifactRef deduplication. The relationship graph still retains each declaration occurrence that led to the target.
-
-Workflow arrays represent graph records. Workflow behavior is determined by IDs, edges, matchers, and joins rather than array position.
-
-Runtime consumers may define explicit runtime request ordering independently of source-array order.
-
-### Locator model
-
-A portable locator identifies a declaration source, implementation, package, command, or external resource.
-
-```text
-Locator =
-  string
-  | PathLocator
-  | URLLocator
-  | GitLocator
-  | PackageLocator
-  | CommandLocator
-```
-
-#### Path locator
-
-```yaml
-locator: ./skills/code-review
-```
-
-Equivalent structured form:
-
-```yaml
-locator:
-  kind: path
-  path: ./skills/code-review
-```
-
-#### URL locator
-
-```yaml
-locator:
-  kind: url
-  url: https://example.com/agents/reviewer.yaml
-  integrity: sha256:...
-```
-
-#### Git locator
-
-```yaml
-locator:
-  kind: git
-  repository: https://github.com/acme/agent-assets.git
-  revision: v2.0.0
-  path: skills/code-review
-```
-
-#### Package locator
-
-```yaml
-locator:
-  kind: package
-  manager: go
-  package: github.com/acme/agent-tools
-  version: v1.2.0
-  path: search
-```
-
-#### Command locator
-
-```yaml
-locator:
-  kind: command
-  command: grep
-```
-
-Relative locators are interpreted relative to the declaration file containing the locator.
-
-For example:
-
-```text
-collections/repository-review.yaml
-  locator: ../skills/code-review
-```
-
-is resolved relative to:
-
-```text
-collections/
-```
-
-It is not resolved relative to the process working directory.
-
-A locator has a context-specific role:
-
-| Context                        | Meaning                                                                                                                      |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Independent declaration        | Identifies source material, a package, an implementation, or another source as defined by that artifact contract             |
-| Incomplete composition entry   | Selects where the expected external target must be found                                                                     |
-| Complete contained declaration | Supplies artifact data only where the artifact contract defines it; it does not implicitly import omitted declaration fields |
-
-A locator in an external composition entry is a selection constraint. If the location does not provide the expected target, that relationship is unavailable.
-
-A command locator is connection or execution information for a Tool or MCP declaration. It is not a location used to find a separate Tool or MCP declaration.
-
-### Path pattern model
-
-Declaration discovery and Context selection use slash-separated patterns.
-
-```text
-*       zero or more characters in one path segment
-?       one character in one path segment
-**      zero or more path segments
-[abc]   one character from a character class
-```
-
-Patterns are relative to their declared base.
-
-Exclusions are evaluated after inclusions.
-
-```yaml
-include:
-  - docs/**/*.md
-  - src/**/*
-exclude:
-  - "**/generated/**"
-  - vendor/**
-```
-
-The same matching behavior applies to:
-
-- Source declaration discovery.
-- Workspace declaration scans.
-- Context resource selection.
-
-## Artifact contracts
-
-### Model
-
-```text
-Model {
-  Header
-
-  model?: string
-  parameters?: map[string, JSONValue]
+Artifact {
+  ID
+  RootID
+  SourceBinding
+
+  Kind
+  LogicalName
+  ResolvedDefinition
+  SourceContentDigest
+
+  State
+  Diagnostics
+
+  DisplayName
+  Enabled
+  Data
 }
 ```
 
-Example:
+An Artifact provides:
 
-```yaml
-type: model
-name: reasoning
-model: anthropic/claude-sonnet
-parameters:
-  temperature: 0
-  maxTokens: 12000
-```
+- Stable local addressability through `ArtifactRef`.
+- A binding to one Source occurrence.
+- Current Definition selection.
+- Source and decode diagnostics.
+- Generic local enablement.
+- Namespaced local consumer data.
 
-The declaration system validates that `parameters` contains JSON values. The selected model provider defines parameter semantics.
+Contained declarations receive stable source subresource occurrences. Their containing composition does not become their Store owner.
 
-### Instruction
+## 13. Resource verification
 
-```text
-Instruction {
-  Header
-
-  content?: string
-  mediaType?: string
-}
-```
-
-Source-backed Instruction:
-
-```yaml
-type: instruction
-name: repository-rules
-locator: ./AGENTS.md
-```
-
-Contained Instruction:
-
-```yaml
-type: instruction
-name: review-rules
-mediaType: text/markdown
-content: |
-  Do not modify generated files.
-  Prefer small, reviewable changes.
-```
-
-### Context
+Resource access verifies:
 
 ```text
-Context {
-  Header
-
-  content?: string
-  mediaType?: string
-
-  include?: string[]
-  exclude?: string[]
-}
+Artifact
+  -> current Definition
+  -> Source binding
+  -> Source generation
+  -> declaration content digest
+  -> expected resource boundary
+  -> verified source material
 ```
 
-Repository Context:
+Consumers must not reopen arbitrary repository paths directly.
 
-```yaml
-type: context
-name: architecture
-locator: ./docs
-include:
-  - "**/*.md"
-exclude:
-  - "**/generated/**"
-```
+A missing resource may make a target unready for runtime use without invalidating an otherwise resolvable composition relationship.
 
-Contained Context:
+Bulk verification-session reuse is an optimization and does not change this trust boundary.
 
-```yaml
-type: context
-name: review-boundary
-mediaType: text/plain
-content: |
-  The review covers checkout and payment packages.
-```
+## 14. Locator resolution architecture
 
-### Tool
+### 14.1 Local path resolution
+
+A local path locator is resolved relative to the declaration Source entry.
+
+Resolution must:
+
+- Normalize the relative path.
+- Remain inside the opened Source.
+- Enforce portable path rules.
+- Avoid process-working-directory interpretation.
+- Avoid arbitrary filesystem access.
+
+### 14.2 External locator resolution
+
+URL, Git, package, command, and future locator kinds are handled by explicit Locator Resolver or Source adapter registrations.
+
+A Locator Resolver may:
+
+- Identify an already registered Source.
+- Create an explicitly authorized Source through a refresh workflow.
+- Materialize verified content.
+- Return an unavailable result when unsupported.
+
+Ordinary resolution must not perform hidden network fetches or Source mutations.
+
+The portable locator shape remains valid even when a corresponding adapter is unavailable.
+
+### 14.3 Context-dependent commands
+
+A command locator remains part of the portable representation. Whether it identifies a declaration source, executable target, or unsupported context is decided by the concrete type resolver and consumer.
+
+Typed Tool and MCP declarations may use their own explicit implementation or transport command fields without narrowing the common locator union.
+
+## 15. Resolver architecture
+
+### 15.1 Per-type registration
+
+The application registers one resolver for each supported Artifact type.
 
 ```text
-Tool {
-  Header
-
-  inputSchema?: JSONSchema
-  outputSchema?: JSONSchema
-}
+ResolverRegistry
+  -> TextResolver
+  -> ModelResolver
+  -> ToolResolver
+  -> SkillResolver
+  -> MCPResolver
+  -> MCPPolicyResolver
+  -> PluginResolver
+  -> AgentResolver
+  -> TeamResolver
+  -> LoopResolver
+  -> WorkflowResolver
+  -> WorkspaceResolver
 ```
 
-Example:
+Each resolver owns:
 
-```yaml
-type: tool
-name: grep
-locator:
-  kind: command
-  command: grep
+- Type-specific declaration interpretation.
+- Child relationship expansion.
+- Selector eligibility.
+- Located-source alias behavior.
+- Fallback-provider support.
+- Consumer projection.
 
-inputSchema:
-  type: object
-  properties:
-    pattern:
-      type: string
-  required:
-    - pattern
+### 15.2 Public typed APIs
 
-outputSchema:
-  type: string
-```
-
-### Skill
+Consumers use typed APIs such as:
 
 ```text
-Skill {
-  Header
-
-  license?: string
-  allowedTools?: CompositionEntry[]
-}
+ResolveText
+ResolveModel
+ResolveTool
+ResolveSkill
+ResolveMCP
+ResolveMCPPolicy
+ResolvePlugin
+ResolveAgent
+ResolveTeam
+ResolveLoop
+ResolveWorkflow
+ResolveWorkspace
 ```
 
-Independent Skill declaration:
-
-```yaml
-type: skill
-name: code-review
-description: Reviews repository changes
-locator: ./skills/code-review
-
-allowedTools:
-  - type: tool
-    name: repository-search
-```
-
-A concrete independent Skill requires a Skill package locator.
-
-A standard Skill is an atomic path-backed capability:
+Composition-capable resolvers may expose typed refresh APIs:
 
 ```text
-skills/code-review/
-  SKILL.md
-  references/
-  scripts/
-  assets/
+RefreshPlugin
+RefreshAgent
+RefreshTeam
+RefreshWorkspace
 ```
 
-The `SKILL.md` file declares the Skill. Its containing directory is the verified Skill resource root.
-
-The `SKILL.md` physical-format adapter emits an explicit `./SKILL.md` locator relative to its own declaration occurrence.
-
-When a Skill appears in a composition position with only `type`, `name`, and an optional locator, it is an external reference:
-
-```yaml
-- type: skill
-  name: code-review
-  locator: ./skills/code-review
-```
-
-This does not create another `skill/code-review` declaration in the containing Collection, Agent, Team, Workflow, or Workspace.
-
-A contained Skill is allowed only when the containing document includes a complete self-contained Skill declaration supported by the Skill contract. A locator pointing to a normal `SKILL.md` package remains an external reference.
-
-`allowedTools` uses the common composition-entry model and has no caller-defined ordering semantics.
-
-### MCP
+Public consumers must not depend on a generic:
 
 ```text
-MCP {
-  Header
-
-  server?: string
-
-  transport?: stdio | streamableHTTP | sse
-
-  command?: string
-  args?: string[]
-  env?: map[string, string]
-
-  url?: string
-  headers?: map[string, string]
-
-  include?: {
-    tools?: string[]
-    resources?: string[]
-    prompts?: string[]
-  }
-}
+ResolveArtifact(type, name)
 ```
 
-Stdio MCP:
+### 15.3 Private shared core
 
-```yaml
-type: mcp
-name: filesystem
-transport: stdio
-command: npx
-args:
-  - -y
-  - "@modelcontextprotocol/server-filesystem"
-  - .
-```
+The private core provides:
 
-HTTP MCP:
+- Current Root lookup.
+- Protected built-in lookup.
+- Fallback-provider dispatch.
+- Located occurrence selection.
+- Contained occurrence selection.
+- Selector expansion.
+- Alias traversal.
+- Cycle detection.
+- Limits.
+- Diagnostics.
+- Stable ordering.
+- Capability-plan graph construction.
 
-```yaml
-type: mcp
-name: issue-tracker
-transport: streamableHTTP
-url: https://mcp.example.com/issues
-headers:
-  Authorization: "${ISSUE_TRACKER_TOKEN}"
-```
+The shared core must not import Tool, Model, Agent, Workflow, MCP connection, prompt, or secret runtimes.
 
-MCP selected from a multi-server configuration:
+## 16. Named lookup and fallback
 
-```yaml
-type: mcp
-name: github
-locator: ./.mcp.json
-server: github
-```
+### 16.1 Default named lookup
 
-In an independent declaration, this form selects connection data for `mcp/github`.
-
-In a composition position, it means:
+An unscoped named relationship resolves in this order:
 
 ```text
-Use the independently declared mcp/github selected from .mcp.json.
+Current Root Artifact
+  -> protected built-in Root Artifact
+  -> registered fallback provider
+  -> unavailable
 ```
 
-The `server` selector participates in source target selection. It does not create a contained MCP declaration.
+A current Root occurrence takes precedence over a protected built-in occurrence.
 
-For a concrete MCP declaration, an absent `include` selects the complete server
-capability.
+A protected built-in Artifact takes precedence over a non-Artifact mapped fallback.
 
-A present `include` limits the declared server capability to the listed tools,
-resources, or prompts.
+### 16.2 Explicit built-in lookup
 
-A non-command source-selected MCP is a pure alias to a terminal Artifact and
-cannot define local `include` rules.
-
-An MCP declaration must use exactly one connection-source model:
-
-- An inline executable connection.
-- A command locator, which implies `stdio`.
-- A non-command locator selecting connection data from another source entry as a pure alias.
-
-A complete inline connection cannot also contain a non-command source locator.
-
-An external MCP composition entry cannot override:
-
-- Connection details.
-- Include rules.
-- Authentication declarations.
-- Runtime policy.
-- Installation configuration.
-- Runtime state.
-- Enablement.
-
-Distinct configurations of the same logical server should use distinct names:
+A relationship with `scope: builtin` resolves as:
 
 ```text
-mcp/github-read
-mcp/github-write
+Protected built-in Root Artifact
+  -> registered built-in fallback provider
+  -> unavailable
 ```
 
-### MCP policy
+It does not search the current Root.
 
-`mcp.policy` is a supported declaration type used by MCP consumers to compose
-runtime policy.
+The scope is:
 
-Concrete MCP policies use a required `body` with the following optional fields:
+- A lookup directive.
+- Not a Root ID.
+- Not a source locator.
+- Not an ArtifactRef.
+- Not a generic cross-Root import.
 
-| Field                 | Meaning                                                   |
-| --------------------- | --------------------------------------------------------- |
-| `trustLevel`          | Trust classification with `trusted` or `untrusted` values |
-| `defaultPolicy`       | Default approval and execution rules                      |
-| `toolPolicies`        | Per-tool policy overrides                                 |
-| `expectedToolDigests` | Optional expected digests for discovered tools            |
-| `staleDigestPolicy`   | Policy applied when an expected tool digest is stale      |
-| `appsPolicy`          | MCP Apps enablement and approval behavior                 |
+### 16.3 Generic fallback providers
 
-Approval rules use `allow`, `ask`, or `deny`. Execution modes use `auto` or
-`manual`.
+Fallback providers are registered per Artifact type.
 
-A concrete MCP policy requires `body`. A non-command source-selected policy may
-use a locator without `body`; it is a pure alias to the selected terminal
-policy Artifact and cannot merge or override the selected policy body.
+Tool and Model are the initial fallback-provider consumers.
 
-`mcp.policy` follows the common header, identity, composition, Source,
-Definition, Artifact, and resolution contracts.
+A provider may return:
 
-### Collection
+- A protected built-in Artifact-backed target.
+- A non-Artifact mapped target.
+- No target.
 
-```text
-Collection {
-  Header
+A mapped target has no:
 
-  version?: string
-  members?: CompositionEntry[]
-}
-```
+- ArtifactRef.
+- Definition.
+- Source binding.
+- Source resource.
+- Artifact enablement.
+- Artifact local data.
+- Artifact lifecycle.
 
-A Collection is a reusable group of declarations.
+Mapped target provenance must identify:
 
-```yaml
-type: collection
-name: repository-review
-description: Repository review capabilities
+- Fallback provider.
+- Artifact type.
+- Logical name.
+- Lookup scope.
+- Built-in classification.
 
-members:
-  - type: instruction
-    name: repository-rules
+### 16.4 Fallback restrictions
 
-  - type: context
-    name: architecture
+Fallback providers apply only to named external relationships.
 
-  - type: skill
-    name: code-review
+They are not used for:
 
-  - type: mcp
-    name: github
-    locator: ../.mcp.json
-    server: github
+- Located relationships.
+- Contained declarations.
+- Member selectors.
+- Source-selected aliases.
+- Arbitrary caller-supplied ArtifactRefs.
 
-  - type: tool
-    name: repository-search
+Current Root ambiguity prevents built-in fallback.
 
-  - type: workflow
-    name: review-workflow
-```
+Protected built-in ambiguity prevents mapped fallback.
 
-Collections can represent:
+Artifact enablement and runtime readiness do not affect declaration lookup.
 
-- Capability bundles.
-- Skill bundles.
-- MCP bundles.
-- Repository-specific groups.
-- Reusable package exports.
-- Mixed artifact groups.
+## 17. Relationship resolution
 
-Portable Collection declarations may contain mixed artifact types. User-facing managed Collection APIs may impose narrower domain rules as described later.
+### 17.1 Relationship result
 
-Collection membership does not create an ownership hierarchy.
-
-The member forms are:
-
-| Form                               | Meaning                                                                  |
-| ---------------------------------- | ------------------------------------------------------------------------ |
-| Exact `type` and `name`            | Use one independently declared target found by Root-wide identity lookup |
-| `type`, `name`, and locator        | Use the expected external target at the stated location                  |
-| Complete type-specific declaration | Declare a contained Artifact in the Collection document                  |
-
-A Collection remains valid when an external member is unavailable or ambiguous.
-
-```text
-collection/repository-review
-  -> skill/code-review: available
-  -> mcp/github: unavailable
-  -> workflow/review-workflow: available
-```
-
-Collection member arrays have no caller-defined ordering semantics.
-
-### Agent
-
-```text
-Agent {
-  Header
-
-  members?: CompositionEntry[]
-  program?: ProgramEntry
-}
-
-ProgramEntry =
-  CompositionEntry constrained to loop or workflow
-```
-
-Example:
-
-```yaml
-type: agent
-name: reviewer
-description: Reviews repository changes
-
-members:
-  - type: instruction
-    name: reviewer-instructions
-    content: |
-      Review changes for correctness, security, and maintainability.
-
-  - type: instruction
-    name: repository-rules
-
-  - type: context
-    name: architecture
-
-  - type: model
-    name: reasoning
-
-  - type: skill
-    name: code-review
-
-  - type: tool
-    name: repository-search
-
-  - type: mcp
-    name: github
-
-  - type: collection
-    name: repository-review
-
-  - type: agent
-    name: security-reviewer
-
-program:
-  type: loop
-  name: reviewer-program
-  maxIterations: 16
-  until:
-    pointer: /complete
-    schema:
-      const: true
-```
-
-An Agent supports all common composition-entry forms.
-
-A minimal independent Agent is valid:
-
-```yaml
-type: agent
-name: reviewer
-```
-
-The same object in a composition position is an external Agent reference. A contained Agent must include actual local composition or program data.
-
-An unavailable member does not invalidate the Agent declaration. It affects readiness for consumers that intend to use that member.
-
-Agent member arrays have no caller-defined ordering semantics.
-
-### Team
-
-```text
-Team {
-  Header
-
-  members?: CompositionEntry[]
-  program?: ProgramEntry
-}
-```
-
-Example:
-
-```yaml
-type: team
-name: change-team
-
-members:
-  - type: agent
-    name: planner
-
-  - type: agent
-    name: implementer
-
-  - type: agent
-    name: reviewer
-
-  - type: collection
-    name: repository-common
-
-program:
-  type: workflow
-  name: change-workflow
-```
-
-A Team provides multi-Agent composition and optional coordination structure.
-
-Team members and programs follow the common symbolic, located, and contained entry semantics.
-
-Team member arrays have no caller-defined ordering semantics.
-
-### Output matching
-
-```text
-OutputMatch {
-  pointer?: string
-  schema: JSONSchema
-}
-```
-
-Example:
-
-```yaml
-pointer: /decision
-schema:
-  const: changes-requested
-```
-
-`pointer` is an RFC 6901 JSON Pointer into a result value.
-
-When `pointer` is absent, the schema applies to the complete result.
-
-### Loop
-
-```text
-Loop {
-  Header
-
-  body?: CompositionEntry
-  maxIterations?: integer
-  until?: OutputMatch
-}
-```
-
-Example:
-
-```yaml
-type: loop
-name: reviewer-loop
-
-body:
-  type: agent
-  name: reviewer
-
-maxIterations: 16
-
-until:
-  pointer: /complete
-  schema:
-    const: true
-```
-
-A Loop ends when:
-
-- The result matches `until`.
-- `maxIterations` is reached.
-- The consumer stops execution for a runtime-specific reason.
-
-A Loop nested under `Agent.program` or `Team.program` may omit `body`. The containing Agent or Team is then the Loop body.
-
-The Loop still requires a name. A body-less program Loop is a named contextual program node whose body is supplied by its containing Agent or Team.
-
-A Loop body may be:
-
-- An unlocated external target.
-- A located external target.
-- A contained declaration.
-
-An unavailable body does not make the Loop structurally invalid. It makes the Loop unavailable for execution until a suitable body is available.
-
-### Workflow
-
-```text
-Workflow {
-  Header
-
-  start?: string[]
-  nodes?: WorkflowNode[]
-  edges?: WorkflowEdge[]
-}
-
-WorkflowNode {
-  id: string
-  target: CompositionEntry
-  join?: all | any
-}
-
-WorkflowEdge {
-  from: string
-  to: string
-  match?: OutputMatch
-}
-```
-
-Example:
-
-```yaml
-type: workflow
-name: change-workflow
-
-start:
-  - plan
-
-nodes:
-  - id: plan
-    target:
-      type: agent
-      name: planner
-
-  - id: implement
-    join: any
-    target:
-      type: agent
-      name: implementer
-
-  - id: review
-    target:
-      type: agent
-      name: reviewer
-
-edges:
-  - from: plan
-    to: implement
-
-  - from: implement
-    to: review
-
-  - from: review
-    to: implement
-    match:
-      pointer: /decision
-      schema:
-        const: changes-requested
-```
-
-Workflow rules:
-
-- Node IDs are unique.
-- Start IDs identify nodes.
-- Edge endpoints identify nodes.
-- `join` defaults to `all`.
-- `join: all` waits for all applicable incoming edges.
-- `join: any` activates after any applicable incoming edge.
-- An edge without a matcher is eligible after its source completes.
-- An edge with a matcher is eligible only when its source result matches.
-- Workflow cycles are valid.
-- A node may execute more than once.
-- Array position does not define execution order.
-
-Workflow node targets use the common composition-entry model.
-
-A Workflow remains structurally valid when a target is unavailable. The affected node remains unavailable for execution until its target resolves.
-
-### Workspace
-
-```text
-Workspace {
-  Header
-
-  declarations?: DeclarationSource[]
-  roots?: CompositionEntry[]
-}
-```
-
-A Workspace describes:
-
-- Where declarations should be discovered for a selected repository experience.
-- Which declarations are the roots of that experience.
-
-When `declarations` is omitted, the Workspace uses the declaration universe already configured on its containing Source.
-
-When `declarations` is present, including an empty array, it defines the selected Workspace's non-Workspace declaration scope for that Source.
-
-Example:
-
-```yaml
-type: workspace
-name: checkout-service
-
-declarations:
-  - ./AGENTS.md
-  - ./.mcp.json
-
-  - base: .
-    include:
-      - agents/**/*.agent.yaml
-      - agents/**/*.agent.yml
-      - collections/**/*.yaml
-      - skills/*/SKILL.md
-      - workflows/**/*.yaml
-    exclude:
-      - vendor/**
-      - "**/generated/**"
-
-roots:
-  - type: agent
-    name: reviewer
-
-  - type: collection
-    name: repository-review
-
-  - type: workflow
-    name: change-workflow
-```
-
-Workspace roots use the common composition-entry model.
-
-A root may:
-
-- Select an independent declaration by type and name.
-- Select an independent declaration at a location.
-- Contain a complete declaration.
-
-A Workspace remains valid when a root or nested relationship is unavailable. Its capability plan reports the affected relationship.
-
-Workspace root arrays have no caller-defined ordering semantics.
-
-A Workspace reference nested inside another Workspace remains declared but resolves as unavailable.
-
-## Declaration discovery and physical formats
-
-### Declaration sources
-
-```text
-DeclarationSource =
-  Locator
-  | Declaration
-  | DeclarationScan
-
-DeclarationScan {
-  base: Locator
-  include: string[]
-  exclude?: string[]
-}
-```
-
-Exact sources:
-
-```yaml
-declarations:
-  - ./agents/reviewer.agent.yaml
-  - ./AGENTS.md
-  - ./.mcp.json
-```
-
-Scanned sources:
-
-```yaml
-declarations:
-  - base: .
-    include:
-      - agents/**/*.agent.yaml
-      - skills/*/SKILL.md
-      - collections/**/*.yaml
-      - workflows/**/*.yaml
-    exclude:
-      - vendor/**
-```
-
-Inline source:
-
-```yaml
-declarations:
-  - type: instruction
-    name: review-policy
-    content: |
-      Do not modify generated files.
-```
-
-A Workspace declaration source adds independent declarations to the Workspace declaration universe.
-
-A contained declaration in `Workspace.roots` is different. It belongs to Workspace composition rather than the independent declaration-source list.
-
-### Supported physical inputs
-
-| Physical input                  | Produced artifact behavior                                                                                       |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Canonical JSON                  | One top-level declaration and named contained declarations                                                       |
-| Canonical YAML                  | One top-level declaration and named contained declarations                                                       |
-| `AGENTS.md`                     | One `instruction`                                                                                                |
-| `CLAUDE.md`                     | One `instruction`                                                                                                |
-| `README.md`                     | One `context`                                                                                                    |
-| `llms.txt`                      | One `context`                                                                                                    |
-| Selected documentation Markdown | One `context` per selected file                                                                                  |
-| `SKILL.md`                      | One independent `skill`                                                                                          |
-| `.mcp.json`                     | One independent `mcp` Artifact per configured server                                                             |
-| `mcp.json`                      | One independent `mcp` Artifact per configured server                                                             |
-| `AGENT.md`                      | One `agent`, an Instruction for a non-empty Markdown body, and complete contained declarations from front matter |
-| `*.agent.md`                    | One `agent`, an Instruction for a non-empty Markdown body, and complete contained declarations from front matter |
-| Canonical Collection YAML       | One `collection` plus complete contained declarations                                                            |
-| Workspace manifest              | One `workspace` plus complete contained root declarations                                                        |
-
-A Collection file does not create another Skill or MCP merely because an external member supplies a locator.
-
-One physical file may emit multiple Artifacts when it contains complete named declarations.
-
-For Agent Markdown, a generated `<agent-name>-instructions` Instruction is emitted
-only when the Markdown body is non-empty. Complete declarations in front matter
-are emitted at their stable contained-declaration positions.
-
-A Workspace manifest emits contained Artifacts for complete declarations in its
-roots. External Workspace roots remain composition relationship edges.
-
-Contained declarations use stable type and name structural positions, for example:
-
-```text
-members/mcp/local-files
-members/instruction/reviewer-rules
-nodes/review/target/agent/reviewer
-```
-
-Reordering an array may change declaration bytes, content digest, and Artifact revision. It does not replace the intended identity of a named contained declaration or introduce composition-order semantics.
-
-Resolution selects a contained Artifact by this exact structural position,
-rather than by logical identity and equal body alone.
-
-## Resolution and capability plans
-
-### Resolution scope
-
-A Root defines the default semantic identity scope.
-
-A selected Workspace may further define which non-Workspace declarations from its containing Source participate in the active declaration universe.
-
-Symbolic identity lookup uses:
-
-```text
-(type, name)
-```
-
-A Root can contain multiple declaration occurrences with that identity.
-
-### Unlocated external resolution
-
-An unlocated reference resolves by:
-
-```text
-(type, name)
-```
-
-Example:
-
-```yaml
-type: skill
-name: code-review
-```
-
-Resolution outcomes are:
-
-- No available target:
-  - The relationship is `unavailable`.
-
-- Exactly one available terminal target:
-  - The relationship is `available`.
-
-- Multiple available terminal targets:
-  - The relationship is `ambiguous`.
-
-The resolver never silently selects a winner based on source order.
-
-### Located external resolution
-
-A located reference resolves by:
-
-```text
-(type, name, locator, optional selector)
-```
-
-Example:
-
-```yaml
-type: skill
-name: code-review
-locator: ./skills/code-review
-```
-
-The selected location must resolve to `skill/code-review`.
-
-If the selected declaration is absent, invalid, incompatible, or has a different type or name, the relationship is unavailable.
-
-A located reference never falls back to another matching declaration elsewhere in the Root.
-
-For MCP declarations, `server` participates in selecting the target from a multi-server source.
-
-### Aliases and terminal Artifacts
-
-Canonical source-selected declarations may act as aliases of physical-format declarations.
-
-For example, a canonical declaration may select an MCP server from `.mcp.json`.
-
-Resolution follows the source-selection relationship to a terminal Artifact.
-
-The following rules apply:
-
-- Multiple aliases resolving to one terminal Artifact count as one symbolic target.
-- Resource claims do not suppress physical declaration targets.
-- Same-Source Skill and MCP targets remain selectable.
-- A source-selected alias cannot merge local capability or policy fields into its terminal Artifact.
-- External composition does not create another Artifact identity.
-- Prompt, Skill, and MCP capability lists use consistent ArtifactRef deduplication.
-
-### Contained declarations
-
-A contained declaration resolves directly through:
-
-```text
-containing declaration
-  -> stable named structural position
-  -> contained Artifact
-```
-
-It does not require Root-wide symbolic lookup for that composition occurrence.
-
-Removing a contained declaration from its containing document means it is no longer declared.
-
-A contained declaration's source occurrence does not imply ownership or cascading lifecycle behavior in Artifact Store.
-
-### Relationship status and declaration validity
-
-Declaration resolution uses:
+Every relationship occurrence has one status:
 
 ```text
 available
@@ -2114,122 +949,587 @@ unavailable
 ambiguous
 ```
 
-A relationship may be unavailable because its target is:
+The result preserves:
 
-- Missing.
-- Invalid.
-- Incompatible.
-- Cyclic on the affected expansion path.
-- Not resolvable at its stated locator.
-- A nested Workspace.
-- Otherwise excluded from the active scope.
+- Relationship occurrence identity.
+- Member form.
+- Selector occurrence identity.
+- Selector-match identity.
+- Lookup scope.
+- Locator.
+- Target provenance.
+- Alias provenance.
+- Relationship `overrides`.
+- Relationship `use`.
+- Diagnostics.
 
-The resolver preserves every declared composition occurrence and its status.
+The resolver must not silently drop, replace, execute, or mutate a relationship.
 
-A missing or ambiguous external target does not invalidate the containing:
+### 17.2 Named relationships
 
-- Collection.
-- Agent.
-- Team.
-- Loop.
-- Workflow.
-- Workspace.
+An ordinary named target resolves by semantic identity.
 
-Resource absence is distinct from declaration absence:
+Text additionally requires its insertion identity.
 
-- Removing an independent declaration makes its relationships unavailable.
-- Removing a required resource from an otherwise resolvable declaration may make the Artifact not ready for runtime use.
-- Removing a contained declaration means it is no longer declared.
-- Resource failure does not invalidate an otherwise valid containing composition declaration.
+Outcomes are:
 
-### Consumer completeness policy
+- No terminal target, `unavailable`.
+- One terminal target, `available`.
+- More than one distinct terminal target, `ambiguous`.
 
-A capability plan contains resolved targets and relationship-level diagnostics.
+Several aliases resolving to the same terminal Artifact count as one symbolic target.
 
-A consumer that requires a complete capability set may reject the plan.
+### 17.3 Located relationships
 
-A catalog, management view, or partial-capability runtime may use available targets while reporting unavailable or ambiguous relationships.
-
-The resolver itself does not silently remove, replace, or execute relationships.
-
-### Collection expansion
-
-Collections expand recursively using deterministic normalized ordering.
-
-Expansion preserves:
-
-- Every declared member occurrence.
-- Relationship-local annotations.
-- Available targets.
-- Unavailable targets.
-- Ambiguous targets.
-
-Example:
+A located relationship resolves by:
 
 ```text
-collection/repository-review
-  -> instruction/repository-rules: available
-  -> context/architecture: available
-  -> skill/code-review: available
-  -> mcp/github: unavailable
+type
+name
+locator
+optional Text insert
+optional MCP server selector
 ```
 
-This supports best-effort groups:
+It must:
 
-- A member may be added before its target exists.
-- An unavailable member may be removed.
-- A target may disappear without invalidating the Collection.
-- A restored target becomes available without rewriting the Collection.
-- A member may be detached without deleting its target.
-- A target may be deleted without deleting its declared memberships.
+1. Resolve the locator relative to the containing occurrence or through an authorized Locator Resolver.
+2. Select the declaration occurrence at that location.
+3. Confirm expected type.
+4. Confirm expected name.
+5. Confirm Text insertion identity when applicable.
+6. Confirm MCP server selection when applicable.
+7. Follow supported source aliases to a terminal target.
 
-Nested Collection cycles are reported on the affected expansion path.
+It does not:
+
+- Search the current Root by name.
+- Search the protected built-in Root.
+- Use fallback providers.
+- Merge local target body fields.
+- Fall back to another location.
+
+### 17.4 Contained relationships
+
+Contained relationships resolve through stable structural occurrences.
 
 ```text
-collection/a
-  -> collection/b
-
-collection/b
-  -> collection/a
+Containing declaration occurrence
+  -> stable relationship path
+  -> contained Artifact
 ```
 
-The Collection declarations remain valid. The cyclic relationship is unavailable for that path.
+Examples:
 
-### Agent and Team expansion
+```text
+members/text/instructions/repository-rules
+members/mcp/local-files
+allowedTools/tool/searchfiles
+body/agent/code-reviewer
+nodes/review/agent/reviewer
+loop/reviewer-loop
+workflow/change-workflow
+```
 
-Agents and Teams may compose:
+Contained resolution does not perform Root-wide symbolic lookup.
 
-- Instructions.
-- Contexts.
-- Models.
-- Skills.
-- Tools.
-- MCP servers.
-- Collections.
-- Delegated Agents.
-- Optional Loop or Workflow programs.
+Removing the contained declaration from its source means it is no longer declared. It does not trigger generic composition-owned cascading deletion.
 
-Their member arrays have no caller-defined ordering semantics. Resolution produces deterministic normalized output.
+### 17.5 Source-selected aliases
 
-An unavailable member is reported in the capability plan without invalidating the Agent or Team declaration.
+Source-selected declarations may act as aliases to terminal Artifacts.
 
-A strict runtime may reject an Agent or Team plan that is not complete.
+The resolver must:
 
-### Loop and Workflow resolution
+- Follow alias chains.
+- Detect alias cycles.
+- Preserve alias provenance.
+- Return terminal ArtifactRefs.
+- Treat aliases to one terminal Artifact as one symbolic target.
+- Preserve an unavailable alias as unavailable.
 
-Loops and Workflows are structural declarations.
+Aliases do not merge local connection, policy, capability, or other target fields into the terminal declaration.
 
-The resolver validates and resolves:
+Resource claims do not suppress physical declaration targets. Same-Source Skill and MCP targets remain selectable.
 
-- Loop bodies.
-- Workflow node IDs.
-- Start node references.
-- Edge endpoints.
-- Node targets.
-- Nested composition relationships.
-- Cycles and limits.
+## 18. Member selectors and discovery
 
-The runtime consumer owns:
+### 18.1 Eligibility
+
+Selector support is registered by Artifact type and constrained by the containing relationship field.
+
+Text and Workspace do not support member selectors.
+
+Current selector-capable types may include:
+
+```text
+model
+tool
+skill
+mcp
+mcp.policy
+plugin
+agent
+team
+loop
+workflow
+```
+
+The containing contract may permit only a subset.
+
+### 18.2 Selector meaning
+
+A selector expands conceptually as:
+
+```text
+Selector base
+  -> candidate declaration enumeration
+  -> physical-format decoding
+  -> Artifact type filtering
+  -> logical-name filtering
+  -> selected source-backed occurrences
+```
+
+Selectors do not select:
+
+- Arbitrary prompt files.
+- Root-wide symbolic names.
+- Protected built-in fallback targets.
+- Mapped fallback targets.
+- Runtime-ready targets.
+- Enabled-only targets.
+- Metadata query results.
+
+### 18.3 Selector scope
+
+A current selector base is local to the declaring Source.
+
+The implementation must:
+
+1. Resolve `base` relative to the containing declaration occurrence.
+2. Stay inside the containing Source.
+3. Stay inside the containing Root.
+4. Enumerate declaration candidates below the base.
+5. Apply source-path inclusion and exclusion.
+6. Decode supported physical formats.
+7. Filter by selected Artifact type.
+8. Apply logical-name inclusion and exclusion.
+9. Produce stable match occurrences.
+
+A selector must not:
+
+- Scan an arbitrary filesystem path.
+- Scan another mutable Root.
+- Scan the protected built-in Root from a mutable Source.
+- Fetch remote content without a registered Source adapter.
+- Treat Text resource patterns as declaration discovery.
+
+### 18.4 Selector results
+
+A selector can produce:
+
+```text
+available with zero matches
+available with one or more matches
+unavailable selector
+```
+
+Zero matches are a valid empty membership set.
+
+A selector is unavailable when its base cannot be inspected, is unsupported, or escapes the permitted Source boundary.
+
+Each selected occurrence retains its own relationship result.
+
+```text
+Selector available
+  -> Artifact A: available
+  -> Artifact B: unavailable
+  -> Artifact C: available
+```
+
+A decode error for one source entry remains a Source diagnostic and does not invalidate unrelated valid matches.
+
+### 18.5 Selector refresh
+
+Selector matching during resolution is read-only.
+
+Explicit refresh ensures the necessary candidate declarations are indexed:
+
+```text
+Composition root
+  -> reachable selectors
+  -> reachable local located declarations
+  -> discovery closure
+  -> affected Source updates
+  -> Source refresh
+```
+
+The closure process must be bounded by depth, node, Source, and iteration limits.
+
+## 19. Composition expansion
+
+Expansion is recursive and typed.
+
+| Artifact type | Expanded relationships        |
+| ------------- | ----------------------------- |
+| `plugin`      | `members`                     |
+| `agent`       | `members`, `loop`, `workflow` |
+| `team`        | `members`, `loop`, `workflow` |
+| `skill`       | `allowedTools`                |
+| `mcp`         | Direct policy relationship    |
+| `loop`        | `body`                        |
+| `workflow`    | Node targets                  |
+| `workspace`   | `members`                     |
+
+The resolver does not expand:
+
+- Text source files into child Artifacts.
+- MCP included tools into child Artifacts.
+- MCP policy map keys into child Artifacts.
+- Runtime Tool calls into graph relationships.
+
+### 19.1 Plugin expansion
+
+Plugin expansion recursively traverses declared members.
+
+Plugin contributes selection and grouping only. It does not apply runtime behavior or own its targets.
+
+### 19.2 Agent expansion
+
+Agent expansion preserves:
+
+- Tool `overrides.autoExecute`.
+- Model `overrides.includeSystemPrompt`.
+- Skill `use.mode`.
+
+The resolver carries this behavior but does not execute it.
+
+### 19.3 Team expansion
+
+Team expansion traverses Agent and Plugin members and the optional Loop or Workflow program.
+
+Team has no additional relationship behavior in v1.
+
+### 19.4 Loop expansion
+
+Loop expansion resolves one body target.
+
+The resolver validates and resolves the body but does not iterate it.
+
+### 19.5 Workflow expansion
+
+Every node target is resolved independently.
+
+Node identity is:
+
+```text
+Workflow occurrence + node ID
+```
+
+The graph is determined by node IDs, starts, edges, joins, and matchers. Source-array order is not execution order.
+
+### 19.6 Workspace expansion
+
+Workspace expansion traverses explicitly declared members.
+
+Workspace does not infer capabilities from every Artifact in the Root.
+
+Workspace Text members contribute source text. Workspace selectors contribute declared Artifacts. These remain separate operations.
+
+A nested Workspace member remains represented but resolves as unavailable.
+
+## 20. Cycles, limits, and partial validity
+
+The resolver must detect:
+
+- Alias cycles.
+- Plugin composition cycles.
+- Agent delegation cycles.
+- Other recursive composition cycles.
+- Maximum resolution depth.
+- Maximum resolved node count.
+- Refresh closure limits.
+
+A cycle or exceeded limit affects the applicable relationship path.
+
+It does not:
+
+- Delete declarations.
+- Create Store ownership.
+- Invalidate unrelated relationship paths.
+- Cause fallback to an unintended target.
+
+An unavailable or ambiguous external relationship does not invalidate its containing Plugin, Agent, Team, Loop, Workflow, or Workspace declaration.
+
+## 21. Ordering and structural identity
+
+### 21.1 Non-positional relationships
+
+The following arrays have no caller-defined semantic order:
+
+```text
+plugin.members
+agent.members
+team.members
+workspace.members
+skill.allowedTools
+member-selector matches
+workflow.nodes
+workflow.edges
+workflow.start
+```
+
+Moving an entry must not change:
+
+- Relationship identity.
+- Contained Artifact identity.
+- Selector identity.
+- Selector matches.
+- Target local state.
+- Lookup precedence.
+- Store ownership.
+- Runtime behavior.
+- Cache identity.
+
+### 21.2 Stable identity
+
+Representative identities are:
+
+```text
+Named relationship
+  -> parent occurrence + field + type + name + locator + scope
+     + canonical overrides + canonical use
+
+Contained declaration
+  -> parent occurrence + field + type + name
+     + Text insert where applicable
+
+Selector
+  -> parent occurrence + field + canonical selector fields
+     + canonical overrides + canonical use
+
+Workflow node
+  -> workflow occurrence + node ID
+
+Workflow edge
+  -> workflow occurrence + from + to + canonical match
+```
+
+Array indexes are excluded.
+
+### 21.3 Duplicate relationships
+
+Exact normalized duplicates in one parent field are invalid.
+
+Distinct relationships to one target remain valid when their relationship behavior differs.
+
+```yaml
+- type: tool
+  name: searchfiles
+  overrides:
+    autoExecute: true
+
+- type: tool
+  name: searchfiles
+  overrides:
+    autoExecute: false
+```
+
+A consumer may deduplicate terminal ArtifactRefs in a capability list, but the graph retains both occurrences.
+
+### 21.4 Source revisions
+
+Reordering source arrays may change:
+
+- Raw bytes.
+- Source content digest.
+- Definition digest.
+- Artifact revision.
+
+It must not change semantic composition.
+
+Intrinsically ordered command and invocation argument arrays remain ordered.
+
+## 22. Capability plans and completeness
+
+A capability plan is a consumer-safe projection of the resolved graph.
+
+It preserves:
+
+- Relationship occurrence identity.
+- Selector and selector-match identities.
+- Artifact-backed, built-in, or mapped provenance.
+- Availability status.
+- Diagnostics.
+- Relationship behavior.
+- Lookup scope.
+- Terminal target identity.
+
+A consumer may require complete resolution:
+
+```text
+RequireComplete = true
+```
+
+A strict consumer rejects unavailable or ambiguous required relationships.
+
+A non-strict consumer may use available portions while presenting diagnostics for incomplete paths.
+
+Resolution availability does not assert that a target has:
+
+- Required source resources.
+- Installation values.
+- Secrets.
+- OAuth tokens.
+- A selected profile.
+- Runtime implementation.
+- Active connection.
+- Execution permission.
+
+## 23. Workspace behavior
+
+### 23.1 Explicit capability selection
+
+A Workspace capability plan is built from `workspace.members` and their recursive composition.
+
+The Workspace does not automatically activate:
+
+- Every Plugin in the Root.
+- Every Skill in the Root.
+- Every MCP server in the Root.
+- Every protected built-in capability.
+- Baseline managed Plugins.
+
+### 23.2 Catalog and capability views
+
+A Workspace catalog may show every discovered Artifact kind.
+
+A Workspace capability view shows only:
+
+- Explicit Workspace members.
+- Their expanded relationships.
+- Available and unavailable selector matches.
+- Relationship diagnostics.
+- Consumer-specific readiness.
+
+### 23.3 Completeness
+
+Workspace runtime selection may use:
+
+```text
+WorkspaceRuntimeSelection.RequireComplete
+```
+
+When enabled, unavailable or ambiguous required relationships reject the selection with relationship-level diagnostics.
+
+### 23.4 Read-only planning
+
+These are read-only:
+
+- Workspace reads.
+- Workspace resolution.
+- Workspace capability inspection.
+- Prompt planning.
+- Skill planning.
+- MCP planning.
+- Runtime-plan generation.
+
+Only explicit refresh updates Source discovery.
+
+## 24. Consumer integration
+
+### 24.1 Common requirements
+
+Consumers must:
+
+- Use typed resolver APIs.
+- Respect resolved Root authorization.
+- Preserve relationship diagnostics.
+- Distinguish Artifact-backed and mapped targets.
+- Avoid arbitrary caller-supplied cross-Root ArtifactRefs.
+- Apply relationship behavior only when defined.
+- Decide runtime readiness separately.
+- Avoid positional interpretation of composition arrays.
+
+### 24.2 Text and prompt consumers
+
+Text materialization supports:
+
+- Inline content.
+- One verified source file.
+- One verified source directory.
+- Inclusion and exclusion patterns.
+- Deterministic normalized source-path ordering.
+- Media type.
+- Insertion target.
+
+Routing is:
+
+```text
+insert=instructions
+  -> behavioral or directive contribution
+
+insert=user-message
+  -> informational user-message contribution
+```
+
+The prompt consumer owns:
+
+- Prompt budget.
+- Truncation.
+- Final contribution ordering.
+- Request-specific content.
+- Model-specific prompt assembly.
+
+### 24.3 Tool and Model consumers
+
+Tool and Model consumers may receive:
+
+- Current Root Artifact-backed targets.
+- Protected built-in Artifact-backed targets.
+- Mapped fallback targets.
+
+Only a consumer that explicitly supports the mapped target type may accept a mapped result.
+
+A consumer requiring a verified declaration resource must reject a non-Artifact mapped target.
+
+### 24.4 Skill consumer
+
+```text
+Resolved Skill
+  -> verified SKILL.md
+  -> verified Skill package directory
+  -> runtime Skill registration
+  -> resource and script operations
+```
+
+One Skill selected through several Plugins retains one Artifact identity.
+
+### 24.5 MCP consumer
+
+The MCP consumer must:
+
+- Read direct typed declaration fields.
+- Resolve the direct policy relationship.
+- Use the terminal MCP ArtifactRef for installation-local state.
+- Keep input values, secret references, selected profile, OAuth tokens, and connection state outside the portable declaration.
+- Avoid interpreting Plugin membership as installation or activation.
+- Keep generic Artifact enablement outside MCP Store and runtime internals unless an outer caller explicitly filters selection.
+
+One MCP selected through several compositions retains one terminal installation identity.
+
+### 24.6 Workflow consumer
+
+```text
+Resolved Workflow
+  -> resolved node targets
+  -> starts and edges
+  -> join behavior
+  -> output matchers
+  -> scheduler and executor
+```
+
+The runtime owns:
 
 - Scheduling.
 - Invocation.
@@ -2240,384 +1540,330 @@ The runtime consumer owns:
 - Output evaluation.
 - Result handling.
 
-A Loop or Workflow remains structurally valid when a target is unavailable. Execution readiness is reported at the affected body or node.
+It must not silently substitute another target for an unavailable node.
 
-### Resolver limits
+## 25. Artifact Store boundaries
 
-The resolver must enforce:
+### 25.1 Persisted state
 
-- Cycle detection.
-- Maximum resolution depth.
-- Maximum resolution node count.
-
-Exceeding a limit affects the applicable relationship path. It does not create an ownership or deletion relationship.
-
-## Workspace behavior
-
-### Workspace declaration universe
-
-A Workspace controls two related concerns:
-
-- `declarations` defines the selected non-Workspace declaration universe for its Source.
-- `roots` defines the selected capability entry points.
-
-When `declarations` is omitted, existing Source discovery configuration is used.
-
-When `declarations` is present, including an empty array, it replaces the selected Workspace's non-Workspace declaration scope for that Source.
-
-Initial broad scanning used to locate Workspace declarations is not retained as an implicit source of unrelated declarations.
-
-However, previously discovered Workspace candidate locations remain in Source discovery. This permits switching between Workspaces in one Source.
-
-Only the selected Workspace's non-Workspace declaration universe is active for that Source.
-
-Concurrently active independent declaration universes require separate Sources.
-
-### Workspace roots and capabilities
-
-Workspace roots are resolved using deterministic normalized ordering.
-
-A root can expand a:
-
-- Collection.
-- Agent.
-- Team.
-- Loop.
-- Workflow.
-- Other supported non-Workspace target.
-
-A Workspace does not automatically activate every Collection, Skill, MCP server, or other Artifact in its Root.
-
-The selected capability set is determined by:
-
-- Workspace roots.
-- Their resolved composition.
-- Consumer-specific filtering and readiness rules.
-
-The Workspace capability plan preserves:
-
-- Selected root occurrences.
-- Available capabilities.
-- Unavailable and ambiguous roots.
-- Unavailable and ambiguous nested relationships.
-- Consumer-specific readiness information.
-
-For Workspace runtime plans, `WorkspaceRuntimeSelection.RequireComplete`
-selects strict completeness behavior. When enabled, unavailable and ambiguous
-required relationships reject the runtime selection with target-level diagnostics.
-
-Nested Workspace references remain visible as declarations but resolve as unavailable.
-
-### Read-only operations and explicit refresh
-
-Located-reference resolution is read-only.
-
-The following operations must not mutate Sources:
-
-- Workspace reads.
-- Workspace capability reads.
-- Prompt planning.
-- Skill planning.
-- MCP planning.
-- Runtime-plan generation.
-
-`RefreshWorkspace` explicitly:
-
-- Computes the reachable local locator closure.
-- Updates Source discovery.
-- Refreshes affected declaration state.
-
-Ordinary resolution does not perform this refresh implicitly.
-
-### Catalog and capability views
-
-Workspace catalog views show all discovered Artifact kinds.
-
-Workspace capability views show only the capabilities selected through roots and their composition.
-
-Prompt, Skill, and MCP capability lists use the same ArtifactRef deduplication behavior.
-
-### Workspace user flow
+Artifact Store persists:
 
 ```text
-Select a local repository directory or Workspace manifest
-  -> register the repository Source
-  -> discover declaration and Workspace candidates
-  -> identify the selected Workspace
-  -> compute and refresh its local declaration closure
-  -> apply the Workspace declaration scope
-  -> resolve Workspace roots
-  -> provide a capability plan to consumers
+Root
+Source
+Definition
+Artifact
+Source binding
+Artifact local data
+Source refresh state
+Resource verification state
 ```
 
-A Workspace may use:
+### 25.2 Derived state
 
-- Existing repository files.
-- Canonical JSON and YAML declarations.
-- Exact declaration paths.
-- Declaration scans.
-- Inline declaration sources.
-- Contained root declarations.
-- Collections.
-- Agents.
-- Teams.
-- Skills.
-- MCP servers.
-- Loops.
-- Workflows.
+Artifact Store does not persist generic:
 
-Unavailable and ambiguous relationships remain visible in the capability plan.
+```text
+Plugin membership
+selector matches
+relationship positions
+parent ownership
+reverse membership
+composition cascade rules
+```
 
-## Managed Collection authoring and lifecycle
+A selector is stored only as declaration content in its containing Definition.
 
-### Storage boundary
+Selector matches are derived resolution output. A cache may retain normalized results for efficiency, but the cache must not become ownership or positional state.
 
-A managed Collection is stored as a source-backed Collection declaration.
+### 25.3 Purge behavior
 
-Artifact Store does not maintain generic Collection relationships.
+A source-backed Artifact cannot be ordinarily purged while its declaration remains available in its Source.
 
-User-facing management code may:
+Purge must follow Source mutation, package removal, or authoritative reconciliation.
 
-- Read Collection declarations to derive membership.
-- Maintain a domain-owned membership cache.
-- Update a managed Collection document.
-- Re-resolve the declaration after publication.
+Removing a contained declaration from its source removes that declaration occurrence. This remains Source reconciliation, not composition-owned cascade deletion.
 
-It must not make Artifact Store infer ownership, reverse membership, or cascading lifecycle behavior.
+## 26. Artifact enablement and local state
 
-### Portable and managed Collection domains
+### 26.1 Artifact enablement
 
-Portable Collection declarations may contain mixed artifact types.
+Every Artifact has one local `Enabled` value.
 
-The currently exposed frontend Collection surfaces are domain-specific:
+Rules:
 
-- User-created Skill Collections accept only Skill members.
-- User-created MCP Collections accept MCP server and MCP policy members.
-- Workspace, Skill, and MCP APIs are the exposed frontend Collection surfaces.
-- Mixed-Collection frontend authoring is deferred.
+- New Artifacts default to `Enabled=true`.
+- The value is retained through ordinary Source refresh.
+- The value is retained through ordinary package hydration.
+- A disabled Artifact remains readable.
+- A disabled Artifact remains addressable by ArtifactRef.
+- A disabled Artifact remains editable when otherwise authorized.
+- Store list APIs remain exhaustive and expose the value.
+- Consumer lists may explicitly request enabled-only filtering.
 
-A mixed Collection remains valid in canonical source documents and for future or non-frontend use cases.
+`Enabled` does not alter:
 
-### Baseline Collections
+- Source discovery.
+- Definition persistence.
+- Graph resolution.
+- Ambiguity.
+- Resource verification.
+- Managed publication.
+- Package replacement.
+- Package removal.
+- Plugin editing.
+- Purge eligibility.
+- Protected topology authorization.
+- MCP policy composition.
 
-Each user Root has:
+MCP has no additional portable or Store-level effective-enabled field.
 
-- One application-provisioned Skill baseline Collection.
-- One application-provisioned MCP baseline Collection.
+`Source.Enabled` is separate. Disabling a Source can make its Artifacts missing or resources unavailable.
 
-Generic Artifact Store Root creation remains domain-neutral and does not infer
-Skill or MCP Collection policy. Application Root lifecycle establishes these
-baselines during user Root creation and reconciles existing user Roots during
-startup.
+### 26.2 Local state ownership
 
-Baseline Collections have:
+| Concern                       | Owner                          |
+| ----------------------------- | ------------------------------ |
+| Generic Artifact enablement   | Artifact record                |
+| Workspace runtime disablement | Workspace local Artifact data  |
+| MCP installation input values | MCP local installation data    |
+| MCP secret references         | MCP local installation data    |
+| Secret values                 | Secret storage                 |
+| OAuth tokens                  | MCP runtime and secret storage |
+| Selected MCP profile          | MCP local installation data    |
+| Additional local MCP policies | MCP local installation data    |
+| Prompt budget                 | Runtime configuration          |
+| Tool invocation arguments     | Runtime request                |
+| Model invocation values       | Runtime request                |
+
+An intentional protected topology replacement may replace ArtifactRefs. Preserving local state across that operation requires an explicit migration or overlay policy.
+
+## 27. Managed Plugin authoring
+
+### 27.1 Storage model
+
+A managed Plugin is an ordinary source-backed Plugin declaration.
+
+Management code may:
+
+- Read and resolve Plugin members.
+- Derive direct membership views.
+- Maintain a domain-owned cache.
+- Update a managed Plugin document.
+- Publish and refresh the managed Source.
+
+It must not make Artifact Store infer ownership or reverse membership.
+
+### 27.2 Portable and managed domains
+
+Portable Plugin declarations may contain mixed Artifact types.
+
+Current user-facing managed surfaces are narrower:
+
+- Skill Plugins accept Skill members.
+- MCP Plugins accept MCP servers and MCP policies.
+- Mixed Plugin frontend authoring is deferred.
+
+This application restriction does not narrow the portable Plugin contract.
+
+### 27.3 Baseline Plugins
+
+Each supported user Root has:
+
+- One application-provisioned Skill baseline Plugin.
+- One application-provisioned MCP baseline Plugin.
+
+Application Root lifecycle, not generic Artifact Store Root creation, provisions these Plugins.
+
+Baseline Plugins have:
 
 - Fixed logical names.
 - Fixed managed package locations.
 - User-visible selection entries.
 - Editable membership.
 
-A baseline Collection cannot be:
+A baseline Plugin cannot be:
 
 - Renamed.
-- Runtime-disabled.
+- Runtime-disabled through application APIs.
 - Deleted.
 
-A baseline Collection is an authoring destination. It is not:
+A baseline Plugin is an authoring destination. It is not:
 
-- An automatically active capability set.
+- Automatically active.
 - A Workspace default.
-- An Agent or Team default.
-- A runtime-session default.
-- An API fallback.
+- An Agent default.
+- A runtime default.
+- An implicit API fallback.
 
-Every managed Skill, MCP server, or MCP policy creation request must explicitly provide the selected compatible editable Collection.
+Every managed creation request must explicitly identify its destination Plugin.
 
-### Managed membership semantics
-
-Managed authoring APIs create external membership entries unless a future specialized flow explicitly supports contained content.
+### 27.4 Membership semantics
 
 Adding an external member does not:
 
-- Create or copy the target.
+- Copy the target.
 - Enable or disable the target.
 - Configure the target.
-- Modify target metadata.
 - Install the target.
-- Change runtime policy.
+- Change target metadata.
+- Change target policy.
 
-Removing an external member does not delete its target.
+Removing a member does not delete its target.
 
-Editing an independently declared target affects every Collection that refers to that target.
+Deleting an independent target leaves membership declared and unavailable.
 
-Deleting an independently declared target leaves membership declarations intact. Those relationships become unavailable.
+Restoring a matching target makes the relationship available without rewriting the Plugin.
 
-Restoring a matching target makes existing relationships available again.
+One target may be referenced by several Plugins.
 
-A contained declaration exists while it remains in the containing Collection document.
+A contained declaration exists while it remains present in the containing Plugin document.
 
-### Managed publication and replacement
+Repository discovery never silently attaches a target to an editable Plugin.
 
-Managed Collections, Skills, MCP servers, and MCP policies are published as
-independent source-backed packages. Managed discovery is authoritative for
-these package types.
+### 27.5 Publication and replacement
 
-A named create operation may be idempotent only when expected package content
-and expected Artifact state are equivalent. It must not silently replace a
-different existing package. Explicit replacement or `upsert`, application
-repair, and built-in reconciliation may authorize replacement.
+Managed Plugins, Skills, MCP servers, and MCP policies are published as independent source-backed packages.
 
-Equivalent current Source and expected Artifact state skips unnecessary Source
-refresh. Package removal reconciles managed discovery and cleans up stale
-managed declaration locators.
+Managed discovery is authoritative for these package types.
 
-Current managed Skill, MCP server, and MCP policy creation uses two source-side
-writes:
+A named create operation may be idempotent only when:
 
-- Record the selected Collection's external membership.
-- Publish the independently declared package.
+- Expected package bytes are equivalent.
+- Expected Source state is current.
+- Expected Artifact state is equivalent.
 
-If publication fails, the declared member remains valid, visible, and
-unavailable. A retry must re-read the Collection revision. Durable recovery of
-the multi-package operation remains pending.
+A non-equivalent package requires:
 
-### Supported Collection operations
+- Explicit replacement.
+- Explicit upsert authorization.
+- Application repair.
+- Built-in reconciliation.
 
-A user can:
+Equivalent current state should skip unnecessary refresh.
 
-- Create an empty compatible Collection.
-- Select a baseline Collection.
-- Select another editable compatible Collection.
-- Create a new Collection and then explicitly select it.
-- Add an existing independently declared Artifact.
-- Add a member before its target is available.
-- Add a locator when a specific declaration occurrence is intended.
+Package removal must reconcile managed discovery and clean stale managed declaration locators.
+
+### 27.6 Multi-package creation behavior
+
+Current managed Skill, MCP server, and policy creation uses two source-side writes:
+
+1. Add external membership to the selected Plugin.
+2. Publish the independent target package.
+
+If publication fails:
+
+- Membership remains declared.
+- The relationship is visible and unavailable.
+- Retry must re-read the Plugin revision.
+- Durable transaction or recovery coordination remains pending.
+
+### 27.7 Supported operations
+
+A user may:
+
+- Create an empty compatible Plugin.
+- Select a baseline Plugin.
+- Select another editable compatible Plugin.
+- Add an existing target.
+- Add a member before its target exists.
+- Add a locator for a specific occurrence.
 - Remove a member without deleting the target.
 - View unavailable or ambiguous members.
-- Attach one independent target to multiple Collections.
-- View direct compatible Collection membership declarations for a selected
-  Artifact, including available, unavailable, and ambiguous direct relationship
-  status.
+- Attach one target to multiple Plugins.
+- View direct compatible Plugin memberships for a target.
 
-Portable mixed Collections may include:
+### 27.8 Plugin deletion
 
-- Skills.
-- MCP servers.
-- MCP policies.
-- Instructions.
-- Contexts.
-- Agents.
-- Teams.
-- Loops.
-- Workflows.
-- Other supported artifacts.
+A managed ordinary Plugin cannot be deleted while it has direct declared members.
 
-Repository discovery does not silently alter an editable Collection. A discovered Skill or MCP server may be attached only through an explicit authoring operation.
+Rules:
 
-### Collection deletion
-
-A managed user Collection cannot be deleted while its direct `members` array contains any declared member.
-
-The deletion guard follows these rules:
-
-- Missing or ambiguous targets still count as declared members.
+- Missing members still count.
+- Ambiguous members still count.
+- Selectors and contained members count.
 - Only direct members are checked.
-- Members of nested Collections are not counted recursively.
-- Baseline Collections can never be deleted.
-- Deleting an empty ordinary Collection removes only the Collection declaration package.
-- Deleting a Collection never deletes independently declared targets.
+- Nested Plugin members are not recursively counted.
+- Baseline Plugins cannot be deleted.
+- Deleting an empty Plugin removes only that Plugin package.
+- Deleting a Plugin never deletes independent targets.
 
-Deletion flow for an ordinary managed Collection:
+Deletion flow:
 
 ```text
 Detach every direct member
-  -> re-read the Collection at the expected revision
-  -> reject deletion if any direct member remains
-  -> remove only the Collection declaration package
+  -> re-read expected Plugin revision
+  -> verify members remain empty
+  -> remove only the Plugin package
 ```
 
-### Skill creation flow
+## 28. Managed Skill and MCP workflows
 
-The user-facing managed Skill creation flow is Collection-oriented.
-
-```text
-Explicitly select an editable Skill Collection
-  -> record an external Skill membership in the selected Collection
-  -> publish the independent Skill declaration and package
-  -> show the Skill and all Collection memberships
-```
-
-Current failure and retry behavior is defined in [Managed publication and replacement](#managed-publication-and-replacement).
-
-There is no implicit baseline fallback.
-
-The user-facing managed API does not expose standalone Skill creation that omits Collection selection.
-
-The result is still one independently declared Skill.
+### 28.1 Managed Skill
 
 ```text
-Detach Skill from Collection
-  -> Skill remains independently available
-
-Delete Skill
-  -> Collection membership remains declared
-  -> Collection reports the Skill relationship as unavailable
-```
-
-Collection-oriented creation does not make the Skill Collection-owned. The Skill may later be attached to additional Collections.
-
-A Skill discovered from a repository remains independently declared. It may be attached to an explicitly selected editable Collection.
-
-### MCP server and policy creation flow
-
-Managed MCP creation follows the same identity and membership model.
-
-```text
-Explicitly select an editable MCP Collection
-  -> record an external member in the selected Collection
-  -> publish the independent MCP server or MCP policy declaration
-  -> configure installation-local inputs where required
-  -> apply any enabled-state filtering outside MCP Store
-  -> connect only when an MCP runtime consumer chooses
+Select editable Skill Plugin
+  -> declare external Skill membership
+  -> publish independent Skill package
+  -> refresh managed Sources
+  -> display Skill and direct Plugin memberships
 ```
 
 There is no implicit baseline fallback.
 
-Collection membership does not:
+Detaching the Skill leaves the Skill independently available.
+
+Deleting the Skill leaves declared memberships unavailable.
+
+The managed API does not expose standalone Skill creation that omits Plugin selection.
+
+### 28.2 Managed MCP server or policy
+
+```text
+Select editable MCP Plugin
+  -> declare external MCP or policy membership
+  -> publish independent package
+  -> configure installation-local values if needed
+  -> connect only when selected by an MCP consumer
+```
+
+Plugin membership does not:
 
 - Configure secrets.
 - Configure OAuth.
 - Configure client credentials.
-- Interpret or apply generic Artifact enablement.
+- Select a connection profile.
 - Connect the server.
-- Change effective MCP policy.
-- Replace installation-local configuration.
+- Interpret generic Artifact enablement.
+- Change effective policy.
+- Replace installation-local state.
 
-These remain properties of the independently declared MCP Artifact and its user-local configuration.
+## 29. Built-in content and protected Roots
 
-If an MCP server or policy is deleted, its Collection membership remains declared and unavailable.
+### 29.1 Common declaration behavior
 
-## Built-in and user-owned artifacts
+Built-in and user-owned content use the same:
 
-Built-in and user-owned artifacts use the same declaration and composition semantics.
+- Semantic identities.
+- Relationship forms.
+- Locator semantics.
+- Contained declaration semantics.
+- Resolver behavior.
 
-| Aspect                     | Built-in content       | User-owned content            |
-| -------------------------- | ---------------------- | ----------------------------- |
-| Declaration semantics      | Same                   | Same                          |
-| Unlocated external members | Same                   | Same                          |
-| Located external members   | Same                   | Same                          |
-| Contained declarations     | Same                   | Same                          |
-| Resolution behavior        | Same                   | Same                          |
-| Editing                    | Application-controlled | User-controlled               |
-| Distribution               | Application release    | Repository or managed storage |
+They differ only in:
 
-### Built-in package composition
+- Edit authority.
+- Distribution.
+- Protected Root policy.
+- Placement of mutable local overlays.
 
-A built-in release may distribute related files together:
+### 29.2 Built-in package composition
+
+A built-in package may distribute independent targets and a Plugin together.
 
 ```text
 software-dev/
-  collections/
+  plugins/
     software-dev.yaml
 
   skills/
@@ -2631,723 +1877,315 @@ software-dev/
     github.yaml
 ```
 
-A built-in Collection may group independently declared artifacts:
+Physical co-distribution does not establish ownership.
 
-```yaml
-type: collection
-name: software-dev
+A built-in Plugin may also contain complete MCP or policy declarations. Hydration must not rewrite those contained declarations into generated external packages.
 
-members:
-  - type: skill
-    name: code-review
-    locator: ../skills/code-review
+### 29.3 Protected Root behavior
 
-  - type: skill
-    name: refactoring-code
-    locator: ../skills/refactoring-code
+Ordinary Source and declaration mutation is rejected for the protected built-in Root.
 
-  - type: mcp
-    name: github
-    locator: ../mcps/github.yaml
-```
+Protected Artifact enablement may be mutable through the authorized local metadata path.
 
-Physical co-distribution does not make the Collection the owner of these Artifacts. It makes package-relative locations portable.
+Mutable MCP installation data for protected servers is stored in an external local overlay.
 
-A built-in Collection may also contain a complete MCP or MCP policy declaration when that declaration is authored inside the Collection document.
+Default named lookup may fall back to this Root, but only for explicitly declared relationships.
 
-Built-in package installation must not rewrite contained MCP or MCP policy declarations into generated external declaration files.
+### 29.4 Package hydration
 
-### Protected Root behavior
+Hydration tracks:
 
-Ordinary Source and Artifact mutation is rejected for the protected built-in Root.
+- Package-scoped desired state.
+- Package fingerprints.
+- Expected physical bytes.
+- Expected Artifact occurrences.
 
-Protected built-in Artifact state is application-managed.
+Startup reconciliation:
 
-Mutable MCP installation state for protected servers is stored in an external local overlay.
+- Skips equivalent current packages.
+- Repairs changed, incomplete, or corrupted known packages.
+- Removes stale known declared packages.
+- Leaves unrelated packages and Sources unchanged.
 
-User-owned direct and managed Artifacts live in user Roots and retain ordinary local Artifact state.
+Current reconciliation does not sweep manually inserted untracked protected content.
 
-Symbolic lookup remains Root-scoped.
+Removing a built-in package purges only overlays and secrets associated with MCP Artifacts removed by that package.
 
-A Workspace in a user Root does not automatically import Artifacts from the protected built-in Root.
-
-Explicit cross-Root Workspace imports are not currently supported.
-
-### Package hydration
-
-Hydration maintains package-scoped desired state and package fingerprints.
-
-During bootstrap, each declared built-in package is checked idempotently
-against expected package content and expected Artifacts. A matching hydration
-marker alone is not proof that physical package content still exists.
-
-Equivalent packages with current Source and Artifact state do not trigger an
-unnecessary Source refresh. Changed, incomplete, or corrupted known packages
-are repaired and refreshed. Stale declared packages are removed through
-package hydration reconciliation.
-
-Current reconciliation is authoritative for known declared packages. It does
-not yet sweep manually inserted untracked content from protected Sources.
-
-Artifacts, overlays, secrets, and settings outside a changed or removed package remain stable.
-
-Removing a package purges only overlays and secrets associated with MCP Artifacts removed by that package.
-
-A complete protected-topology reset and ArtifactRef replacement is reserved for:
+A complete protected topology reset is reserved for:
 
 - Incompatible topology migration.
 - Root identity migration.
 - Unrecoverable topology corruption.
 
-ArtifactRefs remain stable for unchanged packages during ordinary hydration.
-
-ArtifactRef stability is not guaranteed across an intentional topology migration.
-
-### Skill package identity
-
-A Skill directory remains one Artifact:
-
-```text
-skills/code-review/
-  SKILL.md
-  references/
-  scripts/
-  assets/
-  -> skill/code-review
-```
-
-Collection membership does not create additional Skill identities.
-
-## Runtime consumer model
-
-### Prompt and Context consumer
-
-```text
-resolved Instructions and Contexts
-  -> verified source material
-  -> deterministic or consumer-defined contribution ordering
-  -> prompt budget and truncation policy
-  -> final prompt
-```
-
-Instructions and Contexts may originate from:
-
-- Inline content.
-- `AGENTS.md`.
-- `CLAUDE.md`.
-- `README.md`.
-- `llms.txt`.
-- Selected documentation.
-- A source-relative locator.
-
-The consumer owns prompt budgeting, truncation, and final ordering policy.
-
-### Skill consumer
-
-```text
-resolved Skill
-  -> verified Skill declaration source
-  -> verified Skill directory
-  -> Agent Skills runtime registration
-  -> Skill prompt, resource, and script operations
-```
-
-A Skill included by several Collections retains one Skill identity.
-
-Collection membership determines whether the Skill is selected for a particular experience. It does not create another runtime identity.
-
-### MCP consumer
-
-```text
-resolved MCP declaration
-  -> verified declaration source
-  -> optional selected MCP source entry
-  -> installation-local configuration
-  -> secret and environment substitution
-  -> runtime server configuration
-  -> MCP connection
-```
-
-MCP runtime behavior includes:
-
-- Server identity derived from Artifact identity.
-- Runtime grouping derived from active resolution scope.
-- Source and Definition versioning.
-- Connection invalidation.
-- Tool discovery.
-- Resource discovery.
-- Prompt discovery.
-- Completion support.
-- Policy evaluation.
-- Approval handling.
-- OAuth flows.
-- Client credential flows.
-- Secret redaction in runtime errors and process output.
-
-MCP has one enablement metadata field: `Artifact.Enabled`.
-
-- An outer catalog, Workspace selection, or future runtime policy may interpret `Artifact.Enabled` explicitly.
-- Generic Artifact enablement does not suppress MCP policy composition,
-
-An MCP included by several Collections retains one MCP identity and one corresponding installation configuration.
-
-### Workflow consumer
-
-```text
-resolved Workflow
-  -> resolved node targets
-  -> edge conditions
-  -> join behavior
-  -> output match schemas
-  -> scheduler and executor
-```
-
-Workflow execution is owned by a dedicated runtime consumer.
-
-The runtime decides whether all target nodes must be ready before execution begins.
-
-It does not silently substitute another target when a node target is unavailable.
-
-### Runtime implementation boundaries
-
-Declaration resolution remains limited to:
-
-```text
-available
-unavailable
-ambiguous
-```
-
-Runtime readiness and resource materialization remain consumer concerns.
-
-Explicit runtime request ordering is separate from declaration composition ordering.
-
-Built-in package hydration does not require MCP runtime connection invalidation within the scope of this design.
-
-## Technical architecture
-
-### Root
-
-A Root is the identity and resolution boundary for a repository or application domain.
-
-It owns:
-
-- Registered Sources.
-- Source discovery configuration.
-- Source refresh state.
-- Immutable Definitions.
-- Source-backed Artifacts.
-- Local Artifact state.
-- Symbolic identity lookup.
-
-Generic Artifact Store Root creation remains domain-neutral. Application Root
-lifecycle owns user-Root baseline establishment and startup reconciliation
-because baseline Collections are application-domain policy.
-
-The semantic lookup key is:
-
-```text
-(type, logicalName)
-```
-
-Examples:
-
-```text
-skill/code-review
-agent/reviewer
-mcp/github
-collection/repository-review
-workflow/change-workflow
-```
-
-A Root may contain multiple declaration occurrences with the same semantic identity.
-
-### Source
-
-A Source is a physical content origin.
-
-Current Source kinds are:
-
-```text
-fs-directory
-embedded-directory
-managed-directory
-```
-
-A Source keeps physical configuration separate from declaration discovery.
-
-```text
-Source.Config
-  filesystem path
-  embedded provider and root
-  managed source storage
-
-Source.Discovery
-  exact files
-  directory roots
-  include patterns
-  exclude patterns
-  decoder hints
-  allowed decoders
-  expected content digests
-  scan limits
-```
-
-### Definition
-
-A Definition is the immutable normalized semantic result of decoding a declaration.
-
-```text
-Definition {
-  Digest
-  Kind
-  LogicalName
-  LogicalVersion
-  DisplayName
-  Description
-  Labels
-  Body
-  Dependencies
-}
-```
-
-The Definition body contains the complete canonical declaration structure.
-
-Definition digests support:
-
-- Integrity.
-- Equality.
-- Change detection.
-- Immutable persistence.
-- Runtime versioning.
-- Managed publication verification.
-
-### Artifact
-
-An Artifact is the local addressable record for a declaration occurrence.
-
-```text
-Artifact {
-  ID
-  RootID
-  SourceBinding
-
-  Kind
-  LogicalName
-  LogicalVersion
-
-  ResolvedDefinition
-  SourceContentDigest
-
-  State
-  Diagnostics
-
-  DisplayName
-  Enabled
-  Data
-}
-```
-
-Artifact local state supports:
-
-- Local enablement.
-- Local display name.
-- Consumer-specific local data.
-- User-owned MCP installation settings.
-- Workspace runtime disablement.
-- Other namespaced consumer settings.
-
-A contained declaration has a source occurrence within its containing document. That occurrence may use a stable named structural position.
-
-The structural occurrence identifies where the declaration is written. It does not make its containing Collection, Agent, Team, Workflow, or Workspace an owner.
-
-Protected built-in Artifacts permit local `Enabled` metadata mutation. Protected
-source packages, generic Artifact data, display metadata, MCP installation
-settings, secrets, and other protected consumer configuration remain subject to
-their existing protected-root or overlay rules.
-
-### Artifact Store boundary
-
-Artifact Store persists:
-
-- Sources.
-- Definitions.
-- Artifacts.
-- Source bindings.
-- Source refresh and integrity state.
-- Artifact-local state.
-
-Artifact Store does not infer:
-
-- Collection ownership.
-- Reverse membership.
-- Cascading deletion.
-- Generic composition lifecycle.
-- Runtime activation from Collection membership.
-
-A source-backed Artifact must not be purged while its declaration remains
-available in a Source. Purge must be coupled to source mutation or reconciliation.
-
-For user-managed Collections, editing changes only the source-backed Collection declaration body.
-
-A management view may derive membership by:
-
-- Reading Collection declarations.
-- Resolving their composition entries.
-- Maintaining a domain-owned cache.
-
-### Resource verification
-
-Resource access verifies:
-
-```text
-Artifact
-  -> Definition
-  -> Source binding
-  -> Source refresh state
-  -> Source generation
-  -> declaration content digest
-  -> verified source material
-```
-
-Consumers do not reopen arbitrary repository paths directly.
-
-A missing resource affects Artifact readiness and runtime materialization. It does not invalidate an otherwise valid containing composition declaration.
-
-### Resolver
-
-The Resolver is responsible for:
-
-- Root-scoped symbolic lookup.
-- Located declaration selection.
-- Type and name confirmation.
-- MCP source-entry selection.
-- Alias-to-terminal resolution.
-- Duplicate identity detection.
-- Collection expansion.
-- Agent expansion.
-- Team expansion.
-- Loop resolution.
-- Workflow target resolution.
-- Workspace root resolution.
-- Nested Workspace rejection.
-- Cycle detection.
-- Resolution-depth limits.
-- Resolution-node limits.
-- Deterministic normalized ordering.
-- Preservation of relationship-level status.
-
-The Resolver returns:
-
-- A typed graph.
-- Composition occurrences.
-- Target ArtifactRefs.
-- Availability or ambiguity status.
-- Diagnostics needed by capability consumers.
-- A cycle-safe flattened capability plan suitable for frontend transport.
-- A common completeness helper for strict consumers.
-
-It does not execute the graph.
-
-### Workspace refresh architecture
-
-Resolution operates against indexed declaration state and remains read-only.
-
-`RefreshWorkspace` is the explicit operation that:
-
-- Computes reachable local locators.
-- Extends or updates applicable Source discovery.
-- Refreshes only the Workspace Source and Sources whose reachable local locator closure changed.
-- Rebuilds affected Definitions and Artifacts.
-- Leaves unrelated Source state unchanged.
-
-Workspace read and planning operations consume this indexed state without mutating it.
-
-## Implementation consequences and finalized decisions
-
-### External references versus contained declarations
-
-The implementation must classify composition entries before emitting nested Artifacts.
-
-It must ensure that:
-
-- Locator-bearing external Skill and MCP entries remain reference edges.
-- External entries do not become source subresource Artifacts.
-- Complete contained declarations receive stable named structural positions.
-- Located targets confirm the requested type and name.
-- Command locators remain executable declaration data.
-- Common relationship annotations do not override target state.
-
-Existing locator-bearing Collection members that were previously interpreted as Collection-specific child declarations require migration to external reference semantics.
-
-### Member-level resolution
-
-The resolver must preserve every declared composition occurrence.
-
-A missing, ambiguous, disabled, invalid, cyclic, or locator-unresolvable target affects only that relationship path.
-
-The implementation must not fail the entire containing Collection when the first unavailable relationship is encountered.
-
-Consumers must apply an explicit completeness policy.
-
-### Managed authoring
-
-Managed authoring must provide:
-
-- Source-backed editable Collections.
-- Direct membership updates.
-- Revision-aware deletion guards.
-- Explicit Collection selection.
-- Skill baseline provisioning.
-- MCP baseline provisioning.
-- Managed Skill publication.
-- Managed MCP server publication.
-- Managed MCP policy publication.
-- Attach and detach operations.
-- Package removal that does not alter unrelated targets.
-
-Managed APIs should create external members unless a specialized contained-authoring flow is introduced.
-
-### MCP identity and local configuration
-
-Migrating a reference must preserve MCP installation-local configuration only when it still identifies the same independently declared MCP identity.
-
-Distinct MCP configurations must use distinct logical names rather than membership-specific overrides.
-
-### Built-in packages
-
-Built-in implementation must support both:
-
-- Independently declared package artifacts grouped by Collections.
-- Complete contained MCP and MCP policy declarations authored inside built-in Collections.
-
-Hydration must not rewrite contained declarations merely to fit an external-reference implementation model.
-
-### Finalized semantic decisions
-
-The following decisions are authoritative:
-
-- Collection, Agent, Team, Skill tool, and Workspace arrays have no caller-defined ordering semantics.
-- Capability output uses deterministic normalized ordering.
-- Runtime request order is independent of declaration array order.
-- Managed package replacement requires explicit replacement intent.
-- Managed Skill and MCP authoring always receives an explicit Collection.
-- Baseline Collections are selectable destinations, not defaults, fallbacks, or forced-enable records.
-- Application Root lifecycle, rather than generic Artifact Store Root creation,
-  provisions and reconciles baseline Collections.
-- Nested Workspace references resolve as unavailable.
-- Located resolution is read-only.
-- `RefreshWorkspace` owns reachable-local-locator discovery updates.
-- MCP `server` participates in source target selection.
-- A non-command source-selected MCP is a pure terminal alias and cannot define
-  local `include` rules.
-- Resource claims do not suppress physical declaration targets.
-- Source-selected aliases resolve to terminal Artifacts.
-- Multiple aliases to one terminal Artifact count as one symbolic target.
-- Built-in contained MCP and MCP policy declarations remain contained.
-- Package hydration affects only changed packages unless topology recovery requires a reset.
-- Runtime readiness remains outside declaration resolution.
-- Artifact Store does not own generic composition relationships.
-- Ordinary Artifact purge requires the source-backed Artifact to be missing.
-- Workspace refresh does not refresh unrelated Root Sources.
-
-## Current implementation status
-
-### Status interpretation
+ArtifactRefs remain stable for unchanged packages during ordinary hydration. Stability is not guaranteed across intentional topology replacement.
+
+Built-in hydration does not, by itself, require MCP runtime connection invalidation in this design.
+
+## 30. Implementation requirements
+
+### 30.1 Store and Source
+
+- Keep the generic Store independent of concrete declaration packages.
+- Register concrete schemas and decoders at application composition.
+- Preserve immutable Definitions.
+- Preserve Source-backed Artifact occurrences.
+- Enforce the purge guard.
+- Keep generic composition out of Store persistence.
+- Verify resources through Source generation and digest state.
+- Keep Source refresh explicit.
+
+### 30.2 Resolver
+
+- Register every supported type resolver.
+- Expose typed public resolver APIs.
+- Keep generic traversal private.
+- Preserve every relationship occurrence.
+- Implement current and protected built-in lookup.
+- Implement generic fallback providers.
+- Use Tool and Model as initial mapped fallback consumers.
+- Keep fallback out of located, contained, and selector paths.
+- Resolve aliases to terminal Artifacts.
+- Detect cycles and enforce limits.
+- Reject positional identities.
+
+### 30.3 Discovery
+
+- Keep selector eligibility type-specific.
+- Resolve selector bases inside the declaring Source.
+- Apply declaration path filters before logical-name filters.
+- Preserve zero-match selectors.
+- Sort matches by stable source-backed identity.
+- Update discovery only through explicit refresh.
+- Refresh only affected Sources.
+- Keep external locator support behind registered adapters.
+
+### 30.4 Consumers
+
+- Update consumers to typed resolver APIs.
+- Support partial and strict completeness.
+- Support mapped Tool and Model targets where explicitly allowed.
+- Use direct typed MCP declaration fields.
+- Use Workspace members as the selected capability roots.
+- Use one shared Text source-materialization path where practical.
+- Keep all runtime execution outside the resolver.
+
+## 31. Current implementation status
+
+### 31.1 Status interpretation
 
 - `Available` means an implementation path exists for the stated scope.
-- `Pending` means approved completion, verification, or API-consolidation work remains.
-- `Deferred` means the capability is intentionally outside current approved scope.
+- `Pending` means approved completion or verification remains.
+- `Deferred` means intentionally outside current approved implementation scope.
 - `Not supported` means no supported behavior currently exists.
-- `Removed` means the behavior is intentionally no longer exposed.
-- Status does not assert successful build, test, migration, static-analysis, or Wails binding verification.
+- `Removed` means a previous behavior is intentionally no longer exposed.
+- Status does not assert successful completion of all builds, tests, migrations, static analysis, or generated bindings.
 
-### Declaration platform and resolution
+### 31.2 Sources, persistence, and verification
 
-| Capability                                           | Status                                                                                |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Core artifact type vocabulary                        | Available                                                                             |
-| Canonical JSON declarations                          | Available                                                                             |
-| Canonical YAML declarations                          | Available                                                                             |
-| JSON Schema contract validation                      | Available                                                                             |
-| `type` and `apiVersion` schema dispatch              | Available                                                                             |
-| Named nested declaration indexing                    | Available                                                                             |
-| Named contained declarations                         | Available as source-backed nested Artifacts                                           |
-| Stable named contained-declaration positions         | Available                                                                             |
-| Anonymous declarations                               | Not supported                                                                         |
-| Root-scoped symbolic lookup                          | Available                                                                             |
-| Duplicate semantic identity detection                | Available                                                                             |
-| Unlocated symbolic references                        | Available                                                                             |
-| Located composition entries as reference edges       | Available                                                                             |
-| Located Skill external references                    | Available through composition-entry classification and path resolution                |
-| Located MCP external references                      | Available through composition-entry classification and path resolution                |
-| Uniform locator semantics across composition types   | Available through read-only indexed resolution and explicit refresh-closure discovery |
-| Same-Source Skill and MCP resource-claim suppression | Removed; source-selected declarations use terminal alias behavior                     |
-| Member-level unavailable and ambiguous results       | Available in resolver, Collection capability plans, and Workspace capability plans    |
-| Best-effort Collection display and expansion         | Available                                                                             |
-| Collection resolution                                | Available with partial relationship behavior                                          |
-| Agent resolution                                     | Available with relationship-level partial results; execution runtime is deferred      |
-| Team resolution                                      | Available with relationship-level partial results; execution runtime is deferred      |
-| Loop resolution                                      | Available with relationship-level partial results; execution runtime is deferred      |
-| Workflow structure and target resolution             | Available with relationship-level partial results; execution runtime is deferred      |
-| Workspace resolution                                 | Available with partial capability reporting and explicit strict runtime selection     |
-| Workspace completeness policy                        | Available through `WorkspaceRuntimeSelection.RequireComplete`                         |
-| Generic direct composition capability plans          | Available through cycle-safe flattened resolver plans                                 |
-| Generic completeness policy                          | Available through the shared resolver completeness helper                             |
-| Source-selected MCP aliases                          | Available as pure aliases; non-command aliases cannot define local `include` rules    |
-| MCP policy declaration contract                      | Available, including concrete policy body validation                                  |
-| Local path declaration locators                      | Available for supported locator targets                                               |
-| Exact contained occurrence resolution                | Available through stable structural subresource selection                             |
+| Capability                            | Status                                                       |
+| ------------------------------------- | ------------------------------------------------------------ |
+| Filesystem Sources                    | Available                                                    |
+| Embedded Sources                      | Available                                                    |
+| Managed Sources                       | Available                                                    |
+| Source-backed Definition persistence  | Available                                                    |
+| Source-backed Artifact persistence    | Available                                                    |
+| Source refresh state                  | Available                                                    |
+| Definition digest verification        | Available                                                    |
+| Resource generation verification      | Available                                                    |
+| Filesystem Source symlink containment | Decision: Not needed and hence not implemented               |
+| Universal Artifact enabled metadata   | Available                                                    |
+| User-managed Source provisioning      | Available through Workspace APIs                             |
+| Explicit managed package replacement  | Available                                                    |
+| Equivalent publication refresh skip   | Available                                                    |
+| Authoritative managed discovery       | Available for managed Plugin, Skill, MCP, and policy Sources |
+| Managed declaration locator cleanup   | Available                                                    |
+| Source-backed Artifact purge guard    | Available                                                    |
 
-### Sources, persistence, and resource verification
+### 31.3 Resolver and discovery
 
-| Capability                           | Status                                                           |
-| ------------------------------------ | ---------------------------------------------------------------- |
-| Filesystem Sources                   | Available                                                        |
-| Embedded Sources                     | Available                                                        |
-| Managed Sources                      | Available                                                        |
-| Source-backed Definition persistence | Available                                                        |
-| Source-backed Artifact persistence   | Available                                                        |
-| Source refresh state                 | Available                                                        |
-| Definition digest verification       | Available                                                        |
-| Universal Artifact enabled metadata  | Available for mutable and protected Roots                        |
-| Resource generation verification     | Available                                                        |
-| User-managed Source provisioning     | Available through the Workspace consumer API                     |
-| Explicit managed package replacement | Available                                                        |
-| Equivalent publication refresh skip  | Available when Source and expected Artifact state are current    |
-| Authoritative managed discovery      | Available for managed Collection, Skill, MCP, and policy Sources |
-| Managed declaration locator cleanup  | Available after managed package removal                          |
-| Source-backed Artifact purge guard   | Available; ordinary purge requires a missing Artifact            |
+| Capability                                                           | Status    |
+| -------------------------------------------------------------------- | --------- |
+| Per-type resolver registry                                           | Available |
+| Per-type public resolver APIs                                        | Available |
+| Private shared traversal core                                        | Available |
+| Root-scoped symbolic lookup                                          | Available |
+| Protected built-in fallback                                          | Available |
+| Explicit `scope: builtin`                                            | Available |
+| Generic fallback-provider infrastructure                             | Available |
+| Tool mapped fallback infrastructure                                  | Available |
+| Model mapped fallback infrastructure                                 | Available |
+| Application-configured Tool mapped fallback                          | Pending   |
+| Application-configured Model mapped fallback                         | Pending   |
+| Duplicate terminal identity detection                                | Available |
+| Named external relationships                                         | Available |
+| Located external relationships                                       | Available |
+| Contained occurrence resolution                                      | Available |
+| Member-level partial status                                          | Available |
+| Source-selected alias-to-terminal resolution for alias-capable types | Available |
+| Supported-alias cycle detection                                      | Available |
+| Named-lookup same-terminal alias deduplication                       | Available |
+| Selector terminal ArtifactRef projection and deduplication           | Available |
+| Alias provenance in public resolver output                           | Pending   |
+| Member selectors                                                     | Available |
+| Zero-match selectors                                                 | Available |
+| Type-specific selector eligibility                                   | Available |
+| Explicit selector discovery refresh                                  | Available |
+| Application wiring for Plugin, Agent, and Team refresh coordinators  | Pending   |
+| Selector base directory verification                                 | Available |
+| Portable selector-path matching on Windows                           | Available |
+| Refresh-closure Source-count limit                                   | Pending   |
+| Stable selector-match identity                                       | Available |
+| Non-positional relationship identity                                 | Available |
+| Exact duplicate relationship rejection                               | Available |
+| Cycle-safe flattened capability plans                                | Available |
+| Shared completeness helper                                           | Available |
+| Nested Workspace rejection                                           | Available |
+| Local path locator resolution                                        | Available |
+| URL, Git, and package locator wire representation                    | Available |
+| URL, Git, and package materialization adapters                       | Deferred  |
 
-### Physical format support
+### 31.4 Physical formats
 
 | Capability                          | Status    |
 | ----------------------------------- | --------- |
-| `AGENTS.md` support                 | Available |
-| `CLAUDE.md` support                 | Available |
-| `README.md` support                 | Available |
-| `llms.txt` support                  | Available |
-| Documentation Context discovery     | Available |
-| `SKILL.md` support                  | Available |
+| Canonical JSON                      | Available |
+| Canonical YAML                      | Available |
+| `AGENTS.md`                         | Available |
+| `CLAUDE.md`                         | Available |
+| `README.md`                         | Available |
+| `llms.txt`                          | Available |
+| Documentation Text discovery        | Available |
+| `SKILL.md`                          | Available |
 | Direct Skill directory registration | Available |
 | Direct `SKILL.md` registration      | Available |
-| `.mcp.json` support                 | Available |
-| `mcp.json` support                  | Available |
+| `.mcp.json`                         | Available |
+| `mcp.json`                          | Available |
 | Canonical MCP declarations          | Available |
 | Source-selected MCP declarations    | Available |
-| `AGENT.md` support                  | Available |
-| `*.agent.md` support                | Available |
+| `AGENT.md`                          | Available |
+| `*.agent.md`                        | Available |
+| Canonical Plugin declarations       | Available |
+| Workspace manifests                 | Available |
 
-### Workspace capability planning
+### 31.5 Workspace and capability planning
 
-| Capability                                    | Status                                                   |
-| --------------------------------------------- | -------------------------------------------------------- |
-| Read-only Workspace resolution and planning   | Available; Source mutation remains in `RefreshWorkspace` |
-| Workspace prompt planning                     | Available with partial capability-occurrence reporting   |
-| Workspace Skill planning                      | Available with partial capability-occurrence reporting   |
-| Workspace MCP planning                        | Available with partial capability-occurrence reporting   |
-| Explicit Workspace capability completeness    | Available through `RequireComplete`                      |
-| Consistent explicit ArtifactRef deduplication | Available for prompt, Skill, and MCP selections          |
-| Generic Artifact composition inspection       | Available through a frontend-safe flattened plan         |
-| Source-targeted Workspace refresh             | Available; unrelated Root Sources are not refreshed      |
+| Capability                                    | Status    |
+| --------------------------------------------- | --------- |
+| Read-only Workspace resolution                | Available |
+| Explicit `RefreshWorkspace`                   | Available |
+| Source-targeted refresh                       | Available |
+| Unrelated Source refresh avoidance            | Available |
+| Workspace prompt planning                     | Available |
+| Workspace Skill planning                      | Available |
+| Workspace MCP planning                        | Available |
+| Partial capability occurrence reporting       | Available |
+| Strict `RequireComplete` selection            | Available |
+| Consistent terminal ArtifactRef deduplication | Available |
+| Generic composition inspection plan           | Available |
+| Workspace `members` selection                 | Available |
+| Workspace `declarations` and `roots` behavior | Removed   |
 
-### Collections and managed authoring
+### 31.6 Managed Plugins and authoring
 
-| Capability                                                        | Status                                                                     |
-| ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| Portable mixed Collection declarations                            | Available in canonical source documents                                    |
-| Domain-specific editable managed Collections                      | Available through Skill and MCP Collection APIs                            |
-| Collection deletion guard                                         | Available with direct-member protection                                    |
-| Canonical Skill Collection declarations                           | Available as external grouping declarations                                |
-| Application-provisioned Skill baseline Collection per user Root   | Available through application Root provisioning and startup reconciliation |
-| Application-provisioned MCP baseline Collection per user Root     | Available through application Root provisioning and startup reconciliation |
-| Baseline rename, runtime-disable, and deletion protection         | Available through application-facing Collection and Workspace APIs         |
-| Explicit Collection selection for managed Skill authoring         | Available                                                                  |
-| Explicit Collection selection for managed MCP authoring           | Available                                                                  |
-| Managed Skill creation in a Collection                            | Available; an explicit editable Collection is required                     |
-| Managed MCP creation in a Collection                              | Available; an explicit editable Collection is required                     |
-| Managed MCP policy creation in a Collection                       | Available; an explicit editable Collection is required                     |
-| Attach an existing Skill or MCP to a Collection through user APIs | Available                                                                  |
-| Detach a member without deleting its target through user APIs     | Available                                                                  |
-| Direct compatible Artifact membership views                       | Available with direct-member relationship status                           |
-| Explicit replacement protection for managed create flows          | Available                                                                  |
-| User-facing standalone Skill creation                             | Removed from the managed authoring flow                                    |
-| Individual editing of contained Skills                            | Not supported; managed Skill APIs create independent package Artifacts     |
-| Managed declaration publication                                   | Available for Collections, Skills, MCP servers, and MCP policies           |
-| Managed MCP server publication                                    | Available                                                                  |
-| Managed package removal                                           | Available                                                                  |
-| Mixed-Collection frontend authoring                               | Deferred                                                                   |
+| Capability                                                 | Status        |
+| ---------------------------------------------------------- | ------------- |
+| Portable mixed Plugin declarations                         | Available     |
+| Domain-specific managed Skill Plugins                      | Available     |
+| Domain-specific managed MCP Plugins                        | Available     |
+| Direct-member deletion guard                               | Available     |
+| Application-provisioned Skill baseline Plugin              | Available     |
+| Application-provisioned MCP baseline Plugin                | Available     |
+| Baseline runtime-disablement and deletion protection       | Available     |
+| Explicit Plugin selection for managed Skill creation       | Available     |
+| Explicit Plugin selection for managed MCP creation         | Available     |
+| Explicit Plugin selection for managed policy creation      | Available     |
+| Attach existing target                                     | Available     |
+| Detach without deleting target                             | Available     |
+| Direct compatible membership views                         | Available     |
+| Managed Plugin publication                                 | Available     |
+| Managed Skill publication                                  | Available     |
+| Managed MCP server publication                             | Available     |
+| Managed MCP policy publication                             | Available     |
+| Managed package removal                                    | Available     |
+| Explicit replacement protection                            | Available     |
+| Standalone managed Skill creation without Plugin selection | Removed       |
+| Individual editing of contained Skills                     | Not supported |
+| Mixed Plugin frontend authoring                            | Deferred      |
 
-### Skill and built-in package support
+### 31.7 Built-in packages
 
-| Capability                                                       | Status                                                            |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------- |
-| Managed Skill packages                                           | Available                                                         |
-| Built-in Skill packages                                          | Available with independently discovered Skill Artifacts           |
-| Built-in MCP packages                                            | Available with contained MCP and policy declaration Artifacts     |
-| Built-in package-scoped hydration                                | Available                                                         |
-| Known built-in package byte verification and repair              | Available                                                         |
-| Stale known built-in package removal                             | Available                                                         |
-| Built-in ArtifactRef stability across ordinary package hydration | Available for unchanged packages                                  |
-| Built-in ArtifactRef stability across topology migration         | Not guaranteed; affected references may be intentionally replaced |
+| Capability                                      | Status                           |
+| ----------------------------------------------- | -------------------------------- |
+| Managed Skill packages                          | Available                        |
+| Built-in Skill packages                         | Available                        |
+| Built-in MCP packages                           | Available                        |
+| Contained built-in MCP and policy declarations  | Available                        |
+| Package-scoped hydration                        | Available                        |
+| Known package byte verification and repair      | Available                        |
+| Stale known package removal                     | Available                        |
+| ArtifactRef stability during ordinary hydration | Available for unchanged packages |
+| ArtifactRef stability across topology migration | Not guaranteed                   |
 
-### MCP platform and runtime
+### 31.8 MCP platform and runtime
 
-| Capability                                | Status    |
-| ----------------------------------------- | --------- |
-| MCP policy declarations                   | Available |
-| MCP installation-local data               | Available |
-| MCP secret references                     | Available |
-| MCP runtime configuration                 | Available |
-| MCP runtime connection management         | Available |
-| MCP tool discovery and invocation support | Available |
-| MCP resource support                      | Available |
-| MCP prompt support                        | Available |
-| MCP completion support                    | Available |
-| MCP policy evaluation                     | Available |
-| MCP approval handling                     | Available |
-| MCP OAuth and client credential flows     | Available |
-| MCP secret redaction                      | Available |
+| Capability                                                  | Status    |
+| ----------------------------------------------------------- | --------- |
+| MCP policy declarations and resolution                      | Available |
+| MCP installation-local data                                 | Available |
+| Terminal installation state for source-selected MCP aliases | Available |
+| MCP secret references                                       | Available |
+| MCP runtime configuration                                   | Available |
+| MCP connection management                                   | Available |
+| MCP Tool discovery and invocation                           | Available |
+| MCP resource support                                        | Available |
+| MCP prompt support                                          | Available |
+| MCP completion support                                      | Available |
+| MCP policy evaluation                                       | Available |
+| MCP approval handling                                       | Available |
+| MCP OAuth and client credential flows                       | Available |
+| MCP secret redaction                                        | Available |
 
-### Pending completion work
+### 31.9 Pending completion work
 
-| Capability or concern                     | Status  | Remaining work                                                                                                |
-| ----------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
-| Build and acceptance verification         | Pending | Run full tests, static analysis, migration coverage, and Wails binding generation                             |
-| Managed create operation durability       | Pending | Skill, MCP, and policy membership and package publication remain separate source-side operations              |
-| Protected Source undeclared content sweep | Pending | Known packages are repaired, but manually inserted untracked protected packages are not automatically removed |
-| Bulk resource verification efficiency     | Pending | Expose bounded verification-session reuse for bulk Skill and Workspace materialization                        |
+| Concern                               | Status  | Remaining work                                                                                                |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------- |
+| Build and acceptance verification     | Pending | Run complete tests, static analysis, migration coverage, and binding generation                               |
+| Managed creation durability           | Pending | Membership and independent package publication remain separate Source-side operations                         |
+| Protected undeclared-content sweep    | Pending | Known packages are reconciled, but manually inserted untracked protected content is not automatically removed |
+| Bulk resource verification efficiency | Pending | Add bounded verification-session reuse for bulk Skill and Workspace materialization                           |
 
-### Deferred and unsupported capabilities
+### 31.10 Deferred or unsupported ecosystem capabilities
 
-#### Source, locator, and cross-Root capabilities
+#### Source and locator capabilities
 
-| Capability                                                   | Status           |
-| ------------------------------------------------------------ | ---------------- |
-| Cross-Root Workspace imports                                 | Not supported    |
-| Automatic built-in visibility in user Workspaces             | Not supported    |
-| Plugin manifests and external package distribution workflows | Deferred         |
-| Git locators                                                 | Support deferred |
-| Git archive materialization                                  | Support deferred |
-| URL locators                                                 | Support deferred |
-| Package locators                                             | Support deferred |
-| Archive and zip Sources                                      | Support deferred |
+| Capability                                     | Status        |
+| ---------------------------------------------- | ------------- |
+| Arbitrary cross-Root Workspace imports         | Not supported |
+| Automatic activation of all built-in Artifacts | Not supported |
+| Git locator materialization                    | Deferred      |
+| Git archive materialization                    | Deferred      |
+| URL locator materialization                    | Deferred      |
+| Package locator materialization                | Deferred      |
+| Archive and zip Sources                        | Deferred      |
+| External Plugin package distribution workflow  | Deferred      |
 
-#### Authoring and frontend scope
+The portable locator contract remains forward-compatible with these capabilities.
 
-| Capability                                                                                    | Status   |
-| --------------------------------------------------------------------------------------------- | -------- |
-| Mixed-Collection frontend authoring                                                           | Deferred |
-| Managed authoring APIs for Agent, Team, Loop, Workflow, Tool, Model, Instruction, and Context | Deferred |
-| Direct standalone management UI for Agent, Team, Loop, and Workflow composition plans         | Deferred |
+#### Authoring and frontend
+
+| Capability                                                               | Status   |
+| ------------------------------------------------------------------------ | -------- |
+| Mixed Plugin frontend authoring                                          | Deferred |
+| Managed authoring for Agent, Team, Loop, Workflow, Tool, Model, and Text | Deferred |
+| Standalone management UI for Agent, Team, Loop, and Workflow plans       | Deferred |
 
 #### Execution runtimes
 
-| Capability                        | Status                              |
-| --------------------------------- | ----------------------------------- |
-| Tool execution                    | Owned by a future Tool consumer     |
-| Model execution                   | Owned by a future Model consumer    |
-| Agent execution                   | Owned by a future Agent runtime     |
-| Team execution                    | Owned by a future Team runtime      |
-| Loop execution                    | Owned by a future execution runtime |
-| Workflow scheduling and execution | Owned by a future Workflow runtime  |
+| Capability                        | Status                   |
+| --------------------------------- | ------------------------ |
+| Tool execution                    | Future Tool consumer     |
+| Model execution                   | Future Model consumer    |
+| Agent execution                   | Future Agent runtime     |
+| Team execution                    | Future Team runtime      |
+| Loop execution                    | Future execution runtime |
+| Workflow scheduling and execution | Future Workflow runtime  |

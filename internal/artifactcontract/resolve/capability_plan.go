@@ -193,13 +193,13 @@ func (c *capabilityCollector) collectEntry(
 		}
 		if entry.DirectLoopResult != nil {
 			c.collectRelationship(
-				memberOccurrencePath(path, "loop", *entry.DirectLoopResult),
+				memberOccurrencePath(path, loopStr, *entry.DirectLoopResult),
 				*entry.DirectLoopResult,
 			)
 		}
 		if entry.DirectWorkflowResult != nil {
 			c.collectRelationship(
-				memberOccurrencePath(path, "workflow", *entry.DirectWorkflowResult),
+				memberOccurrencePath(path, workflowStr, *entry.DirectWorkflowResult),
 				*entry.DirectWorkflowResult,
 			)
 		}
@@ -315,6 +315,10 @@ func (c *capabilityCollector) collectRelationship(
 		value := match.Artifact
 		matchOccurrence.Artifact = &value
 		if match.Resolved != nil {
+			if terminal, found := match.Resolved.ArtifactRef(); found {
+				terminalValue := terminal
+				matchOccurrence.Artifact = &terminalValue
+			}
 			matchOccurrence.Name = resolvedEntryName(match.Resolved)
 			matchOccurrence.Mapped = cloneMappedTarget(match.Resolved.Mapped)
 		}
@@ -343,7 +347,10 @@ func memberOccurrencePath(
 		)
 	}
 
-	segments := []string{field, string(header.Type)}
+	segments := []string{field}
+	if !isDirectProgramSlotMember(segments, header.Type) {
+		segments = append(segments, string(header.Type))
+	}
 	if header.Type == declaration.TypeText {
 		if insert, err := relationship.Declared.TextInsert(); err == nil {
 			segments = append(segments, string(insert))

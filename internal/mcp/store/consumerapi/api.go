@@ -94,6 +94,7 @@ func New(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
 			SourceArtifacts:      artifacts,
+			SourceEntries:        resources,
 			Locators:             locators,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Limits:               resolve.DefaultLimits(),
@@ -266,6 +267,7 @@ func (a *API) UpdateServerInstallation(
 	if err != nil {
 		return artifact.Artifact{}, err
 	}
+	terminal := material.Resource.Artifact.Ref()
 	if material.BuiltIn {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: protected MCP Server installation belongs in an overlay",
@@ -275,7 +277,7 @@ func (a *API) UpdateServerInstallation(
 	if material.Resource.Artifact.Revision != expectedArtifactRevision {
 		return artifact.Artifact{}, basespec.ErrConflict
 	}
-	if err := data.ValidateFor(ref, material.Document); err != nil {
+	if err := data.ValidateFor(terminal, material.Document); err != nil {
 		return artifact.Artifact{}, err
 	}
 	encoded, err := mcpDomainServer.MergeServerData(
@@ -290,7 +292,7 @@ func (a *API) UpdateServerInstallation(
 	}
 	updated, err := a.artifacts.UpdateData(
 		ctx,
-		ref,
+		terminal,
 		expectedArtifactRevision,
 		encoded,
 	)
@@ -321,12 +323,6 @@ func (a *API) UpdateProtectedServerInstallation(
 	if a == nil {
 		return basespec.ErrClosed
 	}
-	if !a.protection.IsProtectedRoot(ref.RootID) {
-		return fmt.Errorf(
-			"%w: MCP Server is not in a protected Root",
-			basespec.ErrProtected,
-		)
-	}
 	if a.overlays == nil {
 		return fmt.Errorf(
 			"%w: MCP overlay store is unavailable",
@@ -337,17 +333,24 @@ func (a *API) UpdateProtectedServerInstallation(
 	if err != nil {
 		return err
 	}
+	terminal := material.Resource.Artifact.Ref()
+	if !a.protection.IsProtectedRoot(terminal.RootID) {
+		return fmt.Errorf(
+			"%w: MCP Server is not in a protected Root",
+			basespec.ErrProtected,
+		)
+	}
 	if !material.BuiltIn {
 		return fmt.Errorf(
 			"%w: MCP Server is not a protected Artifact",
 			basespec.ErrProtected,
 		)
 	}
-	if err := data.ValidateFor(ref, material.Document); err != nil {
+	if err := data.ValidateFor(terminal, material.Document); err != nil {
 		return err
 	}
 
-	current, found, err := a.overlays.GetServerOverlay(ctx, ref)
+	current, found, err := a.overlays.GetServerOverlay(ctx, terminal)
 	if err != nil {
 		return err
 	}
@@ -368,7 +371,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	}
 	if err := a.overlays.PutServerOverlay(
 		ctx,
-		ref,
+		terminal,
 		expectedOverlayRevision,
 		next,
 	); err != nil {
@@ -376,7 +379,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	}
 	return mcpDomainServer.CleanupUnboundServerSecrets(
 		ctx,
-		ref,
+		terminal,
 		material.Document,
 		data,
 		a.secretCleaner,

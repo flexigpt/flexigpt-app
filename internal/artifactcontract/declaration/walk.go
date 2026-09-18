@@ -364,6 +364,10 @@ func appendMemberIdentity(
 	member Entry,
 ) ([]string, error) {
 	header := member.Header()
+	if isDirectProgramSlotMemberPath(current, header.Type) {
+		return appendPath(current, header.Name), nil
+	}
+
 	if header.Type == TypeText {
 		insert, err := member.TextInsert()
 		if err != nil {
@@ -377,6 +381,24 @@ func appendMemberIdentity(
 		), nil
 	}
 	return appendPath(current, string(header.Type), header.Name), nil
+}
+
+func isDirectProgramSlotMemberPath(
+	current []string,
+	declarationType Type,
+) bool {
+	if len(current) == 0 {
+		return false
+	}
+
+	switch current[len(current)-1] {
+	case "loop":
+		return declarationType == TypeLoop
+	case "workflow":
+		return declarationType == TypeWorkflow
+	default:
+		return false
+	}
 }
 
 // StableWorkflowNodeSegment uses the node ID when it is portable. Other

@@ -89,6 +89,15 @@ func (r *Resolver) resolveMember(
 		Use:       declaration.CloneRawMessageMap(relationshipFields.Use),
 	}
 
+	if member.Header().Type == declaration.TypeWorkspace {
+		relationship.Status = ResolutionUnavailable
+		relationship.Issue = &ResolutionIssue{
+			Code:    "artifact.workspace-nested",
+			Message: "Workspace cannot be resolved as a nested relationship",
+		}
+		return relationship, nil
+	}
+
 	var resolved *ResolvedEntry
 	switch form {
 	case declaration.MemberNamed:
@@ -576,7 +585,9 @@ func containedMemberSubresource(
 ) (basespec.SubresourceLocator, error) {
 	header := member.Header()
 	segments := append([]string(nil), relationshipPath...)
-	segments = append(segments, string(header.Type))
+	if !isDirectProgramSlotMember(relationshipPath, header.Type) {
+		segments = append(segments, string(header.Type))
+	}
 	if header.Type == declaration.TypeText {
 		insert, err := member.TextInsert()
 		if err != nil {
@@ -594,6 +605,24 @@ func containedMemberSubresource(
 		return "", err
 	}
 	return value, nil
+}
+
+func isDirectProgramSlotMember(
+	relationshipPath []string,
+	declarationType declaration.Type,
+) bool {
+	if len(relationshipPath) == 0 {
+		return false
+	}
+
+	switch relationshipPath[len(relationshipPath)-1] {
+	case loopStr:
+		return declarationType == declaration.TypeLoop
+	case workflowStr:
+		return declarationType == declaration.TypeWorkflow
+	default:
+		return false
+	}
 }
 
 func memberTextLogicalVersion(

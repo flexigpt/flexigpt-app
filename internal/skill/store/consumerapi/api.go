@@ -80,6 +80,7 @@ func New(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
 			SourceArtifacts:      artifacts,
+			SourceEntries:        resources,
 			Locators:             locators,
 			ProtectedBuiltinRoot: builtin.BuiltinRootID,
 			Limits:               resolve.DefaultLimits(),

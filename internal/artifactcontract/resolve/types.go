@@ -18,7 +18,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 )
 
-const membersStr = "members"
+const (
+	membersStr  = "members"
+	loopStr     = "loop"
+	workflowStr = "workflow"
+)
 
 type LocatorRequest struct {
 	RootID              root.RootID
@@ -87,6 +91,10 @@ type ResolverOptions struct {
 	// located, and contained relationship resolution does not require it.
 	SourceArtifacts SourceArtifactReader
 
+	// SourceEntries verifies that a selector base is a directory in the
+	// declaring Source. It is used only for member-selector resolution.
+	SourceEntries SourceEntryInspector
+
 	Locators LocatorResolver
 	Registry *Registry
 
@@ -108,24 +116,11 @@ type Resolver struct {
 	artifacts       ArtifactReader
 	sourceArtifacts SourceArtifactReader
 	locators        LocatorResolver
+	sourceEntries   SourceEntryInspector
 	registry        *Registry
 	builtinRoot     root.RootID
 	refresh         RefreshCoordinator
 	limits          Limits
-}
-
-// New remains a convenient constructor for callers that do not yet need
-// protected built-in lookup, selectors, fallback providers, or refresh.
-func New(
-	artifacts ArtifactReader,
-	locators LocatorResolver,
-	limits Limits,
-) (*Resolver, error) {
-	return NewWithOptions(ResolverOptions{
-		Artifacts: artifacts,
-		Locators:  locators,
-		Limits:    limits,
-	})
 }
 
 func NewWithOptions(options ResolverOptions) (*Resolver, error) {
@@ -171,10 +166,18 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 		}
 	}
 
+	sourceEntries := options.SourceEntries
+	if sourceEntries == nil {
+		if value, found := options.Artifacts.(SourceEntryInspector); found {
+			sourceEntries = value
+		}
+	}
+
 	return &Resolver{
 		artifacts:       options.Artifacts,
 		sourceArtifacts: sourceArtifacts,
 		locators:        options.Locators,
+		sourceEntries:   sourceEntries,
 		registry:        registry,
 		builtinRoot:     options.ProtectedBuiltinRoot,
 		refresh:         options.Refresh,

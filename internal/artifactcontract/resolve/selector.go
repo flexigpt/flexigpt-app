@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"path/filepath"
 	"sort"
 	"strings"
 
@@ -34,6 +33,12 @@ func (r *Resolver) expandSelector(
 			basespec.ErrUnsupported,
 		)
 	}
+	if r.sourceEntries == nil {
+		return ResolvedSelector{}, fmt.Errorf(
+			"%w: member selector Source entry inspection is unavailable",
+			basespec.ErrUnsupported,
+		)
+	}
 
 	selector, err := member.Selector()
 	if err != nil {
@@ -54,6 +59,38 @@ func (r *Resolver) expandSelector(
 	)
 	if err != nil {
 		return ResolvedSelector{}, err
+	}
+
+	baseEntry, err := r.sourceEntries.StatSourceEntry(
+		ctx,
+		rootID,
+		from.Binding.SourceID,
+		base,
+	)
+	if err != nil {
+		return ResolvedSelector{}, err
+	}
+	if err := baseEntry.Validate(); err != nil {
+		return ResolvedSelector{}, fmt.Errorf(
+			"%w: member selector base inspection: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if baseEntry.Locator != base {
+		return ResolvedSelector{}, fmt.Errorf(
+			"%w: member selector base inspection returned %q for %q",
+			basespec.ErrInvalid,
+			baseEntry.Locator,
+			base,
+		)
+	}
+	if !baseEntry.IsDirectory {
+		return ResolvedSelector{}, fmt.Errorf(
+			"%w: member selector base %q is not a directory",
+			basespec.ErrReferenceUnresolved,
+			base,
+		)
 	}
 
 	records, err := r.sourceArtifacts.ListBySource(
@@ -142,17 +179,18 @@ func selectorRelativePath(
 	base basespec.Locator,
 	candidate basespec.Locator,
 ) (string, bool) {
-	relative, err := filepath.Rel(string(base), string(candidate))
-	if err != nil {
-		return "", false
+	if base == "." {
+		return string(candidate), true
 	}
-	if relative == "." {
-		return relative, true
+	if candidate == base {
+		return ".", true
 	}
-	if relative == ".." || strings.HasPrefix(relative, "../") {
-		return "", false
-	}
-	return relative, true
+
+	relative, found := strings.CutPrefix(
+		string(candidate),
+		string(base)+"/",
+	)
+	return relative, found && relative != ""
 }
 
 func matchesSelectorPatterns(

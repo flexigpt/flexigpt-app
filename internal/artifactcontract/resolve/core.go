@@ -6,9 +6,15 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -137,9 +143,11 @@ func (r *Resolver) ResolveWorkspaceEntry(
 	return value, nil
 }
 
-// ResolveTerminalArtifact is a narrow source-alias helper. It follows only
-// source-selected MCP and MCP Policy aliases. It does not resolve a generic
-// type/name request and does not expand composition.
+// ResolveTerminalArtifact follows source-selected aliases for every
+// alias-capable declaration type. Text and Skill locators remain resource
+// locators, while Tool and Model locator behavior remains outside this
+// helper. It does not resolve a generic type/name request or expand
+// composition.
 func (r *Resolver) ResolveTerminalArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -449,6 +457,48 @@ func sourceSelectedAlias(entry declaration.Entry) (bool, error) {
 		return false, nil
 	}
 	switch header.Type {
+	case declaration.TypePlugin:
+		value, err := pluginv1.DecodePluginEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
+	case declaration.TypeAgent:
+		value, err := agentv1.DecodeAgentEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
+	case declaration.TypeTeam:
+		value, err := teamv1.DecodeTeamEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
+	case declaration.TypeLoop:
+		value, err := loopv1.DecodeLoopEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
+	case declaration.TypeWorkflow:
+		value, err := workflowv1.DecodeWorkflowEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
+	case declaration.TypeWorkspace:
+		value, err := workspacev1.DecodeWorkspaceEntry(entry)
+		if err != nil {
+			return false, err
+		}
+		return value.Locator != nil, nil
+
 	case declaration.TypeMCP:
 		value, err := mcpv1.DecodeMCPEntry(entry)
 		if err != nil {

@@ -158,7 +158,7 @@ func (r *Resolver) resolveStructure(
 				*value.Loop,
 				from,
 				depth+1,
-				[]string{"loop"},
+				[]string{loopStr},
 			)
 			if err != nil {
 				return err
@@ -174,7 +174,7 @@ func (r *Resolver) resolveStructure(
 				*value.Workflow,
 				from,
 				depth+1,
-				[]string{"workflow"},
+				[]string{workflowStr},
 			)
 			if err != nil {
 				return err
@@ -209,7 +209,7 @@ func (r *Resolver) resolveStructure(
 				*value.Loop,
 				from,
 				depth+1,
-				[]string{"loop"},
+				[]string{loopStr},
 			)
 			if err != nil {
 				return err
@@ -225,7 +225,7 @@ func (r *Resolver) resolveStructure(
 				*value.Workflow,
 				from,
 				depth+1,
-				[]string{"workflow"},
+				[]string{workflowStr},
 			)
 			if err != nil {
 				return err
