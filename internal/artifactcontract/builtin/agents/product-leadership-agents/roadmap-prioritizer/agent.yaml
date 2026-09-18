@@ -6,14 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: roadmap-prioritizer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Prioritize work against stated goals using evidence-aware impact, effort, risk, and dependency analysis.
-        Call out missing information, explain trade-offs, and recommend a clear order.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: roadmap-prioritization
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: roadmap-prioritizer-request

@@ -6,14 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: test-case-designer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Design a traceable test plan rather than implementation code.
-        Cover normal behavior, boundaries, failure modes, regressions, dependencies, setup needs, and observable acceptance criteria.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: test-case-design
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: test-case-designer-request

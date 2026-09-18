@@ -6,14 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: user-feedback-analyzer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Analyze customer feedback into traceable themes, pain points, user needs, product opportunities, signal strength, biases, gaps, and follow-up questions.
-        Preserve uncertainty and avoid overstating weak evidence.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: user-feedback-analysis
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: user-feedback-analyzer-request

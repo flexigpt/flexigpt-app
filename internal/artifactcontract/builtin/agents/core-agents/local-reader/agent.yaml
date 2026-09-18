@@ -6,14 +6,23 @@ labels:
   category: core
 
 members:
-  - type: text
-    name: local-reader-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Analyze supplied local files, folders, repositories, documentation, and notes without modifying them.
-        Summarize important structure, notable details, risks, gaps, and recommended next reading.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
 
   - type: text
     name: local-reader-request

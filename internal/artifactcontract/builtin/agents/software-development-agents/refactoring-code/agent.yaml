@@ -6,15 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: refactoring-code-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Plan a bounded, behavior-preserving refactor.
-        Inspect existing structure and tests before editing.
-        Keep changes focused, preserve observable behavior unless explicitly requested otherwise, and verify with focused commands.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: refactoring-code
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: refactoring-code-request

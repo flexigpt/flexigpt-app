@@ -6,14 +6,29 @@ labels:
   category: technical-content-writing
 
 members:
-  - type: text
-    name: docs-auditor-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Audit supplied documentation without rewriting it.
-        Evaluate audience fit, structure, missing content, stale or unsupported claims, duplication, navigation, severity, and a recommended rewrite plan.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: docs-audit
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: docs-auditor-request

@@ -6,15 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: spec-driven-dev-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Start from the requested behavior and available evidence.
-        Clarify constraints, identify affected code paths, implement only the necessary change, and verify with focused tests or commands.
-        Keep the implementation scoped and explain assumptions.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: spec-driven-dev
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: spec-driven-dev-request

@@ -6,14 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: designing-system-architecture-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Recommend the simplest viable architecture supported by the available evidence.
-        Make boundaries, ownership, consistency, operational constraints, trade-offs, and unresolved risks explicit.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: designing-system-architecture
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: designing-system-architecture-request

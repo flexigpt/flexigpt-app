@@ -1,6 +1,6 @@
 # Artifact-backed Agent Store HLD
 
-Status: Backend implementation and built-in preset conversion available; verification and consumer migration pending
+Status: Backend implementation and static built-in Assistant Preset conversion available; verification and consumer migration pending
 
 Normative foundations:
 
@@ -738,39 +738,37 @@ Built-in Agent packages use ordinary Plugin and Agent declarations.
 
 ```text
 internal/artifactcontract/builtin/agents/
+  core-agents/
+    plugin.yaml
+
+    base/
+      agent.yaml
+
+    local-reader/
+      agent.yaml
+
   software-development-agents/
     plugin.yaml
 
-    agents/
-      bug-investigator/
-        agent.yaml
-
-      code-reviewer/
-        agent.yaml
-
-  product-leadership-agents/
-    plugin.yaml
-
-    agents/
-      product-reviewer/
-        agent.yaml
+    bug-investigator/
+      agent.yaml
 ```
 
 A built-in collection is a Plugin with Agent-only members:
 
 ```yaml
 type: plugin
-name: agent-software-dev
+name: software-development-agents
 displayName: Software Development Agents
 
 members:
   - type: agent
     name: bug-investigator
-    locator: ./agents/bug-investigator/agent.yaml
+    locator: ./bug-investigator/agent.yaml
 
   - type: agent
     name: code-reviewer
-    locator: ./agents/code-reviewer/agent.yaml
+    locator: ./code-reviewer/agent.yaml
 ```
 
 The Plugin and Agents are independent Artifacts even when distributed in the same package.
@@ -978,29 +976,44 @@ Status terminology:
 - `Deferred` means intentionally outside the current Agent Store boundary.
 - Status does not assert that all repository-wide builds, tests, generated bindings, static analysis, or migration verification has completed.
 
-| Capability                                              | Status    | Notes                                                                                                                |
-| ------------------------------------------------------- | --------- | -------------------------------------------------------------------------------------------------------------------- |
-| Source-backed Agent Artifact catalog                    | Available | Reads use the existing Artifact Store and Agent contract.                                                            |
-| Shared Agent resolution and capability plans            | Available | Uses the existing typed resolver and fallback registrations.                                                         |
-| Agent-only Plugin Collection domain                     | Available | Managed Collections permit named, contained, and selector Agent members.                                             |
-| Agent Collection baseline provisioning                  | Available | One editable non-deletable `agent-baseline` Plugin is provisioned per user Root.                                     |
-| Managed Agent creation                                  | Available | Requires explicit Agent Collection selection and creates a located external membership.                              |
-| Managed Agent replacement                               | Available | Requires expected Artifact revision and source generation.                                                           |
-| Managed Agent deletion                                  | Available | Removes the package, preserves relationships, and purges the removed root Agent Artifact.                            |
-| Agent attach and detach                                 | Available | Same-Root, protected built-in, and unsupported cross-Root cases are handled explicitly.                              |
-| Agent and Collection enablement                         | Available | Uses universal `Artifact.Enabled`; enablement does not alter resolution.                                             |
-| Built-in Agent package hydration                        | Available | Uses the shared protected Root and package hydration markers.                                                        |
-| Built-in package resolution admission                   | Available | Final hydration requires complete Plugin capability resolution.                                                      |
-| Built-in Agent local enablement                         | Available | Uses protected Artifact metadata mutation, without an Agent overlay Store.                                           |
-| Built-in Assistant Preset conversion                    | Available | Built-in presets are represented as protected Plugin and Agent packages using `plugin.yaml` and `agent.yaml`.        |
-| Legacy Tool selection conversion                        | Available | Legacy Tool slugs become named Tool relationships with `overrides.autoExecute`.                                      |
-| Legacy starter text conversion                          | Available | Starter text becomes contained Text with `insert: user-message`.                                                     |
-| Legacy opaque Skill ArtifactRef conversion              | Pending   | A verified mapping from legacy Artifact IDs to current portable Skill names is required before adding Skill members. |
-| Assistant Preset compatibility endpoint                 | Removed   | The Agent Store exposes no Assistant Preset request or response type.                                                |
-| Agent-specific persistence database                     | Removed   | Only ordinary Artifact Store metadata and managed Source packages are used.                                          |
-| Agent runtime                                           | Deferred  | Execution, runtime inputs, state, scheduling, and invocation remain outside Agent Store.                             |
-| URL, Git, package, archive, and command materialization | Deferred  | Portable locators remain supported declaration data.                                                                 |
-| Test and acceptance coverage                            | Pending   | Unit, integration, hydration-recovery, concurrency, and end-to-end coverage remain to be added.                      |
-| Frontend and Wails binding migration                    | Pending   | The backend wrapper exists; frontend exposure and binding generation must be completed.                              |
-| Legacy Assistant Preset retirement                      | Pending   | Existing callers must migrate before legacy Store removal.                                                           |
-| Atomic membership and package publication               | Pending   | Current approved behavior preserves an unavailable relationship if independent package publication fails.            |
+| Capability                                              | Status     | Notes                                                                                                         |
+| ------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
+| Source-backed Agent Artifact catalog                    | Available  | Reads use the existing Artifact Store and Agent contract.                                                     |
+| Shared Agent resolution and capability plans            | Available  | Uses the existing typed resolver and fallback registrations.                                                  |
+| Agent-only Plugin Collection domain                     | Available  | Managed Collections permit named, contained, and selector Agent members.                                      |
+| Agent Collection baseline provisioning                  | Available  | One editable non-deletable `agent-baseline` Plugin is provisioned per user Root.                              |
+| Managed Agent creation                                  | Available  | Requires explicit Agent Collection selection and creates a located external membership.                       |
+| Managed Agent replacement                               | Available  | Requires expected Artifact revision and source generation.                                                    |
+| Managed Agent deletion                                  | Available  | Removes the package, preserves relationships, and purges the removed root Agent Artifact.                     |
+| Agent attach and detach                                 | Available  | Same-Root, protected built-in, and unsupported cross-Root cases are handled explicitly.                       |
+| Agent and Collection enablement                         | Available  | Uses universal `Artifact.Enabled`; enablement does not alter resolution.                                      |
+| Built-in Agent package hydration                        | Available  | Uses the shared protected Root and package hydration markers.                                                 |
+| Built-in package resolution admission                   | Available  | Final hydration requires complete Plugin capability resolution.                                               |
+| Built-in Agent local enablement                         | Available  | Uses protected Artifact metadata mutation, without an Agent overlay Store.                                    |
+| Built-in Assistant Preset conversion                    | Available  | Built-in presets are represented as protected Plugin and Agent packages using `plugin.yaml` and `agent.yaml`. |
+| Built-in Agent package layout                           | Available  | Each package uses `plugin.yaml` and direct `<agent-name>/agent.yaml` children.                                |
+| Legacy Tool selection conversion                        | Available  | Legacy Tool slugs become named Tool relationships with `overrides.autoExecute`.                               |
+| Legacy starter text conversion                          | Available  | Starter text becomes contained Text with `insert: user-message`.                                              |
+| Legacy core Skill conversion                            | Available  | `markdown-output`, `use-explicit-tools-batched`, and `grounded-local-work` map to `use.mode: instructions`.   |
+| Legacy active Skill conversion                          | Available  | Every supplied specialist Skill ArtifactRef maps to a protected named Skill with `use.mode: active`.          |
+| Legacy Model system-prompt preference                   | Not needed | Supplied presets had no selected Model reference, so the boolean had no portable target relationship.         |
+| Assistant Preset compatibility endpoint                 | Removed    | The Agent Store exposes no Assistant Preset request or response type.                                         |
+| Agent-specific persistence database                     | Removed    | Only ordinary Artifact Store metadata and managed Source packages are used.                                   |
+| Agent runtime                                           | Deferred   | Execution, runtime inputs, state, scheduling, and invocation remain outside Agent Store.                      |
+| URL, Git, package, archive, and command materialization | Deferred   | Portable locators remain supported declaration data.                                                          |
+| Test and acceptance coverage                            | Pending    | Unit, integration, hydration-recovery, concurrency, and end-to-end coverage remain to be added.               |
+| Frontend and Wails binding migration                    | Pending    | The backend wrapper exists; frontend exposure and binding generation must be completed.                       |
+| Legacy Assistant Preset retirement                      | Pending    | Existing callers must migrate before legacy Store removal.                                                    |
+| Atomic membership and package publication               | Pending    | Current approved behavior preserves an unavailable relationship if independent package publication fails.     |
+
+Built-in Agent package roots currently include:
+
+```text
+core-agents
+software-development-agents
+product-leadership-agents
+technical-content-writing-agents
+research-analysis-agents
+```
+
+Every former built-in Assistant Preset is represented by one protected Agent Artifact. Legacy Artifact IDs, bundle IDs, versions, timestamps, and Assistant Preset compatibility fields are not persisted in Agent declarations.

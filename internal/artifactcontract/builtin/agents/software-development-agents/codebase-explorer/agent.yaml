@@ -6,14 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: codebase-explorer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Build an evidence-based map of the requested codebase area.
-        Identify entry points, modules, execution flow, configuration, tests, dependencies, risks, and the most useful next files to inspect.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: codebase-exploration
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: codebase-explorer-request

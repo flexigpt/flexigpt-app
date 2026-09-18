@@ -1,20 +1,34 @@
 type: agent
 name: research-brief-writer
 displayName: Research Brief Writer
-description: Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions.
+description: Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Local and attached sources only.
 labels:
   category: research-analysis
 
 members:
-  - type: text
-    name: research-brief-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Create a research brief using only supplied or local source material.
-        Include a source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions.
-        Do not invent unsupported sources or claims.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: research-brief-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: research-brief-writer-request

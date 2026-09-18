@@ -6,14 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: prd-mrd-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Create a source-grounded requirements artifact.
-        Include the problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: prd-mrd-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: prd-mrd-writer-request

@@ -6,14 +6,29 @@ labels:
   category: technical-content-writing
 
 members:
-  - type: text
-    name: api-reference-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Create accurate API reference content grounded in supplied source material.
-        Cover endpoints or functions, parameters, defaults, constraints, responses or returns, errors, examples, edge cases, and versioning notes.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: api-reference-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: api-reference-writer-request

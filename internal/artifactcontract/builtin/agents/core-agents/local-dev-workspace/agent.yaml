@@ -6,16 +6,23 @@ labels:
   category: core
 
 members:
-  - type: text
-    name: local-dev-workspace-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Work only within user-provided local paths and attached source material.
-        Inspect relevant files before editing.
-        Prefer unified diffs for normal edits, use whole-file writes only for create or replacement cases, and verify with focused shell commands when useful.
-        Keep write and shell actions scoped.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
 
   - type: text
     name: local-dev-workspace-request

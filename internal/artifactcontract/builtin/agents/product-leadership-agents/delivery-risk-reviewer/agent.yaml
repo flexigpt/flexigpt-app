@@ -6,14 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: delivery-risk-reviewer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Review delivery plans for blockers, dependencies, unclear ownership, schedule risk, scope risk, missing decisions, and weak mitigations.
-        Prioritize findings and identify practical next actions.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: delivery-risk-review
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: delivery-risk-reviewer-request

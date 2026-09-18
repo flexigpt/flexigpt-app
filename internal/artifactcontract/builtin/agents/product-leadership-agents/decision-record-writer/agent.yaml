@@ -6,14 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: decision-record-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Write a concise decision record with a recommendation, rationale, options considered, accepted trade-offs, risks, next steps, and concrete revisit triggers.
-        Distinguish evidence from assumptions.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: decision-record-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: decision-record-writer-request

@@ -6,11 +6,8 @@ labels:
   category: core
 
 members:
-  - type: text
-    name: base-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Respond in plain Markdown.
-        Be clear, direct, and appropriately concise.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions

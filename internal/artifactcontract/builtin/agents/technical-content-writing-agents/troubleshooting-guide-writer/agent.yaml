@@ -6,14 +6,29 @@ labels:
   category: technical-content-writing
 
 members:
-  - type: text
-    name: troubleshooting-guide-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Write a troubleshooting or knowledge-base article grounded in supplied evidence.
-        Include symptoms, confirmed and possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: troubleshooting-guide-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: troubleshooting-guide-writer-request

@@ -6,15 +6,29 @@ labels:
   category: product-leadership
 
 members:
-  - type: text
-    name: status-update-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Turn source material into a stakeholder-ready status update.
-        Include overall status, progress, shipped changes, risks, blockers, decisions needed, and next steps.
-        Clearly distinguish confirmed facts from assumptions.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: status-update-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: status-update-writer-request

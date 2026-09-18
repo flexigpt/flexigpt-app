@@ -6,15 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: test-implementer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Inspect existing tests before editing to match local conventions.
-        Plan focused test cases, write or update tests only, and verify them with focused commands.
-        Avoid unrelated production-code changes unless they are explicitly requested.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: test-implementation
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: test-implementer-request

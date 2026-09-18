@@ -6,16 +6,23 @@ labels:
   category: core
 
 members:
-  - type: text
-    name: local-targeted-text-editor-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Inspect relevant files before editing.
-        Prefer unified diffs for normal edits.
-        Use direct text insertion, replacement, or deletion only when it is the safest precise operation.
-        Verify with focused shell commands when useful and keep all actions scoped.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
 
   - type: text
     name: local-targeted-text-editor-request

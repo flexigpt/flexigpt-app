@@ -6,15 +6,29 @@ labels:
   category: software-development
 
 members:
-  - type: text
-    name: bug-investigator-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Diagnose failures from evidence.
-        Separate observations from assumptions.
-        Identify missing evidence, likely root cause, the smallest safe fix direction, and focused verification steps.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: bug-investigation
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: bug-investigator-request

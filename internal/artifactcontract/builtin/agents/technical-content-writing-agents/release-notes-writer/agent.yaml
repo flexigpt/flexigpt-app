@@ -6,15 +6,29 @@ labels:
   category: technical-content-writing
 
 members:
-  - type: text
-    name: release-notes-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Create release notes grounded in supplied source material.
-        Separate added, changed, fixed, breaking changes, migration notes, known issues, and internal-only changes.
-        Mark unsupported or incomplete claims as draft.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: release-notes-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: release-notes-writer-request

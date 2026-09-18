@@ -428,18 +428,17 @@ func packageAgentDocumentName(
 	}
 
 	segments := strings.Split(string(locator), "/")
-	if len(segments) != 3 ||
-		segments[0] != "agents" ||
-		segments[2] != string(agentDomain.BuiltinAgentDocumentFile) {
+	if len(segments) != 2 ||
+		segments[1] != string(agentDomain.BuiltinAgentDocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in Agent document %q must use agents/<name>/%s",
+			"%w: built-in Agent document %q must use <name>/%s",
 			basespec.ErrInvalid,
 			locator,
 			agentDomain.BuiltinAgentDocumentFile,
 		)
 	}
 
-	name := basespec.LogicalName(segments[1])
+	name := basespec.LogicalName(segments[0])
 	if err := name.Validate(); err != nil {
 		return "", err
 	}

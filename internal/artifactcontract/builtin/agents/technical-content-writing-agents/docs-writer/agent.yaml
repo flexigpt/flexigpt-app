@@ -6,14 +6,29 @@ labels:
   category: technical-content-writing
 
 members:
-  - type: text
-    name: docs-writer-instructions
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |-
-        Create or update documentation grounded in the supplied source.
-        Include a clear outline, useful steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.
+  - type: skill
+    name: markdown-output
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: use-explicit-tools-batched
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: grounded-local-work
+    scope: builtin
+    use:
+      mode: instructions
+
+  - type: skill
+    name: docs-authoring
+    scope: builtin
+    use:
+      mode: active
 
   - type: text
     name: docs-writer-request
