@@ -13,22 +13,6 @@
 		"labels": { "$ref": "#/$defs/labels" },
 		"locator": { "$ref": "#/$defs/locator" },
 		"metadata": { "$ref": "#/$defs/metadata" },
-		"prompt": {
-			"type": "object",
-			"additionalProperties": false,
-			"required": ["content"],
-			"properties": {
-				"mediaType": {
-					"type": "string",
-					"minLength": 1,
-					"maxLength": 256
-				},
-				"content": {
-					"type": "string",
-					"maxLength": 4194304
-				}
-			}
-		},
 		"members": {
 			"type": "array",
 			"maxItems": 4096,

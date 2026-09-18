@@ -1569,7 +1569,6 @@ Agent represents an AI Agent declaration.
 Fields are:
 
 ```text
-prompt?
 members?
 loop?
 workflow?
@@ -1582,11 +1581,6 @@ type: agent
 name: code-reviewer
 displayName: Code Reviewer
 
-prompt:
-  mediaType: text/markdown
-  content: |
-    Review the requested change for defects and regressions.
-
 members:
   - type: text
     name: reviewer-rules
@@ -1595,6 +1589,14 @@ members:
       mediaType: text/markdown
       content: |
         Review correctness, security, and maintainability.
+
+  - type: text
+    name: review-request
+    insert: user-message
+    parameters:
+      mediaType: text/markdown
+      content: |
+        Please review the available repository.
 
   - type: model
     name: reasoning
@@ -1620,13 +1622,12 @@ loop:
 
 Rules:
 
-- `prompt` is Agent-owned inline prompt content.
 - `members` accepts the Agent member types in the relationship table.
 - Model, Tool, and Skill relationship behavior is explicitly typed.
 - `loop` and `workflow` are singular program slots.
 - Program slots do not accept selectors.
 - A minimal standalone Agent with only `type` and `name` is valid.
-- `locator` cannot be combined with local `prompt`, `members`, `loop`, or `workflow`.
+- `locator` cannot be combined with local `members`, `loop`, or `workflow`.
 
 ### 15.3 Team
 

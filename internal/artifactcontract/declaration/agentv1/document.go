@@ -30,16 +30,10 @@ var AgentSchemaKey = schema.ArtifactKey(
 	AgentSchemaVersion,
 )
 
-type Prompt struct {
-	MediaType string `json:"mediaType,omitempty"`
-	Content   string `json:"content"`
-}
-
 type AgentDocument struct {
 	declaration.Header
 
 	Members  []declaration.Entry `json:"members,omitempty"`
-	Prompt   *Prompt             `json:"prompt,omitempty"`
 	Loop     *declaration.Entry  `json:"loop,omitempty"`
 	Workflow *declaration.Entry  `json:"workflow,omitempty"`
 }
@@ -137,7 +131,6 @@ func (v AgentDocument) validateFields() error {
 		"Agent",
 		v.Locator,
 		v.Members != nil ||
-			v.Prompt != nil ||
 			v.Loop != nil ||
 			v.Workflow != nil,
 	); err != nil {
@@ -162,15 +155,7 @@ func (v AgentDocument) validateFields() error {
 			return fmt.Errorf("agent members[%d]: %w", index, err)
 		}
 	}
-	if v.Prompt != nil {
-		if err := declaration.ValidateOptionalMediaType(v.Prompt.MediaType); err != nil {
-			return err
-		}
-		content := v.Prompt.Content
-		if err := declaration.ValidateOptionalContent(&content); err != nil {
-			return err
-		}
-	}
+
 	if v.Loop != nil && v.Workflow != nil {
 		return fmt.Errorf(
 			"%w: Agent cannot contain both loop and workflow",

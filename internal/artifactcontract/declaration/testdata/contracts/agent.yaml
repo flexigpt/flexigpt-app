@@ -7,10 +7,6 @@ labels:
   owner: platform
 metadata:
   acme.example/owner: platform
-prompt:
-  mediaType: text/markdown
-  content: |
-    Review the requested change for defects, regressions, and risk.
 members:
   - type: text
     name: reviewer-rules
