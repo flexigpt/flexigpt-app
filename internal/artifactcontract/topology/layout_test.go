@@ -36,7 +36,11 @@ func TestConfiguredDocumentAliases(t *testing.T) {
 func TestWorkspaceDiscoveryIncludesHiddenMCPConfig(t *testing.T) {
 	t.Parallel()
 
-	spec := WorkspaceDiscoverySpec()
+	spec, err := DiscoverySpec("workspace")
+	if err != nil {
+		t.Fatalf("DiscoverySpec(workspace) error = %v", err)
+	}
+
 	patterns := spec.DirectoryRoots[0].IncludePatterns
 	for _, expected := range []string{
 		".mcp.json",
@@ -48,6 +52,38 @@ func TestWorkspaceDiscoveryIncludesHiddenMCPConfig(t *testing.T) {
 			continue
 		}
 		t.Fatalf("Workspace discovery lacks %q", expected)
+	}
+}
+
+func TestSkillDiscoveryProfileUsesSkillDocument(t *testing.T) {
+	t.Parallel()
+
+	document, err := SkillPackageDocumentFile()
+	if err != nil {
+		t.Fatalf("SkillPackageDocumentFile() error = %v", err)
+	}
+	if document != "SKILL.md" {
+		t.Fatalf(
+			"SkillPackageDocumentFile() = %q, want SKILL.md",
+			document,
+		)
+	}
+
+	spec, err := DiscoverySpecAt("skill", "nested-skills")
+	if err != nil {
+		t.Fatalf("DiscoverySpecAt(skill) error = %v", err)
+	}
+	if len(spec.DirectoryRoots) != 1 {
+		t.Fatalf(
+			"skill directory root count = %d, want 1",
+			len(spec.DirectoryRoots),
+		)
+	}
+	if got := spec.DirectoryRoots[0].Root; got != "nested-skills" {
+		t.Fatalf(
+			"skill discovery root = %q, want nested-skills",
+			got,
+		)
 	}
 }
 

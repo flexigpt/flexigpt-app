@@ -37,7 +37,13 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 	next := current.Discovery.Clone()
 	include := append([]string(nil), request.Selector.Include...)
 	if len(include) == 0 {
-		include = documentTopology.SelectorDiscoveryIncludePatterns()
+		defaultInclude, err := documentTopology.DiscoveryIncludePatterns(
+			"selector",
+		)
+		if err != nil {
+			return nil, err
+		}
+		include = defaultInclude
 	}
 	next.DirectoryRoots = consumerutil.AppendDirectoryRoot(
 		next.DirectoryRoots,
@@ -82,7 +88,11 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 		return nil, err
 	}
 	next := current.Discovery.Clone()
-	for _, candidate := range locatedRefreshCandidates(header.Type, target) {
+	candidates, err := locatedRefreshCandidates(header.Type, target)
+	if err != nil {
+		return nil, err
+	}
+	for _, candidate := range candidates {
 		inScope, err := next.InScope(candidate)
 		if err != nil {
 			return nil, err
@@ -182,13 +192,20 @@ func localRefreshLocator(
 func locatedRefreshCandidates(
 	declarationType declaration.Type,
 	target basespec.Locator,
-) []basespec.Locator {
+) ([]basespec.Locator, error) {
+	skillDocument, err := documentTopology.SkillPackageDocumentFile()
+	if err != nil {
+		return nil, err
+	}
 	if declarationType != declaration.TypeSkill ||
-		path.Base(string(target)) == "SKILL.md" {
-		return []basespec.Locator{target}
+		path.Base(string(target)) == string(skillDocument) {
+		return []basespec.Locator{target}, nil
 	}
 	return []basespec.Locator{
 		target,
-		basespec.Locator(path.Join(string(target), "SKILL.md")),
-	}
+		basespec.Locator(path.Join(
+			string(target),
+			string(skillDocument),
+		)),
+	}, nil
 }

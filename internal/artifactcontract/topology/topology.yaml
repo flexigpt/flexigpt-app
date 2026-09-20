@@ -40,6 +40,33 @@ documents:
       format: "markdown"
 
 discovery:
+  skill:
+    root: "."
+    recursive: true
+    authoritative: true
+    includePatterns: []
+    documentSets:
+      - "skills"
+    decoderHints:
+      - locator: "."
+        recursive: true
+        decoderIDs:
+          - "agent.skill-markdown"
+    allowedDecoderIDs:
+      - "agent.skill-markdown"
+
+  mcp:
+    root: "."
+    recursive: true
+    authoritative: true
+    includePatterns:
+      - "**/*.json"
+      - "**/*.yaml"
+      - "**/*.yml"
+    documentSets:
+      - "collections"
+      - "mcpConfigs"
+
   workspace:
     root: "."
     recursive: true

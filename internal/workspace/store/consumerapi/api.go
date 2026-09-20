@@ -391,7 +391,10 @@ func (a *StoreAPI) defaultDiscovery() (
 	source.DiscoverySpec,
 	error,
 ) {
-	value := documentTopology.WorkspaceDiscoverySpec()
+	value, err := documentTopology.DiscoverySpec("workspace")
+	if err != nil {
+		return source.DiscoverySpec{}, err
+	}
 	for _, hint := range a.config.AdditionalDecoderHints {
 		value.DecoderHints = consumerutil.AppendDecoderHint(
 			value.DecoderHints,

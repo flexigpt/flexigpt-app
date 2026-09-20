@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -113,34 +114,10 @@ func SkillDiscoverySpec(
 	if r == "" {
 		r = "."
 	}
-	if err := r.Validate(true); err != nil {
-		return source.DiscoverySpec{}, err
-	}
-	value := source.DiscoverySpec{
-		DirectoryRoots: []source.DirectoryRoot{{
-			Root:      r,
-			Recursive: true,
-			IncludePatterns: []string{
-				"**/" + string(skillDomain.SkillDefinitionFileName),
-			},
-		}},
-		DecoderHints: []source.DecoderHint{{
-			Locator:   r,
-			Recursive: true,
-			DecoderIDs: []basespec.DecoderID{
-				skillDomain.MarkdownDecoderID,
-			},
-		}},
-		AllowedDecoderIDs: []basespec.DecoderID{
-			skillDomain.MarkdownDecoderID,
-		},
-		Authoritative: true,
-	}
-	value = value.Normalized()
-	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
-	}
-	return value, nil
+	return documentTopology.DiscoverySpecAt(
+		"skill",
+		r,
+	)
 }
 
 func (a *API) RegisterSkillDirectory(

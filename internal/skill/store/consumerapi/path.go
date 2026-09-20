@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -173,23 +174,8 @@ func normalizeSkillPath(
 func skillFileDiscovery(
 	locator basespec.Locator,
 ) (source.DiscoverySpec, error) {
-	value := source.DiscoverySpec{
-		ExplicitLocators: []basespec.Locator{locator},
-		DecoderHints: []source.DecoderHint{{
-			Locator:   locator,
-			Recursive: false,
-			DecoderIDs: []basespec.DecoderID{
-				skillDomain.MarkdownDecoderID,
-			},
-		}},
-		AllowedDecoderIDs: []basespec.DecoderID{
-			skillDomain.MarkdownDecoderID,
-		},
-		Authoritative: true,
-	}
-	value = value.Normalized()
-	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
-	}
-	return value, nil
+	return documentTopology.DiscoverySpecForLocator(
+		"skill",
+		locator,
+	)
 }

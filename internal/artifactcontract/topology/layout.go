@@ -53,11 +53,7 @@ type layoutWire struct {
 		WorkspaceMarkdown []documentAliasWire `json:"workspaceMarkdown"`
 	} `json:"documents"`
 
-	Discovery struct {
-		Workspace discoveryProfileWire `json:"workspace"`
-		Selector  discoveryProfileWire `json:"selector"`
-		Builtin   discoveryProfileWire `json:"builtin"`
-	} `json:"discovery"`
+	Discovery map[string]discoveryProfileWire `json:"discovery"`
 }
 
 type documentAlias struct {
@@ -72,9 +68,7 @@ type layout struct {
 	skills            []documentAlias
 	workspaceMarkdown []documentAlias
 
-	workspace source.DiscoverySpec
-	selector  source.DiscoverySpec
-	builtin   source.DiscoverySpec
+	profiles map[string]source.DiscoverySpec
 }
 
 type aliasGroup struct {
@@ -154,18 +148,131 @@ func IsCanonicalJSONDocument(
 	)
 }
 
-func WorkspaceDiscoverySpec() source.DiscoverySpec {
-	return configuredLayout.workspace.Clone()
+func DiscoverySpec(
+	name string,
+) (source.DiscoverySpec, error) {
+	value, found := configuredLayout.profiles[name]
+	if !found {
+		return source.DiscoverySpec{}, fmt.Errorf(
+			"%w: topology has no discovery profile %q",
+			basespec.ErrNotFound,
+			name,
+		)
+	}
+	return value.Clone(), nil
 }
 
-func SelectorDiscoveryIncludePatterns() []string {
-	return discoveryIncludePatterns(
-		configuredLayout.selector,
+func MustDiscoverySpec(
+	name string,
+) source.DiscoverySpec {
+	value, err := DiscoverySpec(name)
+	if err != nil {
+		panic(err)
+	}
+	return value
+}
+
+func DiscoverySpecAt(
+	name string,
+	root basespec.Locator,
+) (source.DiscoverySpec, error) {
+	if err := root.Validate(true); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+
+	value, err := DiscoverySpec(name)
+	if err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	if len(value.DirectoryRoots) != 1 {
+		return source.DiscoverySpec{}, fmt.Errorf(
+			"%w: discovery profile %q cannot be rooted dynamically",
+			basespec.ErrInvalid,
+			name,
+		)
+	}
+
+	value.DirectoryRoots[0].Root = root
+	value = value.Normalized()
+	if err := value.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	return value, nil
+}
+
+func DiscoverySpecForLocator(
+	name string,
+	locator basespec.Locator,
+) (source.DiscoverySpec, error) {
+	if err := locator.Validate(false); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+
+	profile, err := DiscoverySpec(name)
+	if err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	if len(profile.AllowedDecoderIDs) != 1 {
+		return source.DiscoverySpec{}, fmt.Errorf(
+			"%w: discovery profile %q must define exactly one decoder",
+			basespec.ErrInvalid,
+			name,
+		)
+	}
+
+	value := source.DiscoverySpec{
+		ExplicitLocators: []basespec.Locator{locator},
+		DecoderHints: []source.DecoderHint{{
+			Locator:   locator,
+			Recursive: false,
+			DecoderIDs: append(
+				[]basespec.DecoderID(nil),
+				profile.AllowedDecoderIDs...,
+			),
+		}},
+		AllowedDecoderIDs: append(
+			[]basespec.DecoderID(nil),
+			profile.AllowedDecoderIDs...,
+		),
+		Authoritative: profile.Authoritative,
+	}
+	value = value.Normalized()
+	if err := value.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	return value, nil
+}
+
+func DiscoveryIncludePatterns(
+	name string,
+) ([]string, error) {
+	value, err := DiscoverySpec(name)
+	if err != nil {
+		return nil, err
+	}
+	return discoveryIncludePatterns(value), nil
+}
+
+func SkillPackageDocumentFile() (basespec.Locator, error) {
+	if len(configuredLayout.skills) != 1 {
+		return "", fmt.Errorf(
+			"%w: topology must define exactly one Skill package document filename",
+			basespec.ErrInvalid,
+		)
+	}
+	return configuredLayout.skills[0].locator, nil
+}
+
+func MustBuiltinDiscoverySpec() source.DiscoverySpec {
+	return MustDiscoverySpec(
+		"builtin",
 	)
 }
 
-func BuiltinDiscoverySpec() source.DiscoverySpec {
-	return configuredLayout.builtin.Clone()
+func MustWorkspaceDiscoverySpec() source.DiscoverySpec {
+	return MustDiscoverySpec(
+		"workspace",
+	)
 }
 
 func discoveryIncludePatterns(
@@ -266,25 +373,8 @@ func loadLayout(
 		"workspaceMarkdown": workspaceMarkdown,
 	}
 
-	workspace, err := parseDiscoveryProfile(
-		"workspace",
-		wire.Discovery.Workspace,
-		documentSets,
-	)
-	if err != nil {
-		return layout{}, err
-	}
-	selector, err := parseDiscoveryProfile(
-		"selector",
-		wire.Discovery.Selector,
-		documentSets,
-	)
-	if err != nil {
-		return layout{}, err
-	}
-	builtin, err := parseDiscoveryProfile(
-		"builtin",
-		wire.Discovery.Builtin,
+	profiles, err := parseDiscoveryProfiles(
+		wire.Discovery,
 		documentSets,
 	)
 	if err != nil {
@@ -310,9 +400,7 @@ func loadLayout(
 		agents:            agents,
 		skills:            skills,
 		workspaceMarkdown: workspaceMarkdown,
-		workspace:         workspace,
-		selector:          selector,
-		builtin:           builtin,
+		profiles:          profiles,
 	}, nil
 }
 
@@ -408,6 +496,42 @@ func parseDiscoveryPatterns(
 		}
 		seen[value] = struct{}{}
 		output = append(output, value)
+	}
+	return output, nil
+}
+
+func parseDiscoveryProfiles(
+	values map[string]discoveryProfileWire,
+	documentSets map[string][]documentAlias,
+) (map[string]source.DiscoverySpec, error) {
+	if len(values) == 0 {
+		return nil, fmt.Errorf(
+			"%w: topology has no discovery profiles",
+			basespec.ErrInvalid,
+		)
+	}
+
+	output := make(
+		map[string]source.DiscoverySpec,
+		len(values),
+	)
+	for name, value := range values {
+		if err := basespec.ValidateIdentifier(
+			"discovery profile name",
+			name,
+			basespec.MaxKindBytes,
+		); err != nil {
+			return nil, err
+		}
+		profile, err := parseDiscoveryProfile(
+			name,
+			value,
+			documentSets,
+		)
+		if err != nil {
+			return nil, err
+		}
+		output[name] = profile
 	}
 	return output, nil
 }

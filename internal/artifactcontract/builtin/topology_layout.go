@@ -116,7 +116,9 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
-			Discovery:   documentTopology.BuiltinDiscoverySpec(),
+			Discovery: documentTopology.MustDiscoverySpec(
+				"builtin",
+			),
 		}},
 	}
 }
