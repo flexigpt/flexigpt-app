@@ -8,7 +8,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -392,23 +391,7 @@ func (a *StoreAPI) defaultDiscovery() (
 	source.DiscoverySpec,
 	error,
 ) {
-	value := source.DiscoverySpec{
-		DirectoryRoots: []source.DirectoryRoot{
-			{
-				Root:            ".",
-				Recursive:       true,
-				IncludePatterns: documentTopology.WorkspaceDiscoveryIncludePatterns(),
-			},
-		},
-		Authoritative: true,
-	}
-	value.DecoderHints = append(value.DecoderHints, source.DecoderHint{
-		Locator:   ".",
-		Recursive: true,
-		DecoderIDs: []basespec.DecoderID{
-			providermarkdown.TextMarkdownDecoderID,
-		},
-	})
+	value := documentTopology.WorkspaceDiscoverySpec()
 	for _, hint := range a.config.AdditionalDecoderHints {
 		value.DecoderHints = consumerutil.AppendDecoderHint(
 			value.DecoderHints,

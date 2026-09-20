@@ -9,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
-
-const layoutVersion = "v1"
 
 type documentFormat string
 
@@ -28,9 +27,24 @@ type documentAliasWire struct {
 	Format  documentFormat `json:"format"`
 }
 
-type layoutWire struct {
-	Version string `json:"version"`
+type decoderHintWire struct {
+	Locator    basespec.Locator     `json:"locator"`
+	Recursive  bool                 `json:"recursive"`
+	DecoderIDs []basespec.DecoderID `json:"decoderIDs"`
+}
 
+type discoveryProfileWire struct {
+	Root              basespec.Locator     `json:"root"`
+	Recursive         bool                 `json:"recursive"`
+	Authoritative     bool                 `json:"authoritative"`
+	IncludePatterns   []string             `json:"includePatterns"`
+	ExcludePatterns   []string             `json:"excludePatterns"`
+	DocumentSets      []string             `json:"documentSets"`
+	DecoderHints      []decoderHintWire    `json:"decoderHints"`
+	AllowedDecoderIDs []basespec.DecoderID `json:"allowedDecoderIDs"`
+}
+
+type layoutWire struct {
 	Documents struct {
 		Collections       []documentAliasWire `json:"collections"`
 		MCPConfigs        []documentAliasWire `json:"mcpConfigs"`
@@ -40,8 +54,9 @@ type layoutWire struct {
 	} `json:"documents"`
 
 	Discovery struct {
-		Workspace []string `json:"workspace"`
-		Selector  []string `json:"selector"`
+		Workspace discoveryProfileWire `json:"workspace"`
+		Selector  discoveryProfileWire `json:"selector"`
+		Builtin   discoveryProfileWire `json:"builtin"`
 	} `json:"discovery"`
 }
 
@@ -56,8 +71,10 @@ type layout struct {
 	agents            []documentAlias
 	skills            []documentAlias
 	workspaceMarkdown []documentAlias
-	workspacePatterns []string
-	selectorPatterns  []string
+
+	workspace source.DiscoverySpec
+	selector  source.DiscoverySpec
+	builtin   source.DiscoverySpec
 }
 
 type aliasGroup struct {
@@ -137,41 +154,35 @@ func IsCanonicalJSONDocument(
 	)
 }
 
-// WorkspaceDiscoveryIncludePatterns returns the default filesystem Workspace
-// source discovery patterns.
-func WorkspaceDiscoveryIncludePatterns() []string {
-	return discoveryPatterns(
-		configuredLayout.workspacePatterns,
-		configuredLayout.collections,
-		configuredLayout.mcpConfigs,
-		configuredLayout.agents,
-		configuredLayout.skills,
-		configuredLayout.workspaceMarkdown,
-	)
+func WorkspaceDiscoverySpec() source.DiscoverySpec {
+	return configuredLayout.workspace.Clone()
 }
 
-// SelectorDiscoveryIncludePatterns returns the default discovery patterns
-// used while expanding a selector or local declaration-locator closure.
 func SelectorDiscoveryIncludePatterns() []string {
-	return discoveryPatterns(
-		configuredLayout.selectorPatterns,
-		configuredLayout.collections,
-		configuredLayout.mcpConfigs,
-		configuredLayout.agents,
-		configuredLayout.skills,
+	return discoveryIncludePatterns(
+		configuredLayout.selector,
 	)
 }
 
-// BuiltinDiscoveryIncludePatterns returns the discovery patterns required by
-// the protected built-in Source.
-func BuiltinDiscoveryIncludePatterns() []string {
-	return discoveryPatterns(
-		nil,
-		configuredLayout.collections,
-		configuredLayout.mcpConfigs,
-		configuredLayout.agents,
-		configuredLayout.skills,
-	)
+func BuiltinDiscoverySpec() source.DiscoverySpec {
+	return configuredLayout.builtin.Clone()
+}
+
+func discoveryIncludePatterns(
+	value source.DiscoverySpec,
+) []string {
+	seen := make(map[string]struct{})
+	output := make([]string, 0)
+	for _, directory := range value.DirectoryRoots {
+		for _, pattern := range directory.IncludePatterns {
+			if _, duplicate := seen[pattern]; duplicate {
+				continue
+			}
+			seen[pattern] = struct{}{}
+			output = append(output, pattern)
+		}
+	}
+	return output
 }
 
 func mustLoadLayout(
@@ -202,13 +213,6 @@ func loadLayout(
 		basespec.MaxDefinitionBytes,
 	); err != nil {
 		return layout{}, err
-	}
-	if wire.Version != layoutVersion {
-		return layout{}, fmt.Errorf(
-			"%w: unsupported source naming topology version %q",
-			basespec.ErrInvalid,
-			wire.Version,
-		)
 	}
 
 	collections, err := parseAliasGroup(
@@ -253,16 +257,35 @@ func loadLayout(
 	if err != nil {
 		return layout{}, err
 	}
-	workspacePatterns, err := parseDiscoveryPatterns(
-		"workspace discovery patterns",
+
+	documentSets := map[string][]documentAlias{
+		"collections":       collections,
+		"mcpConfigs":        mcpConfigs,
+		"agents":            agents,
+		"skills":            skills,
+		"workspaceMarkdown": workspaceMarkdown,
+	}
+
+	workspace, err := parseDiscoveryProfile(
+		"workspace",
 		wire.Discovery.Workspace,
+		documentSets,
 	)
 	if err != nil {
 		return layout{}, err
 	}
-	selectorPatterns, err := parseDiscoveryPatterns(
-		"selector discovery patterns",
+	selector, err := parseDiscoveryProfile(
+		"selector",
 		wire.Discovery.Selector,
+		documentSets,
+	)
+	if err != nil {
+		return layout{}, err
+	}
+	builtin, err := parseDiscoveryProfile(
+		"builtin",
+		wire.Discovery.Builtin,
+		documentSets,
 	)
 	if err != nil {
 		return layout{}, err
@@ -287,8 +310,9 @@ func loadLayout(
 		agents:            agents,
 		skills:            skills,
 		workspaceMarkdown: workspaceMarkdown,
-		workspacePatterns: workspacePatterns,
-		selectorPatterns:  selectorPatterns,
+		workspace:         workspace,
+		selector:          selector,
+		builtin:           builtin,
 	}, nil
 }
 
@@ -384,6 +408,113 @@ func parseDiscoveryPatterns(
 		}
 		seen[value] = struct{}{}
 		output = append(output, value)
+	}
+	return output, nil
+}
+
+func parseDiscoveryProfile(
+	name string,
+	value discoveryProfileWire,
+	documentSets map[string][]documentAlias,
+) (source.DiscoverySpec, error) {
+	if err := value.Root.Validate(true); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+
+	var basePatterns []string
+	var err error
+	if len(value.IncludePatterns) != 0 {
+		basePatterns, err = parseDiscoveryPatterns(
+			name+" discovery include patterns",
+			value.IncludePatterns,
+		)
+		if err != nil {
+			return source.DiscoverySpec{}, err
+		}
+	}
+	if err := basespec.ValidatePathPatterns(
+		name+" discovery exclude patterns",
+		value.ExcludePatterns,
+	); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+
+	seenSets := make(
+		map[string]struct{},
+		len(value.DocumentSets),
+	)
+	selectedAliases := make([]documentAlias, 0)
+	for _, setName := range value.DocumentSets {
+		if _, duplicate := seenSets[setName]; duplicate {
+			return source.DiscoverySpec{}, fmt.Errorf(
+				"%w: discovery profile %q repeats document set %q",
+				basespec.ErrInvalid,
+				name,
+				setName,
+			)
+		}
+		seenSets[setName] = struct{}{}
+
+		aliases, found := documentSets[setName]
+		if !found {
+			return source.DiscoverySpec{}, fmt.Errorf(
+				"%w: discovery profile %q references unknown document set %q",
+				basespec.ErrInvalid,
+				name,
+				setName,
+			)
+		}
+		selectedAliases = append(selectedAliases, aliases...)
+	}
+
+	includePatterns := discoveryPatterns(
+		basePatterns,
+		selectedAliases,
+	)
+	if len(includePatterns) == 0 {
+		return source.DiscoverySpec{}, fmt.Errorf(
+			"%w: discovery profile %q has no include patterns",
+			basespec.ErrInvalid,
+			name,
+		)
+	}
+
+	hints := make(
+		[]source.DecoderHint,
+		0,
+		len(value.DecoderHints),
+	)
+	for _, hint := range value.DecoderHints {
+		hints = append(hints, source.DecoderHint{
+			Locator:    hint.Locator,
+			Recursive:  hint.Recursive,
+			DecoderIDs: append([]basespec.DecoderID(nil), hint.DecoderIDs...),
+		})
+	}
+
+	output := source.DiscoverySpec{
+		DirectoryRoots: []source.DirectoryRoot{{
+			Root:            value.Root,
+			Recursive:       value.Recursive,
+			IncludePatterns: includePatterns,
+			ExcludePatterns: append(
+				[]string(nil),
+				value.ExcludePatterns...,
+			),
+		}},
+		DecoderHints: append(
+			[]source.DecoderHint(nil),
+			hints...,
+		),
+		AllowedDecoderIDs: append(
+			[]basespec.DecoderID(nil),
+			value.AllowedDecoderIDs...,
+		),
+		Authoritative: value.Authoritative,
+	}
+	output = output.Normalized()
+	if err := output.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
 	}
 	return output, nil
 }

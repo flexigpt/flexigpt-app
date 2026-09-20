@@ -36,7 +36,8 @@ func TestConfiguredDocumentAliases(t *testing.T) {
 func TestWorkspaceDiscoveryIncludesHiddenMCPConfig(t *testing.T) {
 	t.Parallel()
 
-	patterns := WorkspaceDiscoveryIncludePatterns()
+	spec := WorkspaceDiscoverySpec()
+	patterns := spec.DirectoryRoots[0].IncludePatterns
 	for _, expected := range []string{
 		".mcp.json",
 		"**/.mcp.json",

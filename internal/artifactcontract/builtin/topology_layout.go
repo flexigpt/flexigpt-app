@@ -116,18 +116,7 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 			DisplayName: BuiltinSourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(jsonutil.EmptyObject),
-			// Built-in Plugins are grouping declarations only. Skills,
-			// MCP servers, and MCP policies are independently discovered
-			// Artifacts in the same protected Source.
-			Discovery: source.DiscoverySpec{
-				DirectoryRoots: []source.DirectoryRoot{{
-					Root:      RepositoryRootLocator,
-					Recursive: true,
-					IncludePatterns: documentTopology.
-						BuiltinDiscoveryIncludePatterns(),
-				}},
-				Authoritative: true,
-			},
+			Discovery:   documentTopology.BuiltinDiscoverySpec(),
 		}},
 	}
 }

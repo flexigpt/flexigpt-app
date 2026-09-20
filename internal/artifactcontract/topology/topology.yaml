@@ -1,5 +1,3 @@
-version: v1
-
 documents:
   collections:
     - locator: "plugin.yaml"
@@ -43,13 +41,48 @@ documents:
 
 discovery:
   workspace:
-    - "**/*.json"
-    - "**/*.yaml"
-    - "**/*.yml"
-    - "**/*.agent.md"
-    - "**/docs/**/*.md"
+    root: "."
+    recursive: true
+    authoritative: true
+    includePatterns:
+      - "**/*.json"
+      - "**/*.yaml"
+      - "**/*.yml"
+      - "**/*.agent.md"
+      - "**/docs/**/*.md"
+    documentSets:
+      - "collections"
+      - "mcpConfigs"
+      - "agents"
+      - "skills"
+      - "workspaceMarkdown"
+    decoderHints:
+      - locator: "."
+        recursive: true
+        decoderIDs:
+          - "text-markdown"
 
   selector:
-    - "**/*.json"
-    - "**/*.yaml"
-    - "**/*.yml"
+    root: "."
+    recursive: true
+    authoritative: true
+    includePatterns:
+      - "**/*.json"
+      - "**/*.yaml"
+      - "**/*.yml"
+    documentSets:
+      - "collections"
+      - "mcpConfigs"
+      - "agents"
+      - "skills"
+
+  builtin:
+    root: "."
+    recursive: true
+    authoritative: true
+    includePatterns: []
+    documentSets:
+      - "collections"
+      - "mcpConfigs"
+      - "agents"
+      - "skills"
