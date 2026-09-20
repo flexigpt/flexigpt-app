@@ -34,7 +34,6 @@ const (
 	ManagedAgentDocumentFile basespec.Locator   = "agent.yaml"
 
 	BuiltinAgentCollectionPackageKind source.PackageKind = "agent-collection"
-	BuiltinAgentPluginDocumentFile    basespec.Locator   = "plugin.yaml"
 	BuiltinAgentDocumentFile          basespec.Locator   = "agent.yaml"
 
 	BuiltInInstallerName   = "agent.agent"

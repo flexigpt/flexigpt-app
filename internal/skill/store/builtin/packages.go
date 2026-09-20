@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -96,20 +97,23 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	document, found := builtin.PackageFileContent(
+	documentFile, document, found, err := builtin.PackageFileContentOneOf(
 		files,
-		skillDomain.BuiltinSkillPluginDocumentFile,
+		documentTopology.CollectionDocumentFiles(),
 	)
+	if err != nil {
+		return PreparedPackage{}, err
+	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded Skill package %q lacks %q",
+			"%w: embedded Skill package %q lacks a supported Collection document",
 			basespec.ErrInvalid,
 			packageRoot,
-			skillDomain.BuiltinSkillPluginDocumentFile,
 		)
 	}
 
 	collection, expectations, err := canonicalCollectionPackage(
+		documentFile,
 		document,
 		files,
 	)
@@ -148,14 +152,14 @@ func preparePackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
-		DocumentFile: skillDomain.
-			BuiltinSkillPluginDocumentFile,
-		PackageFiles: files,
-		Expectations: expectations,
+		DocumentFile:        documentFile,
+		PackageFiles:        files,
+		Expectations:        expectations,
 	}, nil
 }
 
 func canonicalCollectionPackage(
+	documentFile basespec.Locator,
 	document []byte,
 	files []source.ManagedPackageFile,
 ) (
@@ -206,7 +210,7 @@ func canonicalCollectionPackage(
 	expectations = append(
 		expectations,
 		skillConsumerAPI.BuiltInSkillArtifactExpectation{
-			Locator:          skillDomain.BuiltinSkillPluginDocumentFile,
+			Locator:          documentFile,
 			Kind:             rootDefinition.Kind,
 			LogicalName:      rootDefinition.LogicalName,
 			DefinitionDigest: rootDefinition.Digest,
@@ -217,7 +221,7 @@ func canonicalCollectionPackage(
 	}
 
 	seenDocuments := map[basespec.Locator]struct{}{
-		skillDomain.BuiltinSkillPluginDocumentFile: {},
+		documentFile: {},
 	}
 	for index, member := range collection.Members {
 		form, err := member.MemberForm()
@@ -251,7 +255,7 @@ func canonicalCollectionPackage(
 
 		documentLocator, err := skillDomain.SourceDocumentLocator(
 			header.Locator,
-			skillDomain.BuiltinSkillPluginDocumentFile,
+			documentFile,
 		)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
@@ -386,11 +390,10 @@ func PackageFingerprint(
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
-	if value.DocumentFile != skillDomain.BuiltinSkillPluginDocumentFile {
+	if !documentTopology.IsCollectionDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in Skill Plugin document must be %q",
+			"%w: built-in Skill Collection document is not declared in topology",
 			basespec.ErrInvalid,
-			skillDomain.BuiltinSkillPluginDocumentFile,
 		)
 	}
 	expectations := append(

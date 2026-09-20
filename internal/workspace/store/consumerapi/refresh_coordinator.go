@@ -7,6 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
@@ -36,14 +37,7 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 	next := current.Discovery.Clone()
 	include := append([]string(nil), request.Selector.Include...)
 	if len(include) == 0 {
-		include = []string{
-			"**/*.json",
-			"**/*.yaml",
-			"**/*.yml",
-			"**/SKILL.md",
-			".mcp.json",
-			"mcp.json",
-		}
+		include = documentTopology.SelectorDiscoveryIncludePatterns()
 	}
 	next.DirectoryRoots = consumerutil.AppendDirectoryRoot(
 		next.DirectoryRoots,

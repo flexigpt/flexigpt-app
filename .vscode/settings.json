@@ -18,7 +18,6 @@
 		"**/.git": true,
 		"**/.gocache": true,
 		"**/tsconfig.tsbuildinfo": true,
-		"**/out": true,
 		"**/dist": true,
 		"**/build/flatpak/shared-modules": true,
 		"**/build/bin": true,

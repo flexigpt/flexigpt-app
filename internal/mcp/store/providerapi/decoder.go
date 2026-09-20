@@ -3,9 +3,8 @@ package providerapi
 import (
 	"context"
 	"fmt"
-	"path"
-	"strings"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -49,12 +48,9 @@ func isMCPConfigCandidate(
 	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
 		return true
 	}
-	switch strings.ToLower(path.Base(string(candidate.Locator))) {
-	case ".mcp.json", "mcp.json":
-		return true
-	default:
-		return false
-	}
+	return documentTopology.IsMCPConfigDocument(
+		candidate.Locator,
+	)
 }
 
 func (d *Decoder) Decode(

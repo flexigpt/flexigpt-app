@@ -100,6 +100,61 @@ func PackageFileContent(
 	return nil, false
 }
 
+// PackageFileContentOneOf returns exactly one package file whose locator is
+// listed in candidates. A package cannot contain two alternative root
+// documents because that would make its declaration root ambiguous.
+func PackageFileContentOneOf(
+	files []source.ManagedPackageFile,
+	candidates []basespec.Locator,
+) (documentFile basespec.Locator, document []byte, found bool, err error) {
+	if len(candidates) == 0 {
+		return "", nil, false, fmt.Errorf(
+			"%w: package document candidates are required",
+			basespec.ErrInvalid,
+		)
+	}
+
+	seenCandidates := make(map[basespec.Locator]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if err := candidate.ValidatePortable(false); err != nil {
+			return "", nil, false, err
+		}
+		if _, duplicate := seenCandidates[candidate]; duplicate {
+			return "", nil, false, fmt.Errorf(
+				"%w: duplicate package document candidate %q",
+				basespec.ErrInvalid,
+				candidate,
+			)
+		}
+		seenCandidates[candidate] = struct{}{}
+	}
+
+	var (
+		selected        basespec.Locator
+		selectedContent []byte
+	)
+	for _, candidate := range candidates {
+		content, found := PackageFileContent(files, candidate)
+		if !found {
+			continue
+		}
+		if selected != "" {
+			return "", nil, false, fmt.Errorf(
+				"%w: package contains both %q and %q",
+				basespec.ErrIdentityConflict,
+				selected,
+				candidate,
+			)
+		}
+		selected = candidate
+		selectedContent = content
+	}
+	if selected == "" {
+		return "", nil, false, nil
+	}
+	return selected, selectedContent, true, nil
+}
+
 func embeddedSubtree(
 	embedded fs.FS,
 	root basespec.Locator,

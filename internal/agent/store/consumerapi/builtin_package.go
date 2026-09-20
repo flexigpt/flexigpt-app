@@ -8,6 +8,7 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -344,15 +345,13 @@ func normalizeBuiltInAgentExpectations(
 	rootExpectation BuiltInAgentArtifactExpectation,
 	err error,
 ) {
-	if documentFile != agentDomain.BuiltinAgentPluginDocumentFile {
-		return nil, BuiltInAgentArtifactExpectation{}, fmt.Errorf(
-			"%w: built-in Agent Plugin document must be %q",
-			basespec.ErrInvalid,
-			agentDomain.BuiltinAgentPluginDocumentFile,
-		)
-	}
 	if err := documentFile.ValidatePortable(false); err != nil {
 		return nil, BuiltInAgentArtifactExpectation{}, err
+	}
+	if !documentTopology.IsCollectionDocumentFile(documentFile) {
+		return nil, BuiltInAgentArtifactExpectation{}, fmt.Errorf(
+			"%w: built-in Agent Collection document is not declared in topology", basespec.ErrInvalid,
+		)
 	}
 	if len(values) == 0 || len(values) > basespec.MaxDiscoveryEntries {
 		return nil, BuiltInAgentArtifactExpectation{}, fmt.Errorf(

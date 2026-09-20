@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -100,19 +101,22 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	document, found := builtin.PackageFileContent(
+	documentFile, document, found, err := builtin.PackageFileContentOneOf(
 		files,
-		mcpDomain.MCPPluginDocumentFile,
+		documentTopology.CollectionDocumentFiles(),
 	)
+	if err != nil {
+		return PreparedPackage{}, err
+	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded MCP package %q lacks %q",
+			"%w: embedded MCP package %q lacks a supported Collection document",
 			basespec.ErrInvalid,
 			packageRoot,
-			mcpDomain.MCPPluginDocumentFile,
 		)
 	}
 	expectations, err := canonicalCollectionExpectations(
+		documentFile,
 		document,
 	)
 	if err != nil {
@@ -141,13 +145,14 @@ func preparePackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
-		DocumentFile:        mcpDomain.MCPPluginDocumentFile,
+		DocumentFile:        documentFile,
 		PackageFiles:        files,
 		Expectations:        expectations,
 	}, nil
 }
 
 func canonicalCollectionExpectations(
+	documentFile basespec.Locator,
 	document []byte,
 ) ([]mcpConsumerAPI.BuiltInArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -225,7 +230,7 @@ func canonicalCollectionExpectations(
 		output = append(
 			output,
 			mcpConsumerAPI.BuiltInArtifactExpectation{
-				Locator:          mcpDomain.MCPPluginDocumentFile,
+				Locator:          documentFile,
 				Subresource:      value.SubresourceLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
@@ -290,11 +295,10 @@ func validatePreparedPackageIdentities(
 func PackageFingerprint(
 	value PreparedPackage,
 ) (cryptoutil.Digest, error) {
-	if value.DocumentFile != mcpDomain.MCPPluginDocumentFile {
+	if !documentTopology.IsCollectionDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in MCP Plugin document must be %q",
+			"%w: built-in MCP Collection document is not declared in topology",
 			basespec.ErrInvalid,
-			mcpDomain.MCPPluginDocumentFile,
 		)
 	}
 

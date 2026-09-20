@@ -1,0 +1,55 @@
+version: v1
+
+documents:
+  collections:
+    - locator: "plugin.yaml"
+      format: "yaml"
+    - locator: "plugin.yml"
+      format: "yaml"
+    - locator: "collection.yaml"
+      format: "yaml"
+    - locator: "collection.yml"
+      format: "yaml"
+    - locator: "plugin.json"
+      format: "json"
+    - locator: "collection.json"
+      format: "json"
+
+  mcpConfigs:
+    - locator: "mcp.json"
+      format: "json"
+    - locator: ".mcp.json"
+      format: "json"
+
+  agents:
+    - locator: "agent.yaml"
+      format: "yaml"
+
+  skills:
+    - locator: "SKILL.md"
+      format: "markdown"
+
+  workspaceMarkdown:
+    - locator: "AGENTS.md"
+      format: "markdown"
+    - locator: "AGENT.md"
+      format: "markdown"
+    - locator: "CLAUDE.md"
+      format: "markdown"
+    - locator: "README.md"
+      format: "markdown"
+    - locator: "llms.txt"
+      format: "markdown"
+
+discovery:
+  workspace:
+    - "**/*.json"
+    - "**/*.yaml"
+    - "**/*.yml"
+    - "**/*.agent.md"
+    - "**/docs/**/*.md"
+
+  selector:
+    - "**/*.json"
+    - "**/*.yaml"
+    - "**/*.yml"

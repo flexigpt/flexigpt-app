@@ -113,7 +113,6 @@ func main() {
 			app.mcpRuntimeAPI,
 			app.mcpAggregateAPI,
 			app.aggregateAPI,
-			app.assistantPresetStoreAPI,
 			app.agentStoreAPI,
 		},
 

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -55,11 +56,14 @@ func (*JSONDecoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	requested := candidate.RequestsDecoder(JSONDecoderID)
+	declared := documentTopology.IsCanonicalJSONDocument(
+		candidate.Locator,
+	)
 	extension := strings.ToLower(
 		path.Ext(string(candidate.Locator)),
 	)
-	if (extension == ".yaml" || extension == ".yml") &&
-		!requested {
+	if (extension == ".yaml" || extension == ".yml") && !requested &&
+		!declared {
 		return providerapi.RecognitionNone
 	}
 
@@ -67,13 +71,13 @@ func (*JSONDecoder) Recognize(
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
-		if requested {
+		if requested || declared {
 			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
-		if requested {
+		if requested || declared {
 			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone

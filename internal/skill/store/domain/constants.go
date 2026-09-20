@@ -20,7 +20,6 @@ const (
 	ManagedSkillPackageKind           source.PackageKind = "skill"
 	SkillDefinitionFileName           basespec.Locator   = "SKILL.md"
 	BuiltinSkillCollectionPackageKind source.PackageKind = "skill-collection"
-	BuiltinSkillPluginDocumentFile    basespec.Locator   = "plugin.yaml"
 
 	InsertLabelKey = "skill.insert"
 

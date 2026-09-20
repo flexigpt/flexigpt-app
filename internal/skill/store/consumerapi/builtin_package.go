@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -56,16 +57,16 @@ func (a *API) InstallBuiltInSkillPackage(
 			skillDomain.BuiltinSkillCollectionPackageKind,
 		)
 	}
-	if request.DocumentFile !=
-		skillDomain.BuiltinSkillPluginDocumentFile {
-		return nil, fmt.Errorf(
-			"%w: built-in Skill document file must be %q",
-			basespec.ErrInvalid,
-			skillDomain.BuiltinSkillPluginDocumentFile,
-		)
-	}
 	if err := request.DocumentFile.ValidatePortable(false); err != nil {
 		return nil, err
+	}
+	if !documentTopology.IsCollectionDocumentFile(
+		request.DocumentFile,
+	) {
+		return nil, fmt.Errorf(
+			"%w: built-in Skill Collection document is not declared in topology",
+			basespec.ErrInvalid,
+		)
 	}
 	if !a.protection.IsProtectedRoot(request.RootID) {
 		return nil, fmt.Errorf(
@@ -78,6 +79,7 @@ func (a *API) InstallBuiltInSkillPackage(
 	}
 
 	expectations, rootExpectation, err := normalizeBuiltInSkillPackageExpectations(
+		request.DocumentFile,
 		request.Expectations,
 	)
 	if err != nil {
@@ -216,6 +218,7 @@ func (a *API) RemoveBuiltInSkillPackage(
 }
 
 func normalizeBuiltInSkillPackageExpectations(
+	documentFile basespec.Locator,
 	values []BuiltInSkillArtifactExpectation,
 ) (
 	expectations []BuiltInSkillArtifactExpectation,
@@ -296,7 +299,7 @@ func normalizeBuiltInSkillPackageExpectations(
 		}
 		seen[key] = struct{}{}
 
-		if expected.Locator != skillDomain.BuiltinSkillPluginDocumentFile ||
+		if expected.Locator != documentFile ||
 			expected.Subresource != "" {
 			continue
 		}

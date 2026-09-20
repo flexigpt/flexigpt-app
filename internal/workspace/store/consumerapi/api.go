@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -394,21 +395,9 @@ func (a *StoreAPI) defaultDiscovery() (
 	value := source.DiscoverySpec{
 		DirectoryRoots: []source.DirectoryRoot{
 			{
-				Root:      ".",
-				Recursive: true,
-				IncludePatterns: []string{
-					"**/*.json",
-					"**/*.yaml",
-					"**/*.yml",
-					"**/SKILL.md",
-					"**/AGENTS.md",
-					"**/AGENT.md",
-					"**/*.agent.md",
-					"**/CLAUDE.md",
-					"**/README.md",
-					"**/llms.txt",
-					"**/docs/**/*.md",
-				},
+				Root:            ".",
+				Recursive:       true,
+				IncludePatterns: documentTopology.WorkspaceDiscoveryIncludePatterns(),
 			},
 		},
 		Authoritative: true,

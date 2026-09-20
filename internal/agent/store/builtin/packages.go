@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -110,20 +111,26 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	document, found := builtin.PackageFileContent(
+	documentFile, document, found, err := builtin.PackageFileContentOneOf(
 		files,
-		agentDomain.BuiltinAgentPluginDocumentFile,
+		documentTopology.CollectionDocumentFiles(),
 	)
+	if err != nil {
+		return PreparedPackage{}, err
+	}
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
-			"%w: embedded Agent package %q lacks %q",
+			"%w: embedded Agent package %q lacks a supported Collection document",
 			basespec.ErrInvalid,
 			packageRoot,
-			agentDomain.BuiltinAgentPluginDocumentFile,
 		)
 	}
 
-	_, expectations, err := canonicalCollectionPackage(document, files)
+	_, expectations, err := canonicalCollectionPackage(
+		documentFile,
+		document,
+		files,
+	)
 	if err != nil {
 		return PreparedPackage{}, fmt.Errorf(
 			"decode embedded canonical Agent Plugin %q: %w",
@@ -148,13 +155,14 @@ func preparePackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		PackageAddress:      address,
-		PluginDocumentFile:  agentDomain.BuiltinAgentPluginDocumentFile,
+		PluginDocumentFile:  documentFile,
 		PackageFiles:        files,
 		Expectations:        expectations,
 	}, nil
 }
 
 func canonicalCollectionPackage(
+	documentFile basespec.Locator,
 	document []byte,
 	files []source.ManagedPackageFile,
 ) (
@@ -190,7 +198,7 @@ func canonicalCollectionPackage(
 	}
 
 	expectations, err := expectationsForDocument(
-		agentDomain.BuiltinAgentPluginDocumentFile,
+		documentFile,
 		r,
 	)
 	if err != nil {
@@ -249,7 +257,7 @@ func canonicalCollectionPackage(
 
 		documentLocator, err := declaration.ResolveSourceRelativePathLocator(
 			*header.Locator,
-			agentDomain.BuiltinAgentPluginDocumentFile,
+			documentFile,
 		)
 		if err != nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
@@ -510,11 +518,10 @@ func PackageFingerprint(
 	if err := value.PackageAddress.Validate(); err != nil {
 		return "", err
 	}
-	if value.PluginDocumentFile != agentDomain.BuiltinAgentPluginDocumentFile {
+	if !documentTopology.IsCollectionDocumentFile(value.PluginDocumentFile) {
 		return "", fmt.Errorf(
-			"%w: built-in Agent Plugin document must be %q",
+			"%w: built-in Agent Collection document is not declared in topology",
 			basespec.ErrInvalid,
-			agentDomain.BuiltinAgentPluginDocumentFile,
 		)
 	}
 

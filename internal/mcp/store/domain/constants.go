@@ -24,7 +24,6 @@ const (
 
 	ManagedMCPDocumentFile       basespec.Locator = "mcp.json"
 	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
-	MCPPluginDocumentFile        basespec.Locator = "collection.yaml"
 
 	InstallationDataSchemaVersion = "v1"
 	BuiltInInstallerName          = "mcp"

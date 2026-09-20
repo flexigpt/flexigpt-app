@@ -4,7 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"path"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -50,17 +52,11 @@ func (a *API) RemoveBuiltInPackage(
 		)
 	}
 
-	documentLocator, err := address.FileLocator(
-		mcpDomain.MCPPluginDocumentFile,
-	)
-	if err != nil {
-		return err
-	}
 	previous, err := a.builtInPackageServers(
 		ctx,
 		rootID,
 		sourceID,
-		documentLocator,
+		address,
 	)
 	if err != nil {
 		return err
@@ -103,8 +99,12 @@ func (a *API) builtInPackageServers(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	documentLocator basespec.Locator,
+	address source.ManagedPackageAddress,
 ) ([]artifact.Artifact, error) {
+	packageDirectory, err := address.Directory()
+	if err != nil {
+		return nil, err
+	}
 	records, err := a.artifacts.ListBySource(ctx, rootID, sourceID)
 	if err != nil {
 		return nil, err
@@ -112,7 +112,13 @@ func (a *API) builtInPackageServers(
 	output := make([]artifact.Artifact, 0)
 	for _, record := range records {
 		if record.Kind != mcpDomain.MCPArtifactKind ||
-			record.Binding.Locator != documentLocator {
+			path.Dir(string(record.Binding.Locator)) !=
+				string(packageDirectory) ||
+			!documentTopology.IsCollectionDocumentFile(
+				basespec.Locator(
+					path.Base(string(record.Binding.Locator)),
+				),
+			) {
 			continue
 		}
 		output = append(output, record.Clone())

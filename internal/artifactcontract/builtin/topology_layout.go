@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -122,12 +123,8 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 				DirectoryRoots: []source.DirectoryRoot{{
 					Root:      RepositoryRootLocator,
 					Recursive: true,
-					IncludePatterns: []string{
-						"**/collection.yaml",
-						"**/plugin.yaml",
-						"**/agent.yaml",
-						"**/SKILL.md",
-					},
+					IncludePatterns: documentTopology.
+						BuiltinDiscoveryIncludePatterns(),
 				}},
 				Authoritative: true,
 			},

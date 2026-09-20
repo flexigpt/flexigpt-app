@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -56,10 +57,14 @@ func (*YAMLDecoder) Recognize(
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
 	requested := candidate.RequestsDecoder(YAMLDecoderID)
+	declared := documentTopology.IsCanonicalYAMLDocument(
+		candidate.Locator,
+	)
 	extension := strings.ToLower(path.Ext(string(candidate.Locator)))
 	if extension != ".yaml" &&
 		extension != ".yml" &&
-		!requested {
+		!requested &&
+		!declared {
 		return providerapi.RecognitionNone
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -67,7 +72,7 @@ func (*YAMLDecoder) Recognize(
 		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
-		if requested {
+		if requested || declared {
 			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
@@ -76,13 +81,13 @@ func (*YAMLDecoder) Recognize(
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
-		if requested {
+		if requested || declared {
 			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone
 	}
 	if !supportsType(header.Type) {
-		if requested {
+		if requested || declared {
 			return providerapi.RecognitionPossible
 		}
 		return providerapi.RecognitionNone

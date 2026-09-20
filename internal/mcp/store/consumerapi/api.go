@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -429,11 +430,15 @@ func (a *API) InstallBuiltInPackage(
 			mcpDomain.MCPCollectionPackageKind,
 		)
 	}
-	if request.DocumentFile != mcpDomain.MCPPluginDocumentFile {
+	if err := request.DocumentFile.ValidatePortable(false); err != nil {
+		return nil, err
+	}
+	if !documentTopology.IsCollectionDocumentFile(
+		request.DocumentFile,
+	) {
 		return nil, fmt.Errorf(
-			"%w: built-in MCP document file must be %q",
+			"%w: built-in MCP Collection document is not declared in topology",
 			basespec.ErrInvalid,
-			mcpDomain.MCPPluginDocumentFile,
 		)
 	}
 	if !a.protection.IsProtectedRoot(request.RootID) {
@@ -465,6 +470,7 @@ func (a *API) InstallBuiltInPackage(
 	}
 
 	expectations, rootExpectation, err := normalizeBuiltInMCPExpectations(
+		request.DocumentFile,
 		request.Expectations...,
 	)
 	if err != nil {
@@ -475,7 +481,7 @@ func (a *API) InstallBuiltInPackage(
 		ctx,
 		request.RootID,
 		request.SourceID,
-		documentLocator,
+		request.PackageAddress,
 	)
 	if err != nil {
 		return nil, err
@@ -561,6 +567,7 @@ func (a *API) ResolveArtifactCapabilities(
 }
 
 func normalizeBuiltInMCPExpectations(
+	documentFile basespec.Locator,
 	values ...BuiltInArtifactExpectation,
 ) (
 	expectations []BuiltInArtifactExpectation,
@@ -624,7 +631,7 @@ func normalizeBuiltInMCPExpectations(
 		}
 		seen[key] = struct{}{}
 
-		if expected.Locator != mcpDomain.MCPPluginDocumentFile ||
+		if expected.Locator != documentFile ||
 			expected.Subresource != "" {
 			continue
 		}
