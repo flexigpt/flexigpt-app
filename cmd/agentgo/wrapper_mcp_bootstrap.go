@@ -23,6 +23,11 @@ import (
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
+const (
+	MCPHostName    = "FlexiGPT"
+	MCPHostVersion = "dev"
+)
+
 func InitMCPWrappers(
 	ctx context.Context,
 	storeWrapper *MCPStoreWrapper,
@@ -133,13 +138,13 @@ func InitMCPWrappers(
 		mcpAuth.WithOAuthRedirectURL(broker.RedirectURL()),
 		mcpAuth.WithOAuthTokenStore(tokenStore),
 		mcpAuth.WithClientInfo(
-			builtin.MCPHostName,
-			builtin.MCPHostVersion,
+			MCPHostName,
+			MCPHostVersion,
 		),
 	)
 	clientFactory, err := sdkclient.NewFactory(mcpServer.ClientInfo{
-		Name:    builtin.MCPHostName,
-		Version: builtin.MCPHostVersion,
+		Name:    MCPHostName,
+		Version: MCPHostVersion,
 	})
 	if err != nil {
 		return cleanup(err)

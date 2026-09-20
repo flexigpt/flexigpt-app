@@ -101,7 +101,7 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	documentFile, document, found, err := builtin.PackageFileContentOneOf(
+	documentFile, document, found, err := source.PackageFileContentOneOf(
 		files,
 		documentTopology.CollectionDocumentFiles(),
 	)
@@ -136,7 +136,7 @@ func preparePackage(
 	address, err := source.NewManagedPackageAddress(
 		mcpDomain.MCPCollectionPackageKind,
 		packageName,
-		builtin.UnversionedPackageVersion,
+		documentTopology.UnversionedPackageVersion(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err

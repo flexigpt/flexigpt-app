@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
@@ -64,34 +66,39 @@ func NewApp() *App {
 	}
 
 	app := &App{}
+	storageName := documentTopology.MustApplicationStorageName
 	app.dataBasePath = filepath.Join(
 		xdg.DataHome,
-		builtin.ApplicationDataDirectoryName,
+		storageName(documentTopology.ApplicationStorageDataDirectory),
 	)
 
 	app.settingsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.SettingsDirectoryName,
+		storageName(documentTopology.ApplicationStorageSettingsDirectory),
 	)
 	app.conversationsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.ConversationsDirectoryName,
+		storageName(documentTopology.ApplicationStorageConversationsDirectory),
 	)
 	app.modelPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.ModelPresetsDirectoryName,
+		storageName(documentTopology.ApplicationStorageModelPresetsDirectory),
 	)
 	app.toolsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.ToolsDirectoryName,
+		storageName(documentTopology.ApplicationStorageToolsDirectory),
 	)
 	app.assistantPresetsDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.AssistantPresetsDirectoryName,
+		storageName(
+			documentTopology.ApplicationStorageAssistantPresetsDirectory,
+		),
 	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
-		builtin.ArtifactStoreDirectoryName,
+		storageName(
+			documentTopology.ApplicationStorageArtifactStoreDirectory,
+		),
 	)
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
@@ -217,7 +224,7 @@ func (a *App) GetAppVersion() string {
 func ensureAppPrivateDirectory(location string) error {
 	return os.MkdirAll(
 		location,
-		os.FileMode(builtin.ApplicationDirectoryMode),
+		os.FileMode(basespec.ApplicationDirectoryMode),
 	)
 }
 

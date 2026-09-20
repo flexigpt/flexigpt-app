@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -130,9 +131,7 @@ func (*AgentMarkdownDecoder) Decode(
 func isAgentMarkdownCandidate(
 	locator basespec.Locator,
 ) bool {
-	name := strings.ToLower(path.Base(string(locator)))
-	return name == "agent.md" ||
-		strings.HasSuffix(name, ".agent.md")
+	return documentTopology.IsAgentMarkdownDocument(locator)
 }
 
 func decodeAgentMarkdown(

@@ -39,8 +39,43 @@ const (
 	MaxDiscoveryDepth      = 256
 )
 
+const (
+	ApplicationDirectoryMode = 0o700
+
+	ArtifactStoreManifestFileName      = "store.json"
+	ArtifactStoreMetadataFileName      = "app.sqlite"
+	ArtifactStoreContentDirectoryName  = "content"
+	ArtifactStoreStagingDirectoryName  = "staging"
+	ArtifactStoreManifestTemporaryName = "store.json.tmp-"
+
+	ArtifactStoreFormat        = "flexigpt-artifactstore/v3"
+	ArtifactStoreContentLayout = "source-packages/v1"
+
+	ArtifactStoreDirectoryMode = 0o750
+	ArtifactStoreManifestMode  = 0o600
+
+	ManagedPackageTemporaryPrefix = "package-"
+	ManagedPackagePreviousPrefix  = "previous-package-"
+	ManagedPackageRemovalPrefix   = "remove-"
+
+	ExternalGitMetadataDirectoryName = ".git"
+)
+
+var ExternalTraversalExcludedDirectoryNames = []string{
+	".git",
+	".hg",
+	".svn",
+	"node_modules",
+	"vendor",
+	"bower_components",
+}
+
+// identifierPattern accepts lower-camel identifiers with optional dotted or
+// hyphenated lower-camel segments. Each segment must begin with a lowercase
+// ASCII letter. Uppercase ASCII letters are valid after the first character of
+// a segment, which permits names such as mcpConfigs and managedMCP.
 var identifierPattern = regexp.MustCompile(
-	`^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$`,
+	`^[a-z][A-Za-z0-9]*(?:[.-][a-z][A-Za-z0-9]*)*$`,
 )
 
 var portableReservedBaseNames = map[string]struct{}{

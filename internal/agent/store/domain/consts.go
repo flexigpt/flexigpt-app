@@ -3,6 +3,7 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
@@ -14,30 +15,20 @@ const (
 	AgentArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
 		agentv1.AgentType,
 	)
-	AgentSchemaID      schema.SchemaID = agentv1.AgentSchemaID
-	AgentSchemaVersion                 = agentv1.AgentSchemaVersion
 
-	AgentManagedSourceStorageKey basespec.StorageKey = "user-agents"
+	ManagedAgentPackageKind           source.PackageKind   = "agent"
+	BuiltinAgentCollectionPackageKind source.PackageKind   = "agent-collection"
+	AgentManagedSourceStorageKey      basespec.StorageKey  = "user-agents"
+	AgentManagedCollectionPackageKind source.PackageKind   = "plugin"
+	AgentBaselineCollectionName       basespec.LogicalName = "agent-baseline"
+	AgentSchemaID                     schema.SchemaID      = agentv1.AgentSchemaID
 
+	AgentSchemaVersion            = agentv1.AgentSchemaVersion
 	AgentManagedSourceDisplayName = "User-managed Agents"
-
-	AgentManagedCollectionPackageKind  source.PackageKind = "plugin"
-	AgentManagedCollectionDocumentFile basespec.Locator   = "plugin.yaml"
-
-	AgentBaselineCollectionName basespec.LogicalName = "agent-baseline"
-
-	AgentBaselineDisplayName = "Agent Baseline"
-
-	AgentBaselineDescription = "Application-provisioned editable Agent Collection."
-
-	ManagedAgentPackageKind  source.PackageKind = "agent"
-	ManagedAgentDocumentFile basespec.Locator   = "agent.yaml"
-
-	BuiltinAgentCollectionPackageKind source.PackageKind = "agent-collection"
-	BuiltinAgentDocumentFile          basespec.Locator   = "agent.yaml"
-
-	BuiltInInstallerName   = "agent.agent"
-	HydrationSchemaVersion = "agent.agent.builtin-hydration/v1"
+	AgentBaselineDisplayName      = "Agent Baseline"
+	AgentBaselineDescription      = "Application-provisioned editable Agent Collection."
+	BuiltInInstallerName          = "agent.agent"
+	HydrationSchemaVersion        = "agent.agent.builtin-hydration/v1"
 )
 
 func IsAgentKind(value artifact.ArtifactKind) bool {
@@ -60,7 +51,7 @@ func AgentCollectionDomainPolicy() collection.DomainPolicy {
 		BaselineDisplayName: AgentBaselineDisplayName,
 		BaselineDescription: AgentBaselineDescription,
 		PackageKind:         AgentManagedCollectionPackageKind,
-		DocumentFile:        AgentManagedCollectionDocumentFile,
+		DocumentUse:         documentTopology.DocumentUseAgentManagedCollection,
 		AllowedMemberTypes: []declaration.Type{
 			declaration.TypeAgent,
 		},

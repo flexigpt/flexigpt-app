@@ -111,7 +111,7 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	documentFile, document, found, err := builtin.PackageFileContentOneOf(
+	documentFile, document, found, err := source.PackageFileContentOneOf(
 		files,
 		documentTopology.CollectionDocumentFiles(),
 	)
@@ -146,7 +146,7 @@ func preparePackage(
 	address, err := source.NewManagedPackageAddress(
 		agentDomain.BuiltinAgentCollectionPackageKind,
 		packageName,
-		builtin.UnversionedPackageVersion,
+		documentTopology.UnversionedPackageVersion(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err
@@ -303,10 +303,9 @@ func canonicalCollectionPackage(
 		content, found := filesByLocator[documentLocator]
 		if !found {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
-				"%w: built-in Agent %q locator does not identify packaged %q",
+				"%w: built-in Agent %q locator does not identify a configured packaged Agent document",
 				basespec.ErrInvalid,
 				header.Name,
-				agentDomain.BuiltinAgentDocumentFile,
 			)
 		}
 
@@ -346,7 +345,8 @@ func canonicalCollectionPackage(
 	}
 
 	for locator := range filesByLocator {
-		if path.Base(string(locator)) != string(agentDomain.BuiltinAgentDocumentFile) {
+		documentFile := basespec.Locator(path.Base(string(locator)))
+		if !agentDomain.IsAgentDeclarationDocument(documentFile) {
 			continue
 		}
 		if _, err := packageAgentDocumentName(locator); err != nil {
@@ -437,12 +437,13 @@ func packageAgentDocumentName(
 
 	segments := strings.Split(string(locator), "/")
 	if len(segments) != 2 ||
-		segments[1] != string(agentDomain.BuiltinAgentDocumentFile) {
+		!agentDomain.IsAgentDeclarationDocument(
+			basespec.Locator(segments[1]),
+		) {
 		return "", fmt.Errorf(
-			"%w: built-in Agent document %q must use <name>/%s",
+			"%w: built-in Agent document %q must use <name>/<configured-agent-document>",
 			basespec.ErrInvalid,
 			locator,
-			agentDomain.BuiltinAgentDocumentFile,
 		)
 	}
 

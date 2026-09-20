@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
@@ -14,7 +14,7 @@ func ManagedPackageAddressForSkill(
 	version basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
-		version = builtin.UnversionedPackageVersion
+		version = documentTopology.UnversionedPackageVersion()
 	}
 	return source.NewManagedPackageAddress(
 		ManagedSkillPackageKind,
@@ -29,7 +29,7 @@ func ManagedPackageLocatorForSkill(
 	if err := validateManagedSkillPackageAddress(address); err != nil {
 		return "", err
 	}
-	return address.FileLocator(SkillDefinitionFileName)
+	return address.FileLocator(SkillDefinitionFileName())
 }
 
 func ManagedPackageAddressFromSkillLocator(
@@ -38,12 +38,11 @@ func ManagedPackageAddressFromSkillLocator(
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(SkillDefinitionFileName) {
+	if !IsSkillDefinitionFile(locator) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
-			"%w: Skill locator %q is not %q",
+			"%w: Skill locator %q is not a configured Skill package document",
 			basespec.ErrInvalid,
 			locator,
-			SkillDefinitionFileName,
 		)
 	}
 

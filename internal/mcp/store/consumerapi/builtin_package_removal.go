@@ -35,6 +35,12 @@ func (a *API) RemoveBuiltInPackage(
 	if err := sourceID.Validate(); err != nil {
 		return err
 	}
+	if !documentTopology.IsBuiltinPackageSource(rootID, sourceID) {
+		return fmt.Errorf(
+			"%w: MCP package does not target the declared built-in package Source",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := address.Validate(); err != nil {
 		return err
 	}

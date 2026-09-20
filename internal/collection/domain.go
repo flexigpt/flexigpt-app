@@ -12,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -36,7 +37,7 @@ type DomainPolicy struct {
 	BaselineDisplayName string
 	BaselineDescription string
 	PackageKind         source.PackageKind
-	DocumentFile        basespec.Locator
+	DocumentUse         string
 	AllowedMemberTypes  []declaration.Type
 	AllowedMemberForms  []declaration.MemberForm
 }
@@ -108,7 +109,12 @@ func (p DomainPolicy) Validate() error {
 	if err := p.managedCollectionPackageKind().Validate(); err != nil {
 		return err
 	}
-	documentFile := p.managedCollectionDocumentFile()
+	documentFile, err := documentTopology.DefaultDocumentFile(
+		p.managedCollectionDocumentUse(),
+	)
+	if err != nil {
+		return err
+	}
 	if err := documentFile.ValidatePortable(false); err != nil {
 		return err
 	}
@@ -195,11 +201,11 @@ func (p DomainPolicy) managedCollectionPackageKind() source.PackageKind {
 	return ManagedCollectionPackageKind
 }
 
-func (p DomainPolicy) managedCollectionDocumentFile() basespec.Locator {
-	if p.DocumentFile != "" {
-		return p.DocumentFile
+func (p DomainPolicy) managedCollectionDocumentUse() string {
+	if p.DocumentUse != "" {
+		return p.DocumentUse
 	}
-	return ManagedCollectionDocumentFile
+	return documentTopology.DocumentUseManagedCollection
 }
 
 func (p DomainPolicy) managedCollectionBaselineDisplayName() string {

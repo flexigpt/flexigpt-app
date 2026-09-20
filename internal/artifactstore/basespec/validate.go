@@ -170,12 +170,19 @@ func ValidateLabels(
 	return nil
 }
 
+// ValidateIdentifier validates an ASCII lower-camel identifier.
+//
+// Dots and hyphens may separate segments. Every segment must start with a
+// lowercase ASCII letter, while subsequent characters may be ASCII letters or
+// digits. This accepts documentSets, managedMCP, mcp.policyV1, and
+// agent-managedMCP while rejecting PascalCase, underscores, empty segments,
+// and leading digits.
 func ValidateIdentifier(label, value string, maximum int) error {
 	if value == "" ||
 		len(value) > maximum ||
 		!identifierPattern.MatchString(value) {
 		return fmt.Errorf(
-			"%w: %s must be a lowercase dotted or hyphenated identifier",
+			"%w: %s must start lowercase and use lower-camel segments separated by dots or hyphens",
 			ErrInvalid,
 			label,
 		)

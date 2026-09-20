@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -75,12 +75,18 @@ func (a *API) CreateManagedMCP(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
+	decoderID, err := documentTopology.DefaultDocumentDecoderID(
+		documentTopology.DocumentUseManagedMCP,
+	)
+	if err != nil {
+		return result, err
+	}
 	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoder.JSONDecoderID,
+		decoderID,
 	); err != nil {
 		return result, err
 	}
@@ -99,7 +105,7 @@ func (a *API) CreateManagedMCP(
 			Package: source.ManagedPackagePublication{
 				Address: address,
 				Files: []source.ManagedPackageFile{{
-					Locator: mcpDomain.ManagedMCPDocumentFile,
+					Locator: mcpDomain.ManagedMCPDocumentFile(),
 					Content: append([]byte(nil), definitionValue.Body...),
 				}},
 			},

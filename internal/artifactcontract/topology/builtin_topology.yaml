@@ -1,0 +1,50 @@
+application:
+  storage:
+    dataDirectory: "flexigpt"
+    settingsDirectory: "settings_v1"
+    conversationsDirectory: "conversations_v1"
+    modelPresetsDirectory: "model_presets_v1"
+    toolsDirectory: "tools_v1"
+    assistantPresetsDirectory: "assistant_presets_v1"
+    artifactStoreDirectory: "artifacts_v3"
+    artifactStoreManifestFile: "store.json"
+    artifactStoreMetadataFile: "app.sqlite"
+    artifactStoreContentDirectory: "content"
+    artifactStoreStagingDirectory: "staging"
+    artifactStoreManifestTemporaryName: "store.json.tmp-"
+
+builtin:
+  root:
+    id: "0192c4c0-0000-7000-8000-000000000001"
+    storageKey: "builtins"
+    displayName: "Application Built-ins"
+    description: "Protected application-provided artifact source namespace."
+    protected: true
+    retained: false
+
+  sources:
+    - name: "artifacts"
+      roles:
+        - "packages"
+      id: "0192c4c0-0001-7000-8000-000000000001"
+      storageKey: "artifacts"
+      kind: "managed-directory"
+      displayName: "Application Built-in Artifact Source"
+      enabled: true
+      config: {}
+      discovery:
+        root: "."
+        recursive: true
+        authoritative: true
+        includePatterns: []
+        documentSets:
+          - "collections"
+          - "mcpConfigs"
+          - "mcpPolicies"
+          - "agents"
+          - "skillPackages"
+
+  embeddedPackages:
+    skills: "skills"
+    agents: "agents"
+    mcps: "mcps"

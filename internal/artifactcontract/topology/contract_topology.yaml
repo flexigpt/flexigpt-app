@@ -1,36 +1,63 @@
+packageVersions:
+  unversioned: "unversioned"
+
 documents:
   collections:
     - locator: "plugin.yaml"
       format: "yaml"
+      decoderID: "artifact-declaration-yaml"
     - locator: "plugin.yml"
       format: "yaml"
+      decoderID: "artifact-declaration-yaml"
     - locator: "collection.yaml"
       format: "yaml"
+      decoderID: "artifact-declaration-yaml"
     - locator: "collection.yml"
       format: "yaml"
+      decoderID: "artifact-declaration-yaml"
     - locator: "plugin.json"
       format: "json"
+      decoderID: "artifact-declaration-json"
     - locator: "collection.json"
       format: "json"
+      decoderID: "artifact-declaration-json"
 
   mcpConfigs:
     - locator: "mcp.json"
       format: "json"
+      decoderID: "artifact.mcp-json"
     - locator: ".mcp.json"
       format: "json"
+      decoderID: "artifact.mcp-json"
 
   agents:
     - locator: "agent.yaml"
       format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "agent.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "agent.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
-  skills:
+  skillPackages:
     - locator: "SKILL.md"
       format: "markdown"
+      decoderID: "agent.skill-markdown"
+
+  mcpPolicies:
+    - locator: "mcp-policy.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
+  agentMarkdown:
+    - locator: "AGENT.md"
+      format: "markdown"
+      decoderID: "agent-markdown"
 
   workspaceMarkdown:
     - locator: "AGENTS.md"
-      format: "markdown"
-    - locator: "AGENT.md"
       format: "markdown"
     - locator: "CLAUDE.md"
       format: "markdown"
@@ -39,6 +66,99 @@ documents:
     - locator: "llms.txt"
       format: "markdown"
 
+  workspaceInstructions:
+    - locator: "AGENTS.md"
+      format: "markdown"
+    - locator: "CLAUDE.md"
+      format: "markdown"
+
+documentUses:
+  collection:
+    documentSets:
+      - "collections"
+
+  canonicalYAML:
+    documentSets:
+      - "collections"
+      - "agents"
+
+  canonicalJSON:
+    documentSets:
+      - "collections"
+      - "agents"
+
+  mcpConfig:
+    documentSets:
+      - "mcpConfigs"
+
+  skillPackage:
+    documentSets:
+      - "skillPackages"
+    defaultLocator: "SKILL.md"
+
+  managedCollection:
+    documentSets:
+      - "collections"
+    defaultLocator: "plugin.json"
+
+  agentManagedCollection:
+    documentSets:
+      - "collections"
+    defaultLocator: "plugin.yaml"
+
+  managedAgent:
+    documentSets:
+      - "agents"
+    defaultLocator: "agent.yaml"
+
+  managedMCP:
+    documentSets:
+      - "mcpConfigs"
+    defaultLocator: "mcp.json"
+    decoderID: "artifact-declaration-json"
+
+  managedMCPPolicy:
+    documentSets:
+      - "mcpPolicies"
+    defaultLocator: "mcp-policy.json"
+
+  agentMarkdown:
+    documentSets:
+      - "agentMarkdown"
+
+  workspaceMarkdown:
+    documentSets:
+      - "workspaceMarkdown"
+
+  workspaceInstructions:
+    documentSets:
+      - "workspaceInstructions"
+
+markdownRules:
+  agent:
+    documentUses:
+      - "agentMarkdown"
+    basenameSuffixes:
+      - ".agent.md"
+
+  text:
+    documentUses:
+      - "workspaceMarkdown"
+    extensions:
+      - ".md"
+    excludeDocumentUses:
+      - "skillPackage"
+    excludeRules:
+      - "agent"
+
+  defaultText:
+    documentUses:
+      - "workspaceMarkdown"
+
+  instructionText:
+    documentUses:
+      - "workspaceInstructions"
+
 discovery:
   skill:
     root: "."
@@ -46,7 +166,7 @@ discovery:
     authoritative: true
     includePatterns: []
     documentSets:
-      - "skills"
+      - "skillPackages"
     decoderHints:
       - locator: "."
         recursive: true
@@ -66,6 +186,7 @@ discovery:
     documentSets:
       - "collections"
       - "mcpConfigs"
+      - "mcpPolicies"
 
   workspace:
     root: "."
@@ -81,8 +202,10 @@ discovery:
       - "collections"
       - "mcpConfigs"
       - "agents"
-      - "skills"
+      - "skillPackages"
+      - "agentMarkdown"
       - "workspaceMarkdown"
+      - "workspaceInstructions"
     decoderHints:
       - locator: "."
         recursive: true
@@ -101,15 +224,48 @@ discovery:
       - "collections"
       - "mcpConfigs"
       - "agents"
-      - "skills"
+      - "skillPackages"
 
-  builtin:
-    root: "."
-    recursive: true
-    authoritative: true
-    includePatterns: []
-    documentSets:
-      - "collections"
-      - "mcpConfigs"
-      - "agents"
-      - "skills"
+discoveryUses:
+  skill:
+    profiles:
+      - "skill"
+
+  mcp:
+    profiles:
+      - "mcp"
+
+  workspace:
+    profiles:
+      - "workspace"
+
+  selector:
+    profiles:
+      - "selector"
+
+resolver:
+  types:
+    - type: "text"
+    - type: "model"
+      supportsSelectors: true
+      supportsMappedFallbackTargets: true
+    - type: "tool"
+      supportsSelectors: true
+      supportsMappedFallbackTargets: true
+    - type: "skill"
+      supportsSelectors: true
+    - type: "mcp"
+      supportsSelectors: true
+    - type: "mcp.policy"
+      supportsSelectors: true
+    - type: "plugin"
+      supportsSelectors: true
+    - type: "agent"
+      supportsSelectors: true
+    - type: "team"
+      supportsSelectors: true
+    - type: "loop"
+      supportsSelectors: true
+    - type: "workflow"
+      supportsSelectors: true
+    - type: "workspace"

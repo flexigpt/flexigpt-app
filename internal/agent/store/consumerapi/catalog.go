@@ -6,9 +6,9 @@ import (
 	"sort"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -16,7 +16,7 @@ import (
 )
 
 func agentBuiltinRootID() root.RootID {
-	return builtin.BuiltinRootID
+	return documentTopology.BuiltinRootID()
 }
 
 func (a *API) GetAgent(
@@ -115,9 +115,8 @@ func (a *API) ListAgents(
 		records = values
 	} else {
 		rootIDs := []root.RootID{request.RootID}
-		if request.IncludeBuiltin &&
-			request.RootID != builtin.BuiltinRootID {
-			rootIDs = append(rootIDs, builtin.BuiltinRootID)
+		if request.IncludeBuiltin && request.RootID != agentBuiltinRootID() {
+			rootIDs = append(rootIDs, agentBuiltinRootID())
 		}
 
 		for _, rootID := range rootIDs {
@@ -277,7 +276,7 @@ func (a *API) agentView(
 		Artifact:    record.Clone(),
 		Name:        record.LogicalName,
 		DisplayName: record.DisplayName,
-		BuiltIn:     record.RootID == builtin.BuiltinRootID,
+		BuiltIn:     record.RootID == agentBuiltinRootID(),
 	}
 
 	if record.State != artifact.StateAvailable {

@@ -23,7 +23,7 @@ func NormalizeManagedSkillFiles(
 			)
 		}
 		return []source.ManagedPackageFile{{
-			Locator: SkillDefinitionFileName,
+			Locator: SkillDefinitionFileName(),
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
@@ -33,9 +33,10 @@ func NormalizeManagedSkillFiles(
 		return nil, nil, err
 	}
 
+	documentFile := SkillDefinitionFileName()
 	var packageSkillMD []byte
 	for _, file := range normalized {
-		if file.Locator != SkillDefinitionFileName {
+		if file.Locator != documentFile {
 			continue
 		}
 		packageSkillMD = append([]byte(nil), file.Content...)
@@ -45,7 +46,7 @@ func NormalizeManagedSkillFiles(
 		return nil, nil, fmt.Errorf(
 			"%w: managed Skill package must contain %q",
 			basespec.ErrInvalid,
-			SkillDefinitionFileName,
+			documentFile,
 		)
 	}
 	if len(skillMD) != 0 &&

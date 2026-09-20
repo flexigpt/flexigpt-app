@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -179,7 +178,7 @@ func (a *API) AttachAgentToCollection(
 			return collection.MemberMutationResult{}, err
 		}
 
-	case builtin.BuiltinRootID:
+	case agentBuiltinRootID():
 		member.Scope = declaration.LookupScopeBuiltin
 
 	default:
@@ -260,7 +259,7 @@ func (a *API) IsManagedAgentCollection(
 	return value.Baseline ||
 		value.Editable &&
 			value.Artifact.LogicalName != "" &&
-			value.Artifact.RootID != builtin.BuiltinRootID &&
+			value.Artifact.RootID != agentBuiltinRootID() &&
 			value.Artifact.Binding.Locator != ""
 }
 

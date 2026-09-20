@@ -97,7 +97,7 @@ func preparePackage(
 		return PreparedPackage{}, err
 	}
 
-	documentFile, document, found, err := builtin.PackageFileContentOneOf(
+	documentFile, document, found, err := source.PackageFileContentOneOf(
 		files,
 		documentTopology.CollectionDocumentFiles(),
 	)
@@ -143,7 +143,7 @@ func preparePackage(
 	address, err := source.NewManagedPackageAddress(
 		skillDomain.BuiltinSkillCollectionPackageKind,
 		packageName,
-		builtin.UnversionedPackageVersion,
+		documentTopology.UnversionedPackageVersion(),
 	)
 	if err != nil {
 		return PreparedPackage{}, err
@@ -270,7 +270,7 @@ func canonicalCollectionPackage(
 				"%w: built-in Skill %q locator does not identify packaged %q",
 				basespec.ErrInvalid,
 				header.Name,
-				skillDomain.SkillDefinitionFileName,
+				skillDomain.SkillDefinitionFileName(),
 			)
 		}
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
@@ -312,8 +312,7 @@ func canonicalCollectionPackage(
 	}
 
 	for locator := range filesByLocator {
-		if path.Base(string(locator)) !=
-			string(skillDomain.SkillDefinitionFileName) {
+		if !skillDomain.IsSkillDefinitionFile(locator) {
 			continue
 		}
 		if _, found := seenDocuments[locator]; !found {

@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -141,20 +142,28 @@ func declarationCandidateLocators(
 	output := make([]basespec.Locator, 0, 2)
 	output = append(output, target)
 	if expectedKind != artifact.ArtifactKind(declaration.TypeSkill) ||
-		path.Base(string(target)) == "SKILL.md" {
+		documentTopology.IsSkillPackageDocument(target) {
 		return output, nil
 	}
 
-	// A portable Skill locator conventionally identifies the package
-	// directory. The independently declared Artifact originates at SKILL.md.
-	document := basespec.Locator(path.Join(
-		string(target),
-		"SKILL.md",
-	))
-	if err := document.Validate(false); err != nil {
-		return nil, err
+	seen := map[basespec.Locator]struct{}{
+		target: {},
 	}
-	return append(output, document), nil
+	for _, documentFile := range documentTopology.SkillPackageDocumentFiles() {
+		document := basespec.Locator(path.Join(
+			string(target),
+			string(documentFile),
+		))
+		if err := document.Validate(false); err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[document]; duplicate {
+			continue
+		}
+		seen[document] = struct{}{}
+		output = append(output, document)
+	}
+	return output, nil
 }
 
 func (r *boundResolver) selectArtifact(

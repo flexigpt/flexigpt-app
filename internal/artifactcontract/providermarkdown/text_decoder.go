@@ -2,12 +2,11 @@ package providermarkdown
 
 import (
 	"context"
-	"path"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
@@ -82,32 +81,15 @@ func (*TextDecoder) Decode(
 }
 
 func isTextCandidate(locator basespec.Locator) bool {
-	if isAgentMarkdownCandidate(locator) {
-		return false
-	}
-	if strings.EqualFold(path.Base(string(locator)), "llms.txt") {
-		return true
-	}
-	return strings.EqualFold(path.Ext(string(locator)), ".md") &&
-		!strings.EqualFold(path.Base(string(locator)), "SKILL.md")
+	return documentTopology.IsTextMarkdownDocument(locator)
 }
 
 func isDefaultTextFile(locator basespec.Locator) bool {
-	switch strings.ToUpper(path.Base(string(locator))) {
-	case "README.MD", "LLMS.TXT", "AGENTS.MD", "CLAUDE.MD":
-		return true
-	default:
-		return false
-	}
+	return documentTopology.IsDefaultTextMarkdownDocument(locator)
 }
 
 func isInstructionFile(locator basespec.Locator) bool {
-	switch strings.ToUpper(path.Base(string(locator))) {
-	case "AGENTS.MD", "CLAUDE.MD":
-		return true
-	default:
-		return false
-	}
+	return documentTopology.IsInstructionMarkdownDocument(locator)
 }
 
 func textDiagnostics(

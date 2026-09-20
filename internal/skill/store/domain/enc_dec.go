@@ -167,8 +167,9 @@ func ValidateDefinition(
 func definitionForSkillDocument(
 	doc document.SkillDocument,
 ) (definition.Definition, error) {
+	documentFile := SkillDefinitionFileName()
 	sourceLocator := declaration.ScalarLocator(
-		"./" + string(SkillDefinitionFileName),
+		"./" + string(documentFile),
 	)
 	insert := portableSkillInsert(doc.Insert)
 	decl := skillv1.SkillDocument{

@@ -7,7 +7,7 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -263,12 +263,18 @@ func (a *API) publishManagedAgent(
 		return artifact.Artifact{}, err
 	}
 
+	decoderID, err := documentTopology.DefaultDocumentDecoderID(
+		documentTopology.DocumentUseManagedAgent,
+	)
+	if err != nil {
+		return artifact.Artifact{}, err
+	}
 	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoder.YAMLDecoderID,
+		decoderID,
 	); err != nil {
 		return artifact.Artifact{}, err
 	}
@@ -289,7 +295,7 @@ func (a *API) publishManagedAgent(
 				Address:            address,
 				ExpectedGeneration: expectedGeneration,
 				Files: []source.ManagedPackageFile{{
-					Locator: agentDomain.ManagedAgentDocumentFile,
+					Locator: agentDomain.ManagedAgentDocumentFile(),
 					Content: raw,
 				}},
 			},

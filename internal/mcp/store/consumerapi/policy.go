@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -66,13 +65,13 @@ func (a *API) UpsertManagedMCPPolicy(
 	address, err := source.NewManagedPackageAddress(
 		mcpDomain.ManagedMCPPolicyPackageKind,
 		request.Name,
-		builtin.UnversionedPackageVersion,
+		documentTopology.UnversionedPackageVersion(),
 	)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 	locator, err := address.FileLocator(
-		mcpDomain.ManagedMCPPolicyDocumentFile,
+		mcpDomain.ManagedMCPPolicyDocumentFile(),
 	)
 	if err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
@@ -98,12 +97,18 @@ func (a *API) UpsertManagedMCPPolicy(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
+	decoderID, err := documentTopology.DefaultDocumentDecoderID(
+		documentTopology.DocumentUseManagedMCPPolicy,
+	)
+	if err != nil {
+		return result, err
+	}
 	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		decoder.JSONDecoderID,
+		decoderID,
 	); err != nil {
 		return result, err
 	}
@@ -122,7 +127,7 @@ func (a *API) UpsertManagedMCPPolicy(
 			Package: source.ManagedPackagePublication{
 				Address: address,
 				Files: []source.ManagedPackageFile{{
-					Locator: mcpDomain.ManagedMCPPolicyDocumentFile,
+					Locator: mcpDomain.ManagedMCPPolicyDocumentFile(),
 					Content: raw,
 				}},
 			},

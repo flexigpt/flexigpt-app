@@ -143,39 +143,68 @@ func normalizeSkillPath(
 		return "", "", err
 	}
 	if info.IsDir() {
-		documentPath := filepath.Join(
-			absolute,
-			string(skillDomain.SkillDefinitionFileName),
-		)
-		document, err := os.Stat(documentPath)
+		_, locator, err := findSkillDefinitionPath(absolute)
 		if err != nil {
 			return "", "", err
 		}
-		if !document.Mode().IsRegular() {
-			return "", "", fmt.Errorf(
-				"%w: Skill directory lacks regular %q",
-				basespec.ErrInvalid,
-				skillDomain.SkillDefinitionFileName,
-			)
-		}
-		return absolute, skillDomain.SkillDefinitionFileName, nil
+		return absolute, locator, nil
 	}
 	if !info.Mode().IsRegular() ||
-		filepath.Base(absolute) != string(skillDomain.SkillDefinitionFileName) {
+		!skillDomain.IsSkillDefinitionFile(
+			basespec.Locator(filepath.Base(absolute)),
+		) {
 		return "", "", fmt.Errorf(
-			"%w: Skill path must identify a Skill directory or %q",
+			"%w: Skill path must identify a Skill directory or configured Skill document",
 			basespec.ErrInvalid,
-			skillDomain.SkillDefinitionFileName,
 		)
 	}
-	return filepath.Dir(absolute), skillDomain.SkillDefinitionFileName, nil
+	return filepath.Dir(absolute),
+		basespec.Locator(filepath.Base(absolute)),
+		nil
+}
+
+func findSkillDefinitionPath(
+	directory string,
+) (string, basespec.Locator, error) {
+	var (
+		selectedPath    string
+		selectedLocator basespec.Locator
+	)
+	for _, candidate := range skillDomain.SkillDefinitionFiles() {
+		candidatePath := filepath.Join(directory, string(candidate))
+		info, err := os.Stat(candidatePath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			return "", "", err
+		}
+		if !info.Mode().IsRegular() {
+			continue
+		}
+		if selectedPath != "" {
+			return "", "", fmt.Errorf(
+				"%w: Skill directory has multiple configured Skill documents",
+				basespec.ErrIdentityConflict,
+			)
+		}
+		selectedPath = candidatePath
+		selectedLocator = candidate
+	}
+	if selectedPath == "" {
+		return "", "", fmt.Errorf(
+			"%w: Skill directory lacks a configured Skill document",
+			basespec.ErrInvalid,
+		)
+	}
+	return selectedPath, selectedLocator, nil
 }
 
 func skillFileDiscovery(
 	locator basespec.Locator,
 ) (source.DiscoverySpec, error) {
-	return documentTopology.DiscoverySpecForLocator(
-		"skill",
+	return documentTopology.DiscoverySpecForLocatorForUse(
+		documentTopology.DiscoveryUseSkill,
 		locator,
 	)
 }

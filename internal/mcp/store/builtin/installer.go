@@ -6,8 +6,9 @@ import (
 	"io/fs"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -24,12 +25,13 @@ type InstallerDependencies struct {
 }
 
 type Installer struct {
-	mcp             mcpConsumerAPI.BuiltinStore
-	builtInTopology topology.Declaration
-	overlays        mcpOverlay.RootPurger
-	prepared        []PreparedPackage
-	fingerprint     cryptoutil.Digest
-	packageScopes   []basespec.Locator
+	mcp           mcpConsumerAPI.BuiltinStore
+	rootID        root.RootID
+	sourceID      source.SourceID
+	overlays      mcpOverlay.RootPurger
+	prepared      []PreparedPackage
+	fingerprint   cryptoutil.Digest
+	packageScopes []basespec.Locator
 }
 
 func NewInstaller(
@@ -43,12 +45,17 @@ func NewInstaller(
 			basespec.ErrInvalid,
 		)
 	}
-	topologyValue := builtin.BuiltinTopologyDeclaration()
+	topologyValue := documentTopology.BuiltinTopologyDeclaration()
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}
-	if len(topologyValue.Sources) != 1 ||
-		topologyValue.Sources[0].Kind != source.SourceKindManagedDirectory {
+	builtinSource, err := documentTopology.BuiltinSource(
+		documentTopology.BuiltinSourceRolePackages,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if builtinSource.Kind != source.SourceKindManagedDirectory {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP Source must be managed",
 			basespec.ErrInvalid,
@@ -73,12 +80,13 @@ func NewInstaller(
 		return nil, err
 	}
 	return &Installer{
-		mcp:             dependencies.MCP,
-		builtInTopology: topologyValue,
-		overlays:        dependencies.Overlays,
-		prepared:        prepared,
-		fingerprint:     fingerprint,
-		packageScopes:   scopes,
+		mcp:           dependencies.MCP,
+		rootID:        topologyValue.Root.ID,
+		sourceID:      builtinSource.ID,
+		overlays:      dependencies.Overlays,
+		prepared:      prepared,
+		fingerprint:   fingerprint,
+		packageScopes: scopes,
 	}, nil
 }
 
@@ -114,8 +122,8 @@ func (i *Installer) DesiredHydration(
 
 	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
-		RootID:        i.builtInTopology.Root.ID,
-		SourceID:      i.builtInTopology.Sources[0].ID,
+		RootID:        i.rootID,
+		SourceID:      i.sourceID,
 		Fingerprint:   i.fingerprint,
 	}
 	if err := value.Validate(); err != nil {
@@ -138,7 +146,7 @@ func (i *Installer) EnsurePackageHydration(
 	if !topologyCurrent {
 		if err := i.overlays.PurgeRoot(
 			ctx,
-			i.builtInTopology.Root.ID,
+			i.rootID,
 		); err != nil {
 			return err
 		}
@@ -180,7 +188,7 @@ func (i *Installer) EnsureHydration(
 	if !topologyCurrent {
 		if err := i.overlays.PurgeRoot(
 			ctx,
-			i.builtInTopology.Root.ID,
+			i.rootID,
 		); err != nil {
 			return err
 		}
@@ -214,8 +222,8 @@ func (i *Installer) FinalizeHydration(
 	}
 	return i.mcp.EnsureBuiltInSourceCurrent(
 		ctx,
-		i.builtInTopology.Root.ID,
-		i.builtInTopology.Sources[0].ID,
+		i.rootID,
+		i.sourceID,
 	)
 }
 
@@ -243,8 +251,8 @@ func (i *Installer) DesiredPackageHydrations(
 				InstallerName: i.BuiltInName(),
 				Scope:         scope,
 			},
-			RootID:      i.builtInTopology.Root.ID,
-			SourceID:    i.builtInTopology.Sources[0].ID,
+			RootID:      i.rootID,
+			SourceID:    i.sourceID,
 			Fingerprint: digest,
 		})
 	}
@@ -258,8 +266,8 @@ func (i *Installer) ensurePackages(
 		if _, err := i.mcp.InstallBuiltInPackage(
 			ctx,
 			mcpConsumerAPI.BuiltInPackageInstallRequest{
-				RootID:         i.builtInTopology.Root.ID,
-				SourceID:       i.builtInTopology.Sources[0].ID,
+				RootID:         i.rootID,
+				SourceID:       i.sourceID,
 				PackageAddress: value.PackageAddress,
 				DocumentFile:   value.DocumentFile,
 				PackageFiles:   value.PackageFiles,

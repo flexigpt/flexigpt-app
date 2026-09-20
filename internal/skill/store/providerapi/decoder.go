@@ -31,8 +31,7 @@ func (*Decoder) Recognize(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) providerapi.Recognition {
-	if basespec.Locator(path.Base(string(candidate.Locator))) !=
-		skillDomain.SkillDefinitionFileName {
+	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
 		return providerapi.RecognitionNone
 	}
 	if candidate.RequestsDecoder(skillDomain.MarkdownDecoderID) {
@@ -45,8 +44,7 @@ func (*Decoder) Decode(
 	_ context.Context,
 	candidate providerapi.Candidate,
 ) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
-	if basespec.Locator(path.Base(string(candidate.Locator))) !=
-		skillDomain.SkillDefinitionFileName {
+	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
 		return nil, nil
 	}
 

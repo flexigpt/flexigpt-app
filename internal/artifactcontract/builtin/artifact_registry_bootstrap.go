@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -82,6 +83,17 @@ type BootstrapRegistry struct {
 	ensureMu   sync.Mutex
 	installers map[string]Installer
 	scopes     map[basespec.Locator]string
+}
+
+func NewDefaultBootstrapRegistry(
+	ensurer topology.Ensurer,
+	hydrator topology.HydrationCoordinator,
+) (*BootstrapRegistry, error) {
+	return NewBootstrapRegistry(
+		documentTopology.BuiltinTopologyDeclaration(),
+		ensurer,
+		hydrator,
+	)
 }
 
 func NewBootstrapRegistry(

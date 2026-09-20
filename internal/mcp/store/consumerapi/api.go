@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -98,7 +97,7 @@ func New(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
-			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
 			Limits:               resolve.DefaultLimits(),
 		},
 	)
@@ -419,6 +418,15 @@ func (a *API) InstallBuiltInPackage(
 	}
 	if err := request.SourceID.Validate(); err != nil {
 		return nil, err
+	}
+	if !documentTopology.IsBuiltinPackageSource(
+		request.RootID,
+		request.SourceID,
+	) {
+		return nil, fmt.Errorf(
+			"%w: MCP package does not target the declared built-in package Source",
+			basespec.ErrInvalid,
+		)
 	}
 	if err := request.PackageAddress.Validate(); err != nil {
 		return nil, err

@@ -242,6 +242,12 @@ func (a *API) validateBuiltInAgentPackageSource(
 	if err := address.Validate(); err != nil {
 		return err
 	}
+	if !documentTopology.IsBuiltinPackageSource(rootID, sourceID) {
+		return fmt.Errorf(
+			"%w: Agent built-in package does not target the declared built-in package Source",
+			basespec.ErrInvalid,
+		)
+	}
 	if address.Kind != agentDomain.BuiltinAgentCollectionPackageKind {
 		return fmt.Errorf(
 			"%w: built-in Agent package kind must be %q",

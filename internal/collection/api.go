@@ -18,6 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -27,9 +28,7 @@ import (
 )
 
 const (
-	ManagedCollectionPackageKind  source.PackageKind      = "plugin"
-	ManagedCollectionDocumentFile basespec.Locator        = "plugin.json"
-	ManagedCollectionVersion      basespec.LogicalVersion = "unversioned"
+	ManagedCollectionPackageKind source.PackageKind = "plugin"
 )
 
 type API struct {
@@ -690,7 +689,7 @@ func (a *API) create(
 	if err != nil {
 		return CollectionView{}, err
 	}
-	locator, err := address.FileLocator(ManagedCollectionDocumentFile)
+	locator, err := address.FileLocator(a.managedCollectionDocumentFile())
 	if err != nil {
 		return CollectionView{}, err
 	}
@@ -1103,7 +1102,7 @@ func managedCollectionAddressFor(
 	return source.NewManagedPackageAddress(
 		packageKind,
 		name,
-		ManagedCollectionVersion,
+		documentTopology.UnversionedPackageVersion(),
 	)
 }
 
@@ -1124,31 +1123,23 @@ func (a *API) managedCollectionPackageKind() source.PackageKind {
 	return ManagedCollectionPackageKind
 }
 
-func (a *API) managedCollectionDocumentFile() basespec.Locator {
-	if a != nil && a.domain != nil && a.domain.DocumentFile != "" {
-		return a.domain.DocumentFile
+func (a *API) managedCollectionDocumentUse() string {
+	if a != nil && a.domain != nil && a.domain.DocumentUse != "" {
+		return a.domain.DocumentUse
 	}
-	return ManagedCollectionDocumentFile
+	return documentTopology.DocumentUseManagedCollection
 }
 
-func (a *API) managedCollectionDecoderID() (
-	basespec.DecoderID,
-	error,
-) {
-	switch strings.ToLower(
-		path.Ext(string(a.managedCollectionDocumentFile())),
-	) {
-	case ".json":
-		return decoder.JSONDecoderID, nil
-	case ".yaml", ".yml":
-		return decoder.YAMLDecoderID, nil
-	default:
-		return "", fmt.Errorf(
-			"%w: managed Collection document file %q has no supported decoder",
-			basespec.ErrInvalid,
-			a.managedCollectionDocumentFile(),
-		)
-	}
+func (a *API) managedCollectionDocumentFile() basespec.Locator {
+	return documentTopology.MustDefaultDocumentFile(
+		a.managedCollectionDocumentUse(),
+	)
+}
+
+func (a *API) managedCollectionDecoderID() (basespec.DecoderID, error) {
+	return documentTopology.DefaultDocumentDecoderID(
+		a.managedCollectionDocumentUse(),
+	)
 }
 
 func managedCollectionAddressFromLocator(
@@ -1156,7 +1147,7 @@ func managedCollectionAddressFromLocator(
 ) (source.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		ManagedCollectionPackageKind,
-		ManagedCollectionDocumentFile,
+		documentTopology.MustDefaultDocumentFile(documentTopology.DocumentUseManagedCollection),
 		locator,
 	)
 }

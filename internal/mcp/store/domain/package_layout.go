@@ -4,17 +4,29 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
+
+func ManagedMCPDocumentFile() basespec.Locator {
+	return documentTopology.MustDefaultDocumentFile(
+		documentTopology.DocumentUseManagedMCP,
+	)
+}
+
+func ManagedMCPPolicyDocumentFile() basespec.Locator {
+	return documentTopology.MustDefaultDocumentFile(
+		documentTopology.DocumentUseManagedMCPPolicy,
+	)
+}
 
 func ManagedPackageAddressForMCP(
 	name basespec.LogicalName,
 	version basespec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
-		version = builtin.UnversionedPackageVersion
+		version = documentTopology.UnversionedPackageVersion()
 	}
 	return source.NewManagedPackageAddress(
 		ManagedMCPPackageKind,
@@ -29,7 +41,7 @@ func ManagedPackageLocatorForMCP(
 	if err := validateManagedMCPPackageAddress(address); err != nil {
 		return "", err
 	}
-	return address.FileLocator(ManagedMCPDocumentFile)
+	return address.FileLocator(ManagedMCPDocumentFile())
 }
 
 func ManagedPackageAddressFromMCPLocator(
@@ -38,12 +50,12 @@ func ManagedPackageAddressFromMCPLocator(
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(ManagedMCPDocumentFile) {
+	if path.Base(string(locator)) != string(ManagedMCPDocumentFile()) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: MCP locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			ManagedMCPDocumentFile,
+			ManagedMCPDocumentFile(),
 		)
 	}
 
@@ -65,12 +77,12 @@ func ManagedPackageAddressFromMCPPolicyLocator(
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
 	}
-	if path.Base(string(locator)) != string(ManagedMCPPolicyDocumentFile) {
+	if path.Base(string(locator)) != string(ManagedMCPPolicyDocumentFile()) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: MCP Policy locator %q is not %q",
 			basespec.ErrInvalid,
 			locator,
-			ManagedMCPPolicyDocumentFile,
+			ManagedMCPPolicyDocumentFile(),
 		)
 	}
 

@@ -6,8 +6,9 @@ import (
 	"io/fs"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -22,11 +23,12 @@ type InstallerDependencies struct {
 }
 
 type Installer struct {
-	skills          skillConsumerAPI.BuiltinStore
-	builtInTopology topology.Declaration
-	prepared        []PreparedPackage
-	packageScopes   []basespec.Locator
-	fingerprint     cryptoutil.Digest
+	skills        skillConsumerAPI.BuiltinStore
+	rootID        root.RootID
+	sourceID      source.SourceID
+	prepared      []PreparedPackage
+	packageScopes []basespec.Locator
+	fingerprint   cryptoutil.Digest
 }
 
 func NewInstaller(
@@ -39,12 +41,17 @@ func NewInstaller(
 		)
 	}
 
-	topologyValue := builtin.BuiltinTopologyDeclaration()
+	topologyValue := documentTopology.BuiltinTopologyDeclaration()
 	if err := topologyValue.Validate(); err != nil {
 		return nil, err
 	}
-	if len(topologyValue.Sources) != 1 ||
-		topologyValue.Sources[0].Kind != source.SourceKindManagedDirectory {
+	builtinSource, err := documentTopology.BuiltinSource(
+		documentTopology.BuiltinSourceRolePackages,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if builtinSource.Kind != source.SourceKindManagedDirectory {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill Source must be managed",
 			basespec.ErrInvalid,
@@ -71,11 +78,12 @@ func NewInstaller(
 	}
 
 	return &Installer{
-		skills:          dependencies.Skills,
-		builtInTopology: topologyValue,
-		prepared:        prepared,
-		packageScopes:   scopes,
-		fingerprint:     fingerprint,
+		skills:        dependencies.Skills,
+		rootID:        topologyValue.Root.ID,
+		sourceID:      builtinSource.ID,
+		prepared:      prepared,
+		packageScopes: scopes,
+		fingerprint:   fingerprint,
 	}, nil
 }
 
@@ -129,8 +137,8 @@ func (i *Installer) installPreparedPackage(
 	if _, err := i.skills.InstallBuiltInSkillPackage(
 		ctx,
 		skillConsumerAPI.BuiltInSkillPackageInstallRequest{
-			RootID:         i.builtInTopology.Root.ID,
-			SourceID:       i.builtInTopology.Sources[0].ID,
+			RootID:         i.rootID,
+			SourceID:       i.sourceID,
 			PackageAddress: value.PackageAddress,
 			DocumentFile:   value.DocumentFile,
 			PackageFiles:   value.PackageFiles,

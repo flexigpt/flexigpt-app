@@ -4,10 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"path"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -85,7 +83,7 @@ func New(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
-			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
 			Limits:               resolve.DefaultLimits(),
 		},
 	)
@@ -114,8 +112,8 @@ func SkillDiscoverySpec(
 	if r == "" {
 		r = "."
 	}
-	return documentTopology.DiscoverySpecAt(
-		"skill",
+	return documentTopology.DiscoverySpecAtForUse(
+		documentTopology.DiscoveryUseSkill,
 		r,
 	)
 }
@@ -348,12 +346,18 @@ func (a *API) CreateManagedSkill(
 	}
 	rootID := membership.Collection.Artifact.RootID
 	sourceID := membership.Collection.Artifact.Binding.SourceID
+	decoderID, err := documentTopology.DefaultDocumentDecoderID(
+		documentTopology.DocumentUseSkillPackage,
+	)
+	if err != nil {
+		return result, err
+	}
 	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
 		locator,
-		skillDomain.MarkdownDecoderID,
+		decoderID,
 	); err != nil {
 		return result, err
 	}
@@ -421,10 +425,11 @@ func (a *API) GetManagedSkillDocument(
 		)
 	}
 	if value.Binding.SubresourceLocator != "" ||
-		path.Base(string(value.Binding.Locator)) !=
-			string(skillDomain.SkillDefinitionFileName) {
+		!skillDomain.IsSkillDefinitionFile(
+			value.Binding.Locator,
+		) {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: managed Skill must originate at its package SKILL.md",
+			"%w: managed Skill must originate at a configured package document",
 			basespec.ErrUnsupported,
 		)
 	}
@@ -508,10 +513,11 @@ func (a *API) PurgeSkill(
 		)
 	}
 	if value.Binding.SubresourceLocator != "" ||
-		path.Base(string(value.Binding.Locator)) !=
-			string(skillDomain.SkillDefinitionFileName) {
+		!skillDomain.IsSkillDefinitionFile(
+			value.Binding.Locator,
+		) {
 		return fmt.Errorf(
-			"%w: managed Skill must originate at its package SKILL.md",
+			"%w: managed Skill must originate at a configured package document",
 			basespec.ErrUnsupported,
 		)
 	}

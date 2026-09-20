@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -16,7 +16,7 @@ func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
 ) (*compositionapi.Store, error) {
-	if err := builtin.ValidateApplicationTopology(); err != nil {
+	if err := documentTopology.ValidateApplicationTopology(); err != nil {
 		return nil, err
 	}
 
@@ -52,8 +52,8 @@ func composeArtifactStore(
 		compositionapi.Config{
 			BaseDirectory:    baseDirectory,
 			Providers:        providers,
-			ProtectedRootIDs: builtin.ProtectedRootIDs(),
-			RetainedRoots:    builtin.RetainedRootDrafts(),
+			ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
+			RetainedRoots:    documentTopology.RetainedRootDrafts(),
 		},
 	)
 }

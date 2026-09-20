@@ -37,8 +37,8 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 	next := current.Discovery.Clone()
 	include := append([]string(nil), request.Selector.Include...)
 	if len(include) == 0 {
-		defaultInclude, err := documentTopology.DiscoveryIncludePatterns(
-			"selector",
+		defaultInclude, err := documentTopology.DiscoveryIncludePatternsForUse(
+			documentTopology.DiscoveryUseSelector,
 		)
 		if err != nil {
 			return nil, err
@@ -88,10 +88,7 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 		return nil, err
 	}
 	next := current.Discovery.Clone()
-	candidates, err := locatedRefreshCandidates(header.Type, target)
-	if err != nil {
-		return nil, err
-	}
+	candidates := locatedRefreshCandidates(header.Type, target)
 	for _, candidate := range candidates {
 		inScope, err := next.InScope(candidate)
 		if err != nil {
@@ -192,20 +189,26 @@ func localRefreshLocator(
 func locatedRefreshCandidates(
 	declarationType declaration.Type,
 	target basespec.Locator,
-) ([]basespec.Locator, error) {
-	skillDocument, err := documentTopology.SkillPackageDocumentFile()
-	if err != nil {
-		return nil, err
-	}
+) []basespec.Locator {
 	if declarationType != declaration.TypeSkill ||
-		path.Base(string(target)) == string(skillDocument) {
-		return []basespec.Locator{target}, nil
+		documentTopology.IsSkillPackageDocument(target) {
+		return []basespec.Locator{target}
 	}
-	return []basespec.Locator{
-		target,
-		basespec.Locator(path.Join(
+
+	output := []basespec.Locator{target}
+	seen := map[basespec.Locator]struct{}{
+		target: {},
+	}
+	for _, skillDocument := range documentTopology.SkillPackageDocumentFiles() {
+		candidate := basespec.Locator(path.Join(
 			string(target),
 			string(skillDocument),
-		)),
-	}, nil
+		))
+		if _, duplicate := seen[candidate]; duplicate {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		output = append(output, candidate)
+	}
+	return output
 }

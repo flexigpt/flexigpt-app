@@ -32,8 +32,8 @@ func (i *Installer) DesiredHydration(
 
 	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
-		RootID:        i.builtInTopology.Root.ID,
-		SourceID:      i.builtInTopology.Sources[0].ID,
+		RootID:        i.rootID,
+		SourceID:      i.sourceID,
 		Fingerprint:   i.fingerprint,
 	}
 	if err := value.Validate(); err != nil {
@@ -67,8 +67,8 @@ func (i *Installer) DesiredPackageHydrations(
 				InstallerName: i.BuiltInName(),
 				Scope:         scope,
 			},
-			RootID:      i.builtInTopology.Root.ID,
-			SourceID:    i.builtInTopology.Sources[0].ID,
+			RootID:      i.rootID,
+			SourceID:    i.sourceID,
 			Fingerprint: fingerprint,
 		})
 	}
@@ -143,8 +143,8 @@ func (i *Installer) FinalizeHydration(
 	}
 	if err := i.agents.EnsureBuiltInAgentSourceCurrent(
 		ctx,
-		i.builtInTopology.Root.ID,
-		i.builtInTopology.Sources[0].ID,
+		i.rootID,
+		i.sourceID,
 	); err != nil {
 		return err
 	}
@@ -153,8 +153,8 @@ func (i *Installer) FinalizeHydration(
 		if err := i.agents.ValidateBuiltInAgentPackage(
 			ctx,
 			value.installRequest(
-				i.builtInTopology.Root.ID,
-				i.builtInTopology.Sources[0].ID,
+				i.rootID,
+				i.sourceID,
 			),
 		); err != nil {
 			return fmt.Errorf(

@@ -33,10 +33,10 @@ func SourceDocumentLocator(
 	if err != nil {
 		return "", err
 	}
-	if path.Base(string(target)) != string(SkillDefinitionFileName) {
+	if !IsSkillDefinitionFile(target) {
 		target = basespec.Locator(path.Join(
 			string(target),
-			string(SkillDefinitionFileName),
+			string(SkillDefinitionFileName()),
 		))
 	}
 	if err := target.Validate(false); err != nil {
@@ -61,12 +61,11 @@ func RuntimePackageLocator(
 			basespec.ErrUnsupported,
 		)
 	}
-	if path.Base(string(locator)) != string(SkillDefinitionFileName) {
+	if !IsSkillDefinitionFile(locator) {
 		return "", fmt.Errorf(
-			"%w: Skill locator %q is not %q",
+			"%w: Skill locator %q is not a configured Skill package document",
 			basespec.ErrInvalid,
 			locator,
-			SkillDefinitionFileName,
 		)
 	}
 

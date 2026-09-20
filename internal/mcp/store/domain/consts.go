@@ -16,14 +16,10 @@ const (
 		mcppolicyv1.MCPPolicyType,
 	)
 
-	SourceDecoderID basespec.DecoderID = "artifact.mcp-json"
-
 	ManagedMCPPackageKind       source.PackageKind = "mcp"
 	ManagedMCPPolicyPackageKind source.PackageKind = "mcp-policy"
 	MCPCollectionPackageKind    source.PackageKind = "mcp-collection"
-
-	ManagedMCPDocumentFile       basespec.Locator = "mcp.json"
-	ManagedMCPPolicyDocumentFile basespec.Locator = "mcp-policy.json"
+	SourceDecoderID             basespec.DecoderID = "artifact.mcp-json"
 
 	InstallationDataSchemaVersion = "v1"
 	BuiltInInstallerName          = "mcp"

@@ -6,8 +6,8 @@ import (
 	"io/fs"
 	"slices"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
 //go:embed skills
@@ -22,25 +22,48 @@ var embeddedMCPFS embed.FS
 // EmbeddedSkillPackages exposes the embedded Skill package tree to the Skill
 // built-in installer. Artifact Store itself never imports this package.
 func EmbeddedSkillPackages() (fs.FS, error) {
-	return embeddedSubtree(
-		embeddedSkillsFS,
-		EmbeddedSkillDataRoot,
+	return EmbeddedPackages(
+		documentTopology.BuiltinEmbeddedPackageSkills,
 	)
 }
 
 // EmbeddedAgentPackages exposes the embedded Agent Collection package tree to
 // the Agent built-in installer.
 func EmbeddedAgentPackages() (fs.FS, error) {
-	return embeddedSubtree(
-		embeddedAgentsFS,
-		EmbeddedAgentDataRoot,
+	return EmbeddedPackages(
+		documentTopology.BuiltinEmbeddedPackageAgents,
 	)
 }
 
 func EmbeddedMCPPackages() (fs.FS, error) {
+	return EmbeddedPackages(
+		documentTopology.BuiltinEmbeddedPackageMCPs,
+	)
+}
+
+// EmbeddedPackages exposes one configured embedded package set. The switch is
+// intentionally limited to compile-time go:embed roots; adding a new embedded
+// package family requires an explicit Go embed declaration as well as YAML.
+func EmbeddedPackages(packageSet string) (fs.FS, error) {
+	var embedded fs.FS
+	switch packageSet {
+	case documentTopology.BuiltinEmbeddedPackageSkills:
+		embedded = embeddedSkillsFS
+	case documentTopology.BuiltinEmbeddedPackageAgents:
+		embedded = embeddedAgentsFS
+	case documentTopology.BuiltinEmbeddedPackageMCPs:
+		embedded = embeddedMCPFS
+	default:
+		return nil, fmt.Errorf(
+			"%w: embedded package set %q is not compiled into the application",
+			basespec.ErrNotFound,
+			packageSet,
+		)
+	}
+
 	return embeddedSubtree(
-		embeddedMCPFS,
-		EmbeddedMCPDataRoot,
+		embedded,
+		documentTopology.MustBuiltinEmbeddedPackageRoot(packageSet),
 	)
 }
 
@@ -84,75 +107,6 @@ func DirectPackageRoots(
 	}
 	slices.Sort(output)
 	return output, nil
-}
-
-// PackageFileContent returns an owned copy of one package-relative file.
-func PackageFileContent(
-	files []source.ManagedPackageFile,
-	locator basespec.Locator,
-) ([]byte, bool) {
-	for _, file := range files {
-		if file.Locator != locator {
-			continue
-		}
-		return append([]byte(nil), file.Content...), true
-	}
-	return nil, false
-}
-
-// PackageFileContentOneOf returns exactly one package file whose locator is
-// listed in candidates. A package cannot contain two alternative root
-// documents because that would make its declaration root ambiguous.
-func PackageFileContentOneOf(
-	files []source.ManagedPackageFile,
-	candidates []basespec.Locator,
-) (documentFile basespec.Locator, document []byte, found bool, err error) {
-	if len(candidates) == 0 {
-		return "", nil, false, fmt.Errorf(
-			"%w: package document candidates are required",
-			basespec.ErrInvalid,
-		)
-	}
-
-	seenCandidates := make(map[basespec.Locator]struct{}, len(candidates))
-	for _, candidate := range candidates {
-		if err := candidate.ValidatePortable(false); err != nil {
-			return "", nil, false, err
-		}
-		if _, duplicate := seenCandidates[candidate]; duplicate {
-			return "", nil, false, fmt.Errorf(
-				"%w: duplicate package document candidate %q",
-				basespec.ErrInvalid,
-				candidate,
-			)
-		}
-		seenCandidates[candidate] = struct{}{}
-	}
-
-	var (
-		selected        basespec.Locator
-		selectedContent []byte
-	)
-	for _, candidate := range candidates {
-		content, found := PackageFileContent(files, candidate)
-		if !found {
-			continue
-		}
-		if selected != "" {
-			return "", nil, false, fmt.Errorf(
-				"%w: package contains both %q and %q",
-				basespec.ErrIdentityConflict,
-				selected,
-				candidate,
-			)
-		}
-		selected = candidate
-		selectedContent = content
-	}
-	if selected == "" {
-		return "", nil, false, nil
-	}
-	return selected, selectedContent, true, nil
 }
 
 func embeddedSubtree(

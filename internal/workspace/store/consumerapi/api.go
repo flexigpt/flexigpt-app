@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -105,7 +104,7 @@ func NewStoreAPI(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.FallbackProviders,
-			ProtectedBuiltinRoot: builtin.BuiltinRootID,
+			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
 			Refresh:              output,
 			Limits:               config.ResolverLimits,
 		},
@@ -391,7 +390,9 @@ func (a *StoreAPI) defaultDiscovery() (
 	source.DiscoverySpec,
 	error,
 ) {
-	value, err := documentTopology.DiscoverySpec("workspace")
+	value, err := documentTopology.DiscoverySpecForUse(
+		documentTopology.DiscoveryUseWorkspace,
+	)
 	if err != nil {
 		return source.DiscoverySpec{}, err
 	}

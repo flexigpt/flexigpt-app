@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
@@ -49,12 +50,11 @@ func EnsureBuiltinArtifactTopology(
 		agents == nil {
 		return errors.New("built-in topology dependencies are incomplete")
 	}
-	if err := builtin.ValidateApplicationTopology(); err != nil {
+	if err := documentTopology.ValidateApplicationTopology(); err != nil {
 		return err
 	}
 
-	bootstrap, err := builtin.NewBootstrapRegistry(
-		builtin.BuiltinTopologyDeclaration(),
+	bootstrap, err := builtin.NewDefaultBootstrapRegistry(
 		topologyAPI,
 		topologyAPI,
 	)

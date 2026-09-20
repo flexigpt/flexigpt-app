@@ -5,6 +5,7 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 )
 
@@ -70,56 +71,16 @@ func NewRegistry(resolvers ...TypeResolver) (*Registry, error) {
 }
 
 func DefaultRegistry() *Registry {
-	values := []TypeResolver{
-		registeredTypeResolver{
-			declarationType: declaration.TypeText,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeModel,
-			selectors:       true,
-			mappedFallback:  true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeTool,
-			selectors:       true,
-			mappedFallback:  true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeSkill,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeMCP,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeMCPPolicy,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypePlugin,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeAgent,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeTeam,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeLoop,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeWorkflow,
-			selectors:       true,
-		},
-		registeredTypeResolver{
-			declarationType: declaration.TypeWorkspace,
-		},
+	policies := documentTopology.ResolverTypePolicies()
+	values := make([]TypeResolver, 0, len(policies))
+	for _, policy := range policies {
+		values = append(values, registeredTypeResolver{
+			declarationType: policy.Type,
+			selectors:       policy.SupportsSelectors,
+			mappedFallback:  policy.SupportsMappedFallbackTargets,
+		})
 	}
+
 	registry, err := NewRegistry(values...)
 	if err != nil {
 		panic(err)
