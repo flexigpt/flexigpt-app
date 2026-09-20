@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"log/slog"
 
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/lookupimpl"
 	"github.com/flexigpt/flexigpt-app/internal/assistantpreset/spec"
@@ -183,18 +182,4 @@ func (w *AssistantPresetStoreWrapper) ListAssistantPresets(
 			)
 		},
 	)
-}
-
-func (w *AssistantPresetStoreWrapper) close() {
-	if w == nil || w.store == nil {
-		return
-	}
-	if err := w.store.Close(); err != nil {
-		slog.Error(
-			"failed to close artifact-backed assistant preset store",
-			"error",
-			err,
-		)
-	}
-	w.store = nil
 }

@@ -23,37 +23,35 @@ const (
 type App struct {
 	ctx context.Context
 
-	settingStoreAPI         *SettingStoreWrapper
-	conversationStoreAPI    *ConversationCollectionWrapper
-	modelPresetStoreAPI     *ModelPresetStoreWrapper
-	toolStoreAPI            *ToolStoreWrapper
-	toolRuntimeAPI          *ToolRuntimeWrapper
-	agentStoreAPI           *AgentStoreWrapper
-	agentBuiltInInstaller   builtin.HydrationInstaller
-	skillStoreAPI           *SkillStoreWrapper
-	skillBuiltInInstaller   builtin.HydrationInstaller
-	skillAggregateAPI       *SkillAggregateWrapper
-	skillRuntimeAPI         *SkillRuntimeWrapper
-	mcpStoreAPI             *MCPStoreWrapper
-	mcpRuntimeAPI           *MCPRuntimeWrapper
-	mcpAggregateAPI         *MCPAggregateWrapper
-	mcpBuiltInInstaller     builtin.HydrationInstaller
-	aggregateAPI            *AggregrateWrapper
-	assistantPresetStoreAPI *AssistantPresetStoreWrapper
-	workspaceStoreAPI       *WorkspaceStoreWrapper
-	workspaceRuntimeAPI     *WorkspaceRuntimeWrapper
-	workspaceAggregateAPI   *WorkspaceAggregateWrapper
+	settingStoreAPI       *SettingStoreWrapper
+	conversationStoreAPI  *ConversationCollectionWrapper
+	modelPresetStoreAPI   *ModelPresetStoreWrapper
+	toolStoreAPI          *ToolStoreWrapper
+	toolRuntimeAPI        *ToolRuntimeWrapper
+	agentStoreAPI         *AgentStoreWrapper
+	agentBuiltInInstaller builtin.HydrationInstaller
+	skillStoreAPI         *SkillStoreWrapper
+	skillBuiltInInstaller builtin.HydrationInstaller
+	skillAggregateAPI     *SkillAggregateWrapper
+	skillRuntimeAPI       *SkillRuntimeWrapper
+	mcpStoreAPI           *MCPStoreWrapper
+	mcpRuntimeAPI         *MCPRuntimeWrapper
+	mcpAggregateAPI       *MCPAggregateWrapper
+	mcpBuiltInInstaller   builtin.HydrationInstaller
+	aggregateAPI          *AggregrateWrapper
+	workspaceStoreAPI     *WorkspaceStoreWrapper
+	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
+	workspaceAggregateAPI *WorkspaceAggregateWrapper
 
 	artifactStoreComposition *compositionapi.Store
 
 	dataBasePath string
 
-	settingsDirPath         string
-	conversationsDirPath    string
-	modelPresetsDirPath     string
-	toolsDirPath            string
-	assistantPresetsDirPath string
-	artifactStoreDirPath    string
+	settingsDirPath      string
+	conversationsDirPath string
+	modelPresetsDirPath  string
+	toolsDirPath         string
+	artifactStoreDirPath string
 }
 
 func NewApp() *App {
@@ -88,12 +86,6 @@ func NewApp() *App {
 		app.dataBasePath,
 		storageName(documentTopology.ApplicationStorageToolsDirectory),
 	)
-	app.assistantPresetsDirPath = filepath.Join(
-		app.dataBasePath,
-		storageName(
-			documentTopology.ApplicationStorageAssistantPresetsDirectory,
-		),
-	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
@@ -103,7 +95,7 @@ func NewApp() *App {
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
-		app.assistantPresetsDirPath == "" || app.toolsDirPath == "" ||
+		app.toolsDirPath == "" ||
 		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
@@ -111,7 +103,6 @@ func NewApp() *App {
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
-			"assistantPresetsDirPath", app.assistantPresetsDirPath,
 			"toolsDirPath", app.toolsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
@@ -143,8 +134,6 @@ func NewApp() *App {
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
 	app.workspaceAggregateAPI = &WorkspaceAggregateWrapper{}
-
-	app.assistantPresetStoreAPI = &AssistantPresetStoreWrapper{}
 
 	if err := ensureAppPrivateDirectory(app.settingsDirPath); err != nil {
 		slog.Error(
@@ -181,15 +170,7 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create tools directory")
 	}
-	if err := ensureAppPrivateDirectory(app.assistantPresetsDirPath); err != nil {
 
-		slog.Error(
-			"failed to create assistant presets directory",
-			"assistant presets path", app.assistantPresetsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create assistant presets directory")
-	}
 	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
 
 		slog.Error(
@@ -207,7 +188,6 @@ func NewApp() *App {
 		"conversationsDirPath", app.conversationsDirPath,
 		"modelPresetsDirPath", app.modelPresetsDirPath,
 		"toolsDirPath", app.toolsDirPath,
-		"assistantPresetsDirPath", app.assistantPresetsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
@@ -507,28 +487,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("user Artifact baseline Collections initialized")
 
-	err = InitAssistantPresetStoreWrapper(
-		a.assistantPresetStoreAPI,
-		a.assistantPresetsDirPath,
-		a.modelPresetStoreAPI.store,
-		a.toolStoreAPI.store,
-		a.skillAggregateAPI.service,
-		a.mcpAggregateAPI.serverResolver,
-		a.mcpRuntimeAPI.runtime,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize assistant preset store",
-			"dir", a.assistantPresetsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: assistant preset store initialization failed\n" + err.Error())
-	}
-	slog.Info(
-		"assistant preset store initialized",
-		"dir", a.assistantPresetsDirPath,
-	)
-
 	err = InitAggregrateWrapper(
 		a.aggregateAPI,
 		a.modelPresetStoreAPI.store,
@@ -574,12 +532,7 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 // shutdown is called at application termination.
 func (a *App) shutdown(ctx context.Context) { //nolint:all
 	// Perform any teardown here.
-
 	// Stop background goroutines + flushes for stores that need it.
-
-	if a.assistantPresetStoreAPI != nil {
-		a.assistantPresetStoreAPI.close()
-	}
 	if a.mcpAggregateAPI != nil {
 		a.mcpAggregateAPI.close()
 	}
