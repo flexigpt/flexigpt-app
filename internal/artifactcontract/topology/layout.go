@@ -14,6 +14,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
+//go:embed contract_topology.yaml
+var layoutYAML []byte
+
 type documentFormat string
 
 const (
@@ -75,9 +78,6 @@ type aliasGroup struct {
 	name    string
 	aliases []documentAlias
 }
-
-//go:embed topology.yaml
-var layoutYAML []byte
 
 var configuredLayout = mustLoadLayout(layoutYAML)
 
