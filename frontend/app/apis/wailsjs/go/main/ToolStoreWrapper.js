@@ -37,3 +37,7 @@ export function PutTool(arg1) {
 export function PutToolBundle(arg1) {
   return window['go']['main']['ToolStoreWrapper']['PutToolBundle'](arg1);
 }
+
+export function ResolveMappedToolTarget(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['ResolveMappedToolTarget'](arg1);
+}

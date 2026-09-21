@@ -182,6 +182,20 @@ func (a *StoreAPI) RegisterFilesystemSource(
 func (a *StoreAPI) GetWorkspace(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
+) (workspaceDomain.WorkspaceView, error) {
+	value, err := a.ResolveWorkspace(ctx, ref)
+	if err != nil {
+		return workspaceDomain.WorkspaceView{}, err
+	}
+	return value.View(), nil
+}
+
+// ResolveWorkspace returns the rich in-process Workspace aggregate used by
+// conversation hydration and runtime materialization. Workspace carries
+// json:"-" fields and is not a consumer wire result.
+func (a *StoreAPI) ResolveWorkspace(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
 	if err := ref.Validate(); err != nil {
 		return workspaceDomain.Workspace{}, err
@@ -192,7 +206,7 @@ func (a *StoreAPI) GetWorkspace(
 func (a *StoreAPI) ListWorkspaces(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]workspaceDomain.Workspace, error) {
+) ([]workspaceDomain.WorkspaceView, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -200,7 +214,7 @@ func (a *StoreAPI) ListWorkspaces(
 	if err != nil {
 		return nil, err
 	}
-	output := make([]workspaceDomain.Workspace, 0)
+	output := make([]workspaceDomain.WorkspaceView, 0)
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, value := range values {
 		if value.Kind != workspaceDomain.WorkspaceArtifactKind ||
@@ -219,10 +233,10 @@ func (a *StoreAPI) ListWorkspaces(
 		output = append(output, workspace)
 	}
 	sort.Slice(output, func(left, right int) bool {
-		if output[left].Definition.LogicalName !=
-			output[right].Definition.LogicalName {
-			return output[left].Definition.LogicalName <
-				output[right].Definition.LogicalName
+		if output[left].Artifact.LogicalName !=
+			output[right].Artifact.LogicalName {
+			return output[left].Artifact.LogicalName <
+				output[right].Artifact.LogicalName
 		}
 		return output[left].Artifact.ID < output[right].Artifact.ID
 	})

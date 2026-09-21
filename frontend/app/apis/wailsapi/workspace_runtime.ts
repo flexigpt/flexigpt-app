@@ -1,70 +1,71 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type {
-	WorkspaceContextInspectionView,
-	WorkspaceContextLoadPlan,
-	WorkspaceContextView,
-	WorkspaceRef,
-	WorkspaceSkillLoadView,
-	WorkspaceSkillView,
-} from '@/spec/workspace';
+	WorkspaceMCPServerLoadPlan,
+	WorkspacePromptPlan,
+	WorkspaceRuntimePlan,
+	WorkspaceRuntimeSelection,
+	WorkspaceSkill,
+	WorkspaceSkillLoadPlan,
+} from '@/spec/workspace_store';
 
 import type { IWorkspaceRuntimeAPI } from '@/apis/interface';
-import { requireWailsBody, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
-	ComposeWorkspaceContext,
-	ListWorkspaceContexts,
+	ComposeWorkspacePrompt,
 	ListWorkspaceSkills,
-	LoadWorkspaceContexts,
+	LoadWorkspaceMCPServers,
 	LoadWorkspaceSkills,
+	ResolveWorkspaceRuntimePlan,
 } from '@/apis/wailsjs/go/main/WorkspaceRuntimeWrapper';
 
 export class WailsWorkspaceRuntimeAPI implements IWorkspaceRuntimeAPI {
-	async listWorkspaceContexts(workspace: WorkspaceRef): Promise<WorkspaceContextView[]> {
-		const response = await ListWorkspaceContexts({
-			workspace,
-		} as Parameters<typeof ListWorkspaceContexts>[0]);
-		const body = requireWailsBody(response.Body, 'ListWorkspaceContexts');
-		return wailsObjectArrayOrEmpty<WorkspaceContextView>(body.contexts, 'ListWorkspaceContexts.contexts');
+	async composeWorkspacePrompt(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspacePromptPlan> {
+		return requiredObject<WorkspacePromptPlan>(
+			await ComposeWorkspacePrompt(
+				workspace as Parameters<typeof ComposeWorkspacePrompt>[0],
+				artifacts as Parameters<typeof ComposeWorkspacePrompt>[1]
+			),
+			'ComposeWorkspacePrompt'
+		);
 	}
 
-	async loadWorkspaceContexts(
-		workspace: WorkspaceRef,
-		artifacts?: ArtifactRef[]
-	): Promise<WorkspaceContextInspectionView> {
-		const response = await LoadWorkspaceContexts({
-			workspace,
-			Body: {
-				artifacts,
-			},
-		} as Parameters<typeof LoadWorkspaceContexts>[0]);
-		return requireWailsBody(response.Body, 'LoadWorkspaceContexts') as WorkspaceContextInspectionView;
+	async listWorkspaceSkills(workspace: ArtifactRef): Promise<WorkspaceSkill[]> {
+		return wailsObjectArrayOrEmpty<WorkspaceSkill>(
+			await ListWorkspaceSkills(workspace as Parameters<typeof ListWorkspaceSkills>[0]),
+			'ListWorkspaceSkills'
+		);
 	}
 
-	async composeWorkspaceContext(workspace: WorkspaceRef, artifacts?: ArtifactRef[]): Promise<WorkspaceContextLoadPlan> {
-		const response = await ComposeWorkspaceContext({
-			workspace,
-			Body: {
-				artifacts,
-			},
-		} as Parameters<typeof ComposeWorkspaceContext>[0]);
-		return requireWailsBody(response.Body, 'ComposeWorkspaceContext') as WorkspaceContextLoadPlan;
+	async loadWorkspaceMCPServers(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceMCPServerLoadPlan> {
+		return requiredObject<WorkspaceMCPServerLoadPlan>(
+			await LoadWorkspaceMCPServers(
+				workspace as Parameters<typeof LoadWorkspaceMCPServers>[0],
+				artifacts as Parameters<typeof LoadWorkspaceMCPServers>[1]
+			),
+			'LoadWorkspaceMCPServers'
+		);
 	}
 
-	async listWorkspaceSkills(workspace: WorkspaceRef): Promise<WorkspaceSkillView[]> {
-		const response = await ListWorkspaceSkills({
-			workspace,
-		} as Parameters<typeof ListWorkspaceSkills>[0]);
-		const body = requireWailsBody(response.Body, 'ListWorkspaceSkills');
-		return wailsObjectArrayOrEmpty<WorkspaceSkillView>(body.skills, 'ListWorkspaceSkills.skills');
+	async loadWorkspaceSkills(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadPlan> {
+		return requiredObject<WorkspaceSkillLoadPlan>(
+			await LoadWorkspaceSkills(
+				workspace as Parameters<typeof LoadWorkspaceSkills>[0],
+				artifacts as Parameters<typeof LoadWorkspaceSkills>[1]
+			),
+			'LoadWorkspaceSkills'
+		);
 	}
 
-	async loadWorkspaceSkills(workspace: WorkspaceRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadView> {
-		const response = await LoadWorkspaceSkills({
-			workspace,
-			Body: {
-				artifacts,
-			},
-		} as Parameters<typeof LoadWorkspaceSkills>[0]);
-		return requireWailsBody(response.Body, 'LoadWorkspaceSkills') as WorkspaceSkillLoadView;
+	async resolveWorkspaceRuntimePlan(
+		workspace: ArtifactRef,
+		selection: WorkspaceRuntimeSelection
+	): Promise<WorkspaceRuntimePlan> {
+		return requiredObject<WorkspaceRuntimePlan>(
+			await ResolveWorkspaceRuntimePlan(
+				workspace as Parameters<typeof ResolveWorkspaceRuntimePlan>[0],
+				selection as Parameters<typeof ResolveWorkspaceRuntimePlan>[1]
+			),
+			'ResolveWorkspaceRuntimePlan'
+		);
 	}
 }

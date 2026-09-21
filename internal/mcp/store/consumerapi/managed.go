@@ -134,6 +134,267 @@ func (a *API) CreateManagedMCP(
 	return result, nil
 }
 
+// ReplaceManagedMCP replaces one complete managed MCP package while retaining
+// its Artifact identity, managed package address, and direct Collection
+// membership. Existing installation data is preserved only when it remains
+// valid for the replacement server document.
+func (a *API) ReplaceManagedMCP(
+	ctx context.Context,
+	request ManagedMCPReplaceRequest,
+) (ManagedMCPReplaceResult, error) {
+	if a == nil || a.collections == nil {
+		return ManagedMCPReplaceResult{}, basespec.ErrClosed
+	}
+	if err := request.Collection.Validate(); err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if err := request.Artifact.Validate(); err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if request.Collection.RootID != request.Artifact.RootID {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: MCP Artifact belongs to another Root",
+			basespec.ErrInvalid,
+		)
+	}
+	if request.ExpectedCollectionRevision == 0 {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if request.ExpectedArtifactRevision == 0 {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: expected MCP Artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if a.protection.IsProtectedRoot(request.Collection.RootID) {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: managed MCP replacement is not allowed in a protected Root",
+			basespec.ErrProtected,
+		)
+	}
+
+	collectionView, err := a.collections.Read(ctx, request.Collection)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
+		return ManagedMCPReplaceResult{}, basespec.ErrConflict
+	}
+	if !collectionView.Editable {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: MCP Collection is read-only",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	current, err := a.artifacts.Get(ctx, request.Artifact)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if current.Kind != mcpDomain.MCPArtifactKind {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: Artifact is not an MCP Server",
+			basespec.ErrUnsupported,
+		)
+	}
+	if current.Revision != request.ExpectedArtifactRevision {
+		return ManagedMCPReplaceResult{}, basespec.ErrConflict
+	}
+	if current.Binding.SubresourceLocator != "" {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: contained MCP declarations cannot be replaced as managed MCP packages",
+			basespec.ErrUnsupported,
+		)
+	}
+	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: MCP Server is not owned by this Collection Source",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	sourceValue, err := a.sources.Get(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: MCP Server is not backed by a managed Source",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	memberships, err := a.collections.ListMembershipsForArtifact(
+		ctx,
+		request.Artifact,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	memberFound := false
+	for _, membership := range memberships {
+		if membership.Collection != request.Collection ||
+			!membership.ResolvedToArtifact {
+			continue
+		}
+		memberFound = true
+		break
+	}
+	if !memberFound {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: MCP Server is not a direct member of the requested Collection",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+
+	if request.Document.LogicalName != current.LogicalName {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: replacement MCP logical name must remain %q",
+			basespec.ErrInvalid,
+			current.LogicalName,
+		)
+	}
+
+	definitionValue, err := mcpDomainServer.DefinitionForDocument(
+		request.Document,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+
+	currentAddress, err := mcpDomain.ManagedPackageAddressFromMCPLocator(
+		current.Binding.Locator,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	requestedAddress, err := mcpDomain.ManagedPackageAddressForMCP(
+		request.Document.LogicalName,
+		request.Document.LogicalVersion,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if requestedAddress != currentAddress {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: replacement MCP cannot change managed package identity",
+			basespec.ErrInvalid,
+		)
+	}
+
+	currentInstallation, err := a.GetServerInstallation(
+		ctx,
+		request.Artifact,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if err := currentInstallation.Installation.ValidateFor(
+		request.Artifact,
+		request.Document,
+	); err != nil {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: replacement MCP document is incompatible with current installation data: %w",
+			basespec.ErrConflict,
+			err,
+		)
+	}
+
+	inspection, err := a.discovery.InspectSource(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if !inspection.IsCurrent() {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: managed MCP Source requires refresh",
+			basespec.ErrRefreshRequired,
+		)
+	}
+
+	decoderID, err := documentTopology.DefaultDocumentDecoderID(
+		documentTopology.DocumentUseManagedMCP,
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+		current.Binding.Locator,
+		decoderID,
+	); err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+
+	published, err := a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: current.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID: current.Binding.SourceID,
+				Locator:  current.Binding.Locator,
+			},
+			ExpectedKind:        mcpDomain.MCPArtifactKind,
+			ExpectedLogicalName: current.LogicalName,
+			ExpectedDefinition:  definitionValue.Digest,
+			Package: source.ManagedPackagePublication{
+				Address:            currentAddress,
+				ExpectedGeneration: inspection.State.SourceGeneration,
+				Files: []source.ManagedPackageFile{{
+					Locator: mcpDomain.ManagedMCPDocumentFile(),
+					Content: append([]byte(nil), definitionValue.Body...),
+				}},
+			},
+			AllowPackageReplacement: true,
+		},
+	)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+	if published.Artifact.Ref() != request.Artifact {
+		return ManagedMCPReplaceResult{}, fmt.Errorf(
+			"%w: replacement published another MCP Artifact",
+			basespec.ErrConflict,
+		)
+	}
+
+	updated := published.Artifact
+	if updated.Enabled != request.Enabled {
+		updated, err = a.artifacts.SetEnabled(
+			ctx,
+			updated.Ref(),
+			updated.Revision,
+			request.Enabled,
+		)
+		if err != nil {
+			return ManagedMCPReplaceResult{}, err
+		}
+	}
+
+	collectionView, err = a.collections.Read(ctx, request.Collection)
+	if err != nil {
+		return ManagedMCPReplaceResult{}, err
+	}
+
+	return ManagedMCPReplaceResult{
+		Artifact:   updated,
+		Address:    updated.Address(),
+		Collection: collectionView,
+	}, nil
+}
+
 func (a *API) PurgeManagedMCP(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

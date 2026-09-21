@@ -17,7 +17,6 @@ import {
 	normalizeSkillRefs,
 	skillRefFromListItem,
 	skillRefKey,
-	toArtifactRefs,
 } from '@/skills/lib/skill_identity_utils';
 
 interface ApplySkillSelectionStateOptions {
@@ -340,10 +339,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			}
 
 			try {
-				const sess = await skillManagementAPI.createSkillSession({
+				const sess = await skillManagementAPI.createArtifactSkillSession({
 					closeSessionID: prevSessionID ?? undefined,
-					allowArtifacts: toArtifactRefs(nextEnabled),
-					activeArtifacts: toArtifactRefs(nextActive),
+					allowArtifacts: nextEnabled,
+					activeArtifacts: nextActive,
 				});
 
 				if (skillSessionSyncVersionRef.current !== syncVersion) {
@@ -636,11 +635,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 			return [];
 		}
 
-		const allowArtifacts = toArtifactRefs(allowSkillRefs);
-		const items = await skillManagementAPI.listRuntimeSkills({
+		const items = await skillManagementAPI.listArtifactRuntimeSkills({
 			sessionID: sid,
 			activity: RuntimeSkillActivity.Active,
-			allowArtifacts,
+			allowArtifacts: allowSkillRefs,
 		});
 
 		return clampActiveSkillRefsToEnabled(
@@ -671,10 +669,10 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		sessionStateKeyRef.current = '';
 
 		try {
-			const sess = await skillManagementAPI.createSkillSession({
+			const sess = await skillManagementAPI.createArtifactSkillSession({
 				closeSessionID: existing ?? undefined,
-				allowArtifacts: toArtifactRefs(currentEnabled),
-				activeArtifacts: toArtifactRefs(currentActive),
+				allowArtifacts: currentEnabled,
+				activeArtifacts: currentActive,
 			});
 
 			if (!sess.sessionID) {

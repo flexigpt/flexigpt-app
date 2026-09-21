@@ -1,5 +1,6 @@
-import type { HTTPToolImpl, Tool, ToolBundle, ToolListItem } from '@/spec/tool';
+import type { HTTPToolImpl, Tool, ToolBundle, ToolListItem, ToolRef } from '@/spec/tool';
 import { HTTPBodyOutputMode, ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
+import type { MappedTarget } from '@/spec/resolution';
 
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 
@@ -10,6 +11,7 @@ import {
 	jsonObjectToWails,
 	optionalWailsBody,
 	optionalWailsString,
+	requiredObject,
 	requireWailsBody,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
@@ -23,6 +25,7 @@ import {
 	PatchToolBundle,
 	PutTool,
 	PutToolBundle,
+	ResolveMappedToolTarget,
 } from '@/apis/wailsjs/go/main/ToolStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -213,5 +216,23 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 		const resp = await GetTool(req);
 		const body = optionalWailsBody(resp.Body, 'GetTool');
 		return body === undefined ? undefined : toolFromWails(body as Tool, 'GetTool');
+	}
+
+	async resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef> {
+		/*
+		 * The generated declaration currently incorrectly shares the model
+		 * resolver response body. The Tool Store endpoint must return toolRef.
+		 * Do not derive a ToolRef from MappedTarget.identifier.
+		 */
+		const response = (await ResolveMappedToolTarget({
+			target,
+		} as Parameters<typeof ResolveMappedToolTarget>[0])) as unknown as {
+			Body?: {
+				toolRef?: ToolRef;
+			};
+		};
+
+		const body = requiredObject(response.Body, 'ResolveMappedToolTarget');
+		return requiredObject<ToolRef>(body.toolRef, 'ResolveMappedToolTarget.toolRef');
 	}
 }

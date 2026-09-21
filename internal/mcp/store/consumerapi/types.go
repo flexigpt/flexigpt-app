@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -16,7 +15,6 @@ import (
 
 type ServerInstallationView struct {
 	Artifact             artifact.Artifact              `json:"artifact"`
-	Definition           definition.Definition          `json:"definition"`
 	Document             mcpDomainServer.ServerDocument `json:"document"`
 	Installation         mcpDomainServer.ServerData     `json:"installation"`
 	InstallationRevision uint64                         `json:"installationRevision"`
@@ -24,10 +22,9 @@ type ServerInstallationView struct {
 }
 
 type PolicyView struct {
-	Artifact   artifact.Artifact     `json:"artifact"`
-	Definition definition.Definition `json:"definition"`
-	Body       mcpPolicy.MCPPolicy   `json:"body"`
-	BuiltIn    bool                  `json:"builtIn"`
+	Artifact artifact.Artifact   `json:"artifact"`
+	Body     mcpPolicy.MCPPolicy `json:"body"`
+	BuiltIn  bool                `json:"builtIn"`
 }
 
 type ManagedMCPPolicyUpsertRequest struct {
@@ -58,6 +55,21 @@ type ManagedMCPCreateResult struct {
 	Address           artifact.ArtifactAddress  `json:"address"`
 	Collection        collection.CollectionView `json:"collection"`
 	MembershipCreated bool                      `json:"membershipCreated"`
+}
+
+type ManagedMCPReplaceRequest struct {
+	Collection                 artifact.ArtifactRef           `json:"collection"`
+	ExpectedCollectionRevision uint64                         `json:"expectedCollectionRevision"`
+	Artifact                   artifact.ArtifactRef           `json:"artifact"`
+	ExpectedArtifactRevision   uint64                         `json:"expectedArtifactRevision"`
+	Document                   mcpDomainServer.ServerDocument `json:"document"`
+	Enabled                    bool                           `json:"enabled"`
+}
+
+type ManagedMCPReplaceResult struct {
+	Artifact   artifact.Artifact         `json:"artifact"`
+	Address    artifact.ArtifactAddress  `json:"address"`
+	Collection collection.CollectionView `json:"collection"`
 }
 
 type BuiltInArtifactExpectation struct {

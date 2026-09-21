@@ -1,9 +1,8 @@
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import type { SkillBundle, SkillListItem } from '@/spec/skill';
 import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
-import { modelPresetStoreAPI, skillManagementAPI, toolStoreAPI } from '@/apis/baseapi';
+import { modelPresetStoreAPI, toolStoreAPI } from '@/apis/baseapi';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
 export async function getAllProviderPresetsMap(
@@ -55,17 +54,4 @@ export async function getAllToolBundles(bundleIDs?: string[], includeDisabled?: 
 			nextPageToken: page.nextPageToken,
 		};
 	});
-}
-
-export function getAllSkillBundles(bundleIDs?: string[], includeDisabled = true): Promise<SkillBundle[]> {
-	return skillManagementAPI.listSkillBundles(bundleIDs, includeDisabled);
-}
-
-export function getAllSkills(
-	bundleIDs?: string[],
-	_tags?: string[],
-	includeDisabled = true,
-	includeRuntimeMetadata = true
-): Promise<SkillListItem[]> {
-	return skillManagementAPI.listSkills(bundleIDs, includeDisabled, includeRuntimeMetadata);
 }

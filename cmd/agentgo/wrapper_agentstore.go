@@ -168,10 +168,10 @@ func (w *AgentStoreWrapper) GetAgent(
 
 func (w *AgentStoreWrapper) ResolveAgent(
 	ref artifact.ArtifactRef,
-) (*resolve.ResolvedEntry, error) {
+) (agentConsumerAPI.AgentResolution, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (*resolve.ResolvedEntry, error) {
+		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentResolution, error) {
 			return api.ResolveAgent(context.Background(), ref)
 		},
 	)
@@ -282,17 +282,6 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 			expectedRevision,
 		)
 	})
-}
-
-func (w *AgentStoreWrapper) AddAgentCollectionEntry(
-	request collection.AddEntryRequest,
-) (collection.CollectionView, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
-			return api.AddAgentCollectionEntry(context.Background(), request)
-		},
-	)
 }
 
 func (w *AgentStoreWrapper) AttachAgentToCollection(

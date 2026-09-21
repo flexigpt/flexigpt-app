@@ -402,6 +402,228 @@ func (a *API) CreateManagedSkill(
 	return result, nil
 }
 
+// ReplaceManagedSkill replaces the complete managed Skill package for an
+// existing managed Skill Artifact. The Skill Artifact identity, logical name,
+// package address, Collection membership, and managed Source remain stable.
+func (a *API) ReplaceManagedSkill(
+	ctx context.Context,
+	request ManagedSkillReplaceRequest,
+) (ManagedSkillReplaceResult, error) {
+	if a == nil || a.collections == nil {
+		return ManagedSkillReplaceResult{}, basespec.ErrClosed
+	}
+	if err := request.Collection.Validate(); err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if err := request.Artifact.Validate(); err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if request.Collection.RootID != request.Artifact.RootID {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill Artifact belongs to another Root",
+			basespec.ErrInvalid,
+		)
+	}
+	if request.ExpectedCollectionRevision == 0 {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: expected Collection revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if request.ExpectedArtifactRevision == 0 {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: expected Skill Artifact revision is required",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := basespec.LogicalName(request.SkillName).Validate(); err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+
+	collectionView, err := a.collections.Read(ctx, request.Collection)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
+		return ManagedSkillReplaceResult{}, basespec.ErrConflict
+	}
+	if !collectionView.Editable {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill Collection is read-only",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	current, err := a.GetSkill(ctx, request.Artifact)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if current.Revision != request.ExpectedArtifactRevision {
+		return ManagedSkillReplaceResult{}, basespec.ErrConflict
+	}
+	if current.Binding.SubresourceLocator != "" ||
+		!skillDomain.IsSkillDefinitionFile(current.Binding.Locator) {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill is not a replaceable managed Skill package",
+			basespec.ErrUnsupported,
+		)
+	}
+	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill is not owned by this Collection Source",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	sourceValue, err := a.sources.Get(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill is not backed by a managed Source",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	memberships, err := a.collections.ListMembershipsForArtifact(
+		ctx,
+		request.Artifact,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	memberFound := false
+	for _, membership := range memberships {
+		if membership.Collection != request.Collection ||
+			!membership.ResolvedToArtifact {
+			continue
+		}
+		memberFound = true
+		break
+	}
+	if !memberFound {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: Skill is not a direct member of the requested Collection",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+
+	files, skillMD, err := skillDomain.NormalizeManagedSkillFiles(
+		request.SKILLMD,
+		request.Files,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	definitionValue, _, err := skillDomain.DecodeSkillDocument(
+		skillMD,
+		request.SkillName,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if definitionValue.LogicalName != current.LogicalName {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: replacement Skill name must remain %q",
+			basespec.ErrInvalid,
+			current.LogicalName,
+		)
+	}
+
+	currentAddress, err := skillDomain.ManagedPackageAddressFromSkillLocator(
+		current.Binding.Locator,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	requestedAddress, err := skillDomain.ManagedPackageAddressForSkill(
+		definitionValue.LogicalName,
+		definitionValue.LogicalVersion,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if requestedAddress != currentAddress {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: replacement Skill cannot change managed package identity",
+			basespec.ErrInvalid,
+		)
+	}
+
+	inspection, err := a.discovery.InspectSource(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if !inspection.IsCurrent() {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: managed Skill Source requires refresh",
+			basespec.ErrRefreshRequired,
+		)
+	}
+
+	published, err := a.managedArtifacts.Publish(
+		ctx,
+		artifact.PublishArtifactRequest{
+			RootID: current.RootID,
+			Binding: artifact.SourceBinding{
+				SourceID: current.Binding.SourceID,
+				Locator:  current.Binding.Locator,
+			},
+			ExpectedKind:        skillDomain.SkillArtifactKind,
+			ExpectedLogicalName: current.LogicalName,
+			ExpectedDefinition:  definitionValue.Digest,
+			Package: source.ManagedPackagePublication{
+				Address:            currentAddress,
+				ExpectedGeneration: inspection.State.SourceGeneration,
+				Files:              files,
+			},
+			AllowPackageReplacement: true,
+		},
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+	if published.Artifact.Ref() != request.Artifact {
+		return ManagedSkillReplaceResult{}, fmt.Errorf(
+			"%w: replacement published another Skill Artifact",
+			basespec.ErrConflict,
+		)
+	}
+
+	updated := published.Artifact
+	if updated.Enabled != request.Enabled {
+		updated, err = a.artifacts.SetEnabled(
+			ctx,
+			updated.Ref(),
+			updated.Revision,
+			request.Enabled,
+		)
+		if err != nil {
+			return ManagedSkillReplaceResult{}, err
+		}
+	}
+
+	collectionView, err = a.collections.Read(ctx, request.Collection)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+
+	return ManagedSkillReplaceResult{
+		Artifact:   updated,
+		Address:    updated.Address(),
+		Collection: collectionView,
+	}, nil
+}
+
 func (a *API) GetManagedSkillDocument(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

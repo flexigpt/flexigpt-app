@@ -6,9 +6,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
 
@@ -32,48 +29,60 @@ func withWorkspaceRuntime[T any](
 func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
-) (prompt.Plan, error) {
-	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (prompt.Plan, error) {
-		return api.ComposeWorkspacePrompt(
-			context.Background(),
-			workspace,
-			artifacts,
-		)
-	})
+) (workspaceConsumerAPI.WorkspacePromptPlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspacePromptPlan, error) {
+			return api.ComposeWorkspacePrompt(
+				context.Background(),
+				workspace,
+				artifacts,
+			)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) ListWorkspaceSkills(
 	workspace artifact.ArtifactRef,
-) ([]skill.WorkspaceSkill, error) {
-	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) ([]skill.WorkspaceSkill, error) {
-		return api.ListWorkspaceSkills(context.Background(), workspace)
-	})
+) ([]workspaceConsumerAPI.WorkspaceSkill, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) ([]workspaceConsumerAPI.WorkspaceSkill, error) {
+			return api.ListWorkspaceSkills(context.Background(), workspace)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
-) (skill.LoadPlan, error) {
-	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (skill.LoadPlan, error) {
-		return api.LoadWorkspaceSkills(
-			context.Background(),
-			workspace,
-			artifacts,
-		)
-	})
+) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error) {
+			return api.LoadWorkspaceSkills(
+				context.Background(),
+				workspace,
+				artifacts,
+			)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
-) (mcp.LoadPlan, error) {
-	return withWorkspaceRuntime(w, func(api *workspaceConsumerAPI.StoreAPI) (mcp.LoadPlan, error) {
-		return api.LoadWorkspaceMCPServers(
-			context.Background(),
-			workspace,
-			artifacts,
-		)
-	})
+) (workspaceConsumerAPI.WorkspaceMCPServerLoadPlan, error) {
+	return withWorkspaceRuntime(
+		w,
+		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceMCPServerLoadPlan, error) {
+			return api.LoadWorkspaceMCPServers(
+				context.Background(),
+				workspace,
+				artifacts,
+			)
+		},
+	)
 }
 
 func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceRuntimePlan(

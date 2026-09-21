@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 )
@@ -14,11 +15,34 @@ const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
 
 // Workspace joins the ordinary Workspace Artifact record to its typed
 // workspacev1 Definition. It is a consumer value, not an Artifact Store
-// aggregate or parent entity.
+// aggregate, portable declaration, or consumer wire projection.
 type Workspace struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
-	Document   workspacev1.WorkspaceDocument
+	Artifact   artifact.Artifact             `json:"-"`
+	Definition definition.Definition         `json:"-"`
+	Document   workspacev1.WorkspaceDocument `json:"-"`
+}
+
+// WorkspaceView is the consumer-facing Workspace projection. Artifact is
+// intentionally exposed as the Artifact Store's stable public base record.
+// Definition.Body and WorkspaceDocument.Members remain internal.
+type WorkspaceView struct {
+	Artifact    artifact.Artifact `json:"artifact"`
+	Description string            `json:"description,omitempty"`
+}
+
+func (v WorkspaceView) Ref() artifact.ArtifactRef {
+	return v.Artifact.Ref()
+}
+
+func (v WorkspaceView) Validate() error {
+	if err := v.Artifact.Validate(); err != nil {
+		return err
+	}
+	return basespec.ValidateOptionalText(
+		"Workspace description",
+		v.Description,
+		basespec.MaxDescriptionBytes,
+	)
 }
 
 func NewWorkspace(
@@ -85,6 +109,13 @@ func NewWorkspace(
 		return Workspace{}, err
 	}
 	return output, nil
+}
+
+func (w Workspace) View() WorkspaceView {
+	return WorkspaceView{
+		Artifact:    w.Artifact.Clone(),
+		Description: w.Definition.Description,
+	}
 }
 
 func (w Workspace) Ref() artifact.ArtifactRef {

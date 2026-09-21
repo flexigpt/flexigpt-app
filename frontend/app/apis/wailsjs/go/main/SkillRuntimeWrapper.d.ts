@@ -12,8 +12,4 @@ export function InvokeSkillTool(arg1:runtime.InvokeSkillToolRequest):Promise<run
 
 export function ListSkills(arg1:runtime.ListSkillsRequest):Promise<runtime.ListSkillsResponse>;
 
-export function RemoveSkillCatalog(arg1:runtime.RemoveCatalogRequest):Promise<runtime.RemoveCatalogResponse>;
-
 export function RenderSkill(arg1:runtime.RenderSkillRequest):Promise<runtime.RenderSkillResponse>;
-
-export function SyncSkillCatalog(arg1:runtime.SyncCatalogRequest):Promise<runtime.SyncCatalogResponse>;

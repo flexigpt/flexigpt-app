@@ -17,6 +17,22 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
+) (WorkspacePromptPlan, error) {
+	value, err := a.ComposeWorkspacePromptForRuntime(
+		ctx,
+		workspace,
+		artifacts,
+	)
+	if err != nil {
+		return WorkspacePromptPlan{}, err
+	}
+	return projectWorkspacePromptPlan(value), nil
+}
+
+func (a *StoreAPI) ComposeWorkspacePromptForRuntime(
+	ctx context.Context,
+	workspace artifact.ArtifactRef,
+	artifacts []artifact.ArtifactRef,
 ) (prompt.Plan, error) {
 	value, capabilities, err := a.resolveWorkspaceCapabilities(
 		ctx,
@@ -43,6 +59,22 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 }
 
 func (a *StoreAPI) LoadWorkspaceSkills(
+	ctx context.Context,
+	workspace artifact.ArtifactRef,
+	artifacts []artifact.ArtifactRef,
+) (WorkspaceSkillLoadPlan, error) {
+	value, err := a.LoadWorkspaceSkillsForRuntime(
+		ctx,
+		workspace,
+		artifacts,
+	)
+	if err != nil {
+		return WorkspaceSkillLoadPlan{}, err
+	}
+	return projectWorkspaceSkillLoadPlan(value), nil
+}
+
+func (a *StoreAPI) LoadWorkspaceSkillsForRuntime(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
@@ -74,15 +106,31 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 func (a *StoreAPI) ListWorkspaceSkills(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
-) ([]skill.WorkspaceSkill, error) {
+) ([]WorkspaceSkill, error) {
 	plan, err := a.LoadWorkspaceSkills(ctx, workspace, nil)
 	if err != nil {
 		return nil, err
 	}
-	return plan.Skills, nil
+	return append([]WorkspaceSkill(nil), plan.Skills...), nil
 }
 
 func (a *StoreAPI) LoadWorkspaceMCPServers(
+	ctx context.Context,
+	workspace artifact.ArtifactRef,
+	artifacts []artifact.ArtifactRef,
+) (WorkspaceMCPServerLoadPlan, error) {
+	value, err := a.LoadWorkspaceMCPServersForRuntime(
+		ctx,
+		workspace,
+		artifacts,
+	)
+	if err != nil {
+		return WorkspaceMCPServerLoadPlan{}, err
+	}
+	return projectWorkspaceMCPServerLoadPlan(value), nil
+}
+
+func (a *StoreAPI) LoadWorkspaceMCPServersForRuntime(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
@@ -189,13 +237,13 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 		return WorkspaceRuntimePlan{}, err
 	}
 
-	return WorkspaceRuntimePlan{
-		Workspace:    value,
-		Capabilities: capabilities,
-		Prompt:       promptPlan,
-		Skills:       skillPlan,
-		MCPServers:   mcpPlan,
-	}, nil
+	return projectWorkspaceRuntimePlan(
+		value,
+		capabilities,
+		promptPlan,
+		skillPlan,
+		mcpPlan,
+	), nil
 }
 
 func (a *StoreAPI) loadWorkspaceMCPServers(

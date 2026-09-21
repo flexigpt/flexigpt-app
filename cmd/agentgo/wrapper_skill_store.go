@@ -181,6 +181,49 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 	})
 }
 
+// ListSkillCollectionsForManagement returns every domain-visible Skill
+// Collection across every Root. Root remains an internal storage concern;
+// callers receive CollectionView values and decide presentation from
+// Editable, Deletable, and Baseline.
+func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
+	[]collection.CollectionView,
+	error,
+) {
+	return middleware.WithRecoveryResp(func() ([]collection.CollectionView, error) {
+		if w == nil || w.api == nil || w.roots == nil {
+			return nil, basespec.ErrClosed
+		}
+
+		roots, err := w.roots.List(context.Background())
+		if err != nil {
+			return nil, err
+		}
+
+		output := make([]collection.CollectionView, 0)
+		for _, rootValue := range roots {
+			values, err := w.api.ListSkillCollections(
+				context.Background(),
+				rootValue.ID,
+			)
+			if err != nil {
+				return nil, err
+			}
+			output = append(output, values...)
+		}
+
+		sort.Slice(output, func(left, right int) bool {
+			if output[left].Artifact.RootID != output[right].Artifact.RootID {
+				return output[left].Artifact.RootID < output[right].Artifact.RootID
+			}
+			if output[left].Name != output[right].Name {
+				return output[left].Name < output[right].Name
+			}
+			return output[left].Artifact.ID < output[right].Artifact.ID
+		})
+		return output, nil
+	})
+}
+
 func (w *SkillStoreWrapper) GetSkill(
 	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
@@ -226,6 +269,20 @@ func (w *SkillStoreWrapper) CreateManagedSkill(
 	return withSkillStore(w, func(api *skillConsumerAPI.API) (skillConsumerAPI.ManagedSkillCreateResult, error) {
 		return api.CreateManagedSkill(context.Background(), request)
 	})
+}
+
+func (w *SkillStoreWrapper) ReplaceManagedSkill(
+	request skillConsumerAPI.ManagedSkillReplaceRequest,
+) (skillConsumerAPI.ManagedSkillReplaceResult, error) {
+	return withSkillStore(
+		w,
+		func(api *skillConsumerAPI.API) (skillConsumerAPI.ManagedSkillReplaceResult, error) {
+			return api.ReplaceManagedSkill(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *SkillStoreWrapper) GetManagedSkillDocument(

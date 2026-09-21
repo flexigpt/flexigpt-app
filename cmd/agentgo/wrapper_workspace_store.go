@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -152,18 +153,60 @@ func (w *WorkspaceStoreWrapper) AddWorkspacePath(
 
 func (w *WorkspaceStoreWrapper) GetWorkspace(
 	ref artifact.ArtifactRef,
-) (workspaceDomain.Workspace, error) {
-	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceDomain.Workspace, error) {
+) (workspaceDomain.WorkspaceView, error) {
+	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) (workspaceDomain.WorkspaceView, error) {
 		return api.GetWorkspace(context.Background(), ref)
 	})
 }
 
 func (w *WorkspaceStoreWrapper) ListWorkspaces(
 	rootID root.RootID,
-) ([]workspaceDomain.Workspace, error) {
-	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) ([]workspaceDomain.Workspace, error) {
+) ([]workspaceDomain.WorkspaceView, error) {
+	return withWorkspaceStore(w, func(api *workspaceConsumerAPI.StoreAPI) ([]workspaceDomain.WorkspaceView, error) {
 		return api.ListWorkspaces(context.Background(), rootID)
 	})
+}
+
+// ListWorkspacesForManagement returns public Workspace views across Roots.
+func (w *WorkspaceStoreWrapper) ListWorkspacesForManagement() (
+	[]workspaceDomain.WorkspaceView,
+	error,
+) {
+	return middleware.WithRecoveryResp(
+		func() ([]workspaceDomain.WorkspaceView, error) {
+			if w == nil || w.api == nil || w.roots == nil {
+				return nil, basespec.ErrClosed
+			}
+
+			roots, err := w.roots.List(context.Background())
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]workspaceDomain.WorkspaceView, 0)
+			for _, rootValue := range roots {
+				values, err := w.api.ListWorkspaces(
+					context.Background(),
+					rootValue.ID,
+				)
+				if err != nil {
+					return nil, err
+				}
+				output = append(output, values...)
+			}
+
+			sort.Slice(output, func(left, right int) bool {
+				if output[left].Artifact.RootID != output[right].Artifact.RootID {
+					return output[left].Artifact.RootID < output[right].Artifact.RootID
+				}
+				if output[left].Artifact.LogicalName != output[right].Artifact.LogicalName {
+					return output[left].Artifact.LogicalName < output[right].Artifact.LogicalName
+				}
+				return output[left].Artifact.ID < output[right].Artifact.ID
+			})
+			return output, nil
+		},
+	)
 }
 
 func (w *WorkspaceStoreWrapper) LoadWorkspace(

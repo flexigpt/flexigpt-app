@@ -138,24 +138,27 @@ func (d ServerDocument) OAuthClientSecretRequired() bool {
 }
 
 type MaterializedServer struct {
-	Core                           CoreServer
-	Auth                           AuthenticationDeclaration
-	ClientCredentialRef            string
-	ClientCredentialSecretRequired bool
-	TimeoutMS                      int
-	SensitiveValues                []string
+	Core                           CoreServer                `json:"-"`
+	Auth                           AuthenticationDeclaration `json:"-"`
+	ClientCredentialRef            string                    `json:"-"`
+	ClientCredentialSecretRequired bool                      `json:"-"`
+	TimeoutMS                      int                       `json:"-"`
+	SensitiveValues                []string                  `json:"-"`
 }
 
+// Resolved is backend runtime material. Consumer APIs project it into
+// domain-specific views and must not serialize connection or installation
+// internals directly.
 type Resolved struct {
-	Server               artifact.ArtifactRef `json:"server"`
-	ArtifactRevision     uint64               `json:"artifactRevision"`
-	DefinitionDigest     cryptoutil.Digest    `json:"definitionDigest"`
-	SourceContentDigest  cryptoutil.Digest    `json:"sourceContentDigest"`
-	SourceGeneration     string               `json:"sourceGeneration"`
-	Document             ServerDocument       `json:"document"`
-	Installation         ServerData           `json:"installation"`
-	Policy               mcpPolicy.Effective  `json:"policy"`
-	InstallationRevision uint64               `json:"installationRevision"`
-	BuiltIn              bool                 `json:"builtIn"`
-	Version              cryptoutil.Digest    `json:"version"`
+	Server               artifact.ArtifactRef `json:"-"`
+	ArtifactRevision     uint64               `json:"-"`
+	DefinitionDigest     cryptoutil.Digest    `json:"-"`
+	SourceContentDigest  cryptoutil.Digest    `json:"-"`
+	SourceGeneration     string               `json:"-"`
+	Document             ServerDocument       `json:"-"`
+	Installation         ServerData           `json:"-"`
+	Policy               mcpPolicy.Effective  `json:"-"`
+	InstallationRevision uint64               `json:"-"`
+	BuiltIn              bool                 `json:"-"`
+	Version              cryptoutil.Digest    `json:"-"`
 }

@@ -170,9 +170,6 @@ export function SkillBundleCard({
 	};
 
 	const patchSkillEnable = (skill: Skill, nextEnabled: boolean) => {
-		if (bundle.isBuiltIn || skill.isBuiltIn) {
-			return;
-		}
 		void runActionWithAlert(
 			`${skill.id}:toggle`,
 			() => onToggleSkillEnable(bundle.id, skill.id, skill.slug, nextEnabled),
@@ -181,14 +178,8 @@ export function SkillBundleCard({
 	};
 
 	const requestDeleteSkill = (skill: Skill) => {
-		if (bundle.isBuiltIn) {
-			setAlertMsg('Cannot delete skills from a built-in bundle.');
-			setShowAlert(true);
-			return;
-		}
-
-		if (skill.isBuiltIn) {
-			setAlertMsg('Cannot delete built-in skill.');
+		if (!bundle.isEditable) {
+			setAlertMsg('This Skill Bundle only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
@@ -222,20 +213,14 @@ export function SkillBundleCard({
 			return;
 		}
 
-		if ((mode === 'add' || mode === 'edit') && bundle.isBuiltIn) {
-			setAlertMsg('Cannot add or edit skills in a built-in bundle.');
+		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEditable) {
+			setAlertMsg('This Skill Bundle only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
 
-		if (mode === 'fork' && bundle.isBuiltIn) {
-			setAlertMsg('Forking into a built-in bundle is not supported. Create or use a custom bundle first.');
-			setShowAlert(true);
-			return;
-		}
-
-		if (mode === 'edit' && skill?.isBuiltIn) {
-			setAlertMsg('Built-in skills cannot be edited (only enabled/disabled).');
+		if (mode === 'edit' && (!skill?.isManaged || skillHasResources(skill))) {
+			setAlertMsg('Fork this Skill to edit it. Managed Skills with package resources cannot be replaced safely.');
 			setShowAlert(true);
 			return;
 		}
@@ -300,7 +285,6 @@ export function SkillBundleCard({
 						onChange={toggleBundleEnable}
 						busy={isPending('bundle:toggle')}
 						compact={false}
-						disabled={bundle.isBuiltIn}
 					/>
 				}
 				actions={
@@ -315,7 +299,7 @@ export function SkillBundleCard({
 							<FiEye size={16} />
 							<span>Details</span>
 						</button>
-						{!bundle.isBuiltIn ? (
+						{bundle.isEditable ? (
 							<>
 								<button
 									type="button"
@@ -347,18 +331,20 @@ export function SkillBundleCard({
 									<FiPlus size={16} />
 									<span>Add Skill</span>
 								</button>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={skills.length > 0 || Boolean(skillLoadError)}
-									onClick={() => {
-										onRequestBundleDelete(bundle);
-									}}
-								>
-									<FiTrash2 size={16} />
-									<span>Delete Bundle</span>
-								</button>
 							</>
+						) : null}
+						{bundle.isDeletable ? (
+							<button
+								type="button"
+								className="btn btn-sm btn-ghost rounded-xl"
+								disabled={skills.length > 0 || Boolean(skillLoadError)}
+								onClick={() => {
+									onRequestBundleDelete(bundle);
+								}}
+							>
+								<FiTrash2 size={16} />
+								<span>Delete Bundle</span>
+							</button>
 						) : null}
 					</>
 				}
@@ -402,7 +388,7 @@ export function SkillBundleCard({
 							{visibleSkills.map(skill => {
 								const insert = normalizeSkillInsert(skill.insert).value;
 								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
-								const editWouldReplaceResources = skill.isManaged && skillHasResources(skill);
+
 								const usage =
 									insert === SkillInsert.UserMessage
 										? 'Composer template'
@@ -462,7 +448,7 @@ export function SkillBundleCard({
 													onChange={enabled => {
 														patchSkillEnable(skill, enabled);
 													}}
-													disabled={!bundle.isEnabled || bundle.isBuiltIn || skill.isBuiltIn}
+													disabled={!bundle.isEnabled}
 													busy={isPending(`${skill.id}:toggle`)}
 													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
 												/>
@@ -485,13 +471,15 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('edit', skill);
 												}}
-												disabled={skill.isBuiltIn || bundle.isBuiltIn || !skill.isManaged || editWouldReplaceResources}
+												disabled={!bundle.isEditable || !skill.isManaged || skillHasResources(skill)}
 												title={
-													!skill.isManaged
-														? 'Only managed Skills can be edited'
-														: editWouldReplaceResources
-															? 'This package has resources. Document-only editing is disabled to avoid deleting them.'
-															: 'Edit'
+													!bundle.isEditable
+														? 'This Skill Bundle only supports enable and disable actions.'
+														: !skill.isManaged
+															? 'Only managed Skills can be edited. Fork this Skill to create a managed copy.'
+															: skillHasResources(skill)
+																? 'Fork this Skill to preserve package resources.'
+																: 'Edit Skill'
 												}
 											>
 												<FiEdit2 size={15} />
@@ -503,7 +491,7 @@ export function SkillBundleCard({
 												onClick={() => {
 													openSkillModal('fork', skill);
 												}}
-												disabled={bundle.isBuiltIn || !bundle.isEnabled}
+												disabled={!bundle.isEditable || !bundle.isEnabled}
 												title={!bundle.isEnabled ? 'Enable the bundle before forking.' : 'Fork skill'}
 											>
 												<FiGitBranch size={15} />
@@ -515,8 +503,8 @@ export function SkillBundleCard({
 												onClick={() => {
 													requestDeleteSkill(skill);
 												}}
-												disabled={skill.isBuiltIn || bundle.isBuiltIn || isPending(`${skill.id}:delete`)}
-												title={skill.isBuiltIn || bundle.isBuiltIn ? 'Built-in items cannot be deleted' : 'Delete'}
+												disabled={!bundle.isEditable || isPending(`${skill.id}:delete`)}
+												title={!bundle.isEditable ? 'This Skill Bundle is read-only' : 'Delete'}
 											>
 												<FiTrash2 size={15} />
 												<span>Delete</span>

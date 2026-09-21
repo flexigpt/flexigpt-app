@@ -195,7 +195,6 @@ func (a *API) GetServerInstallation(
 	}
 	return ServerInstallationView{
 		Artifact:             material.Resource.Artifact.Clone(),
-		Definition:           material.Resource.Definition.Clone(),
 		Document:             material.Document,
 		Installation:         material.Installation,
 		InstallationRevision: material.InstallationRevision,
@@ -236,9 +235,8 @@ func (a *API) GetMCPPolicy(
 		return PolicyView{}, err
 	}
 	return PolicyView{
-		Artifact:   resolved.Artifact.Clone(),
-		Definition: resolved.Definition.Clone(),
-		Body:       body,
+		Artifact: resolved.Artifact.Clone(),
+		Body:     body,
 		BuiltIn: a.protection.IsProtectedRoot(
 			resolved.Artifact.RootID,
 		),

@@ -97,26 +97,6 @@ func (a *API) DeleteAgentCollection(
 	)
 }
 
-func (a *API) AddAgentCollectionEntry(
-	ctx context.Context,
-	request collection.AddEntryRequest,
-) (collection.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
-	}
-	return a.collections.AddEntry(ctx, request)
-}
-
-func (a *API) EnsureAgentCollectionEntry(
-	ctx context.Context,
-	request collection.AddEntryRequest,
-) (collection.MemberMutationResult, error) {
-	if a == nil || a.collections == nil {
-		return collection.MemberMutationResult{}, basespec.ErrClosed
-	}
-	return a.collections.EnsureEntry(ctx, request)
-}
-
 func (a *API) AttachAgentToCollection(
 	ctx context.Context,
 	request AttachAgentToCollectionRequest,

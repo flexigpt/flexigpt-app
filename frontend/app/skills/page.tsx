@@ -11,7 +11,6 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { skillManagementAPI } from '@/apis/baseapi';
-import { getAllSkillBundles, getAllSkills } from '@/apis/list_helper';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -76,7 +75,7 @@ function rememberSkillBundleData(data: BundleData[]) {
 
 function buildSkillBundleData(
 	skillBundles: SkillBundle[],
-	skillListItems: Awaited<ReturnType<typeof getAllSkills>>
+	skillListItems: Awaited<ReturnType<typeof skillManagementAPI.listSkills>>
 ): BundleData[] {
 	const skillsByBundleID = new Map<string, BundleData['skills']>();
 
@@ -101,16 +100,15 @@ function buildSkillBundleData(
  * and in the conversation Workspace selector.
  */
 async function fetchSkillBundleData(): Promise<BundleData[]> {
-	const skillBundles = await getAllSkillBundles(undefined, true);
+	const skillBundles = await skillManagementAPI.listSkillBundles(undefined, true);
 	if (skillBundles.length === 0) {
 		return [];
 	}
 
 	// One request for all bundle IDs avoids relisting roots and bundles once
 	// for every bundle.
-	const skillListItems = await getAllSkills(
+	const skillListItems = await skillManagementAPI.listSkills(
 		skillBundles.map(bundle => bundle.id),
-		undefined,
 		true,
 		true
 	);
@@ -262,7 +260,7 @@ export default function SkillsPage() {
 				if (refreshSource) {
 					await skillManagementAPI.refreshSkillBundle(bundleID);
 				}
-				const skillListItems = await getAllSkills([bundleID], undefined, true, true);
+				const skillListItems = await skillManagementAPI.listSkills([bundleID], true, true);
 				const freshSkills = skillListItems.map(item => item.skillDefinition);
 
 				if (!isMountedRef.current || bundleRefreshRequestIdRef.current[bundleID] !== requestId) {
@@ -311,11 +309,6 @@ export default function SkillsPage() {
 	const handleBundleEnableChange = useCallback(
 		async (bundleID: string, nextEnabled: boolean) => {
 			try {
-				const bundle = bundles.find(item => item.bundle.id === bundleID)?.bundle;
-				if (bundle?.isBuiltIn) {
-					throw new Error('Built-in Skill Bundles are protected and read only.');
-				}
-
 				await skillManagementAPI.patchSkillBundle(bundleID, nextEnabled);
 
 				if (!isMountedRef.current) {
@@ -337,7 +330,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[setBundles, bundles]
+		[setBundles]
 	);
 
 	const handleSkillEnableChange = useCallback(
@@ -386,8 +379,8 @@ export default function SkillsPage() {
 			if (!bundleData) {
 				throw new Error('Skill bundle not found.');
 			}
-			if (bundleData.bundle.isBuiltIn) {
-				throw new Error('Cannot delete skills from a built-in bundle.');
+			if (!bundleData.bundle.isEditable) {
+				throw new Error('This Skill Bundle only supports enable and disable actions.');
 			}
 			const skill = bundleData.skills.find(item => item.id === skillID && item.slug === skillSlug);
 			if (!skill) {
@@ -434,37 +427,24 @@ export default function SkillsPage() {
 			if (!bundleData.bundle.isEnabled) {
 				throw new Error('Enable the skill bundle before adding or editing skills.');
 			}
+
 			if (existingSkillID) {
+				if (!bundleData.bundle.isEditable) {
+					throw new Error('This Skill Bundle only supports enable and disable actions.');
+				}
+
 				const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillID);
 				if (!existingSkill) {
 					throw new Error('Skill not found.');
 				}
-				if (existingSkill.isBuiltIn) {
-					throw new Error('Built-in skills cannot be edited.');
+				if (!existingSkill.isManaged) {
+					throw new Error('Only managed Skills can be edited. Fork this Skill to create a managed copy.');
 				}
 			}
 
 			try {
-				// A successful write is authoritative even if the follow-up list refresh fails.
-				if (existingSkillID) {
-					const existingSkill = bundleData.skills.find(skill => skill.id === existingSkillID);
-					if (!existingSkill) {
-						throw new Error('Skill not found.');
-					}
-
-					if (partial.artifactCreate) {
-						await skillManagementAPI.updateManagedSkill(bundleID, existingSkill.id, partial.artifactCreate);
-					} else {
-						await skillManagementAPI.patchSkill(
-							bundleID,
-							existingSkill.id,
-							partial.isEnabled,
-							partial.location,
-							partial.displayName,
-							partial.description,
-							partial.tags
-						);
-					}
+				if (existingSkillID && partial.artifactCreate) {
+					await skillManagementAPI.replaceManagedSkill(bundleID, existingSkillID, partial.artifactCreate);
 				} else if (partial.artifactCreate) {
 					const slug = (partial.name ?? partial.slug ?? '').trim();
 					const create = partial.artifactCreate;
@@ -524,9 +504,9 @@ export default function SkillsPage() {
 		}
 
 		const bundleData = bundles.find(item => item.bundle.id === deletingBundle.id);
-		if (bundleData?.bundle.isBuiltIn) {
+		if (!bundleData?.bundle.isDeletable) {
 			setBundleToDelete(null);
-			setAlertMsg('Built-in skill bundles cannot be deleted.');
+			setAlertMsg('This Skill Bundle cannot be deleted.');
 			setShowAlert(true);
 			return;
 		}

@@ -17,34 +17,34 @@ import (
 )
 
 type Contribution struct {
-	Artifact         artifact.ArtifactRef
-	ArtifactRevision uint64
-	DefinitionDigest cryptoutil.Digest
-	Kind             artifact.ArtifactKind
-	Name             string
-	Insert           declaration.InsertTarget
-	MediaType        string
-	Locator          basespec.Locator
-	Content          string
-	OriginalBytes    int
-	IncludedBytes    int
-	Truncated        bool
+	Artifact         artifact.ArtifactRef     `json:"-"`
+	ArtifactRevision uint64                   `json:"-"`
+	DefinitionDigest cryptoutil.Digest        `json:"-"`
+	Kind             artifact.ArtifactKind    `json:"-"`
+	Name             string                   `json:"-"`
+	Insert           declaration.InsertTarget `json:"-"`
+	MediaType        string                   `json:"-"`
+	Locator          basespec.Locator         `json:"-"`
+	Content          string                   `json:"-"`
+	OriginalBytes    int                      `json:"-"`
+	IncludedBytes    int                      `json:"-"`
+	Truncated        bool                     `json:"-"`
 }
 
 type Decision struct {
-	Artifact      artifact.ArtifactRef
-	Status        workspaceRuntime.CompositionStatus
-	Code          string
-	OriginalBytes int
-	IncludedBytes int
+	Artifact      artifact.ArtifactRef               `json:"-"`
+	Status        workspaceRuntime.CompositionStatus `json:"-"`
+	Code          string                             `json:"-"`
+	OriginalBytes int                                `json:"-"`
+	IncludedBytes int                                `json:"-"`
 }
 
 type Plan struct {
-	Workspace     artifact.ArtifactRef
-	Contributions []Contribution
-	Prompt        string
-	Diagnostics   []diagnostic.Diagnostic
-	Decisions     []Decision
+	Workspace     artifact.ArtifactRef    `json:"-"`
+	Contributions []Contribution          `json:"-"`
+	Prompt        string                  `json:"-"`
+	Diagnostics   []diagnostic.Diagnostic `json:"-"`
+	Decisions     []Decision              `json:"-"`
 }
 
 type Adapter struct {

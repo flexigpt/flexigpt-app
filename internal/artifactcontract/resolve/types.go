@@ -217,18 +217,20 @@ type FallbackProvider interface {
 	) (FallbackTarget, bool, error)
 }
 
+// ResolvedRelationship is in-process resolver graph state. Consumer APIs
+// expose CapabilityPlan rather than serializing resolver implementation data.
 type ResolvedRelationship struct {
-	Declared  declaration.Entry          `json:"declared"`
-	Form      declaration.MemberForm     `json:"form"`
-	Status    ResolutionStatus           `json:"status"`
-	Required  bool                       `json:"required"`
-	Scope     declaration.LookupScope    `json:"scope,omitempty"`
-	Overrides map[string]json.RawMessage `json:"overrides,omitempty"`
-	Use       map[string]json.RawMessage `json:"use,omitempty"`
+	Declared  declaration.Entry          `json:"-"`
+	Form      declaration.MemberForm     `json:"-"`
+	Status    ResolutionStatus           `json:"-"`
+	Required  bool                       `json:"-"`
+	Scope     declaration.LookupScope    `json:"-"`
+	Overrides map[string]json.RawMessage `json:"-"`
+	Use       map[string]json.RawMessage `json:"-"`
 
-	Resolved *ResolvedEntry    `json:"resolved,omitempty"`
-	Selector *ResolvedSelector `json:"selector,omitempty"`
-	Issue    *ResolutionIssue  `json:"issue,omitempty"`
+	Resolved *ResolvedEntry    `json:"-"`
+	Selector *ResolvedSelector `json:"-"`
+	Issue    *ResolutionIssue  `json:"-"`
 }
 
 func (r ResolvedRelationship) IsAvailable() bool {
@@ -237,79 +239,82 @@ func (r ResolvedRelationship) IsAvailable() bool {
 }
 
 type ResolvedSelector struct {
-	Type    declaration.Type        `json:"type"`
-	Base    basespec.Locator        `json:"base"`
-	Matches []ResolvedSelectorMatch `json:"matches"`
+	Type    declaration.Type        `json:"-"`
+	Base    basespec.Locator        `json:"-"`
+	Matches []ResolvedSelectorMatch `json:"-"`
 }
 
 type ResolvedSelectorMatch struct {
-	Artifact artifact.ArtifactRef `json:"artifact"`
-	Status   ResolutionStatus     `json:"status"`
-	Resolved *ResolvedEntry       `json:"resolved,omitempty"`
-	Issue    *ResolutionIssue     `json:"issue,omitempty"`
+	Artifact artifact.ArtifactRef `json:"-"`
+	Status   ResolutionStatus     `json:"-"`
+	Resolved *ResolvedEntry       `json:"-"`
+	Issue    *ResolutionIssue     `json:"-"`
 }
 
+// ResolvedEntry is an internal graph node. It can contain canonical
+// declaration bodies and nested relationships. CapabilityPlan is its
+// supported consumer-facing projection.
 type ResolvedEntry struct {
-	Type declaration.Type `json:"type"`
+	Type declaration.Type `json:"-"`
 
 	scopeRootID       root.RootID
-	DeclarationOrigin *artifact.Artifact
+	DeclarationOrigin *artifact.Artifact `json:"-"`
 
-	Artifact   *artifact.Artifact     `json:"artifact,omitempty"`
-	Definition *definition.Definition `json:"definition,omitempty"`
-	Mapped     *MappedTarget          `json:"mapped,omitempty"`
+	Artifact   *artifact.Artifact     `json:"-"`
+	Definition *definition.Definition `json:"-"`
+	Mapped     *MappedTarget          `json:"-"`
 
-	Members            []*ResolvedEntry       `json:"members,omitempty"`
-	MemberResults      []ResolvedRelationship `json:"memberResults,omitempty"`
-	AllowedTools       []*ResolvedEntry       `json:"allowedTools,omitempty"`
-	AllowedToolResults []ResolvedRelationship `json:"allowedToolResults,omitempty"`
+	Members            []*ResolvedEntry       `json:"-"`
+	MemberResults      []ResolvedRelationship `json:"-"`
+	AllowedTools       []*ResolvedEntry       `json:"-"`
+	AllowedToolResults []ResolvedRelationship `json:"-"`
 
-	DirectLoop           *ResolvedEntry        `json:"loop,omitempty"`
-	DirectLoopResult     *ResolvedRelationship `json:"loopResult,omitempty"`
-	DirectWorkflow       *ResolvedEntry        `json:"workflow,omitempty"`
-	DirectWorkflowResult *ResolvedRelationship `json:"workflowResult,omitempty"`
+	DirectLoop           *ResolvedEntry        `json:"-"`
+	DirectLoopResult     *ResolvedRelationship `json:"-"`
+	DirectWorkflow       *ResolvedEntry        `json:"-"`
+	DirectWorkflowResult *ResolvedRelationship `json:"-"`
 
-	Loop      *ResolvedLoop      `json:"loopState,omitempty"`
-	Workflow  *ResolvedWorkflow  `json:"workflowState,omitempty"`
-	Workspace *ResolvedWorkspace `json:"workspace,omitempty"`
-	MCP       *ResolvedMCP       `json:"mcp,omitempty"`
+	Loop      *ResolvedLoop      `json:"-"`
+	Workflow  *ResolvedWorkflow  `json:"-"`
+	Workspace *ResolvedWorkspace `json:"-"`
+	MCP       *ResolvedMCP       `json:"-"`
 }
 
 type ResolvedMCP struct {
-	Policy         *ResolvedEntry        `json:"policy,omitempty"`
-	PolicyResult   *ResolvedRelationship `json:"policyResult,omitempty"`
-	PolicyRequired bool                  `json:"policyRequired"`
+	Policy         *ResolvedEntry        `json:"-"`
+	PolicyResult   *ResolvedRelationship `json:"-"`
+	PolicyRequired bool                  `json:"-"`
 }
 
 type ResolvedLoop struct {
-	BodyResult    *ResolvedRelationship    `json:"bodyResult,omitempty"`
-	Body          *ResolvedEntry           `json:"body,omitempty"`
-	MaxIterations int                      `json:"maxIterations,omitempty"`
-	Until         *declaration.OutputMatch `json:"until,omitempty"`
+	BodyResult    *ResolvedRelationship    `json:"-"`
+	Body          *ResolvedEntry           `json:"-"`
+	MaxIterations int                      `json:"-"`
+	Until         *declaration.OutputMatch `json:"-"`
 }
 
 type ResolvedWorkflow struct {
-	Start []string               `json:"start"`
-	Nodes []ResolvedWorkflowNode `json:"nodes"`
-	Edges []ResolvedWorkflowEdge `json:"edges"`
+	Start []string               `json:"-"`
+	Nodes []ResolvedWorkflowNode `json:"-"`
+	Edges []ResolvedWorkflowEdge `json:"-"`
 }
 
 type ResolvedWorkflowNode struct {
-	ID           string                `json:"id"`
-	Join         string                `json:"join"`
-	Member       *ResolvedEntry        `json:"member,omitempty"`
-	MemberResult *ResolvedRelationship `json:"memberResult,omitempty"`
+	ID           string                `json:"-"`
+	Join         string                `json:"-"`
+	Member       *ResolvedEntry        `json:"-"`
+	MemberResult *ResolvedRelationship `json:"-"`
 }
 
 type ResolvedWorkflowEdge struct {
-	From  string                   `json:"from"`
-	To    string                   `json:"to"`
-	Match *declaration.OutputMatch `json:"match,omitempty"`
+	From  string                   `json:"-"`
+	To    string                   `json:"-"`
+	Match *declaration.OutputMatch `json:"-"`
 }
 
 type ResolvedWorkspace struct {
-	Members       []*ResolvedEntry       `json:"members"`
-	MemberResults []ResolvedRelationship `json:"memberResults"`
+	Members       []*ResolvedEntry       `json:"-"`
+	MemberResults []ResolvedRelationship `json:"-"`
 }
 
 func (r *ResolvedEntry) ArtifactRef() (artifact.ArtifactRef, bool) {

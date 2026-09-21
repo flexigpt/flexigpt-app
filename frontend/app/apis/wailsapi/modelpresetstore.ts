@@ -2,11 +2,13 @@ import type { ProviderName } from '@/spec/inference';
 import { ProviderSDKType } from '@/spec/inference';
 import type {
 	ModelPresetID,
+	ModelPresetRef,
 	PatchModelPresetPayload,
 	PatchProviderPresetPayload,
 	PostModelPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
+import type { MappedTarget } from '@/spec/resolution';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
 import {
@@ -15,6 +17,7 @@ import {
 	optionalWailsString,
 	requireNonBlankString,
 	requireWailsBody,
+	requiredObject,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
 	wailsRecordOrEmpty,
@@ -27,6 +30,7 @@ import {
 	PatchModelPreset,
 	PatchProviderPreset,
 	PostModelPreset,
+	ResolveMappedModelTarget,
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
 import type { spec } from '@/apis/wailsjs/go/models';
 
@@ -145,5 +149,17 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 			providers: providers,
 			nextPageToken: optionalWailsString(body.nextPageToken, 'ListProviderPresets.nextPageToken') || undefined,
 		};
+	}
+
+	async resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {
+		const response = await ResolveMappedModelTarget({
+			target,
+		} as Parameters<typeof ResolveMappedModelTarget>[0]);
+		const body = requiredObject<{ modelPresetRef?: ModelPresetRef }>(
+			response.Body,
+			'ResolveMappedModelTarget'
+		);
+
+		return requiredObject<ModelPresetRef>(body.modelPresetRef, 'ResolveMappedModelTarget.modelPresetRef');
 	}
 }

@@ -36,6 +36,13 @@ type ManagedSkillCreateRequest struct {
 	Enabled                    bool                        `json:"enabled"`
 }
 
+type ManagedSkillCreateResult struct {
+	Artifact          artifact.Artifact         `json:"artifact"`
+	Address           artifact.ArtifactAddress  `json:"address"`
+	Collection        collection.CollectionView `json:"collection"`
+	MembershipCreated bool                      `json:"membershipCreated"`
+}
+
 type BuiltInSkillArtifactExpectation struct {
 	Locator          basespec.Locator            `json:"locator"`
 	Subresource      basespec.SubresourceLocator `json:"subresource"`
@@ -53,9 +60,19 @@ type BuiltInSkillPackageInstallRequest struct {
 	Expectations   []BuiltInSkillArtifactExpectation `json:"expectations"`
 }
 
-type ManagedSkillCreateResult struct {
-	Artifact          artifact.Artifact         `json:"artifact"`
-	Address           artifact.ArtifactAddress  `json:"address"`
-	Collection        collection.CollectionView `json:"collection"`
-	MembershipCreated bool                      `json:"membershipCreated"`
+type ManagedSkillReplaceRequest struct {
+	Collection                 artifact.ArtifactRef        `json:"collection"`
+	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision"`
+	Artifact                   artifact.ArtifactRef        `json:"artifact"`
+	ExpectedArtifactRevision   uint64                      `json:"expectedArtifactRevision"`
+	SkillName                  string                      `json:"skillName"`
+	SKILLMD                    []byte                      `json:"skillMD,omitempty"`
+	Files                      []source.ManagedPackageFile `json:"files,omitempty"`
+	Enabled                    bool                        `json:"enabled"`
+}
+
+type ManagedSkillReplaceResult struct {
+	Artifact   artifact.Artifact         `json:"artifact"`
+	Address    artifact.ArtifactAddress  `json:"address"`
+	Collection collection.CollectionView `json:"collection"`
 }

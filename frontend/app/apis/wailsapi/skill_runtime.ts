@@ -1,21 +1,19 @@
 import type {
 	InvokeSkillToolResponse,
 	RuntimeSkillDefinition,
-	RuntimeSkillQuery,
 	RuntimeSkillRecord,
 	RuntimeSkillRenderResult,
 	RuntimeSkillSession,
 	RuntimeSkillSessionOptions,
 } from '@/spec/skill';
+import type { RuntimeSkillListFilter, RuntimeSkillPromptFilter } from '@/spec/skill_store';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { ISkillRuntimeAPI } from '@/apis/interface';
 import {
-	omitUndefined,
-	rawJSONToWails,
+	requiredObject,
 	requireNonBlankString,
-	requireWailsBody,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
@@ -25,82 +23,54 @@ import {
 	GetSkillsPrompt,
 	InvokeSkillTool,
 	ListSkills,
-	RemoveSkillCatalog,
 	RenderSkill,
-	SyncSkillCatalog,
 } from '@/apis/wailsjs/go/main/SkillRuntimeWrapper';
-import type { runtime as wailsRuntime } from '@/apis/wailsjs/go/models';
 
 export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
-	async syncSkillCatalog(catalogID: string): Promise<void> {
-		await SyncSkillCatalog({
-			catalogID: requireNonBlankString(catalogID, 'catalogID'),
-		} as wailsRuntime.SyncCatalogRequest);
-	}
-
-	async removeSkillCatalog(catalogID: string): Promise<void> {
-		await RemoveSkillCatalog({
-			catalogID: requireNonBlankString(catalogID, 'catalogID'),
-		} as wailsRuntime.RemoveCatalogRequest);
-	}
-
 	async createSkillSession(options: RuntimeSkillSessionOptions): Promise<RuntimeSkillSession> {
-		const body = omitUndefined({
-			closeSessionID: options.closeSessionID,
-			maxActivePerSession: options.maxActivePerSession,
-			allowedSkills: options.allowedSkills,
-			activeSkills: options.activeSkills,
-		}) as wailsRuntime.CreateSkillSessionRequestBody;
-
 		const response = await CreateSkillSession({
-			Body: body,
-		} as wailsRuntime.CreateSkillSessionRequest);
-		const responseBody = requireWailsBody(response.Body, 'CreateSkillSession');
+			Body: options,
+		} as Parameters<typeof CreateSkillSession>[0]);
 
-		return {
-			sessionID: requireWailsString(responseBody.sessionID, 'CreateSkillSession.sessionID'),
-			activeSkills: wailsObjectArrayOrEmpty(responseBody.activeSkills, 'CreateSkillSession.activeSkills'),
-		};
+		return requiredObject<RuntimeSkillSession>(response.Body, 'CreateSkillSession');
 	}
 
 	async closeSkillSession(sessionID: string): Promise<void> {
 		await CloseSkillSession({
 			SessionID: requireNonBlankString(sessionID, 'sessionID'),
-		} as wailsRuntime.CloseSkillSessionRequest);
+		} as Parameters<typeof CloseSkillSession>[0]);
 	}
 
-	async getSkillsPrompt(filter?: RuntimeSkillQuery): Promise<string> {
+	async getSkillsPrompt(filter?: RuntimeSkillPromptFilter): Promise<string> {
 		const request =
 			filter === undefined
 				? {}
 				: {
 						Body: {
-							filter: filter as wailsRuntime.SkillPromptFilter,
+							filter,
 						},
 					};
 
-		const response = await GetSkillsPrompt(request as wailsRuntime.GetSkillsPromptRequest);
-		const body = requireWailsBody(response.Body, 'GetSkillsPrompt');
+		const response = await GetSkillsPrompt(request as Parameters<typeof GetSkillsPrompt>[0]);
+		const body = requiredObject<{ prompt: unknown }>(response.Body, 'GetSkillsPrompt');
+
 		return requireWailsString(body.prompt, 'GetSkillsPrompt.prompt');
 	}
 
-	async listSkills(filter?: RuntimeSkillQuery): Promise<RuntimeSkillRecord[]> {
+	async listRuntimeSkills(filter?: RuntimeSkillListFilter): Promise<RuntimeSkillRecord[]> {
 		const request =
 			filter === undefined
 				? {}
 				: {
 						Body: {
-							filter: omitUndefined({
-								...filter,
-								inserts: filter.inserts,
-							}) as wailsRuntime.SkillListFilter,
+							filter,
 						},
 					};
 
-		const response = await ListSkills(request as wailsRuntime.ListSkillsRequest);
-		const body = requireWailsBody(response.Body, 'ListSkills');
+		const response = await ListSkills(request as Parameters<typeof ListSkills>[0]);
+		const body = requiredObject<{ skills?: RuntimeSkillRecord[] }>(response.Body, 'ListSkills');
 
-		return body.skills as RuntimeSkillRecord[];
+		return wailsObjectArrayOrEmpty<RuntimeSkillRecord>(body.skills, 'ListSkills.skills');
 	}
 
 	async renderSkill(
@@ -109,23 +79,23 @@ export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 	): Promise<RuntimeSkillRenderResult> {
 		const response = await RenderSkill({
 			Body: {
-				definition: definition,
+				definition,
 				arguments: args,
 			},
-		} as wailsRuntime.RenderSkillRequest);
+		} as Parameters<typeof RenderSkill>[0]);
 
-		return response.Body as RuntimeSkillRenderResult;
+		return requiredObject<RuntimeSkillRenderResult>(response.Body, 'RenderSkill');
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
 		const response = await InvokeSkillTool({
-			Body: omitUndefined({
+			Body: {
 				sessionID: requireNonBlankString(sessionID, 'sessionID'),
 				toolName: requireNonBlankString(toolName, 'toolName'),
-				args: args === undefined ? undefined : rawJSONToWails(args, 'skill tool arguments'),
-			}) as wailsRuntime.InvokeSkillToolRequestBody,
-		} as wailsRuntime.InvokeSkillToolRequest);
+				args,
+			},
+		} as Parameters<typeof InvokeSkillTool>[0]);
 
-		return requireWailsBody(response.Body, 'InvokeSkillTool') as InvokeSkillToolResponse;
+		return requiredObject<InvokeSkillToolResponse>(response.Body, 'InvokeSkillTool');
 	}
 }

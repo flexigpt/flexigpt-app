@@ -1,22 +1,25 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { SetWorkspaceArtifactRuntimeDisabledBody, WorkspaceArtifactView, WorkspaceRef } from '@/spec/workspace';
+import type { WorkspaceArtifactView } from '@/spec/workspace_store';
 
 import type { IWorkspaceAggregateAPI } from '@/apis/interface';
-import { requireWailsBody } from '@/apis/wailsapi/transport';
+import { requiredObject } from '@/apis/wailsapi/transport';
 import { SetWorkspaceArtifactRuntimeDisabled } from '@/apis/wailsjs/go/main/WorkspaceAggregateWrapper';
 
 export class WailsWorkspaceAggregateAPI implements IWorkspaceAggregateAPI {
 	async setWorkspaceArtifactRuntimeDisabled(
-		workspace: WorkspaceRef,
+		workspace: ArtifactRef,
 		artifact: ArtifactRef,
-		body: SetWorkspaceArtifactRuntimeDisabledBody
+		expectedRevision: number,
+		runtimeDisabled: boolean
 	): Promise<WorkspaceArtifactView> {
-		const response = await SetWorkspaceArtifactRuntimeDisabled({
-			workspace,
-			artifact,
-			Body: body,
-		} as Parameters<typeof SetWorkspaceArtifactRuntimeDisabled>[0]);
-
-		return requireWailsBody(response.Body, 'SetWorkspaceArtifactRuntimeDisabled') as WorkspaceArtifactView;
+		return requiredObject<WorkspaceArtifactView>(
+			await SetWorkspaceArtifactRuntimeDisabled(
+				workspace as Parameters<typeof SetWorkspaceArtifactRuntimeDisabled>[0],
+				artifact as Parameters<typeof SetWorkspaceArtifactRuntimeDisabled>[1],
+				expectedRevision,
+				runtimeDisabled
+			),
+			'SetWorkspaceArtifactRuntimeDisabled'
+		);
 	}
 }

@@ -28,13 +28,13 @@ type ServerResolver interface {
 }
 
 type WorkspaceServer struct {
-	Artifact artifact.ArtifactRef     `json:"artifact"`
-	Server   mcpDomainServer.Resolved `json:"server"`
+	Artifact artifact.ArtifactRef     `json:"-"`
+	Server   mcpDomainServer.Resolved `json:"-"`
 }
 
 type LoadPlan struct {
-	Workspace artifact.ArtifactRef `json:"workspace"`
-	Servers   []WorkspaceServer    `json:"servers"`
+	Workspace artifact.ArtifactRef `json:"-"`
+	Servers   []WorkspaceServer    `json:"-"`
 }
 
 type Adapter struct {

@@ -33,3 +33,7 @@ export function PatchProviderPreset(arg1) {
 export function PostModelPreset(arg1) {
   return window['go']['main']['ModelPresetStoreWrapper']['PostModelPreset'](arg1);
 }
+
+export function ResolveMappedModelTarget(arg1) {
+  return window['go']['main']['ModelPresetStoreWrapper']['ResolveMappedModelTarget'](arg1);
+}

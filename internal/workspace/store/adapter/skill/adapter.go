@@ -15,21 +15,21 @@ import (
 )
 
 type WorkspaceSkill struct {
-	Artifact         artifact.ArtifactRef
-	ArtifactRevision uint64
-	DefinitionDigest cryptoutil.Digest
-	SourceID         string
-	Locator          basespec.Locator
+	Artifact         artifact.ArtifactRef `json:"-"`
+	ArtifactRevision uint64               `json:"-"`
+	DefinitionDigest cryptoutil.Digest    `json:"-"`
+	SourceID         string               `json:"-"`
+	Locator          basespec.Locator     `json:"-"`
 
-	Document        document.SkillDocument
-	RuntimeLocation string
-	Version         string
-	RuntimeDisabled bool
+	Document        document.SkillDocument `json:"-"`
+	RuntimeLocation string                 `json:"-"`
+	Version         string                 `json:"-"`
+	RuntimeDisabled bool                   `json:"-"`
 }
 
 type LoadPlan struct {
-	Workspace artifact.ArtifactRef
-	Skills    []WorkspaceSkill
+	Workspace artifact.ArtifactRef `json:"-"`
+	Skills    []WorkspaceSkill     `json:"-"`
 }
 
 type Adapter struct {

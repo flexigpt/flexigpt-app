@@ -1,200 +1,209 @@
-import type { ArtifactCollectionRef, ArtifactRecord, ArtifactRef, ArtifactRootID } from '@/spec/artifact';
+import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
+import type { StoreArtifact } from '@/spec/artifact_store';
 import type {
-	MCPArtifactRegistration,
-	MCPBundle,
-	MCPBundleDocument,
-	MCPBundleInstallation,
-	MCPCreateBundleInput,
-	MCPPolicyView,
-	MCPServerInstallation,
-	MCPServerResolved,
-	MCPServerSchemaIdentity,
-} from '@/spec/mcp_artifact';
+	AddArtifactMemberRequest,
+	AddMemberRequest,
+	ArtifactMembershipView,
+	CollectionCapabilityPlan,
+	CollectionView,
+	CreateCollectionRequest,
+	DeleteCollectionRequest,
+	RemoveMemberRequest,
+	UpdateCollectionRequest,
+} from '@/spec/collection';
+import type {
+	ManagedMCPCreateRequest,
+	ManagedMCPCreateResult,
+	MCPManagedPolicyUpsertRequest,
+	MCPManagedPolicyUpsertResult,
+	MCPStorePolicyView,
+	MCPStoreServerInstallationView,
+} from '@/spec/mcp';
+import type { CapabilityPlan } from '@/spec/resolution';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
+import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
-	rawJSONFromWails,
-	rawJSONObjectToWails,
-	requiredObject,
-	requireWailsBody,
-	wailsObjectArrayOrEmpty,
-} from '@/apis/wailsapi/transport';
-import {
-	CreateMCPBundle,
-	GetMCPBundle,
-	GetMCPBundleDocument,
-	GetMCPBundleInstallation,
+	AddMCPCollectionMember,
+	AttachMCPArtifactToCollection,
+	CreateManagedMCP,
+	CreateMCPCollection,
+	DeleteMCPCollection,
+	GetMCPCollection,
+	GetMCPPolicy,
 	GetMCPServerInstallation,
-	GetMCPServerSchemaIdentity,
-	InspectMCPPolicy,
-	InspectMCPServer,
-	ListMCPBundlePolicies,
-	ListMCPBundles,
-	ListMCPBundleServers,
-	ListMCPBundlesForManagement,
-	UpdateBundleEnabled,
+	ListMCPCollectionMemberships,
+	ListMCPCollections,
+	ListMCPPolicies,
+	ListMCPServers,
+	ListMCPServersForManagement,
+	PurgeManagedMCP,
+	PurgeManagedMCPPolicy,
+	RemoveMCPCollectionMember,
+	ResolveMCPArtifactCapabilities,
+	ResolveMCPCollection,
+	SetMCPCollectionEnabled,
+	SetMCPPolicyEnabled,
+	SetMCPServerEnabled,
+	UpdateMCPCollection,
+	UpsertManagedMCPPolicy,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
-import type { consumerapi as wailsConsumerAPI } from '@/apis/wailsjs/go/models';
-
-function registrationToWails(value: MCPArtifactRegistration, field: string): unknown {
-	return {
-		ArtifactID: value.artifactID,
-		Subresource: value.subresource,
-		Kind: value.kind,
-		Enabled: value.enabled,
-		...(value.data === undefined ? {} : { Data: rawJSONObjectToWails(value.data, `${field}.data`) }),
-	};
-}
-
-function documentToWails(value: MCPBundleDocument, field: string): unknown {
-	return rawJSONObjectToWails(JSON.stringify(value), field);
-}
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
-	async listMCPBundlesForManagement(): Promise<MCPBundle[]> {
-		return wailsObjectArrayOrEmpty<MCPBundle>(await ListMCPBundlesForManagement(), 'ListMCPBundlesForManagement');
-	}
-
-	async getMCPServerSchemaIdentity(): Promise<MCPServerSchemaIdentity> {
-		return requiredObject<MCPServerSchemaIdentity>(await GetMCPServerSchemaIdentity(), 'GetMCPServerSchemaIdentity');
-	}
-
-	async createMCPBundle(input: MCPCreateBundleInput): Promise<MCPBundle> {
-		const response = await CreateMCPBundle({
-			body: {
-				RootID: input.rootID,
-				CollectionID: input.collectionID,
-				SourceID: input.sourceID,
-				SourceStorageKey: input.sourceStorageKey,
-				Document: documentToWails(input.document, 'CreateMCPBundle.document'),
-				Registrations: input.registrations.map((registration, index) =>
-					registrationToWails(registration, `CreateMCPBundle.registrations[${index}]`)
-				),
-			},
-		} as wailsConsumerAPI.CreateMCPBundleRequest);
-
-		return requiredObject<MCPBundle>(requireWailsBody(response.body, 'CreateMCPBundle.body'), 'CreateMCPBundle.body');
-	}
-
-	async getMCPBundle(bundle: ArtifactCollectionRef): Promise<MCPBundle> {
-		const response = await GetMCPBundle({
-			bundle,
-		} as wailsConsumerAPI.GetMCPBundleRequest);
-
-		return requiredObject<MCPBundle>(requireWailsBody(response.body, 'GetMCPBundle.body'), 'GetMCPBundle.body');
-	}
-
-	async listMCPBundles(rootID: ArtifactRootID): Promise<MCPBundle[]> {
-		const response = await ListMCPBundles({
-			rootID,
-		} as wailsConsumerAPI.ListMCPBundlesRequest);
-
-		const body = requiredObject<{ bundles?: MCPBundle[] }>(
-			requireWailsBody(response.body, 'ListMCPBundles.body'),
-			'ListMCPBundles.body'
-		);
-
-		return wailsObjectArrayOrEmpty<MCPBundle>(body.bundles, 'ListMCPBundles.body.bundles');
-	}
-
-	async getMCPBundleDocument(bundle: ArtifactCollectionRef): Promise<MCPBundleDocument> {
-		const response = await GetMCPBundleDocument({
-			bundle,
-		} as wailsConsumerAPI.GetMCPBundleDocumentRequest);
-
-		return requiredObject<MCPBundleDocument>(
-			requireWailsBody(response.body, 'GetMCPBundleDocument.body'),
-			'GetMCPBundleDocument.body'
+	async addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await AddMCPCollectionMember(request as Parameters<typeof AddMCPCollectionMember>[0]),
+			'AddMCPCollectionMember'
 		);
 	}
 
-	async listMCPBundleServers(bundle: ArtifactCollectionRef): Promise<ArtifactRecord[]> {
-		const response = await ListMCPBundleServers({
-			bundle,
-		} as wailsConsumerAPI.ListMCPBundleServersRequest);
-
-		const body = requiredObject<{ servers?: ArtifactRecord[] }>(
-			requireWailsBody(response.body, 'ListMCPBundleServers.body'),
-			'ListMCPBundleServers.body'
-		);
-
-		return wailsObjectArrayOrEmpty<ArtifactRecord>(body.servers, 'ListMCPBundleServers.body.servers');
-	}
-
-	async listMCPBundlePolicies(bundle: ArtifactCollectionRef): Promise<ArtifactRecord[]> {
-		const response = await ListMCPBundlePolicies({
-			bundle,
-		} as wailsConsumerAPI.ListMCPBundlePoliciesRequest);
-
-		const body = requiredObject<{ policies?: ArtifactRecord[] }>(
-			requireWailsBody(response.body, 'ListMCPBundlePolicies.body'),
-			'ListMCPBundlePolicies.body'
-		);
-
-		return wailsObjectArrayOrEmpty<ArtifactRecord>(body.policies, 'ListMCPBundlePolicies.body.policies');
-	}
-
-	async getMCPBundleInstallation(bundle: ArtifactCollectionRef): Promise<MCPBundleInstallation> {
-		const response = await GetMCPBundleInstallation({
-			bundle,
-		} as wailsConsumerAPI.GetMCPBundleInstallationRequest);
-
-		return requiredObject<MCPBundleInstallation>(
-			requireWailsBody(response.body, 'GetMCPBundleInstallation.body'),
-			'GetMCPBundleInstallation.body'
+	async attachMCPArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await AttachMCPArtifactToCollection(request as Parameters<typeof AttachMCPArtifactToCollection>[0]),
+			'AttachMCPArtifactToCollection'
 		);
 	}
 
-	async updateMCPBundleEnabled(
-		bundle: ArtifactCollectionRef,
+	async createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await CreateMCPCollection(request as Parameters<typeof CreateMCPCollection>[0]),
+			'CreateMCPCollection'
+		);
+	}
+
+	async createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
+		return requiredObject<ManagedMCPCreateResult>(
+			await CreateManagedMCP(request as Parameters<typeof CreateManagedMCP>[0]),
+			'CreateManagedMCP'
+		);
+	}
+
+	async deleteMCPCollection(request: DeleteCollectionRequest): Promise<void> {
+		await DeleteMCPCollection(request as Parameters<typeof DeleteMCPCollection>[0]);
+	}
+
+	async getMCPCollection(collection: ArtifactRef): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await GetMCPCollection(collection as Parameters<typeof GetMCPCollection>[0]),
+			'GetMCPCollection'
+		);
+	}
+
+	async getMCPPolicy(policy: ArtifactRef): Promise<MCPStorePolicyView> {
+		return requiredObject<MCPStorePolicyView>(
+			await GetMCPPolicy(policy as Parameters<typeof GetMCPPolicy>[0]),
+			'GetMCPPolicy'
+		);
+	}
+
+	async getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView> {
+		return requiredObject<MCPStoreServerInstallationView>(
+			await GetMCPServerInstallation(server as Parameters<typeof GetMCPServerInstallation>[0]),
+			'GetMCPServerInstallation'
+		);
+	}
+
+	async listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]> {
+		return wailsObjectArrayOrEmpty<ArtifactMembershipView>(
+			await ListMCPCollectionMemberships(artifact as Parameters<typeof ListMCPCollectionMemberships>[0]),
+			'ListMCPCollectionMemberships'
+		);
+	}
+
+	async listMCPCollections(rootID: ArtifactRootID): Promise<CollectionView[]> {
+		return wailsObjectArrayOrEmpty<CollectionView>(
+			await ListMCPCollections(rootID as Parameters<typeof ListMCPCollections>[0]),
+			'ListMCPCollections'
+		);
+	}
+
+	async listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
+		return wailsObjectArrayOrEmpty<StoreArtifact>(
+			await ListMCPPolicies(rootID as Parameters<typeof ListMCPPolicies>[0]),
+			'ListMCPPolicies'
+		);
+	}
+
+	async listMCPServers(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
+		return wailsObjectArrayOrEmpty<StoreArtifact>(
+			await ListMCPServers(rootID as Parameters<typeof ListMCPServers>[0]),
+			'ListMCPServers'
+		);
+	}
+
+	async listMCPServersForManagement(): Promise<StoreArtifact[]> {
+		return wailsObjectArrayOrEmpty<StoreArtifact>(await ListMCPServersForManagement(), 'ListMCPServersForManagement');
+	}
+
+	async purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void> {
+		await PurgeManagedMCP(server as Parameters<typeof PurgeManagedMCP>[0], expectedRevision);
+	}
+
+	async purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void> {
+		await PurgeManagedMCPPolicy(policy as Parameters<typeof PurgeManagedMCPPolicy>[0], expectedRevision);
+	}
+
+	async removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await RemoveMCPCollectionMember(request as Parameters<typeof RemoveMCPCollectionMember>[0]),
+			'RemoveMCPCollectionMember'
+		);
+	}
+
+	async resolveMCPArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan> {
+		return requiredObject<CapabilityPlan>(
+			await ResolveMCPArtifactCapabilities(artifact as Parameters<typeof ResolveMCPArtifactCapabilities>[0]),
+			'ResolveMCPArtifactCapabilities'
+		);
+	}
+
+	async resolveMCPCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
+		return requiredObject<CollectionCapabilityPlan>(
+			await ResolveMCPCollection(collection as Parameters<typeof ResolveMCPCollection>[0]),
+			'ResolveMCPCollection'
+		);
+	}
+
+	async setMCPCollectionEnabled(
+		collection: ArtifactRef,
 		expectedRevision: number,
 		enabled: boolean
-	): Promise<MCPBundle> {
-		return requiredObject<MCPBundle>(
-			await UpdateBundleEnabled(bundle as Parameters<typeof UpdateBundleEnabled>[0], expectedRevision, enabled),
-			'UpdateBundleEnabled'
+	): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await SetMCPCollectionEnabled(
+				collection as Parameters<typeof SetMCPCollectionEnabled>[0],
+				expectedRevision,
+				enabled
+			),
+			'SetMCPCollectionEnabled'
 		);
 	}
 
-	async getMCPServerInstallation(server: ArtifactRef): Promise<MCPServerInstallation> {
-		const response = await GetMCPServerInstallation({
-			server,
-		} as wailsConsumerAPI.GetMCPServerInstallationRequest);
-
-		return requiredObject<MCPServerInstallation>(
-			requireWailsBody(response.body, 'GetMCPServerInstallation.body'),
-			'GetMCPServerInstallation.body'
+	async setMCPPolicyEnabled(policy: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
+		return requiredObject<StoreArtifact>(
+			await SetMCPPolicyEnabled(policy as Parameters<typeof SetMCPPolicyEnabled>[0], expectedRevision, enabled),
+			'SetMCPPolicyEnabled'
 		);
 	}
 
-	async inspectMCPServer(server: ArtifactRef): Promise<MCPServerResolved> {
-		const response = await InspectMCPServer({
-			server,
-		} as wailsConsumerAPI.InspectMCPServerRequest);
-
-		return requiredObject<MCPServerResolved>(
-			requireWailsBody(response.body, 'InspectMCPServer.body'),
-			'InspectMCPServer.body'
+	async setMCPServerEnabled(server: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
+		return requiredObject<StoreArtifact>(
+			await SetMCPServerEnabled(server as Parameters<typeof SetMCPServerEnabled>[0], expectedRevision, enabled),
+			'SetMCPServerEnabled'
 		);
 	}
 
-	async inspectMCPPolicy(policy: ArtifactRef): Promise<MCPPolicyView> {
-		const response = await InspectMCPPolicy({
-			policy,
-		} as wailsConsumerAPI.InspectMCPPolicyRequest);
-
-		const value = requiredObject<MCPPolicyView>(
-			requireWailsBody(response.body, 'InspectMCPPolicy.body'),
-			'InspectMCPPolicy.body'
+	async updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
+		return requiredObject<CollectionView>(
+			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
+			'UpdateMCPCollection'
 		);
-		const definition = requireWailsBody(value.definition, 'InspectMCPPolicy.body.definition');
+	}
 
-		return {
-			...value,
-			definition: {
-				...definition,
-				body: rawJSONFromWails(definition.body, 'InspectMCPPolicy.body.definition.body'),
-			},
-		};
+	async upsertManagedMCPPolicy(request: MCPManagedPolicyUpsertRequest): Promise<MCPManagedPolicyUpsertResult> {
+		return requiredObject<MCPManagedPolicyUpsertResult>(
+			await UpsertManagedMCPPolicy(request as Parameters<typeof UpsertManagedMCPPolicy>[0]),
+			'UpsertManagedMCPPolicy'
+		);
 	}
 }

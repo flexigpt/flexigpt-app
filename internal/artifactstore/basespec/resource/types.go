@@ -21,10 +21,10 @@ type ResolveOptions struct{}
 //
 // Typed graph expansion remains outside this generic Store value.
 type ResolvedArtifact struct {
-	Artifact     artifact.Artifact     `json:"artifact"`
-	Definition   definition.Definition `json:"definition"`
-	Source       source.Summary        `json:"source"`
-	RefreshState source.RefreshState   `json:"refreshState"`
+	Artifact     artifact.Artifact     `json:"-"`
+	Definition   definition.Definition `json:"-"`
+	Source       source.Summary        `json:"-"`
+	RefreshState source.RefreshState   `json:"-"`
 }
 
 func (r ResolvedArtifact) Validate() error {
@@ -87,13 +87,13 @@ func (r ResolvedArtifact) Clone() ResolvedArtifact {
 // VerifiedEntry is a bounded, generation-confirmed Source read. It can be
 // used by consumers that need source material without creating an Artifact.
 type VerifiedEntry struct {
-	RootID           root.RootID       `json:"rootID"`
-	SourceID         source.SourceID   `json:"sourceID"`
-	Locator          basespec.Locator  `json:"locator"`
-	SourceRevision   uint64            `json:"sourceRevision"`
-	SourceGeneration string            `json:"sourceGeneration"`
-	Content          []byte            `json:"content"`
-	Digest           cryptoutil.Digest `json:"digest"`
+	RootID           root.RootID       `json:"-"`
+	SourceID         source.SourceID   `json:"-"`
+	Locator          basespec.Locator  `json:"-"`
+	SourceRevision   uint64            `json:"-"`
+	SourceGeneration string            `json:"-"`
+	Content          []byte            `json:"-"`
+	Digest           cryptoutil.Digest `json:"-"`
 }
 
 func (e VerifiedEntry) Validate() error {

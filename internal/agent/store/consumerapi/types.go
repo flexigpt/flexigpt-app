@@ -1,7 +1,7 @@
 package consumerapi
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -19,6 +19,11 @@ type AgentView struct {
 
 	BuiltIn bool `json:"builtIn"`
 	Managed bool `json:"managed"`
+}
+
+type AgentResolution struct {
+	Agent        AgentView              `json:"agent"`
+	Capabilities resolve.CapabilityPlan `json:"capabilities"`
 }
 
 type ListAgentsRequest struct {
@@ -48,8 +53,8 @@ type ManagedAgentCreateRequest struct {
 	Collection                 artifact.ArtifactRef `json:"collection"`
 	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
 
-	Document agentv1.AgentDocument `json:"document"`
-	Enabled  bool                  `json:"enabled"`
+	Document ManagedAgentDocument `json:"document"`
+	Enabled  bool                 `json:"enabled"`
 }
 
 type ManagedAgentCreateResult struct {
@@ -60,9 +65,9 @@ type ManagedAgentCreateResult struct {
 }
 
 type ManagedAgentReplaceRequest struct {
-	Agent            artifact.ArtifactRef  `json:"agent"`
-	ExpectedRevision uint64                `json:"expectedRevision"`
-	Document         agentv1.AgentDocument `json:"document"`
+	Agent            artifact.ArtifactRef `json:"agent"`
+	ExpectedRevision uint64               `json:"expectedRevision"`
+	Document         ManagedAgentDocument `json:"document"`
 }
 
 type ManagedAgentReplaceResult struct {

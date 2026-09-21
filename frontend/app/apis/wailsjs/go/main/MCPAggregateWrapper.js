@@ -6,10 +6,6 @@ export function ArtifactRefForRuntimeServerID(arg1) {
   return window['go']['main']['MCPAggregateWrapper']['ArtifactRefForRuntimeServerID'](arg1);
 }
 
-export function CollectionRefForRuntimeCatalogID(arg1) {
-  return window['go']['main']['MCPAggregateWrapper']['CollectionRefForRuntimeCatalogID'](arg1);
-}
-
 export function DeleteMCPServerSecret(arg1, arg2, arg3) {
   return window['go']['main']['MCPAggregateWrapper']['DeleteMCPServerSecret'](arg1, arg2, arg3);
 }
@@ -18,28 +14,12 @@ export function GetMCPServerAuthHealth(arg1) {
   return window['go']['main']['MCPAggregateWrapper']['GetMCPServerAuthHealth'](arg1);
 }
 
-export function PurgeMCPBundle(arg1, arg2) {
-  return window['go']['main']['MCPAggregateWrapper']['PurgeMCPBundle'](arg1, arg2);
-}
-
 export function PutMCPServerSecret(arg1, arg2, arg3, arg4) {
   return window['go']['main']['MCPAggregateWrapper']['PutMCPServerSecret'](arg1, arg2, arg3, arg4);
 }
 
-export function RefreshMCPBundle(arg1) {
-  return window['go']['main']['MCPAggregateWrapper']['RefreshMCPBundle'](arg1);
-}
-
-export function ReplaceMCPBundleDocument(arg1) {
-  return window['go']['main']['MCPAggregateWrapper']['ReplaceMCPBundleDocument'](arg1);
-}
-
-export function RetireMCPBundle(arg1, arg2) {
-  return window['go']['main']['MCPAggregateWrapper']['RetireMCPBundle'](arg1, arg2);
-}
-
-export function RuntimeCatalogIDForCollection(arg1) {
-  return window['go']['main']['MCPAggregateWrapper']['RuntimeCatalogIDForCollection'](arg1);
+export function RootIDForRuntimeCatalogID(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['RootIDForRuntimeCatalogID'](arg1);
 }
 
 export function RuntimeServerIDForArtifact(arg1) {
@@ -50,10 +30,6 @@ export function UpdateMCPServerInstallation(arg1, arg2, arg3) {
   return window['go']['main']['MCPAggregateWrapper']['UpdateMCPServerInstallation'](arg1, arg2, arg3);
 }
 
-export function UpdateProtectedMCPBundleInstallation(arg1, arg2, arg3) {
-  return window['go']['main']['MCPAggregateWrapper']['UpdateProtectedMCPBundleInstallation'](arg1, arg2, arg3);
-}
-
-export function UpdateProtectedMCPServerInstallation(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['MCPAggregateWrapper']['UpdateProtectedMCPServerInstallation'](arg1, arg2, arg3, arg4);
+export function UpdateProtectedMCPServerInstallation(arg1, arg2, arg3) {
+  return window['go']['main']['MCPAggregateWrapper']['UpdateProtectedMCPServerInstallation'](arg1, arg2, arg3);
 }

@@ -494,6 +494,11 @@ export interface SkillBundle {
 	description?: string;
 	isEnabled: boolean;
 	isBuiltIn: boolean;
+	isEditable: boolean;
+	isDeletable: boolean;
+	isBaseline: boolean;
+	sourceID: ArtifactSourceID;
+
 	attachments: SkillBundleAttachmentView[];
 	createdAt: string;
 	modifiedAt: string;

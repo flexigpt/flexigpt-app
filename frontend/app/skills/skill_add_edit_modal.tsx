@@ -274,8 +274,6 @@ function AddEditSkillModalContent({
 }: Omit<AddEditSkillModalProps, 'isOpen' | 'onClose'>) {
 	const requestedMode: ModalMode = mode ?? (initialData ? 'edit' : 'add');
 	const isForkMode = requestedMode === 'fork';
-	// Match the Tool modal pattern: unsupported impls can exist (viewable),
-	// but cannot be created/edited in the UI.
 	const isLockedSkill =
 		!isForkMode &&
 		(Boolean(initialData?.skill?.isBuiltIn) ||
@@ -778,7 +776,7 @@ function AddEditSkillModalContent({
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title={headerTitle}
-						description="Manage filesystem skill metadata, rendering behavior, resources, and runtime visibility."
+						description="Manage filesystem Skill metadata, rendering behavior, resources, and runtime visibility."
 						onClose={() => {
 							requestClose();
 						}}

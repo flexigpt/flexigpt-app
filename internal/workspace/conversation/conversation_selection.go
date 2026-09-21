@@ -111,18 +111,18 @@ type ConversationResolution struct {
 // WorkspaceSource is the narrow Root-scoped Workspace consumer port used by
 // conversation inference hydration.
 type WorkspaceSource interface {
-	GetWorkspace(
+	ResolveWorkspace(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (workspaceDomain.Workspace, error)
 
-	ComposeWorkspacePrompt(
+	ComposeWorkspacePromptForRuntime(
 		ctx context.Context,
 		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
 	) (prompt.Plan, error)
 
-	LoadWorkspaceSkills(
+	LoadWorkspaceSkillsForRuntime(
 		ctx context.Context,
 		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
@@ -157,7 +157,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		return ConversationResolution{}, err
 	}
 
-	workspace, err := r.workspaceAPI.GetWorkspace(
+	workspace, err := r.workspaceAPI.ResolveWorkspace(
 		ctx,
 		selection.Workspace,
 	)
@@ -198,7 +198,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 
 	p := ""
 	if len(contextRefs) != 0 {
-		plan, composeErr := r.workspaceAPI.ComposeWorkspacePrompt(
+		plan, composeErr := r.workspaceAPI.ComposeWorkspacePromptForRuntime(
 			ctx,
 			selection.Workspace,
 			contextRefs,
@@ -232,7 +232,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		}, err
 	}
 	if len(skillRefs) != 0 {
-		plan, loadErr := r.workspaceAPI.LoadWorkspaceSkills(
+		plan, loadErr := r.workspaceAPI.LoadWorkspaceSkillsForRuntime(
 			ctx,
 			selection.Workspace,
 			skillRefs,

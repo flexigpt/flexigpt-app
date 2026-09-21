@@ -22,14 +22,6 @@ export function ListSkills(arg1) {
   return window['go']['main']['SkillRuntimeWrapper']['ListSkills'](arg1);
 }
 
-export function RemoveSkillCatalog(arg1) {
-  return window['go']['main']['SkillRuntimeWrapper']['RemoveSkillCatalog'](arg1);
-}
-
 export function RenderSkill(arg1) {
   return window['go']['main']['SkillRuntimeWrapper']['RenderSkill'](arg1);
-}
-
-export function SyncSkillCatalog(arg1) {
-  return window['go']['main']['SkillRuntimeWrapper']['SyncSkillCatalog'](arg1);
 }

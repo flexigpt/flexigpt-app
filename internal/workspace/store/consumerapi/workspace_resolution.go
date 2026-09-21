@@ -24,16 +24,9 @@ func (a *StoreAPI) LoadWorkspace(
 		return WorkspaceLoad{}, err
 	}
 
-	members := make([]declaration.Entry, len(workspace.Document.Members))
-	for index, value := range workspace.Document.Members {
-		members[index] = value.Clone()
-	}
-
 	return WorkspaceLoad{
-		Workspace:    workspace,
-		Members:      members,
+		Workspace:    workspace.View(),
 		Capabilities: capabilities,
-		resolved:     resolved.Workspace,
 	}, nil
 }
 
@@ -72,7 +65,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 			nil,
 			basespec.ErrClosed
 	}
-	workspace, err := a.GetWorkspace(ctx, ref)
+	workspace, err := a.ResolveWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err
 	}

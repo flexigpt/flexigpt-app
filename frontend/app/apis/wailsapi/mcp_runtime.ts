@@ -1,10 +1,14 @@
 import type {
+	MCPAuthSettings,
+	MCPCompleteArgumentRequestBody,
+	MCPRuntimeInvokeToolResponse,
+	MCPRuntimeServerSnapshot,
+} from '@/spec/mcp';
+import type {
 	InvokeMCPToolRequestBody,
-	InvokeMCPToolResponseBody,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
-	MCPCompletionRefType,
 	MCPCompletionResult,
 	MCPGetPromptResponseBody,
 	MCPGlobalSettings,
@@ -15,7 +19,6 @@ import type {
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPRuntimeServerID,
-	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
 } from '@/spec/mcp_artifact';
 
@@ -29,6 +32,7 @@ import {
 import {
 	CancelPendingMCPOAuthAuthorization,
 	CompleteMCPArgument,
+	ConnectMCPServer,
 	DisconnectMCPServer,
 	EvaluateMappedMCPToolCall,
 	EvaluateMCPToolCall,
@@ -38,9 +42,13 @@ import {
 	InvokeMappedMCPTool,
 	InvokeMCPTool,
 	ListMCPServerPrompts,
+	ListMCPServerPromptsPage,
 	ListMCPServerResources,
+	ListMCPServerResourcesPage,
 	ListMCPServerResourceTemplates,
+	ListMCPServerResourceTemplatesPage,
 	ListMCPServerTools,
+	ListMCPServerToolsPage,
 	ListPendingMCPOAuthAuthorizations,
 	ReadMCPResource,
 	RefreshMCPServer,
@@ -50,10 +58,30 @@ import {
 } from '@/apis/wailsjs/go/main/MCPRuntimeWrapper';
 
 export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
-	async connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return requiredObject<MCPServerRuntimeSnapshot>(
-			await StartMCPServerConnect(server as Parameters<typeof StartMCPServerConnect>[0]),
-			'StartMCPServerConnect'
+	async cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
+		return requireWailsBoolean(
+			await CancelPendingMCPOAuthAuthorization(server as Parameters<typeof CancelPendingMCPOAuthAuthorization>[0]),
+			'CancelPendingMCPOAuthAuthorization'
+		);
+	}
+
+	async completeMCPArgument(
+		server: MCPRuntimeServerID,
+		request: MCPCompleteArgumentRequestBody
+	): Promise<MCPCompletionResult> {
+		return requiredObject<MCPCompletionResult>(
+			await CompleteMCPArgument(
+				server as Parameters<typeof CompleteMCPArgument>[0],
+				request as Parameters<typeof CompleteMCPArgument>[1]
+			),
+			'CompleteMCPArgument'
+		);
+	}
+
+	async connectMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
+		return requiredObject<MCPRuntimeServerSnapshot>(
+			await ConnectMCPServer(server as Parameters<typeof ConnectMCPServer>[0]),
+			'ConnectMCPServer'
 		);
 	}
 
@@ -61,86 +89,16 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		await DisconnectMCPServer(server as Parameters<typeof DisconnectMCPServer>[0]);
 	}
 
-	async refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return requiredObject<MCPServerRuntimeSnapshot>(
-			await RefreshMCPServer(server as Parameters<typeof RefreshMCPServer>[0]),
-			'RefreshMCPServer'
-		);
-	}
-
-	async getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return requiredObject<MCPServerRuntimeSnapshot>(
-			await GetMCPServerStatus(server as Parameters<typeof GetMCPServerStatus>[0]),
-			'GetMCPServerStatus'
-		);
-	}
-
-	async listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]> {
-		return wailsObjectArrayOrEmpty<MCPToolCapability>(
-			await ListMCPServerTools(server as Parameters<typeof ListMCPServerTools>[0]),
-			'ListMCPServerTools'
-		);
-	}
-
-	async listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]> {
-		return wailsObjectArrayOrEmpty<MCPResourceRef>(
-			await ListMCPServerResources(server as Parameters<typeof ListMCPServerResources>[0]),
-			'ListMCPServerResources'
-		);
-	}
-
-	async listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]> {
-		return wailsObjectArrayOrEmpty<MCPResourceTemplateRef>(
-			await ListMCPServerResourceTemplates(server as Parameters<typeof ListMCPServerResourceTemplates>[0]),
-			'ListMCPServerResourceTemplates'
-		);
-	}
-
-	async listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]> {
-		return wailsObjectArrayOrEmpty<MCPPromptRef>(
-			await ListMCPServerPrompts(server as Parameters<typeof ListMCPServerPrompts>[0]),
-			'ListMCPServerPrompts'
-		);
-	}
-
-	async readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {
-		return requiredObject<MCPReadResourceResponseBody>(
-			await ReadMCPResource(server as Parameters<typeof ReadMCPResource>[0], uri),
-			'ReadMCPResource'
-		);
-	}
-
-	async getMCPPrompt(
-		server: MCPRuntimeServerID,
-		promptName: string,
-		promptArguments?: Record<string, string>
-	): Promise<MCPGetPromptResponseBody> {
-		return requiredObject<MCPGetPromptResponseBody>(
-			await GetMCPPrompt(server as Parameters<typeof GetMCPPrompt>[0], promptName, promptArguments ?? {}),
-			'GetMCPPrompt'
-		);
-	}
-
-	async completeMCPArgument(
-		server: MCPRuntimeServerID,
-		refType: MCPCompletionRefType,
-		name: string,
-		argumentName: string,
-		argumentValue?: string,
-		context?: Record<string, string>
-	): Promise<MCPCompletionResult> {
-		return requiredObject<MCPCompletionResult>(
-			await CompleteMCPArgument(
-				server as Parameters<typeof CompleteMCPArgument>[0],
-				{
-					refType,
-					name,
-					argumentName,
-					argumentValue,
-					context,
-				} as Parameters<typeof CompleteMCPArgument>[1]
+	async evaluateMappedMCPToolCall(
+		mapping: MCPProviderToolMapping,
+		request: InvokeMCPToolRequestBody
+	): Promise<MCPApprovalEvaluation> {
+		return requiredObject<MCPApprovalEvaluation>(
+			await EvaluateMappedMCPToolCall(
+				mapping as Parameters<typeof EvaluateMappedMCPToolCall>[0],
+				request as Parameters<typeof EvaluateMappedMCPToolCall>[1]
 			),
-			'CompleteMCPArgument'
+			'EvaluateMappedMCPToolCall'
 		);
 	}
 
@@ -157,37 +115,33 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async evaluateMappedMCPToolCall(
-		mapping: MCPProviderToolMapping,
-		request: InvokeMCPToolRequestBody
-	): Promise<MCPApprovalEvaluation> {
-		return requiredObject<MCPApprovalEvaluation>(
-			await EvaluateMappedMCPToolCall(
-				mapping as Parameters<typeof EvaluateMappedMCPToolCall>[0],
-				request as Parameters<typeof EvaluateMappedMCPToolCall>[1]
-			),
-			'EvaluateMappedMCPToolCall'
+	async getMCPGlobalSettings(): Promise<MCPGlobalSettings> {
+		return requiredObject<MCPGlobalSettings>(await GetMCPGlobalSettings(), 'GetMCPGlobalSettings');
+	}
+
+	async getMCPPrompt(
+		server: MCPRuntimeServerID,
+		promptName: string,
+		promptArguments: Record<string, string>
+	): Promise<MCPGetPromptResponseBody> {
+		return requiredObject<MCPGetPromptResponseBody>(
+			await GetMCPPrompt(server as Parameters<typeof GetMCPPrompt>[0], promptName, promptArguments),
+			'GetMCPPrompt'
 		);
 	}
 
-	async invokeMCPTool(
-		server: MCPRuntimeServerID,
-		request: InvokeMCPToolRequestBody
-	): Promise<InvokeMCPToolResponseBody> {
-		return requiredObject<InvokeMCPToolResponseBody>(
-			await InvokeMCPTool(
-				server as Parameters<typeof InvokeMCPTool>[0],
-				request as Parameters<typeof InvokeMCPTool>[1]
-			),
-			'InvokeMCPTool'
+	async getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
+		return requiredObject<MCPRuntimeServerSnapshot>(
+			await GetMCPServerStatus(server as Parameters<typeof GetMCPServerStatus>[0]),
+			'GetMCPServerStatus'
 		);
 	}
 
 	async invokeMappedMCPTool(
 		mapping: MCPProviderToolMapping,
 		request: InvokeMCPToolRequestBody
-	): Promise<InvokeMCPToolResponseBody> {
-		return requiredObject<InvokeMCPToolResponseBody>(
+	): Promise<MCPRuntimeInvokeToolResponse> {
+		return requiredObject<MCPRuntimeInvokeToolResponse>(
 			await InvokeMappedMCPTool(
 				mapping as Parameters<typeof InvokeMappedMCPTool>[0],
 				request as Parameters<typeof InvokeMappedMCPTool>[1]
@@ -196,13 +150,92 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async resolveMCPApproval(
-		approvalID: string,
-		resolution: MCPApprovalResolution
-	): Promise<MCPApprovalResolutionResult> {
-		return requiredObject<MCPApprovalResolutionResult>(
-			await ResolveMCPApproval(approvalID, resolution),
-			'ResolveMCPApproval'
+	async invokeMCPTool(
+		server: MCPRuntimeServerID,
+		request: InvokeMCPToolRequestBody
+	): Promise<MCPRuntimeInvokeToolResponse> {
+		return requiredObject<MCPRuntimeInvokeToolResponse>(
+			await InvokeMCPTool(
+				server as Parameters<typeof InvokeMCPTool>[0],
+				request as Parameters<typeof InvokeMCPTool>[1]
+			),
+			'InvokeMCPTool'
+		);
+	}
+
+	async listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]> {
+		return wailsObjectArrayOrEmpty<MCPPromptRef>(
+			await ListMCPServerPrompts(server as Parameters<typeof ListMCPServerPrompts>[0]),
+			'ListMCPServerPrompts'
+		);
+	}
+
+	async listMCPServerPromptsPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken: string
+	): Promise<MCPPromptRef[]> {
+		return wailsObjectArrayOrEmpty<MCPPromptRef>(
+			await ListMCPServerPromptsPage(server as Parameters<typeof ListMCPServerPromptsPage>[0], pageSize, pageToken),
+			'ListMCPServerPromptsPage'
+		);
+	}
+
+	async listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]> {
+		return wailsObjectArrayOrEmpty<MCPResourceRef>(
+			await ListMCPServerResources(server as Parameters<typeof ListMCPServerResources>[0]),
+			'ListMCPServerResources'
+		);
+	}
+
+	async listMCPServerResourcesPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken: string
+	): Promise<MCPResourceRef[]> {
+		return wailsObjectArrayOrEmpty<MCPResourceRef>(
+			await ListMCPServerResourcesPage(server as Parameters<typeof ListMCPServerResourcesPage>[0], pageSize, pageToken),
+			'ListMCPServerResourcesPage'
+		);
+	}
+
+	async listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]> {
+		return wailsObjectArrayOrEmpty<MCPResourceTemplateRef>(
+			await ListMCPServerResourceTemplates(server as Parameters<typeof ListMCPServerResourceTemplates>[0]),
+			'ListMCPServerResourceTemplates'
+		);
+	}
+
+	async listMCPServerResourceTemplatesPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken: string
+	): Promise<MCPResourceTemplateRef[]> {
+		return wailsObjectArrayOrEmpty<MCPResourceTemplateRef>(
+			await ListMCPServerResourceTemplatesPage(
+				server as Parameters<typeof ListMCPServerResourceTemplatesPage>[0],
+				pageSize,
+				pageToken
+			),
+			'ListMCPServerResourceTemplatesPage'
+		);
+	}
+
+	async listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]> {
+		return wailsObjectArrayOrEmpty<MCPToolCapability>(
+			await ListMCPServerTools(server as Parameters<typeof ListMCPServerTools>[0]),
+			'ListMCPServerTools'
+		);
+	}
+
+	async listMCPServerToolsPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken: string
+	): Promise<MCPToolCapability[]> {
+		return wailsObjectArrayOrEmpty<MCPToolCapability>(
+			await ListMCPServerToolsPage(server as Parameters<typeof ListMCPServerToolsPage>[0], pageSize, pageToken),
+			'ListMCPServerToolsPage'
 		);
 	}
 
@@ -213,22 +246,40 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
-		return requireWailsBoolean(
-			await CancelPendingMCPOAuthAuthorization(server as Parameters<typeof CancelPendingMCPOAuthAuthorization>[0]),
-			'CancelPendingMCPOAuthAuthorization'
+	async readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {
+		return requiredObject<MCPReadResourceResponseBody>(
+			await ReadMCPResource(server as Parameters<typeof ReadMCPResource>[0], uri),
+			'ReadMCPResource'
 		);
 	}
 
-	async getMCPGlobalSettings(): Promise<MCPGlobalSettings> {
-		return requiredObject<MCPGlobalSettings>(await GetMCPGlobalSettings(), 'GetMCPGlobalSettings');
+	async refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
+		return requiredObject<MCPRuntimeServerSnapshot>(
+			await RefreshMCPServer(server as Parameters<typeof RefreshMCPServer>[0]),
+			'RefreshMCPServer'
+		);
 	}
 
-	async updateMCPGlobalSettings(expectedRevision: number, oauthLoopbackListenAddr?: string): Promise<number> {
+	async resolveMCPApproval(
+		approvalID: string,
+		resolution: MCPApprovalResolution
+	): Promise<MCPApprovalResolutionResult> {
+		return requiredObject<MCPApprovalResolutionResult>(
+			await ResolveMCPApproval(approvalID, resolution as Parameters<typeof ResolveMCPApproval>[1]),
+			'ResolveMCPApproval'
+		);
+	}
+
+	async startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
+		return requiredObject<MCPRuntimeServerSnapshot>(
+			await StartMCPServerConnect(server as Parameters<typeof StartMCPServerConnect>[0]),
+			'StartMCPServerConnect'
+		);
+	}
+
+	async updateMCPGlobalSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<number> {
 		return requireWailsFiniteNumber(
-			await UpdateMCPGlobalSettings(expectedRevision, {
-				oauthLoopbackListenAddr,
-			} as Parameters<typeof UpdateMCPGlobalSettings>[1]),
+			await UpdateMCPGlobalSettings(expectedRevision, settings as Parameters<typeof UpdateMCPGlobalSettings>[1]),
 			'UpdateMCPGlobalSettings'
 		);
 	}

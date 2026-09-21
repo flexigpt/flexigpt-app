@@ -193,11 +193,28 @@ func (a *API) SetAgentEnabled(
 func (a *API) ResolveAgent(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (*resolve.ResolvedEntry, error) {
+) (AgentResolution, error) {
 	if a == nil || a.declarationResolver == nil {
-		return nil, basespec.ErrClosed
+		return AgentResolution{}, basespec.ErrClosed
 	}
-	return a.declarationResolver.ResolveAgent(ctx, ref)
+	plan, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
+	if err != nil {
+		return AgentResolution{}, err
+	}
+	if plan.RootArtifact == nil {
+		return AgentResolution{}, fmt.Errorf(
+			"%w: Agent resolution has no Artifact root",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	agent, err := a.GetAgentView(ctx, *plan.RootArtifact)
+	if err != nil {
+		return AgentResolution{}, err
+	}
+	return AgentResolution{
+		Agent:        agent,
+		Capabilities: plan,
+	}, nil
 }
 
 func (a *API) ResolveAgentCapabilities(

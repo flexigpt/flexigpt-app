@@ -38,8 +38,13 @@ func (a *API) CreateManagedAgent(
 		return ManagedAgentCreateResult{}, err
 	}
 
+	document, err := request.Document.Declaration()
+	if err != nil {
+		return ManagedAgentCreateResult{}, err
+	}
+
 	_, definitionValue, err := agentDomain.ManagedAgentDocumentPayload(
-		request.Document,
+		document,
 	)
 	if err != nil {
 		return ManagedAgentCreateResult{}, err
@@ -79,7 +84,7 @@ func (a *API) CreateManagedAgent(
 		membership.Collection.Artifact.RootID,
 		membership.Collection.Artifact.Binding.SourceID,
 		address,
-		request.Document,
+		document,
 		"",
 		false,
 	)
@@ -137,8 +142,13 @@ func (a *API) ReplaceManagedAgent(
 		return ManagedAgentReplaceResult{}, err
 	}
 
+	document, err := request.Document.Declaration()
+	if err != nil {
+		return ManagedAgentReplaceResult{}, err
+	}
+
 	_, definitionValue, err := agentDomain.ManagedAgentDocumentPayload(
-		request.Document,
+		document,
 	)
 	if err != nil {
 		return ManagedAgentReplaceResult{}, err
@@ -157,7 +167,7 @@ func (a *API) ReplaceManagedAgent(
 		current.artifact.RootID,
 		current.artifact.Binding.SourceID,
 		current.address,
-		request.Document,
+		document,
 		current.generation,
 		true,
 	)

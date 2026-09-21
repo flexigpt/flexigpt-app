@@ -12,7 +12,6 @@ import { SkillInsert } from '@/spec/skill';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { skillManagementAPI } from '@/apis/baseapi';
-import { getAllSkillBundles } from '@/apis/list_helper';
 
 import {
 	actionTriggerChipClearButtonClasses,
@@ -213,7 +212,8 @@ function AddInstructionSkillModalContent({
 
 	useEffect(() => {
 		let cancelled = false;
-		void getAllSkillBundles(undefined, true)
+		void skillManagementAPI
+			.listSkillBundles(undefined, true)
 			.then(nextBundles => {
 				if (cancelled) {
 					return;

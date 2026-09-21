@@ -103,7 +103,7 @@ export enum MCPToolRisk {
 	OpenWorld = 'openWorld',
 }
 
-enum MCPTaskSupport {
+export enum MCPTaskSupport {
 	Forbidden = 'forbidden',
 	Optional = 'optional',
 	Required = 'required',
@@ -152,7 +152,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-enum MCPPromptRole {
+export enum MCPPromptRole {
 	User = 'user',
 	Assistant = 'assistant',
 }
@@ -185,7 +185,7 @@ export interface MCPInputDeclaration {
 	clientSecretRequired?: boolean;
 }
 
-interface MCPInstallationDeclaration {
+export interface MCPInstallationDeclaration {
 	note?: string;
 	inputs?: Record<string, MCPInputDeclaration>;
 	allowEnvironment?: string[];
@@ -433,7 +433,7 @@ interface MCPImplementationInfo {
 	version?: string;
 }
 
-interface MCPServerCapabilitiesSummary {
+export interface MCPServerCapabilitiesSummary {
 	tools?: boolean;
 	toolsListChanged?: boolean;
 	resources?: boolean;
@@ -626,7 +626,7 @@ export interface MCPContent {
 	icons?: MCPIcon[];
 }
 
-interface MCPPromptMessage {
+export interface MCPPromptMessage {
 	role: MCPPromptRole;
 	content: MCPContent;
 }
@@ -758,7 +758,7 @@ export interface MCPOAuthAuthorization {
 	expiresAt?: MCPTimestamp;
 }
 
-interface MCPAuthSettings {
+export interface MCPAuthSettings {
 	oauthLoopbackListenAddr?: string;
 }
 

@@ -2,24 +2,28 @@
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
+import { AgentManagementAPI } from '@/apis/agent_management';
 import type {
+	IAgentStoreAPI,
 	IAggregateAPI,
-	IAssistantPresetStoreAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
 	IConversationStoreAPI,
 	ILogger,
 	IMCPAggregateAPI,
+	IMCPManagementAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
 	IModelPresetStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
+	ISkillManagementAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceAggregateAPI,
+	IWorkspaceManagementAPI,
 	IWorkspaceRuntimeAPI,
 	IWorkspaceStoreAPI,
 } from '@/apis/interface';
@@ -27,6 +31,7 @@ import { MCPManagementAPI } from '@/apis/mcp_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
+import { WailsAgentStoreAPI } from '@/apis/wailsapi/agent_store';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
@@ -40,7 +45,8 @@ import { WorkspaceManagementAPI } from '@/apis/workspace_management';
 
 export let log: ILogger;
 
-export let assistantPresetStoreAPI: IAssistantPresetStoreAPI;
+export let agentStoreAPI: IAgentStoreAPI;
+export let agentManagementAPI: AgentManagementAPI;
 export let attachmentsDropAPI: IAttachmentsDropAPI;
 export let backendAPI: IBackendAPI;
 export let conversationStoreAPI: IConversationStoreAPI;
@@ -51,7 +57,7 @@ export let modelPresetStoreAPI: IModelPresetStoreAPI;
 let mcpStoreAPI: IMCPStoreAPI;
 let mcpAggregateAPI: IMCPAggregateAPI;
 export let mcpRuntimeAPI: IMCPRuntimeAPI;
-export let mcpManagementAPI: MCPManagementAPI;
+export let mcpManagementAPI: IMCPManagementAPI;
 
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
@@ -59,12 +65,12 @@ export let toolRuntimeAPI: IToolRuntimeAPI;
 let skillStoreAPI: ISkillStoreAPI;
 let skillAggregateAPI: ISkillAggregateAPI;
 let skillRuntimeAPI: ISkillRuntimeAPI;
-export let skillManagementAPI: SkillManagementAPI;
+export let skillManagementAPI: ISkillManagementAPI;
 
 let workspaceStoreAPI: IWorkspaceStoreAPI;
 let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 let workspaceAggregateAPI: IWorkspaceAggregateAPI;
-export let workspaceManagementAPI: WorkspaceManagementAPI;
+export let workspaceManagementAPI: IWorkspaceManagementAPI;
 
 // Conditional initialization
 if (IS_WAILS_PLATFORM) {
@@ -78,21 +84,44 @@ if (IS_WAILS_PLATFORM) {
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
+	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
+	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
+
+	agentStoreAPI = new WailsAgentStoreAPI();
+	agentManagementAPI = new AgentManagementAPI(agentStoreAPI, toolStoreAPI, modelPresetStoreAPI);
+
 	mcpStoreAPI = new WailsMCPStoreAPI();
 	mcpRuntimeAPI = new WailsMCPRuntimeAPI();
 	mcpAggregateAPI = new WailsMCPAggregateAPI();
-	mcpManagementAPI = new MCPManagementAPI(mcpStoreAPI, mcpAggregateAPI);
-	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
-	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
-	assistantPresetStoreAPI = new wailsImpl.WailsAssistantPresetStoreAPI();
+	mcpManagementAPI = new MCPManagementAPI(
+		mcpStoreAPI,
+		mcpAggregateAPI,
+		mcpRuntimeAPI,
+		toolStoreAPI,
+		modelPresetStoreAPI
+	);
+
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();
 	workspaceRuntimeAPI = new WailsWorkspaceRuntimeAPI();
 	workspaceAggregateAPI = new WailsWorkspaceAggregateAPI();
-	workspaceManagementAPI = new WorkspaceManagementAPI(workspaceStoreAPI, workspaceRuntimeAPI, workspaceAggregateAPI);
+	workspaceManagementAPI = new WorkspaceManagementAPI(
+		workspaceStoreAPI,
+		workspaceRuntimeAPI,
+		workspaceAggregateAPI,
+		toolStoreAPI,
+		modelPresetStoreAPI
+	);
+
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
 	skillRuntimeAPI = new WailsSkillRuntimeAPI();
-	skillManagementAPI = new SkillManagementAPI(skillStoreAPI, skillAggregateAPI, skillRuntimeAPI);
+	skillManagementAPI = new SkillManagementAPI(
+		skillRuntimeAPI,
+		skillStoreAPI,
+		skillAggregateAPI,
+		toolStoreAPI,
+		modelPresetStoreAPI
+	);
 } else {
 	// Error for unsupported platforms
 	throw new Error('Unsupported platform');
