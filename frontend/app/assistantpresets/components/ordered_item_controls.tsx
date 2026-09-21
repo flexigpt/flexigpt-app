@@ -1,5 +1,4 @@
 import { memo } from 'react';
-
 import { FiChevronDown, FiChevronUp, FiTrash2 } from 'react-icons/fi';
 
 interface OrderedItemControlsProps {

@@ -1,6 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type {
@@ -13,13 +12,6 @@ import type {
 	ProviderSDKType,
 	ReasoningParam,
 } from '@/spec/inference';
-import {
-	OutputFormatKind,
-	OutputVerbosity,
-	ReasoningLevel,
-	ReasoningSummaryStyle,
-	ReasoningType,
-} from '@/spec/inference';
 import type {
 	ModelCapabilitiesOverride,
 	ModelPreset,
@@ -27,6 +19,13 @@ import type {
 	PatchModelPresetPayload,
 	PostModelPresetPayload,
 } from '@/spec/modelpreset';
+import {
+	OutputFormatKind,
+	OutputVerbosity,
+	ReasoningLevel,
+	ReasoningSummaryStyle,
+	ReasoningType,
+} from '@/spec/inference';
 import { DEFAULT_REASONING_TOKENS } from '@/spec/modelpreset';
 
 import { tryParseJSONObject } from '@/lib/jsonschema_utils';

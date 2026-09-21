@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiPlus, FiSearch, FiTag, FiX } from 'react-icons/fi';
 
 import type { SkillBundle } from '@/spec/skill';
@@ -22,6 +21,8 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { PageFrame } from '@/components/page_frame';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
+import type { BundleData } from '@/skills/lib/skill_bundle_utils';
+import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import {
 	getAllSkillTags,
 	getSkillInsertCounts,
@@ -30,9 +31,7 @@ import {
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
-import type { BundleData } from '@/skills/lib/skill_bundle_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
-import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
 function getErrorMessage(error: unknown, fallback: string): string {

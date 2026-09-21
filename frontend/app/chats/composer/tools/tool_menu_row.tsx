@@ -1,5 +1,4 @@
 import type { MouseEvent, ReactNode } from 'react';
-
 import { FiCheck, FiCode, FiEdit2, FiPlus, FiTool, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';

@@ -2,12 +2,14 @@
 /* oxlint-disable @typescript-eslint/no-unused-vars */
 import type { AnchorHTMLAttributes, HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { memo, useMemo } from 'react';
-
 import { FiExternalLink } from 'react-icons/fi';
 
 // oxlint-disable-next-line import/no-unassigned-import
 import 'katex/dist/katex.min.css';
+
 import type { ExtraProps } from 'react-markdown';
+
+import type { PluggableList } from 'unified';
 import Markdown from 'react-markdown';
 import rehypeKatex from 'rehype-katex';
 import rehypeRaw from 'rehype-raw';
@@ -17,7 +19,6 @@ import remarkGemoji from 'remark-gemoji';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import supersub from 'remark-supersub';
-import type { PluggableList } from 'unified';
 
 import { backendAPI } from '@/apis/baseapi';
 

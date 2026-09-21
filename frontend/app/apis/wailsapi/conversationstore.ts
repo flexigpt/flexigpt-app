@@ -4,6 +4,7 @@ import { parseAnyToTime } from '@/lib/date_utils';
 import { extractTimeFromUUIDv7Str } from '@/lib/uuid_utils';
 
 import type { IConversationStoreAPI } from '@/apis/interface';
+import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import {
 	optionalWailsBody,
 	optionalWailsString,
@@ -19,7 +20,6 @@ import {
 	PutMessagesToConversation,
 	SearchConversations,
 } from '@/apis/wailsjs/go/main/ConversationCollectionWrapper';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 function requireWailsDate(value: unknown, field: string): Date {
 	const parsed = parseAnyToTime(value);

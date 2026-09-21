@@ -1,7 +1,6 @@
 // DownloadButton.tsx
 import type { ButtonHTMLAttributes } from 'react';
 import { useState } from 'react';
-
 import { FiDownload } from 'react-icons/fi';
 
 import type { FileFilter } from '@/spec/attachment';

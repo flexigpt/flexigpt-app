@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useMemo } from 'react';
-
 import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';

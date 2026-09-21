@@ -1,15 +1,14 @@
 import { memo, useMemo } from 'react';
-
 import { FiPlus } from 'react-icons/fi';
 
 import { Dropdown } from '@/components/dropdown';
 
-import { OrderedItemControls } from '@/assistantpresets/components/ordered_item_controls';
 import type {
 	SimpleSelectableOption,
 	ToolSelectionDisplayItem,
 	TriStateBoolean,
 } from '@/assistantpresets/lib/assistant_preset_editor_types';
+import { OrderedItemControls } from '@/assistantpresets/components/ordered_item_controls';
 
 interface ToolSelectionSectionProps {
 	isViewMode: boolean;

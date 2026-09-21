@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-
 import { FiCheck, FiEye, FiLayers, FiRefreshCcw, FiTrash2 } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';

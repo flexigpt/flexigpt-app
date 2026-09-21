@@ -1,6 +1,5 @@
 import type { KeyboardEvent, RefObject } from 'react';
 import { useEffect, useMemo, useRef } from 'react';
-
 import { FiSearch, FiX } from 'react-icons/fi';
 
 interface SearchableMenuInputProps {

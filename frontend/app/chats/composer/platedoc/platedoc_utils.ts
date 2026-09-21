@@ -1,6 +1,6 @@
 import type { Value } from 'platejs';
-import { NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
+import { NodeApi } from 'platejs';
 
 // We add a per-chunk prop so Slate doesn't merge them back together.
 export const LARGE_TEXT_AUTOCHUNK_THRESHOLD_CHARS = 10000; // start chunking once draft grows beyond this

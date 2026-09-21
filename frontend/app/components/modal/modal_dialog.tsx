@@ -1,6 +1,5 @@
 import type { DialogHTMLAttributes, ReactNode } from 'react';
 import { useMemo } from 'react';
-
 import { createPortal } from 'react-dom';
 
 import type { ModalDialogController } from '@/hooks/use_dialog_controller';

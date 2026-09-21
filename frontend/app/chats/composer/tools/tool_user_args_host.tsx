@@ -8,9 +8,9 @@ import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { toolStoreAPI } from '@/apis/baseapi';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import { ToolUserArgsModal } from '@/chats/composer/tools/tool_user_args_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { ToolUserArgsModal } from '@/chats/composer/tools/tool_user_args_modal';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface ToolArgsModalHostProps {

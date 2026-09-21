@@ -1,12 +1,11 @@
 import { useMemo } from 'react';
-
 import { FiServer, FiSliders, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
 import type { MCPConversationContext } from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
+import { MCPToolExposure } from '@/spec/mcp';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -22,11 +21,11 @@ import type {
 	AssistantPresetPreparedApplication,
 	AssistantPresetRuntimeSnapshot,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import {
 	buildAssistantPresetModelComparisonState,
 	normalizeAssistantPresetMCPContext,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
 import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
 
 function formatToolLabel(choice: {

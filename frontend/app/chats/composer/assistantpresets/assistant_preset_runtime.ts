@@ -1,14 +1,14 @@
 import type { AssistantPreset } from '@/spec/assistantpreset';
+import type { MCPAppVisibility, MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
+import type { UIChatOption } from '@/spec/modelpreset';
+import type { SkillRef } from '@/spec/skill';
+import type { ToolStoreChoice } from '@/spec/tool';
 import {
 	BASE_ASSISTANT_PRESET_BUNDLEID,
 	BASE_ASSISTANT_PRESET_SLUG,
 	BASE_ASSISTANT_PRESET_VERSION,
 } from '@/spec/assistantpreset';
-import type { MCPAppVisibility, MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
 import { isMCPAppVisibility } from '@/spec/mcp';
-import type { UIChatOption } from '@/spec/modelpreset';
-import type { SkillRef } from '@/spec/skill';
-import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { areComparableValuesEqual } from '@/lib/obj_utils';

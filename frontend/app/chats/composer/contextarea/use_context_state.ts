@@ -3,24 +3,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
-import { ReasoningType } from '@/spec/inference';
 import type { IncludePreviousMessages, ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
-import { DefaultUIChatOptions } from '@/spec/modelpreset';
 import type { Tool, ToolStoreChoice } from '@/spec/tool';
+import { ReasoningType } from '@/spec/inference';
+import { DefaultUIChatOptions } from '@/spec/modelpreset';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
+import type {
+	AssistantPresetOptionItem,
+	AssistantPresetPreparedApplication,
+} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { loadSkillOptions, loadToolOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
-import type {
-	AssistantPresetOptionItem,
-	AssistantPresetPreparedApplication,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import {
 	normalizeAssistantPresetMCPContext,
 	normalizeAssistantPresetSkillRefs,

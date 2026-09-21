@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-
 import {
 	FiAlertTriangle,
 	FiChevronDown,
@@ -16,8 +15,8 @@ import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariaki
 import type { UIAttachment } from '@/spec/attachment';
 import { AttachmentContentBlockMode } from '@/spec/attachment';
 
-import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
 import type { DirectoryAttachmentGroup } from '@/chats/composer/attachments/attachment_editor_utils';
+import { AttachmentChip } from '@/chats/composer/attachments/attachment_chip';
 import {
 	getAttachmentDisplayLabel,
 	getUIAttachmentPath,

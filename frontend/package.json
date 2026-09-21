@@ -121,7 +121,7 @@
 			"^react-dom$",
 			"^react-icons/(.*)$",
 			"",
-			"<TYPES><THIRD_PARTY_MODULES>",
+			"<TYPES>^@?[a-zA-Z]",
 			"<THIRD_PARTY_MODULES>",
 			"",
 			"<TYPES>^@/spec/(.*)$",
@@ -141,11 +141,10 @@
 			"",
 			"<TYPES>^@/(.*)$",
 			"^@/(.*)$",
-			""
+			"",
+			"<TYPES>^[./]",
+			"^[./]"
 		],
-		"importOrderSeparation": true,
-		"importOrderSortSpecifiers": true,
-		"importOrderCaseInsensitive": true,
 		"importOrderTypeScriptVersion": "5.0.0"
 	},
 	"knip": {

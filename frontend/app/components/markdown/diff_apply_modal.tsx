@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffFileTarget, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
@@ -8,6 +7,11 @@ import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { DiagnosticSeverityCounts, HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
+import type {
+	DiffApplyRunOptions,
+	EditableUnifiedDiffTarget,
+	parseUnifiedDiffForUI,
+} from '@/components/markdown/unified_diff_block';
 import {
 	collectFileLevelDiagnostics,
 	collectPatchLevelDiagnostics,
@@ -18,11 +22,6 @@ import {
 	renderDiagnosticsPanel,
 	uniqueDiagnostics,
 } from '@/components/markdown/diff_diagnostic';
-import type {
-	DiffApplyRunOptions,
-	EditableUnifiedDiffTarget,
-	parseUnifiedDiffForUI,
-} from '@/components/markdown/unified_diff_block';
 import {
 	absolutePathStrings,
 	buildEditableTargetsFromOutput,

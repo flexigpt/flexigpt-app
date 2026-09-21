@@ -9,7 +9,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-
 import {
 	FiAlertTriangle,
 	FiEdit2,
@@ -27,19 +26,19 @@ import { Plate, PlateContent } from 'platejs/react';
 
 import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { ProviderSDKType, UIToolCall, UIToolOutput } from '@/spec/inference';
-import { UIToolCallStatus } from '@/spec/inference';
 import type {
 	MCPAppModelContextUpdate,
 	MCPConversationContext,
 	MCPRuntimeServerID,
 	MCPToolSelection,
 } from '@/spec/mcp';
-import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
-import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
-import { ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
+import { UIToolCallStatus } from '@/spec/inference';
+import { MCPExecutionMode } from '@/spec/mcp';
+import { SkillSessionSyncMode } from '@/spec/skill';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
@@ -49,20 +48,24 @@ import { useEnterSubmit } from '@/hooks/use_enter_submit';
 import { HoverTip } from '@/components/hover_tip';
 
 import type { AssistantPresetRuntimeSnapshot } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { mapAssistantPresetWebSearchTemplatesToChoices } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
-import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
-import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
 import type {
 	AssistantTurnFinishedPayload,
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
+import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
+import { mapAssistantPresetWebSearchTemplatesToChoices } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
+import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
+import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
 import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { useComposerMCP } from '@/chats/composer/mcp/use_composer_mcp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { buildEditorValueFromPlainText, insertPlainTextAsSingleBlock } from '@/chats/composer/platedoc/platedoc_utils';
-import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import {
 	getAttachedTools,
 	insertToolSelectionNode,
@@ -72,7 +75,6 @@ import {
 } from '@/chats/composer/platedoc/tool_document_ops';
 import { useComposerDocument } from '@/chats/composer/platedoc/use_composer_document';
 import { useComposerSkills } from '@/chats/composer/skills/use_composer_skills';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	createAutoSubmitTracker,
 	getToolAutoSubmitKey,
@@ -80,13 +82,10 @@ import {
 } from '@/chats/composer/toolruntime/tool_runtime_utils';
 import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tools';
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
-import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
-import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import { buildWebSearchChoicesForSubmit } from '@/chats/composer/tools/websearch_utils';
 import { useComposerWorkspace } from '@/chats/composer/workspaces/use_composer_workspace';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';

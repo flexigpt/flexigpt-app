@@ -9,6 +9,7 @@ import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_d
 import { ensureMakeID } from '@/lib/uuid_utils';
 
 import type { IAggregateAPI } from '@/apis/interface';
+import type { texttool as texttoolSpec, spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import {
 	createAbortError,
 	optionalWailsBody,
@@ -25,7 +26,6 @@ import {
 	PostProviderPreset,
 	SetAuthKey,
 } from '@/apis/wailsjs/go/main/AggregrateWrapper';
-import type { texttool as texttoolSpec, spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 const activeCompletionRequestIDs = new Set<string>();

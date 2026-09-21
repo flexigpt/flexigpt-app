@@ -1,5 +1,4 @@
 import { useState } from 'react';
-
 import { FiChevronDown, FiChevronUp, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { Tool, ToolBundle } from '@/spec/tool';

@@ -1,6 +1,5 @@
 import type { RefObject } from 'react';
 import { memo, useEffect, useState } from 'react';
-
 import { FiFolder, FiLink, FiPaperclip, FiUpload } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';

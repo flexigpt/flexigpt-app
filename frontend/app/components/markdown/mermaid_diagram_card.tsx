@@ -1,6 +1,5 @@
 import type { CSSProperties } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiMoon, FiSun } from 'react-icons/fi';
 
 import type { MermaidConfig } from 'mermaid';

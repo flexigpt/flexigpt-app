@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import {
 	FiChevronDown,
 	FiChevronUp,
@@ -12,7 +11,6 @@ import {
 	FiTrash2,
 } from 'react-icons/fi';
 
-import { ArtifactAdoptionMode, ArtifactOccurrenceState } from '@/spec/artifact';
 import type {
 	UpdateWorkspaceBody,
 	WorkspaceArtifactView,
@@ -22,6 +20,7 @@ import type {
 	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
+import { ArtifactAdoptionMode, ArtifactOccurrenceState } from '@/spec/artifact';
 import { WorkspaceMode } from '@/spec/workspace';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
@@ -41,8 +40,9 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 
-import { artifactRefKey, workspaceRefKey } from '@/workspaces/lib/workspace_api_utils';
 import type { WorkspaceCatalogData } from '@/workspaces/lib/workspace_utils';
+import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
+import { artifactRefKey, workspaceRefKey } from '@/workspaces/lib/workspace_api_utils';
 import {
 	collectWorkspaceDiagnostics,
 	getArtifactKindLabel,
@@ -61,7 +61,6 @@ import { WorkspaceArtifactBindingModal } from '@/workspaces/workspace_artifact_b
 import { WorkspaceContextPreview } from '@/workspaces/workspace_context_preview';
 import { WorkspaceDiagnostics } from '@/workspaces/workspace_diagnostics';
 import { WorkspaceResourceDetailsModal } from '@/workspaces/workspace_resource_details_modal';
-import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSourcesModal } from '@/workspaces/workspace_sources_modal';
 

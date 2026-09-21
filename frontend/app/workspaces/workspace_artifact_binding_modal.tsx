@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useMemo, useState } from 'react';
-
 import { FiAlertCircle, FiMapPin, FiPlus } from 'react-icons/fi';
 
 import type { ArtifactSourceBinding } from '@/spec/artifact';

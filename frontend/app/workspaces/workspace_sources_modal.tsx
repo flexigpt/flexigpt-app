@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useMemo, useState } from 'react';
-
 import { FiAlertCircle, FiCheck, FiFolder, FiLink, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { ArtifactSourceSummary } from '@/spec/artifact';

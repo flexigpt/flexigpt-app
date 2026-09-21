@@ -1,3 +1,9 @@
+import type {
+	CacheCapabilitiesOverride,
+	CacheControlCapabilitiesOverride,
+	ModelCapabilitiesOverride,
+	UIChatOption,
+} from '@/spec/modelpreset';
 import {
 	CacheControlKind,
 	CacheControlTTL,
@@ -7,12 +13,6 @@ import {
 	ReasoningLevel,
 	ReasoningType,
 } from '@/spec/inference';
-import type {
-	CacheCapabilitiesOverride,
-	CacheControlCapabilitiesOverride,
-	ModelCapabilitiesOverride,
-	UIChatOption,
-} from '@/spec/modelpreset';
 
 function pick<T>(modelVal: T | undefined, providerVal: T | undefined): T | undefined {
 	return modelVal !== undefined ? modelVal : providerVal;

@@ -1,6 +1,5 @@
 import type { RefObject, SubmitEventHandler } from 'react';
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-
 import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';

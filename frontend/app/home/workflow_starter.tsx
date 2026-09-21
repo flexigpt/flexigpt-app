@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-
 import { FiAlertTriangle, FiCheckCircle, FiCode } from 'react-icons/fi';
 
 const SOFTWARE_ASSISTANTS_BUNDLE_ID = '019d676e-2533-7fdf-a0af-d3a571ab4f4f';

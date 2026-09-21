@@ -1,11 +1,10 @@
 import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
 import { useId, useState } from 'react';
-
 import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiZap } from 'react-icons/fi';
 
-import { ArtifactState } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
 import type { WorkspaceRef, WorkspaceSkillView } from '@/spec/workspace';
+import { ArtifactState } from '@/spec/artifact';
 import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';

@@ -1,6 +1,5 @@
 import type { Dispatch, MouseEvent, RefObject, SetStateAction, SyntheticEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-
 import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiTool, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -30,16 +29,16 @@ import {
 } from '@/components/searchmenu/searchable_menu_utils';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
-import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import {
 	getEligibleWebSearchTools,
 	normalizeWebSearchChoiceTemplates,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
 } from '@/chats/composer/tools/websearch_utils';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 

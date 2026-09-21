@@ -12,6 +12,8 @@ import type {
 	AssistantPresetPreparedApplication,
 	AssistantPresetRuntimeSnapshot,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import {
 	buildAssistantPresetModelComparisonState,
 	EMPTY_ASSISTANT_PRESET_MODIFICATION_SUMMARY,
@@ -21,8 +23,6 @@ import {
 	normalizeAssistantPresetMCPContext,
 	normalizeAssistantPresetSkillRefs,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 
 function getErrorMessage(error: unknown, fallback: string): string {
 	if (error instanceof Error && error.message.trim().length > 0) {

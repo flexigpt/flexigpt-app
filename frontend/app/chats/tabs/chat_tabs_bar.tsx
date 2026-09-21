@@ -1,6 +1,5 @@
 import type { ReactNode, RefObject } from 'react';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
-
 import { FiEdit2, FiPlus, FiX } from 'react-icons/fi';
 
 import type { TabStore } from '@ariakit/react/tab';

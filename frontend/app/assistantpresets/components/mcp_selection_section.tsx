@@ -1,5 +1,4 @@
 import { memo, useMemo, useState } from 'react';
-
 import { FiExternalLink, FiPlus, FiRefreshCw, FiTrash2, FiWifi, FiWifiOff, FiX } from 'react-icons/fi';
 
 import { MCPAuthHealthState, MCPServerStatus, MCPToolExposure } from '@/spec/mcp';

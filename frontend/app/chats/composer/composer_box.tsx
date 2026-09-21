@@ -7,8 +7,8 @@ import type { UIToolCall } from '@/spec/inference';
 import type { MCPAppModelContextUpdate } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
-import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
+import { SkillSessionSyncMode } from '@/spec/skill';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
@@ -18,6 +18,13 @@ import type {
 	AssistantPresetPreparedApplication,
 	AssistantPresetRuntimeSnapshot,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
+import type {
+	AssistantTurnFinishedPayload,
+	EditorExternalMessage,
+	EditorSubmitPayload,
+} from '@/chats/composer/editor/editor_types';
+import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
 import {
 	areAssistantRuntimeSnapshotsEqual,
 	buildAssistantPresetIdentityKey,
@@ -26,15 +33,8 @@ import {
 import { useAssistantPresetManager } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
 import { EditorContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useAssistantContextState } from '@/chats/composer/contextarea/use_context_state';
-import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import { EditorArea } from '@/chats/composer/editor/editor_area';
-import type {
-	AssistantTurnFinishedPayload,
-	EditorExternalMessage,
-	EditorSubmitPayload,
-} from '@/chats/composer/editor/editor_types';
 import { useComposerSystemPrompt } from '@/chats/composer/skills/use_composer_system_prompt';
-import type { ChatWorkflowStarter, ChatWorkflowStarterAssistantPresetRef } from '@/chats/conversation/starter_intent';
 
 export interface ComposerBoxHandle {
 	getUIChatOptions: () => UIChatOption;

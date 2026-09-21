@@ -1,6 +1,5 @@
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/conversation';
-import { CONVERSATION_SCHEMA_VERSION } from '@/spec/conversation';
 import type {
 	InputOutputContent,
 	InputOutputContentItemUnion,
@@ -11,20 +10,21 @@ import type {
 	UIToolCall,
 	UIToolOutput,
 } from '@/spec/inference';
-import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
-import { ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
+import { CONVERSATION_SCHEMA_VERSION } from '@/spec/conversation';
+import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
+import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { stripUndefinedDeep } from '@/lib/obj_utils';
 import { generateTitle } from '@/lib/title_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
+import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';

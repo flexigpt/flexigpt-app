@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';

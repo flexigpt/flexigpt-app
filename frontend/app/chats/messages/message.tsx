@@ -1,13 +1,13 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-
 import { FiUser, FiZap } from 'react-icons/fi';
 
 import type { ConversationMessage } from '@/spec/conversation';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import { RoleEnum, Status } from '@/spec/inference';
 import type { ToolStoreChoice } from '@/spec/tool';
+import { RoleEnum, Status } from '@/spec/inference';
 
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
+import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { buildAppInstanceFromToolOutput } from '@/chats/mcpapps/mcp_app_types';
 import { MCPAppView } from '@/chats/mcpapps/mcp_app_view';
@@ -17,7 +17,6 @@ import {
 } from '@/chats/messages/mcp_message_context_utils';
 import { MessageAttachmentsBar } from '@/chats/messages/message_attachments_bar';
 import { MessageCitationsBar } from '@/chats/messages/message_citations_bar';
-import type { MessageStreamSource } from '@/chats/messages/message_content_card';
 import { MessageContentCard, useMessageStreamSnapshot } from '@/chats/messages/message_content_card';
 import { MessageFooterArea } from '@/chats/messages/message_footer';
 import { MessageThinkingSection } from '@/chats/messages/message_thinking_section';

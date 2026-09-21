@@ -1,7 +1,8 @@
 /* oxlint-disable no-restricted-exports */
+import path from 'node:path';
+
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
-import path from 'node:path';
 import license from 'rollup-plugin-license';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';

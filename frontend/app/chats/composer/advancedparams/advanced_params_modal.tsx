@@ -1,11 +1,10 @@
 import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
 import type { CacheControlKind, JSONSchemaParam, OutputParam } from '@/spec/inference';
-import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
+import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 

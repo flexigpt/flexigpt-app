@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 
 import type { AppTheme } from '@/spec/setting';

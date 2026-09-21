@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { SkillBundle } from '@/spec/skill';

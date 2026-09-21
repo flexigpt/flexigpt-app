@@ -1,8 +1,8 @@
-import { ArtifactState } from '@/spec/artifact';
 import type { AssistantModelPresetOption, ModelPresetRef, ProviderPreset } from '@/spec/modelpreset';
 import type { AssistantSkillOption } from '@/spec/skill';
-import { SkillInsert } from '@/spec/skill';
 import type { AssistantToolOption, ToolRef } from '@/spec/tool';
+import { ArtifactState } from '@/spec/artifact';
+import { SkillInsert } from '@/spec/skill';
 
 import { raceWithAbortSignal, withTimeout } from '@/lib/async_utils';
 

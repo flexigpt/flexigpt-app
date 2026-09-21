@@ -1,5 +1,4 @@
 import { useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiAlertTriangle } from 'react-icons/fi';
 
 import type { DebugSettings } from '@/spec/setting';

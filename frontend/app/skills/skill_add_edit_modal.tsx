@@ -1,6 +1,5 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiCopy, FiFolder, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Skill, SkillArgument, SkillArtifactCreateInput } from '@/spec/skill';

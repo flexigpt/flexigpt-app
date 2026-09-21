@@ -11,7 +11,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-
 import { FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import type { Attachment } from '@/spec/attachment';
@@ -23,17 +22,17 @@ import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
 import { ButtonScrollToBottom, ButtonScrollToTop } from '@/components/button_scroll_top_bottom';
 
-import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
+import type { MCPAppModelContextUpdateEventDetail, MCPAppUIMessageEventDetail } from '@/chats/mcpapps/mcp_app_events';
+import type { ChatTabState } from '@/chats/tabs/tabs_model';
+import { TabInputPane } from '@/chats/conversation/conversation_input_pane';
 import { useAttachmentsDropTarget } from '@/chats/conversation/use_attachments_drop_target';
 import { useInputRegistry } from '@/chats/conversation/use_input_registry';
 import { useScrollRestore } from '@/chats/conversation/use_scroll_restore';
 import { useSendMessage } from '@/chats/conversation/use_send_message';
 import { useStreamingRuntime } from '@/chats/conversation/use_streaming_runtime';
-import type { MCPAppModelContextUpdateEventDetail, MCPAppUIMessageEventDetail } from '@/chats/mcpapps/mcp_app_events';
 import { MCP_APP_MODEL_CONTEXT_UPDATE_EVENT, MCP_APP_UI_MESSAGE_EVENT } from '@/chats/mcpapps/mcp_app_events';
 import { ChatMessage } from '@/chats/messages/message';
-import type { ChatTabState } from '@/chats/tabs/tabs_model';
 
 const EMPTY_MESSAGES: ConversationMessage[] = [];
 const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();

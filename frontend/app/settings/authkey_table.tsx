@@ -1,5 +1,4 @@
 import { useState } from 'react';
-
 import { FiCheckCircle, FiDelete, FiEdit2, FiTrash2, FiXCircle } from 'react-icons/fi';
 
 import type { AuthKeyMeta } from '@/spec/setting';

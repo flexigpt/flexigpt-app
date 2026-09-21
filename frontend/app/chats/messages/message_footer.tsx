@@ -1,5 +1,4 @@
 import { memo, useCallback, useMemo, useState } from 'react';
-
 import { FiArrowDown, FiArrowUp, FiCode, FiEdit2 } from 'react-icons/fi';
 
 import type { InferenceUsage, ReasoningContent } from '@/spec/inference';

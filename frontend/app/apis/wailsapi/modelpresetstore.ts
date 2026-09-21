@@ -1,6 +1,5 @@
 import type { MappedTarget } from '@/spec/artifact';
 import type { ProviderName } from '@/spec/inference';
-import { ProviderSDKType } from '@/spec/inference';
 import type {
 	ModelPresetID,
 	ModelPresetRef,
@@ -9,8 +8,10 @@ import type {
 	PostModelPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
+import { ProviderSDKType } from '@/spec/inference';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
+import type { spec } from '@/apis/wailsjs/go/models';
 import {
 	enumFromWails,
 	omitUndefined,
@@ -32,7 +33,6 @@ import {
 	PostModelPreset,
 	ResolveMappedModelTarget,
 } from '@/apis/wailsjs/go/main/ModelPresetStoreWrapper';
-import type { spec } from '@/apis/wailsjs/go/models';
 
 function normalizeProviderPreset(providerValue: ProviderPreset, field: string): ProviderPreset {
 	const provider = requireWailsBody(providerValue, field);

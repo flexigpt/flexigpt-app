@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import { useHighlight } from '@/hooks/use_highlight';
 
+import type { MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_card';
 import { CopyButton } from '@/components/copy_button';
 import { DownloadButton } from '@/components/download_button';
 import { DiffApplyControl } from '@/components/markdown/diff_apply_control';
-import type { MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_card';
 import { MermaidDiagram } from '@/components/markdown/mermaid_diagram_card';
 import { looksLikeUnifiedDiff } from '@/components/markdown/unified_diff_block';
 

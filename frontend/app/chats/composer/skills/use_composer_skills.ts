@@ -2,8 +2,8 @@ import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
-import { RuntimeSkillActivity, SkillSessionSyncMode } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
+import { RuntimeSkillActivity, SkillSessionSyncMode } from '@/spec/skill';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 

@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import { validateSlug } from '@/lib/text_utils';

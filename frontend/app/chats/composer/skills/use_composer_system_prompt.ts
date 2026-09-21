@@ -10,9 +10,9 @@ import { dedupeStringArray } from '@/lib/obj_utils';
 
 import { skillManagementAPI } from '@/apis/baseapi';
 
-import { loadSkillOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import type { AssistantPresetPreparedApplication } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import type { SystemInstructionSource } from '@/chats/composer/skills/prompt_utils';
+import { loadSkillOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
 import { buildEffectiveSystemPrompt } from '@/chats/composer/skills/prompt_utils';
 import {
 	getSkillInstructionPromptEligibilityReason,

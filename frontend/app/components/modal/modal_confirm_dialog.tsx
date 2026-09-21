@@ -1,6 +1,5 @@
 import type { DialogHTMLAttributes, ReactNode } from 'react';
 import { useRef, useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import { ModalActions } from '@/components/modal/modal_actions';

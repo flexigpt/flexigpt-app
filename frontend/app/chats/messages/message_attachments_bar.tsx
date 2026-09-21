@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-
 import {
 	FiChevronRight,
 	FiCode,
@@ -18,14 +17,14 @@ import {
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
 import type { Attachment } from '@/spec/attachment';
-import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
-import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
-import { ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
+import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
+import { MCPExecutionMode } from '@/spec/mcp';
+import { ToolStoreChoiceType } from '@/spec/tool';
 import { WorkspaceContextCompositionStatus, WorkspaceConversationSkillUsageStatus } from '@/spec/workspace';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';

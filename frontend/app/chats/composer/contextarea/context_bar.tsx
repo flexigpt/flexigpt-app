@@ -1,30 +1,29 @@
 import { useCallback, useRef, useState } from 'react';
-
 import { FiSliders } from 'react-icons/fi';
 
-import { ReasoningType } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
+import { ReasoningType } from '@/spec/inference';
 
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
-import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
-import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';
 import type {
 	AssistantPresetOptionItem,
 	AssistantPresetPreparedApplication,
 } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { AssistantPresetViewModal } from '@/chats/composer/assistantpresets/assistant_preset_view_modal';
 import type { AssistantPresetManagerState } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
 import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
+import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';
+import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { AssistantPresetViewModal } from '@/chats/composer/assistantpresets/assistant_preset_view_modal';
 import { ModelDropdown } from '@/chats/composer/models/model_dropdown';
 import { OutputVerbosityDropdown } from '@/chats/composer/outputverbosities/output_verbosity_dropdown';
 import { PreviousMessagesDropdown } from '@/chats/composer/previousmessages/previous_messages_dropdown';
 import { HybridReasoningCheckbox } from '@/chats/composer/reasoningparams/reasoning_hybrid_checkbox';
 import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reasoning_levels_dropdown';
 import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
 
 interface EditorContextBarProps {

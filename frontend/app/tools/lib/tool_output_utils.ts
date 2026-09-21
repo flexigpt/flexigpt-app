@@ -1,6 +1,6 @@
 import type { ToolOutputItemUnion } from '@/spec/inference';
-import { ContentItemKind, ImageDetail } from '@/spec/inference';
 import type { ToolOutputUnion } from '@/spec/tool';
+import { ContentItemKind, ImageDetail } from '@/spec/inference';
 import { ToolOutputKind } from '@/spec/tool';
 
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';

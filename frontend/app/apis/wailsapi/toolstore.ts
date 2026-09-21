@@ -5,6 +5,7 @@ import { HTTPBodyOutputMode, ToolImplType, ToolStoreChoiceType } from '@/spec/to
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 
 import type { IToolStoreAPI } from '@/apis/interface';
+import type { spec } from '@/apis/wailsjs/go/models';
 import {
 	enumFromWails,
 	jsonObjectFromWails,
@@ -27,7 +28,6 @@ import {
 	PutToolBundle,
 	ResolveMappedToolTarget,
 } from '@/apis/wailsjs/go/main/ToolStoreWrapper';
-import type { spec } from '@/apis/wailsjs/go/models';
 
 function httpImplFromWails(httpImpl: HTTPToolImpl | null | undefined, field: string): HTTPToolImpl | undefined {
 	if (httpImpl === null || httpImpl === undefined) {

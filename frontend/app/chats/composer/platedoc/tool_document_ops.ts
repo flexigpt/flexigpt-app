@@ -1,6 +1,6 @@
 import type { Path } from 'platejs';
-import { ElementApi, NodeApi } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
+import { ElementApi, NodeApi } from 'platejs';
 
 import type { Tool, UIToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';

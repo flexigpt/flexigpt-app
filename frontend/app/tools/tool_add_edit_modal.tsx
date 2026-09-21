@@ -1,11 +1,11 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiAlertTriangle, FiHelpCircle, FiUpload, FiX } from 'react-icons/fi';
 
 import type { Tool } from '@/spec/tool';
 import { HTTPBodyOutputMode, ToolImplType } from '@/spec/tool';
 
+import type { JSONSchema } from '@/lib/jsonschema_utils';
 import {
 	omitSensitiveHTTPHeaders,
 	parseHTTPHeadersJSON,
@@ -16,7 +16,6 @@ import {
 	restoreRedactedHTTPHeaders,
 	validateHTTPURLTemplateSecurity,
 } from '@/lib/http_input_utils';
-import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { validateSlug, validateTags } from '@/lib/text_utils';
 import { MessageEnterValidURL, validateUrlForInput } from '@/lib/url_utils';

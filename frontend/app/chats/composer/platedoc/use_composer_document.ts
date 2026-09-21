@@ -5,6 +5,7 @@ import type { Value } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 import { usePlateEditor } from 'platejs/react';
 
+import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import {
 	buildSingleParagraphValue,
 	buildSingleParagraphValueChunked,
@@ -20,7 +21,6 @@ import {
 	LARGE_TEXT_CHUNK_SIZE,
 } from '@/chats/composer/platedoc/platedoc_utils';
 import { createComposerEditorPlugins } from '@/chats/composer/platedoc/plugins';
-import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { getAttachedToolEntries } from '@/chats/composer/platedoc/tool_document_ops';
 
 type ReplaceEditorDocumentFocusMode = 'none' | 'preserve' | 'end';

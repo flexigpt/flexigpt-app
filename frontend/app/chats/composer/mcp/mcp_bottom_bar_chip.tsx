@@ -1,6 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-
 import {
 	FiCheck,
 	FiChevronDown,
@@ -83,11 +82,7 @@ function stop(e: MouseEvent) {
 }
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
-	return (
-		option.bundle.enabled &&
-		option.server.enabled &&
-		isServerOperational(option.server)
-	);
+	return option.bundle.enabled && option.server.enabled && isServerOperational(option.server);
 }
 
 function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {

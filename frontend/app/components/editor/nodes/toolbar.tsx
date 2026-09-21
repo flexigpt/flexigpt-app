@@ -1,10 +1,9 @@
 import type { ButtonHTMLAttributes, ComponentType, HTMLAttributes, MouseEvent } from 'react';
 import { forwardRef, useState } from 'react';
-
 import { FiChevronDown } from 'react-icons/fi';
 
-import { cn } from '@udecode/cn';
 import type { VariantProps } from 'class-variance-authority';
+import { cn } from '@udecode/cn';
 import { cva } from 'class-variance-authority';
 
 /* Root toolbar */

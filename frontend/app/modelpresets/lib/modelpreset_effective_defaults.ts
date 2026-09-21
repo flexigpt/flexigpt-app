@@ -1,6 +1,6 @@
 import type { ModelParam } from '@/spec/inference';
-import { DefaultModelParams } from '@/spec/inference';
 import type { ModelPreset } from '@/spec/modelpreset';
+import { DefaultModelParams } from '@/spec/inference';
 
 /**
  * Canonical "effective runtime defaults" for a model preset.

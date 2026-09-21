@@ -1,6 +1,5 @@
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { forwardRef, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
-
 import { FiSearch } from 'react-icons/fi';
 
 import { Popover, usePopoverStore, useStoreState } from '@ariakit/react';

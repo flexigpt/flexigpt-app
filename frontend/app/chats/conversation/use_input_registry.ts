@@ -6,11 +6,11 @@ import type { UIToolCall } from '@/spec/inference';
 
 import type { ComposerBoxHandle } from '@/chats/composer/composer_box';
 import type { AssistantTurnFinishedPayload } from '@/chats/composer/editor/editor_types';
+import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 import {
 	deriveHydratedLastAssistantToolCalls,
 	deriveRestorableConversationContextFromMessages,
 } from '@/chats/conversation/hydration_helper';
-import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
 
 interface PendingDrop {
 	tabId: string;

@@ -1,5 +1,4 @@
 import type { ButtonHTMLAttributes } from 'react';
-
 import { FiChevronsDown, FiChevronsUp } from 'react-icons/fi';
 
 interface ButtonScrollToBottomProps extends ButtonHTMLAttributes<HTMLButtonElement> {

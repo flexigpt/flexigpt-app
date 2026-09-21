@@ -1,6 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSearch, FiSettings, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -19,9 +18,9 @@ import {
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
+import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
 import { workspaceRefsEqual } from '@/workspaces/lib/workspace_api_utils';
-import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
 interface WorkspaceBottomBarChipProps {

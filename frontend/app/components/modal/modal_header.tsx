@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react';
-
 import { FiX } from 'react-icons/fi';
 
 interface ModalHeaderProps {

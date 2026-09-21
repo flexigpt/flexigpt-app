@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useId, useMemo, useState } from 'react';
-
 import { FiAlertCircle, FiFolder, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type {

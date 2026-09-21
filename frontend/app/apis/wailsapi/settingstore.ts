@@ -10,6 +10,7 @@ import type {
 import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
+import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import {
 	enumFromWails,
 	requireWailsBody,
@@ -18,7 +19,6 @@ import {
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 function booleanOrDefault(value: unknown, fallback: boolean, field: string): boolean {
 	if (value === null || value === undefined) {

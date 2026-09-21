@@ -3,9 +3,9 @@ import { useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InferenceError, ModelParam, UIToolCall } from '@/spec/inference';
-import { RoleEnum, Status } from '@/spec/inference';
 import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
+import { RoleEnum, Status } from '@/spec/inference';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -15,6 +15,8 @@ import type {
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
+import type { StreamBuffer } from '@/chats/conversation/use_streaming_runtime';
+import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { sliceMessagesForSend } from '@/chats/composer/previousmessages/previous_messages_helper';
 import {
 	applyCompletionMetadata,
@@ -33,8 +35,6 @@ import {
 	initConversationMessage,
 	shouldPersistAssistantModelParam,
 } from '@/chats/conversation/hydration_helper';
-import type { StreamBuffer } from '@/chats/conversation/use_streaming_runtime';
-import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
 
 interface UseSendMessageArgs {

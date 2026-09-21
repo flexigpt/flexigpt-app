@@ -14,9 +14,9 @@ import type {
 	UIToolOutput,
 	URLCitation,
 } from '@/spec/inference';
-import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
 import type { MCPToolSelection } from '@/spec/mcp';
 import type { ToolStoreChoice } from '@/spec/tool';
+import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
 
 import {
 	buildMCPToolSelectionMap,

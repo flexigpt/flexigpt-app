@@ -1,9 +1,7 @@
 import { useMemo, useState } from 'react';
-
 import { FiCheckCircle, FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiKey, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';
-import { SDK_DISPLAY_NAME } from '@/spec/inference';
 import type {
 	ModelPreset,
 	ModelPresetID,
@@ -12,6 +10,7 @@ import type {
 	ProviderPreset,
 } from '@/spec/modelpreset';
 import type { AuthKeyMeta } from '@/spec/setting';
+import { SDK_DISPLAY_NAME } from '@/spec/inference';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';

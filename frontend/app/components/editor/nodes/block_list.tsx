@@ -1,10 +1,10 @@
 // oxlint-disable-next-line no-restricted-imports
 import type { FC } from 'react';
 
-import { isOrderedList } from '@platejs/list';
-import { useTodoListElement, useTodoListElementState } from '@platejs/list/react';
 import type { TListElement } from 'platejs';
 import type { PlateElementProps, RenderNodeWrapper } from 'platejs/react';
+import { isOrderedList } from '@platejs/list';
+import { useTodoListElement, useTodoListElementState } from '@platejs/list/react';
 import { useReadOnly } from 'platejs/react';
 
 // Tiny helper to merge class names (no external deps)

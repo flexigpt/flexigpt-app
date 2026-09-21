@@ -1,13 +1,12 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
 import type { MCPConversationContext } from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
+import { MCPToolExposure } from '@/spec/mcp';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { tryParseJSONObject } from '@/lib/jsonschema_utils';
@@ -28,11 +27,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
-import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
-import { ToolSelectionSection } from '@/assistantpresets/components/tool_selection_section';
 import type { AssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
-import { loadAssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
 import type {
 	AssistantPresetFormData,
 	ErrorState,
@@ -45,6 +40,10 @@ import type {
 	TriStateBoolean,
 } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import type { AssistantPresetUpsertInput } from '@/assistantpresets/lib/assistant_preset_utils';
+import { MCPSelectionSection } from '@/assistantpresets/components/mcp_selection_section';
+import { SkillSelectionSection } from '@/assistantpresets/components/skill_selection_section';
+import { ToolSelectionSection } from '@/assistantpresets/components/tool_selection_section';
+import { loadAssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
 import {
 	buildModelPresetRefKey,
 	buildSkillRefKey,

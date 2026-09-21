@@ -6,6 +6,7 @@ import type {
 } from '@/spec/assistantpreset';
 
 import type { IAssistantPresetStoreAPI } from '@/apis/interface';
+import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import {
 	omitUndefined,
 	optionalWailsBody,
@@ -24,7 +25,6 @@ import {
 	PutAssistantPreset,
 	PutAssistantPresetBundle,
 } from '@/apis/wailsjs/go/main/AssistantPresetStoreWrapper';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 
 export class WailsAssistantPresetStoreAPI implements IAssistantPresetStoreAPI {
 	async listAssistantPresetBundles(

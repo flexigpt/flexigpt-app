@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from 'react';
-
 import { FiBookOpen, FiChevronLeft, FiChevronRight } from 'react-icons/fi';
 
 import { useLocation, useNavigate } from 'react-router';

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { codeMessage } from '@/lib/__tests__/sample_code_message';
 import type { TitleCandidate } from '@/lib/title_utils';
+import { codeMessage } from '@/lib/__tests__/sample_code_message';
 import { generateTitle } from '@/lib/title_utils';
 
 const DEFAULT = 'New conversation';

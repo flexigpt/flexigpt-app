@@ -1,6 +1,6 @@
 import type { ConversationMessage } from '@/spec/conversation';
-import { InputKind, RoleEnum } from '@/spec/inference';
 import type { IncludePreviousMessages } from '@/spec/modelpreset';
+import { InputKind, RoleEnum } from '@/spec/inference';
 
 function isInstructionMessage(message: ConversationMessage): boolean {
 	return message.role === RoleEnum.System || message.role === RoleEnum.Developer;

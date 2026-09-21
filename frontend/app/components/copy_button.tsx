@@ -1,6 +1,5 @@
 import type { ButtonHTMLAttributes } from 'react';
 import { useState } from 'react';
-
 import { FiCheck, FiCopy } from 'react-icons/fi';
 
 import { log } from '@/apis/baseapi';

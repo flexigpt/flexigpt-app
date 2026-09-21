@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
 import type { UpdateWorkspaceBody, WorkspaceView } from '@/spec/workspace';
@@ -20,6 +19,7 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
+import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import {
 	createEmptyWorkspaceCollection,
 	createFilesystemWorkspaceCollection,
@@ -28,7 +28,6 @@ import {
 } from '@/workspaces/lib/workspace_api_utils';
 import { getErrorMessage, sortWorkspaces, workspaceMatchesSearch } from '@/workspaces/lib/workspace_utils';
 import { WorkspaceCard } from '@/workspaces/workspace_card';
-import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
 import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
 
 async function loadWorkspaces(signal: AbortSignal): Promise<WorkspaceView[]> {

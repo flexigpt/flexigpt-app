@@ -1,7 +1,7 @@
 import type { ProviderName } from '@/spec/inference';
 import type { UIChatOption } from '@/spec/modelpreset';
-import { DefaultUIChatOptions } from '@/spec/modelpreset';
 import type { SettingsSchema } from '@/spec/setting';
+import { DefaultUIChatOptions } from '@/spec/modelpreset';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
 import { modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';

@@ -1,9 +1,4 @@
 import type { ArtifactDiagnostic, ArtifactKind, ArtifactState } from '@/spec/artifact';
-import {
-	ArtifactDiagnosticSeverity,
-	ArtifactOccurrenceState as ArtifactOccurrenceStateValue,
-	ArtifactState as ArtifactStateValue,
-} from '@/spec/artifact';
 import type {
 	WorkspaceArtifactView,
 	WorkspaceCatalogView,
@@ -13,6 +8,11 @@ import type {
 	WorkspaceSuppressionView,
 	WorkspaceView,
 } from '@/spec/workspace';
+import {
+	ArtifactDiagnosticSeverity,
+	ArtifactOccurrenceState as ArtifactOccurrenceStateValue,
+	ArtifactState as ArtifactStateValue,
+} from '@/spec/artifact';
 
 import type { StatusTone } from '@/components/managementui/management_class_consts';
 

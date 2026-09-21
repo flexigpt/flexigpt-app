@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react';
-
 import { FiPlus } from 'react-icons/fi';
 
 import type { AuthKeyMeta, SettingsSchema } from '@/spec/setting';

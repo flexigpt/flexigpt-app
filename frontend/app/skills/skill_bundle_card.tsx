@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-
 import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { Skill, SkillBundle } from '@/spec/skill';
@@ -18,6 +17,7 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
 import type { SkillInsertFilter } from '@/skills/lib/skill_artifact_utils';
+import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import {
 	getSkillArgumentCountLabel,
 	getSkillArgumentTooltip,
@@ -33,7 +33,6 @@ import {
 	skillMatchesSearch,
 	skillMatchesTags,
 } from '@/skills/lib/skill_artifact_utils';
-import type { SkillItem, SkillUpsertInput } from '@/skills/skill_add_edit_modal';
 import { AddEditSkillModal } from '@/skills/skill_add_edit_modal';
 import { SkillBundleDetailsModal } from '@/skills/skill_bundle_details_modal';
 import { SkillBundleEditModal } from '@/skills/skill_bundle_edit_modal';

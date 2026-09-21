@@ -10,19 +10,19 @@ import type { ToolListItem } from '@/spec/tool';
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
+import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
+import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
+import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
+import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
+import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { AttachmentBottomBarChip } from '@/chats/composer/attachments/attachment_bottom_bar_chip';
 import { KeyboardShortcutsMenu } from '@/chats/composer/editor/keyboard_shortcuts_menu';
 import { MCPBottomBarChip } from '@/chats/composer/mcp/mcp_bottom_bar_chip';
-import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
-import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import { SkillTemplateBottomBarChip } from '@/chats/composer/skills/skill_template_bottom_bar_chip';
 import { SkillsBottomBarChip } from '@/chats/composer/skills/skills_bottom_bar_chip';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
 import { ToolsBottomBarChip } from '@/chats/composer/tools/tools_bottom_bar_chip';
-import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
-import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
 import { WorkspaceBottomBarChip } from '@/chats/composer/workspaces/workspace_bottom_bar_chip';
-import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 
 interface EditorBottomBarProps {
 	onAttachFiles: () => Promise<void> | void;

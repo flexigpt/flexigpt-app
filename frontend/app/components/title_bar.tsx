@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-
 import { FiCopy, FiMaximize2, FiMenu, FiMinus, FiX } from 'react-icons/fi';
 
 import { Link } from 'react-router';

@@ -4,8 +4,8 @@ import type { ConversationSearchItem } from '@/spec/conversation';
 
 import { GroupedDropdown } from '@/components/date_grouped_dropdown';
 
-import { ConversationSearchFlatRow, ConversationSearchRowMeta } from '@/chats/search/conversation_search_row';
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
+import { ConversationSearchFlatRow, ConversationSearchRowMeta } from '@/chats/search/conversation_search_row';
 
 interface ConversationSearchDropdownProps {
 	results: SearchResult[];

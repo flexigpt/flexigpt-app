@@ -15,14 +15,15 @@ import { generateTitle } from '@/lib/title_utils';
 import { conversationStoreAPI } from '@/apis/baseapi';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
+import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
+import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
+import type { ChatTabState } from '@/chats/tabs/tabs_model';
+import type { InitialChatsModel } from '@/chats/tabs/tabs_persistence';
 import {
 	hydrateConversationAsync,
 	toStoreConversationAsync,
 } from '@/chats/conversation/conversation_persistence_mapper';
 import { initConversation } from '@/chats/conversation/hydration_helper';
-import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
-import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
-import type { ChatTabState } from '@/chats/tabs/tabs_model';
 import {
 	createEmptyTab,
 	isScratchTab,
@@ -31,7 +32,6 @@ import {
 	sanitizeConversationTitle,
 	toTimestampMap,
 } from '@/chats/tabs/tabs_model';
-import type { InitialChatsModel } from '@/chats/tabs/tabs_persistence';
 import { buildInitialChatsModel, writePersistedChatsPageState } from '@/chats/tabs/tabs_persistence';
 
 interface UseChatsControllerArgs {

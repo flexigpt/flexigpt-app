@@ -1,6 +1,5 @@
 import type { ChangeEvent, ReactNode, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { ProviderName } from '@/spec/inference';

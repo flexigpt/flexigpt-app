@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import { ArtifactState } from '@/spec/artifact';
 import type { SkillRef } from '@/spec/skill';
-import { SkillSessionSyncMode } from '@/spec/skill';
 import type {
 	CreateFilesystemWorkspaceInput,
 	WorkspaceContextView,
@@ -14,6 +12,8 @@ import type {
 	WorkspaceSkillView,
 	WorkspaceView,
 } from '@/spec/workspace';
+import { ArtifactState } from '@/spec/artifact';
+import { SkillSessionSyncMode } from '@/spec/skill';
 import { WorkspaceSkillInsert } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';

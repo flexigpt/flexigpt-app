@@ -1,10 +1,9 @@
 import type { SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiRefreshCcw, FiTool } from 'react-icons/fi';
 
-import { focusTextInputAtEnd } from '@/lib/focus_input';
 import type { JSONObject, JSONSchema } from '@/lib/jsonschema_utils';
+import { focusTextInputAtEnd } from '@/lib/focus_input';
 import {
 	buildExampleFromDraft7Schema,
 	getJSONObject,

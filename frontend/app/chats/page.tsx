@@ -7,12 +7,12 @@ import { useTitleBarContent } from '@/hooks/use_title_bar';
 import { PageFrame } from '@/components/page_frame';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
+import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
 import { ConversationArea } from '@/chats/conversation/conversation_area';
 import {
 	parseChatWorkflowStarterSearchParams,
 	removeChatWorkflowStarterSearchParams,
 } from '@/chats/conversation/starter_intent';
-import type { ConversationSearchHandle } from '@/chats/search/conversation_search';
 import { ConversationSearch } from '@/chats/search/conversation_search';
 import { ChatTabsBar } from '@/chats/tabs/chat_tabs_bar';
 import { useChatsController } from '@/chats/tabs/use_chats_controller';

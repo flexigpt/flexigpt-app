@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-
 import { FiPlus } from 'react-icons/fi';
 
 import type { AssistantPreset, AssistantPresetBundle } from '@/spec/assistantpreset';
@@ -20,15 +19,15 @@ import { ManagementPageHeader } from '@/components/managementui/management_page_
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
+import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
+import type { AssistantPresetUpsertInput } from '@/assistantpresets/lib/assistant_preset_utils';
 import { AssistantPresetBundleCard } from '@/assistantpresets/assistant_preset_bundle_card';
 import { AssistantPresetBundleEditModal } from '@/assistantpresets/assistant_preset_bundle_edit_modal';
-import type { PresetItem } from '@/assistantpresets/lib/assistant_preset_editor_types';
 import {
 	getAllAssistantPresetBundles,
 	getAllAssistantPresetListItems,
 	sortAssistantPresets,
 } from '@/assistantpresets/lib/assistant_preset_store_list_utils';
-import type { AssistantPresetUpsertInput } from '@/assistantpresets/lib/assistant_preset_utils';
 import { toPutAssistantPresetPayload } from '@/assistantpresets/lib/assistant_preset_utils';
 
 interface BundleData {

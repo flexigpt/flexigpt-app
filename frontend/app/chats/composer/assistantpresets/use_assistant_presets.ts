@@ -9,15 +9,16 @@ import type {
 	MCPRuntimeServerID,
 	MCPToolCapability,
 } from '@/spec/mcp';
-import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';
+import { MCPToolExposure } from '@/spec/mcp';
 import { ToolImplType } from '@/spec/tool';
 
 import { assistantPresetStoreAPI, mcpRuntimeAPI } from '@/apis/baseapi';
 
 import type { AssistantPresetCatalogLoadErrors } from '@/assistantpresets/lib/assistant_preset_catalog';
+import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { loadAssistantPresetEditorCatalog } from '@/assistantpresets/lib/assistant_preset_catalog';
 import {
 	getAllAssistantPresetBundles,
@@ -28,7 +29,6 @@ import {
 	buildSkillRefKey,
 	buildToolRefKey,
 } from '@/assistantpresets/lib/assistant_preset_utils';
-import type { AssistantPresetOptionItem } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { buildAssistantPresetIdentityKey } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
 import { isServerOperational, loadMCPBundleViews, loadMCPServerViews } from '@/mcpservers/lib/mcp_management';
 import { isMCPToolModelSelectable } from '@/mcpservers/lib/mcp_server_utils';

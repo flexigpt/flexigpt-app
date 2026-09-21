@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertTriangle, FiCheckCircle, FiGitPullRequest, FiInfo, FiLoader } from 'react-icons/fi';
 
 import type {
@@ -12,8 +11,13 @@ import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/
 
 import { aggregateAPI } from '@/apis/baseapi';
 
-import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
 import type { HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
+import type {
+	DiffApplyRunOptions,
+	EditableUnifiedDiffTarget,
+	FileStatusCounts,
+} from '@/components/markdown/unified_diff_block';
+import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
 import {
 	collectOutputDiagnostics,
 	collectPatchLevelDiagnostics,
@@ -23,11 +27,6 @@ import {
 	getHighestDiagnosticLevel,
 	uniqueDiagnostics,
 } from '@/components/markdown/diff_diagnostic';
-import type {
-	DiffApplyRunOptions,
-	EditableUnifiedDiffTarget,
-	FileStatusCounts,
-} from '@/components/markdown/unified_diff_block';
 import {
 	absolutePathStrings,
 	buildEditableTargetsFromOutput,

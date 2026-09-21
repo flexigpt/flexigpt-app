@@ -1,6 +1,5 @@
 import type { SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiLink } from 'react-icons/fi';
 
 import type { FieldErrorState } from '@/lib/url_utils';
