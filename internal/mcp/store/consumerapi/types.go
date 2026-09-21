@@ -14,11 +14,17 @@ import (
 )
 
 type ServerInstallationView struct {
-	Artifact             artifact.Artifact              `json:"artifact"`
-	Document             mcpDomainServer.ServerDocument `json:"document"`
-	Installation         mcpDomainServer.ServerData     `json:"installation"`
-	InstallationRevision uint64                         `json:"installationRevision"`
-	BuiltIn              bool                           `json:"builtIn"`
+	Artifact     artifact.Artifact              `json:"artifact"`
+	Document     mcpDomainServer.ServerDocument `json:"document"`
+	Installation mcpDomainServer.ServerData     `json:"installation"`
+
+	// InstallationRevision is the optimistic-concurrency token for a write
+	// through UpdateServerInstallation or UpdateProtectedServerInstallation.
+	//
+	// Mutable servers use their Artifact revision. Protected servers use the
+	// persisted overlay revision, which is zero when no overlay exists yet.
+	InstallationRevision uint64 `json:"installationRevision"`
+	BuiltIn              bool   `json:"builtIn"`
 }
 
 type PolicyView struct {
@@ -99,6 +105,45 @@ type ServerStore interface {
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (ServerInstallationView, error)
+}
+
+// ManagementStore is the aggregate-facing MCP persistence port. It includes
+// mutation operations whose callers must coordinate runtime invalidation.
+type ManagementStore interface {
+	ServerStore
+
+	GetMCPPolicy(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) (PolicyView, error)
+
+	GetMCPEffectivePolicy(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) (mcpPolicy.Effective, error)
+
+	ListMCPServersReferencingPolicy(
+		ctx context.Context,
+		rootID root.RootID,
+		policyName basespec.LogicalName,
+	) ([]artifact.ArtifactRef, error)
+
+	CreateManagedMCP(
+		ctx context.Context,
+		request ManagedMCPCreateRequest,
+	) (ManagedMCPCreateResult, error)
+
+	ReplaceManagedMCP(
+		ctx context.Context,
+		request ManagedMCPReplaceRequest,
+	) (ManagedMCPReplaceResult, error)
+
+	PurgeManagedMCP(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
+	UpsertManagedMCPPolicy(
+		ctx context.Context,
+		request ManagedMCPPolicyUpsertRequest,
+	) (ManagedMCPPolicyUpsertResult, error)
+	PurgeManagedMCPPolicy(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
 }
 
 type BuiltinStore interface {

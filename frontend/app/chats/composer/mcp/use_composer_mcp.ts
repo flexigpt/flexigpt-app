@@ -24,7 +24,8 @@ import {
 
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
-import { backendAPI, mcpManagementAPI, mcpRuntimeAPI } from '@/apis/baseapi';
+import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
+import { getAuthMode, isServerOperational } from '@/apis/mcp_management';
 
 import type {
 	MCPComposerServerOption,
@@ -41,12 +42,6 @@ import {
 	mcpServerKey,
 	mcpToolKey,
 } from '@/chats/composer/mcp/mcp_composer_types';
-import {
-	getAuthMode,
-	isServerOperational,
-	loadMCPBundleViews,
-	loadMCPServerViews,
-} from '@/mcpservers/lib/mcp_management';
 import { isMCPToolModelSelectable, isMCPToolVisibleToModel } from '@/mcpservers/lib/mcp_server_utils';
 
 type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources' | 'resourceTemplates' | 'prompts'>;
@@ -303,13 +298,13 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 		try {
 			const [bundles, pendingAuthorizations] = await Promise.all([
-				loadMCPBundleViews(),
-				mcpRuntimeAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
+				mcpManagementAPI.listMCPBundles(),
+				mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
 			]);
 
 			const nestedOptions = await Promise.all(
 				bundles.map(async bundle => {
-					const servers = await loadMCPServerViews(bundle);
+					const servers = await mcpManagementAPI.listMCPServers(bundle);
 
 					const values = await Promise.all(
 						servers.map(async server => {
@@ -319,7 +314,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 							}
 
 							const [runtime, authHealth] = await Promise.all([
-								mcpRuntimeAPI.getMCPServerStatus(runtimeServerID).catch(() => undefined),
+								mcpManagementAPI.getMCPServerStatus(runtimeServerID).catch(() => undefined),
 								mcpManagementAPI.getMCPServerAuthHealth(server.ref).catch(() => undefined),
 							]);
 
@@ -395,10 +390,10 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 			const promise = (async (): Promise<MCPDiscoveryLoadResult | undefined> => {
 				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
-					mcpRuntimeAPI.listMCPServerTools(server),
-					mcpRuntimeAPI.listMCPServerResources(server),
-					mcpRuntimeAPI.listMCPServerResourceTemplates(server),
-					mcpRuntimeAPI.listMCPServerPrompts(server),
+					mcpManagementAPI.listMCPServerTools(server),
+					mcpManagementAPI.listMCPServerResources(server),
+					mcpManagementAPI.listMCPServerResourceTemplates(server),
+					mcpManagementAPI.listMCPServerPrompts(server),
 				]);
 
 				const toolsDiscovery = normalizeMCPDiscoveryList<MCPToolCapability>(toolsResult, 'tools');
@@ -515,9 +510,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			}
 
 			const [runtime, authHealth, pendingAuthorizations] = await Promise.all([
-				mcpRuntimeAPI.getMCPServerStatus(server).catch(() => undefined),
+				mcpManagementAPI.getMCPServerStatus(server).catch(() => undefined),
 				mcpManagementAPI.getMCPServerAuthHealth(previous.server.ref).catch(() => undefined),
-				mcpRuntimeAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
+				mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
 			]);
 
 			if (!mountedRef.current) {
@@ -551,7 +546,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			});
 
 			try {
-				const runtime = await mcpRuntimeAPI.refreshMCPServer(server);
+				const runtime = await mcpManagementAPI.refreshMCPServer(server);
 
 				if (mountedRef.current) {
 					patchOption(server, { runtime });
@@ -587,7 +582,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 				let runtime =
 					current?.runtime?.status === MCPServerStatus.Connecting
 						? current.runtime
-						: await mcpRuntimeAPI.connectMCPServer(server);
+						: await mcpManagementAPI.connectMCPServer(server);
 
 				if (mountedRef.current) {
 					patchOption(server, {
@@ -634,7 +629,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 	);
 
 	const refreshPendingOAuthAuthorizations = useCallback(async () => {
-		const pendingAuthorizations = await mcpRuntimeAPI.listPendingMCPOAuthAuthorizations().catch(() => []);
+		const pendingAuthorizations = await mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => []);
 		const stalePending = optionsRef.current.filter(option => {
 			if (!hasPendingOAuthHealth(option)) {
 				return false;
@@ -688,7 +683,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const disconnectServer = useCallback(
 		async (server: MCPRuntimeServerID) => {
-			await mcpRuntimeAPI.disconnectMCPServer(server);
+			await mcpManagementAPI.disconnectMCPServer(server);
 			await refreshServerStatus(server);
 		},
 		[refreshServerStatus]
@@ -696,7 +691,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const cancelOAuth = useCallback(
 		async (server: MCPRuntimeServerID) => {
-			await mcpRuntimeAPI.cancelPendingMCPOAuthAuthorization(server);
+			await mcpManagementAPI.cancelPendingMCPOAuthAuthorization(server);
 			await refreshServerStatus(server);
 		},
 		[refreshServerStatus]
@@ -752,13 +747,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			}
 
 			const option = optionsRef.current.find(item => optionKey(item) === key);
-			if (
-				!option ||
-				!option.bundle.enabled ||
-				!option.server.runtimeEnabled ||
-				!option.server.artifact.enabled ||
-				!isServerOperational(option.server)
-			) {
+			if (!option || !option.bundle.enabled || !option.server.artifact.enabled || !isServerOperational(option.server)) {
 				return false;
 			}
 
@@ -1013,12 +1002,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 			if (!option) {
 				throw new Error(`Selected MCP server ${selection.server} is no longer available.`);
 			}
-			if (
-				!option.bundle.enabled ||
-				!option.server.runtimeEnabled ||
-				!option.server.artifact.enabled ||
-				!isServerOperational(option.server)
-			) {
+			if (!option.bundle.enabled || !option.server.artifact.enabled || !isServerOperational(option.server)) {
 				throw new Error(`Selected MCP server ${option.server.displayName} is disabled or unavailable.`);
 			}
 			if (option.runtime?.status !== MCPServerStatus.Ready) {

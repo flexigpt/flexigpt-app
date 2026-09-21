@@ -116,9 +116,9 @@ func (w *MCPRuntimeWrapper) ListMCPServerToolsPage(
 	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpServer.MCPToolCapability, *string, error) {
+) (mcpConnection.MCPToolCapabilityPage, error) {
 	if err := w.ready(); err != nil {
-		return nil, nil, err
+		return mcpConnection.MCPToolCapabilityPage{}, err
 	}
 	return w.runtime.ListToolsPage(context.Background(), server, pageSize, pageToken)
 }
@@ -135,9 +135,9 @@ func (w *MCPRuntimeWrapper) ListMCPServerResourcesPage(
 	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpServer.MCPResourceRef, *string, error) {
+) (mcpConnection.MCPResourcePage, error) {
 	if err := w.ready(); err != nil {
-		return nil, nil, err
+		return mcpConnection.MCPResourcePage{}, err
 	}
 	return w.runtime.ListResourcesPage(context.Background(), server, pageSize, pageToken)
 }
@@ -154,9 +154,9 @@ func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplatesPage(
 	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpServer.MCPResourceTemplateRef, *string, error) {
+) (mcpConnection.MCPResourceTemplatePage, error) {
 	if err := w.ready(); err != nil {
-		return nil, nil, err
+		return mcpConnection.MCPResourceTemplatePage{}, err
 	}
 	return w.runtime.ListResourceTemplatesPage(
 		context.Background(),
@@ -178,9 +178,9 @@ func (w *MCPRuntimeWrapper) ListMCPServerPromptsPage(
 	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) ([]mcpServer.MCPPromptRef, *string, error) {
+) (mcpConnection.MCPPromptPage, error) {
 	if err := w.ready(); err != nil {
-		return nil, nil, err
+		return mcpConnection.MCPPromptPage{}, err
 	}
 	return w.runtime.ListPromptsPage(context.Background(), server, pageSize, pageToken)
 }

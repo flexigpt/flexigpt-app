@@ -1,8 +1,8 @@
+import type { MCPBundleView } from '@/spec/mcp';
+
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
 import { ManagementInfoRow } from '@/components/managementui/management_info_row';
-
-import type { MCPBundleView } from '@/mcpservers/lib/mcp_management';
 
 interface MCPBundleDetailsModalProps {
 	isOpen: boolean;
@@ -22,7 +22,7 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 			onClose={onClose}
 			title="MCP Bundle Details"
 			description={`${serverCount} configured server${serverCount === 1 ? '' : 's'}`}
-			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.collectionID}:${bundle.bundle.collection.modifiedAt}`}
+			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.collection.artifact.revision}`}
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{bundle.displayName}</ManagementInfoRow>
@@ -30,33 +30,25 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 					{bundle.logicalName}
 				</ManagementInfoRow>
 				<ManagementInfoRow label="Collection ID" mono>
-					{bundle.ref.collectionID}
+					{bundle.ref.artifactID}
 				</ManagementInfoRow>
 				<ManagementInfoRow label="Root ID" mono>
 					{bundle.ref.rootID}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Collection Revision">{bundle.bundle.collection.revision}</ManagementInfoRow>
-				<ManagementInfoRow label="Overlay Revision">{bundle.installation.overlayRevision || '—'}</ManagementInfoRow>
+				<ManagementInfoRow label="Collection Revision">{bundle.collection.artifact.revision}</ManagementInfoRow>
 				<ManagementInfoRow label="Managed Source ID" mono>
-					{bundle.bundle.data.managedSourceID || '—'}
+					{bundle.collection.artifact.binding.sourceID}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Attached Sources">
-					<div key={bundle.bundle.attachment.sourceID} className="bg-base-100 rounded-xl p-2 text-xs">
-						<div className="font-medium">{bundle.bundle.source?.displayName || bundle.bundle.attachment.sourceID}</div>
-						<div className="text-base-content/60 mt-1">
-							{bundle.bundle.attachment.role}
-							{bundle.bundle.source?.kind ? ` · ${bundle.bundle.source.kind}` : ''}
-						</div>
-						<div className="text-base-content/60 mt-1 font-mono break-all">{bundle.bundle.attachment.sourceID}</div>
-					</div>
-				</ManagementInfoRow>
+				<ManagementInfoRow label="Editable">{bundle.editable ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Deletable">{bundle.deletable ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Baseline">{bundle.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="Runtime Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Created">{bundle.bundle.collection.createdAt.toLocaleString()}</ManagementInfoRow>
-				<ManagementInfoRow label="Modified">{bundle.bundle.collection.modifiedAt.toLocaleString()}</ManagementInfoRow>
+				<ManagementInfoRow label="Created">{bundle.collection.artifact.createdAt.toLocaleString()}</ManagementInfoRow>
+				<ManagementInfoRow label="Modified">{bundle.collection.artifact.modifiedAt.toLocaleString()}</ManagementInfoRow>
 			</ManagementInfoGrid>
 		</ManagementDetailsModal>
 	);

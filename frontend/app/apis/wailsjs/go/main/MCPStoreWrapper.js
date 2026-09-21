@@ -14,10 +14,6 @@ export function CreateMCPCollection(arg1) {
   return window['go']['main']['MCPStoreWrapper']['CreateMCPCollection'](arg1);
 }
 
-export function CreateManagedMCP(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['CreateManagedMCP'](arg1);
-}
-
 export function DeleteMCPCollection(arg1) {
   return window['go']['main']['MCPStoreWrapper']['DeleteMCPCollection'](arg1);
 }
@@ -42,8 +38,8 @@ export function ListMCPCollections(arg1) {
   return window['go']['main']['MCPStoreWrapper']['ListMCPCollections'](arg1);
 }
 
-export function ListMCPCollectionsForManagement() {
-  return window['go']['main']['MCPStoreWrapper']['ListMCPCollectionsForManagement']();
+export function ListMCPCollectionsPage(arg1, arg2) {
+  return window['go']['main']['MCPStoreWrapper']['ListMCPCollectionsPage'](arg1, arg2);
 }
 
 export function ListMCPPolicies(arg1) {
@@ -54,24 +50,12 @@ export function ListMCPServers(arg1) {
   return window['go']['main']['MCPStoreWrapper']['ListMCPServers'](arg1);
 }
 
-export function ListMCPServersForManagement() {
-  return window['go']['main']['MCPStoreWrapper']['ListMCPServersForManagement']();
-}
-
-export function PurgeManagedMCP(arg1, arg2) {
-  return window['go']['main']['MCPStoreWrapper']['PurgeManagedMCP'](arg1, arg2);
-}
-
-export function PurgeManagedMCPPolicy(arg1, arg2) {
-  return window['go']['main']['MCPStoreWrapper']['PurgeManagedMCPPolicy'](arg1, arg2);
+export function ListMCPServersPage(arg1, arg2) {
+  return window['go']['main']['MCPStoreWrapper']['ListMCPServersPage'](arg1, arg2);
 }
 
 export function RemoveMCPCollectionMember(arg1) {
   return window['go']['main']['MCPStoreWrapper']['RemoveMCPCollectionMember'](arg1);
-}
-
-export function ReplaceManagedMCP(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['ReplaceManagedMCP'](arg1);
 }
 
 export function ResolveMCPArtifactCapabilities(arg1) {
@@ -96,8 +80,4 @@ export function SetMCPServerEnabled(arg1, arg2, arg3) {
 
 export function UpdateMCPCollection(arg1) {
   return window['go']['main']['MCPStoreWrapper']['UpdateMCPCollection'](arg1);
-}
-
-export function UpsertManagedMCPPolicy(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['UpsertManagedMCPPolicy'](arg1);
 }

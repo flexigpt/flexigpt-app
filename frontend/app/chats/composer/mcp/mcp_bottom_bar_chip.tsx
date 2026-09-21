@@ -34,7 +34,8 @@ import {
 	MCPToolExposure,
 } from '@/spec/mcp';
 
-import { mcpRuntimeAPI } from '@/apis/baseapi';
+import { mcpManagementAPI } from '@/apis/baseapi';
+import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/apis/mcp_management';
 
 import {
 	actionTriggerChipClearButtonClasses,
@@ -64,7 +65,6 @@ import {
 	normalizeMCPArgumentDefinitions,
 } from '@/chats/composer/mcp/mcp_composer_types';
 import { optionKey } from '@/chats/composer/mcp/use_composer_mcp';
-import { getAuthMode, getServerAuthHealthState, isServerOperational } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPServerAuthHealthBadgeClass,
@@ -85,8 +85,7 @@ function stop(e: MouseEvent) {
 function isEnabledMCPOption(option: MCPComposerServerOption) {
 	return (
 		option.bundle.enabled &&
-		option.server.runtimeEnabled &&
-		option.server.artifact.enabled &&
+		option.server.enabled &&
 		isServerOperational(option.server)
 	);
 }
@@ -266,8 +265,14 @@ function MCPArgumentFields({
 
 		let cancelled = false;
 		const timer = window.setTimeout(() => {
-			void mcpRuntimeAPI
-				.completeMCPArgument(server, refType, name, focusedArg, focusedValue, values)
+			void mcpManagementAPI
+				.completeMCPArgument(server, {
+					refType,
+					name,
+					argumentName: focusedArg,
+					argumentValue: focusedValue,
+					context: values,
+				})
 				.then(result => {
 					if (cancelled) {
 						return;

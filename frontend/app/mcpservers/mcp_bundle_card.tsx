@@ -1,5 +1,4 @@
 import { useState } from 'react';
-
 import {
 	FiChevronDown,
 	FiChevronUp,
@@ -15,10 +14,19 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/mcp';
+import type {
+	MCPAuthHealth,
+	MCPBundleView,
+	MCPServerDraft,
+	MCPServerRuntimeSnapshot,
+	MCPServerView,
+	MCPSetupSubmissionValue,
+} from '@/spec/mcp';
 import { MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
+
+import { getMCPServerSetupStatus, isServerOperational, serverDisplayName } from '@/apis/mcp_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -30,13 +38,6 @@ import { ManagementItemCard } from '@/components/managementui/management_item_ca
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
-import type {
-	MCPBundleView,
-	MCPServerDraft,
-	MCPServerView,
-	MCPSetupSubmissionValue,
-} from '@/mcpservers/lib/mcp_management';
-import { getMCPServerSetupStatus, isServerOperational, serverDisplayName } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPServerAuthHealthBadgeClass,
@@ -162,7 +163,7 @@ export function MCPBundleCard({
 				title={bundle.displayName}
 				identity={
 					<span className="font-mono">
-						{bundle.logicalName} / {bundle.ref.collectionID}
+						{bundle.logicalName} / {bundle.ref.artifactID}
 					</span>
 				}
 				description={bundle.description}
@@ -189,7 +190,7 @@ export function MCPBundleCard({
 				}
 				actionLeading={
 					<EnabledControl
-						id={`mcp-bundle-${bundle.ref.collectionID}`}
+						id={`mcp-bundle-${bundle.ref.artifactID}`}
 						checked={bundle.enabled}
 						compact={false}
 						busy={isPending('bundle:toggle')}
@@ -218,7 +219,7 @@ export function MCPBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.enabled || Boolean(serverLoadError)}
+									disabled={!bundle.editable || Boolean(serverLoadError)}
 									onClick={() => {
 										setServerEditor({});
 									}}
@@ -230,7 +231,7 @@ export function MCPBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={servers.length > 0 || Boolean(serverLoadError)}
+									disabled={!bundle.deletable || servers.length > 0 || Boolean(serverLoadError)}
 									onClick={() => {
 										onDeleteBundleRequested(bundle);
 									}}
@@ -331,14 +332,14 @@ export function MCPBundleCard({
 											leading={
 												<EnabledControl
 													id={`mcp-server-${artifactID}`}
-													checked={server.installationEnabled}
+													checked={server.enabled}
 													disabled={!operational || !bundle.enabled}
 													busy={isPending(`${artifactID}:toggle`)}
 													title={
 														!operational
 															? 'The server installation is unavailable.'
 															: !bundle.enabled
-																? 'Enable the bundle before changing its server settings.'
+																? 'Enable the Collection before changing its server settings.'
 																: undefined
 													}
 													onChange={enabled => {
@@ -430,7 +431,7 @@ export function MCPBundleCard({
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
 												disabled={
-													!server.runtimeEnabled ||
+													!server.enabled ||
 													!operational ||
 													ready ||
 													connecting ||

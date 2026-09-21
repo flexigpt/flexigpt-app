@@ -1,27 +1,7 @@
-import type {
-	ArtifactCollection,
-	ArtifactCollectionAttachment,
-	ArtifactCollectionRef,
-	ArtifactDefinitionView,
-	ArtifactDigest,
-	ArtifactKind,
-	ArtifactRecord,
-	ArtifactRef,
-	ArtifactRootID,
-	ArtifactSourceID,
-	ArtifactSourceSummary,
-	ArtifactStorageKey,
-	CapabilityPlan,
-	ManagedPackageAddress,
-	StoreArtifact,
-	StoreArtifactAddress,
-	StoreArtifactDefinition,
-} from '@/spec/artifact';
+import type { ArtifactRef, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
 import type { CollectionCapabilityPlan, CollectionView } from '@/spec/collection';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
-
-export const MCP_USER_ROOT_ID: ArtifactRootID = '0198f097-0d5b-7000-8000-000000000002';
 
 export const MCP_SCHEMA_VERSION = 'v1';
 export const MCP_APP_HTML_MIME_TYPE = 'text/html;profile=mcp-app';
@@ -33,7 +13,17 @@ type MCPTimestamp = string;
  * between Runtime calls but must not construct or parse them.
  */
 export type MCPRuntimeServerID = string;
-type MCPRuntimeCatalogID = string;
+export type MCPRuntimeCatalogID = string;
+
+export interface MCPManagementPage<T> {
+	items: T[];
+	nextPageToken?: string;
+}
+
+export interface MCPDiscoveryPage<T> {
+	items: T[];
+	nextPageToken?: string;
+}
 
 export enum MCPServerType {
 	Stdio = 'stdio',
@@ -63,6 +53,10 @@ export enum MCPSecretKind {
 	StdioEnv = 'stdioEnv',
 	OAuthClientCredentials = 'oauthClientCredentials',
 	HTTPHeader = 'httpHeader',
+
+	// Runtime-managed only. PutMCPServerSecret and DeleteMCPServerSecret
+	// intentionally reject this value.
+	OAuthToken = 'oauthToken',
 }
 
 export enum MCPTrustLevel {
@@ -157,110 +151,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-export enum MCPPromptRole {
-	User = 'user',
-	Assistant = 'assistant',
-}
-
-interface MCPCoreServer {
-	type: MCPServerType;
-
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-
-	url?: string;
-	headers?: Record<string, string>;
-}
-
-export interface MCPAuthenticationDeclaration {
-	mode: MCPHTTPAuthMode;
-	clientCredentialsInput?: string;
-	clientIDMetadataDocumentURL?: string;
-}
-
-export interface MCPInputDeclaration {
-	kind: MCPInputKind;
-	label?: string;
-	description?: string;
-	note?: string;
-	placeholder?: string;
-	required?: boolean;
-	default?: string;
-	clientSecretRequired?: boolean;
-}
-
-export interface MCPInstallationDeclaration {
-	note?: string;
-	inputs?: Record<string, MCPInputDeclaration>;
-	allowEnvironment?: string[];
-}
-
-interface MCPStdioProfile {
-	command?: string;
-	args?: string[];
-	env?: Record<string, string>;
-	removeEnv?: string[];
-}
-
-interface MCPHTTPProfile {
-	url?: string;
-	headers?: Record<string, string>;
-	removeHeaders?: string[];
-}
-
-interface MCPConnectionProfile {
-	platforms?: string[];
-	stdio?: MCPStdioProfile;
-	http?: MCPHTTPProfile;
-}
-
-interface MCPPolicyReference {
-	ref: string;
-	required: boolean;
-}
-
-interface MCPServerExtension {
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	timeoutMS?: number;
-	labels?: Record<string, string>;
-
-	auth: MCPAuthenticationDeclaration;
-	install: MCPInstallationDeclaration;
-	connectionProfiles?: Record<string, MCPConnectionProfile>;
-	policy?: MCPPolicyReference;
-}
-
-export interface MCPServerDocument {
-	kind: ArtifactKind;
-	schemaID: string;
-	schemaVersion: string;
-	digest?: ArtifactDigest;
-
-	logicalName: string;
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-
-	mcpServer: MCPCoreServer;
-	extension: MCPServerExtension;
-}
-
-export interface MCPDocumentSchemaIdentity {
-	kind: ArtifactKind;
-	schemaID: string;
-	schemaVersion: string;
-}
-
-export interface MCPServerSchemaIdentity {
-	server: MCPDocumentSchemaIdentity;
-	policy: MCPDocumentSchemaIdentity;
-}
-
-interface MCPServerPolicy {
+export interface MCPServerPolicy {
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
 	requireApprovalForUnknownRisk: boolean;
@@ -290,84 +181,6 @@ export interface MCPPolicy {
 	appsPolicy: MCPAppsPolicy;
 }
 
-export interface MCPPolicyDocument {
-	kind: ArtifactKind;
-	schemaID: string;
-	schemaVersion: string;
-	digest?: ArtifactDigest;
-
-	logicalName: string;
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-
-	body: MCPPolicy;
-}
-
-interface MCPBundleExtension {
-	servers?: Record<string, MCPServerExtension>;
-	policies?: Record<string, MCPPolicyDocument>;
-}
-
-export interface MCPBundleDocument {
-	kind: string;
-	schemaID: string;
-	schemaVersion: string;
-	digest?: ArtifactDigest;
-
-	logicalName: string;
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-
-	mcpServers: Record<string, MCPCoreServer>;
-	bundleExtension: MCPBundleExtension;
-}
-
-interface MCPBundleData {
-	schemaVersion: string;
-	discoveryPolicyRevision: string;
-	logicalName: string;
-	logicalVersion?: string;
-	labels?: Record<string, string>;
-	managedSourceID?: ArtifactSourceID;
-}
-
-export interface MCPBundle {
-	collection: ArtifactCollection;
-	data: MCPBundleData;
-	attachment: ArtifactCollectionAttachment;
-	source: ArtifactSourceSummary;
-	packageAddress: ManagedPackageAddress;
-	documentLocator: string;
-}
-
-export interface MCPArtifactRegistration {
-	artifactID: string;
-	subresource: string;
-	kind: ArtifactKind;
-	enabled: boolean;
-	data?: JSONRawString;
-}
-
-export interface MCPCreateBundleInput {
-	rootID: ArtifactRootID;
-	collectionID: string;
-	sourceID: ArtifactSourceID;
-	sourceStorageKey: ArtifactStorageKey;
-	document: MCPBundleDocument;
-	registrations: MCPArtifactRegistration[];
-}
-
-export interface MCPReplaceBundleDocumentInput {
-	bundle: ArtifactCollectionRef;
-	expectedCollectionRevision: number;
-	document: MCPBundleDocument;
-	registrations: MCPArtifactRegistration[];
-}
-
 export interface MCPInputBinding {
 	value?: string;
 	secretRef?: string;
@@ -378,58 +191,6 @@ export interface MCPServerData {
 	selectedConnectionProfile?: string;
 	inputs?: Record<string, MCPInputBinding>;
 	additionalPolicies?: ArtifactRef[];
-}
-
-export interface MCPBundleInstallation {
-	bundle: ArtifactCollectionRef;
-	builtIn: boolean;
-	collectionRevision: number;
-	overlayRevision: number;
-	runtimeEnabled: boolean;
-}
-
-export interface MCPServerInstallation {
-	artifact: ArtifactRecord;
-	collection: ArtifactCollectionRef;
-	catalogRevision: number;
-	document: MCPServerDocument;
-	installation: MCPServerData;
-	installationRevision: number;
-	installationEnabled: boolean;
-	runtimeEnabled: boolean;
-	builtIn: boolean;
-}
-
-export interface MCPPolicyView {
-	artifact: ArtifactRecord;
-	collection: ArtifactCollectionRef;
-	catalogRevision: number;
-	definition: ArtifactDefinitionView;
-	body: MCPPolicy;
-	effectiveEnabled: boolean;
-	builtIn: boolean;
-}
-
-export interface MCPServerResolved {
-	server: ArtifactRef;
-	collection: ArtifactCollectionRef;
-	artifactRevision: number;
-	catalogRevision: number;
-	definitionDigest: ArtifactDigest;
-	sourceContentDigest: ArtifactDigest;
-	sourceGeneration: string;
-	document: MCPServerDocument;
-	installation: MCPServerData;
-	policy: MCPEffectivePolicy;
-	installationRevision: number;
-	runtimeEnabled: boolean;
-	builtIn: boolean;
-	version: ArtifactDigest;
-}
-
-interface MCPImplementationInfo {
-	name?: string;
-	version?: string;
 }
 
 export interface MCPServerCapabilitiesSummary {
@@ -445,28 +206,7 @@ export interface MCPServerCapabilitiesSummary {
 	extensions?: Record<string, any>;
 }
 
-export interface MCPServerRuntimeSnapshot {
-	server: MCPRuntimeServerID;
-	collection: MCPRuntimeCatalogID;
-	status: MCPServerStatus;
-
-	negotiatedProtocolVersion?: string;
-	serverInfo?: MCPImplementationInfo;
-	serverCapabilities?: MCPServerCapabilitiesSummary;
-	instructions?: string;
-
-	lastError?: string;
-	lastConnectedAt?: MCPTimestamp;
-	lastSyncedAt?: MCPTimestamp;
-
-	toolCount: number;
-	resourceCount: number;
-	resourceTemplateCount: number;
-	promptCount: number;
-	snapshotDigest?: string;
-}
-
-interface MCPToolAnnotations {
+export interface MCPToolAnnotations {
 	destructiveHint?: boolean;
 	idempotentHint: boolean;
 	openWorldHint?: boolean;
@@ -474,7 +214,7 @@ interface MCPToolAnnotations {
 	title?: string;
 }
 
-interface MCPToolAppInfo {
+export interface MCPToolAppInfo {
 	resourceUri?: string;
 	visibility?: MCPAppVisibility[];
 }
@@ -594,14 +334,14 @@ export interface MCPConversationContext {
 	prompts?: MCPPromptSelection[];
 }
 
-interface MCPIcon {
+export interface MCPIcon {
 	src: string;
 	mimeType?: string;
 	sizes?: string[];
 	theme?: string;
 }
 
-interface MCPResourceContents {
+export interface MCPResourceContents {
 	uri: string;
 	mimeType?: string;
 	text?: string;
@@ -626,13 +366,13 @@ export interface MCPContent {
 }
 
 export interface MCPPromptMessage {
-	role: MCPPromptRole;
+	role: string;
 	content: MCPContent;
 }
 
-interface MCPToolCallProvenance {
-	Server: MCPRuntimeServerID;
-	Collection: MCPRuntimeCatalogID;
+export interface MCPToolCallProvenance {
+	server: MCPRuntimeServerID;
+	catalog: MCPRuntimeCatalogID;
 	serverDisplayName?: string;
 	toolName: string;
 	providerToolName: string;
@@ -791,7 +531,7 @@ export enum MCPPlatform {
 	Windows = 'windows',
 }
 
-export interface MCPManagedCoreServer {
+export interface MCPServerCore {
 	type: MCPServerType;
 	command?: string;
 	args?: string[];
@@ -800,66 +540,86 @@ export interface MCPManagedCoreServer {
 	headers?: Record<string, string>;
 }
 
-export interface MCPManagedInclude {
+export interface MCPServerInclude {
 	tools?: string[];
 	resources?: string[];
 	prompts?: string[];
 }
 
-export interface MCPManagedStdioProfile {
+export interface MCPAuthenticationDeclaration {
+	mode: MCPHTTPAuthMode;
+	clientCredentialsInput?: string;
+	clientIDMetadataDocumentURL?: string;
+}
+
+export interface MCPInputDeclaration {
+	kind: MCPInputKind;
+	label?: string;
+	description?: string;
+	note?: string;
+	placeholder?: string;
+	required?: boolean;
+	default?: string;
+	clientSecretRequired?: boolean;
+}
+
+export interface MCPInstallationDeclaration {
+	note?: string;
+	inputs?: Record<string, MCPInputDeclaration>;
+	allowEnvironment?: string[];
+}
+
+export interface MCPStdioProfile {
 	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
 	removeEnv?: string[];
 }
 
-export interface MCPManagedHTTPProfile {
+export interface MCPHTTPProfile {
 	url?: string;
 	headers?: Record<string, string>;
 	removeHeaders?: string[];
 }
 
-export interface MCPManagedConnectionProfile {
+export interface MCPConnectionProfile {
 	platforms?: MCPPlatform[];
-	stdio?: MCPManagedStdioProfile;
-	http?: MCPManagedHTTPProfile;
+	stdio?: MCPStdioProfile;
+	http?: MCPHTTPProfile;
 }
 
-export interface MCPManagedPolicyReference {
+export interface MCPServerPolicyReference {
 	name: string;
 	required: boolean;
 }
 
-export interface MCPManagedServerConfiguration {
+export interface MCPServerConfiguration {
 	timeoutMS?: number;
 	auth: MCPAuthenticationDeclaration;
 	install: MCPInstallationDeclaration;
-	connectionProfiles?: Record<string, MCPManagedConnectionProfile>;
-	policy?: MCPManagedPolicyReference;
+	connectionProfiles?: Record<string, MCPConnectionProfile>;
+	policy?: MCPServerPolicyReference;
 }
 
-export interface MCPManagedServerDocument {
+// Exact frontend projection of Go server.ServerDocument.
+//
+// It is used for mutable user Servers and protected built-in Servers alike.
+// It is not a portable declaration and does not contain raw secret values.
+export interface MCPServerDocument {
 	logicalName: string;
 	logicalVersion?: string;
 	displayName?: string;
 	description?: string;
 	labels?: Record<string, string>;
-	mcpServer: MCPManagedCoreServer;
-	include?: MCPManagedInclude;
-	configuration: MCPManagedServerConfiguration;
-}
-
-export interface MCPStoreServerData {
-	schemaVersion: string;
-	selectedConnectionProfile?: string;
-	inputs?: Record<string, MCPInputBinding>;
-	additionalPolicies?: ArtifactRef[];
+	mcpServer: MCPServerCore;
+	include?: MCPServerInclude;
+	configuration: MCPServerConfiguration;
 }
 
 export interface ManagedMCPCreateRequest {
 	collection: ArtifactRef;
 	expectedCollectionRevision: number;
-	document: MCPManagedServerDocument;
+	document: MCPServerDocument;
 	enabled: boolean;
 }
 
@@ -870,7 +630,7 @@ export interface ManagedMCPCreateResult {
 	membershipCreated: boolean;
 }
 
-export interface MCPManagedPolicyUpsertRequest {
+export interface ManagedMCPPolicyUpsertRequest {
 	collection: ArtifactRef;
 	expectedCollectionRevision: number;
 	name: string;
@@ -879,7 +639,7 @@ export interface MCPManagedPolicyUpsertRequest {
 	enabled: boolean;
 }
 
-export interface MCPManagedPolicyUpsertResult {
+export interface ManagedMCPPolicyUpsertResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
 	collection: CollectionView;
@@ -888,16 +648,14 @@ export interface MCPManagedPolicyUpsertResult {
 
 export interface MCPStoreServerInstallationView {
 	artifact: StoreArtifact;
-	definition: StoreArtifactDefinition;
-	document: MCPManagedServerDocument;
-	installation: MCPStoreServerData;
+	document: MCPServerDocument;
+	installation: MCPServerData;
 	installationRevision: number;
 	builtIn: boolean;
 }
 
 export interface MCPStorePolicyView {
 	artifact: StoreArtifact;
-	definition: StoreArtifactDefinition;
 	body: MCPPolicy;
 	builtIn: boolean;
 }
@@ -908,28 +666,14 @@ export interface MCPEffectivePolicy {
 	digest: string;
 }
 
-export interface MCPResolvedServer {
-	server: ArtifactRef;
-	artifactRevision: number;
-	definitionDigest: string;
-	sourceContentDigest: string;
-	sourceGeneration: string;
-	document: MCPManagedServerDocument;
-	installation: MCPStoreServerData;
-	policy: MCPEffectivePolicy;
-	installationRevision: number;
-	builtIn: boolean;
-	version: string;
-}
-
 export interface MCPRuntimeImplementationInfo {
 	name?: string;
 	version?: string;
 }
 
-export interface MCPRuntimeServerSnapshot {
-	server: string;
-	catalog: string;
+export interface MCPServerRuntimeSnapshot {
+	server: MCPRuntimeServerID;
+	catalog: MCPRuntimeCatalogID;
 	status: MCPServerStatus;
 	negotiatedProtocolVersion?: string;
 	serverInfo?: MCPRuntimeImplementationInfo;
@@ -945,6 +689,11 @@ export interface MCPRuntimeServerSnapshot {
 	snapshotDigest?: string;
 }
 
+export type MCPToolCapabilityPage = MCPDiscoveryPage<MCPToolCapability>;
+export type MCPResourcePage = MCPDiscoveryPage<MCPResourceRef>;
+export type MCPResourceTemplatePage = MCPDiscoveryPage<MCPResourceTemplateRef>;
+export type MCPPromptPage = MCPDiscoveryPage<MCPPromptRef>;
+
 export interface MCPCompleteArgumentRequestBody {
 	refType: MCPCompletionRefType;
 	name: string;
@@ -953,45 +702,7 @@ export interface MCPCompleteArgumentRequestBody {
 	context?: Record<string, string>;
 }
 
-export interface MCPRuntimeInvokeToolRequest {
-	source: MCPInvocationSource;
-	toolName: string;
-	providerToolName?: string;
-	choiceID?: string;
-	toolDigest?: string;
-	arguments?: Record<string, unknown>;
-	approvalID?: string;
-	approvalToken?: string;
-	conversationID?: string;
-	messageID?: string;
-	toolUseID?: string;
-	appInstanceID?: string;
-}
-
-export interface MCPRuntimeToolCallProvenance {
-	server: string;
-	catalog: string;
-	serverDisplayName?: string;
-	toolName: string;
-	providerToolName: string;
-	toolDigest?: string;
-	choiceID?: string;
-	toolUseID?: string;
-	approvalID?: string;
-	appResourceUri?: string;
-	appInstanceID?: string;
-}
-
-export interface MCPRuntimeInvokeToolResponse {
-	server: string;
-	toolName: string;
-	providerToolName?: string;
-	content?: MCPContent[];
-	structuredContent?: unknown;
-	isError?: boolean;
-	provenance: MCPRuntimeToolCallProvenance;
-	app?: MCPToolAppRenderInfo;
-}
+export type MCPRuntimeInvokeToolResponse = InvokeMCPToolResponseBody;
 
 export interface MCPAuthSettings {
 	oauthLoopbackListenAddr?: string;
@@ -1005,9 +716,12 @@ export interface MCPCollectionManagementView {
 export interface MCPServerManagementView {
 	installation: MCPStoreServerInstallationView;
 	capabilities: CapabilityPlan;
-	runtimeServerID: string;
+	runtimeServerID: MCPRuntimeServerID;
+	policy: MCPEffectivePolicy;
 	authHealth?: MCPAuthHealth;
-	runtime?: MCPRuntimeServerSnapshot;
+	runtime?: MCPServerRuntimeSnapshot;
+	authHealthError?: string;
+	runtimeError?: string;
 }
 
 export interface MCPPolicyManagementView {
@@ -1015,16 +729,118 @@ export interface MCPPolicyManagementView {
 	capabilities: CapabilityPlan;
 }
 
-export interface MCPRuntimeStatusView {
-	snapshot?: MCPRuntimeServerSnapshot;
-	authState?: MCPAuthHealthState;
-	toolCount?: number;
-	toolRisk?: MCPToolRisk;
-	appVisibility?: MCPAppVisibility[];
-	executionMode?: MCPExecutionMode;
-	approvalRule?: MCPApprovalRule;
-	authMode?: MCPHTTPAuthMode;
-	tool?: MCPToolCapability;
-	providerMapping?: MCPProviderToolMapping;
-	completion?: MCPCompletionResult;
+export interface ManagedMCPReplaceRequest {
+	collection: ArtifactRef;
+	expectedCollectionRevision: number;
+	artifact: ArtifactRef;
+	expectedArtifactRevision: number;
+	document: MCPServerDocument;
+	enabled: boolean;
+}
+
+export interface ManagedMCPReplaceResult {
+	artifact: StoreArtifact;
+	address: StoreArtifactAddress;
+	collection: CollectionView;
+}
+
+export interface MCPBundleView {
+	collection: CollectionView;
+	ref: ArtifactRef;
+	displayName: string;
+	logicalName: string;
+	description?: string;
+	enabled: boolean;
+	builtIn: boolean;
+	editable: boolean;
+	deletable: boolean;
+	baseline: boolean;
+}
+
+export interface MCPServerView {
+	ref: ArtifactRef;
+	runtimeServerID?: MCPRuntimeServerID;
+	artifact: StoreArtifact;
+	bundle: ArtifactRef;
+	logicalName: string;
+	displayName: string;
+	document?: MCPServerDocument;
+	installation?: MCPServerData;
+	installationRevision?: number;
+	enabled: boolean;
+	builtIn: boolean;
+	policy?: MCPEffectivePolicy;
+	policyRef?: ArtifactRef;
+	loadError?: string;
+}
+
+export interface MCPSetupSecretTarget {
+	kind: MCPSecretKind;
+	slot: string;
+}
+
+export interface MCPSetupInputView {
+	name: string;
+	declaration: MCPInputDeclaration;
+	target?: MCPSetupSecretTarget;
+	boundValue?: string;
+	boundSecretRef?: string;
+}
+
+export interface MCPSetupSubmissionValue {
+	value?: string;
+	clientID?: string;
+	clientSecret?: string;
+}
+
+export interface MCPStdioSecretDraft {
+	inputName?: string;
+	envName: string;
+	existingSecretRef?: string;
+	secretValue: string;
+	deleteExisting: boolean;
+}
+
+export interface MCPHTTPSecretDraft {
+	inputName?: string;
+	headerName: string;
+	valuePrefix: string;
+	valueSuffix: string;
+	existingSecretRef?: string;
+	secretValue: string;
+	deleteExisting: boolean;
+}
+
+export interface MCPOAuthClientCredentialsDraft {
+	inputName?: string;
+	existingSecretRef?: string;
+	secretJSON: string;
+	deleteExisting: boolean;
+	useClientCredentials: boolean;
+}
+
+export interface MCPServerDraft {
+	logicalName: string;
+	displayName: string;
+	enabled: boolean;
+	transport: MCPTransportType;
+	trustLevel: MCPTrustLevel;
+
+	stdioCommand: string;
+	stdioArgs: string[];
+	stdioEnv: Record<string, string>;
+	stdioStartupTimeoutMS?: number;
+	stdioSecrets: MCPStdioSecretDraft[];
+
+	httpURL: string;
+	httpHeaders: Record<string, string>;
+	httpTimeoutMS?: number;
+	httpAuthMode: MCPHTTPAuthMode;
+	httpAPIKey?: MCPHTTPSecretDraft;
+	httpOAuthClientCredentials: MCPOAuthClientCredentialsDraft;
+	httpClientIDMetadataDocumentURL: string;
+
+	defaultPolicy: MCPPolicy['defaultPolicy'];
+	toolPolicies: Record<string, MCPToolPolicyOverride>;
+	appsPolicy: MCPAppsPolicy;
 }

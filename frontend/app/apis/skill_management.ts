@@ -6,7 +6,6 @@ import type {
 	MappedTarget,
 	StoreArtifact,
 } from '@/spec/artifact';
-import { ArtifactAdoptionMode as ArtifactAdoptionModeValue, ArtifactState } from '@/spec/artifact';
 import type { CollectionView } from '@/spec/collection';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type {
@@ -33,6 +32,8 @@ import type {
 	SkillManagementView,
 	SkillPresenceStatus,
 } from '@/spec/skill';
+import type { ToolRef } from '@/spec/tool';
+import { ArtifactAdoptionMode as ArtifactAdoptionModeValue, ArtifactState } from '@/spec/artifact';
 import {
 	RuntimeSkillActivity,
 	SkillBundleAttachmentRole as SkillBundleAttachmentRoleValue,
@@ -40,14 +41,12 @@ import {
 	SkillPresenceStatus as SkillPresenceStatusValue,
 	SkillType,
 } from '@/spec/skill';
-import type { ToolRef } from '@/spec/tool';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type {
 	IModelPresetStoreAPI,
 	ISkillAggregateAPI,
-	ISkillManagementAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
 	IToolStoreAPI,
@@ -188,7 +187,7 @@ function isUserMutableCollection(collection: CollectionView): boolean {
 	return collection.editable && !collection.baseline;
 }
 
-export class SkillManagementAPI implements ISkillManagementAPI {
+export class SkillManagementAPI {
 	constructor(
 		private readonly runtime: ISkillRuntimeAPI,
 		private readonly store: ISkillStoreAPI,

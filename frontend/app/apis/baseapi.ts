@@ -2,7 +2,6 @@
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
-import { AgentManagementAPI } from '@/apis/agent_management';
 import type {
 	IAgentStoreAPI,
 	IAggregateAPI,
@@ -11,22 +10,20 @@ import type {
 	IConversationStoreAPI,
 	ILogger,
 	IMCPAggregateAPI,
-	IMCPManagementAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
 	IModelPresetStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
-	ISkillManagementAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceAggregateAPI,
-	IWorkspaceManagementAPI,
 	IWorkspaceRuntimeAPI,
 	IWorkspaceStoreAPI,
 } from '@/apis/interface';
+import { AgentManagementAPI } from '@/apis/agent_management';
 import { MCPManagementAPI } from '@/apis/mcp_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 // oxlint-disable-next-line import/no-namespace
@@ -54,23 +51,23 @@ export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 
-let mcpStoreAPI: IMCPStoreAPI;
-let mcpAggregateAPI: IMCPAggregateAPI;
-export let mcpRuntimeAPI: IMCPRuntimeAPI;
-export let mcpManagementAPI: IMCPManagementAPI;
-
 export let toolStoreAPI: IToolStoreAPI;
 export let toolRuntimeAPI: IToolRuntimeAPI;
 
 let skillStoreAPI: ISkillStoreAPI;
 let skillAggregateAPI: ISkillAggregateAPI;
 let skillRuntimeAPI: ISkillRuntimeAPI;
-export let skillManagementAPI: ISkillManagementAPI;
+export let skillManagementAPI: SkillManagementAPI;
+
+let mcpStoreAPI: IMCPStoreAPI;
+let mcpAggregateAPI: IMCPAggregateAPI;
+let mcpRuntimeAPI: IMCPRuntimeAPI;
+export let mcpManagementAPI: MCPManagementAPI;
 
 let workspaceStoreAPI: IWorkspaceStoreAPI;
 let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 let workspaceAggregateAPI: IWorkspaceAggregateAPI;
-export let workspaceManagementAPI: IWorkspaceManagementAPI;
+export let workspaceManagementAPI: WorkspaceManagementAPI;
 
 // Conditional initialization
 if (IS_WAILS_PLATFORM) {
@@ -90,6 +87,17 @@ if (IS_WAILS_PLATFORM) {
 	agentStoreAPI = new WailsAgentStoreAPI();
 	agentManagementAPI = new AgentManagementAPI(agentStoreAPI, toolStoreAPI, modelPresetStoreAPI);
 
+	skillStoreAPI = new WailsSkillStoreAPI();
+	skillAggregateAPI = new WailsSkillAggregateAPI();
+	skillRuntimeAPI = new WailsSkillRuntimeAPI();
+	skillManagementAPI = new SkillManagementAPI(
+		skillRuntimeAPI,
+		skillStoreAPI,
+		skillAggregateAPI,
+		toolStoreAPI,
+		modelPresetStoreAPI
+	);
+
 	mcpStoreAPI = new WailsMCPStoreAPI();
 	mcpRuntimeAPI = new WailsMCPRuntimeAPI();
 	mcpAggregateAPI = new WailsMCPAggregateAPI();
@@ -108,17 +116,6 @@ if (IS_WAILS_PLATFORM) {
 		workspaceStoreAPI,
 		workspaceRuntimeAPI,
 		workspaceAggregateAPI,
-		toolStoreAPI,
-		modelPresetStoreAPI
-	);
-
-	skillStoreAPI = new WailsSkillStoreAPI();
-	skillAggregateAPI = new WailsSkillAggregateAPI();
-	skillRuntimeAPI = new WailsSkillRuntimeAPI();
-	skillManagementAPI = new SkillManagementAPI(
-		skillRuntimeAPI,
-		skillStoreAPI,
-		skillAggregateAPI,
 		toolStoreAPI,
 		modelPresetStoreAPI
 	);

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertTriangle } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
@@ -8,22 +7,22 @@ import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-import { backendAPI, mcpManagementAPI, mcpRuntimeAPI } from '@/apis/baseapi';
+import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
-import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import type { MCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
+import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
+import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
+import { MCPApprovalModal } from '@/chats/composer/mcp/mcp_approval_modal';
 import { buildMCPAppAllowAttribute, buildMCPAppCSP, getMCPAppUIResourceMeta } from '@/chats/composer/mcp/mcp_apps_csp';
 import { useMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
-import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { dispatchMCPAppModelContextUpdate, dispatchMCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
 import { buildMCPAppHostContext } from '@/chats/mcpapps/mcp_app_host_context';
 import { MCPAppPostMessageBridge } from '@/chats/mcpapps/mcp_app_postmessage_bridge';
 import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
-import type { JSONRPCResponse, MCPAppInstance } from '@/chats/mcpapps/mcp_app_types';
 
 const APP_MIME = MCP_APP_HTML_MIME_TYPE;
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
@@ -220,7 +219,7 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
 		setViewInitialized(false);
 
-		void mcpRuntimeAPI
+		void mcpManagementAPI
 			.readMCPResource(server, instance.resourceUri)
 			.then(resp => {
 				if (cancelled) {

@@ -8,7 +8,7 @@ import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocati
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-import { mcpRuntimeAPI } from '@/apis/baseapi';
+import { mcpManagementAPI } from '@/apis/baseapi';
 
 import type { MCPApprovalRequest } from '@/chats/composer/mcp/use_mcp_approval';
 import type { MCPAppModelContextUpdatePayload, MCPAppUIMessage } from '@/chats/mcpapps/mcp_app_events';
@@ -166,7 +166,7 @@ export class MCPAppRPCRouter {
 
 		// The opaque Runtime server ID identifies the app's connected server.
 		// The backend remains the final authority for policy enforcement.
-		const evaluation = await mcpRuntimeAPI.evaluateMCPToolCall(server, callReq);
+		const evaluation = await mcpManagementAPI.evaluateMCPToolCall(server, callReq);
 		if (!evaluation) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
 		}
@@ -184,7 +184,7 @@ export class MCPAppRPCRouter {
 						summary: evaluation.summary,
 						reason: evaluation.reason,
 					})
-				: await mcpRuntimeAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
+				: await mcpManagementAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
 
 			if (approval.decision !== MCPApprovalDecision.Allowed) {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
@@ -201,7 +201,7 @@ export class MCPAppRPCRouter {
 		}
 
 		try {
-			const resp = await mcpRuntimeAPI.invokeMCPTool(server, callReq);
+			const resp = await mcpManagementAPI.invokeMCPTool(server, callReq);
 			return { jsonrpc: '2.0', id: req.id, result: normalizeToolCallResultForApp(resp) };
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Tool invocation failed';
@@ -219,7 +219,7 @@ export class MCPAppRPCRouter {
 
 		const { server } = this.deps.instance;
 		try {
-			const resp = await mcpRuntimeAPI.readMCPResource(server, uri);
+			const resp = await mcpManagementAPI.readMCPResource(server, uri);
 			return { jsonrpc: '2.0', id: req.id, result: resp };
 		} catch (err) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, err instanceof Error ? err.message : 'Read failed');

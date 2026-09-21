@@ -10,21 +10,13 @@ import type {
 	RemoveMemberRequest,
 	UpdateCollectionRequest,
 } from '@/spec/collection';
-import type {
-	ManagedMCPCreateRequest,
-	ManagedMCPCreateResult,
-	MCPManagedPolicyUpsertRequest,
-	MCPManagedPolicyUpsertResult,
-	MCPStorePolicyView,
-	MCPStoreServerInstallationView,
-} from '@/spec/mcp';
+import type { MCPManagementPage, MCPStorePolicyView, MCPStoreServerInstallationView } from '@/spec/mcp';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddMCPCollectionMember,
 	AttachMCPArtifactToCollection,
-	CreateManagedMCP,
 	CreateMCPCollection,
 	DeleteMCPCollection,
 	GetMCPCollection,
@@ -32,11 +24,10 @@ import {
 	GetMCPServerInstallation,
 	ListMCPCollectionMemberships,
 	ListMCPCollections,
+	ListMCPCollectionsPage,
 	ListMCPPolicies,
 	ListMCPServers,
-	ListMCPServersForManagement,
-	PurgeManagedMCP,
-	PurgeManagedMCPPolicy,
+	ListMCPServersPage,
 	RemoveMCPCollectionMember,
 	ResolveMCPArtifactCapabilities,
 	ResolveMCPCollection,
@@ -44,7 +35,6 @@ import {
 	SetMCPPolicyEnabled,
 	SetMCPServerEnabled,
 	UpdateMCPCollection,
-	UpsertManagedMCPPolicy,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
@@ -66,13 +56,6 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		return requiredObject<CollectionView>(
 			await CreateMCPCollection(request as Parameters<typeof CreateMCPCollection>[0]),
 			'CreateMCPCollection'
-		);
-	}
-
-	async createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
-		return requiredObject<ManagedMCPCreateResult>(
-			await CreateManagedMCP(request as Parameters<typeof CreateManagedMCP>[0]),
-			'CreateManagedMCP'
 		);
 	}
 
@@ -115,6 +98,13 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
+	async listMCPCollectionsPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<CollectionView>> {
+		return requiredObject<MCPManagementPage<CollectionView>>(
+			await ListMCPCollectionsPage(pageSize, pageToken),
+			'ListMCPCollectionsPage'
+		);
+	}
+
 	async listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
 		return wailsObjectArrayOrEmpty<StoreArtifact>(
 			await ListMCPPolicies(rootID as Parameters<typeof ListMCPPolicies>[0]),
@@ -129,16 +119,11 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async listMCPServersForManagement(): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(await ListMCPServersForManagement(), 'ListMCPServersForManagement');
-	}
-
-	async purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void> {
-		await PurgeManagedMCP(server as Parameters<typeof PurgeManagedMCP>[0], expectedRevision);
-	}
-
-	async purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void> {
-		await PurgeManagedMCPPolicy(policy as Parameters<typeof PurgeManagedMCPPolicy>[0], expectedRevision);
+	async listMCPServersPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<StoreArtifact>> {
+		return requiredObject<MCPManagementPage<StoreArtifact>>(
+			await ListMCPServersPage(pageSize, pageToken),
+			'ListMCPServersPage'
+		);
 	}
 
 	async removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
@@ -195,13 +180,6 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		return requiredObject<CollectionView>(
 			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
 			'UpdateMCPCollection'
-		);
-	}
-
-	async upsertManagedMCPPolicy(request: MCPManagedPolicyUpsertRequest): Promise<MCPManagedPolicyUpsertResult> {
-		return requiredObject<MCPManagedPolicyUpsertResult>(
-			await UpsertManagedMCPPolicy(request as Parameters<typeof UpsertManagedMCPPolicy>[0]),
-			'UpsertManagedMCPPolicy'
 		);
 	}
 }

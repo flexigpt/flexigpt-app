@@ -197,7 +197,7 @@ func (a *API) GetServerInstallation(
 		Artifact:             material.Resource.Artifact.Clone(),
 		Document:             material.Document,
 		Installation:         material.Installation,
-		InstallationRevision: material.InstallationRevision,
+		InstallationRevision: material.InstallationWriteRevision,
 		BuiltIn:              material.BuiltIn,
 	}, nil
 }
@@ -705,11 +705,12 @@ func (a *API) listArtifacts(
 }
 
 type serverResolutionMaterial struct {
-	Resource             resource.ResolvedArtifact
-	Document             mcpDomainServer.ServerDocument
-	Installation         mcpDomainServer.ServerData
-	InstallationRevision uint64
-	BuiltIn              bool
+	Resource                  resource.ResolvedArtifact
+	Document                  mcpDomainServer.ServerDocument
+	Installation              mcpDomainServer.ServerData
+	InstallationRevision      uint64
+	InstallationWriteRevision uint64
+	BuiltIn                   bool
 }
 
 func (a *API) resolveMCPServer(
@@ -806,7 +807,7 @@ func (a *API) resolveServerMaterial(
 	if err != nil {
 		return serverResolutionMaterial{}, err
 	}
-	installation, revision, builtIn, err := a.effectiveInstallation(
+	installation, effectiveRevision, writeRevision, builtIn, err := a.effectiveInstallation(
 		ctx,
 		resolved.Artifact,
 		document,
@@ -815,11 +816,12 @@ func (a *API) resolveServerMaterial(
 		return serverResolutionMaterial{}, err
 	}
 	return serverResolutionMaterial{
-		Resource:             resolved.Clone(),
-		Document:             document,
-		Installation:         installation,
-		InstallationRevision: revision,
-		BuiltIn:              builtIn,
+		Resource:                  resolved.Clone(),
+		Document:                  document,
+		Installation:              installation,
+		InstallationRevision:      effectiveRevision,
+		InstallationWriteRevision: writeRevision,
+		BuiltIn:                   builtIn,
 	}, nil
 }
 
@@ -839,7 +841,8 @@ func (a *API) effectiveInstallation(
 	document mcpDomainServer.ServerDocument,
 ) (
 	installation mcpDomainServer.ServerData,
-	revision uint64,
+	effectiveRevision uint64,
+	writeRevision uint64,
 	builtIn bool,
 	err error,
 ) {
@@ -847,16 +850,17 @@ func (a *API) effectiveInstallation(
 	if !builtIn {
 		data, err := mcpDomainServer.DecodeServerData(record.Data)
 		if err != nil {
-			return mcpDomainServer.ServerData{}, 0, false, err
+			return mcpDomainServer.ServerData{}, 0, 0, false, err
 		}
 		if err := data.ValidateFor(record.Ref(), document); err != nil {
-			return mcpDomainServer.ServerData{}, 0, false, err
+			return mcpDomainServer.ServerData{}, 0, 0, false, err
 		}
-		return data, record.Revision, false, nil
+		return data, record.Revision, record.Revision, false, nil
 	}
 
 	if a.overlays == nil {
 		return mcpDomainServer.ServerData{},
+			0,
 			0,
 			true,
 			fmt.Errorf(
@@ -866,18 +870,18 @@ func (a *API) effectiveInstallation(
 	}
 	overlay, found, err := a.overlays.GetServerOverlay(ctx, record.Ref())
 	if err != nil {
-		return mcpDomainServer.ServerData{}, 0, true, err
+		return mcpDomainServer.ServerData{}, 0, 0, true, err
 	}
 	if !found {
-		return mcpDomainServer.DefaultServerData(), 1, true, nil
+		return mcpDomainServer.DefaultServerData(), 1, 0, true, nil
 	}
 	if err := overlay.ServerData.ValidateFor(
 		record.Ref(),
 		document,
 	); err != nil {
-		return mcpDomainServer.ServerData{}, 0, true, err
+		return mcpDomainServer.ServerData{}, 0, 0, true, err
 	}
-	return overlay.ServerData, overlay.Revision, true, nil
+	return overlay.ServerData, overlay.Revision, overlay.Revision, true, nil
 }
 
 func (a *API) effectivePolicy(

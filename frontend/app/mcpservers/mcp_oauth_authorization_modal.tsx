@@ -1,8 +1,7 @@
 import { useState } from 'react';
-
 import { FiAlertCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 
-import type { MCPAuthHealth } from '@/spec/mcp';
+import type { MCPAuthHealth, MCPServerView } from '@/spec/mcp';
 import { MCPAuthHealthState } from '@/spec/mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -12,7 +11,6 @@ import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
 import { getMCPServerAuthHealthBadgeClass, getMCPServerAuthHealthLabel } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPOAuthAuthorizationModalProps {

@@ -106,6 +106,26 @@ type MCPDiscoveryPageToken struct {
 	Index          int      `json:"i"`
 }
 
+type MCPToolCapabilityPage struct {
+	Items         []MCPToolCapability `json:"items"`
+	NextPageToken string              `json:"nextPageToken,omitempty"`
+}
+
+type MCPResourcePage struct {
+	Items         []MCPResourceRef `json:"items"`
+	NextPageToken string           `json:"nextPageToken,omitempty"`
+}
+
+type MCPResourceTemplatePage struct {
+	Items         []MCPResourceTemplateRef `json:"items"`
+	NextPageToken string                   `json:"nextPageToken,omitempty"`
+}
+
+type MCPPromptPage struct {
+	Items         []MCPPromptRef `json:"items"`
+	NextPageToken string         `json:"nextPageToken,omitempty"`
+}
+
 type MCPToolRisk string
 
 const (

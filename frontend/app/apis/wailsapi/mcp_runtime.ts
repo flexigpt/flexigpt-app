@@ -6,6 +6,7 @@ import type {
 	MCPAuthSettings,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
+	MCPDiscoveryPage,
 	MCPGetPromptResponseBody,
 	MCPGlobalSettings,
 	MCPOAuthAuthorization,
@@ -16,7 +17,7 @@ import type {
 	MCPResourceTemplateRef,
 	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
-	MCPRuntimeServerSnapshot,
+	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
 } from '@/spec/mcp';
 
@@ -76,8 +77,8 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async connectMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
-		return requiredObject<MCPRuntimeServerSnapshot>(
+	async connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		return requiredObject<MCPServerRuntimeSnapshot>(
 			await ConnectMCPServer(server as Parameters<typeof ConnectMCPServer>[0]),
 			'ConnectMCPServer'
 		);
@@ -128,8 +129,8 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
-		return requiredObject<MCPRuntimeServerSnapshot>(
+	async getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		return requiredObject<MCPServerRuntimeSnapshot>(
 			await GetMCPServerStatus(server as Parameters<typeof GetMCPServerStatus>[0]),
 			'GetMCPServerStatus'
 		);
@@ -171,9 +172,9 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	async listMCPServerPromptsPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPPromptRef[]> {
-		return wailsObjectArrayOrEmpty<MCPPromptRef>(
+		pageToken = ''
+	): Promise<MCPDiscoveryPage<MCPPromptRef>> {
+		return requiredObject<MCPDiscoveryPage<MCPPromptRef>>(
 			await ListMCPServerPromptsPage(server as Parameters<typeof ListMCPServerPromptsPage>[0], pageSize, pageToken),
 			'ListMCPServerPromptsPage'
 		);
@@ -189,9 +190,9 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	async listMCPServerResourcesPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPResourceRef[]> {
-		return wailsObjectArrayOrEmpty<MCPResourceRef>(
+		pageToken = ''
+	): Promise<MCPDiscoveryPage<MCPResourceRef>> {
+		return requiredObject<MCPDiscoveryPage<MCPResourceRef>>(
 			await ListMCPServerResourcesPage(server as Parameters<typeof ListMCPServerResourcesPage>[0], pageSize, pageToken),
 			'ListMCPServerResourcesPage'
 		);
@@ -207,9 +208,9 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	async listMCPServerResourceTemplatesPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPResourceTemplateRef[]> {
-		return wailsObjectArrayOrEmpty<MCPResourceTemplateRef>(
+		pageToken = ''
+	): Promise<MCPDiscoveryPage<MCPResourceTemplateRef>> {
+		return requiredObject<MCPDiscoveryPage<MCPResourceTemplateRef>>(
 			await ListMCPServerResourceTemplatesPage(
 				server as Parameters<typeof ListMCPServerResourceTemplatesPage>[0],
 				pageSize,
@@ -229,9 +230,9 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	async listMCPServerToolsPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPToolCapability[]> {
-		return wailsObjectArrayOrEmpty<MCPToolCapability>(
+		pageToken = ''
+	): Promise<MCPDiscoveryPage<MCPToolCapability>> {
+		return requiredObject<MCPDiscoveryPage<MCPToolCapability>>(
 			await ListMCPServerToolsPage(server as Parameters<typeof ListMCPServerToolsPage>[0], pageSize, pageToken),
 			'ListMCPServerToolsPage'
 		);
@@ -251,8 +252,8 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
-		return requiredObject<MCPRuntimeServerSnapshot>(
+	async refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		return requiredObject<MCPServerRuntimeSnapshot>(
 			await RefreshMCPServer(server as Parameters<typeof RefreshMCPServer>[0]),
 			'RefreshMCPServer'
 		);
@@ -268,8 +269,8 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		);
 	}
 
-	async startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot> {
-		return requiredObject<MCPRuntimeServerSnapshot>(
+	async startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		return requiredObject<MCPServerRuntimeSnapshot>(
 			await StartMCPServerConnect(server as Parameters<typeof StartMCPServerConnect>[0]),
 			'StartMCPServerConnect'
 		);

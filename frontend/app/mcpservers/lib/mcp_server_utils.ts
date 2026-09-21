@@ -2,6 +2,7 @@ import type {
 	MCPAuthHealth,
 	MCPHTTPAuthMode,
 	MCPServerStatus,
+	MCPServerView,
 	MCPToolCapability,
 	MCPToolRisk,
 	MCPTransportType,
@@ -18,8 +19,7 @@ import {
 	MCPTrustLevel,
 } from '@/spec/mcp';
 
-import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
-import { getAuthMode, getServerAuthHealthState } from '@/mcpservers/lib/mcp_management';
+import { getAuthMode, getServerAuthHealthState } from '@/apis/mcp_management';
 
 export function getMCPTransportLabel(value: MCPTransportType): string {
 	switch (value) {
@@ -82,7 +82,7 @@ export function getMCPToolRiskLabel(value: MCPToolRisk): string {
 }
 
 export function getEffectiveMCPServerStatus(server: MCPServerView, runtimeStatus?: MCPServerStatus): MCPServerStatus {
-	if (!server.runtimeEnabled) {
+	if (!server.enabled) {
 		return MCPServerStatusEnum.Disabled;
 	}
 

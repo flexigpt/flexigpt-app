@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MCPApprovalResolutionResult, MCPApprovalSummary } from '@/spec/mcp';
 import { MCPApprovalResolution } from '@/spec/mcp';
 
-import { mcpRuntimeAPI } from '@/apis/baseapi';
+import { mcpManagementAPI } from '@/apis/baseapi';
 
 export interface MCPApprovalRequest {
 	approvalID: string;
@@ -92,7 +92,7 @@ export function useMCPApproval() {
 			setIsResolving(true);
 
 			try {
-				const result = await mcpRuntimeAPI.resolveMCPApproval(active.request.approvalID, resolution);
+				const result = await mcpManagementAPI.resolveMCPApproval(active.request.approvalID, resolution);
 
 				if (activeApprovalRef.current !== active) {
 					return;
@@ -145,7 +145,7 @@ export function useMCPApproval() {
 			resolvingApprovalIDRef.current = null;
 
 			if (active) {
-				void mcpRuntimeAPI
+				void mcpManagementAPI
 					.resolveMCPApproval(active.request.approvalID, MCPApprovalResolution.DenyOnce)
 					.catch(() => undefined);
 				active.reject(new Error('MCP approval UI was closed.'));
@@ -154,7 +154,7 @@ export function useMCPApproval() {
 			// oxlint-disable-next-line react-hooks/exhaustive-deps
 			const queued = queuedApprovalsRef.current.splice(0);
 			for (const item of queued) {
-				void mcpRuntimeAPI
+				void mcpManagementAPI
 					.resolveMCPApproval(item.request.approvalID, MCPApprovalResolution.DenyOnce)
 					.catch(() => undefined);
 				item.reject(new Error('MCP approval UI was closed.'));

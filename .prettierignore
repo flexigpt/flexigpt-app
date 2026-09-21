@@ -2,9 +2,8 @@
 /out/
 /node_modules/
 /stories/
-frontend/.next/
-frontend/.react-router/
-frontend/dist/
-frontend/app/apis/wailsjs
-build/flatpak/shared-modules
-LICENSE
+/frontend/.react-router/
+/frontend/dist/
+/frontend/app/apis/wailsjs/
+/build/flatpak/shared-modules/
+/LICENSE

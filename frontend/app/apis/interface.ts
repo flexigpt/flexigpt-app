@@ -39,21 +39,24 @@ import type {
 	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
 	ManagedMCPCreateResult,
+	ManagedMCPPolicyUpsertRequest,
+	ManagedMCPPolicyUpsertResult,
+	ManagedMCPReplaceRequest,
+	ManagedMCPReplaceResult,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
 	MCPAuthHealth,
 	MCPAuthSettings,
-	MCPCollectionManagementView,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPConversationContext,
+	MCPDiscoveryPage,
+	MCPEffectivePolicy,
 	MCPGetPromptResponseBody,
 	MCPGlobalSettings,
-	MCPManagedPolicyUpsertRequest,
-	MCPManagedPolicyUpsertResult,
+	MCPManagementPage,
 	MCPOAuthAuthorization,
-	MCPPolicyManagementView,
 	MCPPromptRef,
 	MCPProviderToolMapping,
 	MCPReadResourceResponseBody,
@@ -61,11 +64,10 @@ import type {
 	MCPResourceTemplateRef,
 	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
-	MCPRuntimeServerSnapshot,
 	MCPSecretKind,
 	MCPSecretWriteResult,
 	MCPServerData,
-	MCPServerManagementView,
+	MCPServerRuntimeSnapshot,
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
 	MCPToolCapability,
@@ -81,18 +83,13 @@ import type {
 } from '@/spec/modelpreset';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
-	ArtifactRuntimeSkillListItem,
 	ArtifactSkillFilter,
-	ArtifactSkillSession,
-	ArtifactSkillSessionOptions,
 	ArtifactSkillSummary,
 	InvokeSkillToolResponse,
 	ManagedSkillCreateRequest,
 	ManagedSkillCreateResult,
-	ManagedSkillDocumentView,
 	ManagedSkillReplaceRequest,
 	ManagedSkillReplaceResult,
-	RenderSkillResponse,
 	ResolvedArtifactSkill,
 	RuntimeSkillDefinition,
 	RuntimeSkillListFilter,
@@ -101,13 +98,7 @@ import type {
 	RuntimeSkillRenderResult,
 	RuntimeSkillSession,
 	RuntimeSkillSessionOptions,
-	Skill,
-	SkillArtifactCreateInput,
-	SkillBundle,
-	SkillCollectionManagementView,
 	SkillDirectoryRegistration,
-	SkillListItem,
-	SkillManagementView,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
@@ -120,7 +111,6 @@ import type {
 	WorkspaceArtifactView as StoreWorkspaceArtifactView,
 	Workspace,
 	WorkspaceLoad,
-	WorkspaceManagementSnapshot,
 	WorkspaceMCPServerLoadPlan,
 	WorkspacePathRegistration,
 	WorkspacePathRegistrationResult,
@@ -340,77 +330,6 @@ export interface ISkillRuntimeAPI {
 	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
 }
 
-export interface ISkillManagementAPI {
-	createArtifactSkillSession(options: ArtifactSkillSessionOptions): Promise<ArtifactSkillSession>;
-
-	invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse>;
-
-	closeSkillSession(sessionID: string): Promise<void>;
-
-	getSkillCollectionManagementView(collection: ArtifactRef): Promise<SkillCollectionManagementView>;
-
-	getSkillManagementView(skill: ArtifactRef): Promise<SkillManagementView>;
-
-	listArtifactRuntimeSkills(filter: ArtifactSkillFilter): Promise<ArtifactRuntimeSkillListItem[]>;
-
-	renderArtifactSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RuntimeSkillRenderResult>;
-
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
-
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef>;
-
-	/**
-	 * User-facing Bundle projections over Skill Collections.
-	 * These methods belong to management UI composition only. Store, aggregate,
-	 * and runtime APIs remain available through their typed properties above.
-	 */
-	listSkillBundles(bundleIDs?: string[], includeDisabled?: boolean): Promise<SkillBundle[]>;
-
-	listSkills(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		includeRuntimeMetadata?: boolean
-	): Promise<SkillListItem[]>;
-
-	putSkillBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
-	): Promise<void>;
-
-	patchSkillBundle(bundleID: string, enabled: boolean): Promise<void>;
-
-	updateSkillBundleMetadata(bundleID: string, displayName: string, description?: string): Promise<void>;
-
-	refreshSkillBundle(bundleID: string): Promise<void>;
-
-	deleteSkillBundle(bundleID: string): Promise<void>;
-
-	putSkillArtifact(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<Skill>;
-
-	replaceManagedSkill(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<void>;
-
-	getManagedSkillDocument(bundleID: string, artifactID: string): Promise<ManagedSkillDocumentView>;
-
-	registerFilesystemSkills(bundleID: string, rootPath: string, sourceDisplayName: string): Promise<void>;
-
-	patchSkill(
-		bundleID: string,
-		artifactID: string,
-		isEnabled?: boolean,
-		location?: string,
-		displayName?: string,
-		description?: string,
-		tags?: string[]
-	): Promise<void>;
-
-	deleteSkill(bundleID: string, artifactID: string): Promise<void>;
-
-	renderSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RenderSkillResponse>;
-}
-
 export interface IWorkspaceStoreAPI {
 	addWorkspacePath(request: WorkspacePathRegistration): Promise<WorkspacePathRegistrationResult>;
 
@@ -464,18 +383,6 @@ export interface IWorkspaceAggregateAPI {
 		expectedRevision: number,
 		runtimeDisabled: boolean
 	): Promise<StoreWorkspaceArtifactView>;
-}
-
-export interface IWorkspaceManagementAPI {
-	readonly store: IWorkspaceStoreAPI;
-	readonly runtime: IWorkspaceRuntimeAPI;
-	readonly aggregate: IWorkspaceAggregateAPI;
-
-	getWorkspaceManagementSnapshot(workspace: ArtifactRef): Promise<WorkspaceManagementSnapshot>;
-
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
-
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef>;
 }
 
 export interface IToolRuntimeAPI {
@@ -614,11 +521,11 @@ export interface IAssistantPresetStoreAPI {
 export interface IMCPStoreAPI {
 	addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView>;
 
+	removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
+
 	attachMCPArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView>;
 
 	createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView>;
-
-	createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
 
 	deleteMCPCollection(request: DeleteCollectionRequest): Promise<void>;
 
@@ -636,13 +543,9 @@ export interface IMCPStoreAPI {
 
 	listMCPServers(rootID: ArtifactRootID): Promise<StoreArtifact[]>;
 
-	listMCPServersForManagement(): Promise<StoreArtifact[]>;
+	listMCPCollectionsPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<CollectionView>>;
 
-	purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void>;
-
-	purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void>;
-
-	removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
+	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<StoreArtifact>>;
 
 	resolveMCPArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan>;
 
@@ -655,11 +558,21 @@ export interface IMCPStoreAPI {
 	setMCPServerEnabled(server: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
 
 	updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
-
-	upsertManagedMCPPolicy(request: MCPManagedPolicyUpsertRequest): Promise<MCPManagedPolicyUpsertResult>;
 }
 
 export interface IMCPAggregateAPI {
+	getMCPEffectivePolicy(server: ArtifactRef): Promise<MCPEffectivePolicy>;
+
+	createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
+
+	replaceManagedMCP(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult>;
+
+	purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void>;
+
+	upsertManagedMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult>;
+
+	purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void>;
+
 	artifactRefForRuntimeServerID(server: MCPRuntimeServerID): Promise<ArtifactRef>;
 
 	deleteMCPServerSecret(server: ArtifactRef, kind: MCPSecretKind, slot: string): Promise<void>;
@@ -699,7 +612,7 @@ export interface IMCPRuntimeAPI {
 		request: MCPCompleteArgumentRequestBody
 	): Promise<MCPCompletionResult>;
 
-	connectMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot>;
+	connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
 
 	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void>;
 
@@ -719,7 +632,7 @@ export interface IMCPRuntimeAPI {
 		promptArguments: Record<string, string>
 	): Promise<MCPGetPromptResponseBody>;
 
-	getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot>;
+	getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
 
 	invokeMappedMCPTool(
 		mapping: MCPProviderToolMapping,
@@ -730,53 +643,45 @@ export interface IMCPRuntimeAPI {
 
 	listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]>;
 
-	listMCPServerPromptsPage(server: MCPRuntimeServerID, pageSize: number, pageToken: string): Promise<MCPPromptRef[]>;
+	listMCPServerPromptsPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken?: string
+	): Promise<MCPDiscoveryPage<MCPPromptRef>>;
 
 	listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]>;
 
 	listMCPServerResourcesPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPResourceRef[]>;
+		pageToken?: string
+	): Promise<MCPDiscoveryPage<MCPResourceRef>>;
 
 	listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]>;
 
 	listMCPServerResourceTemplatesPage(
 		server: MCPRuntimeServerID,
 		pageSize: number,
-		pageToken: string
-	): Promise<MCPResourceTemplateRef[]>;
+		pageToken?: string
+	): Promise<MCPDiscoveryPage<MCPResourceTemplateRef>>;
 
 	listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]>;
 
-	listMCPServerToolsPage(server: MCPRuntimeServerID, pageSize: number, pageToken: string): Promise<MCPToolCapability[]>;
+	listMCPServerToolsPage(
+		server: MCPRuntimeServerID,
+		pageSize: number,
+		pageToken?: string
+	): Promise<MCPDiscoveryPage<MCPToolCapability>>;
 
 	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
 
 	readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody>;
 
-	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot>;
+	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
 
 	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult>;
 
-	startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPRuntimeServerSnapshot>;
+	startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
 
 	updateMCPGlobalSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<number>;
-}
-
-export interface IMCPManagementAPI {
-	readonly store: IMCPStoreAPI;
-	readonly aggregate: IMCPAggregateAPI;
-	readonly runtime: IMCPRuntimeAPI;
-
-	getMCPCollectionManagementView(collection: ArtifactRef): Promise<MCPCollectionManagementView>;
-
-	getMCPServerManagementView(server: ArtifactRef): Promise<MCPServerManagementView>;
-
-	getMCPPolicyManagementView(policy: ArtifactRef): Promise<MCPPolicyManagementView>;
-
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
-
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef>;
 }

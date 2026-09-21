@@ -6,16 +6,36 @@ export function ArtifactRefForRuntimeServerID(arg1) {
   return window['go']['main']['MCPAggregateWrapper']['ArtifactRefForRuntimeServerID'](arg1);
 }
 
+export function CreateManagedMCP(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['CreateManagedMCP'](arg1);
+}
+
 export function DeleteMCPServerSecret(arg1, arg2, arg3) {
   return window['go']['main']['MCPAggregateWrapper']['DeleteMCPServerSecret'](arg1, arg2, arg3);
+}
+
+export function GetMCPEffectivePolicy(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['GetMCPEffectivePolicy'](arg1);
 }
 
 export function GetMCPServerAuthHealth(arg1) {
   return window['go']['main']['MCPAggregateWrapper']['GetMCPServerAuthHealth'](arg1);
 }
 
+export function PurgeManagedMCP(arg1, arg2) {
+  return window['go']['main']['MCPAggregateWrapper']['PurgeManagedMCP'](arg1, arg2);
+}
+
+export function PurgeManagedMCPPolicy(arg1, arg2) {
+  return window['go']['main']['MCPAggregateWrapper']['PurgeManagedMCPPolicy'](arg1, arg2);
+}
+
 export function PutMCPServerSecret(arg1, arg2, arg3, arg4) {
   return window['go']['main']['MCPAggregateWrapper']['PutMCPServerSecret'](arg1, arg2, arg3, arg4);
+}
+
+export function ReplaceManagedMCP(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['ReplaceManagedMCP'](arg1);
 }
 
 export function RootIDForRuntimeCatalogID(arg1) {
@@ -32,4 +52,8 @@ export function UpdateMCPServerInstallation(arg1, arg2, arg3) {
 
 export function UpdateProtectedMCPServerInstallation(arg1, arg2, arg3) {
   return window['go']['main']['MCPAggregateWrapper']['UpdateProtectedMCPServerInstallation'](arg1, arg2, arg3);
+}
+
+export function UpsertManagedMCPPolicy(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['UpsertManagedMCPPolicy'](arg1);
 }

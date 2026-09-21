@@ -12,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/management"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
@@ -83,6 +84,11 @@ func InitMCPWrappers(
 		mcpConsumerAPI.WithLocatorResolvers(locatorResolvers),
 		mcpConsumerAPI.WithFallbackProviders(fallbackProviders),
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := management.New(roots, storeAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +190,7 @@ func InitMCPWrappers(
 	}
 
 	storeWrapper.api = storeAPI
-	storeWrapper.roots = roots
+	storeWrapper.management = m
 
 	runtimeWrapper.runtime = runtimeManager
 	runtimeWrapper.toolBridge = toolBridge

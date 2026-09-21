@@ -1,19 +1,18 @@
 import type { SubmitEventHandler } from 'react';
 import { useMemo, useState } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
+import type { MCPServerView, MCPSetupSubmissionValue } from '@/spec/mcp';
 import { MCPInputKind } from '@/spec/mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
+
+import { serverSetupInputs } from '@/apis/mcp_management';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
-
-import type { MCPServerView, MCPSetupSubmissionValue } from '@/mcpservers/lib/mcp_management';
-import { serverSetupInputs } from '@/mcpservers/lib/mcp_management';
 
 interface MCPServerSetupModalProps {
 	isOpen: boolean;
@@ -179,8 +178,8 @@ function MCPServerSetupModalContent({
 					/>
 
 					<form noValidate onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
-						{server.document?.extension.install.note ? (
-							<div className="bg-base-100 rounded-2xl p-3 text-sm">{server.document.extension.install.note}</div>
+						{server.document?.configuration.install.note ? (
+							<div className="bg-base-100 rounded-2xl p-3 text-sm">{server.document.configuration.install.note}</div>
 						) : null}
 
 						{submitError ? (

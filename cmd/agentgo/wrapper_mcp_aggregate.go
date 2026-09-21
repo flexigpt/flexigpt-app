@@ -8,7 +8,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -94,6 +96,67 @@ func (w *MCPAggregateWrapper) UpdateProtectedMCPServerInstallation(
 			ref,
 			expectedOverlayRevision,
 			data,
+		)
+	})
+}
+
+func (w *MCPAggregateWrapper) GetMCPEffectivePolicy(
+	ref artifact.ArtifactRef,
+) (mcpPolicy.Effective, error) {
+	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpPolicy.Effective, error) {
+		return service.GetMCPEffectivePolicy(context.Background(), ref)
+	})
+}
+
+func (w *MCPAggregateWrapper) CreateManagedMCP(
+	request mcpConsumerAPI.ManagedMCPCreateRequest,
+) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+		return service.CreateManagedMCP(context.Background(), request)
+	})
+}
+
+func (w *MCPAggregateWrapper) ReplaceManagedMCP(
+	request mcpConsumerAPI.ManagedMCPReplaceRequest,
+) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+		return service.ReplaceManagedMCP(context.Background(), request)
+	})
+}
+
+func (w *MCPAggregateWrapper) PurgeManagedMCP(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
+		return service.PurgeManagedMCP(
+			context.Background(),
+			ref,
+			expectedRevision,
+		)
+	})
+}
+
+func (w *MCPAggregateWrapper) UpsertManagedMCPPolicy(
+	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
+) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+			return service.UpsertManagedMCPPolicy(context.Background(), request)
+		},
+	)
+}
+
+func (w *MCPAggregateWrapper) PurgeManagedMCPPolicy(
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
+		return service.PurgeManagedMCPPolicy(
+			context.Background(),
+			ref,
+			expectedRevision,
 		)
 	})
 }

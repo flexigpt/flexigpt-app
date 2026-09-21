@@ -1,14 +1,16 @@
 import type { ChangeEvent, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
 
+import type { MCPBundleView, MCPServerDraft, MCPServerView, MCPStdioSecretDraft } from '@/spec/mcp';
 import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
 
 import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { validateSlug } from '@/lib/text_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
+
+import { serverDraftFromView } from '@/apis/mcp_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -21,13 +23,6 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import type {
-	MCPBundleView,
-	MCPServerDraft,
-	MCPServerView,
-	MCPStdioSecretDraft,
-} from '@/mcpservers/lib/mcp_management';
-import { serverDraftFromView } from '@/mcpservers/lib/mcp_management';
 import {
 	getMCPApprovalRuleLabel,
 	getMCPExecutionModeLabel,

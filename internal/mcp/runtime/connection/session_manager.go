@@ -297,13 +297,13 @@ func (m *MCPRuntimeManager) ListToolsPage(
 	ref mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) (out []MCPToolCapability, next *string, err error) {
+) (MCPToolCapabilityPage, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return nil, nil, err
+		return MCPToolCapabilityPage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
 	if err != nil {
-		return nil, nil, err
+		return MCPToolCapabilityPage{}, err
 	}
 	values := make([]MCPToolCapability, len(snapshot.Tools))
 	for index, value := range snapshot.Tools {
@@ -312,7 +312,7 @@ func (m *MCPRuntimeManager) ListToolsPage(
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].ToolName < values[right].ToolName
 	})
-	return paginateArtifactDiscoveryItems(
+	items, next, err := paginateArtifactDiscoveryItems(
 		ref,
 		snapshot.Digest,
 		artifactDiscoveryPageKindTools,
@@ -320,6 +320,13 @@ func (m *MCPRuntimeManager) ListToolsPage(
 		pageSize,
 		pageToken,
 	)
+	if err != nil {
+		return MCPToolCapabilityPage{}, err
+	}
+	return MCPToolCapabilityPage{
+		Items:         items,
+		NextPageToken: optionalMCPPageToken(next),
+	}, nil
 }
 
 func (m *MCPRuntimeManager) ListResources(
@@ -345,22 +352,29 @@ func (m *MCPRuntimeManager) ListResourcesPage(
 	ref mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) (out []MCPResourceRef, next *string, err error) {
+) (MCPResourcePage, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return nil, nil, err
+		return MCPResourcePage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
 	if err != nil {
-		return nil, nil, err
+		return MCPResourcePage{}, err
 	}
 	values := append([]MCPResourceRef(nil), snapshot.Resources...)
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].URI < values[right].URI
 	})
-	return paginateArtifactDiscoveryItems(
+	items, next, err := paginateArtifactDiscoveryItems(
 		ref, snapshot.Digest, artifactDiscoveryPageKindResources,
 		values, pageSize, pageToken,
 	)
+	if err != nil {
+		return MCPResourcePage{}, err
+	}
+	return MCPResourcePage{
+		Items:         items,
+		NextPageToken: optionalMCPPageToken(next),
+	}, nil
 }
 
 func (m *MCPRuntimeManager) ListResourceTemplates(
@@ -389,13 +403,13 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 	ref mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) (out []MCPResourceTemplateRef, next *string, err error) {
+) (MCPResourceTemplatePage, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return nil, nil, err
+		return MCPResourceTemplatePage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
 	if err != nil {
-		return nil, nil, err
+		return MCPResourceTemplatePage{}, err
 	}
 	values := append(
 		[]MCPResourceTemplateRef(nil),
@@ -404,10 +418,17 @@ func (m *MCPRuntimeManager) ListResourceTemplatesPage(
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].URITemplate < values[right].URITemplate
 	})
-	return paginateArtifactDiscoveryItems(
+	items, next, err := paginateArtifactDiscoveryItems(
 		ref, snapshot.Digest, artifactDiscoveryPageKindResourceTemplates,
 		values, pageSize, pageToken,
 	)
+	if err != nil {
+		return MCPResourceTemplatePage{}, err
+	}
+	return MCPResourceTemplatePage{
+		Items:         items,
+		NextPageToken: optionalMCPPageToken(next),
+	}, nil
 }
 
 func (m *MCPRuntimeManager) ListPrompts(
@@ -433,22 +454,29 @@ func (m *MCPRuntimeManager) ListPromptsPage(
 	ref mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
-) (out []MCPPromptRef, next *string, err error) {
+) (MCPPromptPage, error) {
 	if err := validateRuntimeRef(ctx, ref); err != nil {
-		return nil, nil, err
+		return MCPPromptPage{}, err
 	}
 	snapshot, err := m.currentSnapshot(ref)
 	if err != nil {
-		return nil, nil, err
+		return MCPPromptPage{}, err
 	}
 	values := append([]MCPPromptRef(nil), snapshot.Prompts...)
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].PromptName < values[right].PromptName
 	})
-	return paginateArtifactDiscoveryItems(
+	items, next, err := paginateArtifactDiscoveryItems(
 		ref, snapshot.Digest, artifactDiscoveryPageKindPrompts,
 		values, pageSize, pageToken,
 	)
+	if err != nil {
+		return MCPPromptPage{}, err
+	}
+	return MCPPromptPage{
+		Items:         items,
+		NextPageToken: optionalMCPPageToken(next),
+	}, nil
 }
 
 func (m *MCPRuntimeManager) ReadResource(
@@ -1579,6 +1607,13 @@ func mergeSensitiveValues(groups ...[]string) []string {
 
 	sort.Strings(values)
 	return values
+}
+
+func optionalMCPPageToken(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func paginateArtifactDiscoveryItems[T any](

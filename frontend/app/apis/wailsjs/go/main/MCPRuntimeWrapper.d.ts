@@ -29,19 +29,19 @@ export function InvokeMappedMCPTool(arg1:conversation.MCPProviderToolMapping,arg
 
 export function ListMCPServerPrompts(arg1:server.ServerID):Promise<Array<server.MCPPromptRef>>;
 
-export function ListMCPServerPromptsPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<Array<server.MCPPromptRef>>;
+export function ListMCPServerPromptsPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<server.MCPPromptPage>;
 
 export function ListMCPServerResourceTemplates(arg1:server.ServerID):Promise<Array<server.MCPResourceTemplateRef>>;
 
-export function ListMCPServerResourceTemplatesPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<Array<server.MCPResourceTemplateRef>>;
+export function ListMCPServerResourceTemplatesPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<server.MCPResourceTemplatePage>;
 
 export function ListMCPServerResources(arg1:server.ServerID):Promise<Array<server.MCPResourceRef>>;
 
-export function ListMCPServerResourcesPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<Array<server.MCPResourceRef>>;
+export function ListMCPServerResourcesPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<server.MCPResourcePage>;
 
 export function ListMCPServerTools(arg1:server.ServerID):Promise<Array<server.MCPToolCapability>>;
 
-export function ListMCPServerToolsPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<Array<server.MCPToolCapability>>;
+export function ListMCPServerToolsPage(arg1:server.ServerID,arg2:number,arg3:string):Promise<server.MCPToolCapabilityPage>;
 
 export function ListPendingMCPOAuthAuthorizations():Promise<Array<auth.MCPOAuthAuthorization>>;
 

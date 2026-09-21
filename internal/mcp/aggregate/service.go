@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
+	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
@@ -42,7 +43,7 @@ type Dependencies struct {
 	Lifecycle *Lifecycle
 	Servers   *ArtifactServerResolver
 	Source    *RuntimeServerSource
-	Store     mcpConsumerAPI.ServerStore
+	Store     mcpConsumerAPI.ManagementStore
 	Auth      AuthState
 	Secrets   SecretStore
 }
@@ -51,7 +52,7 @@ type Service struct {
 	lifecycle *Lifecycle
 	servers   *ArtifactServerResolver
 	source    *RuntimeServerSource
-	store     mcpConsumerAPI.ServerStore
+	store     mcpConsumerAPI.ManagementStore
 	auth      AuthState
 	secrets   SecretStore
 }
@@ -165,7 +166,7 @@ func (s *Service) PutServerSecret(
 
 	if kind == mcpDomainSecret.MCPSecretKindOAuthClientCredentials {
 		switch installation.Document.Configuration.Auth.Mode {
-		case mcpv1.HTTPAuthModeNone, mcpv1.HTTPAuthModeClientCredentials:
+		case mcpv1.HTTPAuthModeOAuth, mcpv1.HTTPAuthModeClientCredentials:
 		default:
 			return SecretWriteResult{}, fmt.Errorf(
 				"%w: MCP server does not declare OAuth client credentials",
@@ -274,6 +275,119 @@ func (s *Service) GetServerAuthHealth(
 		Configured: false,
 		LastError:  "required MCP installation input is not configured",
 	}, nil
+}
+
+func (s *Service) GetMCPEffectivePolicy(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (mcpPolicy.Effective, error) {
+	if err := s.ready(); err != nil {
+		return mcpPolicy.Effective{}, err
+	}
+	return s.store.GetMCPEffectivePolicy(ctx, ref)
+}
+
+func (s *Service) CreateManagedMCP(
+	ctx context.Context,
+	request mcpConsumerAPI.ManagedMCPCreateRequest,
+) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+	if err := s.ready(); err != nil {
+		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+	}
+
+	result, err := s.store.CreateManagedMCP(ctx, request)
+	if err != nil {
+		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+	}
+	if err := s.lifecycle.InvalidateServer(ctx, result.Artifact.Ref()); err != nil {
+		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
+	}
+	s.clearServerAuthStatus(result.Artifact.Ref())
+	return result, nil
+}
+
+func (s *Service) ReplaceManagedMCP(
+	ctx context.Context,
+	request mcpConsumerAPI.ManagedMCPReplaceRequest,
+) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+	if err := s.ready(); err != nil {
+		return mcpConsumerAPI.ManagedMCPReplaceResult{}, err
+	}
+	if err := s.lifecycle.InvalidateServer(ctx, request.Artifact); err != nil {
+		return mcpConsumerAPI.ManagedMCPReplaceResult{}, err
+	}
+	s.clearServerAuthStatus(request.Artifact)
+	return s.store.ReplaceManagedMCP(ctx, request)
+}
+
+func (s *Service) PurgeManagedMCP(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	if err := s.ready(); err != nil {
+		return err
+	}
+	if err := s.lifecycle.InvalidateServer(ctx, ref); err != nil {
+		return err
+	}
+	s.clearServerAuthStatus(ref)
+	return s.store.PurgeManagedMCP(ctx, ref, expectedRevision)
+}
+
+func (s *Service) UpsertManagedMCPPolicy(
+	ctx context.Context,
+	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
+) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
+	if err := s.ready(); err != nil {
+		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+	}
+	if err := request.Collection.Validate(); err != nil {
+		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+	}
+	if err := request.Name.Validate(); err != nil {
+		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+	}
+
+	affected, err := s.store.ListMCPServersReferencingPolicy(
+		ctx,
+		request.Collection.RootID,
+		request.Name,
+	)
+	if err != nil {
+		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+	}
+	if err := s.lifecycle.InvalidateServers(ctx, affected); err != nil {
+		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
+	}
+	return s.store.UpsertManagedMCPPolicy(ctx, request)
+}
+
+func (s *Service) PurgeManagedMCPPolicy(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+) error {
+	if err := s.ready(); err != nil {
+		return err
+	}
+
+	policy, err := s.store.GetMCPPolicy(ctx, ref)
+	if err != nil {
+		return err
+	}
+	affected, err := s.store.ListMCPServersReferencingPolicy(
+		ctx,
+		policy.Artifact.RootID,
+		policy.Artifact.LogicalName,
+	)
+	if err != nil {
+		return err
+	}
+	if err := s.lifecycle.InvalidateServers(ctx, affected); err != nil {
+		return err
+	}
+	return s.store.PurgeManagedMCPPolicy(ctx, ref, expectedRevision)
 }
 
 func (s *Service) clearServerAuthStatus(ref artifact.ArtifactRef) {

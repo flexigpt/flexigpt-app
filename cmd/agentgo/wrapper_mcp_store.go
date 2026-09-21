@@ -2,21 +2,20 @@ package main
 
 import (
 	"context"
-	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
+	"github.com/flexigpt/flexigpt-app/internal/mcp/management"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPStoreWrapper struct {
-	api   *mcpConsumerAPI.API
-	roots compositionapi.RootAPI
+	api        *mcpConsumerAPI.API
+	management *management.Service
 }
 
 func withMCPStore[T any](
@@ -29,6 +28,19 @@ func withMCPStore[T any](
 			return zero, basespec.ErrClosed
 		}
 		return fn(w.api)
+	})
+}
+
+func withMCPStoreManagement[T any](
+	w *MCPStoreWrapper,
+	fn func(*management.Service) (T, error),
+) (T, error) {
+	return middleware.WithRecoveryResp(func() (T, error) {
+		var zero T
+		if w == nil || w.management == nil {
+			return zero, basespec.ErrClosed
+		}
+		return fn(w.management)
 	})
 }
 
@@ -84,82 +96,21 @@ func (w *MCPStoreWrapper) SetMCPPolicyEnabled(
 	)
 }
 
-func (w *MCPStoreWrapper) ListMCPServersForManagement() (
-	[]artifact.Artifact,
-	error,
-) {
-	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
-		if w == nil || w.api == nil || w.roots == nil {
-			return nil, basespec.ErrClosed
-		}
-		roots, err := w.roots.List(context.Background())
-		if err != nil {
-			return nil, err
-		}
-		output := make([]artifact.Artifact, 0)
-		for _, rootValue := range roots {
-			values, err := w.api.ListServers(
-				context.Background(),
-				rootValue.ID,
-			)
-			if err != nil {
-				return nil, err
-			}
-			output = append(output, values...)
-		}
-		sort.Slice(output, func(left, right int) bool {
-			if output[left].RootID != output[right].RootID {
-				return output[left].RootID < output[right].RootID
-			}
-			if output[left].LogicalName != output[right].LogicalName {
-				return output[left].LogicalName <
-					output[right].LogicalName
-			}
-			return output[left].ID < output[right].ID
-		})
-		return output, nil
+func (w *MCPStoreWrapper) ListMCPCollectionsPage(
+	pageSize int,
+	pageToken string,
+) (management.CollectionPage, error) {
+	return withMCPStoreManagement(w, func(service *management.Service) (management.CollectionPage, error) {
+		return service.ListCollectionsPage(context.Background(), pageSize, pageToken)
 	})
 }
 
-// ListMCPCollectionsForManagement returns every domain-visible MCP Collection
-// across every Root. Root is an internal storage concern. Callers use
-// CollectionView Editable, Deletable, and Baseline for UI capability policy.
-func (w *MCPStoreWrapper) ListMCPCollectionsForManagement() (
-	[]collection.CollectionView,
-	error,
-) {
-	return middleware.WithRecoveryResp(func() ([]collection.CollectionView, error) {
-		if w == nil || w.api == nil || w.roots == nil {
-			return nil, basespec.ErrClosed
-		}
-
-		roots, err := w.roots.List(context.Background())
-		if err != nil {
-			return nil, err
-		}
-
-		output := make([]collection.CollectionView, 0)
-		for _, rootValue := range roots {
-			values, err := w.api.ListMCPCollections(
-				context.Background(),
-				rootValue.ID,
-			)
-			if err != nil {
-				return nil, err
-			}
-			output = append(output, values...)
-		}
-
-		sort.Slice(output, func(left, right int) bool {
-			if output[left].Artifact.RootID != output[right].Artifact.RootID {
-				return output[left].Artifact.RootID < output[right].Artifact.RootID
-			}
-			if output[left].Name != output[right].Name {
-				return output[left].Name < output[right].Name
-			}
-			return output[left].Artifact.ID < output[right].Artifact.ID
-		})
-		return output, nil
+func (w *MCPStoreWrapper) ListMCPServersPage(
+	pageSize int,
+	pageToken string,
+) (management.ServerPage, error) {
+	return withMCPStoreManagement(w, func(service *management.Service) (management.ServerPage, error) {
+		return service.ListServersPage(context.Background(), pageSize, pageToken)
 	})
 }
 
@@ -184,77 +135,6 @@ func (w *MCPStoreWrapper) ResolveMCPArtifactCapabilities(
 ) (resolve.CapabilityPlan, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (resolve.CapabilityPlan, error) {
 		return api.ResolveArtifactCapabilities(context.Background(), ref)
-	})
-}
-
-func (w *MCPStoreWrapper) UpsertManagedMCPPolicy(
-	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
-) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
-			return api.UpsertManagedMCPPolicy(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *MCPStoreWrapper) CreateManagedMCP(
-	request mcpConsumerAPI.ManagedMCPCreateRequest,
-) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
-			return api.CreateManagedMCP(context.Background(), request)
-		},
-	)
-}
-
-func (w *MCPStoreWrapper) ReplaceManagedMCP(
-	request mcpConsumerAPI.ManagedMCPReplaceRequest,
-) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
-			return api.ReplaceManagedMCP(
-				context.Background(),
-				request,
-			)
-		},
-	)
-}
-
-func (w *MCPStoreWrapper) PurgeManagedMCP(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-) error {
-	return middleware.WithRecovery(func() error {
-		if w == nil || w.api == nil {
-			return basespec.ErrClosed
-		}
-		return w.api.PurgeManagedMCP(
-			context.Background(),
-			ref,
-			expectedRevision,
-		)
-	})
-}
-
-func (w *MCPStoreWrapper) PurgeManagedMCPPolicy(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-) error {
-	return middleware.WithRecovery(func() error {
-		if w == nil || w.api == nil {
-			return basespec.ErrClosed
-		}
-		return w.api.PurgeManagedMCPPolicy(
-			context.Background(),
-			ref,
-			expectedRevision,
-		)
 	})
 }
 
@@ -370,5 +250,5 @@ func (w *MCPStoreWrapper) close() {
 		return
 	}
 	w.api = nil
-	w.roots = nil
+	w.management = nil
 }

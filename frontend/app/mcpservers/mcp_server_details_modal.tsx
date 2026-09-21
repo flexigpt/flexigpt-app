@@ -1,21 +1,23 @@
 import type { ReactNode } from 'react';
 import { useCallback } from 'react';
-
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type {
 	MCPAuthHealth,
+	MCPBundleView,
 	MCPPromptRef,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPServerRuntimeSnapshot,
+	MCPServerView,
 	MCPToolCapability,
 } from '@/spec/mcp';
 import { MCPToolRisk } from '@/spec/mcp';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import { mcpRuntimeAPI } from '@/apis/baseapi';
+import { mcpManagementAPI } from '@/apis/baseapi';
+import { requireMCPRuntimeServerID, serverRefLabel } from '@/apis/mcp_management';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -25,8 +27,6 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
-import { requireMCPRuntimeServerID, serverRefLabel } from '@/mcpservers/lib/mcp_management';
 import {
 	getEffectiveMCPServerStatus,
 	getMCPApprovalRuleLabel,
@@ -120,10 +120,10 @@ function MCPServerDetailsModalContent({
 
 			const runtimeServerID = requireMCPRuntimeServerID(server);
 			const results = await Promise.allSettled([
-				mcpRuntimeAPI.listMCPServerTools(runtimeServerID),
-				mcpRuntimeAPI.listMCPServerResources(runtimeServerID),
-				mcpRuntimeAPI.listMCPServerResourceTemplates(runtimeServerID),
-				mcpRuntimeAPI.listMCPServerPrompts(runtimeServerID),
+				mcpManagementAPI.listMCPServerTools(runtimeServerID),
+				mcpManagementAPI.listMCPServerResources(runtimeServerID),
+				mcpManagementAPI.listMCPServerResourceTemplates(runtimeServerID),
+				mcpManagementAPI.listMCPServerPrompts(runtimeServerID),
 			]);
 
 			const [tools, resources, templates, prompts] = results;
@@ -182,7 +182,7 @@ function MCPServerDetailsModalContent({
 					</Field>
 					<Field label="Artifact Revision">{server.artifact.revision}</Field>
 					<Field label="Built-in">{server.builtIn ? 'Yes' : 'No'}</Field>
-					<Field label="Runtime Enabled">{server.runtimeEnabled ? 'Yes' : 'No'}</Field>
+					<Field label="Enabled">{server.enabled ? 'Yes' : 'No'}</Field>
 					<Field label="Created">{server.artifact.createdAt.toLocaleString()}</Field>
 					<Field label="Modified">{server.artifact.modifiedAt.toLocaleString()}</Field>
 
@@ -202,9 +202,9 @@ function MCPServerDetailsModalContent({
 						<JSONBlock
 							value={{
 								core: server.document?.mcpServer,
-								auth: server.document?.extension.auth,
-								install: server.document?.extension.install,
-								connectionProfiles: server.document?.extension.connectionProfiles,
+								auth: server.document?.configuration.auth,
+								install: server.document?.configuration.install,
+								connectionProfiles: server.document?.configuration.connectionProfiles,
 							}}
 						/>
 					</Field>
@@ -226,7 +226,7 @@ function MCPServerDetailsModalContent({
 					</Field>
 
 					<Field label="Effective Policy">
-						<JSONBlock value={server.policy} />
+						<JSONBlock value={server.policy?.body} />
 					</Field>
 
 					<Field label="Server Info">

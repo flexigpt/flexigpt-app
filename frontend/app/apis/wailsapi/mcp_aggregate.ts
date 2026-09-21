@@ -1,17 +1,37 @@
 import type { ArtifactRef, ArtifactRootID, StoreArtifact } from '@/spec/artifact';
-import type { MCPAuthHealth, MCPRuntimeServerID, MCPSecretKind, MCPSecretWriteResult, MCPServerData } from '@/spec/mcp';
+import type {
+	ManagedMCPCreateRequest,
+	ManagedMCPCreateResult,
+	ManagedMCPPolicyUpsertRequest,
+	ManagedMCPPolicyUpsertResult,
+	ManagedMCPReplaceRequest,
+	ManagedMCPReplaceResult,
+	MCPAuthHealth,
+	MCPEffectivePolicy,
+	MCPRuntimeCatalogID,
+	MCPRuntimeServerID,
+	MCPSecretKind,
+	MCPSecretWriteResult,
+	MCPServerData,
+} from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
 import { requiredObject, requireNonBlankString } from '@/apis/wailsapi/transport';
 import {
 	ArtifactRefForRuntimeServerID,
+	CreateManagedMCP,
 	DeleteMCPServerSecret,
+	GetMCPEffectivePolicy,
 	GetMCPServerAuthHealth,
+	PurgeManagedMCP,
+	PurgeManagedMCPPolicy,
 	PutMCPServerSecret,
+	ReplaceManagedMCP,
 	RootIDForRuntimeCatalogID,
 	RuntimeServerIDForArtifact,
 	UpdateMCPServerInstallation,
 	UpdateProtectedMCPServerInstallation,
+	UpsertManagedMCPPolicy,
 } from '@/apis/wailsjs/go/main/MCPAggregateWrapper';
 
 export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
@@ -19,6 +39,13 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		return requiredObject<ArtifactRef>(
 			await ArtifactRefForRuntimeServerID(server as Parameters<typeof ArtifactRefForRuntimeServerID>[0]),
 			'ArtifactRefForRuntimeServerID'
+		);
+	}
+
+	async createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
+		return requiredObject<ManagedMCPCreateResult>(
+			await CreateManagedMCP(request as Parameters<typeof CreateManagedMCP>[0]),
+			'CreateManagedMCP'
 		);
 	}
 
@@ -34,6 +61,13 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		return requiredObject<MCPAuthHealth>(
 			await GetMCPServerAuthHealth(server as Parameters<typeof GetMCPServerAuthHealth>[0]),
 			'GetMCPServerAuthHealth'
+		);
+	}
+
+	async getMCPEffectivePolicy(server: ArtifactRef): Promise<MCPEffectivePolicy> {
+		return requiredObject<MCPEffectivePolicy>(
+			await GetMCPEffectivePolicy(server as Parameters<typeof GetMCPEffectivePolicy>[0]),
+			'GetMCPEffectivePolicy'
 		);
 	}
 
@@ -54,7 +88,29 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		);
 	}
 
-	async rootIDForRuntimeCatalogID(catalogID: string): Promise<ArtifactRootID> {
+	async purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void> {
+		await PurgeManagedMCP(server as Parameters<typeof PurgeManagedMCP>[0], expectedRevision);
+	}
+
+	async purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void> {
+		await PurgeManagedMCPPolicy(policy as Parameters<typeof PurgeManagedMCPPolicy>[0], expectedRevision);
+	}
+
+	async replaceManagedMCP(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult> {
+		return requiredObject<ManagedMCPReplaceResult>(
+			await ReplaceManagedMCP(request as Parameters<typeof ReplaceManagedMCP>[0]),
+			'ReplaceManagedMCP'
+		);
+	}
+
+	async upsertManagedMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult> {
+		return requiredObject<ManagedMCPPolicyUpsertResult>(
+			await UpsertManagedMCPPolicy(request as Parameters<typeof UpsertManagedMCPPolicy>[0]),
+			'UpsertManagedMCPPolicy'
+		);
+	}
+
+	async rootIDForRuntimeCatalogID(catalogID: MCPRuntimeCatalogID): Promise<ArtifactRootID> {
 		return requireNonBlankString(
 			await RootIDForRuntimeCatalogID(catalogID as Parameters<typeof RootIDForRuntimeCatalogID>[0]),
 			'RootIDForRuntimeCatalogID'

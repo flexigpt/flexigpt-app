@@ -1,14 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPAuthHealth, MCPGlobalSettings, MCPOAuthAuthorization, MCPServerRuntimeSnapshot } from '@/spec/mcp';
+import type {
+	MCPAuthHealth,
+	MCPBundleView,
+	MCPGlobalSettings,
+	MCPOAuthAuthorization,
+	MCPServerDraft,
+	MCPServerRuntimeSnapshot,
+	MCPServerView,
+	MCPSetupSubmissionValue,
+} from '@/spec/mcp';
 import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 
-import { backendAPI, mcpManagementAPI, mcpRuntimeAPI } from '@/apis/baseapi';
+import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
+import { getAuthMode, requireMCPRuntimeServerID } from '@/apis/mcp_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -19,26 +28,6 @@ import { ManagementPageHeader } from '@/components/managementui/management_page_
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
-import type {
-	MCPBundleView,
-	MCPServerDraft,
-	MCPServerView,
-	MCPSetupSubmissionValue,
-} from '@/mcpservers/lib/mcp_management';
-import {
-	applyMCPServerSetup,
-	createMCPBundle,
-	deleteMCPBundle,
-	deleteMCPServer,
-	getAuthMode,
-	loadMCPBundleView,
-	loadMCPBundleViews,
-	loadMCPServerViews,
-	requireMCPRuntimeServerID,
-	saveMCPServer,
-	setMCPBundleRuntimeEnabled,
-	setMCPServerRuntimeEnabled,
-} from '@/mcpservers/lib/mcp_management';
 import { MCPBundleCard } from '@/mcpservers/mcp_bundle_card';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
 import { MCPSettingsModal } from '@/mcpservers/mcp_settings_modal';
@@ -192,7 +181,7 @@ export default function MCPServersPage() {
 		}> => {
 			const pending =
 				knownPending ??
-				(await mcpRuntimeAPI.listPendingMCPOAuthAuthorizations().catch(() => [] as MCPOAuthAuthorization[]));
+				(await mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => [] as MCPOAuthAuthorization[]));
 
 			const entries = await mapWithConcurrency(servers, STATUS_READ_CONCURRENCY, async server => {
 				const key = server.ref.artifactID;
@@ -215,7 +204,7 @@ export default function MCPServersPage() {
 					: mcpManagementAPI.getMCPServerAuthHealth(server.ref);
 
 				const [runtimeResult, authResult] = await Promise.allSettled([
-					mcpRuntimeAPI.getMCPServerStatus(runtimeServerID),
+					mcpManagementAPI.getMCPServerStatus(runtimeServerID),
 					authRequest,
 				]);
 
@@ -255,7 +244,7 @@ export default function MCPServersPage() {
 	const loadBundleData = useCallback(
 		async (bundle: MCPBundleView, pending?: MCPOAuthAuthorization[]): Promise<BundleData> => {
 			try {
-				const servers = await loadMCPServerViews(bundle);
+				const servers = await mcpManagementAPI.listMCPServers(bundle);
 				const statuses = await readServerStatus(servers, pending);
 
 				return {
@@ -292,10 +281,10 @@ export default function MCPServersPage() {
 		setPageLoadError(undefined);
 
 		try {
-			const settingsPromise = mcpRuntimeAPI.getMCPGlobalSettings();
+			const settingsPromise = mcpManagementAPI.getMCPGlobalSettings();
 			const [bundleResult, pendingResult] = await Promise.allSettled([
-				loadMCPBundleViews(),
-				mcpRuntimeAPI.listPendingMCPOAuthAuthorizations(),
+				mcpManagementAPI.listMCPBundles(),
+				mcpManagementAPI.listPendingMCPOAuthAuthorizations(),
 			]);
 
 			if (bundleResult.status === 'rejected') {
@@ -316,8 +305,7 @@ export default function MCPServersPage() {
 
 			const shells = bundleResult.value.map(bundle => {
 				const existing = bundlesRef.current.find(
-					item =>
-						item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.collectionID === bundle.ref.collectionID
+					item => item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
 				);
 
 				if (existing) {
@@ -364,7 +352,7 @@ export default function MCPServersPage() {
 				if (mountedRef.current && loadIDRef.current === requestID) {
 					setBundles(previous =>
 						previous.map(item =>
-							item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.collectionID === bundle.ref.collectionID
+							item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
 								? value
 								: item
 						)
@@ -402,20 +390,20 @@ export default function MCPServersPage() {
 	const refreshBundle = useCallback(
 		async (bundleRef: MCPBundleView['ref']) => {
 			const existing = bundlesRef.current.find(
-				item => item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.collectionID === bundleRef.collectionID
+				item => item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
 			);
 
 			if (!existing) {
 				throw new Error('MCP Bundle is no longer available.');
 			}
 
-			const refreshedBundle = await loadMCPBundleView(bundleRef);
+			const refreshedBundle = await mcpManagementAPI.getMCPBundle(bundleRef);
 
 			const refreshed = await loadBundleData(refreshedBundle);
 
 			setBundles(previous =>
 				previous.map(item =>
-					item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.collectionID === bundleRef.collectionID
+					item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
 						? refreshed
 						: item
 				)
@@ -428,7 +416,7 @@ export default function MCPServersPage() {
 		async (server: MCPServerView) => {
 			const parent = bundlesRef.current.find(
 				item =>
-					item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.collectionID === server.bundle.collectionID
+					item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.artifactID === server.bundle.artifactID
 			);
 
 			if (!parent) {
@@ -441,7 +429,7 @@ export default function MCPServersPage() {
 				previous.map(item => {
 					if (
 						item.bundle.ref.rootID !== server.bundle.rootID ||
-						item.bundle.ref.collectionID !== server.bundle.collectionID
+						item.bundle.ref.artifactID !== server.bundle.artifactID
 					) {
 						return item;
 					}
@@ -477,7 +465,7 @@ export default function MCPServersPage() {
 			previous.map(item => {
 				if (
 					item.bundle.ref.rootID !== server.bundle.rootID ||
-					item.bundle.ref.collectionID !== server.bundle.collectionID
+					item.bundle.ref.artifactID !== server.bundle.artifactID
 				) {
 					return item;
 				}
@@ -490,7 +478,7 @@ export default function MCPServersPage() {
 						[server.ref.artifactID]: {
 							...current,
 							server: runtimeServerID,
-							collection: current?.collection ?? '',
+							catalog: current?.catalog ?? '',
 							status: MCPServerStatus.Connecting,
 							lastError: undefined,
 							toolCount: current?.toolCount ?? 0,
@@ -512,7 +500,7 @@ export default function MCPServersPage() {
 
 		setBundles(previous =>
 			previous.map(item =>
-				item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.collectionID === server.bundle.collectionID
+				item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.artifactID === server.bundle.artifactID
 					? {
 							...item,
 							runtimeByArtifactID: {
@@ -538,7 +526,7 @@ export default function MCPServersPage() {
 			markServerConnecting(server);
 
 			try {
-				let snapshot = await mcpRuntimeAPI.connectMCPServer(runtimeServerID);
+				let snapshot = await mcpManagementAPI.connectMCPServer(runtimeServerID);
 				applyRuntimeSnapshot(server, snapshot);
 
 				const deadline = Date.now() + CONNECTION_WAIT_TIMEOUT_MS;
@@ -548,7 +536,7 @@ export default function MCPServersPage() {
 					}
 
 					await sleep(CONNECTION_POLL_INTERVAL_MS);
-					snapshot = await mcpRuntimeAPI.getMCPServerStatus(runtimeServerID);
+					snapshot = await mcpManagementAPI.getMCPServerStatus(runtimeServerID);
 					applyRuntimeSnapshot(server, snapshot);
 
 					// Keep OAuth health and pending authorization state in sync
@@ -609,7 +597,7 @@ export default function MCPServersPage() {
 			polling = true;
 
 			try {
-				const pending = await mcpRuntimeAPI.listPendingMCPOAuthAuthorizations();
+				const pending = await mcpManagementAPI.listPendingMCPOAuthAuthorizations();
 
 				await mapWithConcurrency(servers, STATUS_READ_CONCURRENCY, async ref => {
 					const bundle = bundlesRef.current.find(item =>
@@ -624,7 +612,7 @@ export default function MCPServersPage() {
 							previous.map(item => {
 								if (
 									item.bundle.ref.rootID !== server.bundle.rootID ||
-									item.bundle.ref.collectionID !== server.bundle.collectionID
+									item.bundle.ref.artifactID !== server.bundle.artifactID
 								) {
 									return item;
 								}
@@ -677,7 +665,7 @@ export default function MCPServersPage() {
 
 	const handleSaveBundle = useCallback(
 		async (logicalName: string, displayName: string, description?: string) => {
-			await createMCPBundle(logicalName, displayName, description);
+			await mcpManagementAPI.createMCPBundle(logicalName, displayName, description);
 			await fetchAll();
 		},
 		[fetchAll]
@@ -685,7 +673,7 @@ export default function MCPServersPage() {
 
 	const handleSaveServer = useCallback(
 		async (bundle: MCPBundleView, server: MCPServerView | undefined, draft: MCPServerDraft) => {
-			await saveMCPServer(bundle, server, draft);
+			await mcpManagementAPI.saveMCPServer(bundle, server, draft);
 			await refreshBundle(bundle.ref);
 		},
 		[refreshBundle]
@@ -693,7 +681,7 @@ export default function MCPServersPage() {
 
 	const handleSaveSetup = useCallback(
 		async (server: MCPServerView, values: Record<string, MCPSetupSubmissionValue>, reset: boolean) => {
-			await applyMCPServerSetup(server, values, reset);
+			await mcpManagementAPI.applyMCPServerSetup(server, values, reset);
 			await refreshBundle(server.bundle);
 		},
 		[refreshBundle]
@@ -702,7 +690,7 @@ export default function MCPServersPage() {
 	const patchBundleEnabled = useCallback((bundleRef: MCPBundleView['ref'], enabled: boolean) => {
 		setBundles(previous =>
 			previous.map(item => {
-				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.collectionID !== bundleRef.collectionID) {
+				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
 					return item;
 				}
 
@@ -711,30 +699,14 @@ export default function MCPServersPage() {
 					bundle: {
 						...item.bundle,
 						enabled,
-						installation: {
-							...item.bundle.installation,
-							runtimeEnabled: enabled,
+						collection: {
+							...item.bundle.collection,
+							artifact: {
+								...item.bundle.collection.artifact,
+								enabled,
+							},
 						},
 					},
-					servers: item.servers.map(server => ({
-						...server,
-						runtimeEnabled: enabled && server.installationEnabled,
-					})),
-					runtimeByArtifactID: Object.fromEntries(
-						item.servers.map(server => {
-							const current = item.runtimeByArtifactID[server.ref.artifactID];
-							return [
-								server.ref.artifactID,
-								current
-									? {
-											...current,
-											status: MCPServerStatus.Disconnected,
-											lastError: undefined,
-										}
-									: undefined,
-							];
-						})
-					),
 				};
 			})
 		);
@@ -745,29 +717,25 @@ export default function MCPServersPage() {
 			previous.map(item => {
 				if (
 					item.bundle.ref.rootID !== server.bundle.rootID ||
-					item.bundle.ref.collectionID !== server.bundle.collectionID
+					item.bundle.ref.artifactID !== server.bundle.artifactID
 				) {
 					return item;
 				}
 
-				const current = item.runtimeByArtifactID[server.ref.artifactID];
 				return {
 					...item,
 					servers: item.servers.map(value =>
 						artifactKey(value.ref) === artifactKey(server.ref)
 							? {
 									...value,
-									installationEnabled: enabled,
-									runtimeEnabled: item.bundle.enabled && enabled,
+									enabled,
+									artifact: {
+										...value.artifact,
+										enabled,
+									},
 								}
 							: value
 					),
-					runtimeByArtifactID: {
-						...item.runtimeByArtifactID,
-						[server.ref.artifactID]: current
-							? { ...current, status: MCPServerStatus.Disconnected, lastError: undefined }
-							: undefined,
-					},
 				};
 			})
 		);
@@ -898,7 +866,7 @@ export default function MCPServersPage() {
 
 					{bundles.map(bundleData => (
 						<MCPBundleCard
-							key={`${bundleData.bundle.ref.rootID}:${bundleData.bundle.ref.collectionID}`}
+							key={`${bundleData.bundle.ref.rootID}:${bundleData.bundle.ref.artifactID}`}
 							bundle={bundleData.bundle}
 							servers={bundleData.servers}
 							existingLogicalNames={bundleData.servers.map(server => server.logicalName)}
@@ -913,7 +881,7 @@ export default function MCPServersPage() {
 								patchBundleEnabled(bundle.ref, enabled);
 
 								try {
-									await setMCPBundleRuntimeEnabled(bundle, enabled);
+									await mcpManagementAPI.setMCPBundleEnabled(bundle, enabled);
 								} catch (error) {
 									patchBundleEnabled(bundle.ref, previous);
 									throw error;
@@ -922,11 +890,11 @@ export default function MCPServersPage() {
 								await refreshBundle(bundle.ref);
 							}}
 							onToggleServerEnabled={async (bundle, server, enabled) => {
-								const previous = server.installationEnabled;
+								const previous = server.enabled;
 								patchServerEnabled(server, enabled);
 
 								try {
-									await setMCPServerRuntimeEnabled(bundle, server, enabled);
+									await mcpManagementAPI.setMCPServerEnabled(server, enabled);
 								} catch (error) {
 									patchServerEnabled(server, previous);
 									throw error;
@@ -937,20 +905,20 @@ export default function MCPServersPage() {
 							onSaveServer={handleSaveServer}
 							onSaveSetup={handleSaveSetup}
 							onDeleteServer={async (bundle, server) => {
-								await deleteMCPServer(bundle, server);
+								await mcpManagementAPI.deleteMCPServer(bundle, server);
 								await refreshBundle(bundle.ref);
 							}}
 							onConnectServer={handleConnectServer}
 							onDisconnectServer={async server => {
-								await mcpRuntimeAPI.disconnectMCPServer(requireMCPRuntimeServerID(server));
+								await mcpManagementAPI.disconnectMCPServer(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onRefreshServer={async server => {
-								await mcpRuntimeAPI.refreshMCPServer(requireMCPRuntimeServerID(server));
+								await mcpManagementAPI.refreshMCPServer(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onCancelOAuth={async server => {
-								await mcpRuntimeAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(server));
+								await mcpManagementAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onRequestOAuthAuthorization={server => {
@@ -981,7 +949,7 @@ export default function MCPServersPage() {
 						setIsDeletingBundle(true);
 
 						try {
-							await deleteMCPBundle(bundleToDelete);
+							await mcpManagementAPI.deleteMCPBundle(bundleToDelete);
 							setBundleToDelete(null);
 							await fetchAll();
 						} catch (error) {
@@ -1019,9 +987,11 @@ export default function MCPServersPage() {
 						setIsSettingsOpen(false);
 					}}
 					onSubmit={async oauthLoopbackListenAddr => {
-						const current = settings ?? (await mcpRuntimeAPI.getMCPGlobalSettings());
-						await mcpRuntimeAPI.updateMCPGlobalSettings(current.revision, oauthLoopbackListenAddr || undefined);
-						setSettings(await mcpRuntimeAPI.getMCPGlobalSettings());
+						const current = settings ?? (await mcpManagementAPI.getMCPGlobalSettings());
+						await mcpManagementAPI.updateMCPGlobalSettings(current.revision, {
+							oauthLoopbackListenAddr: oauthLoopbackListenAddr || undefined,
+						});
+						setSettings(await mcpManagementAPI.getMCPGlobalSettings());
 					}}
 				/>
 
@@ -1045,7 +1015,7 @@ export default function MCPServersPage() {
 							return;
 						}
 
-						await mcpRuntimeAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(selectedOAuth.server));
+						await mcpManagementAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(selectedOAuth.server));
 						await refreshSingleServer(selectedOAuth.server);
 						setOAuthTarget(null);
 					}}

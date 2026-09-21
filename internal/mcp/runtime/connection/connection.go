@@ -48,9 +48,12 @@ type (
 	MCPDiscoverySnapshot           = mcpServer.MCPDiscoverySnapshot
 	MCPGetPromptResponseBody       = mcpServer.MCPGetPromptResponseBody
 	MCPImplementationInfo          = mcpServer.MCPImplementationInfo
+	MCPPromptPage                  = mcpServer.MCPPromptPage
 	MCPPromptRef                   = mcpServer.MCPPromptRef
 	MCPReadResourceResponseBody    = mcpServer.MCPReadResourceResponseBody
+	MCPResourcePage                = mcpServer.MCPResourcePage
 	MCPResourceRef                 = mcpServer.MCPResourceRef
+	MCPResourceTemplatePage        = mcpServer.MCPResourceTemplatePage
 	MCPResourceTemplateRef         = mcpServer.MCPResourceTemplateRef
 	MCPServerCapabilitiesSummary   = mcpServer.MCPServerCapabilitiesSummary
 	MCPServerRuntimeSnapshot       = mcpServer.MCPServerRuntimeSnapshot
@@ -58,6 +61,7 @@ type (
 	MCPTaskSupport                 = mcpServer.MCPTaskSupport
 	MCPToolAppRenderInfo           = mcpServer.MCPToolAppRenderInfo
 	MCPToolCapability              = mcpServer.MCPToolCapability
+	MCPToolCapabilityPage          = mcpServer.MCPToolCapabilityPage
 	InvokeMCPToolRequestBody       = mcpServer.InvokeMCPToolRequestBody
 	InvokeMCPToolResponseBody      = mcpServer.InvokeMCPToolResponseBody
 )

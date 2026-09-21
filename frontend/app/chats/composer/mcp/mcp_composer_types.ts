@@ -1,6 +1,7 @@
 import type {
 	MCPArgumentDefinition,
 	MCPAuthHealth,
+	MCPBundleView,
 	MCPConversationContext,
 	MCPPromptRef,
 	MCPPromptSelection,
@@ -10,13 +11,12 @@ import type {
 	MCPRuntimeServerID,
 	MCPServerRuntimeSnapshot,
 	MCPServerSelection,
+	MCPServerView,
 	MCPToolCapability,
 	MCPToolSelection,
 	MCPTransportType,
 } from '@/spec/mcp';
 import { MCPToolExposure } from '@/spec/mcp';
-
-import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
 
 export interface MCPComposerServerOption {
 	bundle: MCPBundleView;
