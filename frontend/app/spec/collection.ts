@@ -1,6 +1,10 @@
-import type { ArtifactRef, ArtifactRootID, ArtifactSourceID } from '@/spec/artifact';
-import type { StoreArtifact } from '@/spec/artifact_store';
-import type { CapabilityOccurrence } from '@/spec/resolution';
+import type {
+	ArtifactRef,
+	ArtifactRootID,
+	ArtifactSourceID,
+	CapabilityOccurrence,
+	StoreArtifact,
+} from '@/spec/artifact';
 
 export interface DeclarationLocator {
 	kind?: string;

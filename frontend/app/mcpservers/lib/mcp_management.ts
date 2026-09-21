@@ -18,7 +18,7 @@ import type {
 	MCPServerData,
 	MCPServerDocument,
 	MCPToolPolicyOverride,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 import {
 	MCP_SCHEMA_VERSION,
 	MCP_USER_ROOT_ID,
@@ -31,7 +31,7 @@ import {
 	MCPServerType,
 	MCPTransportType,
 	MCPTrustLevel,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { omitManyKeys } from '@/lib/obj_utils';

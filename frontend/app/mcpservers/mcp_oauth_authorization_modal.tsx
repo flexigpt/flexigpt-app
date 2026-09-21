@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import { FiAlertCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 
-import type { MCPAuthHealth } from '@/spec/mcp_artifact';
-import { MCPAuthHealthState } from '@/spec/mcp_artifact';
+import type { MCPAuthHealth } from '@/spec/mcp';
+import { MCPAuthHealthState } from '@/spec/mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 

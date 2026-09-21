@@ -1,12 +1,5 @@
-import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import type { StoreArtifact } from '@/spec/artifact_store';
-import type {
-	MCPAuthHealth,
-	MCPRuntimeServerID,
-	MCPSecretKind,
-	MCPSecretWriteResult,
-	MCPServerData,
-} from '@/spec/mcp_artifact';
+import type { ArtifactRef, ArtifactRootID, StoreArtifact } from '@/spec/artifact';
+import type { MCPAuthHealth, MCPRuntimeServerID, MCPSecretKind, MCPSecretWriteResult, MCPServerData } from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
 import { requiredObject, requireNonBlankString } from '@/apis/wailsapi/transport';

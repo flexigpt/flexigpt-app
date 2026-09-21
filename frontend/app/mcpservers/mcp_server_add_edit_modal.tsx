@@ -3,13 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertCircle, FiPlus, FiTrash2 } from 'react-icons/fi';
 
-import {
-	MCPApprovalRule,
-	MCPExecutionMode,
-	MCPHTTPAuthMode,
-	MCPTransportType,
-	MCPTrustLevel,
-} from '@/spec/mcp_artifact';
+import { MCPApprovalRule, MCPExecutionMode, MCPHTTPAuthMode, MCPTransportType, MCPTrustLevel } from '@/spec/mcp';
 
 import { validateHTTPURLSecurity } from '@/lib/http_input_utils';
 import { validateSlug } from '@/lib/text_utils';

@@ -1,5 +1,11 @@
-import type { ArtifactRef, ArtifactRootID, ArtifactSourceID } from '@/spec/artifact';
-import type { StoreArtifact, StoreArtifactSourceSummary } from '@/spec/artifact_store';
+import type {
+	ArtifactRef,
+	ArtifactRootID,
+	ArtifactSourceID,
+	CapabilityPlan,
+	StoreArtifact,
+	StoreArtifactSourceSummary,
+} from '@/spec/artifact';
 import type {
 	AddArtifactMemberRequest,
 	AddMemberRequest,
@@ -11,7 +17,6 @@ import type {
 	RemoveMemberRequest,
 	UpdateCollectionRequest,
 } from '@/spec/collection';
-import type { CapabilityPlan } from '@/spec/resolution';
 import type {
 	ManagedSkillCreateRequest,
 	ManagedSkillCreateResult,
@@ -21,7 +26,7 @@ import type {
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
-} from '@/spec/skill_store';
+} from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { MCPApprovalResolutionResult, MCPApprovalSummary } from '@/spec/mcp_artifact';
-import { MCPApprovalResolution } from '@/spec/mcp_artifact';
+import type { MCPApprovalResolutionResult, MCPApprovalSummary } from '@/spec/mcp';
+import { MCPApprovalResolution } from '@/spec/mcp';
 
 import { mcpRuntimeAPI } from '@/apis/baseapi';
 

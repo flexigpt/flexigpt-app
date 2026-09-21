@@ -10,8 +10,8 @@ import type {
 	MCPResourceTemplateRef,
 	MCPServerRuntimeSnapshot,
 	MCPToolCapability,
-} from '@/spec/mcp_artifact';
-import { MCPToolRisk } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPToolRisk } from '@/spec/mcp';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 

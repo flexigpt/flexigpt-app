@@ -1,6 +1,6 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPContent, MCPServerSelection } from '@/spec/mcp_artifact';
-import { MCPContentType, MCPToolExposure } from '@/spec/mcp_artifact';
+import type { MCPContent, MCPServerSelection } from '@/spec/mcp';
+import { MCPContentType, MCPToolExposure } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 

@@ -1,11 +1,12 @@
-import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
+	ArtifactRef,
+	ArtifactRootID,
+	CapabilityPlan,
 	StoreArtifact,
 	StoreArtifactRoot,
 	StoreArtifactRootDraft,
 	StoreArtifactSourceSummary,
-} from '@/spec/artifact_store';
-import type { CapabilityPlan } from '@/spec/resolution';
+} from '@/spec/artifact';
 import type {
 	FilesystemSourceRegistration,
 	Workspace,
@@ -14,7 +15,7 @@ import type {
 	WorkspacePathRegistration,
 	WorkspacePathRegistrationResult,
 	WorkspaceRefresh,
-} from '@/spec/workspace_store';
+} from '@/spec/workspace';
 
 import type { IWorkspaceStoreAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';

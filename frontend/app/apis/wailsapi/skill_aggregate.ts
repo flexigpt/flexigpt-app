@@ -1,5 +1,5 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { ArtifactSkillFilter, ArtifactSkillSummary, ResolvedArtifactSkill } from '@/spec/skill_store';
+import type { ArtifactSkillFilter, ArtifactSkillSummary, ResolvedArtifactSkill } from '@/spec/skill';
 
 import type { ISkillAggregateAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';

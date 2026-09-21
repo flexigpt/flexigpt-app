@@ -1,14 +1,10 @@
 import type {
-	MCPAuthSettings,
-	MCPCompleteArgumentRequestBody,
-	MCPRuntimeInvokeToolResponse,
-	MCPRuntimeServerSnapshot,
-} from '@/spec/mcp';
-import type {
 	InvokeMCPToolRequestBody,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
+	MCPAuthSettings,
+	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPGetPromptResponseBody,
 	MCPGlobalSettings,
@@ -18,9 +14,11 @@ import type {
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
+	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
+	MCPRuntimeServerSnapshot,
 	MCPToolCapability,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
 import {

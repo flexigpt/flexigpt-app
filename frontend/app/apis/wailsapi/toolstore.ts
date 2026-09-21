@@ -1,6 +1,6 @@
+import type { MappedTarget } from '@/spec/artifact';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolListItem, ToolRef } from '@/spec/tool';
 import { HTTPBodyOutputMode, ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
-import type { MappedTarget } from '@/spec/resolution';
 
 import type { JSONSchema } from '@/lib/jsonschema_utils';
 
@@ -232,7 +232,7 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 			};
 		};
 
-		const body = requiredObject(response.Body, 'ResolveMappedToolTarget');
+		const body = requiredObject<{ toolRef?: ToolRef }>(response.Body, 'ResolveMappedToolTarget');
 		return requiredObject<ToolRef>(body.toolRef, 'ResolveMappedToolTarget.toolRef');
 	}
 }

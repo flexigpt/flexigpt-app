@@ -33,8 +33,8 @@ import type {
 	MCPConversationContext,
 	MCPRuntimeServerID,
 	MCPToolSelection,
-} from '@/spec/mcp_artifact';
-import { MCPExecutionMode } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPExecutionMode } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';

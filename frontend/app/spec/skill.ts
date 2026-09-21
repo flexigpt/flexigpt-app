@@ -1,24 +1,26 @@
 import type {
 	ArtifactAddress,
 	ArtifactAdoptionMode,
-	ArtifactCollectionID,
 	ArtifactCollectionRef,
 	ArtifactDiagnostic,
 	ArtifactDigest,
-	ArtifactID,
 	ArtifactKind,
-	ArtifactLocator,
 	ArtifactRef,
 	ArtifactRootID,
 	ArtifactSourceBinding,
 	ArtifactSourceID,
 	ArtifactState,
-	ArtifactStorageKey,
-	ManagedSourcePackageFile,
+	CapabilityPlan,
+	StoreArtifact,
+	StoreArtifactAddress,
+	StoreArtifactSourceSummary,
+	StoreManagedPackageFile,
 } from '@/spec/artifact';
+import type { ArtifactMembershipView, CollectionCapabilityPlan, CollectionView } from '@/spec/collection';
 import type { ToolOutputUnion } from '@/spec/tool';
 
-export const SKILL_USER_ROOT_ID: ArtifactRootID = '0198f097-0d5c-7000-8000-000000000001';
+export type SkillRef = ArtifactRef;
+export type SkillBundleRef = ArtifactCollectionRef;
 
 export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-load',
@@ -36,8 +38,6 @@ export enum SkillInsert {
 	Instructions = 'instructions',
 	UserMessage = 'user-message',
 }
-
-export type SkillBundleRef = ArtifactCollectionRef;
 
 export enum SkillBundleAttachmentRole {
 	Managed = 'managed',
@@ -59,14 +59,6 @@ export interface SkillArgument {
 	default?: string;
 }
 
-interface SkillBundleAttachmentDraft {
-	sourceID: ArtifactSourceID;
-	role: SkillBundleAttachmentRole;
-	enabled: boolean;
-	discoveryRoot: ArtifactLocator;
-	expectedMemberDigests?: Record<ArtifactLocator, ArtifactDigest>;
-}
-
 interface SkillBundleAttachmentView {
 	sourceID: ArtifactSourceID;
 	revision: number;
@@ -74,27 +66,6 @@ interface SkillBundleAttachmentView {
 	enabled: boolean;
 	sourceDisplayName?: string;
 	sourceKind?: string;
-}
-
-export interface SkillBundleView {
-	bundle: SkillBundleRef;
-	revision: number;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-	retiredAt?: string;
-	logicalName: string;
-	logicalVersion?: string;
-	labels?: Record<string, string>;
-	managedSourceID?: ArtifactSourceID;
-	attachments: SkillBundleAttachmentView[];
-	createdAt: string;
-	modifiedAt: string;
-}
-
-export interface RetireSkillBundleResult {
-	bundle: SkillBundleRef;
-	revision: number;
 }
 
 export interface SkillArtifactView {
@@ -113,61 +84,6 @@ export interface SkillArtifactView {
 	modifiedAt: string;
 }
 
-export interface CreateSkillBundleBody {
-	collectionID: ArtifactCollectionID;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-	logicalName: string;
-	logicalVersion?: string;
-	labels?: Record<string, string>;
-
-	// Requests Artifact Store to provision and exclusively assign a managed
-	// Source to this bundle. It must not also appear in `attachments`.
-	managedSourceID?: ArtifactSourceID;
-
-	// Required whenever managedSourceID is supplied. This is an opaque,
-	// storage-safe identity and must not be derived from a filesystem path.
-	managedSourceStorageKey?: ArtifactStorageKey;
-
-	attachments?: SkillBundleAttachmentDraft[];
-}
-
-export interface UpdateSkillBundleBody {
-	expectedRevision: number;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-}
-
-export interface RegisterSkillBundleDirectoryInput {
-	expectedCollectionRevision: number;
-	rootPath: string;
-	sourceDisplayName: string;
-}
-
-interface SkillOccurrenceRef {
-	sourceID: ArtifactSourceID;
-	locator: ArtifactLocator;
-	subresourceLocator?: ArtifactLocator;
-}
-
-export interface AdoptSkillBody {
-	expectedCatalogRevision: number;
-	occurrence: SkillOccurrenceRef;
-	artifactID: ArtifactID;
-	name: string;
-	enabled: boolean;
-}
-
-export interface PinSkillBody {
-	expectedCollectionRevision: number;
-	artifactID: ArtifactID;
-	binding: ArtifactSourceBinding;
-	name: string;
-	enabled: boolean;
-}
-
 export interface SkillDocumentInput {
 	name: string;
 	displayName?: string;
@@ -179,41 +95,6 @@ export interface SkillDocumentInput {
 	rawFrontmatter?: Record<string, unknown>;
 }
 
-interface CreateManagedSkillCommon {
-	expectedCollectionRevision: number;
-	/**
-	 * Required when replacing an existing managed skill package. New managed
-	 * skills omit this value.
-	 */
-	expectedArtifactRevision?: number;
-	artifactID: ArtifactID;
-	skillName: string;
-	files?: ManagedSourcePackageFile[];
-	enabled: boolean;
-}
-
-/**
- * The backend accepts exactly one semantic authoring input. `files`, when
- * present, are the complete package-relative native payload and must contain
- * the same `SKILL.md` bytes as `skillMD`.
- */
-export type CreateManagedSkillBody = CreateManagedSkillCommon &
-	(
-		| {
-				skillMD: Uint8Array;
-				document?: never;
-		  }
-		| {
-				skillMD?: never;
-				document: SkillDocumentInput;
-		  }
-	);
-
-export interface CreateManagedSkillResult {
-	artifact: SkillArtifactView;
-	address: ArtifactAddress;
-}
-
 /**
  * Editable managed Skill source projected from its canonical definition.
  * This deliberately exposes no source configuration or filesystem path.
@@ -223,41 +104,10 @@ export interface ManagedSkillDocumentView {
 	document: SkillDocumentInput;
 }
 
-export interface SetSkillEnabledBody {
-	expectedRevision: number;
-	enabled: boolean;
-}
-
 export enum RuntimeSkillActivity {
 	Any = 'any',
 	Active = 'active',
 	Inactive = 'inactive',
-}
-
-/**
- * Artifact-oriented runtime filter used by frontend bridge APIs.
- * It is not a Wails transport model.
- */
-export interface RuntimeSkillFilter {
-	types?: string[];
-	inserts?: SkillInsert[];
-	namePrefix?: string;
-	locationPrefix?: string;
-	allowArtifacts?: ArtifactRef[];
-	sessionID?: string;
-	activity?: RuntimeSkillActivity;
-}
-
-export interface CreateSkillSessionOptions {
-	closeSessionID?: string;
-	maxActivePerSession?: number;
-	allowArtifacts?: ArtifactRef[];
-	activeArtifacts?: ArtifactRef[];
-}
-
-export interface SkillSession {
-	sessionID: string;
-	activeArtifacts: ArtifactRef[];
 }
 
 export interface SkillResourceInfo {
@@ -285,12 +135,6 @@ export interface RuntimeSkillListItem {
 }
 
 /**
- * Runtime-owned opaque catalog identity. The frontend may carry this value
- * between bridge calls but does not construct or parse it.
- */
-export type SkillRuntimeCatalogID = string;
-
-/**
  * Runtime-native skill identity. Provider type remains a string because
  * Agent Skills providers are registry-extensible.
  */
@@ -298,30 +142,6 @@ export interface RuntimeSkillDefinition {
 	type: string;
 	name: string;
 	location: string;
-}
-
-/**
- * Store-owned ArtifactRef projection into runtime-native identity.
- * This is used only by frontend bridge code.
- */
-export interface ResolvedSkillRuntime {
-	artifact: ArtifactRef;
-	collection: ArtifactCollectionRef;
-	definition: RuntimeSkillDefinition;
-	version: string;
-}
-
-/**
- * Runtime-native filter. It intentionally has no Artifact Store identity.
- */
-export interface RuntimeSkillQuery {
-	types?: string[];
-	inserts?: SkillInsert[];
-	namePrefix?: string;
-	locationPrefix?: string;
-	allowSkills?: RuntimeSkillDefinition[];
-	sessionID?: string;
-	activity?: RuntimeSkillActivity;
 }
 
 export interface RuntimeSkillSessionOptions {
@@ -511,4 +331,171 @@ export interface SkillListItem {
 	skillDefinition: Skill;
 }
 
-export type SkillRef = ArtifactRef;
+export interface ManagedSkillCreateRequest {
+	collection: ArtifactRef;
+	expectedCollectionRevision: number;
+	skillName: string;
+	skillMD?: number[];
+	files?: StoreManagedPackageFile[];
+	enabled: boolean;
+}
+
+export interface ManagedSkillCreateResult {
+	artifact: StoreArtifact;
+	address: StoreArtifactAddress;
+	collection: CollectionView;
+	membershipCreated: boolean;
+}
+
+export interface ManagedSkillReplaceRequest {
+	collection: ArtifactRef;
+	expectedCollectionRevision: number;
+	artifact: ArtifactRef;
+	expectedArtifactRevision: number;
+	skillName: string;
+	skillMD?: number[];
+	files?: StoreManagedPackageFile[];
+	enabled: boolean;
+}
+
+export interface ManagedSkillReplaceResult {
+	artifact: StoreArtifact;
+	address: StoreArtifactAddress;
+	collection: CollectionView;
+}
+
+export interface StoreManagedSkillDocument {
+	artifact: StoreArtifact;
+	document: SkillDocumentInput;
+}
+
+export interface SkillDirectoryRegistration {
+	rootID: ArtifactRootID;
+	rootPath: string;
+	sourceDisplayName: string;
+}
+
+export interface SkillPathRegistration {
+	rootID: ArtifactRootID;
+	path: string;
+	sourceDisplayName?: string;
+	enabled: boolean;
+}
+
+export interface SkillPathRegistrationResult {
+	source: StoreArtifactSourceSummary;
+	artifact: StoreArtifact;
+}
+
+/**
+ * Aggregate-owned Artifact Skill filter. This is the frontend application
+ * contract for `SkillAggregateWrapper`, not a runtime-native filter.
+ */
+export interface ArtifactSkillFilter {
+	types?: string[];
+	inserts?: SkillInsert[];
+	namePrefix?: string;
+	locationPrefix?: string;
+	allowArtifacts?: ArtifactRef[];
+	sessionID?: string;
+	activity?: RuntimeSkillActivity;
+}
+
+/**
+ * Direct result of `SkillAggregateWrapper.ResolveArtifactSkill`.
+ *
+ * The uppercase property names are intentional. The Go aggregate result has
+ * no JSON field tags, so Wails preserves exported Go field names.
+ */
+export interface ResolvedArtifactSkill {
+	Artifact: ArtifactRef;
+	Definition: RuntimeSkillDefinition;
+	Version: string;
+	Enabled: boolean;
+}
+
+/**
+ * Direct result of `SkillAggregateWrapper.DescribeArtifactSkill`.
+ *
+ * The uppercase property names are intentional for the same reason as
+ * `ResolvedArtifactSkill`.
+ */
+export interface ArtifactSkillSummary {
+	Artifact: ArtifactRef;
+	IsEnabled: boolean;
+	Insert: SkillInsert;
+	HasArguments: boolean;
+	HasResources: boolean;
+}
+
+/**
+ * Runtime-native prompt filter. It intentionally accepts Skill definitions,
+ * never ArtifactRefs.
+ */
+export interface RuntimeSkillPromptFilter {
+	types?: string[];
+	namePrefix?: string;
+	locationPrefix?: string;
+	allowSkills?: RuntimeSkillDefinition[];
+	sessionID?: string;
+	activity?: RuntimeSkillActivity;
+}
+
+/**
+ * Runtime-native list filter. It intentionally accepts Skill definitions,
+ * never ArtifactRefs.
+ */
+export interface RuntimeSkillListFilter {
+	types?: string[];
+	inserts?: SkillInsert[];
+	namePrefix?: string;
+	locationPrefix?: string;
+	allowSkills?: RuntimeSkillDefinition[];
+	sessionID?: string;
+	activity?: RuntimeSkillActivity;
+}
+
+/**
+ * Artifact-oriented session request exposed by Skill management.
+ */
+export interface ArtifactSkillSessionOptions {
+	closeSessionID?: string;
+	maxActivePerSession?: number;
+	allowArtifacts?: ArtifactRef[];
+	activeArtifacts?: ArtifactRef[];
+}
+
+/**
+ * Artifact-oriented session result exposed by Skill management.
+ */
+export interface ArtifactSkillSession {
+	sessionID: string;
+	activeArtifacts: ArtifactRef[];
+}
+
+/**
+ * Runtime record joined with its durable ArtifactRef by Skill management.
+ */
+export interface ArtifactRuntimeSkillListItem extends RuntimeSkillListItem {
+	skillRef: ArtifactRef;
+}
+
+export interface SkillCollectionManagementView {
+	collection: CollectionView;
+	capabilities: CollectionCapabilityPlan;
+}
+
+export interface SkillManagementView {
+	artifact: StoreArtifact;
+	memberships: ArtifactMembershipView[];
+	capabilities: CapabilityPlan;
+	runtimeSummary?: ArtifactSkillSummary;
+	runtimeError?: string;
+}
+
+export interface SkillRuntimeManagementView {
+	session?: RuntimeSkillSession;
+	skills: RuntimeSkillRecord[];
+	rendered?: RuntimeSkillRenderResult;
+	invocation?: InvokeSkillToolResponse;
+}

@@ -1,12 +1,13 @@
 import type {
 	InvokeSkillToolResponse,
 	RuntimeSkillDefinition,
+	RuntimeSkillListFilter,
+	RuntimeSkillPromptFilter,
 	RuntimeSkillRecord,
 	RuntimeSkillRenderResult,
 	RuntimeSkillSession,
 	RuntimeSkillSessionOptions,
 } from '@/spec/skill';
-import type { RuntimeSkillListFilter, RuntimeSkillPromptFilter } from '@/spec/skill_store';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 

@@ -25,14 +25,14 @@ import type {
 	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
 	MCPToolCapability,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 import {
 	MCPAuthHealthState,
 	MCPCompletionRefType,
 	MCPHTTPAuthMode,
 	MCPServerStatus,
 	MCPToolExposure,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 
 import { mcpRuntimeAPI } from '@/apis/baseapi';
 

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react';
 import type { MermaidConfig } from 'mermaid';
 import mermaid from 'mermaid';
 
-import { ALL_DARK_THEMES } from '@/spec/theme_consts';
+import { ALL_DARK_THEMES } from '@/spec/setting';
 
 import { useTheme } from '@/hooks/use_theme_provider';
 

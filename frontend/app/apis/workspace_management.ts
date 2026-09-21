@@ -1,8 +1,8 @@
-import type { ArtifactRef } from '@/spec/artifact';
+// oxlint-disable typescript/parameter-properties
+import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { MappedTarget } from '@/spec/resolution';
 import type { ToolRef } from '@/spec/tool';
-import type { WorkspaceManagementSnapshot } from '@/spec/workspace_store';
+import type { WorkspaceManagementSnapshot } from '@/spec/workspace';
 
 import type {
 	IModelPresetStoreAPI,

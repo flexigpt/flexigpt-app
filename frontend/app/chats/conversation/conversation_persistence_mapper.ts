@@ -15,7 +15,7 @@ import type {
 	URLCitation,
 } from '@/spec/inference';
 import { ContentItemKind, InputKind, RoleEnum } from '@/spec/inference';
-import type { MCPToolSelection } from '@/spec/mcp_artifact';
+import type { MCPToolSelection } from '@/spec/mcp';
 import type { ToolStoreChoice } from '@/spec/tool';
 
 import {

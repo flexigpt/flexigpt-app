@@ -14,7 +14,7 @@ import type {
 	UIToolOutput,
 	URLCitation,
 } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext, MCPProviderToolMapping } from '@/spec/mcp_artifact';
+import type { MCPAppModelContextUpdate, MCPConversationContext, MCPProviderToolMapping } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';

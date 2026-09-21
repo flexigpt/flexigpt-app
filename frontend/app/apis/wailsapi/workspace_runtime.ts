@@ -6,7 +6,7 @@ import type {
 	WorkspaceRuntimeSelection,
 	WorkspaceSkill,
 	WorkspaceSkillLoadPlan,
-} from '@/spec/workspace_store';
+} from '@/spec/workspace';
 
 import type { IWorkspaceRuntimeAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';

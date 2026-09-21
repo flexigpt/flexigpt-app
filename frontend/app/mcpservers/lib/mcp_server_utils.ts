@@ -5,7 +5,7 @@ import type {
 	MCPToolCapability,
 	MCPToolRisk,
 	MCPTransportType,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 import {
 	MCPApprovalRule,
 	MCPAppVisibility,
@@ -16,7 +16,7 @@ import {
 	MCPToolRisk as MCPToolRiskEnum,
 	MCPTransportType as MCPTransportTypeEnum,
 	MCPTrustLevel,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 
 import type { MCPServerView } from '@/mcpservers/lib/mcp_management';
 import { getAuthMode, getServerAuthHealthState } from '@/mcpservers/lib/mcp_management';

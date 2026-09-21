@@ -1,5 +1,5 @@
 import type { UIToolOutput } from '@/spec/inference';
-import type { MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp_artifact';
+import type { MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
 
 /**
  * Runtime-only handle for one MCP App view. Apps are never persisted; this

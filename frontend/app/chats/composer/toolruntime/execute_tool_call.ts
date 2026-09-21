@@ -6,8 +6,8 @@ import type {
 	MCPContent,
 	MCPToolAppRenderInfo,
 	MCPToolSelection,
-} from '@/spec/mcp_artifact';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp';
 import { ToolOutputKind } from '@/spec/tool';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';

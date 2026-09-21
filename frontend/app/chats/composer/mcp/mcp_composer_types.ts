@@ -13,8 +13,8 @@ import type {
 	MCPToolCapability,
 	MCPToolSelection,
 	MCPTransportType,
-} from '@/spec/mcp_artifact';
-import { MCPToolExposure } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 
 import type { MCPBundleView, MCPServerView } from '@/mcpservers/lib/mcp_management';
 

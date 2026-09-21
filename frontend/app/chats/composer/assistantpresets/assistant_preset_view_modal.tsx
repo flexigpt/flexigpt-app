@@ -3,8 +3,8 @@ import { useMemo } from 'react';
 import { FiServer, FiSliders, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AssistantPreset } from '@/spec/assistantpreset';
-import type { MCPConversationContext } from '@/spec/mcp_artifact';
-import { MCPToolExposure } from '@/spec/mcp_artifact';
+import type { MCPConversationContext } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 import type { UIChatOption } from '@/spec/modelpreset';
 import type { SkillSelection } from '@/spec/skill';
 import { ToolStoreChoiceType } from '@/spec/tool';

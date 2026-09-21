@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPAppsPolicy, MCPContent } from '@/spec/mcp_artifact';
-import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp_artifact';
+import type { MCPAppsPolicy, MCPContent } from '@/spec/mcp';
+import { MCP_APP_HTML_MIME_TYPE, MCPContentType } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 

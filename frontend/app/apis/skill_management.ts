@@ -1,14 +1,24 @@
 // oxlint-disable typescript/parameter-properties
-import type { ArtifactAdoptionMode, ArtifactRef, ArtifactSourceBinding } from '@/spec/artifact';
+import type {
+	ArtifactAdoptionMode,
+	ArtifactRef,
+	ArtifactSourceBinding,
+	MappedTarget,
+	StoreArtifact,
+} from '@/spec/artifact';
 import { ArtifactAdoptionMode as ArtifactAdoptionModeValue, ArtifactState } from '@/spec/artifact';
-import type { StoreArtifact } from '@/spec/artifact_store';
 import type { CollectionView } from '@/spec/collection';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { MappedTarget } from '@/spec/resolution';
 import type {
+	ArtifactRuntimeSkillListItem,
+	ArtifactSkillFilter,
+	ArtifactSkillSession,
+	ArtifactSkillSessionOptions,
 	InvokeSkillToolResponse,
 	ManagedSkillDocumentView,
+	ManagedSkillReplaceRequest,
 	RenderSkillResponse,
+	ResolvedArtifactSkill,
 	RuntimeSkillDefinition,
 	RuntimeSkillRecord,
 	RuntimeSkillRenderResult,
@@ -17,8 +27,10 @@ import type {
 	SkillArtifactCreateInput,
 	SkillArtifactView,
 	SkillBundle,
+	SkillCollectionManagementView,
 	SkillDocumentInput,
 	SkillListItem,
+	SkillManagementView,
 	SkillPresenceStatus,
 } from '@/spec/skill';
 import {
@@ -28,16 +40,6 @@ import {
 	SkillPresenceStatus as SkillPresenceStatusValue,
 	SkillType,
 } from '@/spec/skill';
-import type {
-	ArtifactRuntimeSkillListItem,
-	ArtifactSkillFilter,
-	ArtifactSkillSession,
-	ArtifactSkillSessionOptions,
-	ManagedSkillReplaceRequest,
-	ResolvedArtifactSkill,
-	SkillCollectionManagementView,
-	SkillManagementView,
-} from '@/spec/skill_store';
 import type { ToolRef } from '@/spec/tool';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';

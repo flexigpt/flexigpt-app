@@ -1,3 +1,4 @@
+import type { MappedTarget } from '@/spec/artifact';
 import type { ProviderName } from '@/spec/inference';
 import { ProviderSDKType } from '@/spec/inference';
 import type {
@@ -8,16 +9,15 @@ import type {
 	PostModelPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
-import type { MappedTarget } from '@/spec/resolution';
 
 import type { IModelPresetStoreAPI } from '@/apis/interface';
 import {
 	enumFromWails,
 	omitUndefined,
 	optionalWailsString,
+	requiredObject,
 	requireNonBlankString,
 	requireWailsBody,
-	requiredObject,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
 	wailsRecordOrEmpty,
@@ -155,10 +155,7 @@ export class WailsModelPresetStoreAPI implements IModelPresetStoreAPI {
 		const response = await ResolveMappedModelTarget({
 			target,
 		} as Parameters<typeof ResolveMappedModelTarget>[0]);
-		const body = requiredObject<{ modelPresetRef?: ModelPresetRef }>(
-			response.Body,
-			'ResolveMappedModelTarget'
-		);
+		const body = requiredObject<{ modelPresetRef?: ModelPresetRef }>(response.Body, 'ResolveMappedModelTarget');
 
 		return requiredObject<ModelPresetRef>(body.modelPresetRef, 'ResolveMappedModelTarget.modelPresetRef');
 	}

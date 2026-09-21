@@ -15,8 +15,8 @@ import {
 	FiX,
 } from 'react-icons/fi';
 
-import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/mcp_artifact';
-import { MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp_artifact';
+import type { MCPAuthHealth, MCPServerRuntimeSnapshot } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 

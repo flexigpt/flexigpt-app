@@ -3,7 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { FiAlertCircle } from 'react-icons/fi';
 
-import { MCPInputKind } from '@/spec/mcp_artifact';
+import { MCPInputKind } from '@/spec/mcp';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 

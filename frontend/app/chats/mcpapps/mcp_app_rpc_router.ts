@@ -3,8 +3,8 @@ import type {
 	InvokeMCPToolResponseBody,
 	MCPApprovalResolutionResult,
 	MCPContent,
-} from '@/spec/mcp_artifact';
-import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPApprovalDecision, MCPApprovalResolution, MCPContentType, MCPInvocationSource } from '@/spec/mcp';
 
 import { isJSONObject } from '@/lib/jsonschema_utils';
 

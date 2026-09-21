@@ -3,8 +3,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiMonitor, FiMoon, FiSun } from 'react-icons/fi';
 
 import type { AppTheme } from '@/spec/setting';
-import { ThemeType } from '@/spec/setting';
-import { CustomThemeDark, CustomThemeLight, CustomThemeSystem, DAISYUI_BUILTIN_THEMES } from '@/spec/theme_consts';
+import {
+	CustomThemeDark,
+	CustomThemeLight,
+	CustomThemeSystem,
+	DAISYUI_BUILTIN_THEMES,
+	ThemeType,
+} from '@/spec/setting';
 
 import { updateStartupTheme, useStartupTheme } from '@/hooks/use_startup_theme';
 import { useTheme } from '@/hooks/use_theme_provider';

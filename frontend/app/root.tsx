@@ -13,8 +13,7 @@ import {
 } from 'react-router';
 
 import type { AppTheme } from '@/spec/setting';
-import { ThemeType } from '@/spec/setting';
-import { CustomThemeDark, CustomThemeLight } from '@/spec/theme_consts';
+import { CustomThemeDark, CustomThemeLight, ThemeType } from '@/spec/setting';
 
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { recordFrontendCrash, reportFrontendError } from '@/lib/frontend_error_reporter';

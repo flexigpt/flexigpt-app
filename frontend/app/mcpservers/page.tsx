@@ -3,13 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiSettings } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type {
-	MCPAuthHealth,
-	MCPGlobalSettings,
-	MCPOAuthAuthorization,
-	MCPServerRuntimeSnapshot,
-} from '@/spec/mcp_artifact';
-import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp_artifact';
+import type { MCPAuthHealth, MCPGlobalSettings, MCPOAuthAuthorization, MCPServerRuntimeSnapshot } from '@/spec/mcp';
+import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 

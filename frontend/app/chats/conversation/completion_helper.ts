@@ -15,13 +15,8 @@ import type {
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
-import type {
-	MCPConversationContext,
-	MCPProviderToolMapping,
-	MCPRuntimeServerID,
-	MCPToolSelection,
-} from '@/spec/mcp_artifact';
-import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp_artifact';
+import type { MCPConversationContext, MCPProviderToolMapping, MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
+import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';

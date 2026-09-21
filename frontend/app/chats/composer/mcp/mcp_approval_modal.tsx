@@ -1,7 +1,7 @@
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { MCPApprovalSummary } from '@/spec/mcp_artifact';
-import { MCPApprovalResolution } from '@/spec/mcp_artifact';
+import type { MCPApprovalSummary } from '@/spec/mcp';
+import { MCPApprovalResolution } from '@/spec/mcp';
 
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';

@@ -12,7 +12,7 @@ import type {
 	UIToolOutput,
 } from '@/spec/inference';
 import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
-import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp_artifact';
+import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';

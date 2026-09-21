@@ -1,10 +1,14 @@
-import type { ArtifactRef, ArtifactRootID, ArtifactSourceID } from '@/spec/artifact';
 import type {
+	ArtifactRef,
+	ArtifactRootID,
+	ArtifactSourceID,
+	CapabilityPlan,
+	MappedTarget,
 	StoreArtifact,
 	StoreArtifactRoot,
 	StoreArtifactRootDraft,
 	StoreArtifactSourceSummary,
-} from '@/spec/artifact_store';
+} from '@/spec/artifact';
 import type {
 	AssistantPreset,
 	AssistantPresetBundle,
@@ -32,42 +36,40 @@ import type {
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
 import type {
+	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
 	ManagedMCPCreateResult,
-	MCPAuthSettings,
-	MCPCollectionManagementView,
-	MCPCompleteArgumentRequestBody,
-	MCPManagedPolicyUpsertRequest,
-	MCPManagedPolicyUpsertResult,
-	MCPPolicyManagementView,
-	MCPRuntimeInvokeToolResponse,
-	MCPRuntimeServerSnapshot,
-	MCPServerManagementView,
-	MCPStorePolicyView,
-	MCPStoreServerInstallationView,
-} from '@/spec/mcp';
-import type {
-	InvokeMCPToolRequestBody,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
 	MCPAuthHealth,
+	MCPAuthSettings,
+	MCPCollectionManagementView,
+	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPConversationContext,
 	MCPGetPromptResponseBody,
 	MCPGlobalSettings,
+	MCPManagedPolicyUpsertRequest,
+	MCPManagedPolicyUpsertResult,
 	MCPOAuthAuthorization,
+	MCPPolicyManagementView,
 	MCPPromptRef,
 	MCPProviderToolMapping,
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
+	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
+	MCPRuntimeServerSnapshot,
 	MCPSecretKind,
 	MCPSecretWriteResult,
 	MCPServerData,
+	MCPServerManagementView,
+	MCPStorePolicyView,
+	MCPStoreServerInstallationView,
 	MCPToolCapability,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 import type {
 	ModelPresetID,
 	ModelPresetRef,
@@ -77,13 +79,24 @@ import type {
 	PostProviderPresetPayload,
 	ProviderPreset,
 } from '@/spec/modelpreset';
-import type { CapabilityPlan, MappedTarget } from '@/spec/resolution';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
+	ArtifactRuntimeSkillListItem,
+	ArtifactSkillFilter,
+	ArtifactSkillSession,
+	ArtifactSkillSessionOptions,
+	ArtifactSkillSummary,
 	InvokeSkillToolResponse,
+	ManagedSkillCreateRequest,
+	ManagedSkillCreateResult,
 	ManagedSkillDocumentView,
+	ManagedSkillReplaceRequest,
+	ManagedSkillReplaceResult,
 	RenderSkillResponse,
+	ResolvedArtifactSkill,
 	RuntimeSkillDefinition,
+	RuntimeSkillListFilter,
+	RuntimeSkillPromptFilter,
 	RuntimeSkillRecord,
 	RuntimeSkillRenderResult,
 	RuntimeSkillSession,
@@ -91,28 +104,14 @@ import type {
 	Skill,
 	SkillArtifactCreateInput,
 	SkillBundle,
-	SkillListItem,
-} from '@/spec/skill';
-import type {
-	ArtifactRuntimeSkillListItem,
-	ArtifactSkillFilter,
-	ArtifactSkillSession,
-	ArtifactSkillSessionOptions,
-	ArtifactSkillSummary,
-	ManagedSkillCreateRequest,
-	ManagedSkillCreateResult,
-	ManagedSkillReplaceRequest,
-	ManagedSkillReplaceResult,
-	ResolvedArtifactSkill,
-	RuntimeSkillListFilter,
-	RuntimeSkillPromptFilter,
 	SkillCollectionManagementView,
 	SkillDirectoryRegistration,
+	SkillListItem,
 	SkillManagementView,
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
-} from '@/spec/skill_store';
+} from '@/spec/skill';
 import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolRef, ToolStoreChoice } from '@/spec/tool';
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
@@ -131,7 +130,7 @@ import type {
 	WorkspaceRuntimeSelection,
 	WorkspaceSkill,
 	WorkspaceSkillLoadPlan,
-} from '@/spec/workspace_store';
+} from '@/spec/workspace';
 
 import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
 

@@ -1,8 +1,7 @@
 // oxlint-disable typescript/parameter-properties
-import type { ArtifactRef } from '@/spec/artifact';
+import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
 import type { MCPCollectionManagementView, MCPPolicyManagementView, MCPServerManagementView } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { MappedTarget } from '@/spec/resolution';
 import type { ToolRef } from '@/spec/tool';
 
 import type {

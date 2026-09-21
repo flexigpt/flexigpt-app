@@ -1,5 +1,4 @@
-import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import type { StoreArtifact } from '@/spec/artifact_store';
+import type { ArtifactRef, ArtifactRootID, CapabilityPlan, StoreArtifact } from '@/spec/artifact';
 import type {
 	AddArtifactMemberRequest,
 	AddMemberRequest,
@@ -19,7 +18,6 @@ import type {
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
-import type { CapabilityPlan } from '@/spec/resolution';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';

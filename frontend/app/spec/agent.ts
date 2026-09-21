@@ -1,5 +1,4 @@
-import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
-import type { StoreArtifact, StoreArtifactAddress } from '@/spec/artifact_store';
+import type { ArtifactRef, ArtifactRootID, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
 import type {
 	ArtifactMembershipView,
 	CollectionCapabilityPlan,
@@ -7,7 +6,6 @@ import type {
 	DeclarationLocator,
 	MemberMutationResult,
 } from '@/spec/collection';
-import type { CapabilityPlan } from '@/spec/resolution';
 
 export interface AgentDocument {
 	type: string;

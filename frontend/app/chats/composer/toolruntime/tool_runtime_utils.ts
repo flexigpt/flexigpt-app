@@ -1,6 +1,6 @@
 import type { UIToolCall } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
-import { MCPExecutionMode } from '@/spec/mcp_artifact';
+import { MCPExecutionMode } from '@/spec/mcp';
 import { SKILLS_AUTOEXEC_TOOL_CHOICES } from '@/spec/skill';
 
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';

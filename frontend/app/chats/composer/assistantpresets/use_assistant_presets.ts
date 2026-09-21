@@ -8,8 +8,8 @@ import type {
 	MCPResourceTemplateRef,
 	MCPRuntimeServerID,
 	MCPToolCapability,
-} from '@/spec/mcp_artifact';
-import { MCPToolExposure } from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantSkillOption } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';

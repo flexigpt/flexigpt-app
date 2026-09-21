@@ -1,14 +1,14 @@
+// oxlint-disable typescript/parameter-properties
 import type { AgentManagementView } from '@/spec/agent';
-import type { ArtifactRef } from '@/spec/artifact';
+import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { MappedTarget } from '@/spec/resolution';
 import type { ToolRef } from '@/spec/tool';
 
 import type { IAgentManagementAPI, IAgentStoreAPI, IModelPresetStoreAPI, IToolStoreAPI } from '@/apis/interface';
 
 export class AgentManagementAPI implements IAgentManagementAPI {
 	constructor(
-		public readonly store: IAgentStoreAPI,
+		private readonly store: IAgentStoreAPI,
 		private readonly toolStore: IToolStoreAPI,
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}

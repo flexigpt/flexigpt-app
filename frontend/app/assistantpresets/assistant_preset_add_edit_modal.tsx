@@ -3,8 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { FiAlertCircle, FiHelpCircle, FiRefreshCw, FiUpload, FiX } from 'react-icons/fi';
 
-import type { MCPConversationContext } from '@/spec/mcp_artifact';
-import { MCPToolExposure } from '@/spec/mcp_artifact';
+import type { MCPConversationContext } from '@/spec/mcp';
+import { MCPToolExposure } from '@/spec/mcp';
 import type { AssistantModelPresetOption } from '@/spec/modelpreset';
 import type { AssistantSkillOption, SkillSelection } from '@/spec/skill';
 import type { AssistantToolOption } from '@/spec/tool';

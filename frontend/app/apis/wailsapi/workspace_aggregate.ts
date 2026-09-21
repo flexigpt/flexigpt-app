@@ -1,5 +1,5 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { WorkspaceArtifactView } from '@/spec/workspace_store';
+import type { WorkspaceArtifactView } from '@/spec/workspace';
 
 import type { IWorkspaceAggregateAPI } from '@/apis/interface';
 import { requiredObject } from '@/apis/wailsapi/transport';

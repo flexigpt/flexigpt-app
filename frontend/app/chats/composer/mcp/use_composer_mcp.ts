@@ -12,7 +12,7 @@ import type {
 	MCPRuntimeServerID,
 	MCPToolCapability,
 	MCPToolSelection,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 import {
 	MCPAuthHealthState,
 	MCPHTTPAuthMode,
@@ -20,7 +20,7 @@ import {
 	MCPServerType,
 	MCPToolExposure,
 	MCPTransportType,
-} from '@/spec/mcp_artifact';
+} from '@/spec/mcp';
 
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
