@@ -291,6 +291,30 @@ func IsTextMarkdownDocument(locator basespec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleText, locator)
 }
 
+func IsWorkspaceManifestLocator(locator basespec.Locator) bool {
+	name := strings.ToLower(path.Base(string(locator)))
+	if name == "workspace.yaml" || name == "workspace.yml" || name == "workspace.json" {
+		return true
+	}
+	for _, suffix := range []string{".workspace.yaml", ".workspace.yml", ".workspace.json"} {
+		if strings.HasSuffix(name, suffix) {
+			return true
+		}
+	}
+	return false
+}
+
+func WorkspaceManifestPatterns() []string {
+	return []string{
+		"**/workspace.yaml",
+		"**/workspace.yml",
+		"**/workspace.json",
+		"**/*.workspace.yaml",
+		"**/*.workspace.yml",
+		"**/*.workspace.json",
+	}
+}
+
 func IsDefaultTextMarkdownDocument(locator basespec.Locator) bool {
 	return MatchesMarkdownRule(MarkdownRuleDefaultText, locator)
 }

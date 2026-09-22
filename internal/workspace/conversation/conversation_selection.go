@@ -412,16 +412,6 @@ func applySkillPlan(
 			selection.SkillRefs[position].Locator,
 			current.Locator,
 		)
-		if skill.RuntimeDisabled {
-			current.Diagnostics = diagnostic.Append(
-				current.Diagnostics,
-				conversationDiagnostic(
-					"workspace.conversation.skill-runtime-disabled",
-					"runtime use is disabled for this Workspace Skill",
-				),
-			)
-			continue
-		}
 		if skill.Document.Insert != document.SkillInsertInstructions {
 			current.Diagnostics = diagnostic.Append(
 				current.Diagnostics,

@@ -18,17 +18,28 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
 type resolutionState struct {
-	nodes  int
-	active map[artifact.ArtifactRef]struct{}
+	nodes                int
+	active               map[artifact.ArtifactRef]struct{}
+	compositionRootID    root.RootID
+	compositionSourceID  source.SourceID
+	hasCompositionSource bool
 }
 
 func newResolutionState() resolutionState {
 	return resolutionState{
 		active: make(map[artifact.ArtifactRef]struct{}),
 	}
+}
+
+func (s *resolutionState) usesCompositionSource(rootID root.RootID) bool {
+	return s != nil &&
+		s.hasCompositionSource &&
+		s.compositionRootID == rootID
 }
 
 type loadedDeclarationArtifact struct {
@@ -124,6 +135,30 @@ func (r *Resolver) ResolveWorkspace(
 		return nil, err
 	}
 	return value.Workspace, nil
+}
+
+func (r *Resolver) ResolveWorkspaceWithCompositionSource(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	compositionSourceID source.SourceID,
+) (*ResolvedEntry, error) {
+	if r == nil || r.artifacts == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := validateResolutionContext(ctx); err != nil {
+		return nil, err
+	}
+	if err := ref.Validate(); err != nil {
+		return nil, err
+	}
+	if err := compositionSourceID.Validate(); err != nil {
+		return nil, err
+	}
+	state := newResolutionState()
+	state.compositionRootID = ref.RootID
+	state.compositionSourceID = compositionSourceID
+	state.hasCompositionSource = true
+	return r.resolveArtifact(ctx, &state, ref, declaration.TypeWorkspace, "", 0)
 }
 
 func (r *Resolver) ResolveWorkspaceEntry(

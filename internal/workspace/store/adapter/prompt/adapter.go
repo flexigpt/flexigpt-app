@@ -133,41 +133,24 @@ func (a *Adapter) compose(
 	)
 
 	for _, record := range selected {
-		settings, err := workspaceDomain.DecodeArtifactData(record.Data)
-		if err != nil {
+		if !record.Enabled {
 			output.Diagnostics = diagnostic.Append(
 				output.Diagnostics,
 				artifactDiagnostic(
 					record,
-					workspaceDomain.DiagnosticCodeProjectionInvalid,
-					err.Error(),
-				),
-			)
-			output.Decisions = append(output.Decisions, Decision{
-				Artifact: record.Ref(),
-				Status:   workspaceRuntime.CompositionUnavailable,
-				Code:     workspaceDomain.DiagnosticCodeProjectionInvalid,
-			})
-			continue
-		}
-		if settings.RuntimeDisabled {
-			output.Diagnostics = diagnostic.Append(
-				output.Diagnostics,
-				artifactDiagnostic(
-					record,
-					workspaceDomain.DiagnosticCodeRuntimeDisabled,
-					"runtime use is disabled for this Workspace Artifact",
+					workspaceDomain.DiagnosticCodeArtifactUnavailable,
+					"Artifact is disabled",
 				),
 			)
 			output.Decisions = append(output.Decisions, Decision{
 				Artifact: record.Ref(),
 				Status:   workspaceRuntime.CompositionDenied,
-				Code:     workspaceDomain.DiagnosticCodeRuntimeDisabled,
+				Code:     workspaceDomain.DiagnosticCodeArtifactUnavailable,
 			})
 			continue
 		}
 
-		contribution, err := a.resolveContribution(ctx, record)
+		contribution, err := a.resolveContribution(ctx, record, workspace)
 		if err != nil {
 			output.Diagnostics = diagnostic.Append(
 				output.Diagnostics,
@@ -288,10 +271,22 @@ func (a *Adapter) selection(
 func (a *Adapter) resolveContribution(
 	ctx context.Context,
 	record artifact.Artifact,
+	workspace workspaceDomain.Workspace,
 ) (Contribution, error) {
 	switch record.Kind {
 	case artifact.ArtifactKind(textv1.TextType):
-		value, err := a.text.Resolve(ctx, record.Ref())
+		var value materializetext.Document
+		var err error
+		if workspace.CompositionSourceID != "" && record.Binding.SourceID != workspace.CompositionSourceID {
+			value, err = a.text.ResolveWithContentSource(
+				ctx,
+				record.Ref(),
+				workspace.Artifact.RootID,
+				workspace.CompositionSourceID,
+			)
+		} else {
+			value, err = a.text.Resolve(ctx, record.Ref())
+		}
 		if err != nil {
 			return Contribution{}, err
 		}

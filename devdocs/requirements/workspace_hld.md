@@ -939,45 +939,42 @@ The initial feature does not add:
 
 ### Already available
 
-| Capability                                                      | Status                         |
-| --------------------------------------------------------------- | ------------------------------ |
-| Workspace v1 declaration schema                                 | Available                      |
-| Workspace YAML and JSON decoding                                | Available                      |
-| Workspace Artifact creation from physical source                | Available                      |
-| Contained declaration emission                                  | Available                      |
-| Contained Text declarations                                     | Available                      |
-| Text locator/include/exclude source materialization             | Available                      |
-| Skill selectors                                                 | Available                      |
-| Agent, Plugin, MCP, Model, Tool, Team, Loop, Workflow selectors | Available where schemas permit |
-| Source-backed Artifact lifecycle                                | Available                      |
-| Embedded Source adapter                                         | Available                      |
-| Embedded provider registration capability                       | Available                      |
-| Root-local Artifact identity                                    | Available                      |
-| Workspace capability planning                                   | Available                      |
-| Workspace prompt, Skill, and MCP planning                       | Available                      |
-| Built-in fallback infrastructure                                | Available                      |
-| Generic Artifact enablement                                     | Available                      |
-| Source enablement                                               | Available                      |
-| Root list API                                                   | Available                      |
+| Capability                                                      | Status    |
+| --------------------------------------------------------------- | --------- |
+| Embedded base Workspace package                                 | Available |
+| Embedded Workspace policy provider registration                 | Available |
+| Policy loader and policy-specific validation                    | Available |
+| Per-Root directory and policy Source provisioning               | Available |
+| Directory-only registration                                     | Available |
+| Physical manifest intent inventory                              | Available |
+| Default versus physical effective-mode calculation              | Available |
+| Multiple peer Workspace results                                 | Available |
+| Default policy composition-Source attachment                    | Available |
+| Template-aware Text content Source override                     | Available |
+| Source-local named lookup, then built-in and mapped fallback    | Available |
+| Located lookup against the composition Source                   | Available |
+| Selector expansion against the composition Source               | Available |
+| Explicit composition-aware refresh closure                      | Available |
+| Runtime rejection of inactive default Workspace refs            | Available |
+| Directory enable, disable, refresh, and removal                 | Available |
+| Generic Artifact enablement in Workspace runtime paths          | Available |
+| Workspace-specific runtime disablement                          | Removed   |
+| Paginated directory listing                                     | Available |
+| Consumer-safe directory Artifact catalog                        | Available |
+| Workspace prompt, Skill, MCP, and aggregate runtime planning    | Available |
+| Wails directory and policy APIs                                 | Available |
 
 ### Not yet available
 
-| Capability                                      | Status  |
-| ----------------------------------------------- | ------- |
-| Embedded base Workspace package                 | Missing |
-| Embedded Workspace policy provider registration | Missing |
-| Per-Root policy Source provisioning             | Missing |
-| Default Workspace effective-mode calculation    | Missing |
-| Default policy composition-source attachment    | Missing |
-| Template-aware Text materialization             | Missing |
-| Source-local Workspace named lookup             | Missing |
-| Physical manifest intent inventory              | Missing |
-| Multiple Workspace directory result             | Missing |
-| Paginated Workspace directory list API          | Missing |
-| Directory enable API                            | Missing |
-| `RuntimeDisabled` removal                       | Missing |
-| Workspace wrapper directory API                 | Missing |
-| Simplified frontend                             | Missing |
+| Capability                                    | Status  |
+| --------------------------------------------- | ------- |
+| Generated Wails bindings for the final API    | Pending |
+| Frontend Workspace directory client types     | Pending |
+| Workspace directory list UI                   | Pending |
+| Default policy display and copy UI            | Pending |
+| Conversation effective-Workspace selection UI | Pending |
+| Removal of the old Workspace frontend         | Pending |
+| Repository-wide build and static verification | Pending |
 
 ## Migration and implementation changes
 

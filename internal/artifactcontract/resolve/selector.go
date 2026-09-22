@@ -39,6 +39,11 @@ func (r *Resolver) expandSelector(
 		)
 	}
 
+	effectiveSourceID := from.Binding.SourceID
+	if state.usesCompositionSource(rootID) {
+		effectiveSourceID = state.compositionSourceID
+	}
+
 	selector, err := member.Selector()
 	if err != nil {
 		return ResolvedSelector{}, err
@@ -63,7 +68,7 @@ func (r *Resolver) expandSelector(
 	baseEntry, err := r.sourceEntries.StatSourceEntry(
 		ctx,
 		rootID,
-		from.Binding.SourceID,
+		effectiveSourceID,
 		base,
 	)
 	if err != nil {
@@ -110,7 +115,7 @@ func (r *Resolver) expandSelector(
 	records, err := r.sourceArtifacts.ListBySource(
 		ctx,
 		rootID,
-		from.Binding.SourceID,
+		effectiveSourceID,
 	)
 	if err != nil {
 		return ResolvedSelector{}, err
@@ -134,7 +139,7 @@ func (r *Resolver) expandSelector(
 	}
 	for _, record := range records {
 		if record.RootID != rootID ||
-			record.Binding.SourceID != from.Binding.SourceID ||
+			record.Binding.SourceID != effectiveSourceID ||
 			record.Kind != artifact.ArtifactKind(selector.Type) {
 			continue
 		}

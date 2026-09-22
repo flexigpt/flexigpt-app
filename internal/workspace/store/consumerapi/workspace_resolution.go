@@ -11,47 +11,6 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
-func (a *StoreAPI) LoadWorkspace(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (WorkspaceLoad, error) {
-	workspace, resolved, err := a.resolveCurrentWorkspace(ctx, ref)
-	if err != nil {
-		return WorkspaceLoad{}, err
-	}
-	capabilities, err := resolve.CapabilityPlanForResolvedEntry(resolved)
-	if err != nil {
-		return WorkspaceLoad{}, err
-	}
-
-	return WorkspaceLoad{
-		Workspace:    workspace.View(),
-		Capabilities: capabilities,
-	}, nil
-}
-
-func (a *StoreAPI) RefreshWorkspace(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (WorkspaceRefresh, error) {
-	if a == nil || a.resolver == nil {
-		return WorkspaceRefresh{}, basespec.ErrClosed
-	}
-	if err := ref.Validate(); err != nil {
-		return WorkspaceRefresh{}, err
-	}
-	if err := a.resolver.RefreshWorkspace(ctx, ref); err != nil {
-		return WorkspaceRefresh{}, err
-	}
-	workspace, err := a.GetWorkspace(ctx, ref)
-	if err != nil {
-		return WorkspaceRefresh{}, err
-	}
-	return WorkspaceRefresh{
-		Workspace: workspace.Ref(),
-	}, nil
-}
-
 func (a *StoreAPI) resolveCurrentWorkspace(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -69,7 +28,11 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err
 	}
-	resolved, err := a.resolver.ResolveWorkspaceEntry(ctx, ref)
+	resolved, err := a.resolver.ResolveWorkspaceWithCompositionSource(
+		ctx,
+		workspace.Ref(),
+		workspace.CompositionSourceID,
+	)
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err
 	}
@@ -108,18 +71,29 @@ func (a *StoreAPI) workspaceAt(
 	if err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
-	if record.Kind != workspaceDomain.WorkspaceArtifactKind {
-		return workspaceDomain.Workspace{}, fmt.Errorf(
-			"%w: Artifact %q has kind %q",
-			workspaceDomain.ErrNotWorkspace,
-			record.ID,
-			record.Kind,
-		)
-	}
-
 	value, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
-	return workspaceDomain.NewWorkspace(record, value)
+
+	workspace, err := workspaceDomain.NewWorkspace(record, value)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	workspace.CompositionSourceID = record.Binding.SourceID
+
+	sources, err := a.loadWorkspaceSources(ctx, record.RootID)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	if sources.HasDirectory &&
+		(record.Binding.SourceID == sources.Directory.ID ||
+			(sources.HasPolicy &&
+				record.Binding.SourceID == sources.Policy.ID)) {
+		workspace.CompositionSourceID = sources.Directory.ID
+	}
+	if err := workspace.CompositionSourceID.Validate(); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return workspace, nil
 }

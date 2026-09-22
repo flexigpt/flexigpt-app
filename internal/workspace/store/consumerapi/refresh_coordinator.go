@@ -25,6 +25,10 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 	if err != nil {
 		return nil, err
 	}
+	current, err = a.workspaceRefreshSource(ctx, current)
+	if err != nil {
+		return nil, err
+	}
 
 	base, err := declaration.ResolveSourceRelativePathLocator(
 		request.Selector.Base,
@@ -87,6 +91,11 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 	if err != nil {
 		return nil, err
 	}
+	current, err = a.workspaceRefreshSource(ctx, current)
+	if err != nil {
+		return nil, err
+	}
+
 	next := current.Discovery.Clone()
 	candidates := locatedRefreshCandidates(header.Type, target)
 	for _, candidate := range candidates {

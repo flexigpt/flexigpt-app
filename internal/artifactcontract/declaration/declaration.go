@@ -89,8 +89,6 @@ func (t Type) Validate() error {
 	}
 }
 
-const RetiredMCPRuntimeMetadataKey = "flexigpt.site/mcp-runtime-v1"
-
 type Header struct {
 	Type        Type                       `json:"type"`
 	Name        string                     `json:"name"`
@@ -177,13 +175,6 @@ func (h Header) Validate(
 		)
 	}
 	for key, value := range h.Metadata {
-		if key == RetiredMCPRuntimeMetadataKey {
-			return fmt.Errorf(
-				"%w: metadata key %q is retired; use direct typed MCP fields",
-				basespec.ErrInvalid,
-				key,
-			)
-		}
 		if err := basespec.ValidateRequiredText(
 			"artifact declaration metadata key",
 			key,

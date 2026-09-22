@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
 const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
@@ -17,9 +18,10 @@ const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
 // workspacev1 Definition. It is a consumer value, not an Artifact Store
 // aggregate, portable declaration, or consumer wire projection.
 type Workspace struct {
-	Artifact   artifact.Artifact             `json:"-"`
-	Definition definition.Definition         `json:"-"`
-	Document   workspacev1.WorkspaceDocument `json:"-"`
+	Artifact            artifact.Artifact             `json:"-"`
+	Definition          definition.Definition         `json:"-"`
+	Document            workspacev1.WorkspaceDocument `json:"-"`
+	CompositionSourceID source.SourceID               `json:"-"`
 }
 
 // WorkspaceView is the consumer-facing Workspace projection. Artifact is

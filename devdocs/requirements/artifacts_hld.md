@@ -1624,8 +1624,8 @@ MCP has no additional portable or Store-level effective-enabled field.
 
 | Concern                       | Owner                          |
 | ----------------------------- | ------------------------------ |
+| Workspace directory enablement | Directory and policy Sources  |
 | Generic Artifact enablement   | Artifact record                |
-| Workspace runtime disablement | Workspace local Artifact data  |
 | MCP installation input values | MCP local installation data    |
 | MCP secret references         | MCP local installation data    |
 | Secret values                 | Secret storage                 |
@@ -2014,8 +2014,8 @@ Built-in hydration does not, by itself, require MCP runtime connection invalidat
 | Generic fallback-provider infrastructure                             | Available |
 | Tool mapped fallback infrastructure                                  | Available |
 | Model mapped fallback infrastructure                                 | Available |
-| Application-configured Tool mapped fallback                          | Pending   |
-| Application-configured Model mapped fallback                         | Pending   |
+| Application-configured Tool mapped fallback                          | Available |
+| Application-configured Model mapped fallback                         | Available |
 | Duplicate terminal identity detection                                | Available |
 | Named external relationships                                         | Available |
 | Located external relationships                                       | Available |

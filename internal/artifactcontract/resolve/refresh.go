@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
 func (r *Resolver) RefreshPlugin(
@@ -39,10 +40,35 @@ func (r *Resolver) RefreshWorkspace(
 	return r.refreshTyped(ctx, ref, declaration.TypeWorkspace)
 }
 
+func (r *Resolver) RefreshWorkspaceWithCompositionSource(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	compositionSourceID source.SourceID,
+) error {
+	if err := compositionSourceID.Validate(); err != nil {
+		return err
+	}
+	return r.refreshTypedWithCompositionSource(
+		ctx,
+		ref,
+		declaration.TypeWorkspace,
+		compositionSourceID,
+	)
+}
+
 func (r *Resolver) refreshTyped(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expected declaration.Type,
+) error {
+	return r.refreshTypedWithCompositionSource(ctx, ref, expected, "")
+}
+
+func (r *Resolver) refreshTypedWithCompositionSource(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expected declaration.Type,
+	compositionSourceID source.SourceID,
 ) error {
 	if r == nil || r.refresh == nil {
 		return fmt.Errorf(
@@ -59,7 +85,19 @@ func (r *Resolver) refreshTyped(
 
 	refreshed := make(map[RefreshTarget]struct{})
 	for pass := 0; pass <= r.limits.MaxDepth; pass++ {
-		rootEntry, err := r.resolveTyped(ctx, ref, expected)
+		var (
+			rootEntry *ResolvedEntry
+			err       error
+		)
+		if compositionSourceID != "" {
+			rootEntry, err = r.ResolveWorkspaceWithCompositionSource(
+				ctx,
+				ref,
+				compositionSourceID,
+			)
+		} else {
+			rootEntry, err = r.resolveTyped(ctx, ref, expected)
+		}
 		if err != nil {
 			return err
 		}

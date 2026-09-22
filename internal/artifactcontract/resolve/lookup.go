@@ -198,6 +198,19 @@ func (r *Resolver) resolveNamedMember(
 	from *artifact.Artifact,
 	depth int,
 ) (*ResolvedEntry, error) {
+	if state.usesCompositionSource(rootID) {
+		return r.resolveNamedMemberSourceLocal(
+			ctx,
+			state,
+			rootID,
+			declarationType,
+			name,
+			expectedVersion,
+			scope,
+			from,
+			depth,
+		)
+	}
 	if scope != declaration.LookupScopeBuiltin {
 		value, found, err := r.resolveInRoot(
 			ctx,
@@ -246,6 +259,127 @@ func (r *Resolver) resolveNamedMember(
 		from,
 		depth,
 	)
+}
+
+func (r *Resolver) resolveNamedMemberSourceLocal(
+	ctx context.Context,
+	state *resolutionState,
+	rootID root.RootID,
+	declarationType declaration.Type,
+	name basespec.LogicalName,
+	expectedVersion basespec.LogicalVersion,
+	scope declaration.LookupScope,
+	from *artifact.Artifact,
+	depth int,
+) (*ResolvedEntry, error) {
+	if scope == declaration.LookupScopeBuiltin {
+		if r.builtinRoot != "" {
+			value, found, err := r.resolveInRoot(
+				ctx,
+				state,
+				r.builtinRoot,
+				declarationType,
+				name,
+				expectedVersion,
+				depth,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				return value, nil
+			}
+		}
+		return r.resolveFallback(
+			ctx,
+			state,
+			rootID,
+			declarationType,
+			name,
+			expectedVersion,
+			scope,
+			from,
+			depth,
+		)
+	}
+
+	records, err := r.artifacts.FindByIdentity(
+		ctx,
+		rootID,
+		artifact.ArtifactKind(declarationType),
+		name,
+	)
+	if err != nil {
+		return nil, err
+	}
+	compositionRecords := make([]artifact.Artifact, 0)
+	for _, record := range records {
+		if record.Binding.SourceID != state.compositionSourceID {
+			continue
+		}
+		compositionRecords = append(compositionRecords, record)
+	}
+	if len(compositionRecords) == 0 {
+		if r.builtinRoot != "" && r.builtinRoot != rootID {
+			value, found, err := r.resolveInRoot(
+				ctx,
+				state,
+				r.builtinRoot,
+				declarationType,
+				name,
+				expectedVersion,
+				depth,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if found {
+				return value, nil
+			}
+		}
+		return r.resolveFallback(ctx, state, rootID, declarationType, name, expectedVersion, scope, from, depth)
+	}
+	terminals := make(map[artifact.ArtifactRef]struct{})
+	for _, record := range compositionRecords {
+		if record.State != artifact.StateAvailable {
+			continue
+		}
+		if expectedVersion != "" && record.LogicalVersion != expectedVersion {
+			continue
+		}
+		terminal, err := r.resolveTerminalArtifact(ctx, record.Ref(), declarationType, expectedVersion)
+		if err != nil {
+			status, _, partial := resolutionFailure(err)
+			if partial && status == ResolutionUnavailable {
+				continue
+			}
+			return nil, err
+		}
+		terminals[terminal] = struct{}{}
+	}
+	switch len(terminals) {
+	case 0:
+		return nil, fmt.Errorf(
+			"%w: %s/%s is unavailable in composition source",
+			basespec.ErrReferenceUnresolved,
+			declarationType,
+			name,
+		)
+	case 1:
+		var terminal artifact.ArtifactRef
+		for value := range terminals {
+			terminal = value
+		}
+		return r.resolveArtifact(ctx, state, terminal, declarationType, expectedVersion, depth+1)
+	default:
+		return nil, fmt.Errorf(
+			"%w: %s/%s resolves to %d terminal Artifacts",
+			basespec.ErrIdentityConflict,
+			declarationType,
+			name,
+			len(terminals),
+		)
+	}
 }
 
 func (r *Resolver) resolveInRoot(
@@ -426,6 +560,12 @@ func (r *Resolver) resolveLocatedMember(
 			basespec.ErrLocatorUnresolved,
 		)
 	}
+	effectiveFrom := from
+	if state.usesCompositionSource(rootID) {
+		copied := from.Clone()
+		copied.Binding.SourceID = state.compositionSourceID
+		effectiveFrom = &copied
+	}
 	if r.locators == nil {
 		return nil, fmt.Errorf(
 			"%w: declaration locator requires a locator resolver",
@@ -438,7 +578,7 @@ func (r *Resolver) resolveLocatedMember(
 		ctx,
 		LocatorRequest{
 			RootID:              rootID,
-			From:                cloneArtifactPointer(from),
+			From:                cloneArtifactPointer(effectiveFrom),
 			Entry:               member.Clone(),
 			Locator:             header.Locator.Clone(),
 			ExpectedType:        header.Type,

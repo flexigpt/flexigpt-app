@@ -4,20 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
+	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/collection"
-	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
@@ -25,10 +27,12 @@ import (
 )
 
 type StoreAPI struct {
+	roots     compositionapi.RootAPI
 	sources   compositionapi.SourceAPI
 	discovery compositionapi.DiscoveryAPI
 	artifacts compositionapi.ArtifactAPI
 	resources compositionapi.ResourceAPI
+	policy    defaultpolicy.Policy
 
 	config        Config
 	promptAdapter *prompt.Adapter
@@ -42,27 +46,32 @@ func NewStoreAPI(
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
 	resources compositionapi.ResourceAPI,
+	roots compositionapi.RootAPI,
 	config Config,
 ) (*StoreAPI, error) {
-	if sources == nil ||
-		discovery == nil ||
-		artifacts == nil ||
-		resources == nil {
+	if sources == nil || discovery == nil || artifacts == nil || resources == nil || roots == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Store dependencies are incomplete",
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
+	policy, err := defaultpolicy.Load()
+	if err != nil {
+		return nil, err
+	}
+
 	config = config.normalized()
 	if err := config.ContextComposition.Validate(); err != nil {
 		return nil, err
 	}
 
 	output := &StoreAPI{
+		roots:     roots,
 		sources:   sources,
 		discovery: discovery,
 		artifacts: artifacts,
 		resources: resources,
+		policy:    policy,
 		config:    config,
 	}
 
@@ -120,79 +129,8 @@ func NewStoreAPI(
 	return output, nil
 }
 
-func (a *StoreAPI) RegisterFilesystemSource(
-	ctx context.Context,
-	request FilesystemSourceRegistration,
-) (source.Summary, error) {
-	if err := request.RootID.Validate(); err != nil {
-		return source.Summary{}, err
-	}
-	if err := basespec.ValidateRequiredText(
-		"Workspace Source display name",
-		request.SourceDisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return source.Summary{}, err
-	}
-
-	rootPath, err := consumerutil.NormalizeFilesystemSourceRoot(
-		request.RootPath,
-		"Workspace Source root path",
-	)
-	if err != nil {
-		return source.Summary{}, err
-	}
-
-	discovery, err := a.defaultDiscovery()
-	if err != nil {
-		return source.Summary{}, err
-	}
-	config, err := json.Marshal(struct {
-		RootPath string `json:"rootPath"`
-	}{
-		RootPath: rootPath,
-	})
-	if err != nil {
-		return source.Summary{}, err
-	}
-
-	return consumerutil.EnsureAndRefreshSource(
-		ctx,
-		a.sources,
-		a.discovery,
-		consumerutil.EnsureAndRefreshSourceRequest{
-			RootID: request.RootID,
-			Draft: source.Draft{
-				ID: source.SourceID(uuidutil.NewUUIDv7()),
-				StorageKey: consumerutil.FilesystemSourceStorageKey(
-					"workspace-path",
-					rootPath,
-				),
-				Kind:        source.SourceKindFilesystemDirectory,
-				DisplayName: request.SourceDisplayName,
-				Enabled:     true,
-				Config:      config,
-				Discovery:   discovery,
-			},
-			ReconcileDiscovery: consumerutil.MergeDiscoveryScopes,
-		},
-	)
-}
-
-func (a *StoreAPI) GetWorkspace(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (workspaceDomain.WorkspaceView, error) {
-	value, err := a.ResolveWorkspace(ctx, ref)
-	if err != nil {
-		return workspaceDomain.WorkspaceView{}, err
-	}
-	return value.View(), nil
-}
-
-// ResolveWorkspace returns the rich in-process Workspace aggregate used by
-// conversation hydration and runtime materialization. Workspace carries
-// json:"-" fields and is not a consumer wire result.
+// ResolveWorkspace is the runtime read boundary. It accepts only a currently
+// effective and enabled Workspace. Management projections use getWorkspace.
 func (a *StoreAPI) ResolveWorkspace(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -200,96 +138,78 @@ func (a *StoreAPI) ResolveWorkspace(
 	if err := ref.Validate(); err != nil {
 		return workspaceDomain.Workspace{}, err
 	}
-	return a.workspaceForRef(ctx, ref)
+	value, err := a.workspaceForRef(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	if err := a.requireEffectiveWorkspace(ctx, value); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return value, nil
 }
 
-func (a *StoreAPI) ListWorkspaces(
+func (a *StoreAPI) ListArtifactsBySource(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]workspaceDomain.WorkspaceView, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
+	sourceID source.SourceID,
+) ([]artifact.Artifact, error) {
+	if a == nil || a.artifacts == nil {
+		return nil, basespec.ErrClosed
 	}
-	values, err := a.artifacts.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]workspaceDomain.WorkspaceView, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
-	for _, value := range values {
-		if value.Kind != workspaceDomain.WorkspaceArtifactKind ||
-			value.State != artifact.StateAvailable ||
-			value.ResolvedDefinition == nil {
-			continue
-		}
-		workspace, err := a.GetWorkspace(ctx, value.Ref())
-		if err != nil {
-			return nil, err
-		}
-		if _, duplicate := seen[workspace.Ref()]; duplicate {
-			continue
-		}
-		seen[workspace.Ref()] = struct{}{}
-		output = append(output, workspace)
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Artifact.LogicalName !=
-			output[right].Artifact.LogicalName {
-			return output[left].Artifact.LogicalName <
-				output[right].Artifact.LogicalName
-		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
-	})
-	return output, nil
+	return a.artifacts.ListBySource(ctx, rootID, sourceID)
 }
 
-func (a *StoreAPI) ListWorkspaceArtifacts(
+func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	ctx context.Context,
-	workspace artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
-	value, err := a.GetWorkspace(ctx, workspace)
+	directory WorkspaceDirectoryRef,
+) ([]WorkspaceArtifactView, error) {
+	if err := directory.RootID.Validate(); err != nil {
+		return nil, err
+	}
+	if _, err := a.requiredWorkspaceSources(ctx, directory.RootID); err != nil {
+		return nil, err
+	}
+	records, err := a.artifacts.ListByRoot(ctx, directory.RootID)
 	if err != nil {
 		return nil, err
 	}
-	artifacts, err := a.artifacts.ListByRoot(
-		ctx,
-		value.Artifact.RootID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]artifact.Artifact, len(artifacts))
-	for index, value := range artifacts {
-		output[index] = value.Clone()
+	output := make([]WorkspaceArtifactView, 0, len(records))
+	for _, record := range records {
+		output = append(output, workspaceArtifactViewOf(record))
 	}
 	sort.Slice(output, func(left, right int) bool {
 		leftKey := string(output[left].Kind) + "\x00" +
 			string(output[left].LogicalName) + "\x00" +
-			string(output[left].Binding.SourceID) + "\x00" +
-			string(output[left].Binding.Locator) + "\x00" +
-			string(output[left].ID)
+			string(output[left].SourceID) + "\x00" +
+			string(output[left].Locator) + "\x00" +
+			string(output[left].Artifact.ArtifactID)
 		rightKey := string(output[right].Kind) + "\x00" +
 			string(output[right].LogicalName) + "\x00" +
-			string(output[right].Binding.SourceID) + "\x00" +
-			string(output[right].Binding.Locator) + "\x00" +
-			string(output[right].ID)
+			string(output[right].SourceID) + "\x00" +
+			string(output[right].Locator) + "\x00" +
+			string(output[right].Artifact.ArtifactID)
 		return leftKey < rightKey
 	})
 	return output, nil
 }
 
-func (a *StoreAPI) SetWorkspaceArtifactEnabled(
+func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	ctx context.Context,
-	workspace artifact.ArtifactRef,
+	directory WorkspaceDirectoryRef,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (WorkspaceArtifactView, error) {
-	value, err := a.GetWorkspace(ctx, workspace)
-	if err != nil {
+	if err := directory.RootID.Validate(); err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	if ref.RootID != value.Artifact.RootID {
+	if err := ref.Validate(); err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if _, err := a.requiredWorkspaceSources(ctx, directory.RootID); err != nil {
+		return WorkspaceArtifactView{}, err
+	}
+	if ref.RootID != directory.RootID {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: Artifact belongs to another Root",
 			workspaceDomain.ErrReferenceUnresolved,
@@ -308,94 +228,316 @@ func (a *StoreAPI) SetWorkspaceArtifactEnabled(
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	return workspaceArtifactViewOf(updated)
+	return workspaceArtifactViewOf(updated), nil
 }
 
-func (a *StoreAPI) SetArtifactRuntimeDisabled(
+func (a *StoreAPI) RegisterWorkspaceDirectory(ctx context.Context, path string) (WorkspaceDirectoryView, error) {
+	rootPath, err := normalizeWorkspaceDirectoryPath(path)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	existing, found, err := a.findWorkspaceRoot(ctx, rootPath)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	var rootValue root.Root
+	if found {
+		rootValue = existing
+	} else {
+		created, _, err := a.ensureWorkspaceRoot(ctx, rootPath)
+		if err != nil {
+			return WorkspaceDirectoryView{}, err
+		}
+		rootValue = created
+	}
+	if _, _, err := a.ensureWorkspaceSources(ctx, rootValue.ID, rootPath); err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	if err := a.refreshEffectiveWorkspaces(ctx, rootValue.ID); err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	return a.buildDirectoryView(ctx, rootValue.ID)
+}
+
+func (a *StoreAPI) GetWorkspaceDirectory(
 	ctx context.Context,
-	workspace artifact.ArtifactRef,
-	ref artifact.ArtifactRef,
+	ref WorkspaceDirectoryRef,
+) (WorkspaceDirectoryView, error) {
+	if err := ref.RootID.Validate(); err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	return a.buildDirectoryView(ctx, ref.RootID)
+}
+
+func (a *StoreAPI) RefreshWorkspaceDirectory(
+	ctx context.Context,
+	ref WorkspaceDirectoryRef,
+) (WorkspaceDirectoryView, error) {
+	if err := ref.RootID.Validate(); err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	values, err := a.requiredWorkspaceSources(ctx, ref.RootID)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	if !values.Directory.Enabled || !values.Policy.Enabled {
+		return a.buildDirectoryView(ctx, ref.RootID)
+	}
+	for _, summary := range []source.Summary{
+		values.Directory,
+		values.Policy,
+	} {
+		if _, err := a.discovery.RefreshSource(ctx, ref.RootID, summary.ID); err != nil {
+			return WorkspaceDirectoryView{}, err
+		}
+	}
+	if err := a.refreshEffectiveWorkspaces(ctx, ref.RootID); err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	return a.buildDirectoryView(ctx, ref.RootID)
+}
+
+func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
+	ctx context.Context,
+	ref WorkspaceDirectoryRef,
 	expectedRevision uint64,
-	runtimeDisabled bool,
-) (WorkspaceArtifactView, error) {
-	value, err := a.GetWorkspace(ctx, workspace)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
+	enabled bool,
+) (WorkspaceDirectoryView, error) {
+	if err := ref.RootID.Validate(); err != nil {
+		return WorkspaceDirectoryView{}, err
 	}
-	if ref.RootID != value.Artifact.RootID {
-		return WorkspaceArtifactView{}, fmt.Errorf(
-			"%w: Artifact belongs to another Root",
-			workspaceDomain.ErrReferenceUnresolved,
-		)
+	values, err := a.requiredWorkspaceSources(ctx, ref.RootID)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	if expectedRevision != 0 &&
+		values.Directory.Revision != expectedRevision {
+		return WorkspaceDirectoryView{}, basespec.ErrConflict
 	}
 
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	if !workspaceRuntimeDisableSupported(record.Kind) {
-		return WorkspaceArtifactView{}, fmt.Errorf(
-			"%w: Workspace runtime disablement is not supported for MCP Artifacts",
-			basespec.ErrUnsupported,
+	update := func(current source.Summary) error {
+		if current.Enabled == enabled {
+			return nil
+		}
+		_, err := a.sources.Update(
+			ctx,
+			ref.RootID,
+			current.ID,
+			source.Update{
+				ExpectedRevision: current.Revision,
+				DisplayName:      current.DisplayName,
+				Enabled:          enabled,
+			},
 		)
+		return err
 	}
 
-	baseline, err := a.isBaselineCollectionArtifact(ctx, record)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
+	// Keep the aggregate disabled during a partial two-Source transition.
+	order := []source.Summary{values.Directory, values.Policy}
+	if enabled {
+		order = []source.Summary{values.Policy, values.Directory}
 	}
-	if baseline {
-		return WorkspaceArtifactView{}, fmt.Errorf(
-			"%w: baseline Collections cannot be runtime-disabled",
-			basespec.ErrProtected,
-		)
+	for _, current := range order {
+		if err := update(current); err != nil {
+			return WorkspaceDirectoryView{}, err
+		}
 	}
-
-	data, err := workspaceDomain.DecodeArtifactData(record.Data)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
+	if enabled {
+		return a.RefreshWorkspaceDirectory(ctx, ref)
 	}
-	data.RuntimeDisabled = runtimeDisabled
-	raw, err := workspaceDomain.MergeArtifactData(
-		record.Data,
-		data,
-	)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	updated, err := a.artifacts.UpdateData(
-		ctx,
-		ref,
-		expectedRevision,
-		raw,
-	)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	return workspaceArtifactViewOf(updated)
+	return a.buildDirectoryView(ctx, ref.RootID)
 }
 
-func (a *StoreAPI) isBaselineCollectionArtifact(
+func (a *StoreAPI) RemoveWorkspaceDirectory(
 	ctx context.Context,
-	record artifact.Artifact,
-) (bool, error) {
-	if record.Kind != artifact.ArtifactKind(
-		pluginv1.PluginType,
-	) {
-		return false, nil
+	ref WorkspaceDirectoryRef,
+	expectedRevision uint64,
+) error {
+	if err := ref.RootID.Validate(); err != nil {
+		return err
 	}
-	sourceValue, err := a.sources.Get(
+	values, err := a.loadWorkspaceSources(ctx, ref.RootID)
+	if err != nil {
+		return err
+	}
+	if !values.HasDirectory && !values.HasPolicy {
+		return fmt.Errorf(
+			"%w: Workspace directory is not registered",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	if expectedRevision != 0 &&
+		values.HasDirectory &&
+		values.Directory.Revision != expectedRevision {
+		return basespec.ErrConflict
+	}
+
+	ownedSources := make(map[source.SourceID]struct{}, 2)
+	retire := func(current source.Summary) error {
+		ownedSources[current.ID] = struct{}{}
+		_, err := a.sources.Retire(
+			ctx,
+			ref.RootID,
+			current.ID,
+			current.Revision,
+		)
+		return err
+	}
+
+	// Retire policy first so a partial operation cannot expose the default.
+	if values.HasPolicy {
+		if err := retire(values.Policy); err != nil {
+			return err
+		}
+	}
+	if values.HasDirectory {
+		if err := retire(values.Directory); err != nil {
+			return err
+		}
+	}
+
+	records, err := a.artifacts.ListByRoot(ctx, ref.RootID)
+	if err != nil {
+		return err
+	}
+	for _, record := range records {
+		if _, owned := ownedSources[record.Binding.SourceID]; !owned {
+			continue
+		}
+		if record.State != artifact.StateMissing {
+			return fmt.Errorf(
+				"%w: retired Workspace Source still has a non-missing Artifact",
+				basespec.ErrConflict,
+			)
+		}
+		if err := a.artifacts.Purge(ctx, record.Ref(), record.Revision); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a *StoreAPI) ListWorkspaceDirectories(ctx context.Context, request WorkspacePageRequest) (WorkspacePage, error) {
+	limit := request.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	rootIDs, err := a.workspaceDirectoryRootIDs(ctx)
+	if err != nil {
+		return WorkspacePage{}, err
+	}
+
+	var cursor root.RootID
+	if request.Cursor != "" {
+		cursor = root.RootID(request.Cursor)
+		if err := cursor.Validate(); err != nil {
+			return WorkspacePage{}, err
+		}
+	}
+
+	start := 0
+	for start < len(rootIDs) && rootIDs[start] <= cursor {
+		start++
+	}
+	end := min(start+limit, len(rootIDs))
+
+	output := WorkspacePage{
+		Items: make([]WorkspaceDirectoryView, 0, end-start),
+	}
+	for _, rootID := range rootIDs[start:end] {
+		view, err := a.buildDirectoryView(ctx, rootID)
+		if err != nil {
+			return WorkspacePage{}, err
+		}
+		output.Items = append(output.Items, view)
+	}
+	if end < len(rootIDs) {
+		output.NextCursor = string(rootIDs[end-1])
+	}
+	return output, nil
+}
+
+func (a *StoreAPI) WorkspaceDefaultPolicy() WorkspaceDefaultPolicyView {
+	return WorkspaceDefaultPolicyView{
+		ID:      a.policy.ID,
+		Version: a.policy.Version,
+		Digest:  a.policy.Digest,
+		YAML:    string(a.policy.RawYAML),
+	}
+}
+
+func (a *StoreAPI) ensureWorkspaceSources(
+	ctx context.Context,
+	rootID root.RootID,
+	rootPath string,
+) (dir, policy source.Summary, err error) {
+	directoryDiscovery, err := a.defaultDiscovery()
+	if err != nil {
+		return source.Summary{}, source.Summary{}, err
+	}
+	directoryConfig, err := json.Marshal(struct {
+		RootPath string `json:"rootPath"`
+	}{RootPath: rootPath})
+	if err != nil {
+		return source.Summary{}, source.Summary{}, err
+	}
+	directory, err := consumerutil.EnsureAndRefreshSource(
 		ctx,
-		record.RootID,
-		record.Binding.SourceID,
+		a.sources,
+		a.discovery,
+		consumerutil.EnsureAndRefreshSourceRequest{
+			RootID: rootID,
+			Draft: source.Draft{
+				ID:          source.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey:  WorkspaceDirectorySourceStorageKey,
+				Kind:        source.SourceKindFilesystemDirectory,
+				DisplayName: "Workspace directory source",
+				Enabled:     true,
+				Config:      directoryConfig,
+				Discovery:   directoryDiscovery,
+			},
+			ReconcileDiscovery: consumerutil.MergeDiscoveryScopes,
+		},
 	)
 	if err != nil {
-		return false, err
+		return source.Summary{}, source.Summary{}, err
 	}
-	return collection.IsBaselineCollectionArtifactForSource(
-		record,
-		sourceValue,
-	), nil
+	policyDiscovery, err := policySourceDiscovery()
+	if err != nil {
+		return source.Summary{}, source.Summary{}, err
+	}
+	policyConfig, err := json.Marshal(struct {
+		ProviderKey string `json:"providerKey"`
+		Root        string `json:"root"`
+	}{ProviderKey: defaultpolicy.ProviderKey, Root: defaultpolicy.PolicyRoot})
+	if err != nil {
+		return source.Summary{}, source.Summary{}, err
+	}
+	policy, err = consumerutil.EnsureAndRefreshSource(
+		ctx,
+		a.sources,
+		a.discovery,
+		consumerutil.EnsureAndRefreshSourceRequest{
+			RootID: rootID,
+			Draft: source.Draft{
+				ID:          source.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey:  WorkspaceBasePolicySourceStorageKey,
+				Kind:        source.SourceKindEmbeddedDirectory,
+				DisplayName: "Workspace base policy source",
+				Enabled:     true,
+				Config:      policyConfig,
+				Discovery:   policyDiscovery,
+			},
+		},
+	)
+	if err != nil {
+		return source.Summary{}, source.Summary{}, err
+	}
+	return directory, policy, nil
 }
 
 // defaultDiscovery bootstraps Workspace identification. An explicitly
@@ -423,18 +565,198 @@ func (a *StoreAPI) defaultDiscovery() (
 	return value, nil
 }
 
+func (a *StoreAPI) listManifestIntent(
+	ctx context.Context,
+	rootID root.RootID,
+	directoryID source.SourceID,
+) ([]basespec.Locator, error) {
+	entries, err := a.resources.ReadSourceTree(
+		ctx,
+		rootID,
+		directoryID,
+		".",
+		documentTopology.WorkspaceManifestPatterns(),
+		nil,
+		basespec.DefaultMaxEntries,
+		basespec.MaxScanBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]basespec.Locator, 0, len(entries))
+	for _, entry := range entries {
+		output = append(output, entry.Locator)
+	}
+	slices.Sort(output)
+	return output, nil
+}
+
+func (a *StoreAPI) listPhysicalWorkspaces(
+	ctx context.Context,
+	rootID root.RootID,
+	directoryID source.SourceID,
+) ([]artifact.Artifact, error) {
+	records, err := a.artifacts.ListBySource(ctx, rootID, directoryID)
+	if err != nil {
+		return nil, err
+	}
+	output := make([]artifact.Artifact, 0)
+	for _, record := range records {
+		if record.Kind != workspaceDomain.WorkspaceArtifactKind {
+			continue
+		}
+		if record.State != artifact.StateAvailable {
+			continue
+		}
+		output = append(output, record.Clone())
+	}
+	sort.Slice(output, func(i, j int) bool {
+		if output[i].LogicalName != output[j].LogicalName {
+			return output[i].LogicalName < output[j].LogicalName
+		}
+		return output[i].ID < output[j].ID
+	})
+	return output, nil
+}
+
+func (a *StoreAPI) effectiveWorkspaces(
+	ctx context.Context,
+	rootID root.RootID,
+	directory, policy source.Summary,
+) ([]WorkspaceDirectoryWorkspace, []diagnostic.Diagnostic, error) {
+	if !directory.Enabled {
+		return []WorkspaceDirectoryWorkspace{}, nil, nil
+	}
+	if !policy.Enabled {
+		return []WorkspaceDirectoryWorkspace{}, nil, nil
+	}
+	intent, err := a.listManifestIntent(ctx, rootID, directory.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	physical, err := a.listPhysicalWorkspaces(ctx, rootID, directory.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(intent) == 0 && len(physical) == 0 {
+		record, found, err := a.defaultWorkspaceRecord(
+			ctx,
+			workspaceSourceSet{
+				Directory:    directory,
+				Policy:       policy,
+				HasDirectory: true,
+				HasPolicy:    true,
+			},
+		)
+		if err != nil {
+			return nil, nil, err
+		}
+		if found &&
+			record.State == artifact.StateAvailable &&
+			record.Enabled {
+			workspace, err := a.workspaceForRef(ctx, record.Ref())
+			if err != nil {
+				return nil, nil, err
+			}
+			if cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
+				return nil, nil, fmt.Errorf(
+					"%w: default Workspace Definition differs from the loaded policy",
+					basespec.ErrDigestMismatch,
+				)
+			}
+			return []WorkspaceDirectoryWorkspace{{
+				Workspace: workspace.View(),
+				Origin:    WorkspaceDirectoryOriginDefault,
+			}}, nil, nil
+		}
+		return []WorkspaceDirectoryWorkspace{}, []diagnostic.Diagnostic{
+			{
+				Severity: diagnostic.SeverityWarning,
+				Code:     "workspace.default-unavailable",
+				Message:  "default Workspace policy is unavailable",
+			},
+		}, nil
+	}
+	output := make([]WorkspaceDirectoryWorkspace, 0, len(physical))
+	seen := make(map[artifact.ArtifactRef]struct{}, len(physical))
+	for _, record := range physical {
+		if !record.Enabled {
+			continue
+		}
+		workspace, err := a.workspaceForRef(ctx, record.Ref())
+		if err != nil {
+			return nil, nil, err
+		}
+		if !workspace.Artifact.Enabled {
+			continue
+		}
+		if _, duplicate := seen[workspace.Ref()]; duplicate {
+			continue
+		}
+		seen[workspace.Ref()] = struct{}{}
+		output = append(
+			output,
+			WorkspaceDirectoryWorkspace{
+				Workspace:       workspace.View(),
+				Origin:          WorkspaceDirectoryOriginManifest,
+				ManifestLocator: record.Binding.Locator,
+			},
+		)
+	}
+	var diagnostics []diagnostic.Diagnostic
+	if len(output) == 0 {
+		code := "workspace.manifest-unavailable"
+		message := "physical Workspace declarations are unavailable or disabled"
+		if len(physical) == 0 && len(intent) != 0 {
+			code = "workspace.manifest-invalid"
+			message = "physical Workspace manifest intent exists without a valid Workspace declaration"
+		}
+		diagnostics = []diagnostic.Diagnostic{
+			{
+				Severity: diagnostic.SeverityWarning,
+				Code:     code,
+				Message:  diagnostic.BoundedMessage(message),
+			},
+		}
+	}
+	return output, diagnostics, nil
+}
+
+func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (WorkspaceDirectoryView, error) {
+	rootValue, err := a.roots.Get(ctx, rootID)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	values, err := a.requiredWorkspaceSources(ctx, rootID)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	enabled := values.Directory.Enabled && values.Policy.Enabled
+	workspaces, diagnostics, err := a.effectiveWorkspaces(
+		ctx,
+		rootID,
+		values.Directory,
+		values.Policy,
+	)
+	if err != nil {
+		return WorkspaceDirectoryView{}, err
+	}
+	return WorkspaceDirectoryView{
+		Ref:             WorkspaceDirectoryRef{RootID: rootID},
+		Root:            rootValue,
+		DirectorySource: values.Directory,
+		Enabled:         enabled,
+		PolicyID:        a.policy.ID,
+		PolicyVersion:   a.policy.Version,
+		PolicyDigest:    a.policy.Digest,
+		Workspaces:      workspaces,
+		Diagnostics:     diagnostics,
+	}, nil
+}
+
 func workspaceArtifactViewOf(
 	value artifact.Artifact,
-) (WorkspaceArtifactView, error) {
-	data, err := workspaceDomain.DecodeArtifactData(value.Data)
-	if err != nil {
-		return WorkspaceArtifactView{}, err
-	}
-	runtimeDisabled := data.RuntimeDisabled
-	if !workspaceRuntimeDisableSupported(value.Kind) {
-		runtimeDisabled = false
-	}
-
+) WorkspaceArtifactView {
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),
 		Revision:           value.Revision,
@@ -447,16 +769,31 @@ func workspaceArtifactViewOf(
 		SourceID:           value.Binding.SourceID,
 		Locator:            value.Binding.Locator,
 		SubresourceLocator: value.Binding.SubresourceLocator,
-		RuntimeDisabled:    runtimeDisabled,
-	}, nil
+	}
 }
 
-// Workspace runtime disablement remains a Workspace consumer feature for
-// prompt and Skill materialization. MCP server and MCP policy behavior use no
-// Workspace-specific enablement state.
-func workspaceRuntimeDisableSupported(
-	kind artifact.ArtifactKind,
-) bool {
-	return kind != mcpDomain.MCPArtifactKind &&
-		kind != mcpDomain.MCPPolicyArtifactKind
+func workspaceRootStorageKey(rootPath string) basespec.StorageKey {
+	digest := strings.TrimPrefix(
+		string(cryptoutil.DigestBytes([]byte(rootPath))),
+		cryptoutil.DigestSHA256Prefix,
+	)
+	return basespec.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
+}
+
+func policySourceDiscovery() (source.DiscoverySpec, error) {
+	value := source.DiscoverySpec{
+		ExplicitLocators: []basespec.Locator{defaultpolicy.PolicyLocator},
+		DecoderHints: []source.DecoderHint{{
+			Locator:    defaultpolicy.PolicyLocator,
+			Recursive:  false,
+			DecoderIDs: []basespec.DecoderID{"artifact-declaration-yaml"},
+		}},
+		AllowedDecoderIDs: []basespec.DecoderID{"artifact-declaration-yaml"},
+		Authoritative:     true,
+	}
+	value = value.Normalized()
+	if err := value.Validate(); err != nil {
+		return source.DiscoverySpec{}, err
+	}
+	return value, nil
 }

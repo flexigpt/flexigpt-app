@@ -103,17 +103,6 @@ func (a *StoreAPI) LoadWorkspaceSkillsForRuntime(
 	)
 }
 
-func (a *StoreAPI) ListWorkspaceSkills(
-	ctx context.Context,
-	workspace artifact.ArtifactRef,
-) ([]WorkspaceSkill, error) {
-	plan, err := a.LoadWorkspaceSkills(ctx, workspace, nil)
-	if err != nil {
-		return nil, err
-	}
-	return append([]WorkspaceSkill(nil), plan.Skills...), nil
-}
-
 func (a *StoreAPI) LoadWorkspaceMCPServers(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,

@@ -13,37 +13,60 @@ import (
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
-type FilesystemSourceRegistration struct {
-	RootID            root.RootID `json:"rootID"`
-	RootPath          string      `json:"rootPath"`
-	SourceDisplayName string      `json:"sourceDisplayName"`
+const (
+	WorkspaceDirectorySourceStorageKey  = "workspace-directory"
+	WorkspaceBasePolicySourceStorageKey = "workspace-base-policy"
+	WorkspaceRootStorageKeyPrefix       = "workspace-directory-root-"
+)
+
+type WorkspaceDirectoryRef struct {
+	RootID root.RootID `json:"rootID"`
 }
 
-type ManagedSourceRegistration struct {
-	RootID            root.RootID `json:"rootID"`
-	SourceDisplayName string      `json:"sourceDisplayName,omitempty"`
+type WorkspaceDirectoryOrigin string
+
+const (
+	WorkspaceDirectoryOriginDefault  WorkspaceDirectoryOrigin = "default"
+	WorkspaceDirectoryOriginManifest WorkspaceDirectoryOrigin = "manifest"
+)
+
+type WorkspaceDirectoryWorkspace struct {
+	Workspace       workspaceDomain.WorkspaceView `json:"workspace"`
+	Origin          WorkspaceDirectoryOrigin      `json:"origin"`
+	ManifestLocator basespec.Locator              `json:"manifestLocator,omitempty"`
 }
 
-type WorkspacePathRegistration struct {
-	RootID            root.RootID          `json:"rootID"`
-	Path              string               `json:"path"`
-	SourceDisplayName string               `json:"sourceDisplayName,omitempty"`
-	WorkspaceName     basespec.LogicalName `json:"workspaceName,omitempty"`
+type WorkspaceDirectoryView struct {
+	Ref             WorkspaceDirectoryRef         `json:"ref"`
+	Root            root.Root                     `json:"root"`
+	DirectorySource source.Summary                `json:"directorySource"`
+	Enabled         bool                          `json:"enabled"`
+	PolicyID        string                        `json:"policyID"`
+	PolicyVersion   string                        `json:"policyVersion"`
+	PolicyDigest    cryptoutil.Digest             `json:"policyDigest"`
+	Workspaces      []WorkspaceDirectoryWorkspace `json:"workspaces"`
+	Diagnostics     []diagnostic.Diagnostic       `json:"diagnostics,omitempty"`
 }
 
-type WorkspaceLoad struct {
-	Workspace    workspaceDomain.WorkspaceView `json:"workspace"`
-	Capabilities resolve.CapabilityPlan        `json:"capabilities"`
+type WorkspacePageRequest struct {
+	Cursor string `json:"cursor,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+}
+
+type WorkspacePage struct {
+	Items      []WorkspaceDirectoryView `json:"items"`
+	NextCursor string                   `json:"nextCursor,omitempty"`
+}
+
+type WorkspaceDefaultPolicyView struct {
+	ID      string            `json:"policyID"`
+	Version string            `json:"policyVersion"`
+	Digest  cryptoutil.Digest `json:"policyDigest"`
+	YAML    string            `json:"yaml"`
 }
 
 type WorkspaceRefresh struct {
 	Workspace artifact.ArtifactRef `json:"workspace"`
-}
-
-type WorkspacePathRegistrationResult struct {
-	Source    source.Summary                `json:"source"`
-	Workspace workspaceDomain.WorkspaceView `json:"workspace"`
-	Load      WorkspaceLoad                 `json:"load"`
 }
 
 type WorkspaceRuntimeSelection struct {
@@ -91,7 +114,6 @@ type WorkspaceSkill struct {
 	DisplayName      string               `json:"displayName,omitempty"`
 	Locator          basespec.Locator     `json:"locator,omitempty"`
 	Version          string               `json:"version"`
-	RuntimeDisabled  bool                 `json:"runtimeDisabled"`
 }
 
 type WorkspaceSkillLoadPlan struct {
@@ -137,5 +159,4 @@ type WorkspaceArtifactView struct {
 	SourceID           source.SourceID             `json:"sourceID"`
 	Locator            basespec.Locator            `json:"locator"`
 	SubresourceLocator basespec.SubresourceLocator `json:"subresourceLocator,omitempty"`
-	RuntimeDisabled    bool                        `json:"runtimeDisabled"`
 }

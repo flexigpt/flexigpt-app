@@ -105,6 +105,9 @@ func (a *Adapter) Load(
 				ref.ArtifactID,
 			)
 		}
+		if !record.Enabled {
+			continue
+		}
 
 		server, err := a.servers.ResolveMCPServer(ctx, ref)
 		if err != nil {

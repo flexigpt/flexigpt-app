@@ -68,7 +68,6 @@ func projectWorkspaceSkillLoadPlan(
 			DisplayName:      skill.Document.DisplayName,
 			Locator:          skill.Locator,
 			Version:          skill.Version,
-			RuntimeDisabled:  skill.RuntimeDisabled,
 		})
 	}
 	return output

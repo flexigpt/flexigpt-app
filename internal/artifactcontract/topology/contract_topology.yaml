@@ -22,14 +22,6 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
-  mcpConfigs:
-    - locator: "mcp.json"
-      format: "json"
-      decoderID: "artifact.mcp-json"
-    - locator: ".mcp.json"
-      format: "json"
-      decoderID: "artifact.mcp-json"
-
   agents:
     - locator: "agent.yaml"
       format: "yaml"
@@ -41,20 +33,39 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
+  agentMarkdown:
+    - locator: "AGENT.md"
+      format: "markdown"
+      decoderID: "agent-markdown"
+
   skillPackages:
     - locator: "SKILL.md"
       format: "markdown"
       decoderID: "agent.skill-markdown"
+
+  mcpConfigs:
+    - locator: "mcp.json"
+      format: "json"
+      decoderID: "artifact.mcp-json"
+    - locator: ".mcp.json"
+      format: "json"
+      decoderID: "artifact.mcp-json"
 
   mcpPolicies:
     - locator: "mcp-policy.json"
       format: "json"
       decoderID: "artifact-declaration-json"
 
-  agentMarkdown:
-    - locator: "AGENT.md"
-      format: "markdown"
-      decoderID: "agent-markdown"
+  workspaceManifests:
+    - locator: "workspace.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "workspace.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "workspace.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
 
   workspaceMarkdown:
     - locator: "AGENTS.md"
@@ -204,6 +215,7 @@ discovery:
       - "agents"
       - "skillPackages"
       - "agentMarkdown"
+      - "workspaceManifests"
       - "workspaceMarkdown"
       - "workspaceInstructions"
     decoderHints:

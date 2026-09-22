@@ -19,6 +19,9 @@ var embeddedAgentsFS embed.FS
 //go:embed mcps
 var embeddedMCPFS embed.FS
 
+//go:embed workspaces
+var embeddedWorkspacesFS embed.FS
+
 // EmbeddedSkillPackages exposes the embedded Skill package tree to the Skill
 // built-in installer. Artifact Store itself never imports this package.
 func EmbeddedSkillPackages() (fs.FS, error) {
@@ -38,6 +41,15 @@ func EmbeddedAgentPackages() (fs.FS, error) {
 func EmbeddedMCPPackages() (fs.FS, error) {
 	return EmbeddedPackages(
 		documentTopology.BuiltinEmbeddedPackageMCPs,
+	)
+}
+
+// EmbeddedWorkspacePackages exposes the base Workspace policy tree.
+// It is not installed as protected built-in content.
+func EmbeddedWorkspacePackages() (fs.FS, error) {
+	return embeddedSubtree(
+		embeddedWorkspacesFS,
+		"workspaces",
 	)
 }
 

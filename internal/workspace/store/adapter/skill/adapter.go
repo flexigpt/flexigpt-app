@@ -24,7 +24,6 @@ type WorkspaceSkill struct {
 	Document        document.SkillDocument `json:"-"`
 	RuntimeLocation string                 `json:"-"`
 	Version         string                 `json:"-"`
-	RuntimeDisabled bool                   `json:"-"`
 }
 
 type LoadPlan struct {
@@ -101,6 +100,9 @@ func (a *Adapter) loadSelected(
 		if err != nil {
 			return LoadPlan{}, err
 		}
+		if !record.Enabled {
+			continue
+		}
 		value, err := a.resolve(ctx, workspace, record)
 		if err != nil {
 			return LoadPlan{}, err
@@ -113,17 +115,14 @@ func (a *Adapter) loadSelected(
 
 func (a *Adapter) resolve(
 	ctx context.Context,
-	workspace workspaceDomain.Workspace,
+	_ workspaceDomain.Workspace,
 	record artifact.Artifact,
 ) (WorkspaceSkill, error) {
 	value, err := materialize.Resolve(ctx, a.resources, record)
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}
-	settings, err := workspaceDomain.DecodeArtifactData(record.Data)
-	if err != nil {
-		return WorkspaceSkill{}, err
-	}
+
 	return WorkspaceSkill{
 		Artifact:         value.Artifact,
 		ArtifactRevision: value.ArtifactRevision,
@@ -135,6 +134,5 @@ func (a *Adapter) resolve(
 		Version: "workspace-skill:" + string(
 			value.VersionDigest,
 		),
-		RuntimeDisabled: settings.RuntimeDisabled,
 	}, nil
 }

@@ -42,17 +42,6 @@ func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 	)
 }
 
-func (w *WorkspaceRuntimeWrapper) ListWorkspaceSkills(
-	workspace artifact.ArtifactRef,
-) ([]workspaceConsumerAPI.WorkspaceSkill, error) {
-	return withWorkspaceRuntime(
-		w,
-		func(api *workspaceConsumerAPI.StoreAPI) ([]workspaceConsumerAPI.WorkspaceSkill, error) {
-			return api.ListWorkspaceSkills(context.Background(), workspace)
-		},
-	)
-}
-
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,

@@ -11,6 +11,4 @@ var (
 const (
 	DiagnosticCodeArtifactUnavailable = "workspace.artifact.unavailable"
 	DiagnosticCodeArtifactUnresolved  = "workspace.artifact.unresolved"
-	DiagnosticCodeRuntimeDisabled     = "workspace.runtime.disabled"
-	DiagnosticCodeProjectionInvalid   = "workspace.projection.invalid"
 )

@@ -1,0 +1,54 @@
+type: workspace
+name: default-workspace
+displayName: Default Workspace
+description: Default repository workspace policy.
+members:
+  - type: text
+    name: default-workspace-instructions
+    insert: instructions
+    locator: .
+    parameters:
+      mediaType: text/markdown
+      include:
+        - "**/AGENTS.md"
+        - "**/CLAUDE.md"
+        - "**/GEMINI.md"
+        - "**/COPILOT.md"
+        - "**/INSTRUCTIONS.md"
+        - "**/.cursorrules"
+        - "**/.windsurfrules"
+        - "**/.github/copilot-instructions.md"
+        - "**/.cursor/rules/**/*.md"
+        - "**/.github/instructions/**/*.md"
+  - type: text
+    name: default-workspace-context
+    insert: user-message
+    locator: .
+    parameters:
+      mediaType: text/markdown
+      include:
+        - "**/README.md"
+        - "**/llms.txt"
+        - "docs/**/*.md"
+  - type: skill
+    base: .
+    include:
+      - "**/SKILL.md"
+  - type: agent
+    base: .
+  - type: plugin
+    base: .
+  - type: mcp
+    base: .
+  - type: mcp.policy
+    base: .
+  - type: model
+    base: .
+  - type: tool
+    base: .
+  - type: team
+    base: .
+  - type: loop
+    base: .
+  - type: workflow
+    base: .

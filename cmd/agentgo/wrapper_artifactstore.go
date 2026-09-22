@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"io/fs"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -10,6 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
 )
 
 func composeArtifactStore(
@@ -40,6 +43,11 @@ func composeArtifactStore(
 		return nil, err
 	}
 
+	workspaceFS, err := builtin.EmbeddedWorkspacePackages()
+	if err != nil {
+		return nil, err
+	}
+
 	providers := []providerapi.Provider{
 		canonicalProvider,
 		markdownProvider,
@@ -50,7 +58,10 @@ func composeArtifactStore(
 	return compositionapi.Open(
 		ctx,
 		compositionapi.Config{
-			BaseDirectory:    baseDirectory,
+			BaseDirectory: baseDirectory,
+			EmbeddedProviders: map[string]fs.FS{
+				defaultpolicy.ProviderKey: workspaceFS,
+			},
 			Providers:        providers,
 			ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
 			RetainedRoots:    documentTopology.RetainedRootDrafts(),

@@ -41,7 +41,6 @@ type App struct {
 	aggregateAPI          *AggregrateWrapper
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
-	workspaceAggregateAPI *WorkspaceAggregateWrapper
 
 	artifactStoreComposition *compositionapi.Store
 
@@ -133,7 +132,6 @@ func NewApp() *App {
 	app.aggregateAPI = &AggregrateWrapper{}
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
-	app.workspaceAggregateAPI = &WorkspaceAggregateWrapper{}
 
 	if err := ensureAppPrivateDirectory(app.settingsDirPath); err != nil {
 		slog.Error(
@@ -418,7 +416,6 @@ func (a *App) initManagers() {
 	err = InitWorkspaceWrappers(
 		a.workspaceStoreAPI,
 		a.workspaceRuntimeAPI,
-		a.workspaceAggregateAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
 		artifactComposition.Discovery,
@@ -553,9 +550,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	}
 	if a.agentStoreAPI != nil {
 		a.agentStoreAPI.close()
-	}
-	if a.workspaceAggregateAPI != nil {
-		a.workspaceAggregateAPI.close()
 	}
 	if a.workspaceRuntimeAPI != nil {
 		a.workspaceRuntimeAPI.close()
