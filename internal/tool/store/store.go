@@ -21,7 +21,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -60,7 +59,7 @@ type ToolStore struct {
 
 	pp mapstore.PartitionProvider
 
-	slugLock *storehelper.SlugLocks
+	slugLock *slugLocks
 
 	// Cleanup loop plumbing.
 	cleanOnce sync.Once
@@ -125,7 +124,7 @@ func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
 		return nil, err
 	}
 
-	ts.slugLock = storehelper.NewSlugLocks()
+	ts.slugLock = newSlugLocks()
 	ts.startCleanupLoop()
 
 	slog.Info("tool-store ready", "baseDir", ts.baseDir)
@@ -570,7 +569,7 @@ func (ts *ToolStore) PutTool(
 		ModifiedAt:  now,
 	}
 
-	if err := storehelper.ValidateTool(&t); err != nil {
+	if err := t.Validate(); err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
 

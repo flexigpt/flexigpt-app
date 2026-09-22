@@ -15,7 +15,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 
 	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
@@ -84,7 +83,7 @@ func (rt *ToolRuntime) InvokeTool(
 	}
 
 	// Defensive validation of the tool record.
-	if err := storehelper.ValidateTool(tool); err != nil {
+	if err := tool.Validate(); err != nil {
 		return nil, fmt.Errorf("tool validation failed: %w", err)
 	}
 

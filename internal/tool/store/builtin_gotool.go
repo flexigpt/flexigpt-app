@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
 func injectLLMToolsGo(
@@ -140,7 +139,7 @@ func toAppToolFromLLMToolsGo(t llmtoolsSpec.Tool, meta llmtoolsutil.LLMToolMeta)
 		ModifiedAt: mod,
 	}
 
-	if err := storehelper.ValidateTool(&out); err != nil {
+	if err := out.Validate(); err != nil {
 		return spec.Tool{}, err
 	}
 	return out, nil

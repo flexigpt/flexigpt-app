@@ -22,7 +22,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
@@ -1415,8 +1414,8 @@ func addGoToolFile(
 		CreatedAt:     now,
 		ModifiedAt:    now,
 	}
-	if err := storehelper.ValidateTool(&tool); err != nil {
-		return fmt.Errorf("ValidateTool: %w", err)
+	if err := tool.Validate(); err != nil {
+		return fmt.Errorf("validate tool: %w", err)
 	}
 
 	mp, _ := jsonencdec.StructWithJSONTagsToMap(tool)

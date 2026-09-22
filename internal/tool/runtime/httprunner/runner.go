@@ -23,7 +23,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
 // HTTPToolRunner executes an HTTPToolImpl. Safe for concurrent use.
@@ -78,7 +77,7 @@ func WithHTTPSecrets(s map[string]string) HTTPOption {
 }
 
 func NewHTTPToolRunner(impl spec.HTTPToolImpl, opts ...HTTPOption) (*HTTPToolRunner, error) {
-	if err := storehelper.ValidateHTTPImpl(&impl); err != nil {
+	if err := impl.Validate(); err != nil {
 		return nil, err
 	}
 	r := &HTTPToolRunner{

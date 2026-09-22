@@ -1,4 +1,4 @@
-package storehelper
+package spec
 
 import (
 	"encoding/json"
@@ -8,19 +8,18 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
 )
 
-// ValidateTool performs structural validation of a Tool object.
-func ValidateTool(t *spec.Tool) error {
+// Validate performs structural validation of a Tool object.
+func (t *Tool) Validate() error {
 	if t == nil {
 		return errors.New("tool is nil")
 	}
-	if t.SchemaVersion != spec.SchemaVersion {
+	if t.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
 			"schemaVersion %q does not match expected %q",
 			t.SchemaVersion,
-			spec.SchemaVersion,
+			SchemaVersion,
 		)
 	}
 	if err := bundleitemutils.ValidateItemSlug(t.Slug); err != nil {
@@ -45,7 +44,7 @@ func ValidateTool(t *spec.Tool) error {
 
 	// LLMToolType sanity.
 	switch t.LLMToolType {
-	case spec.ToolStoreChoiceTypeFunction, spec.ToolStoreChoiceTypeCustom, spec.ToolStoreChoiceTypeWebSearch:
+	case ToolStoreChoiceTypeFunction, ToolStoreChoiceTypeCustom, ToolStoreChoiceTypeWebSearch:
 		// Ok.
 	default:
 		return fmt.Errorf("invalid llmToolType %q", t.LLMToolType)
@@ -60,7 +59,7 @@ func ValidateTool(t *spec.Tool) error {
 
 	// Type / implementation sanity.
 	switch t.Type {
-	case spec.ToolTypeGo:
+	case ToolTypeGo:
 		if t.GoImpl == nil || strings.TrimSpace(t.GoImpl.Func) == "" {
 			return errors.New("goImpl.func is required for type 'go'")
 		}
@@ -70,7 +69,7 @@ func ValidateTool(t *spec.Tool) error {
 		if t.SDKImpl != nil {
 			return errors.New("sdkImpl must be unset for type 'go'")
 		}
-	case spec.ToolTypeHTTP:
+	case ToolTypeHTTP:
 		if t.HTTPImpl == nil {
 			return errors.New("httpImpl is required for type 'http'")
 		}
@@ -80,10 +79,10 @@ func ValidateTool(t *spec.Tool) error {
 		if t.SDKImpl != nil {
 			return errors.New("sdkImpl must be unset for type 'http'")
 		}
-		if err := ValidateHTTPImpl(t.HTTPImpl); err != nil {
+		if err := t.HTTPImpl.Validate(); err != nil {
 			return errors.New("invalid implementation for type 'http'")
 		}
-	case spec.ToolTypeSDK:
+	case ToolTypeSDK:
 		// SDK-backed tools are surfaced to the provider SDK as
 		// server tools; they are not invoked via ToolStore.
 		if t.GoImpl != nil {
@@ -108,7 +107,7 @@ func ValidateTool(t *spec.Tool) error {
 	return nil
 }
 
-func ValidateHTTPImpl(impl *spec.HTTPToolImpl) error {
+func (impl *HTTPToolImpl) Validate() error {
 	if impl == nil {
 		return errors.New("httpImpl is nil")
 	}
@@ -144,10 +143,10 @@ func ValidateHTTPImpl(impl *spec.HTTPToolImpl) error {
 		}
 	}
 	switch impl.Response.BodyOutputMode {
-	case "", spec.HTTPBodyOutputModeAuto,
-		spec.HTTPBodyOutputModeText,
-		spec.HTTPBodyOutputModeFile,
-		spec.HTTPBodyOutputModeImage:
+	case "", HTTPBodyOutputModeAuto,
+		HTTPBodyOutputModeText,
+		HTTPBodyOutputModeFile,
+		HTTPBodyOutputModeImage:
 		// Ok.
 	default:
 		return fmt.Errorf("invalid bodyOutputMode: %s", impl.Response.BodyOutputMode)

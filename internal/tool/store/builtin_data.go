@@ -21,7 +21,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/fsutil"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 )
 
 const (
@@ -352,7 +351,7 @@ func (d *BuiltInToolData) populateDataFromFS(ctx context.Context) error {
 			}
 			tool.IsBuiltIn = true
 
-			if err := storehelper.ValidateTool(&tool); err != nil {
+			if err := tool.Validate(); err != nil {
 				return fmt.Errorf("%s: invalid tool: %w", inPath, err)
 			}
 
