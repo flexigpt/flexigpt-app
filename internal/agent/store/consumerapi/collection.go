@@ -2,10 +2,8 @@ package consumerapi
 
 import (
 	"context"
-	"fmt"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -97,105 +95,7 @@ func (a *API) DeleteAgentCollection(
 	)
 }
 
-func (a *API) AttachAgentToCollection(
-	ctx context.Context,
-	request AttachAgentToCollectionRequest,
-) (collection.MemberMutationResult, error) {
-	if a == nil || a.collections == nil {
-		return collection.MemberMutationResult{}, basespec.ErrClosed
-	}
-	if request.ExpectedRevision == 0 {
-		return collection.MemberMutationResult{}, fmt.Errorf(
-			"%w: expected Agent Collection revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := request.Collection.Validate(); err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-	if err := request.Agent.Validate(); err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-
-	collectionValue, err := a.collections.Get(ctx, request.Collection)
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-	if collectionValue.Artifact.Revision != request.ExpectedRevision {
-		return collection.MemberMutationResult{}, basespec.ErrConflict
-	}
-
-	target, err := a.GetAgent(ctx, request.Agent)
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-
-	member := collection.MemberReference{
-		Type: declaration.TypeAgent,
-		Name: target.LogicalName,
-	}
-
-	switch target.RootID {
-	case collectionValue.Artifact.RootID:
-		if target.Binding.SourceID != collectionValue.Artifact.Binding.SourceID {
-			break
-		}
-		if target.Binding.SubresourceLocator != "" {
-			return collection.MemberMutationResult{}, fmt.Errorf(
-				"%w: a contained Agent cannot be attached as an exact managed Collection member",
-				basespec.ErrUnsupported,
-			)
-		}
-
-		member, err = a.collections.MemberForCollectionSource(
-			ctx,
-			request.Collection,
-			declaration.TypeAgent,
-			target.LogicalName,
-			target.Binding.Locator,
-		)
-		if err != nil {
-			return collection.MemberMutationResult{}, err
-		}
-
-	case agentBuiltinRootID():
-		member.Scope = declaration.LookupScopeBuiltin
-
-	default:
-		return collection.MemberMutationResult{}, fmt.Errorf(
-			"%w: Agent %q belongs to unsupported Root %q",
-			basespec.ErrUnsupported,
-			target.ID,
-			target.RootID,
-		)
-	}
-
-	result, err := a.collections.EnsureMember(
-		ctx,
-		collection.AddMemberRequest{
-			Collection:       request.Collection,
-			ExpectedRevision: request.ExpectedRevision,
-			Member:           member,
-		},
-	)
-	if err != nil {
-		return collection.MemberMutationResult{}, err
-	}
-
-	return result, nil
-}
-
-func (a *API) DetachAgentFromCollection(
-	ctx context.Context,
-	request collection.RemoveMemberRequest,
-) (collection.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
-	}
-	return a.collections.RemoveMember(ctx, request)
-}
-
-func (a *API) ResolveAgentCollection(
+func (a *API) ListAgentCollectionMembers(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
@@ -203,26 +103,6 @@ func (a *API) ResolveAgentCollection(
 		return collection.CollectionCapabilityPlan{}, basespec.ErrClosed
 	}
 	return a.collections.ResolveCapabilities(ctx, ref)
-}
-
-func (a *API) ListAgentCollectionMembers(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (collection.CollectionCapabilityPlan, error) {
-	return a.ResolveAgentCollection(ctx, ref)
-}
-
-func (a *API) ListDirectAgentMemberships(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]collection.ArtifactMembershipView, error) {
-	if a == nil || a.collections == nil {
-		return nil, basespec.ErrClosed
-	}
-	if _, err := a.GetAgent(ctx, ref); err != nil {
-		return nil, err
-	}
-	return a.collections.ListMembershipsForArtifact(ctx, ref)
 }
 
 func (a *API) IsManagedAgentCollection(

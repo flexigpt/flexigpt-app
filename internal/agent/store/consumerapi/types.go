@@ -42,12 +42,6 @@ type ListAgentsRequest struct {
 	Enabled *bool `json:"enabled,omitempty"`
 }
 
-type AttachAgentToCollectionRequest struct {
-	Collection       artifact.ArtifactRef `json:"collection"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-	Agent            artifact.ArtifactRef `json:"agent"`
-}
-
 type ManagedAgentDeleteRequest struct {
 	Agent            artifact.ArtifactRef `json:"agent"`
 	ExpectedRevision uint64               `json:"expectedRevision"`

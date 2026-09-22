@@ -284,50 +284,6 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 	})
 }
 
-func (w *AgentStoreWrapper) AttachAgentToCollection(
-	request agentConsumerAPI.AttachAgentToCollectionRequest,
-) (collection.MemberMutationResult, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (collection.MemberMutationResult, error) {
-			return api.AttachAgentToCollection(context.Background(), request)
-		},
-	)
-}
-
-func (w *AgentStoreWrapper) DetachAgentFromCollection(
-	request collection.RemoveMemberRequest,
-) (collection.CollectionView, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
-			return api.DetachAgentFromCollection(context.Background(), request)
-		},
-	)
-}
-
-func (w *AgentStoreWrapper) ResolveAgentCollection(
-	ref artifact.ArtifactRef,
-) (collection.CollectionCapabilityPlan, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionCapabilityPlan, error) {
-			return api.ResolveAgentCollection(context.Background(), ref)
-		},
-	)
-}
-
-func (w *AgentStoreWrapper) ListDirectAgentMemberships(
-	ref artifact.ArtifactRef,
-) ([]collection.ArtifactMembershipView, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) ([]collection.ArtifactMembershipView, error) {
-			return api.ListDirectAgentMemberships(context.Background(), ref)
-		},
-	)
-}
-
 func (w *AgentStoreWrapper) ListAgentImportDestinations() (
 	[]agentConsumerAPI.AgentImportDestination,
 	error,
