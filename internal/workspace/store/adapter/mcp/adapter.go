@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -79,14 +80,13 @@ func (a *Adapter) Load(
 	for _, ref := range refs {
 		record, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
-			return LoadPlan{}, err
+			if fatal := fatalLoadError(ctx, err); fatal != nil {
+				return LoadPlan{}, fatal
+			}
+			continue
 		}
 		if record.State != artifact.StateAvailable {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: Workspace MCP Artifact %q is unavailable",
-				workspaceDomain.ErrReferenceUnresolved,
-				ref.ArtifactID,
-			)
+			continue
 		}
 		if !record.Enabled {
 			continue
@@ -94,7 +94,10 @@ func (a *Adapter) Load(
 
 		server, err := a.servers.ResolveMCPServer(ctx, ref)
 		if err != nil {
-			return LoadPlan{}, err
+			if fatal := fatalLoadError(ctx, err); fatal != nil {
+				return LoadPlan{}, fatal
+			}
+			continue
 		}
 		output.Servers = append(output.Servers, WorkspaceServer{
 			Artifact: ref,
@@ -102,4 +105,20 @@ func (a *Adapter) Load(
 		})
 	}
 	return output, nil
+}
+
+// fatalLoadError distinguishes operation-level failure from one server being
+// unavailable or not runtime-ready. Per-server failures do not discard other
+// successfully loaded servers.
+func fatalLoadError(
+	ctx context.Context,
+	err error,
+) error {
+	if contextErr := ctx.Err(); contextErr != nil {
+		return contextErr
+	}
+	if errors.Is(err, basespec.ErrClosed) {
+		return err
+	}
+	return nil
 }

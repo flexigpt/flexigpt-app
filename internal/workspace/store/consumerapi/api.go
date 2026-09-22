@@ -41,23 +41,6 @@ type StoreAPI struct {
 	resolver      *resolve.Resolver
 }
 
-// workspaceLocatorRuntime keeps the generic provider runtime port out of the
-// Workspace consumer API surface.
-type workspaceLocatorRuntime struct {
-	artifacts compositionapi.ArtifactAPI
-}
-
-func (r workspaceLocatorRuntime) ListArtifactsBySource(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
-	if r.artifacts == nil {
-		return nil, basespec.ErrClosed
-	}
-	return r.artifacts.ListBySource(ctx, rootID, sourceID)
-}
-
 func NewStoreAPI(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
