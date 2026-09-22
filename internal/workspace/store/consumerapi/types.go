@@ -97,7 +97,8 @@ type WorkspacePromptDecision struct {
 type WorkspacePromptPlan struct {
 	Workspace     artifact.ArtifactRef          `json:"workspace"`
 	Contributions []WorkspacePromptContribution `json:"contributions"`
-	Prompt        string                        `json:"prompt"`
+	Instructions  string                        `json:"instructions"`
+	UserMessage   string                        `json:"userMessage"`
 	Diagnostics   []diagnostic.Diagnostic       `json:"diagnostics,omitempty"`
 	Decisions     []WorkspacePromptDecision     `json:"decisions"`
 }

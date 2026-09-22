@@ -42,7 +42,8 @@ type Decision struct {
 type Plan struct {
 	Workspace     artifact.ArtifactRef    `json:"-"`
 	Contributions []Contribution          `json:"-"`
-	Prompt        string                  `json:"-"`
+	Instructions  string                  `json:"-"`
+	UserMessage   string                  `json:"-"`
 	Diagnostics   []diagnostic.Diagnostic `json:"-"`
 	Decisions     []Decision              `json:"-"`
 }
@@ -170,7 +171,7 @@ func (a *Adapter) compose(
 		contributionsByID[id] = contribution
 		runtimeValues = append(runtimeValues, workspaceRuntime.ContextContribution{
 			ID:      id,
-			Kind:    string(contribution.Insert),
+			Insert:  contribution.Insert,
 			Name:    contribution.Name,
 			Locator: string(contribution.Locator),
 			Content: contribution.Content,
@@ -233,7 +234,8 @@ func (a *Adapter) compose(
 			),
 		)
 	}
-	output.Prompt = result.Prompt
+	output.Instructions = result.Instructions
+	output.UserMessage = result.UserMessage
 	return output, nil
 }
 

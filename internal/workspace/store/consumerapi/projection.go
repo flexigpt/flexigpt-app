@@ -15,7 +15,8 @@ func projectWorkspacePromptPlan(
 	output := WorkspacePromptPlan{
 		Workspace:     value.Workspace,
 		Contributions: make([]WorkspacePromptContribution, 0, len(value.Contributions)),
-		Prompt:        value.Prompt,
+		Instructions:  value.Instructions,
+		UserMessage:   value.UserMessage,
 		Diagnostics:   diagnostic.Clone(value.Diagnostics),
 		Decisions:     make([]WorkspacePromptDecision, 0, len(value.Decisions)),
 	}

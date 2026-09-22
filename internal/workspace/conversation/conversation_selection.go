@@ -104,8 +104,9 @@ type ConversationUsage struct {
 }
 
 type ConversationResolution struct {
-	Usage  ConversationUsage
-	Prompt string
+	Usage        ConversationUsage
+	Instructions string
+	UserMessage  string
 }
 
 // WorkspaceSource is the narrow Root-scoped Workspace consumer port used by
@@ -187,7 +188,8 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		}, err
 	}
 
-	p := ""
+	instructions := ""
+	userMessage := ""
 	if len(contextRefs) != 0 {
 		plan, composeErr := r.workspaceAPI.ComposeWorkspacePromptForRuntime(
 			ctx,
@@ -203,7 +205,8 @@ func (r *ConversationResolver) ResolveConversationSelection(
 				),
 			)
 		} else {
-			p = plan.Prompt
+			instructions = plan.Instructions
+			userMessage = plan.UserMessage
 			applyContextPlan(
 				&usage,
 				selection,
@@ -254,8 +257,9 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		)
 	}
 	return ConversationResolution{
-		Usage:  usage,
-		Prompt: p,
+		Usage:        usage,
+		Instructions: instructions,
+		UserMessage:  userMessage,
 	}, nil
 }
 

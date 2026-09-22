@@ -325,6 +325,15 @@ func (ps *ProviderSetAPI) FetchCompletion(
 				},
 			}, nil
 		}
+		if hydrated != nil && len(hydrated.SystemPromptParts) != 0 {
+			// Workspace insert=instructions content is intentionally routed
+			// through the system-prompt path. User-message Workspace content
+			// remains in hydrated.CurrentInputs and is never merged here.
+			modelParam.SystemPrompt = appendToSystemPrompt(
+				modelParam.SystemPrompt,
+				hydrated.SystemPromptParts...,
+			)
+		}
 	}
 
 	mcpContext := body.MCPContext

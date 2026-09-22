@@ -1,6 +1,10 @@
 package runtime
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+)
 
 func TestEngineComposeTruncatesAtUTF8Boundary(t *testing.T) {
 	t.Parallel()
@@ -13,7 +17,7 @@ func TestEngineComposeTruncatesAtUTF8Boundary(t *testing.T) {
 		},
 		[]ContextContribution{{
 			ID:      "context-1",
-			Kind:    "context",
+			Insert:  declaration.InsertUserMessage,
 			Name:    "README.md",
 			Locator: "README.md",
 			Content: "éé",

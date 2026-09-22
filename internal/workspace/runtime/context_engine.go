@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 )
 
 const (
@@ -13,7 +15,7 @@ const (
 	maxContextPromptBytes          = 2 << 20
 
 	contextPromptSeparator   = "\n\n"
-	contextPromptStartFormat = "<<<WORKSPACE_ARTIFACT type=%q name=%q source=%q>>>\n"
+	contextPromptStartFormat = "<<<WORKSPACE_ARTIFACT insert=%q name=%q source=%q>>>\n"
 	contextPromptEndMarker   = "\n<<<END_WORKSPACE_CONTEXT>>>"
 )
 
@@ -93,8 +95,8 @@ const (
 // package.
 type ContextContribution struct {
 	ID      string
+	Insert  declaration.InsertTarget
 	Name    string
-	Kind    string
 	Locator string
 	Content string
 
@@ -119,7 +121,8 @@ type CompositionDecision struct {
 
 type CompositionResult struct {
 	Contributions []ContextContribution
-	Prompt        string
+	Instructions  string
+	UserMessage   string
 	Diagnostics   []CompositionDiagnostic
 	Decisions     []CompositionDecision
 }
@@ -146,12 +149,16 @@ func (e *Engine) Compose(
 
 	result := CompositionResult{
 		Contributions: make([]ContextContribution, 0, len(values)),
+		Instructions:  "",
+		UserMessage:   "",
 		Diagnostics:   make([]CompositionDiagnostic, 0),
 		Decisions:     make([]CompositionDecision, 0, len(values)),
 	}
 
 	seen := make(map[string]struct{}, len(values))
-	var prompt strings.Builder
+	var instructions strings.Builder
+	var userMessage strings.Builder
+	promptBytes := 0
 
 	for _, input := range values {
 		if strings.TrimSpace(input.ID) == "" {
@@ -166,8 +173,23 @@ func (e *Engine) Compose(
 			)
 		}
 		seen[input.ID] = struct{}{}
+		if err := input.Insert.Validate(); err != nil {
+			return CompositionResult{}, fmt.Errorf(
+				"workspace context contribution insert: %w",
+				err,
+			)
+		}
 
 		value := input
+		destination, err := promptForInsert(
+			value.Insert,
+			&instructions,
+			&userMessage,
+		)
+		if err != nil {
+			return CompositionResult{}, err
+		}
+
 		content := value.Content
 		originalBytes := len(content)
 		status := CompositionIncluded
@@ -205,12 +227,12 @@ func (e *Engine) Compose(
 		}
 
 		separatorBytes := 0
-		if prompt.Len() > 0 {
+		if destination.Len() > 0 {
 			separatorBytes = len(contextPromptSeparator)
 		}
 
 		rendered := renderContextContribution(value, content)
-		remaining := policy.MaxPromptBytes - prompt.Len() - separatorBytes
+		remaining := policy.MaxPromptBytes - promptBytes - separatorBytes
 
 		if len(rendered) > remaining {
 			if policy.Overflow == OverflowExclude {
@@ -298,10 +320,11 @@ func (e *Engine) Compose(
 			)
 		}
 
-		if prompt.Len() > 0 {
-			prompt.WriteString(contextPromptSeparator)
+		if destination.Len() > 0 {
+			destination.WriteString(contextPromptSeparator)
 		}
-		prompt.WriteString(rendered)
+		destination.WriteString(rendered)
+		promptBytes += separatorBytes + len(rendered)
 
 		value.Content = content
 		value.OriginalBytes = originalBytes
@@ -321,8 +344,30 @@ func (e *Engine) Compose(
 		)
 	}
 
-	result.Prompt = prompt.String()
+	result.Instructions = instructions.String()
+	result.UserMessage = userMessage.String()
 	return result, nil
+}
+
+// promptForInsert owns the mapping from the portable Text insertion contract
+// to one Workspace inference channel. The aggregate composition budget is
+// enforced by Compose across both returned builders.
+func promptForInsert(
+	insert declaration.InsertTarget,
+	instructions *strings.Builder,
+	userMessage *strings.Builder,
+) (*strings.Builder, error) {
+	switch insert {
+	case declaration.InsertInstructions:
+		return instructions, nil
+	case declaration.InsertUserMessage:
+		return userMessage, nil
+	default:
+		return nil, fmt.Errorf(
+			"unsupported workspace context insertion target %q",
+			insert,
+		)
+	}
 }
 
 func renderContextContribution(
@@ -334,7 +379,7 @@ func renderContextContribution(
 	fmt.Fprintf(
 		&output,
 		contextPromptStartFormat,
-		value.Kind,
+		value.Insert,
 		value.Name,
 		value.Locator,
 	)
