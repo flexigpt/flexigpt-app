@@ -108,7 +108,7 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceMCPServerLoadPlan, error) {
-	value, err := a.LoadWorkspaceMCPServersForRuntime(
+	value, err := a.loadWorkspaceMCPServersForRuntime(
 		ctx,
 		workspace,
 		artifacts,
@@ -119,7 +119,7 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	return projectWorkspaceMCPServerLoadPlan(value), nil
 }
 
-func (a *StoreAPI) LoadWorkspaceMCPServersForRuntime(
+func (a *StoreAPI) loadWorkspaceMCPServersForRuntime(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,

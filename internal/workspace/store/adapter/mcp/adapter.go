@@ -58,8 +58,9 @@ func New(
 	}, nil
 }
 
-// Load resolves Workspace-selected MCP Artifacts into runtime-ready MCP
-// server material. It intentionally does not start or connect servers.
+// Load resolves capability-authorized MCP Artifacts into runtime-ready server
+// material. Protected built-in ArtifactRefs may belong to another Root. It
+// intentionally does not start or connect servers.
 func (a *Adapter) Load(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
@@ -70,30 +71,12 @@ func (a *Adapter) Load(
 		a.servers == nil {
 		return LoadPlan{}, basespec.ErrClosed
 	}
-	if err := workspace.Validate(); err != nil {
-		return LoadPlan{}, err
-	}
 
 	output := LoadPlan{
 		Workspace: workspace.Ref(),
 		Servers:   make([]WorkspaceServer, 0, len(refs)),
 	}
-	seen := make(map[artifact.ArtifactRef]struct{}, len(refs))
 	for _, ref := range refs {
-		if err := ref.Validate(); err != nil {
-			return LoadPlan{}, err
-		}
-		if ref.RootID != workspace.Artifact.RootID {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: Workspace MCP Artifact belongs to another Root",
-				workspaceDomain.ErrReferenceUnresolved,
-			)
-		}
-		if _, duplicate := seen[ref]; duplicate {
-			continue
-		}
-		seen[ref] = struct{}{}
-
 		record, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return LoadPlan{}, err

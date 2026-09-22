@@ -81,9 +81,10 @@ func New(
 	}, nil
 }
 
-// ComposeSelected composes exactly refs in order. Unlike Compose, an empty
-// ref list means an intentionally empty selection rather than every prompt
-// Artifact in the Root.
+// ComposeSelected composes exactly refs in order. The Workspace consumer API
+// must authorize refs against the resolved capability plan before calling it.
+// Protected built-in ArtifactRefs may therefore belong to another Root. An
+// empty ref list means an intentionally empty selection.
 func (a *Adapter) ComposeSelected(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
@@ -99,9 +100,6 @@ func (a *Adapter) compose(
 ) (Plan, error) {
 	if a == nil || a.artifacts == nil || a.engine == nil {
 		return Plan{}, basespec.ErrClosed
-	}
-	if err := workspace.Validate(); err != nil {
-		return Plan{}, err
 	}
 	if err := ctx.Err(); err != nil {
 		return Plan{}, err
@@ -250,15 +248,6 @@ func (a *Adapter) selection(
 
 	output := make([]artifact.Artifact, 0, len(refs))
 	for _, ref := range refs {
-		if err := ref.Validate(); err != nil {
-			return nil, err
-		}
-		if ref.RootID != workspace.Artifact.RootID {
-			return nil, fmt.Errorf(
-				"%w: selected Artifact belongs to another Root",
-				workspaceDomain.ErrReferenceUnresolved,
-			)
-		}
 		value, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return nil, err
@@ -277,7 +266,9 @@ func (a *Adapter) resolveContribution(
 	case artifact.ArtifactKind(textv1.TextType):
 		var value materializetext.Document
 		var err error
-		if workspace.CompositionSourceID != "" && record.Binding.SourceID != workspace.CompositionSourceID {
+		if record.RootID == workspace.Artifact.RootID &&
+			workspace.CompositionSourceID != "" &&
+			record.Binding.SourceID != workspace.CompositionSourceID {
 			value, err = a.text.ResolveWithContentSource(
 				ctx,
 				record.Ref(),

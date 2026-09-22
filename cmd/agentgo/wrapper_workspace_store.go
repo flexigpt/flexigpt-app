@@ -97,7 +97,21 @@ func (w *WorkspaceStoreWrapper) RegisterWorkspaceDirectory(
 	return withWorkspaceStore(
 		w,
 		func(api *workspaceConsumerAPI.StoreAPI) (workspaceConsumerAPI.WorkspaceDirectoryView, error) {
-			return api.RegisterWorkspaceDirectory(context.Background(), path)
+			ctx := context.Background()
+			view, err := api.RegisterWorkspaceDirectory(ctx, path)
+			if err != nil {
+				return workspaceConsumerAPI.WorkspaceDirectoryView{}, err
+			}
+			if w.ensureArtifactBaselines == nil {
+				return workspaceConsumerAPI.WorkspaceDirectoryView{}, basespec.ErrClosed
+			}
+			if err := w.ensureArtifactBaselines(
+				ctx,
+				view.Ref.RootID,
+			); err != nil {
+				return workspaceConsumerAPI.WorkspaceDirectoryView{}, err
+			}
+			return view, nil
 		},
 	)
 }

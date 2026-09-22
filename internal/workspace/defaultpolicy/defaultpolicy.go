@@ -62,9 +62,6 @@ func Load() (Policy, error) {
 		CanonicalJSON: append([]byte(nil), canonical...),
 		Document:      document,
 	}
-	if err := output.Validate(); err != nil {
-		return Policy{}, err
-	}
 	return output, nil
 }
 
@@ -105,13 +102,6 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 		if header.Type == declaration.TypeWorkspace {
 			return fmt.Errorf("%w: members[%d] cannot contain workspace", basespec.ErrInvalid, index)
 		}
-		relationship, err := member.Relationship()
-		if err != nil {
-			return fmt.Errorf("members[%d]: %w", index, err)
-		}
-		if len(relationship.Overrides) != 0 || len(relationship.Use) != 0 {
-			return fmt.Errorf("%w: members[%d] cannot contain overrides or use", basespec.ErrInvalid, index)
-		}
 		if header.Type == declaration.TypeText {
 			if form != declaration.MemberContained {
 				return fmt.Errorf("%w: members[%d] text must be contained", basespec.ErrInvalid, index)
@@ -130,12 +120,26 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 			if text.Content != nil || text.Locator == nil {
 				return fmt.Errorf("%w: members[%d] text must use locator content", basespec.ErrInvalid, index)
 			}
+			if _, err := declaration.ResolveSourceRelativePathLocator(
+				*text.Locator,
+				basespec.Locator(PolicyLocator),
+			); err != nil {
+				return fmt.Errorf(
+					"members[%d] text must use a local source-relative locator: %w",
+					index,
+					err,
+				)
+			}
 			continue
 		}
 		switch form {
 		case declaration.MemberSelector:
 			continue
 		case declaration.MemberNamed:
+			relationship, err := member.Relationship()
+			if err != nil {
+				return fmt.Errorf("members[%d]: %w", index, err)
+			}
 			if relationship.Scope != declaration.LookupScopeBuiltin {
 				return fmt.Errorf("%w: members[%d] named non-text must use scope builtin", basespec.ErrInvalid, index)
 			}

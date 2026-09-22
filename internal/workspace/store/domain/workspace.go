@@ -102,15 +102,11 @@ func NewWorkspace(
 		)
 	}
 
-	output := Workspace{
+	return Workspace{
 		Artifact:   record.Clone(),
 		Definition: value.Clone(),
 		Document:   document,
-	}
-	if err := output.Validate(); err != nil {
-		return Workspace{}, err
-	}
-	return output, nil
+	}, nil
 }
 
 func (w Workspace) View() WorkspaceView {

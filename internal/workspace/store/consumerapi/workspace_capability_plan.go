@@ -6,23 +6,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
-
-// ResolveArtifactCapabilities exposes the complete generic declaration
-// capability plan. It can resolve Plugin, Agent, Team, Loop, Workflow,
-// Workspace, Skill, Tool, Model, and other contract declaration Artifacts.
-func (a *StoreAPI) ResolveArtifactCapabilities(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	if a == nil || a.resolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
-	}
-	return a.resolver.ResolveCapabilities(ctx, ref)
-}
 
 func (a *StoreAPI) ResolveWorkspaceCapabilities(
 	ctx context.Context,

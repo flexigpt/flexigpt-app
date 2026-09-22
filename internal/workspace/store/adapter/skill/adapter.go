@@ -52,8 +52,9 @@ func New(
 	}, nil
 }
 
-// LoadSelected loads exactly refs in order. An empty list means no Skills,
-// rather than every available Skill in the Workspace Root.
+// LoadSelected loads exactly the capability-authorized refs in order.
+// Protected built-in ArtifactRefs may belong to another Root. An empty list
+// means no Skills rather than every available Skill.
 func (a *Adapter) LoadSelected(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
@@ -61,9 +62,6 @@ func (a *Adapter) LoadSelected(
 ) (LoadPlan, error) {
 	if a == nil || a.artifacts == nil || a.resources == nil {
 		return LoadPlan{}, basespec.ErrClosed
-	}
-	if err := workspace.Validate(); err != nil {
-		return LoadPlan{}, err
 	}
 	return a.loadSelected(ctx, workspace, refs)
 }
@@ -73,29 +71,11 @@ func (a *Adapter) loadSelected(
 	workspace workspaceDomain.Workspace,
 	refs []artifact.ArtifactRef,
 ) (LoadPlan, error) {
-	seen := make(map[artifact.ArtifactID]struct{}, len(refs))
 	output := LoadPlan{
 		Workspace: workspace.Ref(),
 		Skills:    make([]WorkspaceSkill, 0, len(refs)),
 	}
 	for _, ref := range refs {
-		if err := ref.Validate(); err != nil {
-			return LoadPlan{}, err
-		}
-		if ref.RootID != workspace.Artifact.RootID {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: selected Skill belongs to another Root",
-				workspaceDomain.ErrReferenceUnresolved,
-			)
-		}
-		if _, duplicate := seen[ref.ArtifactID]; duplicate {
-			return LoadPlan{}, fmt.Errorf(
-				"%w: duplicate selected Workspace Skill",
-				workspaceDomain.ErrInvalidWorkspace,
-			)
-		}
-		seen[ref.ArtifactID] = struct{}{}
-
 		record, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return LoadPlan{}, err

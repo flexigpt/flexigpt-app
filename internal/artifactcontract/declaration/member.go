@@ -155,6 +155,27 @@ func (r Relationship) Validate() error {
 	return ValidateRawMessageMap("member use", r.Use)
 }
 
+// ValidateNoRelationshipBehavior enforces a containing contract position that
+// permits selection or containment but defines no overrides or use behavior.
+func ValidateNoRelationshipBehavior(
+	label string,
+	entry Entry,
+) error {
+	relationship, err := entry.Relationship()
+	if err != nil {
+		return err
+	}
+	if len(relationship.Overrides) != 0 ||
+		len(relationship.Use) != 0 {
+		return fmt.Errorf(
+			"%w: %s does not support overrides or use",
+			basespec.ErrInvalid,
+			label,
+		)
+	}
+	return nil
+}
+
 func (e Entry) MemberForm() (MemberForm, error) {
 	if err := e.Validate(); err != nil {
 		return "", err
@@ -221,10 +242,21 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		); err != nil {
 			return "", err
 		}
-		if err := e.Header().Validate(HeaderValidation{
+		header := e.Header()
+		if err := header.Validate(HeaderValidation{
 			RequireName: true,
 		}); err != nil {
 			return "", err
+		}
+		if header.Type == TypeText {
+			if _, err := e.TextInsert(); err != nil {
+				return "", err
+			}
+		} else if _, present := fields["insert"]; present {
+			return "", fmt.Errorf(
+				"%w: member insert is valid only for Text",
+				basespec.ErrInvalid,
+			)
 		}
 		if _, err := e.Relationship(); err != nil {
 			return "", err

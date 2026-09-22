@@ -41,6 +41,23 @@ type StoreAPI struct {
 	resolver      *resolve.Resolver
 }
 
+// workspaceLocatorRuntime keeps the generic provider runtime port out of the
+// Workspace consumer API surface.
+type workspaceLocatorRuntime struct {
+	artifacts compositionapi.ArtifactAPI
+}
+
+func (r workspaceLocatorRuntime) ListArtifactsBySource(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) ([]artifact.Artifact, error) {
+	if r.artifacts == nil {
+		return nil, basespec.ErrClosed
+	}
+	return r.artifacts.ListBySource(ctx, rootID, sourceID)
+}
+
 func NewStoreAPI(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
@@ -101,7 +118,9 @@ func NewStoreAPI(
 
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.LocatorResolvers,
-		output,
+		workspaceLocatorRuntime{
+			artifacts: artifacts,
+		},
 	)
 	if err != nil {
 		return nil, err
@@ -130,7 +149,7 @@ func NewStoreAPI(
 }
 
 // ResolveWorkspace is the runtime read boundary. It accepts only a currently
-// effective and enabled Workspace. Management projections use getWorkspace.
+// effective and enabled Workspace. Management projections use workspaceForRef.
 func (a *StoreAPI) ResolveWorkspace(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -148,17 +167,6 @@ func (a *StoreAPI) ResolveWorkspace(
 	return value, nil
 }
 
-func (a *StoreAPI) ListArtifactsBySource(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, basespec.ErrClosed
-	}
-	return a.artifacts.ListBySource(ctx, rootID, sourceID)
-}
-
 func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	ctx context.Context,
 	directory WorkspaceDirectoryRef,
@@ -166,13 +174,26 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	if err := directory.RootID.Validate(); err != nil {
 		return nil, err
 	}
-	if _, err := a.requiredWorkspaceSources(ctx, directory.RootID); err != nil {
-		return nil, err
-	}
-	records, err := a.artifacts.ListByRoot(ctx, directory.RootID)
+	values, err := a.requiredWorkspaceSources(ctx, directory.RootID)
 	if err != nil {
 		return nil, err
 	}
+	records, err := a.artifacts.ListBySource(
+		ctx,
+		directory.RootID,
+		values.Directory.ID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defaultRecord, found, err := a.defaultWorkspaceRecord(ctx, values)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		records = append(records, defaultRecord)
+	}
+
 	output := make([]WorkspaceArtifactView, 0, len(records))
 	for _, record := range records {
 		output = append(output, workspaceArtifactViewOf(record))
@@ -206,7 +227,8 @@ func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	if err := ref.Validate(); err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	if _, err := a.requiredWorkspaceSources(ctx, directory.RootID); err != nil {
+	values, err := a.requiredWorkspaceSources(ctx, directory.RootID)
+	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
 	if ref.RootID != directory.RootID {
@@ -215,8 +237,21 @@ func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 			workspaceDomain.ErrReferenceUnresolved,
 		)
 	}
-	if _, err := a.artifacts.Get(ctx, ref); err != nil {
+	record, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
 		return WorkspaceArtifactView{}, err
+	}
+	if !isWorkspaceDirectoryCatalogArtifact(values, record) {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: Artifact is not exposed by this Workspace directory",
+			workspaceDomain.ErrReferenceUnresolved,
+		)
+	}
+	if record.Ref() != ref {
+		return WorkspaceArtifactView{}, fmt.Errorf(
+			"%w: Artifact lookup returned another occurrence",
+			basespec.ErrInvalid,
+		)
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -605,6 +640,10 @@ func (a *StoreAPI) listPhysicalWorkspaces(
 		if record.Kind != workspaceDomain.WorkspaceArtifactKind {
 			continue
 		}
+		if record.Binding.SubresourceLocator != "" ||
+			!documentTopology.IsWorkspaceManifestLocator(record.Binding.Locator) {
+			continue
+		}
 		if record.State != artifact.StateAvailable {
 			continue
 		}
@@ -638,6 +677,10 @@ func (a *StoreAPI) effectiveWorkspaces(
 	if err != nil {
 		return nil, nil, err
 	}
+	diagnostics := invalidWorkspaceManifestDiagnostics(
+		intent,
+		physical,
+	)
 	if len(intent) == 0 && len(physical) == 0 {
 		record, found, err := a.defaultWorkspaceRecord(
 			ctx,
@@ -667,15 +710,17 @@ func (a *StoreAPI) effectiveWorkspaces(
 			return []WorkspaceDirectoryWorkspace{{
 				Workspace: workspace.View(),
 				Origin:    WorkspaceDirectoryOriginDefault,
-			}}, nil, nil
+			}}, diagnostics, nil
 		}
-		return []WorkspaceDirectoryWorkspace{}, []diagnostic.Diagnostic{
-			{
+		diagnostics = diagnostic.Append(
+			diagnostics,
+			diagnostic.Diagnostic{
 				Severity: diagnostic.SeverityWarning,
 				Code:     "workspace.default-unavailable",
 				Message:  "default Workspace policy is unavailable",
 			},
-		}, nil
+		)
+		return []WorkspaceDirectoryWorkspace{}, diagnostics, nil
 	}
 	output := make([]WorkspaceDirectoryWorkspace, 0, len(physical))
 	seen := make(map[artifact.ArtifactRef]struct{}, len(physical))
@@ -703,23 +748,43 @@ func (a *StoreAPI) effectiveWorkspaces(
 			},
 		)
 	}
-	var diagnostics []diagnostic.Diagnostic
-	if len(output) == 0 {
-		code := "workspace.manifest-unavailable"
-		message := "physical Workspace declarations are unavailable or disabled"
-		if len(physical) == 0 && len(intent) != 0 {
-			code = "workspace.manifest-invalid"
-			message = "physical Workspace manifest intent exists without a valid Workspace declaration"
-		}
-		diagnostics = []diagnostic.Diagnostic{
-			{
+	if len(output) == 0 && len(diagnostics) == 0 {
+		diagnostics = diagnostic.Append(
+			diagnostics,
+			diagnostic.Diagnostic{
 				Severity: diagnostic.SeverityWarning,
-				Code:     code,
-				Message:  diagnostic.BoundedMessage(message),
+				Code:     "workspace.manifest-unavailable",
+				Message:  "physical Workspace declarations are unavailable or disabled",
 			},
-		}
+		)
 	}
 	return output, diagnostics, nil
+}
+
+func invalidWorkspaceManifestDiagnostics(
+	intent []basespec.Locator,
+	physical []artifact.Artifact,
+) []diagnostic.Diagnostic {
+	available := make(map[basespec.Locator]struct{}, len(physical))
+	for _, record := range physical {
+		available[record.Binding.Locator] = struct{}{}
+	}
+
+	var output []diagnostic.Diagnostic
+	for _, locator := range intent {
+		if _, found := available[locator]; found {
+			continue
+		}
+		output = diagnostic.Append(output, diagnostic.Diagnostic{
+			Severity: diagnostic.SeverityWarning,
+			Code:     "workspace.manifest-invalid",
+			Message:  "Workspace manifest did not produce an available top-level Workspace declaration",
+			Location: &diagnostic.Location{
+				Locator: locator,
+			},
+		})
+	}
+	return output
 }
 
 func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (WorkspaceDirectoryView, error) {
@@ -770,6 +835,23 @@ func workspaceArtifactViewOf(
 		Locator:            value.Binding.Locator,
 		SubresourceLocator: value.Binding.SubresourceLocator,
 	}
+}
+
+func isWorkspaceDirectoryCatalogArtifact(
+	values workspaceSourceSet,
+	value artifact.Artifact,
+) bool {
+	if value.RootID != values.Directory.RootID {
+		return false
+	}
+	if value.Binding.SourceID == values.Directory.ID {
+		return true
+	}
+	return value.Binding.SourceID == values.Policy.ID &&
+		value.Binding.Locator == basespec.Locator(defaultpolicy.PolicyLocator) &&
+		value.Binding.SubresourceLocator == "" &&
+		value.Kind == workspaceDomain.WorkspaceArtifactKind &&
+		string(value.LogicalName) == defaultpolicy.PolicyID
 }
 
 func workspaceRootStorageKey(rootPath string) basespec.StorageKey {

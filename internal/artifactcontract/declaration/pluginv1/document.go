@@ -115,7 +115,7 @@ func (v PluginDocument) validateFields() error {
 	); err != nil {
 		return err
 	}
-	return declaration.ValidateMemberUniqueness(
+	return declaration.ValidateMembersWithoutRelationshipBehavior(
 		"Plugin members",
 		v.Members,
 	)

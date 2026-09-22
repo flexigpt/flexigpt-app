@@ -429,7 +429,7 @@ func memberOccurrencePath(
 }
 
 func relationshipDigest(relationship ResolvedRelationship) string {
-	raw, err := relationship.Declared.CanonicalJSON()
+	raw, err := declaration.MemberIdentityJSON(relationship.Declared)
 	if err != nil {
 		return "invalid"
 	}

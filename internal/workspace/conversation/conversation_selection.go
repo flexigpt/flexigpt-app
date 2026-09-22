@@ -166,15 +166,6 @@ func (r *ConversationResolver) ResolveConversationSelection(
 			Usage: unresolvedConversationUsage(selection, err),
 		}, err
 	}
-	if workspace.Artifact.State != artifact.StateAvailable {
-		err := fmt.Errorf(
-			"%w: selected Workspace Artifact is unavailable",
-			basespec.ErrReferenceUnresolved,
-		)
-		return ConversationResolution{
-			Usage: unresolvedConversationUsage(selection, err),
-		}, err
-	}
 
 	usage := ConversationUsage{
 		Workspace:         selection.Workspace,
@@ -271,26 +262,20 @@ func (r *ConversationResolver) ResolveConversationSelection(
 func initializeContextUsage(
 	selection ConversationSelection,
 	usage *ConversationUsage,
-) ([]artifact.ArtifactRef, map[artifact.ArtifactID]int, error) {
-	index := make(map[artifact.ArtifactID]int, len(selection.ContextRefs))
+) ([]artifact.ArtifactRef, map[artifact.ArtifactRef]int, error) {
+	index := make(map[artifact.ArtifactRef]int, len(selection.ContextRefs))
 	refs := make([]artifact.ArtifactRef, 0, len(selection.ContextRefs))
 	for _, selected := range selection.ContextRefs {
 		if err := selected.Artifact.Validate(); err != nil {
 			return nil, nil, err
 		}
-		if selected.Artifact.RootID != selection.Workspace.RootID {
-			return nil, nil, fmt.Errorf(
-				"%w: selected Context Artifact belongs to another Root",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, duplicate := index[selected.Artifact.ArtifactID]; duplicate {
+		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Context Artifact",
 				basespec.ErrInvalid,
 			)
 		}
-		index[selected.Artifact.ArtifactID] = len(usage.Contexts)
+		index[selected.Artifact] = len(usage.Contexts)
 		refs = append(refs, selected.Artifact)
 		usage.Contexts = append(usage.Contexts, ConversationContextUsage{
 			Artifact:                 selected.Artifact,
@@ -306,26 +291,20 @@ func initializeContextUsage(
 func initializeSkillUsage(
 	selection ConversationSelection,
 	usage *ConversationUsage,
-) ([]artifact.ArtifactRef, map[artifact.ArtifactID]int, error) {
-	index := make(map[artifact.ArtifactID]int, len(selection.SkillRefs))
+) ([]artifact.ArtifactRef, map[artifact.ArtifactRef]int, error) {
+	index := make(map[artifact.ArtifactRef]int, len(selection.SkillRefs))
 	refs := make([]artifact.ArtifactRef, 0, len(selection.SkillRefs))
 	for _, selected := range selection.SkillRefs {
 		if err := selected.Artifact.Validate(); err != nil {
 			return nil, nil, err
 		}
-		if selected.Artifact.RootID != selection.Workspace.RootID {
-			return nil, nil, fmt.Errorf(
-				"%w: selected Skill Artifact belongs to another Root",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, duplicate := index[selected.Artifact.ArtifactID]; duplicate {
+		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Skill Artifact",
 				basespec.ErrInvalid,
 			)
 		}
-		index[selected.Artifact.ArtifactID] = len(usage.Skills)
+		index[selected.Artifact] = len(usage.Skills)
 		refs = append(refs, selected.Artifact)
 		usage.Skills = append(usage.Skills, ConversationSkillUsage{
 			Artifact:                 selected.Artifact,
@@ -342,7 +321,7 @@ func applyContextPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
 	plan prompt.Plan,
-	index map[artifact.ArtifactID]int,
+	index map[artifact.ArtifactRef]int,
 ) {
 	usage.Diagnostics = diagnostic.Append(
 		usage.Diagnostics,
@@ -350,7 +329,7 @@ func applyContextPlan(
 	)
 
 	for _, contribution := range plan.Contributions {
-		position, found := index[contribution.Artifact.ArtifactID]
+		position, found := index[contribution.Artifact]
 		if !found {
 			continue
 		}
@@ -375,7 +354,7 @@ func applyContextPlan(
 		}
 	}
 	for _, decision := range plan.Decisions {
-		position, found := index[decision.Artifact.ArtifactID]
+		position, found := index[decision.Artifact]
 		if !found {
 			continue
 		}
@@ -391,10 +370,10 @@ func applySkillPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
 	plan skill.LoadPlan,
-	index map[artifact.ArtifactID]int,
+	index map[artifact.ArtifactRef]int,
 ) {
 	for _, skill := range plan.Skills {
-		position, found := index[skill.Artifact.ArtifactID]
+		position, found := index[skill.Artifact]
 		if !found {
 			continue
 		}

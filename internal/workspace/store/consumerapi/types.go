@@ -65,10 +65,6 @@ type WorkspaceDefaultPolicyView struct {
 	YAML    string            `json:"yaml"`
 }
 
-type WorkspaceRefresh struct {
-	Workspace artifact.ArtifactRef `json:"workspace"`
-}
-
 type WorkspaceRuntimeSelection struct {
 	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts,omitempty"`
 	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts,omitempty"`

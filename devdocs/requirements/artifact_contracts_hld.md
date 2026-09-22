@@ -2168,7 +2168,7 @@ Status terminology:
 | Opaque generic `parameters` classification                          | Available  |
 | Stable contained declaration positions                              | Available  |
 | Member selectors                                                    | Available  |
-| Rejection of `overrides` and `use` where no behavior is defined     | Pending    |
+| Rejection of `overrides` and `use` where no behavior is defined     | Available  |
 | Text insertion identity                                             | Available  |
 | Typed Model defaults                                                | Available  |
 | Strict Tool implementations                                         | Available  |

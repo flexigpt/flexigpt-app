@@ -197,7 +197,10 @@ func validateProgramMember(
 			expected,
 		)
 	}
-	return nil
+	return declaration.ValidateNoRelationshipBehavior(
+		label,
+		value,
+	)
 }
 
 func validateMemberRelationship(member declaration.Entry) error {

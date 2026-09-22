@@ -144,6 +144,12 @@ func (v LoopDocument) validateFields() error {
 				basespec.ErrInvalid,
 			)
 		}
+		if err := declaration.ValidateNoRelationshipBehavior(
+			"Loop body",
+			*v.Body,
+		); err != nil {
+			return err
+		}
 	}
 	if v.Until != nil {
 		if err := declaration.ValidateOutputMatch(

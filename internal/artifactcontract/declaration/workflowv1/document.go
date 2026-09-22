@@ -245,6 +245,12 @@ func (v WorkflowDocument) validateFields() error {
 				node.ID,
 			)
 		}
+		if err := declaration.ValidateNoRelationshipBehavior(
+			"Workflow node",
+			node.Member,
+		); err != nil {
+			return fmt.Errorf("workflow nodes[%d]: %w", index, err)
+		}
 		switch node.Join {
 		case "", JoinAll, JoinAny:
 		default:

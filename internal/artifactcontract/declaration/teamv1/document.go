@@ -133,7 +133,7 @@ func (v TeamDocument) validateFields() error {
 	); err != nil {
 		return err
 	}
-	if err := declaration.ValidateMemberTypes(
+	if err := declaration.ValidateMembersWithoutRelationshipBehavior(
 		"Team members",
 		v.Members,
 		declaration.TypeAgent,
@@ -182,5 +182,8 @@ func validateProgramMember(
 			expected,
 		)
 	}
-	return nil
+	return declaration.ValidateNoRelationshipBehavior(
+		label,
+		value,
+	)
 }

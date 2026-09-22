@@ -52,13 +52,6 @@ func (a *StoreAPI) workspaceForRef(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
-	return a.workspaceAt(ctx, ref)
-}
-
-func (a *StoreAPI) workspaceAt(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (workspaceDomain.Workspace, error) {
 	if a.resolver != nil {
 		terminal, err := a.resolver.ResolveTerminalArtifact(ctx, ref)
 		if err != nil {

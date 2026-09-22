@@ -146,7 +146,7 @@ func (v SkillDocument) validateFields() error {
 			return err
 		}
 	}
-	return declaration.ValidateMemberTypes(
+	return declaration.ValidateMembersWithoutRelationshipBehavior(
 		"Skill allowedTools",
 		v.AllowedTools,
 		declaration.TypeTool,

@@ -947,14 +947,18 @@ The initial feature does not add:
 | Per-Root directory and policy Source provisioning               | Available |
 | Directory-only registration                                     | Available |
 | Physical manifest intent inventory                              | Available |
+| Top-level manifest-only physical Workspace eligibility          | Available |
+| Mixed valid and invalid manifest diagnostics                    | Available |
 | Default versus physical effective-mode calculation              | Available |
 | Multiple peer Workspace results                                 | Available |
 | Default policy composition-Source attachment                    | Available |
 | Template-aware Text content Source override                     | Available |
 | Source-local named lookup, then built-in and mapped fallback    | Available |
+| Protected built-in runtime materialization                      | Available |
 | Located lookup against the composition Source                   | Available |
 | Selector expansion against the composition Source               | Available |
 | Explicit composition-aware refresh closure                      | Available |
+| Post-registration baseline provisioning                         | Available |
 | Runtime rejection of inactive default Workspace refs            | Available |
 | Directory enable, disable, refresh, and removal                 | Available |
 | Generic Artifact enablement in Workspace runtime paths          | Available |

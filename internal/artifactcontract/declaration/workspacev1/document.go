@@ -136,7 +136,7 @@ func (v WorkspaceDocument) validateFields() error {
 	); err != nil {
 		return err
 	}
-	return declaration.ValidateMemberUniqueness(
+	return declaration.ValidateMembersWithoutRelationshipBehavior(
 		"Workspace members",
 		v.Members,
 	)

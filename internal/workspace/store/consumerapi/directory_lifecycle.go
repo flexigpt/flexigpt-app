@@ -201,7 +201,9 @@ func (a *StoreAPI) defaultWorkspaceRecord(
 
 	candidates := make([]artifact.Artifact, 0, 1)
 	for _, record := range records {
-		if record.Kind == workspaceDomain.WorkspaceArtifactKind &&
+		if record.Binding.Locator == basespec.Locator(defaultpolicy.PolicyLocator) &&
+			record.Binding.SubresourceLocator == "" &&
+			record.Kind == workspaceDomain.WorkspaceArtifactKind &&
 			string(record.LogicalName) == defaultpolicy.PolicyID {
 			candidates = append(candidates, record)
 		}
@@ -246,9 +248,6 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 
 	if len(physical) != 0 {
 		for _, record := range physical {
-			if !record.Enabled {
-				continue
-			}
 			if err := a.resolver.RefreshWorkspaceWithCompositionSource(
 				ctx,
 				record.Ref(),
@@ -267,7 +266,7 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 	if err != nil || !found {
 		return err
 	}
-	if record.State != artifact.StateAvailable || !record.Enabled {
+	if record.State != artifact.StateAvailable {
 		return nil
 	}
 	return a.resolver.RefreshWorkspaceWithCompositionSource(
@@ -305,9 +304,33 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 
 	switch workspace.Artifact.Binding.SourceID {
 	case values.Directory.ID:
+		effective, err := a.isEffectivePhysicalWorkspace(
+			ctx,
+			values,
+			workspace.Ref(),
+		)
+		if err != nil {
+			return err
+		}
+		if !effective {
+			return fmt.Errorf(
+				"%w: Workspace is not an effective physical manifest Workspace",
+				basespec.ErrReferenceUnresolved,
+			)
+		}
 		return nil
 
 	case values.Policy.ID:
+		record, found, err := a.defaultWorkspaceRecord(ctx, values)
+		if err != nil {
+			return err
+		}
+		if !found || record.Ref() != workspace.Ref() {
+			return fmt.Errorf(
+				"%w: selected Workspace is not the Root-local default policy Workspace",
+				basespec.ErrReferenceUnresolved,
+			)
+		}
 		if string(workspace.Artifact.LogicalName) != defaultpolicy.PolicyID ||
 			cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
 			return fmt.Errorf(
@@ -347,6 +370,43 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 	}
 }
 
+func (a *StoreAPI) isEffectivePhysicalWorkspace(
+	ctx context.Context,
+	values workspaceSourceSet,
+	ref artifact.ArtifactRef,
+) (bool, error) {
+	records, err := a.listPhysicalWorkspaces(
+		ctx,
+		ref.RootID,
+		values.Directory.ID,
+	)
+	if err != nil {
+		return false, err
+	}
+	for _, record := range records {
+		if !record.Enabled {
+			continue
+		}
+		if record.Ref() == ref {
+			return true, nil
+		}
+		terminal, err := a.resolver.ResolveTerminalArtifact(
+			ctx,
+			record.Ref(),
+		)
+		if err != nil {
+			if contextErr := ctx.Err(); contextErr != nil {
+				return false, contextErr
+			}
+			continue
+		}
+		if terminal == ref {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (a *StoreAPI) workspaceDirectoryRootIDs(
 	ctx context.Context,
 ) ([]root.RootID, error) {
@@ -360,7 +420,7 @@ func (a *StoreAPI) workspaceDirectoryRootIDs(
 		if err != nil {
 			return nil, err
 		}
-		if sources.HasDirectory {
+		if sources.HasDirectory && sources.HasPolicy {
 			output = append(output, value.ID)
 		}
 	}
