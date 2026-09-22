@@ -4,21 +4,21 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
+	"github.com/flexigpt/flexigpt-app/internal/tool/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
-	"github.com/flexigpt/flexigpt-app/internal/toolruntime"
-	"github.com/flexigpt/flexigpt-app/internal/toolruntime/spec"
 )
 
 type ToolRuntimeWrapper struct {
 	store *toolStore.ToolStore
-	tr    *toolruntime.ToolRuntime
+	tr    *runtime.ToolRuntime
 }
 
 func InitToolRuntimeWrapper(
 	trw *ToolRuntimeWrapper,
 	store *toolStore.ToolStore,
 ) error {
-	tr := toolruntime.NewToolRuntime(store)
+	tr := runtime.NewToolRuntime(store)
 	trw.store = store
 	trw.tr = tr
 	return nil

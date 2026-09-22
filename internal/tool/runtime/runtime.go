@@ -1,4 +1,4 @@
-package toolruntime
+package runtime
 
 import (
 	"context"
@@ -17,8 +17,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
 
-	"github.com/flexigpt/flexigpt-app/internal/toolruntime/httprunner"
-	"github.com/flexigpt/flexigpt-app/internal/toolruntime/spec"
+	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/httprunner"
+	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
 )
 
 // ToolRuntime executes tools (HTTP/Go) using tool definitions retrieved from ToolStore.

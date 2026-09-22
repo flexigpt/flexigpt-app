@@ -1,4 +1,4 @@
-package toolruntime
+package runtime
 
 import (
 	"context"
@@ -19,10 +19,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
 	"github.com/flexigpt/flexigpt-app/internal/tool/storehelper"
-	"github.com/flexigpt/flexigpt-app/internal/toolruntime/spec"
 
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
