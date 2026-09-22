@@ -8,14 +8,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/mcp/management"
+
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPStoreWrapper struct {
 	api        *mcpConsumerAPI.API
-	management *management.Service
+	management *mcpConsumerAPI.MCPListService
 }
 
 func withMCPStore[T any](
@@ -33,7 +33,7 @@ func withMCPStore[T any](
 
 func withMCPStoreManagement[T any](
 	w *MCPStoreWrapper,
-	fn func(*management.Service) (T, error),
+	fn func(*mcpConsumerAPI.MCPListService) (T, error),
 ) (T, error) {
 	return middleware.WithRecoveryResp(func() (T, error) {
 		var zero T
@@ -99,17 +99,20 @@ func (w *MCPStoreWrapper) SetMCPPolicyEnabled(
 func (w *MCPStoreWrapper) ListMCPCollectionsPage(
 	pageSize int,
 	pageToken string,
-) (management.CollectionPage, error) {
-	return withMCPStoreManagement(w, func(service *management.Service) (management.CollectionPage, error) {
-		return service.ListCollectionsPage(context.Background(), pageSize, pageToken)
-	})
+) (mcpConsumerAPI.CollectionPage, error) {
+	return withMCPStoreManagement(
+		w,
+		func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.CollectionPage, error) {
+			return service.ListCollectionsPage(context.Background(), pageSize, pageToken)
+		},
+	)
 }
 
 func (w *MCPStoreWrapper) ListMCPServersPage(
 	pageSize int,
 	pageToken string,
-) (management.ServerPage, error) {
-	return withMCPStoreManagement(w, func(service *management.Service) (management.ServerPage, error) {
+) (mcpConsumerAPI.ServerPage, error) {
+	return withMCPStoreManagement(w, func(service *mcpConsumerAPI.MCPListService) (mcpConsumerAPI.ServerPage, error) {
 		return service.ListServersPage(context.Background(), pageSize, pageToken)
 	})
 }

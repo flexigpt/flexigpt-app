@@ -1,9 +1,4 @@
-// Package management provides bounded cross-Root MCP management queries.
-//
-// It is intentionally separate from Store persistence and Runtime execution.
-// It owns management pagination only. Frontend management composition may
-// iterate these pages, but no backend endpoint returns the full inventory.
-package management
+package consumerapi
 
 import (
 	"context"
@@ -52,22 +47,22 @@ type Store interface {
 	) ([]artifact.Artifact, error)
 }
 
-type Service struct {
+type MCPListService struct {
 	roots RootStore
 	store Store
 }
 
-func New(
+func NewMCPListService(
 	roots RootStore,
 	store Store,
-) (*Service, error) {
+) (*MCPListService, error) {
 	if roots == nil || store == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP management dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
-	return &Service{
+	return &MCPListService{
 		roots: roots,
 		store: store,
 	}, nil
@@ -87,7 +82,7 @@ type pageKey struct {
 	id     artifact.ArtifactID
 }
 
-func (s *Service) ListCollectionsPage(
+func (s *MCPListService) ListCollectionsPage(
 	ctx context.Context,
 	pageSize int,
 	pageToken string,
@@ -132,7 +127,7 @@ func (s *Service) ListCollectionsPage(
 	}, nil
 }
 
-func (s *Service) ListServersPage(
+func (s *MCPListService) ListServersPage(
 	ctx context.Context,
 	pageSize int,
 	pageToken string,
@@ -177,7 +172,7 @@ func (s *Service) ListServersPage(
 	}, nil
 }
 
-func (s *Service) orderedRoots(
+func (s *MCPListService) orderedRoots(
 	ctx context.Context,
 ) ([]root.Root, error) {
 	if s == nil || s.roots == nil {
