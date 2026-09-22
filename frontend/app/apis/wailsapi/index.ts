@@ -15,6 +15,5 @@ export * from './skill_runtime';
 export * from './skill_store';
 export * from './toolruntime';
 export * from './toolstore';
-export * from './workspace_aggregate';
 export * from './workspace_runtime';
 export * from './workspace_store';

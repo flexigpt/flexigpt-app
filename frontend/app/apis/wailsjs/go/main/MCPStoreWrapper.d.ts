@@ -4,7 +4,6 @@ import {collection} from '../models';
 import {artifact} from '../models';
 import {consumerapi} from '../models';
 import {root} from '../models';
-import {management} from '../models';
 import {resolve} from '../models';
 
 export function AddMCPCollectionMember(arg1:collection.AddMemberRequest):Promise<collection.CollectionView>;
@@ -25,13 +24,13 @@ export function ListMCPCollectionMemberships(arg1:artifact.ArtifactRef):Promise<
 
 export function ListMCPCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
 
-export function ListMCPCollectionsPage(arg1:number,arg2:string):Promise<management.CollectionPage>;
+export function ListMCPCollectionsPage(arg1:number,arg2:string):Promise<consumerapi.CollectionPage>;
 
 export function ListMCPPolicies(arg1:root.RootID):Promise<Array<artifact.Artifact>>;
 
 export function ListMCPServers(arg1:root.RootID):Promise<Array<artifact.Artifact>>;
 
-export function ListMCPServersPage(arg1:number,arg2:string):Promise<management.ServerPage>;
+export function ListMCPServersPage(arg1:number,arg2:string):Promise<consumerapi.ServerPage>;
 
 export function RemoveMCPCollectionMember(arg1:collection.RemoveMemberRequest):Promise<collection.CollectionView>;
 

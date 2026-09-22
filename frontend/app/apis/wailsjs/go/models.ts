@@ -1549,21 +1549,37 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class FilesystemSourceRegistration {
-	    rootID: string;
-	    rootPath: string;
-	    sourceDisplayName: string;
+	export class CollectionPage {
+	    items: collection.CollectionView[];
+	    nextPageToken?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new FilesystemSourceRegistration(source);
+	        return new CollectionPage(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.rootPath = source["rootPath"];
-	        this.sourceDisplayName = source["sourceDisplayName"];
+	        this.items = this.convertValues(source["items"], collection.CollectionView);
+	        this.nextPageToken = source["nextPageToken"];
 	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 	export class ListAgentsRequest {
 	    rootID: string;
@@ -2325,6 +2341,38 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class ServerPage {
+	    items: artifact.Artifact[];
+	    nextPageToken?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerPage(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.items = this.convertValues(source["items"], artifact.Artifact);
+	        this.nextPageToken = source["nextPageToken"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class SkillDirectoryRegistration {
 	    rootID: string;
 	    rootPath: string;
@@ -2403,7 +2451,6 @@ export namespace consumerapi {
 	    sourceID: string;
 	    locator: string;
 	    subresourceLocator?: string;
-	    runtimeDisabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceArtifactView(source);
@@ -2422,7 +2469,6 @@ export namespace consumerapi {
 	        this.sourceID = source["sourceID"];
 	        this.locator = source["locator"];
 	        this.subresourceLocator = source["subresourceLocator"];
-	        this.runtimeDisabled = source["runtimeDisabled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2443,18 +2489,50 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class WorkspaceLoad {
-	    workspace: domain.WorkspaceView;
-	    capabilities: resolve.CapabilityPlan;
+	export class WorkspaceDefaultPolicyView {
+	    policyID: string;
+	    policyVersion: string;
+	    policyDigest: string;
+	    yaml: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new WorkspaceLoad(source);
+	        return new WorkspaceDefaultPolicyView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.policyID = source["policyID"];
+	        this.policyVersion = source["policyVersion"];
+	        this.policyDigest = source["policyDigest"];
+	        this.yaml = source["yaml"];
+	    }
+	}
+	export class WorkspaceDirectoryRef {
+	    rootID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceDirectoryRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	    }
+	}
+	export class WorkspaceDirectoryWorkspace {
+	    workspace: domain.WorkspaceView;
+	    origin: string;
+	    manifestLocator?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceDirectoryWorkspace(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.workspace = this.convertValues(source["workspace"], domain.WorkspaceView);
-	        this.capabilities = this.convertValues(source["capabilities"], resolve.CapabilityPlan);
+	        this.origin = source["origin"];
+	        this.manifestLocator = source["manifestLocator"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2475,6 +2553,53 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class WorkspaceDirectoryView {
+	    ref: WorkspaceDirectoryRef;
+	    root: root.Root;
+	    directorySource: source.Summary;
+	    enabled: boolean;
+	    policyID: string;
+	    policyVersion: string;
+	    policyDigest: string;
+	    workspaces: WorkspaceDirectoryWorkspace[];
+	    diagnostics?: diagnostic.Diagnostic[];
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspaceDirectoryView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ref = this.convertValues(source["ref"], WorkspaceDirectoryRef);
+	        this.root = this.convertValues(source["root"], root.Root);
+	        this.directorySource = this.convertValues(source["directorySource"], source.Summary);
+	        this.enabled = source["enabled"];
+	        this.policyID = source["policyID"];
+	        this.policyVersion = source["policyVersion"];
+	        this.policyDigest = source["policyDigest"];
+	        this.workspaces = this.convertValues(source["workspaces"], WorkspaceDirectoryWorkspace);
+	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class WorkspaceMCPServer {
 	    artifact: artifact.ArtifactRef;
 	    artifactRevision: number;
@@ -2549,38 +2674,18 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class WorkspacePathRegistration {
-	    rootID: string;
-	    path: string;
-	    sourceDisplayName?: string;
-	    workspaceName?: string;
+	export class WorkspacePage {
+	    items: WorkspaceDirectoryView[];
+	    nextCursor?: string;
 	
 	    static createFrom(source: any = {}) {
-	        return new WorkspacePathRegistration(source);
+	        return new WorkspacePage(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.path = source["path"];
-	        this.sourceDisplayName = source["sourceDisplayName"];
-	        this.workspaceName = source["workspaceName"];
-	    }
-	}
-	export class WorkspacePathRegistrationResult {
-	    source: source.Summary;
-	    workspace: domain.WorkspaceView;
-	    load: WorkspaceLoad;
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspacePathRegistrationResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.source = this.convertValues(source["source"], source.Summary);
-	        this.workspace = this.convertValues(source["workspace"], domain.WorkspaceView);
-	        this.load = this.convertValues(source["load"], WorkspaceLoad);
+	        this.items = this.convertValues(source["items"], WorkspaceDirectoryView);
+	        this.nextCursor = source["nextCursor"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2600,6 +2705,20 @@ export namespace consumerapi {
 		    }
 		    return a;
 		}
+	}
+	export class WorkspacePageRequest {
+	    cursor?: string;
+	    limit?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new WorkspacePageRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.cursor = source["cursor"];
+	        this.limit = source["limit"];
+	    }
 	}
 	export class WorkspacePromptContribution {
 	    artifact: artifact.ArtifactRef;
@@ -2692,7 +2811,8 @@ export namespace consumerapi {
 	export class WorkspacePromptPlan {
 	    workspace: artifact.ArtifactRef;
 	    contributions: WorkspacePromptContribution[];
-	    prompt: string;
+	    instructions: string;
+	    userMessage: string;
 	    diagnostics?: diagnostic.Diagnostic[];
 	    decisions: WorkspacePromptDecision[];
 	
@@ -2704,39 +2824,10 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
 	        this.contributions = this.convertValues(source["contributions"], WorkspacePromptContribution);
-	        this.prompt = source["prompt"];
+	        this.instructions = source["instructions"];
+	        this.userMessage = source["userMessage"];
 	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
 	        this.decisions = this.convertValues(source["decisions"], WorkspacePromptDecision);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class WorkspaceRefresh {
-	    workspace: artifact.ArtifactRef;
-	
-	    static createFrom(source: any = {}) {
-	        return new WorkspaceRefresh(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2763,9 +2854,9 @@ export namespace consumerapi {
 	    definitionDigest: string;
 	    name: string;
 	    displayName?: string;
+	    insert?: string;
 	    locator?: string;
 	    version: string;
-	    runtimeDisabled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new WorkspaceSkill(source);
@@ -2778,9 +2869,9 @@ export namespace consumerapi {
 	        this.definitionDigest = source["definitionDigest"];
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
+	        this.insert = source["insert"];
 	        this.locator = source["locator"];
 	        this.version = source["version"];
-	        this.runtimeDisabled = source["runtimeDisabled"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3686,75 +3777,6 @@ export namespace main {
 
 }
 
-export namespace management {
-	
-	export class CollectionPage {
-	    items: collection.CollectionView[];
-	    nextPageToken?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new CollectionPage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.items = this.convertValues(source["items"], collection.CollectionView);
-	        this.nextPageToken = source["nextPageToken"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ServerPage {
-	    items: artifact.Artifact[];
-	    nextPageToken?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ServerPage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.items = this.convertValues(source["items"], artifact.Artifact);
-	        this.nextPageToken = source["nextPageToken"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
 export namespace policy {
 	
 	export class MCPAppsPolicy {
@@ -4097,24 +4119,6 @@ export namespace root {
 		    }
 		    return a;
 		}
-	}
-	export class RootDraft {
-	    id: string;
-	    storageKey: string;
-	    displayName: string;
-	    description?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new RootDraft(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.storageKey = source["storageKey"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	    }
 	}
 
 }

@@ -1,130 +1,113 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type {
-	ArtifactRef,
-	ArtifactRootID,
-	CapabilityPlan,
-	StoreArtifact,
-	StoreArtifactRoot,
-	StoreArtifactRootDraft,
-	StoreArtifactSourceSummary,
-} from '@/spec/artifact';
-import type {
-	FilesystemSourceRegistration,
-	Workspace,
 	WorkspaceArtifactView,
-	WorkspaceLoad,
-	WorkspacePathRegistration,
-	WorkspacePathRegistrationResult,
-	WorkspaceRefresh,
+	WorkspaceDefaultPolicyView,
+	WorkspaceDirectoryRef,
+	WorkspaceDirectoryView,
+	WorkspaceDirectoryWorkspace,
+	WorkspacePage,
+	WorkspacePageRequest,
 } from '@/spec/workspace';
+import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import type { IWorkspaceStoreAPI } from '@/apis/interface';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
-	AddWorkspacePath,
-	CreateWorkspaceRoot,
-	GetWorkspace,
-	ListWorkspaceArtifacts,
-	ListWorkspaceRoots,
-	ListWorkspaces,
-	LoadWorkspace,
-	RefreshWorkspace,
-	RegisterFilesystemWorkspaceSource,
-	ResolveWorkspaceArtifactCapabilities,
-	ResolveWorkspaceCapabilities,
-	SetWorkspaceArtifactEnabled,
+	GetWorkspaceDefaultPolicy,
+	GetWorkspaceDirectory,
+	ListWorkspaceDirectories,
+	ListWorkspaceDirectoryArtifacts,
+	RefreshWorkspaceDirectory,
+	RegisterWorkspaceDirectory,
+	RemoveWorkspaceDirectory,
+	SetWorkspaceDirectoryArtifactEnabled,
+	SetWorkspaceDirectoryEnabled,
 } from '@/apis/wailsjs/go/main/WorkspaceStoreWrapper';
 
+function projectWorkspaceDirectory(value: unknown, operation: string): WorkspaceDirectoryView {
+	const directory = requiredObject<WorkspaceDirectoryView>(value, operation);
+	const workspaces = directory.workspaces as WorkspaceDirectoryWorkspace[];
+	for (const workspace of workspaces) {
+		workspace.origin = enumFromWails(workspace.origin, WorkspaceDirectoryOrigin, `${operation}.workspaces.origin`);
+	}
+
+	return directory;
+}
+
 export class WailsWorkspaceStoreAPI implements IWorkspaceStoreAPI {
-	async addWorkspacePath(request: WorkspacePathRegistration): Promise<WorkspacePathRegistrationResult> {
-		return requiredObject<WorkspacePathRegistrationResult>(
-			await AddWorkspacePath(request as Parameters<typeof AddWorkspacePath>[0]),
-			'AddWorkspacePath'
+	async getWorkspaceDefaultPolicy(): Promise<WorkspaceDefaultPolicyView> {
+		return requiredObject<WorkspaceDefaultPolicyView>(await GetWorkspaceDefaultPolicy(), 'GetWorkspaceDefaultPolicy');
+	}
+
+	async getWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView> {
+		return projectWorkspaceDirectory(
+			await GetWorkspaceDirectory(directory as Parameters<typeof GetWorkspaceDirectory>[0]),
+			'GetWorkspaceDirectory'
 		);
 	}
 
-	async createWorkspaceRoot(request: StoreArtifactRootDraft): Promise<StoreArtifactRoot> {
-		return requiredObject<StoreArtifactRoot>(
-			await CreateWorkspaceRoot(request as Parameters<typeof CreateWorkspaceRoot>[0]),
-			'CreateWorkspaceRoot'
+	async listWorkspaceDirectories(request: WorkspacePageRequest): Promise<WorkspacePage> {
+		const page = requiredObject<WorkspacePage>(
+			await ListWorkspaceDirectories(request as Parameters<typeof ListWorkspaceDirectories>[0]),
+			'ListWorkspaceDirectories'
+		);
+
+		page.items = page.items.map(directory => projectWorkspaceDirectory(directory, 'ListWorkspaceDirectories.items'));
+
+		return page;
+	}
+
+	async listWorkspaceDirectoryArtifacts(directory: WorkspaceDirectoryRef): Promise<WorkspaceArtifactView[]> {
+		return wailsObjectArrayOrEmpty<WorkspaceArtifactView>(
+			await ListWorkspaceDirectoryArtifacts(directory as Parameters<typeof ListWorkspaceDirectoryArtifacts>[0]),
+			'ListWorkspaceDirectoryArtifacts'
 		);
 	}
 
-	async getWorkspace(workspace: ArtifactRef): Promise<Workspace> {
-		return requiredObject<Workspace>(
-			await GetWorkspace(workspace as Parameters<typeof GetWorkspace>[0]),
-			'GetWorkspace'
+	async refreshWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView> {
+		return projectWorkspaceDirectory(
+			await RefreshWorkspaceDirectory(directory as Parameters<typeof RefreshWorkspaceDirectory>[0]),
+			'RefreshWorkspaceDirectory'
 		);
 	}
 
-	async listWorkspaceArtifacts(workspace: ArtifactRef): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(
-			await ListWorkspaceArtifacts(workspace as Parameters<typeof ListWorkspaceArtifacts>[0]),
-			'ListWorkspaceArtifacts'
-		);
+	async registerWorkspaceDirectory(path: string): Promise<WorkspaceDirectoryView> {
+		return projectWorkspaceDirectory(await RegisterWorkspaceDirectory(path), 'RegisterWorkspaceDirectory');
 	}
 
-	async listWorkspaceRoots(): Promise<StoreArtifactRoot[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifactRoot>(await ListWorkspaceRoots(), 'ListWorkspaceRoots');
+	async removeWorkspaceDirectory(directory: WorkspaceDirectoryRef, expectedRevision: number): Promise<void> {
+		await RemoveWorkspaceDirectory(directory as Parameters<typeof RemoveWorkspaceDirectory>[0], expectedRevision);
 	}
 
-	async listWorkspaces(rootID: ArtifactRootID): Promise<Workspace[]> {
-		return wailsObjectArrayOrEmpty<Workspace>(
-			await ListWorkspaces(rootID as Parameters<typeof ListWorkspaces>[0]),
-			'ListWorkspaces'
-		);
-	}
-
-	async loadWorkspace(workspace: ArtifactRef): Promise<WorkspaceLoad> {
-		return requiredObject<WorkspaceLoad>(
-			await LoadWorkspace(workspace as Parameters<typeof LoadWorkspace>[0]),
-			'LoadWorkspace'
-		);
-	}
-
-	async refreshWorkspace(workspace: ArtifactRef): Promise<WorkspaceRefresh> {
-		return requiredObject<WorkspaceRefresh>(
-			await RefreshWorkspace(workspace as Parameters<typeof RefreshWorkspace>[0]),
-			'RefreshWorkspace'
-		);
-	}
-
-	async registerFilesystemWorkspaceSource(request: FilesystemSourceRegistration): Promise<StoreArtifactSourceSummary> {
-		return requiredObject<StoreArtifactSourceSummary>(
-			await RegisterFilesystemWorkspaceSource(request as Parameters<typeof RegisterFilesystemWorkspaceSource>[0]),
-			'RegisterFilesystemWorkspaceSource'
-		);
-	}
-
-	async resolveWorkspaceArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
-			await ResolveWorkspaceArtifactCapabilities(
-				artifact as Parameters<typeof ResolveWorkspaceArtifactCapabilities>[0]
-			),
-			'ResolveWorkspaceArtifactCapabilities'
-		);
-	}
-
-	async resolveWorkspaceCapabilities(workspace: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
-			await ResolveWorkspaceCapabilities(workspace as Parameters<typeof ResolveWorkspaceCapabilities>[0]),
-			'ResolveWorkspaceCapabilities'
-		);
-	}
-
-	async setWorkspaceArtifactEnabled(
-		workspace: ArtifactRef,
+	async setWorkspaceDirectoryArtifactEnabled(
+		directory: WorkspaceDirectoryRef,
 		artifact: ArtifactRef,
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<WorkspaceArtifactView> {
 		return requiredObject<WorkspaceArtifactView>(
-			await SetWorkspaceArtifactEnabled(
-				workspace as Parameters<typeof SetWorkspaceArtifactEnabled>[0],
-				artifact as Parameters<typeof SetWorkspaceArtifactEnabled>[1],
+			await SetWorkspaceDirectoryArtifactEnabled(
+				directory as Parameters<typeof SetWorkspaceDirectoryArtifactEnabled>[0],
+				artifact as Parameters<typeof SetWorkspaceDirectoryArtifactEnabled>[1],
 				expectedRevision,
 				enabled
 			),
-			'SetWorkspaceArtifactEnabled'
+			'SetWorkspaceDirectoryArtifactEnabled'
+		);
+	}
+
+	async setWorkspaceDirectoryEnabled(
+		directory: WorkspaceDirectoryRef,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<WorkspaceDirectoryView> {
+		return projectWorkspaceDirectory(
+			await SetWorkspaceDirectoryEnabled(
+				directory as Parameters<typeof SetWorkspaceDirectoryEnabled>[0],
+				expectedRevision,
+				enabled
+			),
+			'SetWorkspaceDirectoryEnabled'
 		);
 	}
 }

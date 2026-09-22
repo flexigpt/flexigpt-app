@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
 
-import type { UpdateWorkspaceBody, WorkspaceView } from '@/spec/workspace';
-import { WorkspaceMode } from '@/spec/workspace';
+import type { WorkspaceDirectoryView } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
 
@@ -19,166 +18,137 @@ import { ManagementResourceError } from '@/components/managementui/management_re
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
-import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
-import {
-	createEmptyWorkspaceCollection,
-	createFilesystemWorkspaceCollection,
-	listAllWorkspaces,
-	workspaceRefKey,
-} from '@/workspaces/lib/workspace_api_utils';
-import { getErrorMessage, sortWorkspaces, workspaceMatchesSearch } from '@/workspaces/lib/workspace_utils';
-import { WorkspaceCard } from '@/workspaces/workspace_card';
-import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
+import { WorkspaceDefaultPolicyModal } from '@/workspaces/workspace_default_policy_modal';
+import { WorkspaceDirectoryCard } from '@/workspaces/workspace_directory_card';
+import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
 
-async function loadWorkspaces(signal: AbortSignal): Promise<WorkspaceView[]> {
-	const workspaces = await listAllWorkspaces();
-	throwIfAborted(signal);
-	return sortWorkspaces(workspaces);
+const DIRECTORY_PAGE_SIZE = 100;
+const MAX_DIRECTORY_PAGE_HOPS = 10_000;
+
+function directoryKey(directory: WorkspaceDirectoryView): string {
+	return directory.ref.rootID;
+}
+
+async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<WorkspaceDirectoryView[]> {
+	const items: WorkspaceDirectoryView[] = [];
+	const seenCursors = new Set<string>();
+	let cursor: string | undefined;
+
+	for (let hop = 0; hop < MAX_DIRECTORY_PAGE_HOPS; hop += 1) {
+		const page = await workspaceManagementAPI.listWorkspaceDirectories({
+			cursor,
+			limit: DIRECTORY_PAGE_SIZE,
+		});
+		throwIfAborted(signal);
+
+		items.push(...page.items);
+
+		if (!page.nextCursor) {
+			return items.toSorted((left, right) =>
+				left.root.displayName.localeCompare(right.root.displayName, undefined, {
+					sensitivity: 'base',
+				})
+			);
+		}
+		if (seenCursors.has(page.nextCursor)) {
+			throw new Error('Workspace directory pagination returned a repeated cursor.');
+		}
+
+		seenCursors.add(page.nextCursor);
+		cursor = page.nextCursor;
+	}
+
+	throw new Error(`Workspace directory pagination exceeded ${MAX_DIRECTORY_PAGE_HOPS} pages.`);
 }
 
 // oxlint-disable-next-line no-restricted-exports
-export default function WorkspacesPage() {
-	const loadPageData = useCallback((signal: AbortSignal) => loadWorkspaces(signal), []);
+export default function WorkspaceDirectoryManagement() {
+	const loadDirectories = useCallback((signal: AbortSignal) => loadAllWorkspaceDirectories(signal), []);
 	const {
-		data: workspaces,
-		error: pageLoadError,
+		data: directories,
+		error,
 		isLoading,
 		isRefreshing,
 		hasResolved,
 		reloadOrThrow,
-		setData: setWorkspaces,
-	} = useAsyncResource(loadPageData, { initialData: [] as WorkspaceView[] });
+		setData: setDirectories,
+	} = useAsyncResource(loadDirectories, {
+		initialData: [] as WorkspaceDirectoryView[],
+	});
 
-	const [searchQuery, setSearchQuery] = useState('');
-	const [isCreateOpen, setIsCreateOpen] = useState(false);
-	const [workspaceToDelete, setWorkspaceToDelete] = useState<WorkspaceView | null>(null);
-	const [alertMessage, setAlertMessage] = useState('');
-	const mountedRef = useRef(true);
-	const retiredWorkspaceRevisionsRef = useRef(new Map<string, number>());
+	const [search, setSearch] = useState('');
+	const [isRegisterOpen, setIsRegisterOpen] = useState(false);
+	const [isPolicyOpen, setIsPolicyOpen] = useState(false);
+	const [directoryToRemove, setDirectoryToRemove] = useState<WorkspaceDirectoryView | null>(null);
+	const [actionError, setActionError] = useState('');
 
-	useEffect(() => {
-		mountedRef.current = true;
-		return () => {
-			mountedRef.current = false;
-		};
-	}, []);
+	const visibleDirectories = useMemo(() => {
+		const query = search.trim().toLowerCase();
+		if (!query) {
+			return directories;
+		}
 
-	const existingDisplayNames = useMemo(() => workspaces.map(workspace => workspace.displayName), [workspaces]);
+		return directories.filter(directory =>
+			[
+				directory.root.displayName,
+				directory.root.id,
+				directory.directorySource.displayName,
+				directory.policyID,
+				...directory.workspaces.map(entry => entry.workspace.artifact.displayName),
+				...directory.workspaces.map(entry => entry.workspace.artifact.logicalName),
+				...directory.workspaces.map(entry => entry.manifestLocator),
+			]
+				.filter(Boolean)
+				.join('\n')
+				.toLowerCase()
+				.includes(query)
+		);
+	}, [directories, search]);
 
-	const visibleWorkspaces = useMemo(
-		() => workspaces.filter(workspace => workspaceMatchesSearch(workspace, searchQuery)),
-		[searchQuery, workspaces]
-	);
+	const replaceDirectory = (next: WorkspaceDirectoryView) => {
+		setDirectories(previous =>
+			previous
+				.map(value => (directoryKey(value) === directoryKey(next) ? next : value))
+				.toSorted((left, right) =>
+					left.root.displayName.localeCompare(right.root.displayName, undefined, {
+						sensitivity: 'base',
+					})
+				)
+		);
+	};
 
-	const enabledCount = useMemo(() => workspaces.filter(workspace => workspace.enabled).length, [workspaces]);
-	const filesystemCount = workspaces.filter(workspace => workspace.mode === WorkspaceMode.Filesystem).length;
-	const sourceCount = workspaces.reduce((total, workspace) => total + workspace.attachments.length, 0);
+	const registerDirectory = async (path: string) => {
+		const directory = await workspaceManagementAPI.registerWorkspaceDirectory(path);
 
-	const replaceWorkspace = useCallback(
-		(nextWorkspace: WorkspaceView) => {
-			const nextKey = workspaceRefKey(nextWorkspace.workspace);
-			setWorkspaces(previous => {
-				const currentWorkspace = previous.find(workspace => workspaceRefKey(workspace.workspace) === nextKey);
+		setDirectories(previous => {
+			const withoutCurrent = previous.filter(value => directoryKey(value) !== directoryKey(directory));
+			return [...withoutCurrent, directory].toSorted((left, right) =>
+				left.root.displayName.localeCompare(right.root.displayName, undefined, {
+					sensitivity: 'base',
+				})
+			);
+		});
+	};
 
-				// Catalog reads can complete after a newer Workspace mutation. Never
-				// replace a newer Collection revision with an older response.
-				if (currentWorkspace && currentWorkspace.revision > nextWorkspace.revision) {
-					return previous;
-				}
-
-				const nextWorkspaces = currentWorkspace
-					? previous.map(workspace => (workspaceRefKey(workspace.workspace) === nextKey ? nextWorkspace : workspace))
-					: [...previous, nextWorkspace];
-
-				return sortWorkspaces(nextWorkspaces);
-			});
-		},
-		[setWorkspaces]
-	);
-
-	const createWorkspace = useCallback(
-		async (submission: WorkspaceSetupSubmission) => {
-			let created: WorkspaceView;
-
-			if (submission.kind === 'filesystem') {
-				created = await createFilesystemWorkspaceCollection(submission.payload);
-			} else if (submission.kind === 'empty') {
-				created = await createEmptyWorkspaceCollection(submission.payload);
-			} else {
-				throw new Error('Expected a new Workspace payload.');
-			}
-
-			if (mountedRef.current) {
-				replaceWorkspace(created);
-			}
-
-			try {
-				await workspaceManagementAPI.refreshWorkspace(created.workspace);
-				const refreshed = await workspaceManagementAPI.getWorkspace(created.workspace);
-				if (mountedRef.current) {
-					replaceWorkspace(refreshed);
-				}
-			} catch (error) {
-				if (mountedRef.current) {
-					setAlertMessage(
-						`Workspace was created, but initial discovery failed. Open the workspace and retry Refresh. ${getErrorMessage(
-							error,
-							''
-						)}`.trim()
-					);
-				}
-			}
-		},
-		[replaceWorkspace]
-	);
-
-	const updateWorkspace = useCallback(
-		async (workspace: WorkspaceView, payload: UpdateWorkspaceBody): Promise<WorkspaceView> => {
-			const updated = await workspaceManagementAPI.updateWorkspace(workspace.workspace, payload);
-			if (mountedRef.current) {
-				replaceWorkspace(updated);
-			}
-			return updated;
-		},
-		[replaceWorkspace]
-	);
-
-	const deleteWorkspace = async () => {
-		if (!workspaceToDelete) {
+	const removeDirectory = async () => {
+		if (!directoryToRemove) {
 			return;
 		}
 
-		const deletingWorkspace = workspaceToDelete;
-		const deletingRef = deletingWorkspace.workspace;
-		const deletingKey = workspaceRefKey(deletingRef);
-		let purgeRevision = retiredWorkspaceRevisionsRef.current.get(deletingKey);
-
-		if (purgeRevision === undefined) {
-			const retired = await workspaceManagementAPI.retireWorkspace(deletingRef, deletingWorkspace.revision);
-			purgeRevision = retired.revision;
-			retiredWorkspaceRevisionsRef.current.set(deletingKey, purgeRevision);
-		}
-
 		try {
-			await workspaceManagementAPI.purgeWorkspace(deletingRef, purgeRevision);
-		} catch (error) {
-			const details = getErrorMessage(error, '');
-			throw new Error(
-				`Workspace was retired, but its stored records could not be purged. Retry Delete Workspace to finish cleanup. ${details}`.trim(),
-				{ cause: error }
+			await workspaceManagementAPI.removeWorkspaceDirectory(
+				directoryToRemove.ref,
+				directoryToRemove.directorySource.revision
 			);
-		}
-
-		retiredWorkspaceRevisionsRef.current.delete(deletingKey);
-
-		if (mountedRef.current) {
-			setWorkspaces(previous => previous.filter(workspace => workspaceRefKey(workspace.workspace) !== deletingKey));
-			setWorkspaceToDelete(null);
+			setDirectories(previous => previous.filter(value => directoryKey(value) !== directoryKey(directoryToRemove)));
+			setDirectoryToRemove(null);
+		} catch (cause) {
+			setActionError(cause instanceof Error ? cause.message : 'Workspace directory removal failed.');
 		}
 	};
 
 	if (isLoading && !hasResolved) {
-		return <Loader text="Loading workspaces..." />;
+		return <Loader text="Loading Workspace directories..." />;
 	}
 
 	return (
@@ -186,166 +156,151 @@ export default function WorkspacesPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Workspaces"
-					description="Manage project sources, discovered context documents, workspace skills, and conversation permissions."
+					description="Select repository directories and manage the effective Workspace declarations discovered in each one."
 					width="wide"
 					actions={
 						<button
 							type="button"
 							className="btn btn-ghost rounded-xl"
 							onClick={() => {
-								setIsCreateOpen(true);
+								setIsRegisterOpen(true);
 							}}
 						>
 							<FiFolderPlus size={18} />
-							<span>Add Workspace</span>
+							Add Workspace Directory
 						</button>
 					}
 				/>
 
 				<ManagementPageContent width="wide">
-					{pageLoadError ? (
+					{error ? (
 						<ManagementResourceError
-							title="Workspaces could not be loaded"
-							error={pageLoadError}
+							title="Workspace directories could not be loaded"
+							error={error}
 							isRetrying={isRefreshing}
 							onRetry={reloadOrThrow}
 						/>
 					) : null}
 
 					<div className="border-base-content/10 bg-base-100 rounded-2xl border p-4 text-sm">
-						<div className="font-semibold">How workspace discovery works</div>
+						<div className="font-semibold">How Workspace declarations work</div>
 						<ul className="text-base-content/70 mt-2 list-disc space-y-1 pl-5 text-xs">
+							<li>A directory without a Workspace manifest receives the compiled default policy.</li>
 							<li>
-								Create a filesystem workspace from a project root, or create an empty workspace and attach sources
-								later.
+								Add `workspace.yaml`, `workspace.yml`, `workspace.json`, or `*.workspace.*` to replace the default
+								policy with repository declarations.
 							</li>
-							<li>AGENTS.md, CLAUDE.md, optional README.md, and .skills folders are discovered automatically.</li>
-							<li>Add project-specific Context files or Skill folders from Edit Workspace, then refresh discovery.</li>
-							<li>Manage library, package, overlay, and primary source attachments from each workspace.</li>
+							<li>Multiple valid Workspace manifests become peer Workspaces that conversations can select.</li>
+							<li>Invalid Workspace manifests intentionally block default-policy fallback until fixed.</li>
 						</ul>
-					</div>
-
-					<div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-						<div className="bg-base-100 border-base-content/10 rounded-2xl border p-3">
-							<div className="text-sm font-semibold">Workspaces</div>
-							<div className="text-base-content/70 mt-1 text-xs">{workspaces.length} configured</div>
-						</div>
-						<div className="bg-base-100 border-base-content/10 rounded-2xl border p-3">
-							<div className="text-sm font-semibold">Enabled</div>
-							<div className="text-base-content/70 mt-1 text-xs">{enabledCount} available</div>
-						</div>
-						<div className="bg-base-100 border-base-content/10 rounded-2xl border p-3">
-							<div className="text-sm font-semibold">Filesystem roots</div>
-							<div className="text-base-content/70 mt-1 text-xs">{filesystemCount} configured</div>
-						</div>
-						<div className="bg-base-100 border-base-content/10 rounded-2xl border p-3">
-							<div className="text-sm font-semibold">Attached sources</div>
-							<div className="text-base-content/70 mt-1 text-xs">{sourceCount} total</div>
-						</div>
 					</div>
 
 					<div className="border-base-content/10 bg-base-100 flex flex-col gap-3 rounded-2xl border p-3 sm:flex-row sm:items-center">
 						<div className="input input-sm flex grow items-center gap-2 rounded-xl">
-							<label htmlFor="workspace-search" className="sr-only">
-								Search Workspaces
+							<label htmlFor="workspace-directory-search" className="sr-only">
+								Search Workspace directories
 							</label>
-							<FiSearch size={14} aria-hidden="true" />
+							<FiSearch size={14} />
 							<input
-								id="workspace-search"
+								id="workspace-directory-search"
 								type="search"
 								className="grow"
-								value={searchQuery}
+								value={search}
 								onChange={event => {
-									setSearchQuery(event.currentTarget.value);
+									setSearch(event.currentTarget.value);
 								}}
-								placeholder="Search workspaces, project paths, and discovery paths..."
-								spellCheck="false"
+								placeholder="Search directory roots and Workspace declarations..."
 							/>
-							{searchQuery ? (
+							{search ? (
 								<button
 									type="button"
 									className="btn btn-ghost btn-xs rounded-lg"
 									onClick={() => {
-										setSearchQuery('');
+										setSearch('');
 									}}
-									aria-label="Clear workspace search"
+									aria-label="Clear Workspace directory search"
 								>
 									<FiX size={12} />
 								</button>
 							) : null}
 						</div>
 
-						<div className="text-base-content/70 shrink-0 text-xs">
-							{visibleWorkspaces.length} of {workspaces.length} workspaces
+						<div className="text-base-content/60 text-xs">
+							{visibleDirectories.length} of {directories.length} directories
 						</div>
 					</div>
 
-					<div className="pb-8">
-						{visibleWorkspaces.map(workspace => (
-							<WorkspaceCard
-								key={workspaceRefKey(workspace.workspace)}
-								workspace={workspace}
-								existingDisplayNames={existingDisplayNames.filter(
-									name => name.toLowerCase() !== workspace.displayName.toLowerCase()
-								)}
-								onWorkspaceChange={replaceWorkspace}
-								onUpdateWorkspace={payload => updateWorkspace(workspace, payload)}
-								onRequestDelete={setWorkspaceToDelete}
+					<div className="space-y-4 pb-8">
+						{visibleDirectories.map(directory => (
+							<WorkspaceDirectoryCard
+								key={directory.ref.rootID}
+								directory={directory}
+								onChanged={replaceDirectory}
+								onRequestRemove={setDirectoryToRemove}
+								onShowDefaultPolicy={() => {
+									setIsPolicyOpen(true);
+								}}
 							/>
 						))}
 
-						{workspaces.length === 0 ? (
-							<ManagementEmptyState className="mt-4">
-								No workspaces configured. Add a project root or create an empty workspace to get started.
+						{directories.length === 0 ? (
+							<ManagementEmptyState>
+								No Workspace directories are configured. Add a repository directory to get started.
 							</ManagementEmptyState>
 						) : null}
 
-						{workspaces.length > 0 && visibleWorkspaces.length === 0 ? (
-							<ManagementEmptyState className="mt-4">No workspaces match the current search.</ManagementEmptyState>
+						{directories.length > 0 && visibleDirectories.length === 0 ? (
+							<ManagementEmptyState>No Workspace directories match the current search.</ManagementEmptyState>
 						) : null}
 					</div>
 				</ManagementPageContent>
-
-				<WorkspaceSetupModal
-					isOpen={isCreateOpen}
-					onClose={() => {
-						setIsCreateOpen(false);
-					}}
-					onSubmit={createWorkspace}
-					existingDisplayNames={existingDisplayNames}
-				/>
-
-				<ModalConfirmDialog
-					isOpen={workspaceToDelete !== null}
-					onClose={() => {
-						setWorkspaceToDelete(null);
-					}}
-					title="Delete Workspace"
-					message={
-						<div className="space-y-2 text-sm">
-							<p>
-								Delete workspace <span className="font-semibold">{workspaceToDelete?.displayName}</span>?
-							</p>
-							<p className="text-base-content/70">
-								This removes the workspace index and saved workspace settings. It does not delete project files.
-							</p>
-						</div>
-					}
-					confirmLabel="Delete Workspace"
-					busyLabel="Deleting..."
-					confirmTone="error"
-					onConfirm={deleteWorkspace}
-					blockCancel
-				/>
-
-				<ActionDeniedAlertModal
-					isOpen={Boolean(alertMessage)}
-					onClose={() => {
-						setAlertMessage('');
-					}}
-					message={alertMessage}
-				/>
 			</div>
+
+			<WorkspaceDirectoryRegistrationModal
+				isOpen={isRegisterOpen}
+				onClose={() => {
+					setIsRegisterOpen(false);
+				}}
+				onRegister={registerDirectory}
+			/>
+
+			<WorkspaceDefaultPolicyModal
+				isOpen={isPolicyOpen}
+				onClose={() => {
+					setIsPolicyOpen(false);
+				}}
+			/>
+
+			<ModalConfirmDialog
+				isOpen={directoryToRemove !== null}
+				onClose={() => {
+					setDirectoryToRemove(null);
+				}}
+				title="Remove Workspace Directory"
+				message={
+					<div className="space-y-2 text-sm">
+						<p>
+							Remove <span className="font-semibold">{directoryToRemove?.root.displayName}</span>?
+						</p>
+						<p className="text-base-content/70">
+							This removes the local Workspace Root and Source registrations. Repository files are never deleted.
+						</p>
+					</div>
+				}
+				confirmLabel="Remove Directory"
+				busyLabel="Removing..."
+				confirmTone="error"
+				onConfirm={removeDirectory}
+				blockCancel
+			/>
+
+			<ActionDeniedAlertModal
+				isOpen={Boolean(actionError)}
+				onClose={() => {
+					setActionError('');
+				}}
+				message={actionError}
+			/>
 		</PageFrame>
 	);
 }

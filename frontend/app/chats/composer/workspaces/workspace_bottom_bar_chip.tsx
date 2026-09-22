@@ -6,7 +6,8 @@ import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { SkillRef } from '@/spec/skill';
-import { WorkspaceSkillInsert } from '@/spec/workspace';
+import { ArtifactState } from '@/spec/artifact';
+import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import {
 	actionTriggerChipClearButtonClasses,
@@ -17,11 +18,12 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 
-import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
-import type { WorkspaceSetupSubmission } from '@/workspaces/workspace_setup_modal';
-import { WorkspaceSelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
-import { workspaceRefsEqual } from '@/workspaces/lib/workspace_api_utils';
-import { WorkspaceSetupModal } from '@/workspaces/workspace_setup_modal';
+import type {
+	ComposerWorkspaceCandidate,
+	ComposerWorkspaceController,
+} from '@/chats/composer/workspaces/use_composer_workspace';
+import { WorkspaceDirectorySelectionModal } from '@/chats/composer/workspaces/workspace_selection_modal';
+import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_directory_registration_modal';
 
 interface WorkspaceBottomBarChipProps {
 	store: MenuStore;
@@ -29,37 +31,107 @@ interface WorkspaceBottomBarChipProps {
 	activeSkillRefs: SkillRef[];
 	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
+
+	// Kept temporarily so composer callers do not need an unrelated migration.
+	// Directory Workspaces no longer use the old Workspace template insertion
+	// path. User-message Skills remain regular runtime capabilities.
 	onInsertTemplateText: (text: string) => Promise<void> | void;
 }
 
-export function WorkspaceBottomBarChip(props: WorkspaceBottomBarChipProps) {
-	const { store, isInputLocked = false } = props;
+function workspaceKey(candidate: ComposerWorkspaceCandidate): string {
+	const artifact = candidate.workspace.workspace.artifact;
+	return `${artifact.rootID}:${artifact.id}`;
+}
 
+function workspaceDisplayName(candidate: ComposerWorkspaceCandidate): string {
+	const artifact = candidate.workspace.workspace.artifact;
+	return artifact.displayName || artifact.logicalName;
+}
+
+function workspaceSubtitle(candidate: ComposerWorkspaceCandidate): string {
+	if (candidate.workspace.origin === WorkspaceDirectoryOrigin.Default) {
+		return `${candidate.directory.root.displayName} · Default policy`;
+	}
+
+	return candidate.workspace.manifestLocator ?? candidate.workspace.workspace.artifact.binding.locator;
+}
+
+function workspaceIsAvailable(candidate: ComposerWorkspaceCandidate): boolean {
+	const artifact = candidate.workspace.workspace.artifact;
+
+	return candidate.directory.enabled && artifact.enabled && artifact.state === ArtifactState.Available;
+}
+
+function candidateMatchesSearch(candidate: ComposerWorkspaceCandidate, rawQuery: string): boolean {
+	const query = rawQuery.trim().toLocaleLowerCase();
+
+	if (!query) {
+		return true;
+	}
+
+	const artifact = candidate.workspace.workspace.artifact;
+
+	return [
+		workspaceDisplayName(candidate),
+		candidate.workspace.workspace.description,
+		workspaceSubtitle(candidate),
+		candidate.directory.root.displayName,
+		candidate.directory.root.id,
+		artifact.logicalName,
+		artifact.binding.locator,
+		candidate.workspace.origin,
+	]
+		.filter(Boolean)
+		.join('\n')
+		.toLocaleLowerCase()
+		.includes(query);
+}
+
+function selectedWorkspaceName(state: ComposerWorkspaceController): string {
+	if (state.workspace) {
+		return workspaceDisplayName(state.workspace);
+	}
+
+	return state.selection?.displayName || 'Workspace';
+}
+
+export function WorkspaceBottomBarChip({
+	store,
+	state,
+	activeSkillRefs,
+	setActiveSkillRefs,
+	isInputLocked = false,
+}: WorkspaceBottomBarChipProps) {
 	useEffect(() => {
 		if (isInputLocked) {
 			store.hide();
 		}
 	}, [isInputLocked, store]);
 
-	return <WorkspaceBottomBarChipContent key={isInputLocked ? 'locked' : 'ready'} {...props} />;
+	return (
+		<WorkspaceBottomBarChipContent
+			store={store}
+			state={state}
+			activeSkillRefs={activeSkillRefs}
+			setActiveSkillRefs={setActiveSkillRefs}
+			isInputLocked={isInputLocked}
+		/>
+	);
 }
 
-function WorkspaceBottomBarChipInner({
+function WorkspaceBottomBarChipContent({
 	store,
 	state,
 	activeSkillRefs,
 	setActiveSkillRefs,
 	isInputLocked = false,
-	onInsertTemplateText,
-}: WorkspaceBottomBarChipProps) {
+}: Omit<WorkspaceBottomBarChipProps, 'onInsertTemplateText'>) {
 	const open = useStoreState(store, 'open');
 	const [search, setSearch] = useState('');
-	const [isCreateOpen, setIsCreateOpen] = useState(false);
+	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
 	const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const refreshedForCurrentOpenRef = useRef(false);
-
-	const refreshWorkspaces = state.refreshWorkspaces;
 
 	useEffect(() => {
 		if (!open) {
@@ -71,49 +143,37 @@ function WorkspaceBottomBarChipInner({
 		}
 
 		refreshedForCurrentOpenRef.current = true;
-		void refreshWorkspaces();
-	}, [open, refreshWorkspaces]);
+		void state.refreshWorkspaces();
+	}, [open, state]);
 
-	const visibleWorkspaces = useMemo(() => {
-		const query = search.trim().toLowerCase();
-		if (!query) {
-			return state.workspaces;
-		}
-		return state.workspaces.filter(workspace =>
-			[workspace.displayName, workspace.description, workspace.primaryPath]
-				.filter(Boolean)
-				.join('\n')
-				.toLowerCase()
-				.includes(query)
-		);
-	}, [search, state.workspaces]);
+	const visibleWorkspaces = useMemo(
+		() => state.workspaces.filter(candidate => candidateMatchesSearch(candidate, search)),
+		[search, state.workspaces]
+	);
 
-	const selectedName = state.workspace?.displayName ?? state.selection?.displayName ?? 'Workspace';
-
+	const selected = Boolean(state.selection);
+	const selectedName = selectedWorkspaceName(state);
 	const selectedContextCount = state.selection?.contextRefs?.length ?? 0;
 	const selectedSkillCount = state.selection?.skillRefs?.length ?? 0;
-	const selected = Boolean(state.selection);
-	const workspaceTemplateCount = state.skills.filter(
-		skill => skill.skill.insert === WorkspaceSkillInsert.UserMessage
-	).length;
+	const discoveredMCPCount = state.plan?.mcpServers.servers.length ?? 0;
 
 	const hoverContent = (
 		<HoverTipContent
 			title="Workspace"
-			description="Attach project Context and Workspace Skills to this conversation without changing the configured Workspace."
+			description="Attach one effective repository Workspace to this conversation."
 			sections={[
 				{
-					id: 'current',
+					id: 'selection',
 					title: 'Current selection',
 					items: selected
 						? [
 								selectedName,
-								`${selectedContextCount} Context file${selectedContextCount === 1 ? '' : 's'} selected`,
-								`${selectedSkillCount} Workspace Skill${selectedSkillCount === 1 ? '' : 's'} selected`,
-								`${workspaceTemplateCount} Workspace template${workspaceTemplateCount === 1 ? '' : 's'} available`,
+								`${selectedContextCount} Context contribution${selectedContextCount === 1 ? '' : 's'} selected`,
+								`${selectedSkillCount} instruction Skill${selectedSkillCount === 1 ? '' : 's'} selected`,
+								`${discoveredMCPCount} discovered MCP server${discoveredMCPCount === 1 ? '' : 's'} loaded`,
 								state.attentionCount > 0
 									? `${state.attentionCount} item${state.attentionCount === 1 ? '' : 's'} need attention`
-									: 'All selected items currently resolve',
+									: 'Current Workspace capabilities resolved',
 							]
 						: ['No Workspace is attached.'],
 				},
@@ -121,10 +181,10 @@ function WorkspaceBottomBarChipInner({
 					id: 'behavior',
 					title: 'Behavior',
 					items: [
-						'Workspace Context is refetched when sending or editing.',
-						'Workspace instruction Skills use the normal conversation Skill session.',
-						'Workspace user-message Skills render here as transient composer templates.',
-						'Detaching affects future turns only.',
+						'Only effective Workspace declarations can be selected.',
+						'Default policy Workspaces disappear when repository manifests exist.',
+						'Workspace Context is composed again for each send.',
+						'MCP installation inputs and secrets remain managed by MCP setup.',
 					],
 				},
 			]}
@@ -160,17 +220,16 @@ function WorkspaceBottomBarChipInner({
 								) : undefined
 							}
 							suffix={
-								selectedSkillCount > 0 || state.attentionCount > 0 || (selected && selectedSkillCount === 0) ? (
+								selected ? (
 									<span className="flex items-center gap-1">
 										{selectedSkillCount > 0 ? (
 											<span className="badge badge-info badge-xs">Skills {selectedSkillCount}</span>
 										) : null}
-
 										{state.attentionCount > 0 ? (
 											<FiAlertCircle size={14} className="text-warning" />
-										) : selected && selectedSkillCount === 0 ? (
+										) : (
 											<FiCheck size={14} className="shrink-0" />
-										) : null}
+										)}
 									</span>
 								) : null
 							}
@@ -186,8 +245,15 @@ function WorkspaceBottomBarChipInner({
 							onClick={event => {
 								event.preventDefault();
 								event.stopPropagation();
-								void state.detachWorkspace();
-								store.hide();
+
+								void state
+									.detachWorkspace()
+									.then(() => {
+										store.hide();
+									})
+									.catch((error: unknown) => {
+										setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
+									});
 							}}
 							title="Detach Workspace from future turns"
 							aria-label="Detach Workspace"
@@ -203,11 +269,11 @@ function WorkspaceBottomBarChipInner({
 				gutter={8}
 				overflowPadding={8}
 				portal
-				className={actionTriggerMenuWideClasses}
 				autoFocusOnShow={false}
+				className={actionTriggerMenuWideClasses}
 			>
 				<div className="mb-2 flex items-center justify-between gap-2 px-1">
-					<div className="text-base-content/70 text-xs font-semibold">Workspace</div>
+					<div className="text-base-content/70 text-xs font-semibold">Effective Workspaces</div>
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs rounded-lg"
@@ -215,8 +281,8 @@ function WorkspaceBottomBarChipInner({
 						onClick={() => {
 							void state.refreshWorkspaces();
 						}}
-						aria-label="Refresh Workspace list"
-						title="Refresh Workspace list"
+						aria-label="Refresh Workspace directory list"
+						title="Refresh Workspace directory list"
 					>
 						<FiRefreshCw size={12} />
 					</button>
@@ -240,7 +306,7 @@ function WorkspaceBottomBarChipInner({
 					<div className="border-secondary/30 bg-secondary/10 mb-2 rounded-xl border p-2">
 						<div className="truncate text-xs font-semibold">{selectedName}</div>
 						<div className="text-base-content/60 mt-1 text-xs">
-							{selectedContextCount} Context · {selectedSkillCount} Skills
+							{selectedContextCount} Context · {selectedSkillCount} instruction Skills
 						</div>
 						<div className="mt-2 flex flex-wrap gap-2">
 							<button
@@ -270,9 +336,14 @@ function WorkspaceBottomBarChipInner({
 								className="btn btn-ghost btn-xs text-error rounded-lg"
 								disabled={isInputLocked}
 								onClick={() => {
-									void state.detachWorkspace().finally(() => {
-										store.hide();
-									});
+									void state
+										.detachWorkspace()
+										.then(() => {
+											store.hide();
+										})
+										.catch((error: unknown) => {
+											setActionError(error instanceof Error ? error.message : 'Workspace could not be detached.');
+										});
 								}}
 							>
 								<FiX size={12} />
@@ -295,37 +366,44 @@ function WorkspaceBottomBarChipInner({
 						onChange={event => {
 							setSearch(event.currentTarget.value);
 						}}
-						placeholder="Search Workspaces..."
-						aria-label="Search Workspaces"
+						placeholder="Search effective Workspaces..."
+						aria-label="Search effective Workspaces"
 						spellCheck="false"
 					/>
 				</div>
 
 				{state.workspacesLoading && state.workspaces.length === 0 ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						Loading Workspaces...
+						Loading Workspace directories...
 					</div>
 				) : visibleWorkspaces.length === 0 ? (
 					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-						No Workspaces match.
+						No effective Workspaces match.
 					</div>
 				) : (
 					<div className="space-y-1">
-						{visibleWorkspaces.map(workspace => {
-							const isCurrent = workspaceRefsEqual(workspace.workspace, state.selection?.workspace);
+						{visibleWorkspaces.map(candidate => {
+							const candidateKey = workspaceKey(candidate);
+							const current =
+								state.selection?.workspace.rootID === candidate.workspace.workspace.artifact.rootID &&
+								state.selection?.workspace.artifactID === candidate.workspace.workspace.artifact.id;
+							const available = workspaceIsAvailable(candidate);
+
 							return (
 								<MenuItem
-									key={`${workspace.workspace.rootID}:${workspace.workspace.collectionID}`}
+									key={candidateKey}
 									hideOnClick={false}
-									disabled={!workspace.enabled || isInputLocked}
+									disabled={!available || isInputLocked}
 									className={`${actionTriggerMenuItemClasses} items-start`}
 									onClick={() => {
-										if (isCurrent || !workspace.enabled) {
+										if (current || !available) {
 											return;
 										}
+
 										setActionError(null);
+
 										void state
-											.attachWorkspace(workspace)
+											.attachWorkspace(candidate)
 											.then(() => {
 												store.hide();
 											})
@@ -336,16 +414,20 @@ function WorkspaceBottomBarChipInner({
 								>
 									<FiFolderPlus size={14} className="mt-0.5 shrink-0" />
 									<div className="min-w-0 flex-1">
-										<div className="truncate text-xs font-medium">{workspace.displayName}</div>
-										{workspace.primaryPath ? (
-											<div className="text-base-content/60 truncate font-mono text-[10px]">{workspace.primaryPath}</div>
-										) : null}
+										<div className="truncate text-xs font-medium">{workspaceDisplayName(candidate)}</div>
+										<div className="text-base-content/60 truncate font-mono text-[10px]">
+											{workspaceSubtitle(candidate)}
+										</div>
 									</div>
-									{isCurrent ? (
+									{current ? (
 										<span className="badge badge-secondary badge-xs">Selected</span>
-									) : !workspace.enabled ? (
-										<span className="badge badge-warning badge-xs">Disabled</span>
-									) : null}
+									) : !available ? (
+										<span className="badge badge-warning badge-xs">Unavailable</span>
+									) : candidate.workspace.origin === WorkspaceDirectoryOrigin.Default ? (
+										<span className="badge badge-info badge-xs">Default</span>
+									) : (
+										<span className="badge badge-ghost badge-xs">Manifest</span>
+									)}
 								</MenuItem>
 							);
 						})}
@@ -359,31 +441,37 @@ function WorkspaceBottomBarChipInner({
 						disabled={isInputLocked}
 						onClick={() => {
 							store.hide();
-							setIsCreateOpen(true);
+							setIsDirectoryRegistrationOpen(true);
 						}}
 					>
 						<FiFolderPlus size={14} />
-						Add Workspace from folder or path
+						Add Workspace Directory
 					</button>
 				</div>
 			</Menu>
 
-			<WorkspaceSetupModal
-				isOpen={isCreateOpen}
+			<WorkspaceDirectoryRegistrationModal
+				isOpen={isDirectoryRegistrationOpen}
 				onClose={() => {
-					setIsCreateOpen(false);
+					setIsDirectoryRegistrationOpen(false);
 				}}
-				onSubmit={async (submission: WorkspaceSetupSubmission) => {
-					if (submission.kind !== 'filesystem') {
-						throw new Error('Expected a filesystem Workspace.');
+				title="Add Workspace Directory to Conversation"
+				description="Choose a repository directory. Its effective Workspace will be selected for this conversation after discovery succeeds."
+				onRegister={async path => {
+					setActionError(null);
+
+					try {
+						await state.createWorkspaceDirectory(path);
+						store.hide();
+					} catch (error) {
+						const message = error instanceof Error ? error.message : 'Workspace directory could not be registered.';
+						setActionError(message);
+						throw error;
 					}
-					await state.createFilesystemWorkspace(submission.payload);
 				}}
-				existingDisplayNames={state.workspaces.map(workspace => workspace.displayName)}
-				presentation="composer"
 			/>
 
-			<WorkspaceSelectionModal
+			<WorkspaceDirectorySelectionModal
 				isOpen={isSelectionOpen}
 				onClose={() => {
 					setIsSelectionOpen(false);
@@ -392,11 +480,7 @@ function WorkspaceBottomBarChipInner({
 				activeSkillRefs={activeSkillRefs}
 				setActiveSkillRefs={setActiveSkillRefs}
 				isInputLocked={isInputLocked}
-				onInsertTemplateText={onInsertTemplateText}
 			/>
 		</div>
 	);
-}
-function WorkspaceBottomBarChipContent(props: WorkspaceBottomBarChipProps) {
-	return <WorkspaceBottomBarChipInner {...props} />;
 }

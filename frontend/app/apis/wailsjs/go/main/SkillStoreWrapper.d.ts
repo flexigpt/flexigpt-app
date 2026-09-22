@@ -46,8 +46,6 @@ export function RemoveSkillCollectionMember(arg1:collection.RemoveMemberRequest)
 
 export function ReplaceManagedSkill(arg1:consumerapi.ManagedSkillReplaceRequest):Promise<consumerapi.ManagedSkillReplaceResult>;
 
-export function ResolveSkillArtifactCapabilities(arg1:artifact.ArtifactRef):Promise<resolve.CapabilityPlan>;
-
 export function ResolveSkillCapabilities(arg1:artifact.ArtifactRef):Promise<resolve.CapabilityPlan>;
 
 export function ResolveSkillCollection(arg1:artifact.ArtifactRef):Promise<collection.CollectionCapabilityPlan>;

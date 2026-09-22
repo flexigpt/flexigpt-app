@@ -16,6 +16,7 @@ import {
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
@@ -25,7 +26,11 @@ import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from 
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { ToolStoreChoiceType } from '@/spec/tool';
-import { WorkspaceContextCompositionStatus, WorkspaceConversationSkillUsageStatus } from '@/spec/workspace';
+import {
+	WorkspaceConversationContextUsageStatus,
+	WorkspaceConversationSelectionStatus,
+	WorkspaceConversationSkillUsageStatus,
+} from '@/spec/workspace';
 
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
@@ -35,7 +40,10 @@ import {
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
 import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
-import { artifactRefKey } from '@/workspaces/lib/workspace_api_utils';
+
+function artifactRefKey(ref: ArtifactRef): string {
+	return `${ref.rootID}:${ref.artifactID}`;
+}
 
 /**
  * Get a path/URL for tooltip display, similar to getUIAttachmentPath
@@ -541,27 +549,32 @@ function MessageWorkspaceContextChip({
 	const requestedContexts = selection?.contextRefs ?? [];
 	const requestedSkills = selection?.skillRefs ?? [];
 	const workspaceRef = usage?.workspace ?? selection?.workspace;
-	const workspaceIdentity = workspaceRef ? `${workspaceRef.rootID}/${workspaceRef.collectionID}` : 'unknown';
+	const workspaceIdentity = workspaceRef ? `${workspaceRef.rootID}/${workspaceRef.artifactID}` : 'unknown';
+	const workspaceRevision = usage?.workspaceRevision ?? selection?.workspaceRevision;
 	const hasRecordedUsage = usage !== undefined;
 	const contexts = usage?.contexts ?? [];
 	const skills = usage?.skills ?? [];
 	const includedContextCount = contexts.filter(
 		item =>
-			item.status === WorkspaceContextCompositionStatus.Included ||
-			item.status === WorkspaceContextCompositionStatus.Truncated
+			item.status === WorkspaceConversationContextUsageStatus.Included ||
+			item.status === WorkspaceConversationContextUsageStatus.Truncated
 	).length;
 	const availableSkillCount = skills.filter(item => item.sessionAvailable).length;
 	const activeSkillCount = skills.filter(item => item.active).length;
 	const contextBadgeCount = hasRecordedUsage ? includedContextCount : requestedContexts.length;
 	const skillBadgeCount = hasRecordedUsage ? availableSkillCount : requestedSkills.length;
+	const workspaceUsageNeedsAttention =
+		usage?.status === WorkspaceConversationSelectionStatus.Partial ||
+		usage?.status === WorkspaceConversationSelectionStatus.Unavailable;
 	const warningCount =
 		contexts.filter(
 			item =>
-				item.status !== WorkspaceContextCompositionStatus.Included &&
-				item.status !== WorkspaceContextCompositionStatus.Truncated
+				item.status !== WorkspaceConversationContextUsageStatus.Included &&
+				item.status !== WorkspaceConversationContextUsageStatus.Truncated
 		).length +
 		skills.filter(item => item.status !== WorkspaceConversationSkillUsageStatus.Available).length +
-		(usage?.diagnostics?.length ?? 0);
+		(usage?.diagnostics?.length ?? 0) +
+		(workspaceUsageNeedsAttention ? 1 : 0);
 
 	return (
 		<div className="shrink-0">
@@ -599,9 +612,18 @@ function MessageWorkspaceContextChip({
 					<div className="text-sm font-semibold">{displayName}</div>
 					<div className="text-base-content/60 mt-1 text-xs">
 						{usage
-							? `Recorded at send time · catalog revision ${usage.catalogRevision ?? 'unknown'}`
+							? `Recorded at send time${
+									workspaceRevision !== undefined ? ` · Workspace revision ${workspaceRevision}` : ''
+								}`
 							: 'The Workspace selection was recorded, but an exact backend usage result is unavailable.'}
 					</div>
+					{usage ? (
+						<div className="mt-2">
+							<span className={`badge badge-xs ${workspaceUsageNeedsAttention ? 'badge-warning' : 'badge-success'}`}>
+								{usage.status}
+							</span>
+						</div>
+					) : null}
 
 					{selection ? (
 						<>
@@ -630,9 +652,7 @@ function MessageWorkspaceContextChip({
 									>
 										<FiZap size={13} className="mt-0.5" />
 										<div className="min-w-0 flex-1">
-											<div className="truncate text-xs">
-												{item.displayName || item.name || item.artifact.artifactID}
-											</div>
+											<div className="truncate text-xs">{item.name || item.artifact.artifactID}</div>
 											<div className="text-base-content/60 truncate font-mono text-[10px]">
 												{item.artifact.artifactID}
 											</div>

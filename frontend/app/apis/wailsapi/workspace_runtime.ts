@@ -4,35 +4,63 @@ import type {
 	WorkspacePromptPlan,
 	WorkspaceRuntimePlan,
 	WorkspaceRuntimeSelection,
-	WorkspaceSkill,
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
+import { WorkspaceInsertTarget, WorkspacePromptCompositionStatus } from '@/spec/workspace';
 
 import type { IWorkspaceRuntimeAPI } from '@/apis/interface';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumFromWails, requiredObject } from '@/apis/wailsapi/transport';
 import {
 	ComposeWorkspacePrompt,
-	ListWorkspaceSkills,
 	LoadWorkspaceMCPServers,
 	LoadWorkspaceSkills,
 	ResolveWorkspaceRuntimePlan,
 } from '@/apis/wailsjs/go/main/WorkspaceRuntimeWrapper';
 
+function projectWorkspacePromptPlan(value: unknown, operation: string): WorkspacePromptPlan {
+	const plan = requiredObject<WorkspacePromptPlan>(value, operation);
+
+	for (const contribution of plan.contributions) {
+		contribution.insert = enumFromWails(
+			contribution.insert,
+			WorkspaceInsertTarget,
+			`${operation}.contributions.insert`
+		) as WorkspaceInsertTarget;
+	}
+	for (const decision of plan.decisions) {
+		decision.status = enumFromWails(decision.status, WorkspacePromptCompositionStatus, `${operation}.decisions.status`);
+	}
+
+	return plan;
+}
+
+function projectWorkspaceSkillLoadPlan(value: unknown, operation: string): WorkspaceSkillLoadPlan {
+	const plan = requiredObject<WorkspaceSkillLoadPlan>(value, operation);
+
+	for (const skill of plan.skills) {
+		if (skill.insert !== undefined) {
+			skill.insert = enumFromWails(skill.insert, WorkspaceInsertTarget, `${operation}.skills.insert`);
+		}
+	}
+
+	return plan;
+}
+
+function projectWorkspaceRuntimePlan(value: unknown, operation: string): WorkspaceRuntimePlan {
+	const plan = requiredObject<WorkspaceRuntimePlan>(value, operation);
+	plan.prompt = projectWorkspacePromptPlan(plan.prompt, `${operation}.prompt`);
+	plan.skills = projectWorkspaceSkillLoadPlan(plan.skills, `${operation}.skills`);
+	return plan;
+}
+
 export class WailsWorkspaceRuntimeAPI implements IWorkspaceRuntimeAPI {
 	async composeWorkspacePrompt(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspacePromptPlan> {
-		return requiredObject<WorkspacePromptPlan>(
+		return projectWorkspacePromptPlan(
 			await ComposeWorkspacePrompt(
 				workspace as Parameters<typeof ComposeWorkspacePrompt>[0],
 				artifacts as Parameters<typeof ComposeWorkspacePrompt>[1]
 			),
 			'ComposeWorkspacePrompt'
-		);
-	}
-
-	async listWorkspaceSkills(workspace: ArtifactRef): Promise<WorkspaceSkill[]> {
-		return wailsObjectArrayOrEmpty<WorkspaceSkill>(
-			await ListWorkspaceSkills(workspace as Parameters<typeof ListWorkspaceSkills>[0]),
-			'ListWorkspaceSkills'
 		);
 	}
 
@@ -47,7 +75,7 @@ export class WailsWorkspaceRuntimeAPI implements IWorkspaceRuntimeAPI {
 	}
 
 	async loadWorkspaceSkills(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadPlan> {
-		return requiredObject<WorkspaceSkillLoadPlan>(
+		return projectWorkspaceSkillLoadPlan(
 			await LoadWorkspaceSkills(
 				workspace as Parameters<typeof LoadWorkspaceSkills>[0],
 				artifacts as Parameters<typeof LoadWorkspaceSkills>[1]
@@ -60,7 +88,7 @@ export class WailsWorkspaceRuntimeAPI implements IWorkspaceRuntimeAPI {
 		workspace: ArtifactRef,
 		selection: WorkspaceRuntimeSelection
 	): Promise<WorkspaceRuntimePlan> {
-		return requiredObject<WorkspaceRuntimePlan>(
+		return projectWorkspaceRuntimePlan(
 			await ResolveWorkspaceRuntimePlan(
 				workspace as Parameters<typeof ResolveWorkspaceRuntimePlan>[0],
 				selection as Parameters<typeof ResolveWorkspaceRuntimePlan>[1]

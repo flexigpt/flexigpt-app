@@ -6,10 +6,6 @@ export function ComposeWorkspacePrompt(arg1, arg2) {
   return window['go']['main']['WorkspaceRuntimeWrapper']['ComposeWorkspacePrompt'](arg1, arg2);
 }
 
-export function ListWorkspaceSkills(arg1) {
-  return window['go']['main']['WorkspaceRuntimeWrapper']['ListWorkspaceSkills'](arg1);
-}
-
 export function LoadWorkspaceMCPServers(arg1, arg2) {
   return window['go']['main']['WorkspaceRuntimeWrapper']['LoadWorkspaceMCPServers'](arg1, arg2);
 }

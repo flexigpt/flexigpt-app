@@ -856,11 +856,12 @@ export class MCPManagementAPI {
 	}
 
 	async applyMCPServerSetup(
-		server: MCPServerView,
+		server: MCPServerView | ArtifactRef,
 		values: Record<string, MCPSetupSubmissionValue>,
 		reset: boolean
 	): Promise<void> {
-		const latest = await this.store.getMCPServerInstallation(server.ref);
+		const serverRef = 'ref' in server ? server.ref : server;
+		const latest = await this.store.getMCPServerInstallation(serverRef);
 		const nextData = cloneJSON(latest.installation);
 		nextData.inputs = cloneJSON(nextData.inputs ?? {});
 		const inputs = latest.document.configuration.install.inputs ?? {};
@@ -899,7 +900,7 @@ export class MCPManagementAPI {
 					});
 
 					const result = await this.aggregate.putMCPServerSecret(
-						server.ref,
+						serverRef,
 						MCPSecretKindValue.OAuthClientCredentials,
 						'clientCredentials',
 						secret
@@ -909,7 +910,7 @@ export class MCPManagementAPI {
 					};
 				} else if (reset && existing?.secretRef) {
 					await this.aggregate.deleteMCPServerSecret(
-						server.ref,
+						serverRef,
 						MCPSecretKindValue.OAuthClientCredentials,
 						'clientCredentials'
 					);
@@ -928,22 +929,22 @@ export class MCPManagementAPI {
 			}
 
 			if (submitted?.value) {
-				const result = await this.aggregate.putMCPServerSecret(server.ref, target.kind, target.slot, submitted.value);
+				const result = await this.aggregate.putMCPServerSecret(serverRef, target.kind, target.slot, submitted.value);
 				nextData.inputs[inputName] = {
 					secretRef: result.secretRef,
 				};
 			} else if (reset && existing?.secretRef) {
-				await this.aggregate.deleteMCPServerSecret(server.ref, target.kind, target.slot);
+				await this.aggregate.deleteMCPServerSecret(serverRef, target.kind, target.slot);
 				nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
 			}
 		}
 
 		if (latest.builtIn) {
-			await this.aggregate.updateProtectedMCPServerInstallation(server.ref, latest.installationRevision, nextData);
+			await this.aggregate.updateProtectedMCPServerInstallation(serverRef, latest.installationRevision, nextData);
 			return;
 		}
 
-		await this.aggregate.updateMCPServerInstallation(server.ref, latest.artifact.revision, nextData);
+		await this.aggregate.updateMCPServerInstallation(serverRef, latest.artifact.revision, nextData);
 	}
 
 	async getMCPCollectionManagementView(collection: ArtifactRef): Promise<MCPCollectionManagementView> {

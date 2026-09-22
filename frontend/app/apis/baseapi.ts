@@ -19,7 +19,6 @@ import type {
 	ISkillStoreAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
-	IWorkspaceAggregateAPI,
 	IWorkspaceRuntimeAPI,
 	IWorkspaceStoreAPI,
 } from '@/apis/interface';
@@ -35,7 +34,6 @@ import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
-import { WailsWorkspaceAggregateAPI } from '@/apis/wailsapi/workspace_aggregate';
 import { WailsWorkspaceRuntimeAPI } from '@/apis/wailsapi/workspace_runtime';
 import { WailsWorkspaceStoreAPI } from '@/apis/wailsapi/workspace_store';
 import { WorkspaceManagementAPI } from '@/apis/workspace_management';
@@ -66,7 +64,6 @@ export let mcpManagementAPI: MCPManagementAPI;
 
 let workspaceStoreAPI: IWorkspaceStoreAPI;
 let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
-let workspaceAggregateAPI: IWorkspaceAggregateAPI;
 export let workspaceManagementAPI: WorkspaceManagementAPI;
 
 // Conditional initialization
@@ -111,11 +108,9 @@ if (IS_WAILS_PLATFORM) {
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();
 	workspaceRuntimeAPI = new WailsWorkspaceRuntimeAPI();
-	workspaceAggregateAPI = new WailsWorkspaceAggregateAPI();
 	workspaceManagementAPI = new WorkspaceManagementAPI(
 		workspaceStoreAPI,
 		workspaceRuntimeAPI,
-		workspaceAggregateAPI,
 		toolStoreAPI,
 		modelPresetStoreAPI
 	);

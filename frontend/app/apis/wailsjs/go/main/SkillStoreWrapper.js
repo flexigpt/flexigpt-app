@@ -78,10 +78,6 @@ export function ReplaceManagedSkill(arg1) {
   return window['go']['main']['SkillStoreWrapper']['ReplaceManagedSkill'](arg1);
 }
 
-export function ResolveSkillArtifactCapabilities(arg1) {
-  return window['go']['main']['SkillStoreWrapper']['ResolveSkillArtifactCapabilities'](arg1);
-}
-
 export function ResolveSkillCapabilities(arg1) {
   return window['go']['main']['SkillStoreWrapper']['ResolveSkillCapabilities'](arg1);
 }

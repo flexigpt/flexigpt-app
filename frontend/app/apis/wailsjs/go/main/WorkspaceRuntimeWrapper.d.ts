@@ -5,8 +5,6 @@ import {consumerapi} from '../models';
 
 export function ComposeWorkspacePrompt(arg1:artifact.ArtifactRef,arg2:Array<artifact.ArtifactRef>):Promise<consumerapi.WorkspacePromptPlan>;
 
-export function ListWorkspaceSkills(arg1:artifact.ArtifactRef):Promise<Array<consumerapi.WorkspaceSkill>>;
-
 export function LoadWorkspaceMCPServers(arg1:artifact.ArtifactRef,arg2:Array<artifact.ArtifactRef>):Promise<consumerapi.WorkspaceMCPServerLoadPlan>;
 
 export function LoadWorkspaceSkills(arg1:artifact.ArtifactRef,arg2:Array<artifact.ArtifactRef>):Promise<consumerapi.WorkspaceSkillLoadPlan>;

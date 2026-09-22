@@ -5,8 +5,6 @@ import type {
 	CapabilityPlan,
 	MappedTarget,
 	StoreArtifact,
-	StoreArtifactRoot,
-	StoreArtifactRootDraft,
 	StoreArtifactSourceSummary,
 } from '@/spec/artifact';
 import type {
@@ -107,18 +105,16 @@ import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolRe
 import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
-	FilesystemSourceRegistration,
-	WorkspaceArtifactView as StoreWorkspaceArtifactView,
-	Workspace,
-	WorkspaceLoad,
+	WorkspaceArtifactView,
+	WorkspaceDefaultPolicyView,
+	WorkspaceDirectoryRef,
+	WorkspaceDirectoryView,
 	WorkspaceMCPServerLoadPlan,
-	WorkspacePathRegistration,
-	WorkspacePathRegistrationResult,
+	WorkspacePage,
+	WorkspacePageRequest,
 	WorkspacePromptPlan,
-	WorkspaceRefresh,
 	WorkspaceRuntimePlan,
 	WorkspaceRuntimeSelection,
-	WorkspaceSkill,
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
 
@@ -329,40 +325,36 @@ export interface ISkillRuntimeAPI {
 }
 
 export interface IWorkspaceStoreAPI {
-	addWorkspacePath(request: WorkspacePathRegistration): Promise<WorkspacePathRegistrationResult>;
+	getWorkspaceDefaultPolicy(): Promise<WorkspaceDefaultPolicyView>;
 
-	createWorkspaceRoot(request: StoreArtifactRootDraft): Promise<StoreArtifactRoot>;
+	getWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView>;
 
-	getWorkspace(workspace: ArtifactRef): Promise<Workspace>;
+	listWorkspaceDirectories(request: WorkspacePageRequest): Promise<WorkspacePage>;
 
-	listWorkspaceArtifacts(workspace: ArtifactRef): Promise<StoreArtifact[]>;
+	listWorkspaceDirectoryArtifacts(directory: WorkspaceDirectoryRef): Promise<WorkspaceArtifactView[]>;
 
-	listWorkspaceRoots(): Promise<StoreArtifactRoot[]>;
+	refreshWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView>;
 
-	listWorkspaces(rootID: ArtifactRootID): Promise<Workspace[]>;
+	registerWorkspaceDirectory(path: string): Promise<WorkspaceDirectoryView>;
 
-	loadWorkspace(workspace: ArtifactRef): Promise<WorkspaceLoad>;
+	removeWorkspaceDirectory(directory: WorkspaceDirectoryRef, expectedRevision: number): Promise<void>;
 
-	refreshWorkspace(workspace: ArtifactRef): Promise<WorkspaceRefresh>;
-
-	registerFilesystemWorkspaceSource(request: FilesystemSourceRegistration): Promise<StoreArtifactSourceSummary>;
-
-	resolveWorkspaceArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan>;
-
-	resolveWorkspaceCapabilities(workspace: ArtifactRef): Promise<CapabilityPlan>;
-
-	setWorkspaceArtifactEnabled(
-		workspace: ArtifactRef,
+	setWorkspaceDirectoryArtifactEnabled(
+		directory: WorkspaceDirectoryRef,
 		artifact: ArtifactRef,
 		expectedRevision: number,
 		enabled: boolean
-	): Promise<StoreWorkspaceArtifactView>;
+	): Promise<WorkspaceArtifactView>;
+
+	setWorkspaceDirectoryEnabled(
+		directory: WorkspaceDirectoryRef,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<WorkspaceDirectoryView>;
 }
 
 export interface IWorkspaceRuntimeAPI {
 	composeWorkspacePrompt(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspacePromptPlan>;
-
-	listWorkspaceSkills(workspace: ArtifactRef): Promise<WorkspaceSkill[]>;
 
 	loadWorkspaceMCPServers(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceMCPServerLoadPlan>;
 
@@ -374,13 +366,44 @@ export interface IWorkspaceRuntimeAPI {
 	): Promise<WorkspaceRuntimePlan>;
 }
 
-export interface IWorkspaceAggregateAPI {
-	setWorkspaceArtifactRuntimeDisabled(
-		workspace: ArtifactRef,
+export interface IWorkspaceManagementAPI {
+	getWorkspaceDefaultPolicy(): Promise<WorkspaceDefaultPolicyView>;
+
+	getWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView>;
+
+	listWorkspaceDirectories(request: WorkspacePageRequest): Promise<WorkspacePage>;
+
+	listWorkspaceDirectoryArtifacts(directory: WorkspaceDirectoryRef): Promise<WorkspaceArtifactView[]>;
+
+	refreshWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView>;
+
+	registerWorkspaceDirectory(path: string): Promise<WorkspaceDirectoryView>;
+
+	removeWorkspaceDirectory(directory: WorkspaceDirectoryRef, expectedRevision: number): Promise<void>;
+
+	setWorkspaceDirectoryArtifactEnabled(
+		directory: WorkspaceDirectoryRef,
 		artifact: ArtifactRef,
 		expectedRevision: number,
-		runtimeDisabled: boolean
-	): Promise<StoreWorkspaceArtifactView>;
+		enabled: boolean
+	): Promise<WorkspaceArtifactView>;
+
+	setWorkspaceDirectoryEnabled(
+		directory: WorkspaceDirectoryRef,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<WorkspaceDirectoryView>;
+
+	composeWorkspacePrompt(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspacePromptPlan>;
+
+	loadWorkspaceMCPServers(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceMCPServerLoadPlan>;
+
+	loadWorkspaceSkills(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspaceSkillLoadPlan>;
+
+	resolveWorkspaceRuntimePlan(
+		workspace: ArtifactRef,
+		selection: WorkspaceRuntimeSelection
+	): Promise<WorkspaceRuntimePlan>;
 }
 
 export interface IToolRuntimeAPI {
