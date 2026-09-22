@@ -6,7 +6,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -47,32 +46,6 @@ type AttachAgentToCollectionRequest struct {
 	Collection       artifact.ArtifactRef `json:"collection"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
 	Agent            artifact.ArtifactRef `json:"agent"`
-}
-
-type ManagedAgentCreateRequest struct {
-	Collection                 artifact.ArtifactRef `json:"collection"`
-	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
-
-	Document ManagedAgentDocument `json:"document"`
-	Enabled  bool                 `json:"enabled"`
-}
-
-type ManagedAgentCreateResult struct {
-	Agent             artifact.Artifact         `json:"agent"`
-	Address           artifact.ArtifactAddress  `json:"address"`
-	Collection        collection.CollectionView `json:"collection"`
-	MembershipCreated bool                      `json:"membershipCreated"`
-}
-
-type ManagedAgentReplaceRequest struct {
-	Agent            artifact.ArtifactRef `json:"agent"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-	Document         ManagedAgentDocument `json:"document"`
-}
-
-type ManagedAgentReplaceResult struct {
-	Agent   artifact.Artifact        `json:"agent"`
-	Address artifact.ArtifactAddress `json:"address"`
 }
 
 type ManagedAgentDeleteRequest struct {

@@ -96,17 +96,24 @@ func ValidateManagedAgentPackageAddress(
 	return nil
 }
 
-// ManagedAgentDocumentPayload validates one concrete managed Agent declaration
-// and projects it into its canonical source bytes and immutable Definition.
+// ManagedAgentEntryPayload projects one concrete canonical Agent Entry into
+// managed package bytes and an immutable Definition.
 //
-// Managed Agent packages must contain concrete Agent declarations. A
-// source-selected Agent alias is a valid portable declaration, but it is not
-// a managed Agent package body because the package would not own the selected
-// declaration occurrence.
-func ManagedAgentDocumentPayload(
-	document agentv1.AgentDocument,
+// Strict managed-import profile validation belongs to the managed import
+// domain. This package owns the invariant that a managed package root is a
+// concrete Agent declaration rather than a source-selected alias.
+func ManagedAgentEntryPayload(
+	entry declaration.Entry,
 ) ([]byte, definition.Definition, error) {
-	if err := document.Validate(); err != nil {
+	if err := declaration.ValidateEntryType(
+		entry,
+		declaration.TypeAgent,
+	); err != nil {
+		return nil, definition.Definition{}, err
+	}
+
+	document, err := agentv1.DecodeAgentEntry(entry)
+	if err != nil {
 		return nil, definition.Definition{}, err
 	}
 	if document.Locator != nil {
@@ -115,16 +122,10 @@ func ManagedAgentDocumentPayload(
 			basespec.ErrUnsupported,
 		)
 	}
-
-	entry, err := declaration.NewEntry(document)
-	if err != nil {
-		return nil, definition.Definition{}, err
-	}
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
 		return nil, definition.Definition{}, err
 	}
-
 	value, err := decoder.DefinitionForEntry(entry)
 	if err != nil {
 		return nil, definition.Definition{}, err

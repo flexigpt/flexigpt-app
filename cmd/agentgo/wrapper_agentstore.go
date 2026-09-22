@@ -328,24 +328,86 @@ func (w *AgentStoreWrapper) ListDirectAgentMemberships(
 	)
 }
 
-func (w *AgentStoreWrapper) CreateManagedAgent(
-	request agentConsumerAPI.ManagedAgentCreateRequest,
-) (agentConsumerAPI.ManagedAgentCreateResult, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.ManagedAgentCreateResult, error) {
-			return api.CreateManagedAgent(context.Background(), request)
+func (w *AgentStoreWrapper) ListAgentImportDestinations() (
+	[]agentConsumerAPI.AgentImportDestination,
+	error,
+) {
+	return middleware.WithRecoveryResp(
+		func() ([]agentConsumerAPI.AgentImportDestination, error) {
+			if w == nil || w.api == nil || w.roots == nil {
+				return nil, basespec.ErrClosed
+			}
+
+			roots, err := w.roots.List(context.Background())
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]agentConsumerAPI.AgentImportDestination, 0)
+			for _, rootValue := range roots {
+				values, err := w.api.ListAgentImportDestinations(
+					context.Background(),
+					rootValue.ID,
+				)
+				if err != nil {
+					return nil, err
+				}
+				for index := range values {
+					values[index].RootDisplayName = rootValue.DisplayName
+				}
+				output = append(output, values...)
+			}
+
+			sort.Slice(output, func(left, right int) bool {
+				if output[left].RootID != output[right].RootID {
+					return output[left].RootID < output[right].RootID
+				}
+				return output[left].CollectionName <
+					output[right].CollectionName
+			})
+			return output, nil
 		},
 	)
 }
 
-func (w *AgentStoreWrapper) ReplaceManagedAgent(
-	request agentConsumerAPI.ManagedAgentReplaceRequest,
-) (agentConsumerAPI.ManagedAgentReplaceResult, error) {
+func (w *AgentStoreWrapper) PreviewAgentImport(
+	request agentConsumerAPI.AgentImportPreviewRequest,
+) (agentConsumerAPI.AgentImportPreview, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.ManagedAgentReplaceResult, error) {
-			return api.ReplaceManagedAgent(context.Background(), request)
+		func(api *agentConsumerAPI.API) (
+			agentConsumerAPI.AgentImportPreview,
+			error,
+		) {
+			return api.PreviewAgentImport(context.Background(), request)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) CommitAgentImport(
+	request agentConsumerAPI.AgentImportCommitRequest,
+) (agentConsumerAPI.AgentImportCommitResult, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (
+			agentConsumerAPI.AgentImportCommitResult,
+			error,
+		) {
+			return api.CommitAgentImport(context.Background(), request)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) ExportManagedAgent(
+	request agentConsumerAPI.AgentExportRequest,
+) (agentConsumerAPI.AgentExportResult, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (
+			agentConsumerAPI.AgentExportResult,
+			error,
+		) {
+			return api.ExportManagedAgent(context.Background(), request)
 		},
 	)
 }

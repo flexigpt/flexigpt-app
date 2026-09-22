@@ -7,6 +7,7 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -27,11 +28,16 @@ type API struct {
 
 	collections         *collection.API
 	declarationResolver *resolve.Resolver
+	fallbackProviders   map[declaration.Type]resolve.FallbackProvider
+
+	managedAgentProfile *declaration.ManagedProfilePolicy
+	importSigner        *resolve.Signer
 }
 
 type apiOptions struct {
 	locatorResolvers  []providerapi.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
+	importSigner      *resolve.Signer
 }
 
 type Option func(*apiOptions)
@@ -64,6 +70,14 @@ func WithFallbackProviders(
 	}
 }
 
+func WithManagedAgentImportSigner(
+	value *resolve.Signer,
+) Option {
+	return func(options *apiOptions) {
+		options.importSigner = value
+	}
+}
+
 func New(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
@@ -92,13 +106,38 @@ func New(
 		}
 	}
 
+	profiles, err := declaration.NewManagedProfileRegistry(
+		agentv1.ManagedAgentImportProfileDescriptor(),
+	)
+	if err != nil {
+		return nil, err
+	}
+	managedAgentProfile, err := profiles.ManagedProfilePolicyFor(
+		agentv1.AgentType,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	importSigner := config.importSigner
+	if importSigner == nil {
+		importSigner, err = resolve.NewSigner(nil)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	output := &API{
-		sources:          sources,
-		discovery:        discovery,
-		artifacts:        artifacts,
-		resources:        resources,
-		managedArtifacts: managedArtifacts,
-		protection:       protection,
+		sources:           sources,
+		discovery:         discovery,
+		artifacts:         artifacts,
+		resources:         resources,
+		managedArtifacts:  managedArtifacts,
+		protection:        protection,
+		fallbackProviders: maps.Clone(config.fallbackProviders),
+
+		managedAgentProfile: managedAgentProfile,
+		importSigner:        importSigner,
 	}
 
 	locators, err := resolve.NewProviderLocatorResolver(

@@ -5,7 +5,6 @@ application:
     conversationsDirectory: "conversations_v1"
     modelPresetsDirectory: "model_presets_v1"
     toolsDirectory: "tools_v1"
-    assistantPresetsDirectory: "assistant_presets_v1"
     artifactStoreDirectory: "artifacts_v3"
     artifactStoreManifestFile: "store.json"
     artifactStoreMetadataFile: "app.sqlite"

@@ -1,0 +1,228 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.site/artifact/agent/managed-restrictions.json",
+	"title": "FlexiGPT Managed Agent Import Restrictions",
+	"type": "object",
+	"properties": {
+		"type": {
+			"const": "agent"
+		},
+		"locator": false,
+		"loop": false,
+		"workflow": false,
+		"members": {
+			"type": "array",
+			"items": {
+				"oneOf": [
+					{
+						"$ref": "#/$defs/containedText"
+					},
+					{
+						"$ref": "#/$defs/namedModel"
+					},
+					{
+						"$ref": "#/$defs/namedTool"
+					},
+					{
+						"$ref": "#/$defs/namedSkill"
+					},
+					{
+						"$ref": "#/$defs/namedMCP"
+					},
+					{
+						"$ref": "#/$defs/containedMCP"
+					},
+					{
+						"$ref": "#/$defs/namedMCPPolicy"
+					}
+				]
+			}
+		}
+	},
+	"$defs": {
+		"name": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"builtinScope": {
+			"const": "builtin"
+		},
+		"containedText": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name", "insert", "parameters"],
+			"properties": {
+				"type": {
+					"const": "text"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"insert": {
+					"enum": ["instructions", "user-message"]
+				},
+				"parameters": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["content"],
+					"properties": {
+						"displayName": true,
+						"description": true,
+						"labels": true,
+						"metadata": true,
+						"content": {
+							"type": "string"
+						},
+						"mediaType": {
+							"type": "string"
+						}
+					}
+				}
+			}
+		},
+		"namedModel": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name"],
+			"properties": {
+				"type": {
+					"const": "model"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"$ref": "#/$defs/builtinScope"
+				},
+				"overrides": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"includeSystemPrompt": {
+							"type": "boolean"
+						}
+					}
+				}
+			}
+		},
+		"namedTool": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name"],
+			"properties": {
+				"type": {
+					"const": "tool"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"$ref": "#/$defs/builtinScope"
+				},
+				"overrides": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"autoExecute": {
+							"type": "boolean"
+						}
+					}
+				}
+			}
+		},
+		"namedSkill": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name", "scope"],
+			"properties": {
+				"type": {
+					"const": "skill"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"$ref": "#/$defs/builtinScope"
+				},
+				"use": {
+					"type": "object",
+					"additionalProperties": false,
+					"required": ["mode"],
+					"properties": {
+						"mode": {
+							"enum": ["available", "active", "instructions"]
+						}
+					}
+				}
+			}
+		},
+		"namedMCP": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name", "scope"],
+			"properties": {
+				"type": {
+					"const": "mcp"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"$ref": "#/$defs/builtinScope"
+				}
+			}
+		},
+		"containedMCP": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name", "parameters"],
+			"properties": {
+				"type": {
+					"const": "mcp"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"parameters": {
+					"type": "object",
+					"additionalProperties": false,
+					"properties": {
+						"displayName": true,
+						"description": true,
+						"labels": true,
+						"metadata": true,
+						"transport": true,
+						"command": true,
+						"args": true,
+						"env": true,
+						"url": true,
+						"headers": true,
+						"include": true,
+						"timeoutMS": true,
+						"auth": true,
+						"install": true,
+						"connectionProfiles": true,
+						"policy": true
+					}
+				}
+			}
+		},
+		"namedMCPPolicy": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["type", "name", "scope"],
+			"properties": {
+				"type": {
+					"const": "mcp.policy"
+				},
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"$ref": "#/$defs/builtinScope"
+				}
+			}
+		}
+	}
+}

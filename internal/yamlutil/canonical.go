@@ -157,7 +157,7 @@ func (c *converter) convert(
 		for index := 0; index < len(node.Content); index += 2 {
 			key := node.Content[index]
 			if key.Kind != yaml.ScalarNode ||
-				(key.Tag != "!!str" && key.Tag != "") {
+				(key.Tag != tagStr && key.Tag != "") {
 				return nil, errors.New(
 					"YAML object keys must be strings",
 				)
@@ -210,10 +210,10 @@ func convertScalar(
 		//nolint:nilnil // Explicit.
 		return nil, nil
 
-	case "", "!!str":
+	case "", tagStr:
 		return node.Value, nil
 
-	case "!!bool":
+	case tagBool:
 		switch strings.ToLower(node.Value) {
 		case "true":
 			return true, nil
