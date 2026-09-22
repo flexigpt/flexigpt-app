@@ -18,6 +18,7 @@ type AgentImportIssueSeverity string
 const (
 	AgentImportIssueError        AgentImportIssueSeverity = "error"
 	AgentImportIssueConfirmation AgentImportIssueSeverity = "confirmation"
+	AgentImportIssueWarning      AgentImportIssueSeverity = "warning"
 	AgentImportIssueInformation  AgentImportIssueSeverity = "information"
 )
 
@@ -59,14 +60,17 @@ type AgentImportArtifactPreview struct {
 }
 
 type AgentImportRelationship struct {
-	Path   string                  `json:"path"`
-	Type   declaration.Type        `json:"type"`
-	Name   basespec.LogicalName    `json:"name"`
-	Scope  declaration.LookupScope `json:"scope,omitempty"`
-	Status string                  `json:"status"`
+	Path   string                   `json:"path"`
+	Type   declaration.Type         `json:"type"`
+	Name   basespec.LogicalName     `json:"name"`
+	Scope  declaration.LookupScope  `json:"scope,omitempty"`
+	Status resolve.ResolutionStatus `json:"status"`
 
 	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
 	Mapped   *resolve.MappedTarget `json:"mapped,omitempty"`
+
+	Code    string `json:"code,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type AgentImportConflict struct {
@@ -157,6 +161,7 @@ type AgentExportResult struct {
 	DefinitionDigest  cryptoutil.Digest    `json:"definitionDigest"`
 	ArtifactRevision  uint64               `json:"artifactRevision"`
 
-	Resolution          resolve.CapabilityPlan    `json:"resolution"`
+	Resolution          *resolve.CapabilityPlan   `json:"resolution,omitempty"`
+	ResolutionIssue     *resolve.ResolutionIssue  `json:"resolutionIssue,omitempty"`
 	MCPSetupDescriptors []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors,omitempty"`
 }

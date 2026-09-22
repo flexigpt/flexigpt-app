@@ -11,6 +11,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type ManagedImportIssueSeverity string
@@ -50,6 +52,183 @@ type ManagedMCPSetupDescriptor struct {
 type ManagedAgentImportAdmission struct {
 	Issues              []ManagedImportIssue
 	MCPSetupDescriptors []ManagedMCPSetupDescriptor
+}
+
+const managedAgentMemberPathDigestLength = 16
+
+// NormalizeManagedAgentImport converts accepted managed-Agent input into the
+// persisted managed form. Every supported named external dependency is pinned
+// to protected built-in lookup before Definition calculation or publication.
+func NormalizeManagedAgentImport(
+	entry declaration.Entry,
+) (declaration.Entry, error) {
+	if err := declaration.ValidateEntryType(
+		entry,
+		declaration.TypeAgent,
+	); err != nil {
+		return declaration.Entry{}, err
+	}
+	if _, err := agentv1.DecodeAgentEntry(entry); err != nil {
+		return declaration.Entry{}, err
+	}
+
+	raw, err := entry.CanonicalJSON()
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return declaration.Entry{}, err
+	}
+	if fields == nil {
+		return declaration.Entry{}, fmt.Errorf(
+			"%w: managed Agent declaration must be an object",
+			basespec.ErrInvalid,
+		)
+	}
+
+	membersRaw, found := fields["members"]
+	if !found {
+		return entry.Clone(), nil
+	}
+
+	var members []json.RawMessage
+	if err := json.Unmarshal(membersRaw, &members); err != nil {
+		return declaration.Entry{}, fmt.Errorf(
+			"%w: managed Agent members must be an array",
+			basespec.ErrInvalid,
+		)
+	}
+
+	changed := false
+	for index, rawMember := range members {
+		member, err := declaration.DecodeCanonicalEntryJSON(rawMember)
+		if err != nil {
+			return declaration.Entry{}, fmt.Errorf(
+				"managed Agent members[%d]: %w",
+				index,
+				err,
+			)
+		}
+
+		form, err := member.MemberForm()
+		if err != nil {
+			return declaration.Entry{}, fmt.Errorf(
+				"managed Agent members[%d]: %w",
+				index,
+				err,
+			)
+		}
+		if form != declaration.MemberNamed ||
+			!managedAgentNamedDependencyType(member.Header().Type) {
+			continue
+		}
+
+		relationship, err := member.Relationship()
+		if err != nil {
+			return declaration.Entry{}, fmt.Errorf(
+				"managed Agent members[%d]: %w",
+				index,
+				err,
+			)
+		}
+		if relationship.Scope == declaration.LookupScopeBuiltin {
+			continue
+		}
+		if relationship.Scope != "" {
+			return declaration.Entry{}, fmt.Errorf(
+				"%w: managed Agent dependency %q has unsupported scope %q",
+				basespec.ErrInvalid,
+				member.Header().Name,
+				relationship.Scope,
+			)
+		}
+
+		var memberFields map[string]json.RawMessage
+		if err := json.Unmarshal(rawMember, &memberFields); err != nil {
+			return declaration.Entry{}, err
+		}
+		memberFields["scope"] = json.RawMessage(`"builtin"`)
+
+		normalizedMember, err := jsonutil.MarshalCanonicalObject(
+			memberFields,
+			basespec.MaxDefinitionBodyBytes,
+		)
+		if err != nil {
+			return declaration.Entry{}, err
+		}
+		members[index] = normalizedMember
+		changed = true
+	}
+
+	if !changed {
+		return entry.Clone(), nil
+	}
+
+	normalizedMembers, err := json.Marshal(members)
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+	fields["members"] = normalizedMembers
+
+	normalized, err := jsonutil.MarshalCanonicalObject(
+		fields,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return declaration.Entry{}, err
+	}
+	return declaration.DecodeCanonicalEntryJSON(normalized)
+}
+
+func managedAgentNamedDependencyType(
+	value declaration.Type,
+) bool {
+	switch value {
+	case declaration.TypeModel,
+		declaration.TypeTool,
+		declaration.TypeSkill,
+		declaration.TypeMCP,
+		declaration.TypeMCPPolicy:
+		return true
+	default:
+		return false
+	}
+}
+
+// ManagedAgentMemberPath returns a stable non-positional identity for one
+// managed Agent relationship occurrence.
+func ManagedAgentMemberPath(
+	member declaration.Entry,
+) (string, error) {
+	identity, err := declaration.MemberIdentityJSON(member)
+	if err != nil {
+		return "", err
+	}
+
+	digest := strings.TrimPrefix(
+		string(cryptoutil.DigestBytes(identity)),
+		cryptoutil.DigestSHA256Prefix,
+	)
+	if len(digest) < managedAgentMemberPathDigestLength {
+		return "", fmt.Errorf(
+			"%w: managed Agent member identity digest is invalid",
+			basespec.ErrInvalid,
+		)
+	}
+
+	header := member.Header()
+	name := header.Name
+	if name == "" {
+		name = "selector"
+	}
+	return strings.Join([]string{
+		"members",
+		string(header.Type),
+		name,
+		digest[:managedAgentMemberPathDigestLength],
+	}, "/"), nil
 }
 
 func (v *ManagedAgentImportAdmission) HasErrors() bool {
@@ -139,11 +318,10 @@ func validateManagedAgentMember(
 		return err
 	}
 
-	memberPath := fmt.Sprintf(
-		"members/%s/%s",
-		header.Type,
-		header.Name,
-	)
+	memberPath, err := ManagedAgentMemberPath(member)
+	if err != nil {
+		return err
+	}
 
 	switch header.Type {
 	case declaration.TypeText:
@@ -165,7 +343,8 @@ func validateManagedAgentMember(
 			return err
 		}
 		memberPath = fmt.Sprintf(
-			"members/text/%s/%s",
+			"%s/%s/%s",
+			"members/text",
 			document.Insert,
 			document.Name,
 		)
@@ -187,7 +366,7 @@ func validateManagedAgentMember(
 			header,
 			relationship.Scope,
 			memberPath,
-			true,
+			false,
 		)
 
 	case declaration.TypeTool:
@@ -197,7 +376,7 @@ func validateManagedAgentMember(
 			header,
 			relationship.Scope,
 			memberPath,
-			true,
+			false,
 		)
 
 		raw, found := relationship.Overrides["autoExecute"]

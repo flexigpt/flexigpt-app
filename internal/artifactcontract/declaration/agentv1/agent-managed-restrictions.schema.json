@@ -134,7 +134,7 @@
 		"namedSkill": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["type", "name", "scope"],
+			"required": ["type", "name"],
 			"properties": {
 				"type": {
 					"const": "skill"
@@ -160,7 +160,7 @@
 		"namedMCP": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["type", "name", "scope"],
+			"required": ["type", "name"],
 			"properties": {
 				"type": {
 					"const": "mcp"
@@ -211,7 +211,7 @@
 		"namedMCPPolicy": {
 			"type": "object",
 			"additionalProperties": false,
-			"required": ["type", "name", "scope"],
+			"required": ["type", "name"],
 			"properties": {
 				"type": {
 					"const": "mcp.policy"

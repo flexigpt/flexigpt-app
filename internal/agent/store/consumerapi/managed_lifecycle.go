@@ -75,10 +75,26 @@ func (a *API) DeleteManagedAgent(
 	)
 }
 
+func (a *API) loadExportableManagedAgent(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (editableManagedAgent, error) {
+	return a.loadManagedAgent(ctx, ref, 0, false)
+}
+
 func (a *API) loadEditableManagedAgent(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
+) (editableManagedAgent, error) {
+	return a.loadManagedAgent(ctx, ref, expectedRevision, true)
+}
+
+func (a *API) loadManagedAgent(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedRevision uint64,
+	requireCurrentSource bool,
 ) (editableManagedAgent, error) {
 	if a == nil {
 		return editableManagedAgent{}, basespec.ErrClosed
@@ -132,7 +148,7 @@ func (a *API) loadEditableManagedAgent(
 			basespec.ErrUnsupported,
 		)
 	}
-	if !sourceValue.Enabled {
+	if requireCurrentSource && !sourceValue.Enabled {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent Source is disabled",
 			basespec.ErrReferenceUnresolved,
@@ -152,19 +168,23 @@ func (a *API) loadEditableManagedAgent(
 		)
 	}
 
-	inspection, err := a.discovery.InspectSource(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
-	if err != nil {
-		return editableManagedAgent{}, err
-	}
-	if !inspection.IsCurrent() {
-		return editableManagedAgent{}, fmt.Errorf(
-			"%w: managed Agent Source requires refresh",
-			basespec.ErrRefreshRequired,
+	generation := ""
+	if requireCurrentSource {
+		inspection, err := a.discovery.InspectSource(
+			ctx,
+			record.RootID,
+			record.Binding.SourceID,
 		)
+		if err != nil {
+			return editableManagedAgent{}, err
+		}
+		if !inspection.IsCurrent() {
+			return editableManagedAgent{}, fmt.Errorf(
+				"%w: managed Agent Source requires refresh",
+				basespec.ErrRefreshRequired,
+			)
+		}
+		generation = inspection.State.SourceGeneration
 	}
 
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
@@ -186,6 +206,6 @@ func (a *API) loadEditableManagedAgent(
 	return editableManagedAgent{
 		artifact:   record.Clone(),
 		address:    address,
-		generation: inspection.State.SourceGeneration,
+		generation: generation,
 	}, nil
 }

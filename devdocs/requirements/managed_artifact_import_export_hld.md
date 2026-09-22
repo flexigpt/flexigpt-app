@@ -1,8 +1,8 @@
-Proposed file: `devdocs/requirements/managed_artifact_import_export_hld.md`
+# Managed Agent File Import and Export HLD
 
-# Managed Artifact Import and Export Extension HLD
+Status: Revised proposed replacement for managed Agent composition authoring and Assistant Preset management.
 
-Status: Proposed breaking replacement for managed Agent composition authoring and Assistant Preset management
+This design intentionally uses a client-carried HMAC-signed prepared payload. It does not require backend-held prepared import state, projected Artifact overlays, cross-package transactions, Agent readiness aggregation, or an Agent reference catalog.
 
 Normative foundations:
 
@@ -10,1936 +10,718 @@ Normative foundations:
 - [Artifact Store, Resolution, and Ecosystem HLD](./artifacts_hld.md)
 - [Artifact-backed Agent Store HLD](./agent_store_hld.md)
 
-This HLD extends the existing Artifact ecosystem with previewed, strict-profile import and portable export for user-managed Artifacts.
-
-The first supported domain is Agent.
-
-The common infrastructure must remain reusable for MCP and Text, but each domain remains the public entry point and owns its admission, destination, lifecycle, conflict, and readiness policies.
-
 - [1. Purpose](#1-purpose)
-- [2. Goals and scope](#2-goals-and-scope)
-  - [2.1 Goals](#21-goals)
-  - [2.2 In scope](#22-in-scope)
-  - [2.3 Out of scope](#23-out-of-scope)
-- [3. Normative relationship to existing HLDs](#3-normative-relationship-to-existing-hlds)
+- [2. Scope and non-goals](#2-scope-and-non-goals)
+- [3. Core decisions](#3-core-decisions)
 - [4. Terminology](#4-terminology)
-- [5. Requirements](#5-requirements)
-  - [5.1 Domain ownership requirements](#51-domain-ownership-requirements)
-  - [5.2 File input requirements](#52-file-input-requirements)
-  - [5.3 Strict profile schema requirements](#53-strict-profile-schema-requirements)
-  - [5.4 Preview requirements](#54-preview-requirements)
-  - [5.5 Prepared import requirements](#55-prepared-import-requirements)
-  - [5.6 Commit requirements](#56-commit-requirements)
-  - [5.7 Atomicity requirements](#57-atomicity-requirements)
-  - [5.8 Export requirements](#58-export-requirements)
-  - [5.9 Managed declaration immutability requirements](#59-managed-declaration-immutability-requirements)
-  - [5.10 Collection requirements](#510-collection-requirements)
-  - [5.11 Identity and conflict requirements](#511-identity-and-conflict-requirements)
-  - [5.12 Reference catalog requirements](#512-reference-catalog-requirements)
-  - [5.13 MCP completion and Agent readiness requirements](#513-mcp-completion-and-agent-readiness-requirements)
-  - [5.14 Breaking-change requirements](#514-breaking-change-requirements)
-- [6. Design principles and invariants](#6-design-principles-and-invariants)
-  - [6.1 Preview is authoritative preparation](#61-preview-is-authoritative-preparation)
-  - [6.2 Commit does not reread the import source](#62-commit-does-not-reread-the-import-source)
-  - [6.3 A digest is identity, not frontend authority](#63-a-digest-is-identity-not-frontend-authority)
-  - [6.4 Strict profile is not a portable schema version](#64-strict-profile-is-not-a-portable-schema-version)
-  - [6.5 Importability and readiness are separate](#65-importability-and-readiness-are-separate)
-  - [6.6 Export is declaration recovery, not Store backup](#66-export-is-declaration-recovery-not-store-backup)
-  - [6.7 Collection membership does not own the Agent](#67-collection-membership-does-not-own-the-agent)
-  - [6.8 Domains drive common infrastructure](#68-domains-drive-common-infrastructure)
-- [7. Architecture and ownership](#7-architecture-and-ownership)
-  - [7.1 Conceptual architecture](#71-conceptual-architecture)
-  - [7.2 Component responsibilities](#72-component-responsibilities)
-  - [7.3 Common infrastructure and domain drivers](#73-common-infrastructure-and-domain-drivers)
-- [8. Strict managed profile schemas](#8-strict-managed-profile-schemas)
-  - [8.1 Schema purpose](#81-schema-purpose)
-  - [8.2 Subset by construction](#82-subset-by-construction)
-  - [8.3 Initialization-time validation](#83-initialization-time-validation)
-  - [8.4 Schema and semantic admission](#84-schema-and-semantic-admission)
-  - [8.5 Schema placement](#85-schema-placement)
-- [9. Agent managed import profile](#9-agent-managed-import-profile)
-  - [9.1 Agent root declaration](#91-agent-root-declaration)
-  - [9.2 Allowed Agent members](#92-allowed-agent-members)
-  - [9.3 Prohibited Agent forms](#93-prohibited-agent-forms)
-  - [9.4 Contained Text](#94-contained-text)
-  - [9.5 Model and Tool relationships](#95-model-and-tool-relationships)
-  - [9.6 Skill relationships](#96-skill-relationships)
-  - [9.7 MCP relationships](#97-mcp-relationships)
-  - [9.8 Inline MCP declarations](#98-inline-mcp-declarations)
-  - [9.9 Metadata and local state](#99-metadata-and-local-state)
-- [10. Safe file input](#10-safe-file-input)
-- [11. Agent import preview flow](#11-agent-import-preview-flow)
-  - [11.1 Preview request](#111-preview-request)
-  - [11.2 Preview processing](#112-preview-processing)
-  - [11.3 Projected Artifact resolution](#113-projected-artifact-resolution)
-  - [11.4 Preview result](#114-preview-result)
-  - [11.5 Revalidation](#115-revalidation)
-- [12. Prepared import trust model](#12-prepared-import-trust-model)
-  - [12.1 Backend-held prepared state](#121-backend-held-prepared-state)
-  - [12.2 Digests and fingerprint](#122-digests-and-fingerprint)
-  - [12.3 Commit token](#123-commit-token)
-  - [12.4 Expiration and replay](#124-expiration-and-replay)
-  - [12.5 Environmental witnesses](#125-environmental-witnesses)
-- [13. Identity and conflict handling](#13-identity-and-conflict-handling)
-  - [13.1 Root Agent identity](#131-root-agent-identity)
-  - [13.2 Contained Artifact identities](#132-contained-artifact-identities)
-  - [13.3 Package conflicts](#133-package-conflicts)
-  - [13.4 Collection relationship conflicts](#134-collection-relationship-conflicts)
-  - [13.5 Built-in conflicts](#135-built-in-conflicts)
-  - [13.6 Delete and re-import](#136-delete-and-re-import)
-- [14. Atomic import commit](#14-atomic-import-commit)
-  - [14.1 Transaction contents](#141-transaction-contents)
-  - [14.2 Commit sequence](#142-commit-sequence)
-  - [14.3 Durable result and recovery](#143-durable-result-and-recovery)
-- [15. Portable managed export](#15-portable-managed-export)
-  - [15.1 Export eligibility](#151-export-eligibility)
-  - [15.2 Export content](#152-export-content)
-  - [15.3 Export exclusions](#153-export-exclusions)
-  - [15.4 Export and re-import](#154-export-and-re-import)
-- [16. Agent Collections and lifecycle](#16-agent-collections-and-lifecycle)
-- [17. Agent readiness and MCP completion](#17-agent-readiness-and-mcp-completion)
-  - [17.1 Readiness dimensions](#171-readiness-dimensions)
-  - [17.2 Inline MCP completion](#172-inline-mcp-completion)
-  - [17.3 Secret handling](#173-secret-handling)
-  - [17.4 Readiness derivation](#174-readiness-derivation)
-- [18. User interface flow](#18-user-interface-flow)
-  - [18.1 Agent management page](#181-agent-management-page)
-  - [18.2 Import dialog](#182-import-dialog)
-  - [18.3 Preview presentation](#183-preview-presentation)
-  - [18.4 Confirmation and commit](#184-confirmation-and-commit)
-  - [18.5 Export flow](#185-export-flow)
-  - [18.6 Delete and re-import flow](#186-delete-and-re-import-flow)
-- [19. Consumer API shape](#19-consumer-api-shape)
-  - [19.1 Agent import destination](#191-agent-import-destination)
-  - [19.2 Agent import preview](#192-agent-import-preview)
-  - [19.3 Agent import commit](#193-agent-import-commit)
-  - [19.4 Agent export](#194-agent-export)
-  - [19.5 Agent reference catalog](#195-agent-reference-catalog)
-  - [19.6 Agent readiness](#196-agent-readiness)
-- [20. Persistence and security boundaries](#20-persistence-and-security-boundaries)
-- [21. Breaking removals](#21-breaking-removals)
-  - [21.1 Assistant Preset removal](#211-assistant-preset-removal)
-  - [21.2 Managed Agent authoring removal](#212-managed-agent-authoring-removal)
-  - [21.3 Behaviors intentionally not retained](#213-behaviors-intentionally-not-retained)
-- [22. Implementation areas](#22-implementation-areas)
-  - [22.1 Contract profile infrastructure](#221-contract-profile-infrastructure)
-  - [22.2 Common managed transfer infrastructure](#222-common-managed-transfer-infrastructure)
-  - [22.3 Artifact Store transaction support](#223-artifact-store-transaction-support)
-  - [22.4 Agent domain implementation](#224-agent-domain-implementation)
-  - [22.5 Application composition and wrappers](#225-application-composition-and-wrappers)
-  - [22.6 Future MCP and Text reuse](#226-future-mcp-and-text-reuse)
-- [23. Implementation status](#23-implementation-status)
+- [5. Managed Agent invariants](#5-managed-agent-invariants)
+- [6. Managed dependency lookup and normalization](#6-managed-dependency-lookup-and-normalization)
+- [7. Strict managed Agent profile](#7-strict-managed-agent-profile)
+- [8. Import input and validation](#8-import-input-and-validation)
+- [9. Preview and signed preparation](#9-preview-and-signed-preparation)
+- [10. Best-effort commit behavior](#10-best-effort-commit-behavior)
+- [11. Collection membership behavior](#11-collection-membership-behavior)
+- [12. MCP handling](#12-mcp-handling)
+- [13. Conflict handling](#13-conflict-handling)
+- [14. Managed Agent export](#14-managed-agent-export)
+- [15. API shape](#15-api-shape)
+- [16. UI and runtime responsibilities](#16-ui-and-runtime-responsibilities)
+- [17. Security and persistence boundaries](#17-security-and-persistence-boundaries)
+- [18. Breaking removals](#18-breaking-removals)
+- [19. Implementation requirements](#19-implementation-requirements)
+- [20. Current implementation status](#20-current-implementation-status)
 
 ## 1. Purpose
 
-This HLD defines a managed Artifact import and export workflow that replaces field-by-field managed Agent composition.
+This HLD defines file-based import and export for user-managed Agent Artifacts.
 
-The primary Agent import flow is:
-
-```text
-User-selected Agent YAML path
-  -> safe bounded file read
-  -> portable Agent validation
-  -> strict managed Agent profile validation
-  -> projected managed package and Artifact preparation
-  -> relationship resolution and conflict analysis
-  -> immutable backend-held preview
-  -> explicit user confirmation
-  -> atomic managed Source commit
-  -> Agent Artifact and Collection membership
-```
-
-The primary Agent export flow is:
+The managed Agent workflow is:
 
 ```text
-Managed Agent Artifact
-  -> current immutable Definition
-  -> strict managed profile validation
-  -> normalized portable YAML
-  -> user-selected download destination
+Create or select an Agent Collection
+  -> select an Agent YAML file
+  -> validate and normalize the Agent declaration
+  -> inspect current managed dependency resolution
+  -> return a signed client-carried prepared payload
+  -> commit the prepared Agent package
+  -> best-effort add or preserve Collection membership
+  -> resolve the published Agent normally
+  -> configure MCP installation and runtime state through MCP flows
 ```
 
-The workflow is based on portable declarations. It does not preserve Assistant Preset APIs, storage, identifiers, versions, or behaviors.
+This design replaces field-by-field managed Agent composition.
 
-## 2. Goals and scope
+It does not make Agent import responsible for:
 
-### 2.1 Goals
+- Connecting MCP servers.
+- Populating MCP installation values.
+- Saving secrets.
+- Obtaining OAuth tokens.
+- Determining operational MCP readiness.
+- Producing a backend-owned Agent readiness state.
+- Building a visual Agent composition editor.
+- Maintaining backend-held import sessions.
 
-The design must:
+## 2. Scope and non-goals
 
-- Replace managed Agent composition forms with import of complete portable Agent files.
-- Present the complete Agent Artifact instead of asking users to select members one at a time.
-- Require an explicit user Agent Collection destination.
-- Validate the selected file without modifying Artifact Store.
-- Return a complete preview and clear import instructions before confirmation.
-- Prepare the exact managed package and Artifact projection during preview.
-- Commit the previously prepared content without reading the external file again.
-- Prevent frontend modification of prepared content from changing the committed Artifact.
-- Commit Agent package creation and Collection membership atomically.
-- Export the current portable Definition of a user-managed Agent.
-- Disallow in-place Agent declaration editing and replacement.
-- Support delete-and-re-import or import-under-a-new-name workflows.
-- Provide a strict managed Agent schema that is a subset of the portable Agent schema.
-- Validate strict-profile registration at application initialization.
-- Expose the built-in and mapped names accepted by the managed Agent profile.
-- Permit inline MCP declarations while keeping secrets and local installation values outside portable content.
-- Derive Agent readiness from relationship resolution and required local MCP completion.
-- Provide common infrastructure reusable by MCP and Text import/export.
-- Keep Agent, MCP, and Text domains as their own public entry points and policy owners.
-- Avoid declaration or package version changes.
-
-### 2.2 In scope
+### 2.1 In scope
 
 This HLD defines:
 
-- Common strict managed profile registration.
-- Safe import file reading.
-- Agent import preview.
-- Backend-held prepared imports.
-- Source, Definition, and prepared-plan fingerprints.
-- Agent import confirmation.
-- Atomic managed package and Collection mutation.
-- Agent-specific strict admission rules.
-- Agent name and package conflict behavior.
-- Managed Agent portable export.
-- Managed Agent declaration immutability.
-- Built-in and mapped reference catalogs.
-- Inline MCP setup requirements.
-- Derived Agent readiness.
-- Breaking removal of Assistant Presets.
-- Removal of structured managed Agent creation and replacement.
+- Safe YAML file import for managed Agents.
+- Strict managed Agent admission.
+- Normalization of managed external dependency scope.
+- Client-carried signed prepared payloads.
+- Best-effort Agent package publication and Collection membership.
+- Conflict detection for Agent identity and managed packages.
+- Non-blocking dependency-resolution diagnostics.
+- Validation of contained Text and inline MCP declarations.
+- Portable managed Agent export.
+- Deletion and re-import behavior.
+- Removal of structured managed Agent create and replace APIs.
 
-### 2.3 Out of scope
+### 2.2 Out of scope
 
 This HLD does not define:
 
-- A visual Agent composition editor.
-- An in-application YAML editor.
-- In-place managed Agent declaration editing.
+- Backend-held prepared import registries.
+- Random commit-token registries.
+- One-time commit-token consumption.
+- Replay receipts.
+- Atomic transactions across Collection and Agent package mutations.
+- Projected Artifact Store overlays.
+- Agent readiness APIs.
+- MCP installation completion APIs in Agent Store.
+- MCP connection attempts during import.
+- Secret entry during Agent import.
+- Reference catalogs for Agent dependency authoring.
+- A generic import API that accepts arbitrary declaration types.
+- A visual Agent editor.
+- In-place Agent declaration editing.
 - Managed Agent replacement.
-- Managed Agent release versions.
+- Agent release versions.
 - Linked-file synchronization.
-- Watching the imported source path.
-- Repository Source registration from the import path.
-- Import from URL, Git, package, command, or archive locators.
-- Assistant Preset compatibility.
-- Assistant Preset migration.
-- Assistant Preset dual-read or dual-write.
-- Export of built-in, repository-authored, or contained child Artifacts as independent managed files.
-- Export of Agent Collection membership as part of an Agent declaration.
-- Agent execution.
-- MCP connection execution during import.
-- Persistence of secrets in the preview, portable declaration, or export.
-- A generic frontend import endpoint that bypasses domain policy.
+- Watching imported files.
+- Assistant Preset compatibility or migration.
 
-## 3. Normative relationship to existing HLDs
+## 3. Core decisions
 
-This HLD preserves the portable declaration and Artifact Store models defined by the parent HLDs.
+### 3.1 Collections are created separately
 
-It changes the managed Agent authoring behavior defined by the Agent Store HLD.
+Collection creation is independent from Agent import.
 
-The following Agent Store behaviors are superseded:
+The user first creates or selects an existing editable Agent Collection. Import requires that Collection as its destination.
 
-- Structured managed Agent creation through `ManagedAgentDocument`.
-- Field-by-field member construction through `ManagedAgentMember`.
-- Managed Agent replacement.
-- In-place update semantics for a managed Agent declaration.
-- Any frontend composition editor for managed Agents.
+There is no transaction spanning:
 
-The following Agent Store behaviors remain:
+```text
+Create Collection
+  + import Agent
+```
 
-- Agent Collections are Agent-only Plugin Artifacts.
-- Import requires an explicit Agent Collection.
-- Agent and Collection enablement remain independent.
-- An Agent can belong to several Collections.
-- Collection membership does not own the Agent.
-- Deleting an Agent does not implicitly detach Collection relationships.
-- Deleting a Collection does not delete Agents.
-- Built-in Agents remain protected.
-- Local management operations may use authorized `ArtifactRef` values.
-- Portable declarations must not persist Store identity.
-- Repository-authored Agents may use the complete portable Agent contract.
+### 3.2 Preparation is client-carried and signed
 
-No existing portable schema version, declaration version, package version, or Agent release version is changed by this extension.
+Preview produces an HMAC-signed prepared payload.
 
-The strict managed profile is an additional admission schema. It is not a new portable Agent schema version and does not participate in portable declaration dispatch.
+The client carries that payload into commit. The backend does not retain prepared import state.
+
+The signed payload prevents the frontend from changing:
+
+- The normalized Agent declaration.
+- The managed package identity.
+- The selected Collection.
+- The expected Collection revision.
+- The expected managed Source generation.
+- Required confirmation codes.
+
+The signed payload is authenticated, not encrypted. Portable declarations must therefore not contain secret values.
+
+### 3.3 Import is best effort across membership and package publication
+
+Collection membership mutation and Agent package publication are separate managed Source operations.
+
+Each individual operation uses normal Artifact Store guarantees. The application does not require one transaction spanning both operations.
+
+The selected behavior is:
+
+```text
+Ensure Collection relationship
+  -> publish Agent package
+```
+
+If Collection membership succeeds and Agent publication fails:
+
+- The Collection relationship remains declared.
+- The relationship is unavailable.
+- The dangling relationship represents user intent.
+- The user may preview and import again later.
+
+This is intentional behavior.
+
+### 3.4 Resolution is observational, not an import gate
+
+Preview attempts to resolve managed external relationships and reports whether each is:
+
+```text
+available
+unavailable
+ambiguous
+```
+
+Resolution result does not make a structurally valid Agent unimportable.
+
+Import must not fail only because:
+
+- A named MCP is absent.
+- A named Tool is absent.
+- A named Model is absent.
+- A named Skill is absent.
+- A named MCP Policy is absent.
+- A target is ambiguous.
+- A target Source is currently unavailable.
+- A target declaration has a Source-side diagnostic.
+
+### 3.5 Empty Agents are valid
+
+A managed Agent with no members is valid.
+
+Example:
+
+```yaml
+type: agent
+name: empty-agent
+displayName: Empty Agent
+```
+
+This is a valid managed Agent import.
+
+The absence of members is not an error.
+
+### 3.6 Malformed authored content is invalid
+
+Every declaration authored inside the imported file must be valid.
+
+Examples that block import:
+
+- Invalid YAML.
+- Invalid root Agent fields.
+- Invalid member wire shape.
+- Unsupported managed member type.
+- Invalid contained Text.
+- Invalid inline MCP.
+- Invalid MCP transport.
+- Invalid inline MCP policy reference syntax.
+- Invalid relationship behavior.
+- Invalid local secret placement.
+- Invalid managed package identity.
+
+The importer does not silently ignore malformed authored content.
+
+### 3.7 Operational readiness belongs outside Agent import
+
+Agent import validates declaration content and publishes Artifacts.
+
+The UI and MCP subsystem own:
+
+- Installation input completion.
+- Secret storage.
+- Secret references.
+- OAuth setup.
+- Profile selection.
+- Connection establishment.
+- Operational MCP readiness.
+- User-facing readiness presentation.
 
 ## 4. Terminology
 
-| Term                       | Meaning                                                                                       |
-| -------------------------- | --------------------------------------------------------------------------------------------- |
-| Portable declaration       | A declaration accepted by the normative Artifact contract                                     |
-| Strict managed profile     | A domain-owned subset of a portable declaration accepted for managed import and export        |
-| Import source              | The external user-selected file read during preview                                           |
-| Source digest              | Digest of the exact bytes read from the external file                                         |
-| Portable Definition digest | Digest of the canonical portable declaration                                                  |
-| Prepared import            | Immutable backend-held import state produced by successful preview                            |
-| Prepared fingerprint       | Digest binding prepared bytes, destination, mutations, dependencies, and expected state       |
-| Commit token               | Opaque capability identifying one prepared import                                             |
-| Projected Artifact         | An in-memory Artifact occurrence expected from the prepared managed Source mutation           |
-| Environmental witness      | Revision, digest, generation, or mapped-target identity that must remain current until commit |
-| Importable                 | The prepared import has no blocking admission or conflict issue                               |
-| Resolution complete        | Every required declaration relationship resolves uniquely                                     |
-| Installation complete      | Every required local MCP installation input and secret reference is populated                 |
-| Agent ready                | Resolution is complete and all required local completion checks pass                          |
-| Managed export             | Portable Definition bytes produced from an eligible user-managed root Artifact                |
+| Term                     | Meaning                                                                        |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| Portable declaration     | A declaration accepted by the standard Artifact declaration contract           |
+| Managed Agent profile    | The stricter subset accepted for managed Agent import and export               |
+| Imported source file     | The user-selected YAML file read during preview                                |
+| Source digest            | Digest of exact bytes read from the selected file                              |
+| Normalized declaration   | Canonical Agent declaration after managed import normalization                 |
+| Definition digest        | Digest of the normalized portable declaration                                  |
+| Prepared payload         | HMAC-signed client-carried import plan                                         |
+| Prepared fingerprint     | Digest of the signed prepared payload                                          |
+| Managed lookup           | Built-in-first then mapped-fallback lookup used for managed Agent dependencies |
+| External relationship    | A named dependency whose target is not contained in the imported Agent         |
+| Contained declaration    | Text or MCP declaration physically contained in the imported Agent             |
+| Unavailable relationship | A valid relationship whose target cannot currently be resolved                 |
+| Malformed declaration    | A declaration whose own syntax, schema, or semantic contract is invalid        |
+| Dangling membership      | A declared Collection relationship whose Agent target is unavailable           |
 
-## 5. Requirements
+## 5. Managed Agent invariants
 
-### 5.1 Domain ownership requirements
+### 5.1 Validity categories
 
-- Agent APIs must remain the public entry point for Agent import and export.
-- MCP APIs must remain the future public entry point for MCP import and export.
-- Text APIs must remain the future public entry point for Text import and export.
-- Common infrastructure must not decide domain admission rules.
-- Common infrastructure must not decide domain destination rules.
-- Common infrastructure must not decide Collection membership rules.
-- Common infrastructure must not decide domain readiness.
-- The Agent domain must provide the Agent strict profile, destination policy, conflict policy, package plan, reference catalog, and readiness projection.
-- No generic public API may allow a caller to select an arbitrary declaration type and bypass its domain.
+Managed Agent import distinguishes three categories.
 
-### 5.2 File input requirements
+| Category                                               | Import result              |
+| ------------------------------------------------------ | -------------------------- |
+| Empty Agent                                            | Valid and importable       |
+| Structurally valid Agent with unavailable dependencies | Valid and importable       |
+| Agent containing malformed authored declarations       | Invalid and not importable |
 
-- Agent import preview must read the file through the safe filesystem tool adapter based on `llmtoolsutil.ReadFile`.
-- Import must not use unrestricted `os.ReadFile`.
-- The read must be symlink-safe, sandboxed, and cross-platform.
-- The read capability must be limited to the user-selected file.
-- The input must be a regular bounded text file.
-- Agent import initially accepts YAML files only.
-- The file must contain exactly one YAML document.
-- The YAML root must be an object.
-- Duplicate YAML mapping keys must be rejected.
-- YAML alias or expansion behavior must remain bounded.
-- The read file path is preview input only.
-- The path must not be written into the portable declaration.
-- The path must not be persisted as an Agent locator.
-- The path must not be required during commit.
-- The path must not be required after import.
-- An optional caller-supplied expected source digest may be used during revalidation.
-- The backend-calculated source digest is authoritative.
+Examples:
 
-### 5.3 Strict profile schema requirements
+```yaml
+type: agent
+name: valid-empty-agent
+```
 
-- Each managed importable domain must register one strict profile against one portable base schema.
-- The Agent strict profile must be registered against the current Agent schema.
-- The strict profile must be a subset of the portable base schema by construction.
-- A strict profile must not replace or modify the base schema.
-- A strict profile must not add fields to portable declaration instances.
-- A strict profile must not add a declaration version.
-- A strict profile must not add a Store identity field.
-- A strict profile must be compiled using JSON Schema Draft 2020-12.
-- Application initialization must fail if a registered strict profile cannot be compiled.
-- Application initialization must fail if the strict profile is not conjunctively bound to its declared base schema.
-- Every imported document must pass both the base portable schema and the strict profile.
-- Every exported document must pass the base portable schema and the strict profile.
-- Semantic admission checks not expressible in JSON Schema must run after schema validation.
+This is valid.
 
-### 5.4 Preview requirements
+```yaml
+type: agent
+name: valid-unresolved-agent
+members:
+  - type: mcp
+    name: not-currently-installed
+```
 
-Preview must:
+This is valid and importable. The MCP relationship is unavailable.
 
-- Require an explicit editable Agent Collection.
-- Derive the target Root and managed Source from the selected Collection.
-- Read the external file exactly once for that preview.
-- Calculate the source digest.
-- Decode and validate the portable Agent declaration.
-- Validate the strict Agent profile.
-- Validate Agent-specific semantic restrictions.
-- Calculate the canonical portable Definition.
-- Calculate the managed package address and source files.
-- Calculate the exact Collection member relationship.
-- Project every root and contained Artifact expected from the declaration.
-- Resolve the projected Agent against the target Root, built-in Root, and registered fallback providers.
-- Inspect name, package, Source, Collection, and contained identity conflicts.
-- Identify existing dangling Collection relationships that the import would restore.
-- Identify MCP installation and secret completion requirements.
-- Determine whether the import is allowed.
-- Determine whether user confirmation is required.
-- Determine whether the resulting Agent would be ready immediately after import.
-- Produce normalized portable YAML for display.
-- Produce structured issues with severity, code, location, message, and remediation.
-- Produce no persistent mutation.
+```yaml
+type: agent
+name: invalid-inline-mcp-agent
+members:
+  - type: mcp
+    name: broken-server
+    parameters:
+      transport: stdio
+```
 
-A failed preview must not create:
+This is invalid because an inline stdio MCP requires a command.
 
-- Source content.
-- Artifact records.
-- Collection membership.
-- local MCP installation data.
-- secret data.
-- persistent preview records.
+### 5.2 Imported declarations are never partially salvaged
 
-### 5.5 Prepared import requirements
+The imported file is one Agent declaration.
 
-A successful importable preview must create an immutable backend-held prepared import.
+If any authored contained declaration is malformed, preview fails.
 
-The prepared import must contain:
+The importer must not:
 
-- The canonical portable Agent declaration.
-- The normalized exportable YAML.
-- The source digest.
-- The portable Definition digest.
-- The prepared managed package files.
-- The projected root and contained Artifact expectations.
-- The selected Root, Source, and Collection.
-- The expected Collection revision.
-- The expected managed Source generation.
-- The planned Collection document mutation, if one is required.
-- The Agent package address.
-- Dependency witnesses.
-- Conflict analysis.
-- Required confirmation issue codes.
-- Predicted readiness and setup requirements.
-- A creation time and expiration time.
+- Drop malformed members.
+- Rewrite malformed members into another shape.
+- Publish only the valid subset.
+- Publish an Agent with a silently removed inline MCP or Text declaration.
 
-The prepared import must not contain:
+External target availability is different. A named relationship remains in the Agent declaration even if its target does not currently exist.
 
-- MCP secret values.
-- OAuth tokens.
-- resolved secret contents.
-- arbitrary frontend-supplied declaration changes.
-- a requirement to reread the external file.
+### 5.3 Managed Agents remain immutable after import
 
-### 5.6 Commit requirements
+Managed Agent declaration content is immutable after import.
 
-Commit must:
+The public Agent API must not expose:
 
-- Accept only an opaque commit token, prepared fingerprint, and explicit confirmations.
-- Resolve the token to backend-held prepared state.
-- Reject an unknown, expired, consumed, or mismatched token.
-- Reject a fingerprint mismatch.
-- Reject missing required confirmations.
-- Revalidate Collection revision, Source generation, identity conflicts, and dependency witnesses.
-- Not reread the external file.
-- Not accept replacement declaration bytes from the frontend.
-- Not accept a modified managed package from the frontend.
-- Commit exactly the declaration and package prepared during preview.
-- Return the imported Agent, Collection result, restored memberships, and current readiness.
-- Be idempotent for replay of the same successfully committed token.
-- Consume the token after a durable success.
-- Reject a new import preview for an already present conflicting Agent name.
-
-New imported Agents default to `Artifact.Enabled=true`.
-
-Agent enablement may be changed later through the universal Artifact enablement API. It is not part of portable import or export content.
-
-### 5.7 Atomicity requirements
-
-The durable managed Source mutation must be atomic.
-
-One Agent import transaction may include:
-
-- Creation of the managed Agent package.
-- Replacement of the selected managed Collection package with a document containing the new located Agent relationship.
-- No Collection package change when the exact required relationship already exists.
-- Reconciliation of the resulting Source generation.
-- Verification of the expected Agent and contained Artifacts.
-
-The transaction must not expose a durable state in which:
-
-- A newly added selected Collection relationship exists without its prepared Agent package.
-- The prepared Agent package exists but the required selected Collection membership was omitted.
-- Only part of the prepared package files were published.
-- A conflicting package was replaced.
-
-A committed Source mutation followed by interrupted derived-state reconciliation must be recoverable and idempotently verifiable.
-
-No Agent-specific transaction database or sidecar file may be introduced.
-
-### 5.8 Export requirements
-
-- Only a user-managed, top-level, concrete Agent may be exported through the managed Agent export API.
-- Built-in Agents must not be exported through this API.
-- Repository-authored Agents must not be exported through this API.
-- Contained Agent child Artifacts must not be exported independently through this API.
-- Export must read the current immutable Definition selected by the Agent Artifact.
-- Export must validate the Definition against the portable Agent schema.
-- Export must validate the Definition against the strict managed Agent profile.
-- Export must produce normalized portable YAML.
-- Export must provide a suggested portable filename.
-- Export must return the Artifact revision and Definition digest used.
-- Export must remain available when dependencies are currently unavailable.
-- Export must report current resolution and readiness issues separately from export eligibility.
-- Export must not include Agent Collection membership.
-- Export must not include local enablement.
-- Export must not include Root, Source, Artifact, package, or runtime identity.
-- Export must not include MCP installation values, secret references, OAuth tokens, connection state, or discovery state.
-
-### 5.9 Managed declaration immutability requirements
-
-Managed Agent declaration content must not be edited in place.
-
-The Agent management API must not expose:
-
-- Agent declaration patch.
+- Declaration patching.
 - Member add or remove.
 - Agent rename.
 - Agent replacement.
 - Agent upsert.
-- New Agent version creation.
-- In-app declaration editor.
+- New declaration versions.
+- An in-app Agent YAML editor.
 
-A user who wants changed content must:
+A user changes a managed Agent by:
 
-- Export the current managed Agent.
-- Modify the exported file externally.
-- Give it a new Agent name and import it as another Agent.
+- Exporting it.
+- Editing it externally.
+- Importing it under a new name.
 
-Alternatively, the user may:
+Or:
 
-- Export the current managed Agent.
-- Delete the current Agent.
-- Modify the file.
-- Import the file again using the same name.
+- Exporting it.
+- Deleting the current Agent.
+- Editing it externally.
+- Importing it again with the same name.
 
-Artifact enablement and MCP local completion are local-state operations and are not declaration edits.
+Artifact enablement remains separate local state.
 
-### 5.10 Collection requirements
+## 6. Managed dependency lookup and normalization
 
-- Import must identify an explicit editable Agent Collection.
-- There is no implicit baseline destination.
-- The selected Collection must belong to a user Root.
-- The selected Collection must use the managed Agent Source expected by the Agent domain.
-- The selected Collection must be an Agent-only managed Plugin.
-- Collection enablement must not gate import.
-- Agent enablement must not follow Collection enablement.
-- Import must add a located external Agent relationship.
-- The persisted relationship must not contain an `ArtifactRef`.
-- Existing exact dangling membership may be reused.
-- Existing incompatible membership must be reported as a conflict.
-- Importing one Agent must not remove or rewrite unrelated Collection members.
-- Export must not infer ownership from Collection membership.
-- Deleting an Agent must not automatically detach it from Collections.
-- Re-importing the same deleted Agent package may restore all exact dangling relationships to that package occurrence.
+## 6.1 Managed lookup differs from normal lookup
 
-### 5.11 Identity and conflict requirements
-
-- The root Agent logical name is the managed package identity.
-- Automatic renaming is prohibited.
-- Silent replacement is prohibited.
-- An existing available Agent with the same semantic identity in the target Root is a blocking conflict.
-- An existing managed package at the calculated Agent package address is a blocking conflict.
-- A case-folded physical package collision on a case-insensitive platform is a blocking conflict.
-- An existing protected built-in Agent with the same logical name is a blocking conflict for strict managed import.
-- Every contained Artifact identity emitted by the import must be checked for target-Root conflict.
-- Text identity checks must include `insert`.
-- A missing package with an exact dangling managed Collection locator is a restoration case, not a duplicate.
-- A same-name Collection member that points elsewhere is a blocking conflict.
-- A selector or contained Collection member that would overlap the imported name is a blocking conflict.
-- New preview after successful import must report a name conflict.
-- Replay of the same commit token must return the original result rather than create another Artifact.
-
-### 5.12 Reference catalog requirements
-
-The Agent domain must expose the names accepted by the strict Agent profile.
-
-The catalog must include, where supported:
-
-- Protected built-in Models.
-- Protected built-in Tools.
-- Protected built-in Skills.
-- Protected built-in MCP servers.
-- Protected built-in MCP policies.
-- Mapped Model targets accepted by the current fallback provider.
-- Mapped Tool targets accepted by the current fallback provider.
-
-Each catalog item must expose:
-
-- Artifact type.
-- Logical name.
-- Display name.
-- Description where available.
-- Built-in or mapped provenance.
-- Supported Agent relationship behavior.
-- Current declaration availability.
-- A copyable YAML relationship snippet.
-
-The catalog is informational.
-
-It must not:
-
-- Add a relationship to an Agent.
-- Become a field-by-field composition editor.
-- Persist target IDs.
-- Treat runtime readiness as declaration availability.
-
-Fallback providers that want to expose mapped targets in the catalog must implement a bounded catalog port in addition to exact-name fallback resolution.
-
-### 5.13 MCP completion and Agent readiness requirements
-
-- A strict managed Agent may contain an inline MCP declaration.
-- MCP installation input definitions may be portable declaration content.
-- MCP installation input values must not be portable declaration content.
-- Secret values must not be portable declaration content.
-- Secret values must not be included in export.
-- Secret values must not be retained in prepared import state.
-- Preview must identify required MCP installation inputs and secret requirements.
-- Missing MCP completion must not invalidate an otherwise valid portable Agent declaration.
-- Missing MCP completion must make the Agent not ready.
-- An imported Agent may therefore be importable but not ready.
-- Agent readiness must be derived, not persisted in the Agent Definition.
-- Agent readiness must require complete required relationship resolution.
-- Agent readiness must require all required MCP installation inputs to be populated.
-- Agent readiness must require all required MCP secret references to resolve.
-- Agent readiness must require applicable MCP authentication setup to be complete.
-- Current active MCP connection state is not required for configuration readiness.
-- Agent execution remains responsible for operational readiness.
-
-### 5.14 Breaking-change requirements
-
-The change is development-time breaking.
-
-The implementation must not retain:
-
-- Assistant Preset APIs.
-- Assistant Preset wire types.
-- Assistant Preset storage.
-- Assistant Preset built-in overlays.
-- Assistant Preset versions.
-- Assistant Preset bundle IDs.
-- Assistant Preset migration.
-- Assistant Preset compatibility aliases.
-- Assistant Preset frontend routes.
-- Structured managed Agent authoring.
-- Managed Agent replacement.
-- Legacy dual-read or dual-write behavior.
-
-No version bump, compatibility decoder, or migration layer is required.
-
-## 6. Design principles and invariants
-
-### 6.1 Preview is authoritative preparation
-
-Preview is not only validation.
-
-A successful preview prepares the exact managed mutation that commit will use.
+Normal relationship resolution may use:
 
 ```text
-Previewed bytes
-  -> canonical declaration
-  -> package files
-  -> Collection relationship
-  -> projected Artifacts
-  -> prepared import
+Current Root
+  -> protected built-in Root
+  -> mapped fallback
 ```
 
-Commit does not reconstruct this plan from frontend values.
-
-### 6.2 Commit does not reread the import source
-
-The external file is relevant only while producing a preview.
+Managed Agent import uses:
 
 ```text
-Preview
-  -> read file
-  -> prepare immutable backend state
-
-Commit
-  -> consume prepared state
-  -> no file read
+Protected built-in Root
+  -> mapped fallback for supported types
+  -> unavailable
 ```
 
-Changing or deleting the original file after preview does not alter the prepared import.
+Managed Agent import must not search the destination user Root for external dependencies.
 
-The user must explicitly revalidate to produce a preview from changed file content.
+This prevents a managed imported Agent from silently binding to arbitrary user Root Artifacts.
 
-### 6.3 A digest is identity, not frontend authority
+## 6.2 `scope` is optional in import input
 
-A plain digest supplied by the frontend is not proof that frontend content was not modified.
+Users may write either form:
 
-The backend therefore retains the prepared bytes and plan. The frontend receives only an opaque commit token and fingerprint.
-
-The frontend cannot replace the prepared declaration during commit.
-
-### 6.4 Strict profile is not a portable schema version
-
-The strict profile determines what this application is willing to manage through import and export.
-
-It does not change what a valid portable Agent declaration is.
-
-Repository-authored Agents continue to use the complete Agent contract.
-
-### 6.5 Importability and readiness are separate
-
-```text
-Portable and strict-profile valid
-  -> importable
-
-Resolution complete
-  + required local MCP setup complete
-  -> ready
+```yaml
+- type: mcp
+  name: github
 ```
 
-An Agent can be imported before it is ready.
-
-### 6.6 Export is declaration recovery, not Store backup
-
-Export returns portable declaration semantics.
-
-It does not return:
-
-- Artifact Store records.
-- local state.
-- Collection membership.
-- secret state.
-- runtime state.
-- source package metadata.
-
-### 6.7 Collection membership does not own the Agent
-
-The selected Collection is the required import destination.
-
-It does not become the Agent owner.
-
-### 6.8 Domains drive common infrastructure
-
-The common layer owns mechanics.
-
-The Agent domain owns Agent meaning.
-
-Future MCP and Text support must register their own domain profiles rather than adding type conditionals to a generic frontend API.
-
-## 7. Architecture and ownership
-
-### 7.1 Conceptual architecture
-
-```text
-AgentStoreWrapper
-  -> Agent import/export consumer API
-    -> Agent managed profile and domain policy
-      -> common managed transfer service
-        -> safe file reader
-        -> strict profile registry
-        -> canonical declaration decoder
-        -> projected Artifact resolver
-        -> prepared import registry
-        -> atomic managed Source transaction API
-      -> Artifact Store
-      -> Agent Collection domain
-      -> shared declaration resolver
-      -> MCP installation/readiness aggregate
+```yaml
+- type: mcp
+  name: github
+  scope: builtin
 ```
 
-Future domains use the same lower-level mechanics:
+For managed Agent import, these forms have the same meaning.
 
-```text
-MCPStoreWrapper
-  -> MCP import/export consumer API
-    -> MCP managed profile
-      -> common managed transfer service
+The importer normalizes all allowed named managed dependencies to:
+
+```yaml
+scope: builtin
 ```
 
-```text
-TextStoreWrapper
-  -> Text import/export consumer API
-    -> Text managed profile
-      -> common managed transfer service
+before calculating the managed Definition and publishing the package.
+
+This normalization is required because the ordinary resolver must later preserve managed lookup behavior after publication.
+
+Without normalization, an unscoped relationship would later search the current user Root before built-ins.
+
+## 6.3 Exported managed YAML uses normalized scope
+
+Managed Agent export returns the normalized declaration.
+
+If the input omitted `scope`, exported YAML may contain:
+
+```yaml
+scope: builtin
 ```
 
-### 7.2 Component responsibilities
+This is intentional. It records the actual managed dependency behavior.
 
-| Component                      | Responsibility                                                       |
-| ------------------------------ | -------------------------------------------------------------------- |
-| Safe file reader               | One-file sandboxed read through `llmtoolsutil`                       |
-| Portable decoder               | YAML normalization and portable declaration validation               |
-| Strict profile registry        | Base-schema binding, profile compilation, fail-fast initialization   |
-| Prepared import registry       | Backend-held immutable preview state and commit tokens               |
-| Projected Artifact reader      | In-memory overlay of prepared Source and current Store state         |
-| Common transfer service        | Preview lifecycle, fingerprinting, token handling, export mechanics  |
-| Atomic managed transaction API | Multi-package Source mutation, expected generation, reconciliation   |
-| Agent domain                   | Strict Agent rules, package layout, Collection membership, conflicts |
-| Shared resolver                | Built-in and mapped relationship resolution                          |
-| MCP aggregate                  | Installation requirements, secret completion, readiness              |
-| Agent management UI            | Preview, confirmation, inspection, export, deletion                  |
+The source digest remains the digest of user-selected input bytes. The Definition digest identifies the normalized managed declaration.
 
-### 7.3 Common infrastructure and domain drivers
+## 6.4 Built-in and mapped target behavior
 
-A common managed profile descriptor conceptually provides:
+Managed lookup supports:
 
-```text
-ManagedProfile {
-  DeclarationType
-  BaseSchema
-  RestrictionSchema
-  Decode
-  ValidateSemantics
-  BuildPackagePlan
-  BuildDestinationMutation
-  InspectConflicts
-  BuildReferenceCatalog
-  ProjectReadiness
-  Export
-}
-```
+| Type         | Lookup behavior                                          |
+| ------------ | -------------------------------------------------------- |
+| `model`      | Built-in Artifact first, then registered mapped fallback |
+| `tool`       | Built-in Artifact first, then registered mapped fallback |
+| `skill`      | Built-in Artifact only                                   |
+| `mcp`        | Built-in Artifact only                                   |
+| `mcp.policy` | Built-in Artifact only                                   |
 
-The common service must not expose this descriptor directly to the frontend.
+A future type may support mapped fallback only when its resolver explicitly supports mapped targets.
 
-The Agent consumer API selects the Agent profile internally.
+The importer must not invent mapped targets.
 
-## 8. Strict managed profile schemas
+## 6.5 Preview resolution is informational
 
-### 8.1 Schema purpose
+Preview resolves normalized external relationships using managed lookup.
 
-The strict managed Agent schema constrains portable Agent declarations to forms the application can safely:
+For each relationship, preview reports:
 
-- Import as one managed package.
-- Resolve without user-root external dependencies.
-- Export and re-import.
-- Inspect without a composition editor.
-- Complete through supported local MCP setup flows.
+- Declared type.
+- Declared name.
+- Normalized scope.
+- Current status.
+- Built-in Artifact provenance when available.
+- Mapped target provenance when available.
+- Resolution diagnostic when unavailable or ambiguous.
 
-The strict schema remains narrower than the portable Agent schema.
+These conditions do not block import:
 
-### 8.2 Subset by construction
+- No matching built-in Artifact.
+- No mapped fallback.
+- Ambiguous built-in target.
+- Unavailable Source.
+- Malformed external target declaration.
+- Missing external target package.
 
-A generic JSON Schema implication solver is not required.
+## 6.6 No dependency witnesses at commit
 
-The strict profile is compiled as:
+External dependency state is not part of commit correctness.
 
-```text
-StrictManagedAgentSchema =
-  allOf(
-    PortableAgentSchema,
-    ManagedAgentRestrictionSchema
-  )
-```
+Commit must not fail because:
 
-The common profile registry constructs the `allOf` wrapper itself.
+- A built-in dependency revision changed.
+- A mapped target changed.
+- A previously resolved target disappeared.
+- A previously unavailable target became available.
+- A relationship became ambiguous.
+- A target Source refreshed.
 
-The domain supplies only:
+The imported Agent stores relationships, not snapshots of dependency state.
 
-- The registered portable base schema key.
-- The restriction schema.
-- The declaration type.
-- Semantic admission hooks.
+The normal resolver determines current relationship status after publication.
 
-Because the portable schema is always a required conjunct, every strict-profile-valid document must also be portable-schema-valid.
+## 7. Strict managed Agent profile
 
-The restriction schema must not be compiled or used independently as the import authority.
+## 7.1 Root declaration
 
-### 8.3 Initialization-time validation
-
-During application composition, the strict profile registry must:
-
-- Confirm that the base Agent schema is registered.
-- Confirm that the profile declaration type is `agent`.
-- Compile the portable base and restriction schema as one Draft 2020-12 schema.
-- Bind all referenced schema resources.
-- Confirm that the resulting profile reports the declared base schema key.
-- Confirm that exactly one profile is registered for the Agent managed import domain.
-- Fail application initialization on any inconsistency.
-
-The existing Agent schema key and schema version remain unchanged.
-
-### 8.4 Schema and semantic admission
-
-The strict schema owns structural restrictions such as:
-
-- Prohibited top-level locator.
-- Prohibited Agent program fields.
-- Allowed member types.
-- Allowed member forms.
-- Inline Text requirement.
-- Inline MCP shape.
-- Prohibited selectors.
-- Prohibited located relationships.
-
-The Agent semantic validator owns contextual restrictions such as:
-
-- Built-in target existence.
-- Mapped target support.
-- Dependency ambiguity.
-- MCP policy provenance.
-- Name conflicts.
-- contained identity conflicts.
-- package conflicts.
-- secret placeholder rules.
-- destination Collection compatibility.
-
-### 8.5 Schema placement
-
-Representative layout:
-
-```text
-internal/artifactcontract/declaration/
-  agentv1/
-    agent-v1.schema.json
-    agent-managed-restrictions.schema.json
-    document.go
-    managed_profile.go
-```
-
-The restrictions schema is stored beside the Agent declaration schema because it constrains the same portable declaration type.
-
-It is not added to generic declaration dispatch and does not create another Artifact `SchemaKey`.
-
-Future domains follow the same pattern:
-
-```text
-internal/artifactcontract/declaration/
-  mcpv1/
-    mcp-v1.schema.json
-    mcp-managed-restrictions.schema.json
-
-  textv1/
-    text-v1.schema.json
-    text-managed-restrictions.schema.json
-```
-
-## 9. Agent managed import profile
-
-### 9.1 Agent root declaration
-
-A managed import root must:
+A managed Agent import root must:
 
 - Use `type: agent`.
-- Have a valid portable `name`.
+- Have a valid portable name.
 - Be concrete.
 - Have no top-level `locator`.
 - Have no `loop`.
 - Have no `workflow`.
-- Use only strict-profile members.
-- Contain no Store or runtime identity.
+- Contain only allowed managed member forms.
+- Contain no Store identity fields.
+- Contain no runtime state fields.
 
-The common Agent header fields remain allowed:
+An empty `members` field or absent `members` field is valid.
 
-- `name`.
-- `displayName`.
-- `description`.
-- `labels`.
-- `metadata`.
+## 7.2 Allowed member forms
 
-### 9.2 Allowed Agent members
-
-The initial strict profile permits:
-
-| Member type  | Allowed form                                        |
+| Member type  | Allowed managed form                                |
 | ------------ | --------------------------------------------------- |
 | `text`       | Contained inline Text                               |
-| `model`      | Named protected built-in or supported mapped target |
-| `tool`       | Named protected built-in or supported mapped target |
-| `skill`      | Named protected built-in                            |
-| `mcp`        | Named protected built-in or contained inline MCP    |
-| `mcp.policy` | Named protected built-in                            |
+| `model`      | Named external relationship                         |
+| `tool`       | Named external relationship                         |
+| `skill`      | Named external relationship                         |
+| `mcp`        | Named external relationship or contained inline MCP |
+| `mcp.policy` | Named external relationship                         |
 
-The profile does not initially permit:
+Named external managed relationships may omit `scope` or use `scope: builtin`.
 
-- Plugin members.
-- Nested Agent members.
-- Loop members.
-- Workflow members.
+The importer normalizes both forms to `scope: builtin`.
+
+## 7.3 Prohibited forms
+
+The managed profile rejects:
+
+- Top-level Agent locator.
+- Agent loop.
+- Agent workflow.
 - Member selectors.
-- User-root external members.
-- Located external members.
+- Member locators.
+- User Root named dependencies.
+- Contained Model.
+- Contained Tool.
+- Contained Skill.
+- Contained Plugin.
+- Contained Agent.
+- Contained Loop.
+- Contained Workflow.
+- Nested Agent composition.
+- Persisted Artifact refs.
+- Persisted Root IDs.
+- Persisted Source IDs.
+- Runtime MCP server IDs.
+- Agent versions.
+- Package versions.
+- Local installation values.
+- Secret values.
+- OAuth tokens.
+- Runtime connection state.
 
-### 9.3 Prohibited Agent forms
+## 7.4 Contained Text
 
-The strict profile rejects:
+Contained Text must:
 
-- Any selector `base`.
-- Any external member `locator`.
-- Any top-level Agent `locator`.
-- Any user-root named dependency.
-- Any persisted `ArtifactRef`.
-- Any Root ID.
-- Any Source ID.
-- Any runtime MCP server ID.
-- Any Tool bundle ID.
-- Any Model preset ID.
-- Any declaration version.
-- Any Agent release version.
-- Any program `loop` or `workflow`.
-- Any contained Tool.
-- Any contained Skill.
-- Any contained Model.
-- Any contained Plugin.
-- Any contained Agent.
-- Any contained Loop.
-- Any contained Workflow.
-
-These restrictions apply only to managed Agent import and export.
-
-### 9.4 Contained Text
-
-Contained Text may use:
-
-- `insert: instructions`.
-- `insert: user-message`.
-- Inline `content`.
-- Optional `mediaType`.
-- Portable Text descriptive fields.
-
-Contained Text must not use:
-
-- A file or directory locator.
-- Include patterns.
-- Exclude patterns.
-- External source content.
+- Be physically contained in the Agent declaration.
+- Use `insert: instructions` or `insert: user-message`.
+- Use inline `content`.
+- Not use a locator.
+- Not use include or exclude patterns.
 
 Example:
 
 ```yaml
 - type: text
-  name: reviewer-instructions
+  name: review-instructions
   insert: instructions
   parameters:
     mediaType: text/markdown
     content: |
-      Review correctness and security.
+      Review correctness, security, and maintainability.
 ```
 
-### 9.5 Model and Tool relationships
+A malformed contained Text blocks import.
 
-Model and Tool relationships may use:
+## 7.5 Named Model and Tool relationships
 
-- `scope: builtin` when selecting a protected built-in or built-in mapped target.
-- An unscoped name only when the registered fallback provider resolves it as an accepted mapped target and no Artifact occurrence shadows it.
+Model and Tool relationships are named external relationships.
 
-Model may use:
+Example:
 
 ```yaml
-overrides:
-  includeSystemPrompt: true
+- type: model
+  name: reasoning
 ```
-
-Tool may use:
 
 ```yaml
-overrides:
-  autoExecute: false
+- type: tool
+  name: searchfiles
+  overrides:
+    autoExecute: true
 ```
 
-A Tool relationship with `autoExecute: true` requires explicit preview confirmation.
+The importer normalizes them to:
 
-The reference catalog must show the exact accepted names and copyable snippets.
-
-### 9.6 Skill relationships
-
-Skill relationships must:
-
-- Be named.
-- Use `scope: builtin`.
-- Resolve to one protected built-in Skill Artifact.
-- Use only a supported `use.mode`.
-
-Supported modes remain:
-
-```text
-available
-active
-instructions
+```yaml
+- type: model
+  name: reasoning
+  scope: builtin
 ```
 
-A managed Agent import must not refer to a Skill by `ArtifactRef`.
+```yaml
+- type: tool
+  name: searchfiles
+  scope: builtin
+  overrides:
+    autoExecute: true
+```
 
-A managed Agent import must not contain a Skill because a concrete Skill requires an external package resource.
+A missing or unavailable target does not block import.
 
-### 9.7 MCP relationships
+`autoExecute: true` requires explicit user confirmation.
 
-A named MCP relationship must:
+## 7.6 Named Skill, MCP, and MCP Policy relationships
 
-- Use `scope: builtin`.
-- Resolve to one protected built-in MCP Artifact.
-- Contain no runtime server ID.
-- Contain no selected discovered Tool, resource, template, or prompt.
-- Contain no runtime argument value.
+Skill, MCP, and MCP Policy relationships are named external relationships.
 
-A named MCP policy relationship must resolve to one protected built-in MCP Policy Artifact.
+Example:
 
-### 9.8 Inline MCP declarations
-
-An inline MCP is represented as a contained MCP member:
+```yaml
+- type: skill
+  name: reviewing-code
+```
 
 ```yaml
 - type: mcp
-  name: example-server
+  name: github
+```
+
+```yaml
+- type: mcp.policy
+  name: builtin-manual-write
+```
+
+The importer normalizes each to `scope: builtin`.
+
+No currently available target is required for import success.
+
+## 7.7 Contained inline MCP
+
+An inline MCP is a contained MCP declaration.
+
+Example:
+
+```yaml
+- type: mcp
+  name: local-server
   parameters:
-    transport: streamableHTTP
-    url: https://example.com/mcp
-    auth:
-      mode: apiKey
-    install:
-      inputs:
-        EXAMPLE_API_KEY:
-          kind: secret
-          label: Example API key
-          required: true
+    transport: stdio
+    command: npx
+    args:
+      - -y
+      - "@example/mcp-server"
 ```
 
-An inline MCP:
+An inline MCP must:
 
-- Must be concrete.
-- Must not contain a declaration locator.
-- Must not contain a source server selector.
-- May declare stdio or streamable HTTP transport supported by the portable MCP contract.
-- May declare installation input definitions.
-- May declare authentication requirements.
-- May refer to an accepted built-in MCP policy.
-- Must not contain installation values.
-- Must not contain secret defaults.
-- Must not contain OAuth tokens.
-- Must not contain selected local connection profile state.
-- Must not contain active connection state.
+- Be concrete.
+- Have valid MCP transport configuration.
+- Have a command for `stdio`.
+- Have a URL for `streamableHTTP`.
+- Have valid installation input declarations.
+- Not contain a declaration locator.
+- Not contain a source server selector.
+- Not contain runtime connection state.
+- Not contain installation input values.
+- Not contain secret values.
+- Not contain OAuth tokens.
 
-Credential-bearing inline values must use the MCP installation-input mechanism supported by the MCP consumer.
+Malformed inline MCP declarations block import.
 
-The semantic admission validator must reject credential placement that bypasses the supported installation-input and secret-reference flow.
+An inline stdio MCP requires explicit user confirmation.
 
-Preview must prominently show:
+## 8. Import input and validation
 
-- Commands.
-- URLs.
-- Environment variable names.
-- Header names.
-- Authentication mode.
-- Required installation inputs.
-- Required secrets.
-- Auto-execution or approval-relevant policy.
+## 8.1 Safe file input
 
-Executable stdio MCP declarations require explicit confirmation.
+Preview accepts YAML files only.
 
-### 9.9 Metadata and local state
+The production file reader must use the safe filesystem tool adapter, currently represented by `llmtoolsutil.ReadPortableTextFile` or an equivalent safe wrapper.
 
-Agent `metadata` remains annotation only.
+The file reader must:
 
-The strict profile must not use metadata to store:
+- Read only the user-selected file.
+- Reject directories and unsupported special files.
+- Enforce bounded file size.
+- Respect cancellation.
+- Prevent unsafe path traversal and symlink escape.
+- Avoid logging declaration content.
+- Return valid UTF-8 text.
+- Not persist the selected path.
 
-- import source path.
-- collection identity.
-- source digest.
-- prepared fingerprint.
-- Agent readiness.
-- MCP installation values.
-- secret references.
-- local enablement.
-- runtime configuration.
+## 8.2 YAML requirements
 
-All such values remain application or Store state.
+The imported file must contain:
 
-## 10. Safe file input
+- One YAML document.
+- One YAML object root.
+- No duplicate mapping keys.
+- Bounded YAML aliases and expansion.
+- A portable Agent declaration.
 
-The application must define a narrow file-reader port:
+Invalid YAML blocks import.
 
-```text
-ReadPortableArtifactFile(
-  context,
-  selectedPath,
-  maximumBytes
-) -> bytes and normalized path metadata
-```
+## 8.3 Validation order
 
-The production adapter uses `llmtoolsutil.ReadFile`.
-
-The adapter must:
-
-- Authorize only the explicitly selected file.
-- Use the safe filesystem tool's sandbox boundary.
-- Prevent symlink escape.
-- Handle platform path rules through the filesystem tool.
-- Reject directories.
-- Reject devices and unsupported special files.
-- Enforce a bounded read.
-- Return cancellation and file errors without exposing unrelated file content.
-- Avoid logging declaration content or secret-like values.
-- Avoid exposing a generic file-reading method to the frontend.
-
-For an absolute pasted path, the adapter may derive a one-file sandbox from the selected path's parent and basename. The safe filesystem implementation remains responsible for containment and symlink handling.
-
-## 11. Agent import preview flow
-
-### 11.1 Preview request
-
-Conceptually:
+Preview performs:
 
 ```text
-AgentImportPreviewRequest {
-  Path
-  Collection
-  ExpectedCollectionRevision
-  ExpectedSourceDigest?
-}
-```
-
-The Collection identifies the Root and managed Source.
-
-A separate caller-supplied Root is not required.
-
-### 11.2 Preview processing
-
-```text
-Validate Collection destination
-  -> read selected file through safe reader
+Read selected file
   -> calculate source digest
-  -> check optional expected source digest
-  -> parse one YAML object
-  -> validate portable Agent schema
-  -> validate strict Agent profile
-  -> run Agent semantic admission
-  -> build canonical Definition
-  -> build managed Agent package
-  -> build Collection relationship mutation
-  -> project Source and Artifacts
-  -> resolve projected Agent
-  -> inspect conflicts
-  -> inspect MCP setup requirements
-  -> calculate readiness
-  -> retain prepared import
-  -> return preview
+  -> canonicalize YAML
+  -> validate portable Agent schema and raw-input managed profile
+  -> normalize managed dependency scopes
+  -> validate normalized managed profile and Agent declaration
+  -> validate contained Text and inline MCP declarations
+  -> calculate managed Definition
+  -> inspect destination and identity conflicts
+  -> inspect current managed dependency resolution
+  -> sign prepared payload
 ```
 
-If any structural or semantic error blocks import, preview returns issues but no committable token.
+`RestoredMemberships` and MCP setup descriptors are signed prepare-time
+descriptive snapshots. They are returned from the prepared operation and are
+not recomputed or used as commit correctness witnesses.
 
-### 11.3 Projected Artifact resolution
+## 8.4 Import-blocking versus informational diagnostics
 
-Preview must validate the declaration as it would exist after import without committing it.
+| Condition                       | Severity     | Blocks import        |
+| ------------------------------- | ------------ | -------------------- |
+| Invalid YAML                    | Error        | Yes                  |
+| Invalid Agent root              | Error        | Yes                  |
+| Invalid contained Text          | Error        | Yes                  |
+| Invalid inline MCP              | Error        | Yes                  |
+| Unsupported member type or form | Error        | Yes                  |
+| Invalid destination Collection  | Error        | Yes                  |
+| Name or package conflict        | Error        | Yes                  |
+| Invalid prepared payload        | Error        | Yes                  |
+| Built-in target unavailable     | Warning      | No                   |
+| Mapped target unavailable       | Warning      | No                   |
+| Named dependency ambiguous      | Warning      | No                   |
+| External target malformed       | Warning      | No                   |
+| Tool auto-execute               | Confirmation | No, after acceptance |
+| Inline stdio MCP                | Confirmation | No, after acceptance |
 
-The common transfer infrastructure therefore provides an in-memory projected Artifact overlay containing:
+## 9. Preview and signed preparation
 
-- The prepared Agent package Source entry.
-- The root Agent Artifact.
-- Every contained Text and MCP Artifact.
-- The planned Collection document when changed.
-- Current Artifact Store records outside the prepared mutation.
-
-The existing typed resolver runs against the overlay plus current Store state.
-
-Projected Artifact references are preview-only identities. They must not be exposed as durable `ArtifactRef` values.
-
-The preview response addresses projected declarations by stable occurrence paths.
-
-### 11.4 Preview result
+## 9.1 Preview request
 
 Conceptually:
-
-```text
-AgentImportPreview {
-  CommitToken?
-  PreparedFingerprint?
-  ExpiresAt?
-
-  SourceDigest
-  DefinitionDigest
-  NormalizedYAML
-
-  AgentSummary
-  Destination
-  ProjectedArtifacts
-  Relationships
-  Conflicts
-  RestoredMemberships
-  MCPSetupRequirements
-  Readiness
-
-  CanImport
-  RequiresConfirmation
-  ReadyAfterCommit
-
-  Issues
-}
-```
-
-Issue severities are:
-
-```text
-error
-confirmation
-setup
-information
-```
-
-Meanings:
-
-- `error` blocks commit.
-- `confirmation` requires explicit user acceptance.
-- `setup` does not block import but prevents readiness.
-- `information` describes resulting behavior.
-
-Every issue should contain:
-
-```text
-code
-severity
-path
-message
-instruction
-```
-
-Source line and column may be included when available from YAML parsing.
-
-### 11.5 Revalidation
-
-The UI may rerun preview at any time.
-
-Revalidation:
-
-- Reads the external file again.
-- Calculates a new source digest.
-- Creates a new prepared import.
-- Returns a new commit token and fingerprint.
-- Does not mutate the previous prepared import.
-- Does not alter persisted Store state.
-
-Changing any of these requires revalidation:
-
-- File content.
-- Destination Collection.
-- Destination Collection revision.
-- Confirmation-relevant profile behavior.
-
-## 12. Prepared import trust model
-
-### 12.1 Backend-held prepared state
-
-Prepared import state is held by the backend in a bounded process-local registry.
-
-The frontend does not send the prepared YAML or package back during commit.
-
-This prevents a modified frontend object from changing committed content.
-
-Prepared state is not durable across application restart.
-
-A restart requires a new preview.
-
-### 12.2 Digests and fingerprint
-
-The preview exposes three separate digests:
-
-```text
-SourceDigest
-  -> exact external file bytes read during preview
-
-DefinitionDigest
-  -> canonical portable Agent declaration
-
-PreparedFingerprint
-  -> complete prepared import plan
-```
-
-The prepared fingerprint binds at least:
-
-- Strict profile identity.
-- Canonical declaration bytes.
-- managed package files.
-- Root and Source.
-- selected Collection.
-- expected Collection revision.
-- expected Source generation.
-- package address.
-- planned Collection member.
-- projected Artifact expectations.
-- dependency witnesses.
-- required confirmation codes.
-
-A fingerprint alone is not accepted without its commit token.
-
-### 12.3 Commit token
-
-The commit token must be:
-
-- Cryptographically random.
-- Opaque to the frontend.
-- Bound to one prepared import.
-- Bound to one destination.
-- Bound to one prepared fingerprint.
-- Time-limited.
-- Unusable for another domain operation.
-
-Commit accepts no alternate path or declaration content.
-
-### 12.4 Expiration and replay
-
-The prepared registry must:
-
-- Enforce a bounded number of entries.
-- Enforce a bounded total byte size.
-- Expire unused entries.
-- Remove abandoned entries.
-- Retain a bounded success receipt for committed-token replay.
-- Return the original result for a duplicate commit request using the same successfully committed token.
-- Reject token reuse with a different fingerprint or confirmation set.
-
-### 12.5 Environmental witnesses
-
-The external file is not reread at commit, but mutable Store dependencies must remain current.
-
-Prepared state records witnesses for:
-
-- Collection Artifact revision.
-- managed Source generation.
-- existing exact dangling memberships.
-- protected built-in Artifact revisions or Definition digests.
-- mapped target provider identity.
-- mapped target identifier.
-- any fallback catalog generation exposed by the provider.
-- relevant Root and Source existence.
-
-Commit checks these witnesses.
-
-A changed witness makes the prepared import stale and requires revalidation.
-
-## 13. Identity and conflict handling
-
-### 13.1 Root Agent identity
-
-The root managed Agent identity is:
-
-```text
-target Root
-  + type: agent
-  + logical name
-```
-
-The logical name also determines the managed package address.
-
-Preview blocks import when:
-
-- An available Agent with that name exists in the target Root.
-- A missing but unpurged conflicting Agent occurrence exists.
-- Another managed package occupies the calculated package address.
-- Physical package normalization collides on the current platform.
-- The name is reserved by Agent domain policy.
-
-### 13.2 Contained Artifact identities
-
-The decoder derives contained Artifact occurrences using stable semantic subresource paths.
-
-Preview must inspect conflicts for every emitted identity.
-
-For Text:
-
-```text
-text
-  + name
-  + insert
-```
-
-For MCP:
-
-```text
-mcp
-  + name
-```
-
-The strict profile should encourage Agent-prefixed contained names, for example:
-
-```text
-my-agent-instructions
-my-agent-request
-my-agent-mcp
-```
-
-A dynamic name-prefix rule that cannot be expressed in JSON Schema may be enforced by the Agent semantic validator.
-
-### 13.3 Package conflicts
-
-Managed import is create-only.
-
-The following are prohibited:
-
-- Package replacement.
-- Package merge.
-- Package overwrite.
-- Equivalent-content no-op import from a new preview.
-- Automatic package rename.
-
-A new preview for an already imported name returns a conflict even when the declaration is byte-equivalent.
-
-Idempotency is limited to replay of the same commit token.
-
-### 13.4 Collection relationship conflicts
-
-The desired selected Collection relationship is a located external Agent member identifying the managed package occurrence.
-
-Possible outcomes:
-
-- No matching relationship:
-  - Stage addition.
-- Exact matching available relationship:
-  - Conflict because the Agent already exists.
-- Exact matching unavailable relationship and package absent:
-  - Reuse as restoration.
-- Same name with another locator:
-  - Conflict.
-- Same name as a symbolic member:
-  - Conflict.
-- Same name selected by a selector:
-  - Conflict.
-- Same name as a contained member:
-  - Conflict.
-
-Unavailable exact relationships in other Agent Collections may also be restored by re-import. Preview must list those affected Collections.
-
-### 13.5 Built-in conflicts
-
-A strict managed Agent name must not equal a protected built-in Agent name.
-
-This avoids implicit Root shadowing in the managed import workflow.
-
-Users must choose a distinct name when deriving a custom Agent from a built-in declaration.
-
-Other member references may intentionally select built-ins through `scope: builtin`.
-
-### 13.6 Delete and re-import
-
-Delete remains package deletion, not Collection ownership mutation.
-
-```text
-Delete managed Agent
-  -> remove Agent package
-  -> preserve Collection relationships
-  -> relationships become unavailable
-```
-
-Re-importing the same name:
-
-```text
-Preview same managed package address
-  -> detect package absent
-  -> detect exact dangling memberships
-  -> prepare package restoration
-  -> add selected membership only when missing
-  -> commit
-  -> exact dangling memberships become available
-```
-
-If the user keeps the existing Agent, changed content must use a new Agent name.
-
-## 14. Atomic import commit
-
-### 14.1 Transaction contents
-
-The common Artifact Store transaction API must support one managed Source transaction containing multiple package mutations.
-
-For Agent import this includes:
-
-- One Agent package creation.
-- Zero or one Agent Collection package replacement.
-- Expected managed Source generation.
-- Expected Collection Artifact revision.
-- Expected package absence.
-- Expected resulting root and contained Definitions.
-- No unrelated package changes.
-
-Both packages must belong to the same authorized managed Agent Source.
-
-Otherwise import is rejected.
-
-### 14.2 Commit sequence
-
-```text
-Load prepared import
-  -> verify token and fingerprint
-  -> verify confirmations
-  -> acquire managed Source transaction lock
-  -> verify Source generation
-  -> verify Collection revision
-  -> verify identity and package absence
-  -> verify dependency witnesses
-  -> stage Agent package
-  -> stage Collection package mutation if required
-  -> validate staged Source projection
-  -> atomically publish staged package set
-  -> reconcile Source once
-  -> verify expected Artifacts and Collection
-  -> store commit receipt
-  -> return result
-```
-
-The staged Source projection must be equivalent to the projection used during preview.
-
-### 14.3 Durable result and recovery
-
-The durable transaction boundary is the managed Source package set.
-
-Artifact and Definition records are derived from the committed Source.
-
-If interruption occurs after Source publication but before response:
-
-- The transaction receipt or Source generation identifies the committed mutation.
-- Reconciliation is rerun idempotently.
-- Replaying the same commit token returns the recovered result.
-- No second package is created.
-- No duplicate Collection member is added.
-
-Generic Artifact Store staging and metadata may be extended for this purpose.
-
-No Agent-specific transaction sidecar is introduced.
-
-## 15. Portable managed export
-
-### 15.1 Export eligibility
-
-The Agent domain verifies that the requested Artifact:
-
-- Is an Agent.
-- Is in a non-protected user Root.
-- Is available.
-- Is top-level.
-- Is backed by the managed Agent Source.
-- Uses the managed Agent package kind.
-- Uses the expected concrete Agent document location.
-- Is not a source-selected alias.
-- Passes the strict managed Agent structural profile.
-
-Current dependency resolution is not required for export eligibility.
-
-### 15.2 Export content
-
-The export result contains:
-
-```text
-PortableArtifactExport {
-  Type
-  Name
-  MediaType
-  SuggestedFileName
-  Content
-  ContentDigest
-  DefinitionDigest
-  ArtifactRevision
-  Resolution
-  Readiness
-}
-```
-
-For Agent export:
-
-```text
-MediaType: application/yaml
-SuggestedFileName: <agent-name>.agent.yaml
-```
-
-`Content` is normalized portable YAML generated from the current immutable Definition.
-
-### 15.3 Export exclusions
-
-Export excludes:
-
-- Collection membership.
-- Collection identity.
-- Root ID.
-- Source ID.
-- Artifact ID.
-- package address.
-- Artifact revision fields inside YAML.
-- Definition digest fields inside YAML.
-- local Agent enablement.
-- local MCP installation input values.
-- secret references and values.
-- OAuth state.
-- MCP connection profile selection.
-- MCP runtime connection state.
-- discovered MCP Tools, resources, prompts, or digests.
-- readiness state.
-
-Portable MCP installation input definitions remain exportable.
-
-### 15.4 Export and re-import
-
-An exported Agent file can be:
-
-- Imported into another valid destination after changing its root Agent name and any conflicting contained names.
-- Re-imported under its original name after deleting the existing managed Agent.
-- Retained as a user-authored source file outside the application.
-
-Export does not establish a synchronization link.
-
-## 16. Agent Collections and lifecycle
-
-The primary Agent management view is Artifact-oriented.
-
-Collections are used for:
-
-- Import destination.
-- Filtering.
-- Membership display.
-- Empty Collection management.
-
-The UI must not imply that a Collection owns its Agents.
-
-Managed Collection operations remain:
-
-- Create empty Agent Collection.
-- Update display name and description.
-- Enable or disable.
-- Delete when empty.
-- Inspect direct member status.
-- Detach a direct member.
-- Attach an existing eligible Agent where separately exposed.
-
-Agent declaration operations become:
-
-- Import.
-- Inspect.
-- Export.
-- Enable or disable.
-- Delete.
-
-Agent declaration operations do not include:
-
-- Create through a form.
-- Edit.
-- Replace.
-- Version.
-- Rename.
-
-## 17. Agent readiness and MCP completion
-
-### 17.1 Readiness dimensions
-
-Agent management exposes separate readiness dimensions:
-
-```text
-DeclarationValid
-ResolutionComplete
-InstallationComplete
-Ready
-```
-
-Definitions:
-
-- `DeclarationValid` means the current Definition passes the portable and strict schemas.
-- `ResolutionComplete` means all required relationships are available and unambiguous.
-- `InstallationComplete` means all required local installation inputs, secret references, and authentication setup are complete.
-- `Ready` means `DeclarationValid`, `ResolutionComplete`, and `InstallationComplete`.
-
-`Ready` is configuration readiness.
-
-It does not assert:
-
-- Active MCP connection.
-- Current network availability.
-- Model provider availability.
-- Tool execution permission.
-- Successful Agent execution.
-
-### 17.2 Inline MCP completion
-
-Preview identifies inline MCP requirements by stable occurrence path, for example:
-
-```text
-members/mcp/example-server
-```
-
-After import, the contained MCP has a real terminal `ArtifactRef`.
-
-The existing MCP installation and secret APIs then own completion.
-
-The Agent detail view may launch the MCP completion UI for each incomplete MCP occurrence.
-
-MCP completion does not modify the Agent Definition.
-
-### 17.3 Secret handling
-
-Preview returns only secret descriptors:
-
-- Input name.
-- Input kind.
-- Label.
-- Description.
-- Required flag.
-- Client-secret requirement.
-- Occurrence path.
-
-Preview never returns or retains secret values.
-
-Secret values are submitted only to the MCP installation or secret subsystem after the MCP Artifact exists.
-
-Export never reads secret values.
-
-### 17.4 Readiness derivation
-
-The Agent Store remains responsible for declaration and resolution.
-
-An Agent management aggregate derives readiness by combining:
-
-```text
-Resolved Agent capability plan
-  + terminal MCP Artifact identities
-  + MCP installation completion
-  + secret-reference health
-  + authentication setup health
-```
-
-Readiness is calculated on demand.
-
-It must not be persisted into:
-
-- Agent YAML.
-- Agent Definition.
-- generic Artifact state.
-- Agent metadata.
-- Collection membership.
-
-## 18. User interface flow
-
-### 18.1 Agent management page
-
-The page displays Agents rather than Assistant Preset bundles.
-
-Primary controls:
-
-- User Root or active Workspace selection.
-- Agent Collection filter.
-- Search.
-- provenance filter.
-- readiness filter.
-- `Import Agent`.
-- Collection management.
-
-The Agent list shows:
-
-- Display name.
-- Logical name.
-- managed or built-in provenance.
-- enabled state.
-- resolution state.
-- setup/readiness state.
-- Collection memberships.
-
-Selecting an Agent shows:
-
-- Summary.
-- Normalized portable YAML.
-- relationships and diagnostics.
-- contained MCP setup state.
-- Collection memberships.
-- export.
-- enablement.
-- deletion for eligible managed Agents.
-
-No declaration editor is shown.
-
-### 18.2 Import dialog
-
-The dialog contains:
-
-- Destination Collection.
-- File path.
-- Native browse action.
-- `Validate and Preview`.
-- Strict profile explanation.
-- Copyable valid Agent example.
-- Available built-in and mapped reference catalog.
-- Copyable reference snippets.
-
-Changing the destination or file requires another preview.
-
-### 18.3 Preview presentation
-
-The preview shows:
-
-- Source digest.
-- Definition digest.
-- Agent identity.
-- Normalized YAML.
-- planned Collection.
-- projected contained Artifacts.
-- protected built-in references.
-- mapped references.
-- inline MCP commands and URLs.
-- resolution status.
-- conflict analysis.
-- restored dangling memberships.
-- setup requirements.
-- whether the Agent will be ready after commit.
-- blocking errors.
-- confirmation warnings.
-- remediation instructions.
-
-The dialog must clearly distinguish:
-
-```text
-Can import: yes or no
-Ready after import: yes or no
-Setup required: yes or no
-```
-
-### 18.4 Confirmation and commit
-
-The user confirms the prepared preview.
-
-The frontend submits:
-
-- Commit token.
-- Prepared fingerprint.
-- Accepted confirmation issue codes.
-
-The frontend does not submit:
-
-- YAML.
-- path.
-- package bytes.
-- Collection replacement content.
-- projected Artifact data.
-
-On success:
-
-- The new Agent becomes selected.
-- The Agent detail view opens.
-- If setup is incomplete, the MCP completion flow is offered.
-- The Agent remains visibly not ready until completion succeeds.
-
-### 18.5 Export flow
-
-For an eligible managed Agent:
-
-- User selects `Export`.
-- Backend returns the current portable export.
-- The existing download flow writes the returned content.
-- The UI explains that membership, enablement, and secrets are not exported.
-- The UI explains that importing while the current Agent exists requires a new name.
-
-### 18.6 Delete and re-import flow
-
-The deletion dialog explains:
-
-- The managed Agent package will be deleted.
-- Collection relationships will remain declared and become unavailable.
-- Re-importing the same Agent name can restore those relationships.
-- Export should be used first if the user wants to preserve or modify the declaration.
-
-After deletion:
-
-- The unavailable Collection relationships remain inspectable.
-- The user may modify the exported YAML.
-- The user previews and imports again.
-- Preview reports which dangling memberships will be restored.
-
-## 19. Consumer API shape
-
-The names below are conceptual. Concrete Go naming follows repository conventions.
-
-### 19.1 Agent import destination
-
-```text
-ListAgentImportDestinations()
-  -> []AgentImportDestination
-```
-
-```text
-AgentImportDestination {
-  RootID
-  RootDisplayName
-
-  Collection
-  CollectionRevision
-  CollectionName
-  CollectionDisplayName
-  Baseline
-  Enabled
-}
-```
-
-Only eligible editable managed Agent Collections are returned.
-
-### 19.2 Agent import preview
-
-```text
-PreviewAgentImport(
-  AgentImportPreviewRequest
-) -> AgentImportPreview
-```
 
 ```text
 AgentImportPreviewRequest {
@@ -1950,9 +732,20 @@ AgentImportPreviewRequest {
 }
 ```
 
+The selected Collection identifies:
+
+- Destination Root.
+- Managed Agent Source.
+- Collection revision.
+- Collection package location.
+
+## 9.2 Preview result
+
+Conceptually:
+
 ```text
 AgentImportPreview {
-  CommitToken?
+  Prepared?
   PreparedFingerprint?
   ExpiresAt?
 
@@ -1966,21 +759,519 @@ AgentImportPreview {
   Relationships
   Conflicts
   RestoredMemberships
-  MCPSetupRequirements
-  Readiness
   Issues
 
   CanImport
   RequiresConfirmation
-  ReadyAfterCommit
+  RequiredConfirmationCodes
 }
 ```
 
-Validation and policy failures are represented as preview issues.
+`ProjectedArtifacts` describes declaration identities expected from the managed Agent package.
 
-Unexpected infrastructure failures remain operation errors.
+It is not an Artifact Store overlay and does not contain durable `ArtifactRef` values before publication.
 
-### 19.3 Agent import commit
+`Relationships` reports current managed lookup observations. It does not determine import validity.
+
+## 9.3 Signed prepared payload
+
+The prepared payload contains enough data to deterministically recreate the import operation:
+
+- Normalized canonical Agent declaration.
+- Source digest.
+- Definition digest.
+- Destination Root and Source.
+- Selected Collection ref.
+- Expected Collection revision.
+- Expected Source generation.
+- Managed package address.
+- Managed Agent document locator.
+- Required confirmation codes.
+- Expiration time.
+
+The package file list is deterministic from the normalized declaration and managed package layout. It does not need to be separately retained.
+
+The prepared payload does not contain:
+
+- The original import path.
+- Secret values.
+- OAuth tokens.
+- MCP installation values.
+- Backend-only prepared state.
+- Dependency witnesses.
+- Dependency revision snapshots.
+- Runtime readiness state.
+
+## 9.4 Stateless preparation behavior
+
+The backend signs the prepared payload using a process-local HMAC key.
+
+Commit requires:
+
+- The signed payload.
+- The prepared fingerprint.
+- Accepted confirmation codes.
+
+A restart invalidates pending prepared payloads because the signer key is process-local.
+
+Replay behavior is intentionally simple:
+
+- A replay may return a conflict after successful import.
+- The application may require a new preview after a failed or uncertain commit.
+- No replay receipt is required.
+
+## 10. Best-effort commit behavior
+
+## 10.1 Commit validation
+
+Commit must:
+
+- Verify the HMAC signature.
+- Verify the prepared fingerprint.
+- Reject expired payloads.
+- Verify accepted confirmation codes.
+- Revalidate the selected Collection revision.
+- Revalidate managed Source generation.
+- Revalidate Agent identity conflicts.
+- Revalidate managed package conflicts.
+- Revalidate Collection membership conflicts.
+- Revalidate the normalized managed Agent declaration.
+
+Commit must not:
+
+- Reread the original file.
+- Accept replacement YAML from the client.
+- Accept replacement package bytes from the client.
+- Re-resolve dependencies as an import gate.
+- Require dependency witnesses to remain unchanged.
+- Require MCP installation completion.
+- Attempt MCP connection.
+
+## 10.2 Commit sequence
+
+The intended best-effort sequence is:
+
+```text
+Open and verify signed payload
+  -> validate destination state and conflicts
+  -> ensure desired Collection relationship
+  -> publish managed Agent package
+  -> refresh or reconcile normal managed Source state
+  -> return Agent and Collection state
+```
+
+The Collection relationship is written first because it represents the selected user intent.
+
+If Agent publication fails after membership creation:
+
+- The Collection relationship remains declared.
+- The relationship is unavailable.
+- The user can correct the issue and preview again.
+- No rollback is required.
+
+## 10.3 No cross-package transaction requirement
+
+The application does not require a transaction covering:
+
+- Collection package mutation.
+- Agent package mutation.
+- Source reconciliation.
+- Artifact verification.
+
+Each operation must use ordinary Artifact Store consistency guarantees.
+
+The application must not claim that the combined operation is atomic.
+
+## 11. Collection membership behavior
+
+## 11.1 Explicit destination
+
+Every import requires an explicit editable managed Agent Collection.
+
+There is no implicit baseline destination.
+
+The selected Collection must:
+
+- Belong to a non-protected user Root.
+- Be an Agent Collection.
+- Use the managed Agent Source.
+- Be mutable.
+- Have the expected revision.
+- Use an enabled managed Source.
+
+Collection enabled state does not gate import.
+
+## 11.2 Persisted relationship
+
+Import creates or preserves a located external Agent relationship.
+
+Conceptually:
+
+```yaml
+- type: agent
+  name: imported-agent
+  locator: agent/imported-agent/unversioned/agent.yaml
+```
+
+The relationship must not contain an `ArtifactRef`.
+
+## 11.3 Existing relationships
+
+The selected Collection may already contain:
+
+- The exact desired relationship.
+- A dangling exact relationship from a deleted Agent.
+- An incompatible same-name named relationship.
+- A selector.
+- A contained Agent declaration.
+
+Behavior:
+
+| Existing Collection state                    | Import behavior                           |
+| -------------------------------------------- | ----------------------------------------- |
+| Exact desired dangling relationship          | Reuse relationship and publish Agent      |
+| Exact desired available relationship         | Conflict because Agent already exists     |
+| Same Agent name at another locator           | Conflict                                  |
+| Same Agent name as symbolic member           | Conflict                                  |
+| Unrelated selector                           | Does not block import                     |
+| Unrelated contained Agent                    | Does not block import                     |
+| Other Collection exact dangling relationship | Becomes available when Agent is published |
+
+The importer must not reject an import merely because the selected Collection contains an unrelated selector or unrelated contained Agent.
+
+## 11.4 Membership does not own the Agent
+
+Collection membership does not:
+
+- Own the Agent package.
+- Delete the Agent when detached.
+- Change Agent enablement.
+- Change Agent metadata.
+- Change MCP installation state.
+- Change Agent runtime state.
+
+Deleting an Agent leaves Collection relationships declared and unavailable.
+
+Re-importing the same managed Agent name can restore exact dangling relationships.
+
+## 12. MCP handling
+
+## 12.1 Import validates declaration shape only
+
+Agent import validates:
+
+- Named MCP relationship syntax.
+- Inline MCP declaration syntax.
+- MCP transport configuration.
+- Installation input definitions.
+- Authentication declaration shape.
+- Policy reference syntax.
+- Prohibited local state and secret placement.
+
+Agent import does not validate:
+
+- Whether a named MCP currently exists.
+- Whether installation inputs have values.
+- Whether secrets exist.
+- Whether OAuth setup is complete.
+- Whether the MCP can connect.
+- Whether the MCP is currently healthy.
+
+## 12.2 Named MCP relationships
+
+A named MCP is valid even when unavailable.
+
+Example:
+
+```yaml
+- type: mcp
+  name: github
+```
+
+Preview normalizes this to:
+
+```yaml
+- type: mcp
+  name: github
+  scope: builtin
+```
+
+Preview may report the relationship as unavailable. Import remains allowed.
+
+## 12.3 Inline MCP declarations
+
+Inline MCP declarations are part of the imported Agent and must be valid.
+
+After publication, contained MCP declarations receive normal Artifact occurrences and can be resolved through the Agent capability plan.
+
+The UI may then use the resulting MCP Artifact refs to:
+
+- Show setup requirements.
+- Request installation values.
+- Save secret references.
+- Perform OAuth setup.
+- Attempt connection.
+- Show connection and runtime state.
+
+## 12.4 Secret handling
+
+Portable Agent YAML must not contain secret values.
+
+The current managed inline MCP validator performs partial declaration-level
+credential placement validation for recognized sensitive environment and header
+positions, including:
+
+- Sensitive environment variables.
+- Sensitive headers.
+- Sensitive connection profile headers.
+- Sensitive connection profile environment variables.
+
+URL, query-string, and command-argument credential classification remains MCP consumer and installation validation work. The import API must not represent
+this partial validation as complete transport-secret detection.
+
+The HMAC-signed prepared payload is not encrypted. This rule prevents secret values from being exposed through it.
+
+## 13. Conflict handling
+
+## 13.1 Root Agent identity
+
+Managed Agent identity is:
+
+```text
+Destination Root
+  + type: agent
+  + logical name
+```
+
+The logical name determines the managed package address.
+
+Import blocks when:
+
+- An Agent with the same identity already exists.
+- A missing but unpurged conflicting Agent occurrence exists.
+- The target managed package address is occupied.
+- Managed storage reports a case-folded package collision.
+- The name collides with a protected built-in Agent.
+- The package would require replacement.
+- The name violates managed package naming rules.
+
+Automatic rename is not allowed.
+
+## 13.2 Contained Artifact identity
+
+Contained declarations must not conflict with existing target Root Artifacts.
+
+Text identity includes:
+
+```text
+text
+  + name
+  + insert
+```
+
+MCP identity includes:
+
+```text
+mcp
+  + name
+```
+
+Contained Artifact conflicts block import because the managed package cannot safely publish the expected declarations.
+
+## 13.3 Dependency availability is not a conflict
+
+These are not import conflicts:
+
+- Missing built-in Model.
+- Missing built-in Tool.
+- Missing built-in Skill.
+- Missing built-in MCP.
+- Missing built-in MCP Policy.
+- Missing mapped Model target.
+- Missing mapped Tool target.
+- Ambiguous external dependency.
+
+They are relationship diagnostics.
+
+## 13.4 Package publication remains create-only
+
+Managed Agent import is create-only.
+
+The importer must not:
+
+- Replace a package.
+- Merge package content.
+- Upsert a package.
+- Overwrite equivalent content from another preview.
+- Rename automatically.
+
+A new import preview for an already imported Agent name reports a conflict.
+
+## 14. Managed Agent export
+
+## 14.1 Export eligibility
+
+Managed Agent export is available only for an Agent that is:
+
+- In a non-protected user Root.
+- Available.
+- Top-level.
+- Backed by the managed Agent Source.
+- Backed by the managed Agent package kind.
+- Stored at the expected managed Agent document locator.
+- A concrete Agent, not a source-selected alias.
+- Valid against the portable Agent contract.
+- Valid against the managed Agent profile.
+
+Dependency resolution is not an export eligibility requirement.
+
+An Agent remains exportable when:
+
+- Named relationships are unavailable.
+- Named relationships are ambiguous.
+- MCP installation is incomplete.
+- Secrets are missing.
+- MCP connection is unavailable.
+
+## 14.2 Export content
+
+Export returns normalized portable YAML.
+
+It includes:
+
+- Type.
+- Name.
+- Source-authored display name.
+- Source-authored description.
+- Source-authored labels.
+- Source-authored annotations.
+- Normalized `scope: builtin` relationships.
+- Contained Text declarations.
+- Contained MCP declarations.
+- Portable MCP installation input definitions.
+
+It excludes:
+
+- Collection membership.
+- Collection identity.
+- Root ID.
+- Source ID.
+- Artifact ID.
+- Package address.
+- Artifact revision fields in YAML.
+- Definition digest fields in YAML.
+- Artifact enablement.
+- MCP installation values.
+- Secret references.
+- Secret values.
+- OAuth tokens.
+- Selected connection profiles.
+- Runtime connection state.
+- Agent readiness state.
+
+## 14.3 Export result
+
+Conceptually:
+
+```text
+AgentExportResult {
+  Type
+  Name
+  MediaType
+  SuggestedFileName
+  Content
+  ContentDigest
+  DefinitionDigest
+  ArtifactRevision
+}
+```
+
+Resolution details may be returned as optional informational data, but export must not fail because relationship resolution is incomplete.
+
+## 15. API shape
+
+## 15.1 Import destinations
+
+```text
+ListAgentImportDestinations()
+  -> []AgentImportDestination
+```
+
+Destinations are existing editable managed Agent Collections.
+
+## 15.2 Preview
+
+```text
+PreviewAgentImport(
+  AgentImportPreviewRequest
+) -> AgentImportPreview
+```
+
+Conceptually:
+
+```text
+AgentImportPreviewRequest {
+  Path
+  Collection
+  ExpectedCollectionRevision
+  ExpectedSourceDigest?
+}
+```
+
+```text
+AgentImportPreview {
+  Prepared?
+  PreparedFingerprint?
+  ExpiresAt?
+
+  SourceDigest
+  DefinitionDigest
+  NormalizedYAML
+
+  Agent
+  Destination
+  ProjectedArtifacts
+  Relationships
+  Conflicts
+  RestoredMemberships
+  Issues
+
+  CanImport
+  RequiresConfirmation
+  RequiredConfirmationCodes
+}
+```
+
+## 15.3 Issues
+
+```text
+AgentImportIssue {
+  Code
+  Severity
+  Path?
+  Message
+}
+```
+
+Severity values are:
+
+```text
+error
+confirmation
+warning
+information
+```
+
+Meaning:
+
+| Severity       | Meaning                                                  |
+| -------------- | -------------------------------------------------------- |
+| `error`        | Blocks import                                            |
+| `confirmation` | Requires explicit user acceptance                        |
+| `warning`      | Does not block import, including unresolved dependencies |
+| `information`  | Describes normalization or resulting behavior            |
+
+## 15.4 Commit
 
 ```text
 CommitAgentImport(
@@ -1990,7 +1281,7 @@ CommitAgentImport(
 
 ```text
 AgentImportCommitRequest {
-  CommitToken
+  Prepared
   PreparedFingerprint
   AcceptedConfirmationCodes
 }
@@ -2001,19 +1292,26 @@ AgentImportCommitResult {
   Agent
   Collection
   RestoredMemberships
-  Readiness
-  CommitFingerprint
+  PreparedFingerprint
 }
 ```
 
-No declaration content is accepted by commit.
+Commit does not accept:
 
-### 19.4 Agent export
+- A file path.
+- YAML content.
+- Package bytes.
+- A replacement Collection document.
+- Dependency witnesses.
+- MCP secrets.
+- MCP installation values.
+
+## 15.5 Export
 
 ```text
 ExportManagedAgent(
   AgentExportRequest
-) -> PortableArtifactExport
+) -> AgentExportResult
 ```
 
 ```text
@@ -2022,113 +1320,133 @@ AgentExportRequest {
 }
 ```
 
-The backend returns portable bytes. The download destination remains an application UI concern.
+## 15.6 Post-import resolution
 
-### 19.5 Agent reference catalog
-
-```text
-ListAgentImportReferenceCatalog(
-  AgentReferenceCatalogRequest
-) -> AgentReferenceCatalog
-```
-
-The request may include the selected destination Collection so that accepted mapped and built-in names are checked in the correct Root context.
-
-### 19.6 Agent readiness
+The UI uses existing Agent APIs after commit:
 
 ```text
-GetAgentReadiness(
-  ArtifactRef
-) -> AgentReadiness
+GetAgent
+ResolveAgent
+ResolveAgentCapabilities
 ```
 
-```text
-AgentReadiness {
-  DeclarationValid
-  ResolutionComplete
-  InstallationComplete
-  Ready
-  Issues
-  MCPRequirements
-}
-```
+The returned capability plan is the authoritative post-publication relationship state.
 
-The Agent management detail response may include this projection to avoid a separate call.
+No Agent readiness API is required.
 
-## 20. Persistence and security boundaries
+## 16. UI and runtime responsibilities
 
-The feature persists only normal Artifact ecosystem state:
+## 16.1 Import UI
+
+The import UI owns:
+
+- File selection.
+- Destination Collection selection.
+- Preview display.
+- Confirmation display.
+- Commit initiation.
+- Display of dangling membership behavior.
+- Re-preview after stale or failed commit.
+
+The import UI does not need:
+
+- A reference catalog.
+- A field-by-field Agent editor.
+- Backend readiness state.
+- Backend MCP setup orchestration.
+
+## 16.2 Post-import Agent UI
+
+After successful import, the Agent UI may:
+
+- Resolve the Agent.
+- Show available, unavailable, and ambiguous relationships.
+- Show normalized YAML.
+- Show dangling Collection memberships.
+- Export the Agent.
+- Enable or disable the Agent.
+- Delete the Agent.
+
+## 16.3 MCP UI
+
+After resolving an Agent, the MCP UI may:
+
+- Identify resolved MCP Artifact refs.
+- Inspect MCP installation input definitions.
+- Collect local installation values.
+- Save secret references.
+- Perform OAuth setup.
+- Select profiles.
+- Attempt connection.
+- Show runtime state.
+
+These actions do not modify the Agent declaration.
+
+## 17. Security and persistence boundaries
+
+## 17.1 Persisted state
+
+The feature persists normal Artifact ecosystem state:
 
 - Managed Agent package.
-- Managed Collection package update.
+- Collection package mutations.
 - Definitions.
 - Artifacts.
 - Source generation.
 - Artifact enablement.
-- MCP local installation data after separate completion.
-- Secret references in the MCP installation subsystem.
-- Secret values in secret storage.
+- MCP local installation data, through MCP APIs.
+- Secret references, through secret and MCP APIs.
+
+## 17.2 Non-persisted state
 
 The feature does not persist:
 
-- External import path.
-- prepared preview after expiration.
-- source file contents outside the managed package.
-- commit token in the Agent declaration.
-- source digest in the Agent declaration.
-- prepared fingerprint in the Agent declaration.
-- readiness in the Agent declaration.
-- Collection membership inside the Agent declaration.
-- secret values in prepared state.
-- Agent-specific transaction sidecars.
+- Original import path.
+- Backend prepared-import records.
+- Commit tokens.
+- Source file contents outside the managed package.
+- Dependency witnesses.
+- Dependency revision snapshots.
+- Agent readiness.
+- MCP installation values in Agent YAML.
+- Secret values in Agent YAML.
+- OAuth tokens in Agent YAML.
+- Collection membership inside Agent YAML.
 
-Security-sensitive preview information must identify behavior without exposing secrets.
+## 17.3 Signed payload boundary
 
-Preview must call out:
+The signed prepared payload may be visible to the client.
 
-- Stdio commands.
-- Command arguments.
-- HTTP URLs.
-- Header names.
-- Environment variable names.
-- Authentication modes.
-- auto-execute overrides.
-- required secret inputs.
-- approval-relevant MCP policies.
+Therefore:
 
-Artifact enablement must not be presented as a security sandbox.
+- It must not contain secrets.
+- It must not contain private filesystem paths.
+- It must not contain local MCP state.
+- It must not contain backend-only credentials.
+- It must expire.
+- It must be HMAC-authenticated before commit.
 
-## 21. Breaking removals
+## 18. Breaking removals
 
-### 21.1 Assistant Preset removal
+The following legacy capabilities are removed.
 
-The following backend areas are removed:
+### 18.1 Assistant Presets
 
-```text
-cmd/agentgo/
-  wrapper_assistantpreset_artifact.go
+Removed:
 
-internal/assistantpreset/
-  lookupimpl/
-  spec/
-  store/
-```
+- Assistant Preset APIs.
+- Assistant Preset storage.
+- Assistant Preset overlays.
+- Assistant Preset versions.
+- Assistant Preset bundle IDs.
+- Assistant Preset migrations.
+- Assistant Preset frontend routes.
+- Assistant Preset compatibility aliases.
+- Assistant Preset dual-read and dual-write behavior.
 
-Legacy Assistant Preset embedded data, overlay storage, storage constants, and application storage declarations are removed.
+### 18.2 Structured managed Agent authoring
 
-The following frontend area is removed:
-
-```text
-frontend/app/assistantpresets/
-```
-
-Assistant Preset routes, API adapters, generated models, composer integrations, and management labels are removed.
-
-No migration or compatibility path is retained.
-
-### 21.2 Managed Agent authoring removal
-
-The following Agent APIs and types are removed:
+Removed:
 
 - `ManagedAgentDocument`.
 - `ManagedAgentMember`.
@@ -2138,255 +1456,158 @@ The following Agent APIs and types are removed:
 - `ManagedAgentReplaceResult`.
 - `CreateManagedAgent`.
 - `ReplaceManagedAgent`.
+- Field-by-field Model selection.
+- Field-by-field Tool selection.
+- Field-by-field Skill selection.
+- Field-by-field MCP selection.
+- In-place Agent declaration editing.
+- Managed Agent replacement.
 
-The internal package-publication logic may be refactored and retained behind import commit.
+### 18.3 Retained operations
 
-The following remain:
+These remain:
 
-- Managed Agent delete.
+- Agent import.
+- Agent export.
+- Agent delete.
 - Agent enablement.
 - Agent reads.
 - Agent resolution.
-- Collection reads and management.
-- Collection membership internals.
+- Collection create, read, update, enablement, and delete.
 - Built-in Agent installation.
+- MCP local installation and runtime flows.
 
-### 21.3 Behaviors intentionally not retained
+## 19. Implementation requirements
 
-The new design does not retain:
+## 19.1 Managed scope normalization
 
-- Assistant Preset versions.
-- New-version creation.
-- bundle enablement gating.
-- ordered Tool selection.
-- ordered Skill selection.
-- persisted Tool user arguments.
-- persisted MCP conversation context.
-- persisted discovered MCP capabilities.
-- field-by-field Model selection.
-- field-by-field Tool selection.
-- field-by-field Skill selection.
-- field-by-field MCP selection.
-- copying another preset through a form.
-- editing a managed Agent declaration.
-- replacing a managed Agent declaration.
+The implementation must add a normalization step before Definition creation.
 
-## 22. Implementation areas
-
-### 22.1 Contract profile infrastructure
-
-Representative common implementation:
+For every allowed named external managed relationship:
 
 ```text
-internal/artifactcontract/managedprofile/
-  descriptor.go
-  registry.go
-  schema.go
-  validation.go
+scope omitted
+  -> normalize to scope: builtin
+
+scope: builtin
+  -> retain scope: builtin
 ```
 
-Responsibilities:
+The normalized declaration must be used for:
 
-- Bind one restriction schema to one portable base schema.
-- Construct the conjunctive strict schema.
-- Compile registered profiles.
-- Reject duplicate or invalid profile registration.
-- Expose strict validation to domain services.
-- Keep profile schemas out of portable declaration dispatch.
+- Definition digest.
+- Managed package bytes.
+- Preview normalized YAML.
+- Signed prepared payload.
+- Exported YAML.
 
-Agent-specific additions:
+## 19.2 Non-blocking dependency preflight
 
-```text
-internal/artifactcontract/declaration/agentv1/
-  agent-managed-restrictions.schema.json
-  managed_profile.go
-```
+`preflightManagedAgentDependencies` must stop producing import-blocking errors for ordinary resolution failures.
 
-No existing Agent schema key or version changes.
+Instead:
 
-### 22.2 Common managed transfer infrastructure
+- Resolve through managed lookup.
+- Record `available`, `unavailable`, or `ambiguous`.
+- Record built-in or mapped provenance when available.
+- Return warnings for resolution failures.
+- Do not prevent `CanImport`.
+- Do not create dependency witnesses for commit.
 
-Representative implementation:
+Infrastructure failures such as context cancellation, closed Store state, or invalid internal configuration may remain operation errors.
 
-```text
-internal/managedartifact/transfer/
-  file_reader.go
-  preview.go
-  prepared.go
-  registry.go
-  fingerprint.go
-  export.go
-  types.go
-```
+## 19.3 Commit must stop checking dependency witnesses
 
-Responsibilities:
+`preparedDependencyWitness` and `verifyDependencyWitnesses` are not part of this design.
 
-- Safe file-reader port.
-- Source digest.
-- normalized portable content.
-- prepared import registry.
-- commit tokens.
-- fingerprints.
-- expiration and replay.
-- common preview issue model.
-- common portable export response.
-- no domain type switching in public APIs.
+Commit correctness is based on:
 
-The production file-reader adapter uses:
+- Signed normalized declaration.
+- Destination Collection revision.
+- Managed Source generation.
+- Agent and package conflicts.
+- Collection membership conflicts.
+- Required confirmations.
 
-```text
-internal/llmtoolsutil.ReadFile
-```
+It is not based on external dependency state.
 
-### 22.3 Artifact Store transaction support
+## 19.4 Validation errors must become preview issues
 
-Extend the managed Artifact boundary with a transaction or batch mutation API capable of:
+Malformed user-authored declarations must be returned as preview `error` issues where possible.
 
-- Expected Source generation.
-- Multiple managed package mutations in one Source.
-- Package create and package replace operations.
-- Staged projection.
-- Atomic package-set publication.
-- One Source reconciliation.
-- Expected Artifact verification.
-- Durable idempotent recovery.
+This includes failures from:
 
-Representative area:
+- Contained Text decoding.
+- Inline MCP decoding.
+- Inline MCP semantic validation.
+- Managed scope normalization.
+- Package layout generation.
 
-```text
-internal/artifactstore/
-  managedtransaction/
-```
+They should not normally escape as opaque operation errors.
 
-or an extension of:
+## 19.5 Secret validation must be tightened
 
-```text
-internal/artifactstore/compositionapi/
-internal/artifactstore/providerapi/
-```
+The current sensitive-header and sensitive-environment heuristic is insufficient.
 
-The transaction implementation must reuse existing managed Source staging and metadata facilities where possible.
+The managed inline MCP validator must reject literal secret-like values in recognized credential-bearing positions, including:
 
-### 22.4 Agent domain implementation
+- Command arguments.
+- URL query values.
+- URL user information.
+- Headers.
+- Environment variables.
+- Connection profile overrides.
 
-Representative Agent additions:
+Only declared installation-input references may identify secrets.
 
-```text
-internal/agent/store/
-  consumerapi/
-    import.go
-    export.go
-    reference_catalog.go
-    readiness.go
-    import_types.go
+## 19.6 Export must not require successful resolution
 
-  domain/
-    managed_profile.go
-    import_policy.go
-    import_conflicts.go
-    import_package.go
-```
+`ExportManagedAgent` must export a valid managed Agent from its immutable Definition even when relationships are unavailable.
 
-Responsibilities:
+Resolution may be returned as optional information, but it must not be a hard export prerequisite.
 
-- Agent strict semantic admission.
-- Agent destination validation.
-- Agent package planning.
-- Collection member planning.
-- root and contained identity conflict checks.
-- dangling membership restoration.
-- built-in and mapped reference validation.
-- managed Agent export eligibility.
-- Agent readiness projection.
+## 19.7 No implementation required for excluded features
 
-Existing `publishManagedAgent` logic should be refactored into the atomic transaction planner rather than exposed as structured authoring.
+The following do not require implementation:
 
-### 22.5 Application composition and wrappers
+- Backend-held prepared import registry.
+- Random opaque commit token.
+- Prepared import replay receipt.
+- Projected Artifact overlay.
+- Cross-package import transaction.
+- Agent readiness aggregate.
+- Agent MCP completion aggregate.
+- Agent reference catalog.
 
-`AgentStoreWrapper` gains methods for:
+## 20. Current implementation status
 
-- Listing import destinations.
-- Listing accepted reference names.
-- Previewing an Agent import path.
-- Committing a prepared Agent import.
-- Exporting a managed Agent.
-- Reading Agent management detail and readiness.
-
-The wrapper composes:
-
-- Agent domain import/export service.
-- common prepared import registry.
-- strict profile registry.
-- safe file reader.
-- managed transaction API.
-- MCP readiness dependencies.
-
-No Assistant Preset wrapper remains.
-
-### 22.6 Future MCP and Text reuse
-
-Future MCP import/export adds:
-
-- MCP restriction schema beside `mcpv1`.
-- MCP destination and Collection policy.
-- MCP package planning.
-- MCP conflict policy.
-- MCP export eligibility.
-- MCP installation completion projection.
-
-Future Text import/export adds:
-
-- Text restriction schema beside `textv1`.
-- Text destination policy.
-- inline or managed resource policy.
-- Text package planning.
-- Text export eligibility.
-
-Neither future domain changes the Agent profile.
-
-The common transfer service remains unaware of Agent, MCP, and Text semantics.
-
-## 23. Implementation status
-
-Status terminology:
-
-- `Available` means an existing implementation path or dependency is present.
-- `Planned` means required by this HLD but not yet implemented.
-- `Removed` means the capability must not exist after this breaking change.
-- `Deferred` means intentionally reserved for a later domain profile.
-
-| Capability                                      | Status    | Notes                                              |
-| ----------------------------------------------- | --------- | -------------------------------------------------- |
-| Portable Agent schema                           | Available | Existing `agentv1` contract remains unchanged      |
-| Canonical Agent YAML decoding                   | Available | Existing canonical YAML provider and Agent decoder |
-| Managed Agent Source and package layout         | Available | Existing Agent managed Source infrastructure       |
-| Agent Collections                               | Available | Existing Agent-only Plugin domain                  |
-| Built-in Agent, Skill, Tool, and MCP resolution | Available | Existing protected Root and typed resolver         |
-| Tool and Model mapped fallback                  | Available | Current registered fallback types                  |
-| Safe cross-platform file operations             | Available | `llmtoolsutil` and `llmtools-go/fstool`            |
-| Strict managed profile registry                 | Planned   | Common conjunctive schema registration             |
-| Agent managed restriction schema                | Planned   | Additional schema beside `agentv1`                 |
-| Initialization-time profile validation          | Planned   | Fail-fast application composition                  |
-| Safe Agent YAML preview reader                  | Planned   | Uses the safe file adapter                         |
-| Projected managed Artifact overlay              | Planned   | Required for mutation-free dry run                 |
-| Agent semantic import admission                 | Planned   | Built-in, mapped, inline MCP, and conflict policy  |
-| Backend-held prepared import registry           | Planned   | Bounded token and fingerprint state                |
-| Source, Definition, and prepared fingerprints   | Planned   | Separate digests with distinct purposes            |
-| Environmental dependency witnesses              | Planned   | Collection, Source, built-in, and mapped state     |
-| Atomic multi-package managed Source transaction | Planned   | Agent package plus Collection package              |
-| Commit without source-file reread               | Planned   | Commit consumes backend-held prepared state        |
-| Idempotent committed-token replay               | Planned   | Returns original result                            |
-| Managed Agent portable YAML export              | Planned   | User-managed top-level Agents only                 |
-| Agent accepted-reference catalog                | Planned   | Built-in and mapped names with snippets            |
-| Inline MCP import profile                       | Planned   | Declaration permitted without local values         |
-| MCP completion requirements in preview          | Planned   | Input descriptors only                             |
-| Derived Agent readiness                         | Planned   | Resolution plus MCP local completion               |
-| In-place managed Agent editing                  | Removed   | Export, rename externally, and import instead      |
-| Managed Agent replacement                       | Removed   | Delete and re-import or use a new name             |
-| Structured `ManagedAgentDocument` authoring     | Removed   | Replaced by strict file import                     |
-| Assistant Preset backend                        | Removed   | No compatibility or migration                      |
-| Assistant Preset frontend                       | Removed   | Replaced by Agent Artifact management              |
-| Assistant Preset storage and overlays           | Removed   | No retained legacy behavior                        |
-| Agent declaration versions                      | Removed   | No Agent release version is introduced             |
-| MCP domain import/export profile                | Deferred  | Reuses common transfer infrastructure              |
-| Text domain import/export profile               | Deferred  | Reuses common transfer infrastructure              |
+| Capability                                  | Status       | Notes                                                                             |
+| ------------------------------------------- | ------------ | --------------------------------------------------------------------------------- |
+| Portable Agent schema                       | Available    | Existing `agentv1` contract remains unchanged                                     |
+| Managed Agent restrictions schema           | Available    | Raw input permits omitted built-in scope; normalized storage is revalidated       |
+| Managed-scope normalization                 | Available    | Normalized `scope: builtin` is used for digest, publication, and export           |
+| Conjunctive strict profile validation       | Available    | Existing `allOf(base, restrictions)` implementation                               |
+| Safe YAML preview entry point               | Available    | Uses `llmtoolsutil.ReadPortableTextFile`; underlying safety requires verification |
+| Explicit Collection destination             | Available    | Existing import destination logic                                                 |
+| Client-carried signed prepared payload      | Available    | Existing HMAC signer design matches this HLD                                      |
+| Backend prepared-import registry            | Out of scope | Intentionally not required                                                        |
+| Projected Artifact overlay                  | Out of scope | Intentionally not required                                                        |
+| Cross-package atomic import transaction     | Out of scope | Best-effort membership and publication is intentional                             |
+| Managed package create-only publication     | Available    | Existing `AllowPackageReplacement: false` behavior                                |
+| Empty Agent import                          | Available    | Existing behavior is retained intentionally                                       |
+| Validation of contained Text and inline MCP | Available    | User-authored content failures are returned as structured preview issues          |
+| Non-blocking external dependency resolution | Available    | Unavailable and ambiguous dependencies are warnings, not import gates             |
+| Built-in-first mapped managed lookup        | Available    | Normalized scope prevents destination-Root dependency lookup                      |
+| Dependency witness enforcement              | Removed      | Prepared payloads and commit no longer capture or verify dependency state         |
+| Warning severity and relationship reporting | Available    | Preview returns warning issues and statusful relationship observations            |
+| Inline MCP literal-secret protection        | Partial      | Sensitive env/header placements are guarded; broader MCP validation is deferred   |
+| Collection conflict filtering               | Available    | Only conflicting direct same-name Agent relationships block import                |
+| Managed package-address conflict preflight  | Available    | Preview and commit inspect the target managed package directory                   |
+| Post-import normal Agent resolution         | Available    | Existing `ResolveAgent` and capability APIs                                       |
+| Agent readiness aggregate                   | Out of scope | UI and MCP subsystem responsibility                                               |
+| MCP installation completion during import   | Out of scope | UI and MCP subsystem responsibility                                               |
+| Agent reference catalog                     | Out of scope | Optional future UI convenience only                                               |
+| Managed Agent export                        | Available    | Export reads the immutable Definition; resolution is optional information         |
+| Managed Agent delete preserving membership  | Available    | Existing lifecycle behavior                                                       |
+| Structured managed Agent create and replace | Removed      | Must remain absent                                                                |
+| Assistant Preset backend and compatibility  | Removed      | Must remain absent                                                                |

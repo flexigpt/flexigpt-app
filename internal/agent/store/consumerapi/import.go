@@ -1,8 +1,10 @@
 package consumerapi
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path"
 	"sort"
@@ -18,6 +20,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -52,21 +55,9 @@ type preparedAgentImport struct {
 	Address      source.ManagedPackageAddress `json:"address"`
 	AgentLocator basespec.Locator             `json:"agentLocator"`
 
-	Dependencies              []preparedDependencyWitness `json:"dependencies"`
-	RestoredMemberships       []AgentRestoredMembership   `json:"restoredMemberships"`
-	MCPSetupDescriptors       []AgentMCPSetupDescriptor   `json:"mcpSetupDescriptors"`
-	RequiredConfirmationCodes []string                    `json:"requiredConfirmationCodes"`
-}
-
-type preparedDependencyWitness struct {
-	Path   string          `json:"path"`
-	Member json.RawMessage `json:"member"`
-
-	Artifact         *artifact.ArtifactRef `json:"artifact,omitempty"`
-	ArtifactRevision uint64                `json:"artifactRevision,omitempty"`
-	DefinitionDigest cryptoutil.Digest     `json:"definitionDigest,omitempty"`
-
-	Mapped *resolve.MappedTarget `json:"mapped,omitempty"`
+	RestoredMemberships       []AgentRestoredMembership `json:"restoredMemberships"`
+	MCPSetupDescriptors       []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors"`
+	RequiredConfirmationCodes []string                  `json:"requiredConfirmationCodes"`
 }
 
 type plannedImportIdentity struct {
@@ -226,15 +217,6 @@ func (a *API) PreviewAgentImport(
 		return preview, nil
 	}
 
-	normalizedYAML, err := yamlutil.CanonicalObjectYAML(
-		canonical,
-		basespec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return preview, err
-	}
-	preview.NormalizedYAML = string(normalizedYAML)
-
 	entry, err := declaration.DecodeCanonicalEntryJSON(canonical)
 	if err != nil {
 		preview.Issues = append(preview.Issues, importIssue(
@@ -243,6 +225,58 @@ func (a *API) PreviewAgentImport(
 			err,
 		))
 		return preview, nil
+	}
+
+	entry, err = agentDomain.NormalizeManagedAgentImport(entry)
+	if err != nil {
+		return previewValidationError(
+			preview,
+			"agent.import.managed-normalization-invalid",
+			"",
+			err,
+		)
+	}
+	canonical, err = entry.CanonicalJSON()
+	if err != nil {
+		return previewValidationError(
+			preview,
+			"agent.import.managed-normalization-invalid",
+			"",
+			err,
+		)
+	}
+	canonical, err = a.managedAgentProfile.Validate(canonical)
+	if err != nil {
+		preview.Issues = append(preview.Issues, importIssue(
+			"agent.import.strict-profile-invalid",
+			"",
+			err,
+		))
+		return preview, nil
+	}
+
+	normalizedYAML, err := yamlutil.CanonicalObjectYAML(
+		canonical,
+		basespec.MaxDefinitionBytes,
+	)
+	if err != nil {
+		return previewValidationError(
+			preview,
+			"agent.import.normalized-yaml-invalid",
+			"",
+			err,
+		)
+	}
+	preview.NormalizedYAML = string(normalizedYAML)
+
+	entry, err = declaration.DecodeCanonicalEntryJSON(canonical)
+	if err != nil {
+		return previewValidationError(
+			preview,
+			"agent.import.declaration-invalid",
+			"",
+			err,
+		)
 	}
 	document, err := agentv1.DecodeAgentEntry(entry)
 	if err != nil {
@@ -256,7 +290,12 @@ func (a *API) PreviewAgentImport(
 
 	admission, err := agentDomain.ValidateManagedAgentImport(document)
 	if err != nil {
-		return preview, err
+		return previewValidationError(
+			preview,
+			"agent.import.managed-content-invalid",
+			"",
+			err,
+		)
 	}
 	preview.Issues = append(
 		preview.Issues,
@@ -269,7 +308,12 @@ func (a *API) PreviewAgentImport(
 
 	rawAgent, rootDefinition, err := agentDomain.ManagedAgentEntryPayload(entry)
 	if err != nil {
-		return preview, err
+		return previewValidationError(
+			preview,
+			"agent.import.managed-content-invalid",
+			"",
+			err,
+		)
 	}
 	preview.DefinitionDigest = rootDefinition.Digest
 
@@ -277,16 +321,31 @@ func (a *API) PreviewAgentImport(
 		rootDefinition.LogicalName,
 	)
 	if err != nil {
-		return preview, err
+		return previewValidationError(
+			preview,
+			"agent.import.package-invalid",
+			"",
+			err,
+		)
 	}
 	agentLocator, err := agentDomain.ManagedPackageLocatorForAgent(address)
 	if err != nil {
-		return preview, err
+		return previewValidationError(
+			preview,
+			"agent.import.package-invalid",
+			"",
+			err,
+		)
 	}
 
 	identities, artifacts, err := plannedImportArtifacts(entry)
 	if err != nil {
-		return preview, err
+		return previewValidationError(
+			preview,
+			"agent.import.managed-content-invalid",
+			"",
+			err,
+		)
 	}
 	preview.ProjectedArtifacts = artifacts
 	for _, value := range artifacts {
@@ -316,6 +375,25 @@ func (a *API) PreviewAgentImport(
 		})
 	}
 
+	packageConflict, err := a.managedAgentPackageConflict(
+		ctx,
+		destination.value.RootID,
+		destination.value.SourceID,
+		address,
+	)
+	if err != nil {
+		return preview, err
+	}
+	if packageConflict != nil {
+		preview.Conflicts = append(preview.Conflicts, *packageConflict)
+		preview.Issues = append(preview.Issues, AgentImportIssue{
+			Code:     packageConflict.Code,
+			Severity: AgentImportIssueError,
+			Path:     packageConflict.Path,
+			Message:  packageConflict.Message,
+		})
+	}
+
 	restored, membershipConflicts, err := a.analyzeAgentImportMembership(
 		ctx,
 		destination.value.Collection,
@@ -342,7 +420,7 @@ func (a *API) PreviewAgentImport(
 		})
 	}
 
-	relationships, witnesses, dependencySetups, dependencyIssues, err := a.preflightManagedAgentDependencies(
+	relationships, dependencySetups, dependencyIssues, err := a.preflightManagedAgentDependencies(
 		ctx,
 		destination.value.RootID,
 		document,
@@ -377,7 +455,6 @@ func (a *API) PreviewAgentImport(
 		ExpectedSourceGeneration:   destination.sourceGeneration,
 		Address:                    address,
 		AgentLocator:               agentLocator,
-		Dependencies:               witnesses,
 		RestoredMemberships:        preview.RestoredMemberships,
 		MCPSetupDescriptors:        preview.MCPSetupDescriptors,
 		RequiredConfirmationCodes:  requiredCodes,
@@ -466,13 +543,33 @@ func (a *API) CommitAgentImport(
 		)
 	}
 
-	canonical, err := a.managedAgentProfile.Validate(
-		plan.CanonicalDeclaration,
-	)
+	canonical, err := a.managedAgentProfile.Validate(plan.CanonicalDeclaration)
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
 	entry, err := declaration.DecodeCanonicalEntryJSON(canonical)
+	if err != nil {
+		return AgentImportCommitResult{}, err
+	}
+	normalizedEntry, err := agentDomain.NormalizeManagedAgentImport(entry)
+	if err != nil {
+		return AgentImportCommitResult{}, err
+	}
+	normalizedCanonical, err := normalizedEntry.CanonicalJSON()
+	if err != nil {
+		return AgentImportCommitResult{}, err
+	}
+	if !bytes.Equal(canonical, normalizedCanonical) {
+		return AgentImportCommitResult{}, fmt.Errorf(
+			"%w: prepared Agent import is not normalized",
+			basespec.ErrConflict,
+		)
+	}
+	canonical, err = a.managedAgentProfile.Validate(normalizedCanonical)
+	if err != nil {
+		return AgentImportCommitResult{}, err
+	}
+	entry, err = declaration.DecodeCanonicalEntryJSON(canonical)
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}
@@ -542,12 +639,22 @@ func (a *API) CommitAgentImport(
 			basespec.ErrConflict,
 		)
 	}
-	if err := a.verifyDependencyWitnesses(
+
+	packageConflict, err := a.managedAgentPackageConflict(
 		ctx,
 		plan.RootID,
-		plan.Dependencies,
-	); err != nil {
+		plan.SourceID,
+		plan.Address,
+	)
+	if err != nil {
 		return AgentImportCommitResult{}, err
+	}
+	if packageConflict != nil {
+		return AgentImportCommitResult{}, fmt.Errorf(
+			"%w: %s",
+			basespec.ErrConflict,
+			packageConflict.Message,
+		)
 	}
 
 	membership, err := a.collections.EnsureMemberForCollectionSource(
@@ -783,6 +890,52 @@ func (a *API) agentImportIdentityConflicts(
 	return output, nil
 }
 
+func (a *API) managedAgentPackageConflict(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+	address source.ManagedPackageAddress,
+) (*AgentImportConflict, error) {
+	if a == nil || a.resources == nil {
+		return nil, basespec.ErrClosed
+	}
+
+	directory, err := address.Directory()
+	if err != nil {
+		return nil, err
+	}
+	entry, err := a.resources.StatSourceEntry(
+		ctx,
+		rootID,
+		sourceID,
+		directory,
+	)
+	if err != nil {
+		if errors.Is(err, basespec.ErrNotFound) {
+			//nolint:nilnil // Explicit.
+			return nil, nil
+		}
+		return nil, err
+	}
+	if err := entry.Validate(); err != nil {
+		return nil, err
+	}
+	if entry.Locator != directory {
+		return nil, fmt.Errorf(
+			"%w: managed package inspection returned %q for %q",
+			basespec.ErrInvalid,
+			entry.Locator,
+			directory,
+		)
+	}
+
+	return &AgentImportConflict{
+		Code:    "agent.import.package-conflict",
+		Path:    "package",
+		Message: fmt.Sprintf("managed Agent package %q is already occupied", directory),
+	}, nil
+}
+
 func (a *API) analyzeAgentImportMembership(
 	ctx context.Context,
 	selected collection.CollectionView,
@@ -805,18 +958,6 @@ func (a *API) analyzeAgentImportMembership(
 
 	conflicts := make([]AgentImportConflict, 0)
 	exact := false
-	for _, entry := range selected.Entries {
-		if entry.Type != declaration.TypeAgent {
-			continue
-		}
-		if entry.Contained || entry.Selector {
-			conflicts = append(conflicts, AgentImportConflict{
-				Code:    "agent.import.collection-nonexternal-member",
-				Path:    "members",
-				Message: "selected Collection has a contained or selector Agent member",
-			})
-		}
-	}
 	for _, member := range selected.Members {
 		if member.Type != declaration.TypeAgent ||
 			member.Name != name {
@@ -902,40 +1043,40 @@ func (a *API) preflightManagedAgentDependencies(
 	document agentv1.AgentDocument,
 ) (
 	[]AgentImportRelationship,
-	[]preparedDependencyWitness,
 	[]AgentMCPSetupDescriptor,
 	[]AgentImportIssue,
 	error,
 ) {
 	relationships := make([]AgentImportRelationship, 0)
-	witnesses := make([]preparedDependencyWitness, 0)
 	setup := make([]AgentMCPSetupDescriptor, 0)
 	issues := make([]AgentImportIssue, 0)
 
 	for _, member := range document.Members {
 		form, err := member.MemberForm()
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
 		header := member.Header()
-		memberPath := "members/" + string(header.Type) + "/" + header.Name
+		memberPath, err := agentDomain.ManagedAgentMemberPath(member)
+		if err != nil {
+			return nil, nil, nil, err
+		}
 
 		if form == declaration.MemberNamed {
-			relationship, witness, mcpSetup, issue, err := a.preflightNamedManagedDependency(
+			relationship, mcpSetup, issue, err := a.preflightNamedManagedDependency(
 				ctx,
 				rootID,
 				member,
 				memberPath,
 			)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, err
 			}
+			relationships = append(relationships, relationship)
 			if issue != nil {
 				issues = append(issues, *issue)
 				continue
 			}
-			relationships = append(relationships, relationship)
-			witnesses = append(witnesses, witness)
 			if mcpSetup != nil {
 				setup = append(setup, *mcpSetup)
 			}
@@ -949,11 +1090,11 @@ func (a *API) preflightManagedAgentDependencies(
 
 		target, err := member.ContainedDeclaration()
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
 		mcp, err := mcpv1.DecodeMCPEntry(target)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
 		if mcp.Policy == nil {
 			continue
@@ -965,25 +1106,24 @@ func (a *API) preflightManagedAgentDependencies(
 			"scope": string(declaration.LookupScopeBuiltin),
 		})
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
-		relationship, witness, _, issue, err := a.preflightNamedManagedDependency(
+		relationship, _, issue, err := a.preflightNamedManagedDependency(
 			ctx,
 			rootID,
 			policyMember,
 			memberPath+"/policy",
 		)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, err
 		}
+		relationships = append(relationships, relationship)
 		if issue != nil {
 			issues = append(issues, *issue)
 			continue
 		}
-		relationships = append(relationships, relationship)
-		witnesses = append(witnesses, witness)
 	}
-	return relationships, witnesses, setup, issues, nil
+	return relationships, setup, issues, nil
 }
 
 func (a *API) preflightNamedManagedDependency(
@@ -993,14 +1133,12 @@ func (a *API) preflightNamedManagedDependency(
 	memberPath string,
 ) (
 	AgentImportRelationship,
-	preparedDependencyWitness,
 	*AgentMCPSetupDescriptor,
 	*AgentImportIssue,
 	error,
 ) {
 	if a.declarationResolver == nil {
 		return AgentImportRelationship{},
-			preparedDependencyWitness{},
 			nil,
 			nil,
 			basespec.ErrClosed
@@ -1010,13 +1148,12 @@ func (a *API) preflightNamedManagedDependency(
 	relationshipFields, err := member.Relationship()
 	if err != nil {
 		return AgentImportRelationship{},
-			preparedDependencyWitness{},
 			nil,
 			nil,
 			err
 	}
 
-	target, err := a.declarationResolver.ResolveNamedRelationship(
+	target, err := a.declarationResolver.InspectNamedRelationship(
 		ctx,
 		resolve.NamedRelationshipRequest{
 			RootID: rootID,
@@ -1024,35 +1161,7 @@ func (a *API) preflightNamedManagedDependency(
 		},
 	)
 	if err != nil {
-		issue := importIssue(
-			"agent.import.dependency-unresolved",
-			memberPath,
-			err,
-		)
 		return AgentImportRelationship{},
-			preparedDependencyWitness{},
-			nil,
-			&issue,
-			nil
-	}
-
-	if issue := validateManagedDependencyTarget(
-		header.Type,
-		relationshipFields.Scope,
-		target,
-		memberPath,
-	); issue != nil {
-		return AgentImportRelationship{},
-			preparedDependencyWitness{},
-			nil,
-			issue,
-			nil
-	}
-
-	raw, err := member.CanonicalJSON()
-	if err != nil {
-		return AgentImportRelationship{},
-			preparedDependencyWitness{},
 			nil,
 			nil,
 			err
@@ -1063,20 +1172,39 @@ func (a *API) preflightNamedManagedDependency(
 		Type:   header.Type,
 		Name:   basespec.LogicalName(header.Name),
 		Scope:  relationshipFields.Scope,
-		Status: "available",
+		Status: target.Status,
 	}
-	witness := preparedDependencyWitness{
-		Path:   memberPath,
-		Member: raw,
+	if target.Issue != nil {
+		output.Code = target.Issue.Code
+		output.Message = target.Issue.Message
+	}
+	if target.Artifact != nil {
+		ref := *target.Artifact
+		output.Artifact = &ref
+	}
+	if target.Mapped != nil {
+		value := *target.Mapped
+		output.Mapped = &value
+	}
+
+	if target.Status != resolve.ResolutionAvailable {
+		return output, nil, managedDependencyIssue(output), nil
+	}
+	if err := validateManagedDependencyTarget(
+		header.Type,
+		relationshipFields.Scope,
+		target,
+		memberPath,
+	); err != nil {
+		return AgentImportRelationship{}, nil, nil, err
 	}
 
 	var setup *AgentMCPSetupDescriptor
-	if target.Artifact != nil {
-		ref := *target.Artifact
-		record, err := a.artifacts.Get(ctx, ref)
+	if output.Artifact != nil {
+		ref := *output.Artifact
+		_, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
 			return AgentImportRelationship{},
-				preparedDependencyWitness{},
 				nil,
 				nil,
 				err
@@ -1084,22 +1212,15 @@ func (a *API) preflightNamedManagedDependency(
 		definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 		if err != nil {
 			return AgentImportRelationship{},
-				preparedDependencyWitness{},
 				nil,
 				nil,
 				err
 		}
 
-		output.Artifact = &ref
-		witness.Artifact = &ref
-		witness.ArtifactRevision = record.Revision
-		witness.DefinitionDigest = definitionValue.Digest
-
 		if header.Type == declaration.TypeMCP {
 			document, err := mcpv1.DecodeMCPJSON(definitionValue.Body)
 			if err != nil {
 				return AgentImportRelationship{},
-					preparedDependencyWitness{},
 					nil,
 					nil,
 					err
@@ -1114,127 +1235,73 @@ func (a *API) preflightNamedManagedDependency(
 			setup = &value
 		}
 	}
-	if target.Mapped != nil {
-		value := *target.Mapped
-		output.Mapped = &value
-		witness.Mapped = &value
+	return output, setup, nil, nil
+}
+
+func managedDependencyIssue(
+	value AgentImportRelationship,
+) *AgentImportIssue {
+	code := "agent.import.dependency-unavailable"
+	if value.Status == resolve.ResolutionAmbiguous {
+		code = "agent.import.dependency-ambiguous"
 	}
-	return output, witness, setup, nil, nil
+
+	message := value.Message
+	if message == "" {
+		message = fmt.Sprintf(
+			"managed dependency %s/%s is %s",
+			value.Type,
+			value.Name,
+			value.Status,
+		)
+	}
+	return &AgentImportIssue{
+		Code:     code,
+		Severity: AgentImportIssueWarning,
+		Path:     value.Path,
+		Message:  message,
+	}
 }
 
 func validateManagedDependencyTarget(
 	declarationType declaration.Type,
 	scope declaration.LookupScope,
-	target resolve.NamedRelationshipTarget,
+	target resolve.NamedRelationshipInspection,
 	memberPath string,
-) *AgentImportIssue {
+) error {
+	if scope != declaration.LookupScopeBuiltin {
+		return fmt.Errorf(
+			"%w: managed Agent dependency %q is not normalized to built-in scope",
+			basespec.ErrInvalid,
+			memberPath,
+		)
+	}
+
 	switch declarationType {
 	case declaration.TypeModel, declaration.TypeTool:
-		if scope == "" &&
-			target.Mapped != nil &&
-			target.Mapped.Builtin {
+		if target.Artifact != nil &&
+			target.Artifact.RootID == agentBuiltinRootID() {
 			return nil
 		}
-		if scope == declaration.LookupScopeBuiltin {
-			if target.Artifact != nil &&
-				target.Artifact.RootID == agentBuiltinRootID() {
-				return nil
-			}
-			if target.Mapped != nil && target.Mapped.Builtin {
-				return nil
-			}
+		if target.Mapped != nil && target.Mapped.Builtin {
+			return nil
 		}
 
 	case declaration.TypeSkill,
 		declaration.TypeMCP,
 		declaration.TypeMCPPolicy:
-		if scope == declaration.LookupScopeBuiltin &&
-			target.Artifact != nil &&
+		if target.Artifact != nil &&
 			target.Artifact.RootID == agentBuiltinRootID() {
 			return nil
 		}
 	default:
 	}
 
-	return &AgentImportIssue{
-		Code:     "agent.import.reference-provenance",
-		Severity: AgentImportIssueError,
-		Path:     memberPath,
-		Message:  "managed Agent dependency does not resolve to the required protected built-in or mapped target",
-	}
-}
-
-func (a *API) verifyDependencyWitnesses(
-	ctx context.Context,
-	rootID root.RootID,
-	witnesses []preparedDependencyWitness,
-) error {
-	for _, expected := range witnesses {
-		member, err := declaration.DecodeCanonicalEntryJSON(
-			expected.Member,
-		)
-		if err != nil {
-			return err
-		}
-		target, err := a.declarationResolver.ResolveNamedRelationship(
-			ctx,
-			resolve.NamedRelationshipRequest{
-				RootID: rootID,
-				Member: member,
-			},
-		)
-		if err != nil {
-			return fmt.Errorf(
-				"%w: dependency %q changed: %w",
-				basespec.ErrConflict,
-				expected.Path,
-				err,
-			)
-		}
-
-		if expected.Artifact != nil {
-			if target.Artifact == nil ||
-				*target.Artifact != *expected.Artifact {
-				return fmt.Errorf(
-					"%w: dependency %q Artifact target changed",
-					basespec.ErrConflict,
-					expected.Path,
-				)
-			}
-
-			record, err := a.artifacts.Get(ctx, *expected.Artifact)
-			if err != nil {
-				return err
-			}
-			definitionValue, err := a.artifacts.GetDefinition(
-				ctx,
-				*expected.Artifact,
-			)
-			if err != nil {
-				return err
-			}
-			if record.Revision != expected.ArtifactRevision ||
-				definitionValue.Digest != expected.DefinitionDigest {
-				return fmt.Errorf(
-					"%w: dependency %q witness changed",
-					basespec.ErrConflict,
-					expected.Path,
-				)
-			}
-		}
-
-		if expected.Mapped != nil {
-			if target.Mapped == nil ||
-				*target.Mapped != *expected.Mapped {
-				return fmt.Errorf(
-					"%w: dependency %q mapped target changed",
-					basespec.ErrConflict,
-					expected.Path,
-				)
-			}
-		}
-	}
-	return nil
+	return fmt.Errorf(
+		"%w: managed Agent dependency %q does not resolve to the required protected built-in or mapped target",
+		basespec.ErrInvalid,
+		memberPath,
+	)
 }
 
 func (a *API) publishPreparedManagedAgent(
@@ -1429,8 +1496,22 @@ func importIssue(
 		Code:     code,
 		Severity: AgentImportIssueError,
 		Path:     pathValue,
-		Message:  err.Error(),
+		Message:  diagnostic.BoundedMessage(err.Error()),
 	}
+}
+
+func previewValidationError(
+	preview AgentImportPreview,
+	code string,
+	pathValue string,
+	err error,
+) (AgentImportPreview, error) {
+	preview.Issues = append(preview.Issues, importIssue(
+		code,
+		pathValue,
+		err,
+	))
+	return preview, nil
 }
 
 func hasImportErrors(
