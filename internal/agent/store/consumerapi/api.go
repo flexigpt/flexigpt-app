@@ -103,7 +103,7 @@ func New(
 
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		agentLocatorRuntime{api: output},
+		agentLocatorRuntime{artifacts: artifacts},
 	)
 	if err != nil {
 		return nil, err
@@ -166,7 +166,7 @@ func (a *API) requireMutable(
 }
 
 type agentLocatorRuntime struct {
-	api *API
+	artifacts compositionapi.ArtifactAPI
 }
 
 func (r agentLocatorRuntime) ListArtifactsBySource(
@@ -174,8 +174,8 @@ func (r agentLocatorRuntime) ListArtifactsBySource(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) ([]artifact.Artifact, error) {
-	if r.api == nil || r.api.artifacts == nil {
+	if r.artifacts == nil {
 		return nil, basespec.ErrClosed
 	}
-	return r.api.artifacts.ListBySource(ctx, rootID, sourceID)
+	return r.artifacts.ListBySource(ctx, rootID, sourceID)
 }

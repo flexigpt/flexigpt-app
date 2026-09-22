@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-func (a *API) InstallBuiltInAgentPackage(
+func (a *API) installBuiltInAgentPackage(
 	ctx context.Context,
 	request BuiltInAgentPackageInstallRequest,
 ) ([]artifact.Artifact, error) {
@@ -98,7 +98,7 @@ func (a *API) InstallBuiltInAgentPackage(
 	return records, nil
 }
 
-func (a *API) ValidateBuiltInAgentPackage(
+func (a *API) validateBuiltInAgentPackage(
 	ctx context.Context,
 	request BuiltInAgentPackageInstallRequest,
 ) error {
@@ -133,7 +133,7 @@ func (a *API) ValidateBuiltInAgentPackage(
 	); err != nil {
 		return err
 	}
-	if err := a.EnsureBuiltInAgentSourceCurrent(
+	if err := a.ensureBuiltInAgentSourceCurrent(
 		ctx,
 		request.RootID,
 		request.SourceID,
@@ -173,7 +173,7 @@ func (a *API) ValidateBuiltInAgentPackage(
 	return nil
 }
 
-func (a *API) RemoveBuiltInAgentPackage(
+func (a *API) removeBuiltInAgentPackage(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
@@ -205,7 +205,7 @@ func (a *API) RemoveBuiltInAgentPackage(
 	)
 }
 
-func (a *API) EnsureBuiltInAgentSourceCurrent(
+func (a *API) ensureBuiltInAgentSourceCurrent(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,

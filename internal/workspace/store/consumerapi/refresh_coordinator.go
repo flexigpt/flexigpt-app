@@ -10,14 +10,33 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 )
 
-func (a *StoreAPI) PrepareSelectorDiscovery(
+type workspaceRefreshCoordinator struct {
+	sources          compositionapi.SourceAPI
+	discovery        compositionapi.DiscoveryAPI
+	workspaceSources workspaceSourceRegistry
+}
+
+func newWorkspaceRefreshCoordinator(
+	sources compositionapi.SourceAPI,
+	discovery compositionapi.DiscoveryAPI,
+	workspaceSources workspaceSourceRegistry,
+) *workspaceRefreshCoordinator {
+	return &workspaceRefreshCoordinator{
+		sources:          sources,
+		discovery:        discovery,
+		workspaceSources: workspaceSources,
+	}
+}
+
+func (c *workspaceRefreshCoordinator) PrepareSelectorDiscovery(
 	ctx context.Context,
 	request resolve.SelectorRefreshRequest,
 ) ([]resolve.RefreshDirective, error) {
-	current, err := a.sources.Get(
+	current, err := c.sources.Get(
 		ctx,
 		request.Parent.RootID,
 		request.Parent.Binding.SourceID,
@@ -25,7 +44,7 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 	if err != nil {
 		return nil, err
 	}
-	current, err = a.workspaceRefreshSource(ctx, current)
+	current, err = c.workspaceSources.refreshSource(ctx, current)
 	if err != nil {
 		return nil, err
 	}
@@ -58,10 +77,10 @@ func (a *StoreAPI) PrepareSelectorDiscovery(
 			ExcludePatterns: append([]string(nil), request.Selector.Exclude...),
 		},
 	)
-	return a.updateDiscoveryForRefresh(ctx, current, next)
+	return c.updateDiscoveryForRefresh(ctx, current, next)
 }
 
-func (a *StoreAPI) PrepareLocatedMemberDiscovery(
+func (c *workspaceRefreshCoordinator) PrepareLocatedMemberDiscovery(
 	ctx context.Context,
 	request resolve.LocatedMemberRefreshRequest,
 ) ([]resolve.RefreshDirective, error) {
@@ -83,7 +102,7 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 		return nil, nil
 	}
 
-	current, err := a.sources.Get(
+	current, err := c.sources.Get(
 		ctx,
 		request.Parent.RootID,
 		request.Parent.Binding.SourceID,
@@ -91,7 +110,7 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 	if err != nil {
 		return nil, err
 	}
-	current, err = a.workspaceRefreshSource(ctx, current)
+	current, err = c.workspaceSources.refreshSource(ctx, current)
 	if err != nil {
 		return nil, err
 	}
@@ -110,17 +129,17 @@ func (a *StoreAPI) PrepareLocatedMemberDiscovery(
 			)
 		}
 	}
-	return a.updateDiscoveryForRefresh(ctx, current, next)
+	return c.updateDiscoveryForRefresh(ctx, current, next)
 }
 
-func (a *StoreAPI) RefreshSource(
+func (c *workspaceRefreshCoordinator) RefreshSource(
 	ctx context.Context,
 	target resolve.RefreshTarget,
 ) error {
-	if a == nil || a.discovery == nil {
+	if c == nil || c.discovery == nil {
 		return basespec.ErrClosed
 	}
-	_, err := a.discovery.RefreshSource(
+	_, err := c.discovery.RefreshSource(
 		ctx,
 		target.RootID,
 		target.SourceID,
@@ -128,7 +147,7 @@ func (a *StoreAPI) RefreshSource(
 	return err
 }
 
-func (a *StoreAPI) updateDiscoveryForRefresh(
+func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
 	ctx context.Context,
 	current source.Summary,
 	next source.DiscoverySpec,
@@ -148,7 +167,7 @@ func (a *StoreAPI) updateDiscoveryForRefresh(
 		}}, nil
 	}
 
-	if _, err := a.sources.Update(
+	if _, err := c.sources.Update(
 		ctx,
 		current.RootID,
 		current.ID,

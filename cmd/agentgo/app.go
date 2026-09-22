@@ -6,11 +6,15 @@ import (
 	"os"
 	"path/filepath"
 
+	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
+	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/adrg/xdg"
@@ -309,8 +313,21 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store consumer API initialized")
 
-	a.skillBuiltInInstaller, err = NewSkillBuiltInInstaller(
+	skillBuiltinStore, err := skillConsumerAPI.NewBuiltinStore(
 		a.skillStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize Skill built-in port: " + err.Error())
+	}
+	skillBaselineEnsurer, err := skillConsumerAPI.NewBaselineEnsurer(
+		a.skillStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize Skill baseline port: " + err.Error())
+	}
+
+	a.skillBuiltInInstaller, err = NewSkillBuiltInInstaller(
+		skillBuiltinStore,
 	)
 	if err != nil {
 		slog.Error(
@@ -342,8 +359,22 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: agent Store initialization failed\n" + err.Error())
 	}
 	slog.Info("agent store consumer API initialized")
-	a.agentBuiltInInstaller, err = NewAgentBuiltInInstaller(
+
+	agentBuiltinStore, err := agentConsumerAPI.NewBuiltinStore(
 		a.agentStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize Agent built-in port: " + err.Error())
+	}
+	agentBaselineEnsurer, err := agentConsumerAPI.NewBaselineEnsurer(
+		a.agentStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize Agent baseline port: " + err.Error())
+	}
+
+	a.agentBuiltInInstaller, err = NewAgentBuiltInInstaller(
+		agentBuiltinStore,
 	)
 	if err != nil {
 		slog.Error(
@@ -413,6 +444,19 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed mcp host initialized")
 
+	mcpBaselineEnsurer, err := mcpConsumerAPI.NewBaselineEnsurer(
+		a.mcpStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize MCP baseline port: " + err.Error())
+	}
+	mcpWorkspaceResolver, err := mcpConsumerAPI.NewWorkspaceServerResolver(
+		a.mcpStoreAPI.api,
+	)
+	if err != nil {
+		panic("failed to initialize Workspace MCP resolver: " + err.Error())
+	}
+
 	err = InitWorkspaceWrappers(
 		a.workspaceStoreAPI,
 		a.workspaceRuntimeAPI,
@@ -423,14 +467,14 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
-		a.mcpStoreAPI.api,
+		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID root.RootID) error {
 			return EnsureUserArtifactBaselineCollectionsForRoot(
 				ctx,
 				rootID,
-				a.skillStoreAPI.api,
-				a.mcpStoreAPI.api,
-				a.agentStoreAPI.api,
+				skillBaselineEnsurer,
+				mcpBaselineEnsurer,
+				agentBaselineEnsurer,
 			)
 		},
 	)
@@ -467,9 +511,9 @@ func (a *App) initManagers() {
 		context.Background(),
 		artifactComposition.Roots,
 		artifactComposition.Protection,
-		a.skillStoreAPI.api,
-		a.mcpStoreAPI.api,
-		a.agentStoreAPI.api,
+		skillBaselineEnsurer,
+		mcpBaselineEnsurer,
+		agentBaselineEnsurer,
 	)
 	if err != nil {
 		slog.Error(
@@ -484,6 +528,16 @@ func (a *App) initManagers() {
 	}
 	slog.Info("user Artifact baseline Collections initialized")
 
+	workspaceConversationSource, err := workspaceConsumerAPI.NewConversationSource(
+		a.workspaceStoreAPI.api,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Workspace conversation source failed\n" +
+				err.Error(),
+		)
+	}
+
 	err = InitAggregrateWrapper(
 		a.aggregateAPI,
 		a.modelPresetStoreAPI.store,
@@ -491,7 +545,7 @@ func (a *App) initManagers() {
 		a.toolStoreAPI.store,
 		a.skillAggregateAPI.service,
 		a.mcpRuntimeAPI.runtime,
-		a.workspaceStoreAPI.api,
+		workspaceConversationSource,
 	)
 	if err != nil {
 		slog.Error(

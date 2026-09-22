@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
@@ -49,7 +50,7 @@ func WithFallbackProviders(
 }
 
 type mcpLocatorRuntime struct {
-	api *API
+	artifacts compositionapi.ArtifactAPI
 }
 
 func (r mcpLocatorRuntime) ListArtifactsBySource(
@@ -57,8 +58,8 @@ func (r mcpLocatorRuntime) ListArtifactsBySource(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) ([]artifact.Artifact, error) {
-	if r.api == nil || r.api.artifacts == nil {
+	if r.artifacts == nil {
 		return nil, basespec.ErrClosed
 	}
-	return r.api.artifacts.ListBySource(ctx, rootID, sourceID)
+	return r.artifacts.ListBySource(ctx, rootID, sourceID)
 }

@@ -85,7 +85,7 @@ func New(
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		mcpLocatorRuntime{api: output},
+		mcpLocatorRuntime{artifacts: artifacts},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bind MCP declaration locator resolvers: %w", err)
@@ -243,13 +243,6 @@ func (a *API) GetMCPPolicy(
 	}, nil
 }
 
-func (a *API) ResolveMCPServer(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpDomainServer.Resolved, error) {
-	return a.resolveMCPServer(ctx, ref)
-}
-
 func (a *API) UpdateServerInstallation(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -385,7 +378,19 @@ func (a *API) UpdateProtectedServerInstallation(
 	)
 }
 
-func (a *API) EnsureBuiltInSourceCurrent(
+// ResolveArtifactCapabilities exposes the complete contract capability plan
+// for a declaration Artifact visible to the MCP consumer.
+func (a *API) ResolveArtifactCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.declarationResolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.declarationResolver.ResolveCapabilities(ctx, ref)
+}
+
+func (a *API) ensureBuiltInSourceCurrent(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
@@ -401,7 +406,7 @@ func (a *API) EnsureBuiltInSourceCurrent(
 	)
 }
 
-func (a *API) InstallBuiltInPackage(
+func (a *API) installBuiltInPackage(
 	ctx context.Context,
 	request BuiltInPackageInstallRequest,
 ) ([]artifact.Artifact, error) {
@@ -558,18 +563,6 @@ func (a *API) InstallBuiltInPackage(
 		return nil, err
 	}
 	return output, nil
-}
-
-// ResolveArtifactCapabilities exposes the complete contract capability plan
-// for a declaration Artifact visible to the MCP consumer.
-func (a *API) ResolveArtifactCapabilities(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
-	}
-	return a.declarationResolver.ResolveCapabilities(ctx, ref)
 }
 
 func normalizeBuiltInMCPExpectations(

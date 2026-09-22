@@ -1,6 +1,7 @@
 package consumerapi
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -67,6 +68,7 @@ func projectWorkspaceSkillLoadPlan(
 			DefinitionDigest: skill.DefinitionDigest,
 			Name:             skill.Document.Name,
 			DisplayName:      skill.Document.DisplayName,
+			Insert:           declaration.InsertTarget(skill.Document.Insert),
 			Locator:          skill.Locator,
 			Version:          skill.Version,
 		})

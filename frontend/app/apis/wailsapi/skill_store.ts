@@ -50,7 +50,6 @@ import {
 	RegisterSkillDirectory,
 	RemoveSkillCollectionMember,
 	ReplaceManagedSkill,
-	ResolveSkillArtifactCapabilities,
 	ResolveSkillCapabilities,
 	ResolveSkillCollection,
 	SetSkillCollectionEnabled,
@@ -176,13 +175,6 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		return requiredObject<CollectionView>(
 			await RemoveSkillCollectionMember(request as Parameters<typeof RemoveSkillCollectionMember>[0]),
 			'RemoveSkillCollectionMember'
-		);
-	}
-
-	async resolveSkillArtifactCapabilities(skill: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
-			await ResolveSkillArtifactCapabilities(skill as Parameters<typeof ResolveSkillArtifactCapabilities>[0]),
-			'ResolveSkillArtifactCapabilities'
 		);
 	}
 

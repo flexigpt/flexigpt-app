@@ -24,7 +24,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 			nil,
 			basespec.ErrClosed
 	}
-	workspace, err := a.ResolveWorkspace(ctx, ref)
+	workspace, err := a.resolveWorkspace(ctx, ref)
 	if err != nil {
 		return workspaceDomain.Workspace{}, nil, err
 	}
@@ -46,6 +46,25 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 		)
 	}
 	return workspace, resolved, nil
+}
+
+// ResolveWorkspace is the runtime read boundary. It accepts only a currently
+// effective and enabled Workspace. Management projections use workspaceForRef.
+func (a *StoreAPI) resolveWorkspace(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (workspaceDomain.Workspace, error) {
+	if err := ref.Validate(); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	value, err := a.workspaceForRef(ctx, ref)
+	if err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	if err := a.requireEffectiveWorkspace(ctx, value); err != nil {
+		return workspaceDomain.Workspace{}, err
+	}
+	return value, nil
 }
 
 func (a *StoreAPI) workspaceForRef(
@@ -75,7 +94,7 @@ func (a *StoreAPI) workspaceForRef(
 	}
 	workspace.CompositionSourceID = record.Binding.SourceID
 
-	sources, err := a.loadWorkspaceSources(ctx, record.RootID)
+	sources, err := a.workspaceSources.load(ctx, record.RootID)
 	if err != nil {
 		return workspaceDomain.Workspace{}, err
 	}

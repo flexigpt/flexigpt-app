@@ -17,7 +17,7 @@ import (
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-func (a *API) RemoveBuiltInPackage(
+func (a *API) removeBuiltInPackage(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,

@@ -23,7 +23,7 @@ func (a *API) CreateAgentCollection(
 	return a.collections.Create(ctx, request)
 }
 
-func (a *API) EnsureAgentBaselineCollection(
+func (a *API) ensureAgentBaselineCollection(
 	ctx context.Context,
 	rootID root.RootID,
 ) (collection.CollectionView, error) {

@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
@@ -26,11 +27,21 @@ type workspaceSourceSet struct {
 	HasPolicy    bool
 }
 
-func (a *StoreAPI) loadWorkspaceSources(
+type workspaceSourceRegistry struct {
+	sources compositionapi.SourceAPI
+}
+
+func newWorkspaceSourceRegistry(
+	sources compositionapi.SourceAPI,
+) workspaceSourceRegistry {
+	return workspaceSourceRegistry{sources: sources}
+}
+
+func (r workspaceSourceRegistry) load(
 	ctx context.Context,
 	rootID root.RootID,
 ) (workspaceSourceSet, error) {
-	values, err := a.sources.List(ctx, rootID)
+	values, err := r.sources.List(ctx, rootID)
 	if err != nil {
 		return workspaceSourceSet{}, err
 	}
@@ -81,11 +92,11 @@ func (a *StoreAPI) loadWorkspaceSources(
 	return output, nil
 }
 
-func (a *StoreAPI) requiredWorkspaceSources(
+func (r workspaceSourceRegistry) required(
 	ctx context.Context,
 	rootID root.RootID,
 ) (workspaceSourceSet, error) {
-	values, err := a.loadWorkspaceSources(ctx, rootID)
+	values, err := r.load(ctx, rootID)
 	if err != nil {
 		return workspaceSourceSet{}, err
 	}
@@ -99,14 +110,14 @@ func (a *StoreAPI) requiredWorkspaceSources(
 	return values, nil
 }
 
-func (a *StoreAPI) workspaceRefreshSource(
+func (r workspaceSourceRegistry) refreshSource(
 	ctx context.Context,
 	current source.Summary,
 ) (source.Summary, error) {
 	if string(current.StorageKey) != WorkspaceBasePolicySourceStorageKey {
 		return current, nil
 	}
-	values, err := a.requiredWorkspaceSources(ctx, current.RootID)
+	values, err := r.required(ctx, current.RootID)
 	if err != nil {
 		return source.Summary{}, err
 	}
@@ -225,7 +236,7 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 	ctx context.Context,
 	rootID root.RootID,
 ) error {
-	values, err := a.requiredWorkspaceSources(ctx, rootID)
+	values, err := a.workspaceSources.required(ctx, rootID)
 	if err != nil {
 		return err
 	}
@@ -288,7 +299,7 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 		)
 	}
 
-	values, err := a.requiredWorkspaceSources(
+	values, err := a.workspaceSources.required(
 		ctx,
 		workspace.Artifact.RootID,
 	)
@@ -416,7 +427,7 @@ func (a *StoreAPI) workspaceDirectoryRootIDs(
 	}
 	output := make([]root.RootID, 0)
 	for _, value := range values {
-		sources, err := a.loadWorkspaceSources(ctx, value.ID)
+		sources, err := a.workspaceSources.load(ctx, value.ID)
 		if err != nil {
 			return nil, err
 		}

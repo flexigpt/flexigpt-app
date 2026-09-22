@@ -19,7 +19,7 @@ func (a *API) CreateMCPCollection(
 	return a.collections.Create(ctx, request)
 }
 
-func (a *API) EnsureMCPBaselineCollection(
+func (a *API) ensureMCPBaselineCollection(
 	ctx context.Context,
 	rootID root.RootID,
 ) (collection.CollectionView, error) {

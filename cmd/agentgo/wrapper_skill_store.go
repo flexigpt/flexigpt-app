@@ -240,14 +240,6 @@ func (w *SkillStoreWrapper) ResolveSkillCapabilities(
 	})
 }
 
-func (w *SkillStoreWrapper) ResolveSkillArtifactCapabilities(
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (resolve.CapabilityPlan, error) {
-		return api.ResolveArtifactCapabilities(context.Background(), ref)
-	})
-}
-
 func (w *SkillStoreWrapper) SetSkillEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,

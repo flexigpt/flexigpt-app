@@ -87,12 +87,27 @@ func InitMCPWrappers(
 		return nil, err
 	}
 
-	m, err := mcpConsumerAPI.NewMCPListService(roots, storeAPI)
+	catalogStore, err := mcpConsumerAPI.NewCatalogStore(storeAPI)
+	if err != nil {
+		return nil, err
+	}
+	managementStore, err := mcpConsumerAPI.NewManagementStore(storeAPI)
+	if err != nil {
+		return nil, err
+	}
+	builtinStore, err := mcpConsumerAPI.NewBuiltinStore(storeAPI)
 	if err != nil {
 		return nil, err
 	}
 
-	serverResolver, err := mcpAggregate.NewArtifactServerResolver(storeAPI)
+	m, err := mcpConsumerAPI.NewMCPListService(roots, catalogStore)
+	if err != nil {
+		return nil, err
+	}
+
+	serverResolver, err := mcpAggregate.NewArtifactServerResolver(
+		managementStore,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -167,7 +182,10 @@ func InitMCPWrappers(
 		runtimeManager,
 		invocation.NewApprovalManager(5*time.Minute),
 	)
-	lifecycle, err := mcpAggregate.NewLifecycle(storeAPI, runtimeManager)
+	lifecycle, err := mcpAggregate.NewLifecycle(
+		storeAPI,
+		runtimeManager,
+	)
 	if err != nil {
 		return cleanup(err)
 	}
@@ -175,7 +193,7 @@ func InitMCPWrappers(
 		Lifecycle: lifecycle,
 		Servers:   serverResolver,
 		Source:    source,
-		Store:     storeAPI,
+		Store:     managementStore,
 		Auth:      authManager,
 		Secrets:   secrets,
 	})
@@ -183,7 +201,7 @@ func InitMCPWrappers(
 		return cleanup(err)
 	}
 
-	builtIns, err := NewMCPBuiltInInstaller(storeAPI, overlays)
+	builtIns, err := NewMCPBuiltInInstaller(builtinStore, overlays)
 	if err != nil {
 		return cleanup(err)
 	}

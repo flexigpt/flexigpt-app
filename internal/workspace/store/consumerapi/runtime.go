@@ -18,7 +18,7 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
-	value, err := a.ComposeWorkspacePromptForRuntime(
+	value, err := a.composeWorkspacePrompt(
 		ctx,
 		workspace,
 		artifacts,
@@ -29,7 +29,7 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	return projectWorkspacePromptPlan(value), nil
 }
 
-func (a *StoreAPI) ComposeWorkspacePromptForRuntime(
+func (a *StoreAPI) composeWorkspacePrompt(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
@@ -63,7 +63,7 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
-	value, err := a.LoadWorkspaceSkillsForRuntime(
+	value, err := a.loadWorkspaceSkills(
 		ctx,
 		workspace,
 		artifacts,
@@ -74,7 +74,7 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	return projectWorkspaceSkillLoadPlan(value), nil
 }
 
-func (a *StoreAPI) LoadWorkspaceSkillsForRuntime(
+func (a *StoreAPI) loadWorkspaceSkills(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,

@@ -27,12 +27,13 @@ import (
 )
 
 type StoreAPI struct {
-	roots     compositionapi.RootAPI
-	sources   compositionapi.SourceAPI
-	discovery compositionapi.DiscoveryAPI
-	artifacts compositionapi.ArtifactAPI
-	resources compositionapi.ResourceAPI
-	policy    defaultpolicy.Policy
+	roots            compositionapi.RootAPI
+	sources          compositionapi.SourceAPI
+	discovery        compositionapi.DiscoveryAPI
+	artifacts        compositionapi.ArtifactAPI
+	resources        compositionapi.ResourceAPI
+	workspaceSources workspaceSourceRegistry
+	policy           defaultpolicy.Policy
 
 	config        Config
 	promptAdapter *prompt.Adapter
@@ -65,14 +66,19 @@ func NewStoreAPI(
 		return nil, err
 	}
 
+	workspaceSources := newWorkspaceSourceRegistry(sources)
+	refreshCoordinator := newWorkspaceRefreshCoordinator(
+		sources, discovery, workspaceSources,
+	)
 	output := &StoreAPI{
-		roots:     roots,
-		sources:   sources,
-		discovery: discovery,
-		artifacts: artifacts,
-		resources: resources,
-		policy:    policy,
-		config:    config,
+		roots:            roots,
+		sources:          sources,
+		discovery:        discovery,
+		artifacts:        artifacts,
+		resources:        resources,
+		workspaceSources: workspaceSources,
+		policy:           policy,
+		config:           config,
 	}
 
 	promptAdapter, err := prompt.New(
@@ -116,7 +122,7 @@ func NewStoreAPI(
 			Locators:             locators,
 			FallbackProviders:    config.FallbackProviders,
 			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
-			Refresh:              output,
+			Refresh:              refreshCoordinator,
 			Limits:               config.ResolverLimits,
 		},
 	)
@@ -131,25 +137,6 @@ func NewStoreAPI(
 	return output, nil
 }
 
-// ResolveWorkspace is the runtime read boundary. It accepts only a currently
-// effective and enabled Workspace. Management projections use workspaceForRef.
-func (a *StoreAPI) ResolveWorkspace(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (workspaceDomain.Workspace, error) {
-	if err := ref.Validate(); err != nil {
-		return workspaceDomain.Workspace{}, err
-	}
-	value, err := a.workspaceForRef(ctx, ref)
-	if err != nil {
-		return workspaceDomain.Workspace{}, err
-	}
-	if err := a.requireEffectiveWorkspace(ctx, value); err != nil {
-		return workspaceDomain.Workspace{}, err
-	}
-	return value, nil
-}
-
 func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	ctx context.Context,
 	directory WorkspaceDirectoryRef,
@@ -157,7 +144,7 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	if err := directory.RootID.Validate(); err != nil {
 		return nil, err
 	}
-	values, err := a.requiredWorkspaceSources(ctx, directory.RootID)
+	values, err := a.workspaceSources.required(ctx, directory.RootID)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +197,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	if err := ref.Validate(); err != nil {
 		return WorkspaceArtifactView{}, err
 	}
-	values, err := a.requiredWorkspaceSources(ctx, directory.RootID)
+	values, err := a.workspaceSources.required(ctx, directory.RootID)
 	if err != nil {
 		return WorkspaceArtifactView{}, err
 	}
@@ -294,7 +281,7 @@ func (a *StoreAPI) RefreshWorkspaceDirectory(
 	if err := ref.RootID.Validate(); err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
-	values, err := a.requiredWorkspaceSources(ctx, ref.RootID)
+	values, err := a.workspaceSources.required(ctx, ref.RootID)
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
@@ -324,7 +311,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
 	if err := ref.RootID.Validate(); err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
-	values, err := a.requiredWorkspaceSources(ctx, ref.RootID)
+	values, err := a.workspaceSources.required(ctx, ref.RootID)
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
@@ -374,7 +361,7 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 	if err := ref.RootID.Validate(); err != nil {
 		return err
 	}
-	values, err := a.loadWorkspaceSources(ctx, ref.RootID)
+	values, err := a.workspaceSources.load(ctx, ref.RootID)
 	if err != nil {
 		return err
 	}
@@ -775,7 +762,7 @@ func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
-	values, err := a.requiredWorkspaceSources(ctx, rootID)
+	values, err := a.workspaceSources.required(ctx, rootID)
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}

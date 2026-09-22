@@ -104,13 +104,14 @@ type WorkspacePromptPlan struct {
 }
 
 type WorkspaceSkill struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64               `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
-	Name             string               `json:"name"`
-	DisplayName      string               `json:"displayName,omitempty"`
-	Locator          basespec.Locator     `json:"locator,omitempty"`
-	Version          string               `json:"version"`
+	Artifact         artifact.ArtifactRef     `json:"artifact"`
+	ArtifactRevision uint64                   `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
+	Name             string                   `json:"name"`
+	DisplayName      string                   `json:"displayName,omitempty"`
+	Insert           declaration.InsertTarget `json:"insert,omitempty"`
+	Locator          basespec.Locator         `json:"locator,omitempty"`
+	Version          string                   `json:"version"`
 }
 
 type WorkspaceSkillLoadPlan struct {

@@ -71,7 +71,7 @@ func New(
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		skillLocatorRuntime{api: output},
+		skillLocatorRuntime{artifacts: artifacts},
 	)
 	if err != nil {
 		return nil, err
@@ -189,16 +189,6 @@ func (a *API) RefreshSkillSource(
 	}
 	_, err := a.discovery.RefreshSource(ctx, rootID, sourceID)
 	return err
-}
-
-func (a *API) EnsureSkillBaselineCollection(
-	ctx context.Context,
-	rootID root.RootID,
-) (collection.CollectionView, error) {
-	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
-	}
-	return a.collections.EnsureBaseline(ctx, rootID)
 }
 
 func (a *API) ListSkills(
@@ -782,7 +772,29 @@ func (a *API) PurgeSkill(
 	)
 }
 
-func (a *API) EnsureBuiltInSkillSourceCurrent(
+// ResolveSkillCapabilities resolves a Skill and preserves mapped Tool
+// fallback occurrences from Skill.allowedTools.
+func (a *API) ResolveSkillCapabilities(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.CapabilityPlan, error) {
+	if a == nil || a.declarationResolver == nil {
+		return resolve.CapabilityPlan{}, basespec.ErrClosed
+	}
+	return a.declarationResolver.ResolveSkillCapabilities(ctx, ref)
+}
+
+func (a *API) ensureSkillBaselineCollection(
+	ctx context.Context,
+	rootID root.RootID,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.EnsureBaseline(ctx, rootID)
+}
+
+func (a *API) ensureBuiltInSkillSourceCurrent(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
@@ -800,30 +812,6 @@ func (a *API) EnsureBuiltInSkillSourceCurrent(
 		rootID,
 		sourceID,
 	)
-}
-
-// ResolveArtifactCapabilities returns the complete capability tree for any
-// declaration Artifact visible through the Skill consumer.
-func (a *API) ResolveArtifactCapabilities(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
-	}
-	return a.declarationResolver.ResolveCapabilities(ctx, ref)
-}
-
-// ResolveSkillCapabilities resolves a Skill and preserves mapped Tool
-// fallback occurrences from Skill.allowedTools.
-func (a *API) ResolveSkillCapabilities(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
-	}
-	return a.declarationResolver.ResolveSkillCapabilities(ctx, ref)
 }
 
 func (a *API) requireMutable(

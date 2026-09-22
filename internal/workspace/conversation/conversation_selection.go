@@ -6,15 +6,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/agentskills-go/document"
-
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
+	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -115,19 +113,19 @@ type WorkspaceSource interface {
 	ResolveWorkspace(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
-	) (workspaceDomain.Workspace, error)
+	) (workspaceDomain.WorkspaceView, error)
 
-	ComposeWorkspacePromptForRuntime(
+	ComposeWorkspacePrompt(
 		ctx context.Context,
 		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
-	) (prompt.Plan, error)
+	) (workspaceConsumerAPI.WorkspacePromptPlan, error)
 
-	LoadWorkspaceSkillsForRuntime(
+	LoadWorkspaceSkills(
 		ctx context.Context,
 		workspace artifact.ArtifactRef,
 		artifacts []artifact.ArtifactRef,
-	) (skill.LoadPlan, error)
+	) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error)
 }
 
 type ConversationResolver struct {
@@ -191,7 +189,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 	instructions := ""
 	userMessage := ""
 	if len(contextRefs) != 0 {
-		plan, composeErr := r.workspaceAPI.ComposeWorkspacePromptForRuntime(
+		plan, composeErr := r.workspaceAPI.ComposeWorkspacePrompt(
 			ctx,
 			selection.Workspace,
 			contextRefs,
@@ -226,7 +224,7 @@ func (r *ConversationResolver) ResolveConversationSelection(
 		}, err
 	}
 	if len(skillRefs) != 0 {
-		plan, loadErr := r.workspaceAPI.LoadWorkspaceSkillsForRuntime(
+		plan, loadErr := r.workspaceAPI.LoadWorkspaceSkills(
 			ctx,
 			selection.Workspace,
 			skillRefs,
@@ -324,7 +322,7 @@ func initializeSkillUsage(
 func applyContextPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
-	plan prompt.Plan,
+	plan workspaceConsumerAPI.WorkspacePromptPlan,
 	index map[artifact.ArtifactRef]int,
 ) {
 	usage.Diagnostics = diagnostic.Append(
@@ -373,7 +371,7 @@ func applyContextPlan(
 func applySkillPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
-	plan skill.LoadPlan,
+	plan workspaceConsumerAPI.WorkspaceSkillLoadPlan,
 	index map[artifact.ArtifactRef]int,
 ) {
 	for _, skill := range plan.Skills {
@@ -382,8 +380,8 @@ func applySkillPlan(
 			continue
 		}
 		current := &usage.Skills[position]
-		current.Name = skill.Document.Name
-		current.DisplayName = skill.Document.DisplayName
+		current.Name = skill.Name
+		current.DisplayName = skill.DisplayName
 		current.Locator = skill.Locator
 		current.UsedDefinitionDigest = skill.DefinitionDigest
 		current.UsedArtifactRevision = skill.ArtifactRevision
@@ -395,7 +393,7 @@ func applySkillPlan(
 			selection.SkillRefs[position].Locator,
 			current.Locator,
 		)
-		if skill.Document.Insert != document.SkillInsertInstructions {
+		if skill.Insert != declaration.InsertInstructions {
 			current.Diagnostics = diagnostic.Append(
 				current.Diagnostics,
 				conversationDiagnostic(

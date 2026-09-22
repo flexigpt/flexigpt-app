@@ -291,8 +291,6 @@ export interface ISkillStoreAPI {
 
 	removeSkillCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
 
-	resolveSkillArtifactCapabilities(skill: ArtifactRef): Promise<CapabilityPlan>;
-
 	resolveSkillCapabilities(skill: ArtifactRef): Promise<CapabilityPlan>;
 
 	resolveSkillCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;

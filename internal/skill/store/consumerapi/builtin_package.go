@@ -21,7 +21,7 @@ import (
 //
 // Collection membership remains external. Each Skill originates at its own
 // SKILL.md source entry and is not a collection subresource Artifact.
-func (a *API) InstallBuiltInSkillPackage(
+func (a *API) installBuiltInSkillPackage(
 	ctx context.Context,
 	request BuiltInSkillPackageInstallRequest,
 ) ([]artifact.Artifact, error) {
@@ -169,7 +169,7 @@ func (a *API) InstallBuiltInSkillPackage(
 	return output, nil
 }
 
-func (a *API) RemoveBuiltInSkillPackage(
+func (a *API) removeBuiltInSkillPackage(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
