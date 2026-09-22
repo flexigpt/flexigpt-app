@@ -316,7 +316,7 @@ func (a *API) PreviewAgentImport(
 		})
 	}
 
-	member, restored, membershipConflicts, err := a.analyzeAgentImportMembership(
+	restored, membershipConflicts, err := a.analyzeAgentImportMembership(
 		ctx,
 		destination.value.Collection,
 		rootDefinition.LogicalName,
@@ -325,7 +325,6 @@ func (a *API) PreviewAgentImport(
 	if err != nil {
 		return preview, err
 	}
-	_ = member
 	preview.RestoredMemberships = append(
 		preview.RestoredMemberships,
 		restored...,
@@ -790,20 +789,18 @@ func (a *API) analyzeAgentImportMembership(
 	name basespec.LogicalName,
 	agentLocator basespec.Locator,
 ) (
-	collection.MemberReference,
 	[]AgentRestoredMembership,
 	[]AgentImportConflict,
 	error,
 ) {
-	expected, err := a.collections.MemberForCollectionSource(
+	if _, err := a.collections.MemberForCollectionSource(
 		ctx,
 		selected.Artifact.Ref(),
 		declaration.TypeAgent,
 		name,
 		agentLocator,
-	)
-	if err != nil {
-		return collection.MemberReference{}, nil, nil, err
+	); err != nil {
+		return nil, nil, err
 	}
 
 	conflicts := make([]AgentImportConflict, 0)
@@ -854,7 +851,7 @@ func (a *API) analyzeAgentImportMembership(
 		selected.Artifact.RootID,
 	)
 	if err != nil {
-		return collection.MemberReference{}, nil, nil, err
+		return nil, nil, err
 	}
 	for _, value := range collections {
 		if value.Artifact.Ref() == selected.Artifact.Ref() {
@@ -878,7 +875,7 @@ func (a *API) analyzeAgentImportMembership(
 		}
 	}
 
-	return expected, restored, conflicts, nil
+	return restored, conflicts, nil
 }
 
 func memberTargetsAgentLocator(
@@ -1108,9 +1105,11 @@ func (a *API) preflightNamedManagedDependency(
 					err
 			}
 			value := importMCPSetupDescriptor(
-				memberPath,
 				&ref,
-				agentDomainMCPSetupDescriptor(document),
+				agentDomain.MCPSetupDescriptorForDocument(
+					memberPath,
+					document,
+				),
 			)
 			setup = &value
 		}
@@ -1365,7 +1364,6 @@ func importMCPSetupDescriptors(
 	output := make([]AgentMCPSetupDescriptor, 0, len(values))
 	for _, value := range values {
 		output = append(output, importMCPSetupDescriptor(
-			value.OccurrencePath,
 			nil,
 			value,
 		))
@@ -1373,49 +1371,12 @@ func importMCPSetupDescriptors(
 	return output
 }
 
-func agentDomainMCPSetupDescriptor(
-	document mcpv1.MCPDocument,
-) agentDomain.ManagedMCPSetupDescriptor {
-	output := agentDomain.ManagedMCPSetupDescriptor{
-		Name:      basespec.LogicalName(document.Name),
-		Transport: string(document.Transport),
-		Command:   document.Command,
-		URL:       document.URL,
-	}
-	if document.Auth != nil {
-		output.AuthMode = string(document.Auth.Mode)
-	}
-	if document.Install == nil {
-		return output
-	}
-
-	names := make([]string, 0, len(document.Install.Inputs))
-	for name := range document.Install.Inputs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	for _, name := range names {
-		input := document.Install.Inputs[name]
-		output.Inputs = append(output.Inputs, agentDomain.ManagedMCPSetupInput{
-			Name:                 name,
-			Kind:                 input.Kind,
-			Label:                input.Label,
-			Description:          input.Description,
-			Required:             input.Required != nil && *input.Required,
-			ClientSecretRequired: input.ClientSecretRequired != nil && *input.ClientSecretRequired,
-		})
-	}
-	return output
-}
-
 func importMCPSetupDescriptor(
-	occurrencePath string,
 	artifactRef *artifact.ArtifactRef,
 	value agentDomain.ManagedMCPSetupDescriptor,
 ) AgentMCPSetupDescriptor {
 	output := AgentMCPSetupDescriptor{
-		OccurrencePath: occurrencePath,
+		OccurrencePath: value.OccurrencePath,
 		Name:           value.Name,
 		Transport:      value.Transport,
 		Command:        value.Command,

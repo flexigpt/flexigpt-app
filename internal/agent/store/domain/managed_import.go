@@ -113,11 +113,10 @@ func ValidateManagedAgentImport(
 		)
 	}
 
-	for index, member := range document.Members {
+	for _, member := range document.Members {
 		if err := validateManagedAgentMember(
 			&output,
 			member,
-			index,
 		); err != nil {
 			return ManagedAgentImportAdmission{}, err
 		}
@@ -128,7 +127,6 @@ func ValidateManagedAgentImport(
 func validateManagedAgentMember(
 	output *ManagedAgentImportAdmission,
 	member declaration.Entry,
-	index int,
 ) error {
 	form, err := member.MemberForm()
 	if err != nil {
@@ -271,7 +269,7 @@ func validateManagedAgentMember(
 
 			output.MCPSetupDescriptors = append(
 				output.MCPSetupDescriptors,
-				mcpSetupDescriptor(memberPath, document),
+				MCPSetupDescriptorForDocument(memberPath, document),
 			)
 			validateInlineMCPCredentialPlacement(
 				output,
@@ -354,12 +352,15 @@ func validateManagedBuiltinReference(
 	)
 }
 
-func mcpSetupDescriptor(
-	path string,
+// MCPSetupDescriptorForDocument projects declaration-owned MCP setup metadata.
+// It deliberately contains no installation values, secret references, OAuth
+// state, selected profile, or runtime connection state.
+func MCPSetupDescriptorForDocument(
+	occurrencePath string,
 	document mcpv1.MCPDocument,
 ) ManagedMCPSetupDescriptor {
 	output := ManagedMCPSetupDescriptor{
-		OccurrencePath: path,
+		OccurrencePath: occurrencePath,
 		Name:           basespec.LogicalName(document.Name),
 		Transport:      string(document.Transport),
 		Command:        document.Command,

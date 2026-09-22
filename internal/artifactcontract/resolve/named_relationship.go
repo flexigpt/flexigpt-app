@@ -106,21 +106,3 @@ func (r *Resolver) ResolveNamedRelationship(
 	}
 	return output, nil
 }
-
-type FallbackCatalogRequest struct {
-	RootID root.RootID
-	Type   declaration.Type
-	Scope  declaration.LookupScope
-}
-
-// FallbackCatalogProvider is optional. Exact-name fallback resolution does not
-// require catalog support. This interface exists only for bounded management
-// reference catalogs.
-type FallbackCatalogProvider interface {
-	FallbackProvider
-
-	ListFallbackCatalog(
-		ctx context.Context,
-		request FallbackCatalogRequest,
-	) ([]MappedTarget, error)
-}

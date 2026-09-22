@@ -160,19 +160,3 @@ type AgentExportResult struct {
 	Resolution          resolve.CapabilityPlan    `json:"resolution"`
 	MCPSetupDescriptors []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors,omitempty"`
 }
-
-type AgentImportReferenceCatalogItem struct {
-	Type        declaration.Type     `json:"type"`
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName,omitempty"`
-	Description string               `json:"description,omitempty"`
-
-	BuiltIn bool `json:"builtIn"`
-	Mapped  bool `json:"mapped"`
-
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Target   *resolve.MappedTarget `json:"target,omitempty"`
-
-	SupportedRelationshipFields []string `json:"supportedRelationshipFields,omitempty"`
-	YAMLSnippet                 string   `json:"yamlSnippet"`
-}

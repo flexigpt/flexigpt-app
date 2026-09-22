@@ -1,4 +1,4 @@
-package resolve
+package signer
 
 import (
 	"encoding/base64"
@@ -10,13 +10,15 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
+const hmacSHA256SignatureBytes = 32
+
 type Sealed struct {
 	Envelope    string
 	Fingerprint cryptoutil.Digest
 }
 
-// Signer authenticates client-carried prepared import data. It is deliberately
-// process-local. Restarting the application invalidates outstanding envelopes.
+// Signer authenticates client-carried prepared import payloads. It is
+// process-local by design. Application restart invalidates pending envelopes.
 type Signer struct {
 	key []byte
 }
@@ -42,10 +44,6 @@ func NewSigner(
 	}, nil
 }
 
-// Seal canonicalizes one object, calculates its public fingerprint, and signs
-// its canonical bytes. The encoded payload is intentionally not encrypted:
-// declaration content is not secret and secret values are forbidden from the
-// prepared import plan.
 func (s *Signer) Seal(
 	value any,
 ) (Sealed, error) {
@@ -73,8 +71,6 @@ func (s *Signer) Seal(
 	}, nil
 }
 
-// Open verifies the envelope and expected public fingerprint before exact
-// canonical JSON decoding into target.
 func (s *Signer) Open(
 	envelope string,
 	expected cryptoutil.Digest,
@@ -100,6 +96,22 @@ func (s *Signer) Open(
 	if !found || payloadEncoded == "" || signatureEncoded == "" {
 		return "", fmt.Errorf(
 			"%w: prepared import envelope is malformed",
+			basespec.ErrInvalid,
+		)
+	}
+	if base64.RawURLEncoding.DecodedLen(
+		len(payloadEncoded),
+	) > basespec.MaxDefinitionBytes {
+		return "", fmt.Errorf(
+			"%w: prepared import payload exceeds maximum size",
+			basespec.ErrInvalid,
+		)
+	}
+	if base64.RawURLEncoding.DecodedLen(
+		len(signatureEncoded),
+	) != hmacSHA256SignatureBytes {
+		return "", fmt.Errorf(
+			"%w: prepared import signature has invalid size",
 			basespec.ErrInvalid,
 		)
 	}
@@ -134,7 +146,7 @@ func (s *Signer) Open(
 	if !valid {
 		return "", fmt.Errorf(
 			"%w: prepared import signature is invalid",
-			basespec.ErrProtected,
+			basespec.ErrInvalid,
 		)
 	}
 

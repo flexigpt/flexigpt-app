@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -31,13 +32,13 @@ type API struct {
 	fallbackProviders   map[declaration.Type]resolve.FallbackProvider
 
 	managedAgentProfile *declaration.ManagedProfilePolicy
-	importSigner        *resolve.Signer
+	importSigner        *signer.Signer
 }
 
 type apiOptions struct {
 	locatorResolvers  []providerapi.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
-	importSigner      *resolve.Signer
+	importSigner      *signer.Signer
 }
 
 type Option func(*apiOptions)
@@ -71,7 +72,7 @@ func WithFallbackProviders(
 }
 
 func WithManagedAgentImportSigner(
-	value *resolve.Signer,
+	value *signer.Signer,
 ) Option {
 	return func(options *apiOptions) {
 		options.importSigner = value
@@ -121,7 +122,7 @@ func New(
 
 	importSigner := config.importSigner
 	if importSigner == nil {
-		importSigner, err = resolve.NewSigner(nil)
+		importSigner, err = signer.NewSigner(nil)
 		if err != nil {
 			return nil, err
 		}

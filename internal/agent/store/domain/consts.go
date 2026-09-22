@@ -57,8 +57,6 @@ func AgentCollectionDomainPolicy() collection.DomainPolicy {
 		},
 		AllowedMemberForms: []declaration.MemberForm{
 			declaration.MemberNamed,
-			declaration.MemberContained,
-			declaration.MemberSelector,
 		},
 	}
 }
