@@ -38,6 +38,14 @@ type verificationSession struct {
 	closed  bool
 }
 
+// borrowedVerificationSession is returned for a nested request using the
+// same Service. The outer session owns confirmation and snapshot closure.
+type borrowedVerificationSession struct{}
+
+func (borrowedVerificationSession) Close(context.Context) error {
+	return nil
+}
+
 // BeginVerificationSession creates a request-scoped session that reuses one
 // confirmed Source snapshot per Root/Source pair. It is intentionally exposed
 // as an optional capability: old ResourceReader test doubles remain valid and
@@ -51,11 +59,17 @@ func (s *Service) BeginVerificationSession(
 	if s == nil {
 		return nil, nil, basespec.ErrClosed
 	}
-	if verificationSessionFromContext(ctx) != nil {
-		return nil, nil, fmt.Errorf(
-			"%w: resource verification session already exists",
-			basespec.ErrInvalid,
-		)
+	if existing := verificationSessionFromContext(ctx); existing != nil {
+		if existing.service != s {
+			return nil, nil, fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				basespec.ErrInvalid,
+			)
+		}
+
+		// Reuse the outer session. Closing this borrowed lease is deliberately
+		// a no-op, so the outer caller remains responsible for confirmation.
+		return ctx, borrowedVerificationSession{}, nil
 	}
 
 	session := &verificationSession{

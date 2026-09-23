@@ -4,7 +4,6 @@ package materialize
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 
@@ -15,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
@@ -43,13 +43,6 @@ type ResourceReader interface {
 	) (string, error)
 }
 
-// VerificationSessionFactory is optional. Production Artifact Store resources
-// implement it, while existing unit-test ResourceReader doubles can continue
-// to implement only ResourceReader.
-type VerificationSessionFactory interface {
-	BeginVerificationSession(ctx context.Context) (context.Context, resource.VerificationSession, error)
-}
-
 // ResolvedSkill is verified Skill package material. It contains no session,
 // Workspace, catalog, or execution state.
 type ResolvedSkill struct {
@@ -64,14 +57,13 @@ type ResolvedSkill struct {
 	VersionDigest   cryptoutil.Digest
 }
 
-// ResolveAll materializes a set of Skills inside one request-scoped source
-// verification session. Each physical Source is inspected, opened, and
-// confirmed once rather than once per Skill.
+// ResolveAll materializes all records under one shared Artifact Store source
+// verification session when the supplied ResourceReader supports one.
 func ResolveAll(
 	ctx context.Context,
 	resources ResourceReader,
 	records []artifact.Artifact,
-) (output []ResolvedSkill, returnErr error) {
+) ([]ResolvedSkill, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill batch materialization context is nil",
@@ -91,30 +83,25 @@ func ResolveAll(
 		return []ResolvedSkill{}, nil
 	}
 
-	requestCtx := ctx
-	if factory, supported := resources.(VerificationSessionFactory); supported {
-		sessionCtx, session, err := factory.BeginVerificationSession(ctx)
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			returnErr = errors.Join(
-				returnErr,
-				session.Close(context.WithoutCancel(sessionCtx)),
-			)
-		}()
-		requestCtx = sessionCtx
-	}
-
-	output = make([]ResolvedSkill, 0, len(records))
-	for _, record := range records {
-		value, err := Resolve(requestCtx, resources, record)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
-	}
-	return output, nil
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		resources,
+		func(sessionCtx context.Context) ([]ResolvedSkill, error) {
+			output := make([]ResolvedSkill, 0, len(records))
+			for _, record := range records {
+				value, err := Resolve(
+					sessionCtx,
+					resources,
+					record,
+				)
+				if err != nil {
+					return nil, err
+				}
+				output = append(output, value)
+			}
+			return output, nil
+		},
+	)
 }
 
 func Resolve(

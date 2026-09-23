@@ -618,6 +618,22 @@ func (a *API) GetManagedSkillDocument(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (skillDomain.ManagedSkillDocument, error) {
+	if a == nil || a.resources == nil {
+		return skillDomain.ManagedSkillDocument{}, basespec.ErrClosed
+	}
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (skillDomain.ManagedSkillDocument, error) {
+			return a.getManagedSkillDocument(sessionCtx, ref)
+		},
+	)
+}
+
+func (a *API) getManagedSkillDocument(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (skillDomain.ManagedSkillDocument, error) {
 	value, err := a.GetSkill(ctx, ref)
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err
@@ -783,10 +799,21 @@ func (a *API) ResolveSkillCapabilities(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (resolve.CapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
+	if a == nil ||
+		a.resources == nil ||
+		a.declarationResolver == nil {
 		return resolve.CapabilityPlan{}, basespec.ErrClosed
 	}
-	return a.declarationResolver.ResolveSkillCapabilities(ctx, ref)
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (resolve.CapabilityPlan, error) {
+			return a.declarationResolver.ResolveSkillCapabilities(
+				sessionCtx,
+				ref,
+			)
+		},
+	)
 }
 
 func (a *API) ensureSkillBaselineCollection(

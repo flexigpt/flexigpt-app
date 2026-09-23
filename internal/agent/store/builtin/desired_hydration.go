@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -141,28 +142,24 @@ func (i *Installer) FinalizeHydration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if err := i.agents.EnsureBuiltInAgentSourceCurrent(
-		ctx,
-		i.rootID,
-		i.sourceID,
-	); err != nil {
-		return err
+	if len(i.prepared) == 0 {
+		return i.agents.EnsureBuiltInAgentSourceCurrent(
+			ctx,
+			i.rootID,
+			i.sourceID,
+		)
 	}
 
+	requests := make(
+		[]agentConsumerAPI.BuiltInAgentPackageInstallRequest,
+		0,
+		len(i.prepared),
+	)
 	for _, value := range i.prepared {
-		if err := i.agents.ValidateBuiltInAgentPackage(
-			ctx,
-			value.installRequest(
-				i.rootID,
-				i.sourceID,
-			),
-		); err != nil {
-			return fmt.Errorf(
-				"validate built-in Agent package %q: %w",
-				value.EmbeddedPackageRoot,
-				err,
-			)
-		}
+		requests = append(requests, value.installRequest(
+			i.rootID,
+			i.sourceID,
+		))
 	}
-	return nil
+	return i.agents.ValidateBuiltInAgentPackages(ctx, requests)
 }

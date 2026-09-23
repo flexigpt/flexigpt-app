@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
@@ -27,7 +28,13 @@ import (
 type SkillStoreWrapper struct {
 	api   *skillConsumerAPI.API
 	roots compositionapi.RootAPI
+
+	catalogWarmupMu     sync.Mutex
+	catalogWarmupCancel context.CancelFunc
+	catalogWarmupDone   chan struct{}
 }
+
+const skillCatalogWarmupStopTimeout = 10 * time.Second
 
 func NewSkillBuiltInInstaller(
 	skills skillConsumerAPI.BuiltinStore,
@@ -411,39 +418,32 @@ func (w *SkillStoreWrapper) DeleteSkillCollection(
 	})
 }
 
-func (w *SkillStoreWrapper) close() {
-	if w == nil {
+// startBuiltinCatalogWarmup starts only runtime catalog preparation. Protected
+// topology hydration remains synchronous and must complete before this method
+// is called.
+func (w *SkillStoreWrapper) startBuiltinCatalogWarmup(
+	syncRoot func(context.Context, root.RootID) error,
+) {
+	if w == nil || syncRoot == nil {
 		return
 	}
-	w.api = nil
-	w.roots = nil
-}
 
-// startSkillCatalogWarmup runs only after protected topology hydration has
-// completed. It must not replace synchronous topology hydration because the
-// UI and other services require the protected Root and Source to exist.
-func (a *App) startSkillCatalogWarmup() {
-	if a == nil ||
-		a.skillAggregateAPI == nil ||
-		a.skillAggregateAPI.service == nil ||
-		a.skillCatalogWarmupCancel != nil {
+	w.catalogWarmupMu.Lock()
+	if w.catalogWarmupCancel != nil {
+		w.catalogWarmupMu.Unlock()
 		return
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
-	service := a.skillAggregateAPI.service
-
-	a.skillCatalogWarmupCancel = cancel
-	a.skillCatalogWarmupDone = done
+	w.catalogWarmupCancel = cancel
+	w.catalogWarmupDone = done
+	w.catalogWarmupMu.Unlock()
 
 	go func() {
 		defer close(done)
 
-		err := service.SyncRootCatalog(
-			ctx,
-			documentTopology.BuiltinRootID(),
-		)
+		err := syncRoot(ctx, documentTopology.BuiltinRootID())
 		if err != nil && ctx.Err() == nil {
 			slog.Warn(
 				"warm built-in Skill runtime catalog",
@@ -454,11 +454,17 @@ func (a *App) startSkillCatalogWarmup() {
 	}()
 }
 
-func (a *App) stopSkillCatalogWarmup() {
-	cancel := a.skillCatalogWarmupCancel
-	done := a.skillCatalogWarmupDone
-	a.skillCatalogWarmupCancel = nil
-	a.skillCatalogWarmupDone = nil
+func (w *SkillStoreWrapper) stopBuiltinCatalogWarmup() {
+	if w == nil {
+		return
+	}
+
+	w.catalogWarmupMu.Lock()
+	cancel := w.catalogWarmupCancel
+	done := w.catalogWarmupDone
+	w.catalogWarmupCancel = nil
+	w.catalogWarmupDone = nil
+	w.catalogWarmupMu.Unlock()
 
 	if cancel == nil {
 		return
@@ -470,7 +476,16 @@ func (a *App) stopSkillCatalogWarmup() {
 
 	select {
 	case <-done:
-	case <-time.After(2 * time.Second):
+	case <-time.After(skillCatalogWarmupStopTimeout):
 		slog.Warn("skill runtime catalog warmup did not stop before shutdown")
 	}
+}
+
+func (w *SkillStoreWrapper) close() {
+	if w == nil {
+		return
+	}
+	w.stopBuiltinCatalogWarmup()
+	w.api = nil
+	w.roots = nil
 }

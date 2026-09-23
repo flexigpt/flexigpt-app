@@ -19,6 +19,11 @@ type BuiltinStore interface {
 		request BuiltInAgentPackageInstallRequest,
 	) ([]artifact.Artifact, error)
 
+	ValidateBuiltInAgentPackages(
+		ctx context.Context,
+		requests []BuiltInAgentPackageInstallRequest,
+	) error
+
 	ValidateBuiltInAgentPackage(
 		ctx context.Context,
 		request BuiltInAgentPackageInstallRequest,
@@ -69,6 +74,19 @@ func (s *builtinStore) InstallBuiltInAgentPackage(
 		return nil, basespec.ErrClosed
 	}
 	return s.api.installBuiltInAgentPackage(ctx, request)
+}
+
+func (s *builtinStore) ValidateBuiltInAgentPackages(
+	ctx context.Context,
+	requests []BuiltInAgentPackageInstallRequest,
+) error {
+	if s == nil || s.api == nil {
+		return basespec.ErrClosed
+	}
+	return s.api.validateBuiltInAgentPackages(
+		ctx,
+		requests,
+	)
 }
 
 func (s *builtinStore) ValidateBuiltInAgentPackage(

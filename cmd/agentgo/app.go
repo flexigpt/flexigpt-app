@@ -27,9 +27,6 @@ const (
 type App struct {
 	ctx context.Context
 
-	skillCatalogWarmupCancel context.CancelFunc
-	skillCatalogWarmupDone   chan struct{}
-
 	settingStoreAPI       *SettingStoreWrapper
 	conversationStoreAPI  *ConversationCollectionWrapper
 	modelPresetStoreAPI   *ModelPresetStoreWrapper
@@ -559,6 +556,14 @@ func (a *App) initManagers() {
 	}
 
 	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
+
+	if a.skillStoreAPI != nil &&
+		a.skillAggregateAPI != nil &&
+		a.skillAggregateAPI.service != nil {
+		a.skillStoreAPI.startBuiltinCatalogWarmup(
+			a.skillAggregateAPI.service.SyncRootCatalog,
+		)
+	}
 }
 
 // startup is called at application startup.
@@ -566,8 +571,6 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
 
 	SetWrappedProviderAppContext(a.aggregateAPI, a.ctx)
-
-	a.startSkillCatalogWarmup()
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)
@@ -587,8 +590,9 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 
 // shutdown is called at application termination.
 func (a *App) shutdown(ctx context.Context) { //nolint:all
-	a.stopSkillCatalogWarmup()
-
+	if a.skillStoreAPI != nil {
+		a.skillStoreAPI.stopBuiltinCatalogWarmup()
+	}
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
 	if a.mcpAggregateAPI != nil {

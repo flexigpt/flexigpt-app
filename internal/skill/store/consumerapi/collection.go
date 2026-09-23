@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -23,10 +24,21 @@ func (a *API) ResolveSkillCollection(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
-	if a == nil || a.collections == nil {
+	if a == nil ||
+		a.resources == nil ||
+		a.collections == nil {
 		return collection.CollectionCapabilityPlan{}, basespec.ErrClosed
 	}
-	return a.collections.ResolveCapabilities(ctx, ref)
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (collection.CollectionCapabilityPlan, error) {
+			return a.collections.ResolveCapabilities(
+				sessionCtx,
+				ref,
+			)
+		},
+	)
 }
 
 func (a *API) GetSkillCollection(

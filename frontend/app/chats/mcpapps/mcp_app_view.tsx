@@ -25,6 +25,7 @@ import { MCPAppRPCRouter } from '@/chats/mcpapps/mcp_app_rpc_router';
 import { MCPAppSandbox } from '@/chats/mcpapps/mcp_app_sandbox';
 
 const APP_MIME = MCP_APP_HTML_MIME_TYPE;
+const NORMALIZED_APP_MIME = APP_MIME.toLowerCase().replaceAll(/\s/g, '');
 const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
 	enabled: false,
 	allowAppInitiatedToolCalls: false,
@@ -32,12 +33,14 @@ const UNKNOWN_APP_POLICY: MCPAppsPolicy = {
 	requireApprovalForContextUpdates: true,
 };
 
+const DEFAULT_APP_HEIGHT = 480;
 const MIN_APP_HEIGHT = 160;
 const MAX_APP_HEIGHT = 1200;
+const MAX_APPROVAL_PREVIEW_LENGTH = 4000;
+const MAX_EXTERNAL_URL_LENGTH = 8192;
 
 interface LoadedMCPAppResource {
 	html: string;
-	mimeType: string;
 	meta?: MCPAppUIResourceMeta;
 }
 interface MCPAppViewProps {
@@ -47,21 +50,32 @@ interface MCPAppViewProps {
 	height?: number;
 }
 
+interface BlockedExternalLink {
+	url: string;
+	reason: 'unsafe' | 'open-failed';
+}
+
 function isAppMime(mime?: string): boolean {
 	if (!mime) {
 		return false;
 	}
 	const norm = mime.toLowerCase().replaceAll(/\s/g, '');
-	return norm === APP_MIME || norm.startsWith(`${APP_MIME};`);
+	return norm === NORMALIZED_APP_MIME || norm.startsWith(`${NORMALIZED_APP_MIME};`);
 }
 
 function decodeMCPBlob(blob: string | number[] | undefined): string {
-	if (!blob) {
+	if (blob === undefined || (typeof blob === 'string' && blob.length === 0)) {
 		return '';
 	}
 	if (typeof blob === 'string') {
 		try {
-			return atob(blob);
+			const binary = atob(blob);
+			const bytes = new Uint8Array(binary.length);
+			for (let i = 0; i < binary.length; i += 1) {
+				// oxlint-disable-next-line unicorn/prefer-code-point
+				bytes[i] = binary.charCodeAt(i);
+			}
+			return new TextDecoder().decode(bytes);
 		} catch {
 			return '';
 		}
@@ -85,13 +99,13 @@ function extractAppHTML(contents?: MCPContent[]): LoadedMCPAppResource | null {
 		if (!isAppMime(res.mimeType)) {
 			continue;
 		}
-		const html = typeof res.text === 'string' && res.text.length > 0 ? res.text : decodeMCPBlob(res.blob);
+		const text = typeof res.text === 'string' ? res.text : '';
+		const html = text.trim() ? text : decodeMCPBlob(res.blob);
 		if (!html.trim()) {
 			continue;
 		}
 		return {
 			html,
-			mimeType: res.mimeType ?? APP_MIME,
 			meta: getMCPAppUIResourceMeta(res),
 		};
 	}
@@ -113,13 +127,67 @@ function parseToolInput(raw: unknown): unknown {
 	}
 }
 
-function isSafeExternalURL(raw: string): boolean {
+function normalizeSafeExternalURL(raw: string): string | null {
+	if (!raw || raw.length > MAX_EXTERNAL_URL_LENGTH) {
+		return null;
+	}
 	try {
 		const url = new URL(raw);
-		return url.protocol === 'http:' || url.protocol === 'https:';
+		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+			return null;
+		}
+		if (url.username || url.password) {
+			return null;
+		}
+		return url.href;
 	} catch {
-		return false;
+		return null;
 	}
+}
+
+function clampAppHeight(value: number): number {
+	if (!Number.isFinite(value)) {
+		return DEFAULT_APP_HEIGHT;
+	}
+	return Math.max(MIN_APP_HEIGHT, Math.min(MAX_APP_HEIGHT, Math.round(value)));
+}
+
+function truncateForDisplay(value: string, maximumLength = MAX_APPROVAL_PREVIEW_LENGTH): string {
+	if (value.length <= maximumLength) {
+		return value;
+	}
+	return `${value.slice(0, maximumLength)}\n[Preview truncated]`;
+}
+
+function formatApprovalPreview(value: unknown): string {
+	try {
+		const serialized = typeof value === 'string' ? value : (JSON.stringify(value, null, 2) ?? String(value));
+		return truncateForDisplay(serialized);
+	} catch {
+		return '[Preview unavailable]';
+	}
+}
+
+function disposeMCPAppBridge(bridge: MCPAppPostMessageBridge, resourceUri: string, reason: string): void {
+	try {
+		void bridge.sendRequest('ui/resource-teardown', { resourceUri, reason }, 500).catch(() => undefined);
+	} catch {
+		// The bridge may already be disconnected.
+	}
+
+	// Posting the teardown request is synchronous. Dispose immediately so the
+	// unmounted view cannot continue handling incoming messages for 500 ms.
+	bridge.dispose();
+}
+
+function getMCPAppViewKey(instance: MCPAppInstance): string {
+	return JSON.stringify([
+		instance.instanceID,
+		instance.server,
+		instance.resourceUri,
+		instance.toolName,
+		instance.toolUseID,
+	]);
 }
 
 function buildToolResultNotificationParams(
@@ -186,38 +254,55 @@ function buildToolInputNotificationParams(
 	return params;
 }
 
-export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MCPAppViewProps) {
+export function MCPAppView(props: MCPAppViewProps) {
+	return <MCPAppViewContent key={getMCPAppViewKey(props.instance)} {...props} />;
+}
+
+function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_APP_HEIGHT }: MCPAppViewProps) {
 	const [loadedResource, setLoadedResource] = useState<LoadedMCPAppResource | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [pendingURL, setPendingURL] = useState<string | null>(null);
 	const [pendingUIMessage, setPendingUIMessage] = useState<MCPAppUIMessage | null>(null);
 	const [pendingContextUpdate, setPendingContextUpdate] = useState<MCPAppModelContextUpdatePayload | null>(null);
 	const [serverArtifact, setServerArtifact] = useState<ArtifactRef | null>(null);
-	const [blockedURL, setBlockedURL] = useState<string | null>(null);
-	const [viewInitialized, setViewInitialized] = useState(false);
+	const [blockedLink, setBlockedLink] = useState<BlockedExternalLink | null>(null);
+	const [initializedBridgeVersion, setInitializedBridgeVersion] = useState(0);
 	const [appsPolicy, setAppsPolicy] = useState<MCPAppsPolicy | null>(null);
 	const [policyError, setPolicyError] = useState<string | null>(null);
-	const [frameHeight, setFrameHeight] = useState(height);
+	const [appRequestedHeight, setAppRequestedHeight] = useState<number | null>(null);
 
 	const approvalResolverRef = useRef<((ok: boolean) => void) | null>(null);
+	const mountedRef = useRef(true);
 	const mcpApproval = useMCPApproval();
 
 	const bridgeRef = useRef<MCPAppPostMessageBridge | null>(null);
-	const iframeRef = useRef<HTMLIFrameElement | null>(null);
+	const bridgeVersionRef = useRef(0);
 	const sizeAnimationFrameRef = useRef<number | null>(null);
+	const lastToolInputNotificationRef = useRef<{
+		bridgeVersion: number;
+		toolName: string;
+		toolUseID: string;
+		value: unknown;
+	} | null>(null);
+	const lastToolResultNotificationRef = useRef<{
+		bridgeVersion: number;
+		toolName: string;
+		toolUseID: string;
+		value: MCPAppViewProps['toolResult'];
+	} | null>(null);
 
 	const server = instance.server;
+	const appsEnabled = appsPolicy?.enabled === true;
 	const effectiveAppsPolicy = appsPolicy ?? UNKNOWN_APP_POLICY;
-	const serverLabel = serverArtifact?.artifactID ?? server;
+	const serverLabel = serverArtifact ? `${serverArtifact.rootID}/${serverArtifact.artifactID}` : server;
+	const frameHeight = appRequestedHeight ?? clampAppHeight(height);
 
 	useEffect(() => {
+		if (!appsEnabled) {
+			return;
+		}
+
 		let cancelled = false;
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLoadError(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLoadedResource(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setViewInitialized(false);
 
 		void mcpManagementAPI
 			.readMCPResource(server, instance.resourceUri)
@@ -242,34 +327,39 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		return () => {
 			cancelled = true;
 		};
-	}, [instance.resourceUri, server]);
+	}, [appsEnabled, instance.resourceUri, server]);
 
 	useEffect(() => {
 		let cancelled = false;
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setPolicyError(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setAppsPolicy(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setServerArtifact(null);
 
 		void mcpManagementAPI
 			.artifactRefForRuntimeServerID(server)
-			.then(async artifact => ({
-				artifact,
-				resolved: await mcpManagementAPI.inspectMCPServer(artifact),
-			}))
-			.then(({ artifact, resolved }) => {
+			.then(async artifact => {
 				if (cancelled) {
+					return null;
+				}
+				return {
+					artifact,
+					resolved: await mcpManagementAPI.inspectMCPServer(artifact),
+				};
+			})
+			.then(result => {
+				if (cancelled || !result) {
 					return;
 				}
 
+				const { artifact, resolved } = result;
 				setServerArtifact(artifact);
 				const nextPolicy = resolved.policy.body.appsPolicy;
-				setAppsPolicy(nextPolicy);
-				if (nextPolicy && !nextPolicy.enabled) {
-					setPolicyError('MCP Apps is currently disabled for this server.');
+				if (!nextPolicy) {
+					setPolicyError('The server did not return an MCP Apps policy.');
+					return;
 				}
+				if (!nextPolicy.enabled) {
+					setPolicyError('MCP Apps is currently disabled for this server.');
+					return;
+				}
+				setAppsPolicy(nextPolicy);
 			})
 			.catch((err: unknown) => {
 				if (cancelled) {
@@ -293,8 +383,13 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 
 	const requestOpenLinkApproval = useCallback(
 		async (url: string) => {
-			if (!isSafeExternalURL(url)) {
-				setBlockedURL(url);
+			if (!mountedRef.current) {
+				return false;
+			}
+
+			const safeURL = normalizeSafeExternalURL(url);
+			if (!safeURL) {
+				setBlockedLink({ url, reason: 'unsafe' });
 				return false;
 			}
 			if (approvalResolverRef.current) {
@@ -302,16 +397,18 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			}
 			if (!effectiveAppsPolicy.requireApprovalForOpenLink) {
 				try {
-					backendAPI.openURL(url);
+					backendAPI.openURL(safeURL);
 					return true;
 				} catch {
-					setBlockedURL(url);
+					if (mountedRef.current) {
+						setBlockedLink({ url: safeURL, reason: 'open-failed' });
+					}
 					return false;
 				}
 			}
 			return await new Promise<boolean>(resolve => {
 				approvalResolverRef.current = resolve;
-				setPendingURL(url);
+				setPendingURL(safeURL);
 			});
 		},
 		[effectiveAppsPolicy.requireApprovalForOpenLink]
@@ -321,18 +418,18 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		if (!params || typeof params !== 'object') {
 			return;
 		}
-		const heightValue = Number((params as Record<string, unknown>).height);
-		if (!Number.isFinite(heightValue) || heightValue <= 0) {
+		const heightValue = (params as Record<string, unknown>).height;
+		if (typeof heightValue !== 'number' || !Number.isFinite(heightValue) || heightValue <= 0) {
 			return;
 		}
-		const nextHeight = Math.max(MIN_APP_HEIGHT, Math.min(MAX_APP_HEIGHT, Math.round(heightValue)));
+		const nextHeight = clampAppHeight(heightValue);
 
 		if (sizeAnimationFrameRef.current !== null) {
 			window.cancelAnimationFrame(sizeAnimationFrameRef.current);
 		}
 		sizeAnimationFrameRef.current = window.requestAnimationFrame(() => {
 			sizeAnimationFrameRef.current = null;
-			setFrameHeight(current => (Math.abs(current - nextHeight) < 4 ? current : nextHeight));
+			setAppRequestedHeight(current => (current !== null && Math.abs(current - nextHeight) < 4 ? current : nextHeight));
 		});
 	}, []);
 
@@ -381,10 +478,44 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 		]
 	);
 
+	const routerRef = useRef(router);
+	useEffect(() => {
+		routerRef.current = router;
+	}, [router]);
+
+	const sandboxConfiguration = useMemo(() => {
+		if (!loadedResource) {
+			return null;
+		}
+		return {
+			csp: buildMCPAppCSP(loadedResource.meta),
+			allow: buildMCPAppAllowAttribute(loadedResource.meta),
+		};
+	}, [loadedResource]);
+
 	const handleIframeReady = useCallback(
 		(iframe: HTMLIFrameElement) => {
-			iframeRef.current = iframe;
-			bridgeRef.current?.dispose();
+			const bridgeVersion = bridgeVersionRef.current + 1;
+			bridgeVersionRef.current = bridgeVersion;
+
+			const previousBridge = bridgeRef.current;
+			bridgeRef.current = null;
+			if (previousBridge) {
+				const pendingResolver = approvalResolverRef.current;
+				if (pendingResolver) {
+					approvalResolverRef.current = null;
+					setPendingURL(null);
+					setPendingUIMessage(null);
+					setPendingContextUpdate(null);
+					pendingResolver(false);
+				}
+				disposeMCPAppBridge(previousBridge, instance.resourceUri, 'iframe replaced');
+			}
+
+			if (sizeAnimationFrameRef.current !== null) {
+				window.cancelAnimationFrame(sizeAnimationFrameRef.current);
+				sizeAnimationFrameRef.current = null;
+			}
 
 			const bridge = new MCPAppPostMessageBridge({
 				iframe,
@@ -400,19 +531,18 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 							}),
 						};
 					}
-					return router.handle(req);
+					return routerRef.current.handle(req);
 				},
 				onNotification: note => {
+					if (bridgeVersionRef.current !== bridgeVersion) {
+						return;
+					}
 					if (note.method === 'ui/notifications/initialized' || note.method === 'notifications/initialized') {
-						setViewInitialized(true);
+						setInitializedBridgeVersion(bridgeVersion);
 						return;
 					}
 					if (note.method === 'ui/notifications/size-changed') {
 						applySizeChanged(note.params);
-						return;
-					}
-					if (note.method === 'notifications/message') {
-						console.info('MCP App message', instance.instanceID, note.params);
 					}
 				},
 			});
@@ -422,70 +552,105 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 			applySizeChanged,
 			effectiveAppsPolicy.allowAppInitiatedToolCalls,
 			effectiveAppsPolicy.enabled,
-			instance.instanceID,
-			router,
+			instance.resourceUri,
 		]
 	);
 
 	useEffect(() => {
 		const bridge = bridgeRef.current;
-		if (!bridge || !viewInitialized) {
+		if (!bridge || initializedBridgeVersion === 0 || initializedBridgeVersion !== bridgeVersionRef.current) {
 			return;
 		}
 
 		if (toolInput !== undefined) {
+			const lastNotification = lastToolInputNotificationRef.current;
+			if (
+				lastNotification?.bridgeVersion === initializedBridgeVersion &&
+				lastNotification.toolName === instance.toolName &&
+				lastNotification.toolUseID === instance.toolUseID &&
+				Object.is(lastNotification.value, toolInput)
+			) {
+				return;
+			}
+
 			bridge.sendNotification(
 				'ui/notifications/tool-input',
 				buildToolInputNotificationParams(instance.toolName, instance.toolUseID, toolInput)
 			);
+			lastToolInputNotificationRef.current = {
+				bridgeVersion: initializedBridgeVersion,
+				toolName: instance.toolName,
+				toolUseID: instance.toolUseID,
+				value: toolInput,
+			};
 		}
-	}, [instance.toolName, instance.toolUseID, toolInput, viewInitialized]);
+	}, [initializedBridgeVersion, instance.toolName, instance.toolUseID, toolInput]);
 
 	useEffect(() => {
 		const bridge = bridgeRef.current;
-		if (!bridge || !viewInitialized) {
+		if (!bridge || initializedBridgeVersion === 0 || initializedBridgeVersion !== bridgeVersionRef.current) {
 			return;
 		}
 
 		if (toolResult !== undefined) {
+			const lastNotification = lastToolResultNotificationRef.current;
+			if (
+				lastNotification?.bridgeVersion === initializedBridgeVersion &&
+				lastNotification.toolName === instance.toolName &&
+				lastNotification.toolUseID === instance.toolUseID &&
+				Object.is(lastNotification.value, toolResult)
+			) {
+				return;
+			}
+
 			bridge.sendNotification(
 				'ui/notifications/tool-result',
 				buildToolResultNotificationParams(instance.toolName, instance.toolUseID, toolResult)
 			);
+			lastToolResultNotificationRef.current = {
+				bridgeVersion: initializedBridgeVersion,
+				toolName: instance.toolName,
+				toolUseID: instance.toolUseID,
+				value: toolResult,
+			};
 		}
-	}, [instance.toolName, instance.toolUseID, toolResult, viewInitialized]);
+	}, [initializedBridgeVersion, instance.toolName, instance.toolUseID, toolResult]);
+
 	useEffect(() => {
 		return () => {
+			bridgeVersionRef.current += 1;
 			const bridge = bridgeRef.current;
 			bridgeRef.current = null;
 			if (!bridge) {
 				return;
 			}
 
-			void bridge
-				.sendRequest('ui/resource-teardown', { resourceUri: instance.resourceUri, reason: 'view unmounted' }, 500)
-				.catch(() => undefined)
-				.finally(() => {
-					bridge.dispose();
-				});
+			disposeMCPAppBridge(bridge, instance.resourceUri, 'view unmounted');
 		};
 	}, [instance.resourceUri]);
+
 	useEffect(() => {
+		mountedRef.current = true;
 		return () => {
+			mountedRef.current = false;
 			approvalResolverRef.current?.(false);
 			approvalResolverRef.current = null;
 		};
 	}, []);
 
 	if (!appsPolicy && !policyError) {
-		return <div className="text-base-content/60 text-xs">Verifying MCP App policy…</div>;
+		return (
+			<output className="text-base-content/60 text-xs" aria-live="polite">
+				Verifying MCP App policy…
+			</output>
+		);
 	}
 
 	if (policyError) {
 		return (
-			<div className="alert alert-warning rounded-2xl text-sm">
+			<div className="alert alert-warning rounded-2xl text-sm" role="alert">
 				<div className="flex items-center gap-2">
-					<FiAlertTriangle size={14} />
+					<FiAlertTriangle size={14} aria-hidden="true" />
 					<span>MCP App is unavailable: {policyError}</span>
 				</div>
 			</div>
@@ -493,17 +658,21 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 	}
 	if (loadError) {
 		return (
-			<div className="alert alert-warning rounded-2xl text-sm">
+			<div className="alert alert-warning rounded-2xl text-sm" role="alert">
 				<div className="flex items-center gap-2">
-					<FiAlertTriangle size={14} />
+					<FiAlertTriangle size={14} aria-hidden="true" />
 					<span>MCP App failed to load: {loadError}</span>
 				</div>
 			</div>
 		);
 	}
 
-	if (!loadedResource) {
-		return <div className="text-base-content/60 text-xs">Loading MCP App…</div>;
+	if (!loadedResource || !sandboxConfiguration) {
+		return (
+			<output className="text-base-content/60 text-xs" aria-live="polite">
+				Loading MCP App…
+			</output>
+		);
 	}
 
 	return (
@@ -520,81 +689,99 @@ export function MCPAppView({ instance, toolInput, toolResult, height = 480 }: MC
 				</div>
 				<MCPAppSandbox
 					html={loadedResource.html}
-					csp={buildMCPAppCSP(loadedResource.meta)}
+					csp={sandboxConfiguration.csp}
 					title={`MCP App ${instance.toolName}`}
 					onIframeReady={handleIframeReady}
 					height={frameHeight}
-					allow={buildMCPAppAllowAttribute(loadedResource.meta)}
+					allow={sandboxConfiguration.allow}
 				/>
 			</div>
 
 			<DeleteConfirmationModal
 				isOpen={pendingURL !== null}
 				title="Open external link?"
-				message={`The MCP App for ${serverLabel} wants to open:\n${pendingURL ?? ''}`}
+				message={`The MCP App for ${serverLabel} wants to open:\n${truncateForDisplay(pendingURL ?? '')}`}
 				confirmButtonText="Open"
 				onConfirm={() => {
 					const url = pendingURL;
+					const resolver = approvalResolverRef.current;
+					approvalResolverRef.current = null;
 					setPendingURL(null);
-					if (!url) {
-						approvalResolverRef.current?.(false);
-						approvalResolverRef.current = null;
+					if (!url || !resolver) {
+						resolver?.(false);
 						return;
 					}
-					try {
-						backendAPI.openURL(url);
-						approvalResolverRef.current?.(true);
-					} catch {
-						setBlockedURL(url);
-						approvalResolverRef.current?.(false);
-					}
-					approvalResolverRef.current = null;
+
+					void (async () => {
+						try {
+							backendAPI.openURL(url);
+							resolver(true);
+						} catch {
+							if (mountedRef.current) {
+								setBlockedLink({ url, reason: 'open-failed' });
+							}
+							resolver(false);
+						}
+					})();
 				}}
 				onClose={() => {
-					setPendingURL(null);
-					approvalResolverRef.current?.(false);
+					const resolver = approvalResolverRef.current;
 					approvalResolverRef.current = null;
+					setPendingURL(null);
+					resolver?.(false);
 				}}
 			/>
 			<DeleteConfirmationModal
 				isOpen={pendingUIMessage !== null}
 				title="Add message from MCP App?"
-				message={`The MCP App for ${serverLabel} wants to add this draft message:\n\n${pendingUIMessage?.text ?? ''}`}
+				message={`The MCP App for ${serverLabel} wants to add this draft message:\n\n${truncateForDisplay(pendingUIMessage?.text ?? '')}`}
 				confirmButtonText="Add draft"
 				onConfirm={() => {
-					setPendingUIMessage(null);
-					approvalResolverRef.current?.(true);
+					const resolver = approvalResolverRef.current;
 					approvalResolverRef.current = null;
+					setPendingUIMessage(null);
+					resolver?.(true);
 				}}
 				onClose={() => {
-					setPendingUIMessage(null);
-					approvalResolverRef.current?.(false);
+					const resolver = approvalResolverRef.current;
 					approvalResolverRef.current = null;
+					setPendingUIMessage(null);
+					resolver?.(false);
 				}}
 			/>
 
 			<DeleteConfirmationModal
 				isOpen={pendingContextUpdate !== null}
 				title="Allow MCP App model context?"
-				message={`The MCP App for ${serverLabel} wants to add context to the next model request.`}
+				message={`The MCP App for ${serverLabel} wants to add this context to the next model request:\n\n${
+					pendingContextUpdate ? formatApprovalPreview(pendingContextUpdate) : ''
+				}`}
 				confirmButtonText="Allow"
 				onConfirm={() => {
-					setPendingContextUpdate(null);
-					approvalResolverRef.current?.(true);
+					const resolver = approvalResolverRef.current;
 					approvalResolverRef.current = null;
+					setPendingContextUpdate(null);
+					resolver?.(true);
 				}}
 				onClose={() => {
-					setPendingContextUpdate(null);
-					approvalResolverRef.current?.(false);
+					const resolver = approvalResolverRef.current;
 					approvalResolverRef.current = null;
+					setPendingContextUpdate(null);
+					resolver?.(false);
 				}}
 			/>
 			<ActionDeniedAlertModal
-				isOpen={blockedURL !== null}
+				isOpen={blockedLink !== null}
 				onClose={() => {
-					setBlockedURL(null);
+					setBlockedLink(null);
 				}}
-				message={`Could not open ${blockedURL ?? ''}.`}
+				message={
+					blockedLink
+						? blockedLink.reason === 'unsafe'
+							? `Blocked an unsafe or unsupported external link:\n${truncateForDisplay(blockedLink.url)}\n\nOnly HTTP and HTTPS links without embedded credentials are allowed.`
+							: `Could not open:\n${truncateForDisplay(blockedLink.url)}`
+						: ''
+				}
 			/>
 			<MCPApprovalModal
 				approvalRequest={mcpApproval.approvalRequest}

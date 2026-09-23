@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -102,12 +103,22 @@ func (a *API) validateBuiltInAgentPackage(
 	ctx context.Context,
 	request BuiltInAgentPackageInstallRequest,
 ) error {
+	return a.validateBuiltInAgentPackages(
+		ctx,
+		[]BuiltInAgentPackageInstallRequest{request},
+	)
+}
+
+func (a *API) validateBuiltInAgentPackages(
+	ctx context.Context,
+	requests []BuiltInAgentPackageInstallRequest,
+) error {
 	if a == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
-			"%w: built-in Agent package validation context is nil",
+			"%w: built-in Agent package batch validation context is nil",
 			basespec.ErrInvalid,
 		)
 	}
@@ -117,60 +128,125 @@ func (a *API) validateBuiltInAgentPackage(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-
-	expectations, rootExpectation, err := normalizeBuiltInAgentExpectations(
-		request.PluginDocumentFile,
-		request.Expectations,
-	)
-	if err != nil {
-		return err
-	}
-	if err := a.validateBuiltInAgentPackageSource(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		request.PackageAddress,
-	); err != nil {
-		return err
-	}
-	if err := a.ensureBuiltInAgentSourceCurrent(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	); err != nil {
-		return err
-	}
-
-	_, rootArtifact, err := a.verifyBuiltInAgentArtifacts(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		request.PackageAddress,
-		expectations,
-		rootExpectation,
-	)
-	if err != nil {
-		return err
+	if len(requests) == 0 {
+		return nil
 	}
 	if a.declarationResolver == nil {
 		return basespec.ErrClosed
 	}
 
-	plan, err := a.declarationResolver.ResolvePluginCapabilities(
-		ctx,
-		rootArtifact.Ref(),
+	type validationPlan struct {
+		request         BuiltInAgentPackageInstallRequest
+		expectations    []BuiltInAgentArtifactExpectation
+		rootExpectation BuiltInAgentArtifactExpectation
+	}
+
+	plans := make([]validationPlan, 0, len(requests))
+	var (
+		sharedRootID   root.RootID
+		sharedSourceID source.SourceID
 	)
-	if err != nil {
+	for index, request := range requests {
+		expectations, rootExpectation, err := normalizeBuiltInAgentExpectations(
+			request.PluginDocumentFile,
+			request.Expectations,
+		)
+		if err != nil {
+			return fmt.Errorf(
+				"built-in Agent package validation request %d: %w",
+				index,
+				err,
+			)
+		}
+		if err := a.validateBuiltInAgentPackageSource(
+			ctx,
+			request.RootID,
+			request.SourceID,
+			request.PackageAddress,
+		); err != nil {
+			return fmt.Errorf(
+				"built-in Agent package validation request %d: %w",
+				index,
+				err,
+			)
+		}
+
+		if index == 0 {
+			sharedRootID = request.RootID
+			sharedSourceID = request.SourceID
+		} else if request.RootID != sharedRootID ||
+			request.SourceID != sharedSourceID {
+			return fmt.Errorf(
+				"%w: built-in Agent validation batch spans multiple Sources",
+				basespec.ErrInvalid,
+			)
+		}
+
+		plans = append(plans, validationPlan{
+			request:         request,
+			expectations:    expectations,
+			rootExpectation: rootExpectation,
+		})
+	}
+
+	if err := a.ensureBuiltInAgentSourceCurrent(
+		ctx,
+		sharedRootID,
+		sharedSourceID,
+	); err != nil {
 		return err
 	}
-	if err := resolve.RequireComplete(plan.Occurrences); err != nil {
-		return fmt.Errorf(
-			"validate built-in Agent Collection %q resolution: %w",
-			rootArtifact.LogicalName,
-			err,
-		)
-	}
-	return nil
+
+	_, err := consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (struct{}, error) {
+			for index, plan := range plans {
+				if err := sessionCtx.Err(); err != nil {
+					return struct{}{}, err
+				}
+
+				_, rootArtifact, err := a.verifyBuiltInAgentArtifacts(
+					sessionCtx,
+					plan.request.RootID,
+					plan.request.SourceID,
+					plan.request.PackageAddress,
+					plan.expectations,
+					plan.rootExpectation,
+				)
+				if err != nil {
+					return struct{}{}, fmt.Errorf(
+						"verify built-in Agent package %d: %w",
+						index,
+						err,
+					)
+				}
+
+				capabilities, err := a.declarationResolver.ResolvePluginCapabilities(
+					sessionCtx,
+					rootArtifact.Ref(),
+				)
+				if err != nil {
+					return struct{}{}, fmt.Errorf(
+						"resolve built-in Agent package %d: %w",
+						index,
+						err,
+					)
+				}
+				if err := resolve.RequireComplete(
+					capabilities.Occurrences,
+				); err != nil {
+					return struct{}{}, fmt.Errorf(
+						"validate built-in Agent Collection %q resolution: %w",
+						rootArtifact.LogicalName,
+						err,
+					)
+				}
+			}
+			return struct{}{}, nil
+		},
+	)
+	return err
 }
 
 func (a *API) removeBuiltInAgentPackage(

@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
@@ -43,7 +44,7 @@ func (a *API) ListMCPServersReferencingPolicy(
 	rootID root.RootID,
 	policyName basespec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
-	if a == nil {
+	if a == nil || a.resources == nil {
 		return nil, basespec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
@@ -52,7 +53,24 @@ func (a *API) ListMCPServersReferencingPolicy(
 	if err := policyName.Validate(); err != nil {
 		return nil, err
 	}
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) ([]artifact.ArtifactRef, error) {
+			return a.listMCPServersReferencingPolicy(
+				sessionCtx,
+				rootID,
+				policyName,
+			)
+		},
+	)
+}
 
+func (a *API) listMCPServersReferencingPolicy(
+	ctx context.Context,
+	rootID root.RootID,
+	policyName basespec.LogicalName,
+) ([]artifact.ArtifactRef, error) {
 	servers, err := a.ListServers(ctx, rootID)
 	if err != nil {
 		return nil, err
