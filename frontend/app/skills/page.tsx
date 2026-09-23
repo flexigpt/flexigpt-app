@@ -433,6 +433,9 @@ export default function SkillsPage() {
 				if (!existingSkill.isManaged) {
 					throw new Error('Only managed Skills can be edited. Fork this Skill to create a managed copy.');
 				}
+				if (!partial.artifactCreate) {
+					throw new Error('The managed Skill document was not loaded. Reload the Skill before editing it.');
+				}
 			}
 
 			try {
@@ -475,7 +478,7 @@ export default function SkillsPage() {
 			}
 
 			try {
-				await refreshBundleSkills(bundleID, !partial.artifactCreate);
+				await refreshBundleSkills(bundleID, false);
 			} catch (err) {
 				console.error('Skill was saved but bundle refresh failed:', err);
 				if (isMountedRef.current) {

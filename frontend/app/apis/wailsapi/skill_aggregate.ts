@@ -7,6 +7,7 @@ import {
 	DescribeArtifactSkill,
 	ListArtifactSkillRefs,
 	ResolveArtifactSkill,
+	ResolveArtifactSkills,
 } from '@/apis/wailsjs/go/main/SkillAggregateWrapper';
 
 export class WailsSkillAggregateAPI implements ISkillAggregateAPI {
@@ -14,6 +15,13 @@ export class WailsSkillAggregateAPI implements ISkillAggregateAPI {
 		return requiredObject<ResolvedArtifactSkill>(
 			await ResolveArtifactSkill(skill as Parameters<typeof ResolveArtifactSkill>[0]),
 			'ResolveArtifactSkill'
+		);
+	}
+
+	async resolveArtifactSkills(skills: ArtifactRef[]): Promise<ResolvedArtifactSkill[]> {
+		return requiredObject<ResolvedArtifactSkill[]>(
+			await ResolveArtifactSkills(skills as Parameters<typeof ResolveArtifactSkills>[0]),
+			'ResolveArtifactSkills'
 		);
 	}
 

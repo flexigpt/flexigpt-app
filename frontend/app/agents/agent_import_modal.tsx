@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFileText, FiUpload } from 'react-icons/fi';
 
 import type {
@@ -60,19 +60,19 @@ function relationshipTarget(relationship: AgentImportRelationship): string | und
 	return undefined;
 }
 
-export function AgentImportModal({
-	isOpen,
+interface AgentImportModalContentProps {
+	destinations: AgentImportDestination[];
+
+	initialDestinationKey: string;
+	onClose: () => void;
+	onCommitted: (result: AgentImportCommitResult) => Promise<void>;
+}
+function AgentImportModalContent({
 	destinations,
-	initialDestination,
+	initialDestinationKey,
 	onClose,
 	onCommitted,
-}: AgentImportModalProps) {
-	const initialDestinationKey = initialDestination
-		? agentCollectionKey(initialDestination.collection)
-		: destinations[0]
-			? agentCollectionKey(destinations[0].collection)
-			: '';
-
+}: AgentImportModalContentProps) {
 	const [destinationKey, setDestinationKey] = useState(initialDestinationKey);
 	const [path, setPath] = useState('');
 	const [preview, setPreview] = useState<AgentImportPreview | null>(null);
@@ -81,26 +81,6 @@ export function AgentImportModal({
 	const [isPickingFile, setIsPickingFile] = useState(false);
 	const [isPreviewing, setIsPreviewing] = useState(false);
 	const [isCommitting, setIsCommitting] = useState(false);
-
-	useEffect(() => {
-		if (!isOpen) {
-			return;
-		}
-
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-derived-state
-		setDestinationKey(initialDestinationKey);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setPath('');
-
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setPreview(null);
-
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setAcceptedConfirmationCodes(new Set());
-
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setError('');
-	}, [initialDestinationKey, isOpen]);
 
 	const destinationByKey = useMemo(
 		() => new Map(destinations.map(destination => [agentCollectionKey(destination.collection), destination] as const)),
@@ -218,12 +198,8 @@ export function AgentImportModal({
 		}
 	};
 
-	if (!isOpen) {
-		return null;
-	}
-
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel={isPreviewing || isCommitting}>
+		<ModalDialog isOpen={true} onClose={onClose} blockCancel={isPreviewing || isCommitting}>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
@@ -493,5 +469,33 @@ export function AgentImportModal({
 				</div>
 			</div>
 		</ModalDialog>
+	);
+}
+
+export function AgentImportModal({
+	isOpen,
+	destinations,
+	initialDestination,
+	onClose,
+	onCommitted,
+}: AgentImportModalProps) {
+	if (!isOpen) {
+		return null;
+	}
+
+	const initialDestinationKey = initialDestination
+		? agentCollectionKey(initialDestination.collection)
+		: destinations[0]
+			? agentCollectionKey(destinations[0].collection)
+			: '';
+
+	return (
+		<AgentImportModalContent
+			key={initialDestinationKey || 'agent-import-default'}
+			destinations={destinations}
+			initialDestinationKey={initialDestinationKey}
+			onClose={onClose}
+			onCommitted={onCommitted}
+		/>
 	);
 }

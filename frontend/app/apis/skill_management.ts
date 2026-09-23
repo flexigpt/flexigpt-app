@@ -177,6 +177,11 @@ interface ResolvedRuntimeArtifactSet {
 	artifactByDefinitionKey: Map<string, ArtifactRef>;
 }
 
+interface PrefetchedRuntimeMetadata {
+	record?: RuntimeSkillRecord;
+	error?: string;
+}
+
 function isUserMutableCollection(collection: CollectionView): boolean {
 	return collection.editable && !collection.baseline;
 }
@@ -394,27 +399,46 @@ export class SkillManagementAPI {
 		includeDisabled = true,
 		includeRuntimeMetadata = true
 	): Promise<SkillListItem[]> {
-		const bundles = await this.listSkillBundles(bundleIDs, true);
+		const bundles = await this.listSkillBundles(bundleIDs, includeDisabled);
+		const collections = await this.store.listSkillCollectionsForManagement();
+		const collectionsByID = new Map(collections.map(collection => [collection.artifact.id, collection] as const));
+		const candidates: Array<{ bundle: SkillBundle; artifact: StoreArtifact }> = [];
 		const output: SkillListItem[] = [];
 
 		for (const bundle of bundles) {
-			const collection = await this.resolveBundleCollection(bundle.id);
+			const collection = collectionsByID.get(bundle.id);
+			if (!collection) {
+				throw new Error(`Skill Bundle ${bundle.id} disappeared while loading skills.`);
+			}
 			const artifacts = await this.listCollectionSkillArtifacts(collection);
 
 			for (const artifact of artifacts) {
-				const skill = await this.projectSkill(bundle, artifact, includeRuntimeMetadata);
-
-				if (!includeDisabled && !skill.isEnabled) {
-					continue;
-				}
-
-				output.push({
-					bundleID: bundle.id,
-					bundleSlug: bundle.slug,
-					skillSlug: skill.slug,
-					skillDefinition: skill,
-				});
+				candidates.push({ bundle, artifact });
 			}
+		}
+
+		const runtimeMetadata = includeRuntimeMetadata
+			? await this.resolveRuntimeMetadata(candidates.map(candidate => candidate.artifact))
+			: new Map<string, PrefetchedRuntimeMetadata>();
+
+		for (const { bundle, artifact } of candidates) {
+			const skill = await this.projectSkill(
+				bundle,
+				artifact,
+				includeRuntimeMetadata,
+				runtimeMetadata.get(artifactRefKey({ rootID: artifact.rootID, artifactID: artifact.id }))
+			);
+
+			if (!includeDisabled && !skill.isEnabled) {
+				continue;
+			}
+
+			output.push({
+				bundleID: bundle.id,
+				bundleSlug: bundle.slug,
+				skillSlug: skill.slug,
+				skillDefinition: skill,
+			});
 		}
 
 		return output.toSorted((left, right) => {
@@ -470,8 +494,25 @@ export class SkillManagementAPI {
 
 	async refreshSkillBundle(bundleID: string): Promise<void> {
 		const collection = await this.resolveBundleCollection(bundleID);
+		const artifacts = await this.listCollectionSkillArtifacts(collection);
+		const sources = new Map<string, { rootID: string; sourceID: string }>();
 
-		await this.store.refreshSkillSource(collection.artifact.rootID, collection.artifact.binding.sourceID);
+		const addSource = (rootID: string, sourceID: string) => {
+			sources.set(`${rootID}:${sourceID}`, { rootID, sourceID });
+		};
+
+		addSource(collection.artifact.rootID, collection.artifact.binding.sourceID);
+		for (const artifact of artifacts) {
+			addSource(artifact.rootID, artifact.binding.sourceID);
+		}
+
+		for (const source of [...sources.values()].toSorted((left, right) => {
+			const leftKey = `${left.rootID}:${left.sourceID}`;
+			const rightKey = `${right.rootID}:${right.sourceID}`;
+			return leftKey.localeCompare(rightKey);
+		})) {
+			await this.store.refreshSkillSource(source.rootID, source.sourceID);
+		}
 	}
 
 	async deleteSkillBundle(bundleID: string): Promise<void> {
@@ -775,7 +816,8 @@ export class SkillManagementAPI {
 	private async projectSkill(
 		bundle: SkillBundle,
 		artifact: StoreArtifact,
-		includeRuntimeMetadata: boolean
+		includeRuntimeMetadata: boolean,
+		prefetchedRuntime?: PrefetchedRuntimeMetadata
 	): Promise<Skill> {
 		const ref: ArtifactRef = {
 			rootID: artifact.rootID,
@@ -783,31 +825,41 @@ export class SkillManagementAPI {
 		};
 
 		let managedDocument: SkillDocumentInput | undefined;
-		let isManaged: boolean;
+		let isManaged = false;
 
-		try {
-			const result = await this.store.getManagedSkillDocument(ref);
-			managedDocument = result.document;
-			isManaged = true;
-		} catch {
-			isManaged = false;
+		// Built-ins use protected skill-collection packages. They are not
+		// user-managed replaceable skill packages, so avoid an unnecessary
+		// document-resolution round trip for every built-in card.
+		if (!bundle.isBuiltIn) {
+			try {
+				const result = await this.store.getManagedSkillDocument(ref);
+				managedDocument = result.document;
+				isManaged = true;
+			} catch {
+				isManaged = false;
+			}
 		}
 
 		let runtimeRecord: RuntimeSkillRecord | undefined;
 		let runtimeError: string | undefined;
 
 		if (includeRuntimeMetadata) {
-			try {
-				const resolved = await this.aggregate.resolveArtifactSkill(ref);
-				const records = await this.runtime.listRuntimeSkills({
-					allowSkills: [resolved.Definition],
-				});
+			if (prefetchedRuntime !== undefined) {
+				runtimeRecord = prefetchedRuntime.record;
+				runtimeError = prefetchedRuntime.error;
+			} else {
+				try {
+					const resolved = await this.aggregate.resolveArtifactSkill(ref);
+					const records = await this.runtime.listRuntimeSkills({
+						allowSkills: [resolved.Definition],
+					});
 
-				runtimeRecord = records.find(
-					record => runtimeDefinitionKey(record.def) === runtimeDefinitionKey(resolved.Definition)
-				);
-			} catch (error) {
-				runtimeError = getErrorMessage(error, 'Runtime metadata is unavailable.');
+					runtimeRecord = records.find(
+						record => runtimeDefinitionKey(record.def) === runtimeDefinitionKey(resolved.Definition)
+					);
+				} catch (error) {
+					runtimeError = getErrorMessage(error, 'Runtime metadata is unavailable.');
+				}
 			}
 		}
 
@@ -854,6 +906,76 @@ export class SkillManagementAPI {
 		};
 	}
 
+	private async resolveRuntimeMetadata(artifacts: StoreArtifact[]): Promise<Map<string, PrefetchedRuntimeMetadata>> {
+		const output = new Map<string, PrefetchedRuntimeMetadata>();
+		const refsByRoot = new Map<string, ArtifactRef[]>();
+
+		for (const artifact of artifacts) {
+			const ref: ArtifactRef = {
+				rootID: artifact.rootID,
+				artifactID: artifact.id,
+			};
+			const key = artifactRefKey(ref);
+
+			if (artifact.state !== ArtifactState.Available) {
+				output.set(key, {
+					error: 'Runtime metadata is unavailable because this Skill Artifact is not available.',
+				});
+				continue;
+			}
+			if (!artifact.enabled) {
+				output.set(key, {
+					error: 'Runtime metadata is unavailable because this Skill is disabled.',
+				});
+				continue;
+			}
+
+			const refs = refsByRoot.get(ref.rootID) ?? [];
+			refs.push(ref);
+			refsByRoot.set(ref.rootID, refs);
+		}
+
+		const resolved: ResolvedArtifactSkill[] = [];
+		for (const refs of refsByRoot.values()) {
+			try {
+				resolved.push(...(await this.aggregate.resolveArtifactSkills(refs)));
+			} catch (error) {
+				const message = getErrorMessage(error, 'Runtime metadata is unavailable for this Skill Root.');
+				for (const ref of refs) {
+					output.set(artifactRefKey(ref), { error: message });
+				}
+			}
+		}
+
+		if (resolved.length === 0) {
+			return output;
+		}
+
+		let records: RuntimeSkillRecord[];
+		try {
+			records = await this.runtime.listRuntimeSkills({
+				allowSkills: resolved.map(value => value.Definition),
+			});
+		} catch (error) {
+			const message = getErrorMessage(error, 'Runtime metadata is unavailable.');
+			for (const value of resolved) {
+				output.set(artifactRefKey(value.Artifact), { error: message });
+			}
+			return output;
+		}
+
+		const recordsByDefinition = new Map(records.map(record => [runtimeDefinitionKey(record.def), record] as const));
+		for (const value of resolved) {
+			const record = recordsByDefinition.get(runtimeDefinitionKey(value.Definition));
+			output.set(
+				artifactRefKey(value.Artifact),
+				record ? { record } : { error: 'The runtime did not index this Skill after catalog synchronization.' }
+			);
+		}
+
+		return output;
+	}
+
 	private async resolveRuntimeArtifacts(refs: ArtifactRef[]): Promise<ResolvedRuntimeArtifactSet> {
 		const uniqueRefs = new Map<string, ArtifactRef>();
 
@@ -869,7 +991,7 @@ export class SkillManagementAPI {
 			};
 		}
 
-		const values = await Promise.all([...uniqueRefs.values()].map(ref => this.aggregate.resolveArtifactSkill(ref)));
+		const values = await this.aggregate.resolveArtifactSkills([...uniqueRefs.values()]);
 
 		const definitions: RuntimeSkillDefinition[] = [];
 		const byArtifactKey = new Map<string, ResolvedArtifactSkill>();

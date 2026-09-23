@@ -1,6 +1,7 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -14,6 +15,15 @@ import (
 // ResolveOptions is reserved for future resource projection options.
 // Declaration source verification is unconditional.
 type ResolveOptions struct{}
+
+// VerificationSession is an opaque request-scoped source verification lease.
+//
+// Callers must close it before using results outside the batch. Close confirms
+// every retained source snapshot once, so a source change invalidates the
+// entire batch rather than allowing mixed-generation results.
+type VerificationSession interface {
+	Close(ctx context.Context) error
+}
 
 // ResolvedArtifact contains the verified current Store resource chain:
 //

@@ -636,12 +636,17 @@ func (a *API) GetManagedSkillDocument(
 			basespec.ErrUnsupported,
 		)
 	}
-	if value.Binding.SubresourceLocator != "" ||
-		!skillDomain.IsSkillDefinitionFile(
-			value.Binding.Locator,
-		) {
+	if value.Binding.SubresourceLocator != "" {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: managed Skill must originate at a configured package document",
+			basespec.ErrUnsupported,
+		)
+	}
+	if _, err := skillDomain.ManagedPackageAddressFromSkillLocator(
+		value.Binding.Locator,
+	); err != nil {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: only application-managed Skill packages expose editable documents",
 			basespec.ErrUnsupported,
 		)
 	}

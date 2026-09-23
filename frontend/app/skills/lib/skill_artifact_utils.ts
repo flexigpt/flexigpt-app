@@ -286,6 +286,9 @@ export function buildSkillMarkdownScaffold(input: SkillMarkdownScaffoldInput): s
 	const tags = input.tags?.map(tag => tag.trim()).filter(Boolean) ?? [];
 
 	const lines: string[] = ['---', `name: ${yamlQuote(name)}`, `description: ${yamlQuote(description)}`];
+	if (input.displayName?.trim()) {
+		lines.push(`displayName: ${yamlQuote(input.displayName.trim())}`);
+	}
 
 	if (insert !== SkillInsert.Instructions) {
 		lines.push(`insert: ${yamlQuote(insert)}`);

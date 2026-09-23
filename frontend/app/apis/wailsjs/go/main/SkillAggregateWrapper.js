@@ -17,3 +17,7 @@ export function ListArtifactSkillRefs(arg1) {
 export function ResolveArtifactSkill(arg1) {
   return window['go']['main']['SkillAggregateWrapper']['ResolveArtifactSkill'](arg1);
 }
+
+export function ResolveArtifactSkills(arg1) {
+  return window['go']['main']['SkillAggregateWrapper']['ResolveArtifactSkills'](arg1);
+}

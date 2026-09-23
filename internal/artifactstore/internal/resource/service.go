@@ -84,6 +84,15 @@ func (s *Service) ResolveArtifact(
 			record.ID,
 		)
 	}
+	if session := verificationSessionFromContext(ctx); session != nil {
+		if session.service != s {
+			return resource.ResolvedArtifact{}, fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				basespec.ErrInvalid,
+			)
+		}
+		return s.resolveArtifactInSession(ctx, session, record)
+	}
 
 	inspection, err := s.refresh.InspectSource(
 		ctx,
@@ -168,6 +177,15 @@ func (s *Service) ResolveVerifiedLocalPath(
 	if err := localLocator.Validate(true); err != nil {
 		return "", err
 	}
+	if session := verificationSessionFromContext(ctx); session != nil {
+		if session.service != s {
+			return "", fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				basespec.ErrInvalid,
+			)
+		}
+		return s.resolveVerifiedLocalPathInSession(ctx, session, resolved, localLocator)
+	}
 
 	value, err := s.sources.Get(
 		ctx,
@@ -229,6 +247,15 @@ func (s *Service) ReadSourceEntry(
 			"%w: Source entry read limit is invalid",
 			basespec.ErrInvalid,
 		)
+	}
+	if session := verificationSessionFromContext(ctx); session != nil {
+		if session.service != s {
+			return resource.VerifiedEntry{}, fmt.Errorf(
+				"%w: verification session belongs to another resource service",
+				basespec.ErrInvalid,
+			)
+		}
+		return s.readSourceEntryInSession(ctx, session, rootID, sourceID, locator, maximumBytes)
 	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)

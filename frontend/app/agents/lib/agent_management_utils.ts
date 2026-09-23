@@ -1,5 +1,5 @@
+import type { AgentImportRelationshipStatus } from '@/spec/agent';
 import type { ArtifactRef } from '@/spec/artifact';
-import { AgentImportRelationshipStatus } from '@/spec/agent';
 
 export function formatArtifactRef(ref?: ArtifactRef): string {
 	if (!ref) {
@@ -31,10 +31,10 @@ export function textToBase64(value: string): string {
 export function getAgentRelationshipBadgeClass(
 	status: AgentImportRelationshipStatus | string
 ): 'badge-success' | 'badge-warning' | 'badge-error' {
-	switch (status) {
-		case AgentImportRelationshipStatus.Available.toString():
+	switch (status.toLowerCase()) {
+		case 'available':
 			return 'badge-success';
-		case AgentImportRelationshipStatus.Ambiguous.toString():
+		case 'ambiguous':
 			return 'badge-warning';
 		default:
 			return 'badge-error';

@@ -4,6 +4,7 @@ package materialize
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 
@@ -42,6 +43,13 @@ type ResourceReader interface {
 	) (string, error)
 }
 
+// VerificationSessionFactory is optional. Production Artifact Store resources
+// implement it, while existing unit-test ResourceReader doubles can continue
+// to implement only ResourceReader.
+type VerificationSessionFactory interface {
+	BeginVerificationSession(ctx context.Context) (context.Context, resource.VerificationSession, error)
+}
+
 // ResolvedSkill is verified Skill package material. It contains no session,
 // Workspace, catalog, or execution state.
 type ResolvedSkill struct {
@@ -54,6 +62,59 @@ type ResolvedSkill struct {
 	Document        document.SkillDocument
 	RuntimeLocation string
 	VersionDigest   cryptoutil.Digest
+}
+
+// ResolveAll materializes a set of Skills inside one request-scoped source
+// verification session. Each physical Source is inspected, opened, and
+// confirmed once rather than once per Skill.
+func ResolveAll(
+	ctx context.Context,
+	resources ResourceReader,
+	records []artifact.Artifact,
+) (output []ResolvedSkill, returnErr error) {
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: Skill batch materialization context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if resources == nil {
+		return nil, fmt.Errorf(
+			"%w: Skill materializer ResourceReader is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if len(records) == 0 {
+		return []ResolvedSkill{}, nil
+	}
+
+	requestCtx := ctx
+	if factory, supported := resources.(VerificationSessionFactory); supported {
+		sessionCtx, session, err := factory.BeginVerificationSession(ctx)
+		if err != nil {
+			return nil, err
+		}
+		defer func() {
+			returnErr = errors.Join(
+				returnErr,
+				session.Close(context.WithoutCancel(sessionCtx)),
+			)
+		}()
+		requestCtx = sessionCtx
+	}
+
+	output = make([]ResolvedSkill, 0, len(records))
+	for _, record := range records {
+		value, err := Resolve(requestCtx, resources, record)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+	return output, nil
 }
 
 func Resolve(

@@ -10,3 +10,5 @@ export function GetArtifactSkillsPrompt(arg1:aggregate.ArtifactSkillFilter):Prom
 export function ListArtifactSkillRefs(arg1:aggregate.ArtifactSkillFilter):Promise<Array<artifact.ArtifactRef>>;
 
 export function ResolveArtifactSkill(arg1:artifact.ArtifactRef):Promise<aggregate.ResolvedArtifactSkill>;
+
+export function ResolveArtifactSkills(arg1:Array<artifact.ArtifactRef>):Promise<Array<aggregate.ResolvedArtifactSkill>>;

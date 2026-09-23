@@ -22,8 +22,15 @@ type Service struct {
 	resolver *ArtifactRouter
 	runtime  *skillRuntime.Service
 
-	lifecycleMu sync.RWMutex
-	closed      bool
+	lifecycleMu    sync.RWMutex
+	closed         bool
+	catalogSyncMu  sync.Mutex
+	catalogSyncing map[root.RootID]*rootCatalogSync
+}
+
+type rootCatalogSync struct {
+	done chan struct{}
+	err  error
 }
 
 func New(
@@ -37,8 +44,9 @@ func New(
 		return nil, errors.New("skill runtime service is required")
 	}
 	return &Service{
-		resolver: resolver,
-		runtime:  runtimeService,
+		resolver:       resolver,
+		runtime:        runtimeService,
+		catalogSyncing: make(map[root.RootID]*rootCatalogSync),
 	}, nil
 }
 
@@ -62,34 +70,57 @@ func (s *Service) ResolveArtifactSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ResolvedArtifactSkill, error) {
-	if err := s.ensureConfigured(); err != nil {
-		return ResolvedArtifactSkill{}, err
-	}
 	if err := ref.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	rootID, err := s.resolver.RootForArtifact(ctx, ref)
+	values, err := s.ResolveArtifactSkills(
+		ctx,
+		[]artifact.ArtifactRef{ref},
+	)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	if err := s.resyncRoot(ctx, rootID); err != nil {
-		return ResolvedArtifactSkill{}, err
-	}
-	value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
-	if err != nil {
-		return ResolvedArtifactSkill{}, err
-	}
-	if !s.runtime.IsRegistered(skillRuntime.SkillRegistration{
-		Definition: value.Definition,
-		Revision:   value.Version,
-	}) {
+	if len(values) != 1 {
 		return ResolvedArtifactSkill{}, fmt.Errorf(
-			"%w: runtime did not register Artifact Skill %q",
+			"%w: expected one resolved Artifact Skill",
 			basespec.ErrReferenceUnresolved,
-			ref.ArtifactID,
 		)
 	}
-	return value, nil
+	return values[0], nil
+}
+
+// ResolveArtifactSkills synchronizes each owning Root at most once for this
+// request, then maps all requested durable Artifact references to runtime
+// definitions. Callers that need several Skills must use this instead of
+// repeatedly calling ResolveArtifactSkill.
+func (s *Service) ResolveArtifactSkills(
+	ctx context.Context,
+	refs []artifact.ArtifactRef,
+) ([]ResolvedArtifactSkill, error) {
+	if err := s.ensureConfigured(); err != nil {
+		return nil, err
+	}
+
+	resolved, err := s.resolveArtifactSkills(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	return append([]ResolvedArtifactSkill(nil), resolved.Values...), nil
+}
+
+// SyncRootCatalog warms or reconciles one Root's runtime catalog. It is
+// useful during startup after protected topology hydration has completed.
+func (s *Service) SyncRootCatalog(
+	ctx context.Context,
+	rootID root.RootID,
+) error {
+	if err := s.ensureConfigured(); err != nil {
+		return err
+	}
+	if err := rootID.Validate(); err != nil {
+		return err
+	}
+	return s.resyncRoot(ctx, rootID)
 }
 
 func (s *Service) GetArtifactSkillsPrompt(
@@ -218,7 +249,42 @@ func (s *Service) resyncRoot(
 	if err != nil {
 		return err
 	}
-	return s.runtime.SyncCatalog(ctx, catalogID)
+	return s.syncRootCatalog(ctx, rootID, catalogID)
+}
+
+// syncRootCatalog prevents a startup warmup and a foreground page request
+// from independently materializing the same Root at the same time.
+func (s *Service) syncRootCatalog(
+	ctx context.Context,
+	rootID root.RootID,
+	catalogID skillRuntime.CatalogID,
+) error {
+	s.catalogSyncMu.Lock()
+	if current, found := s.catalogSyncing[rootID]; found {
+		s.catalogSyncMu.Unlock()
+		select {
+		case <-current.done:
+			return current.err
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+
+	current := &rootCatalogSync{
+		done: make(chan struct{}),
+	}
+	s.catalogSyncing[rootID] = current
+	s.catalogSyncMu.Unlock()
+
+	err := s.runtime.SyncCatalog(ctx, catalogID)
+
+	s.catalogSyncMu.Lock()
+	current.err = err
+	delete(s.catalogSyncing, rootID)
+	close(current.done)
+	s.catalogSyncMu.Unlock()
+
+	return err
 }
 
 func (s *Service) ensureConfigured() error {
@@ -244,6 +310,7 @@ func (s *Service) isClosed() bool {
 type resolvedArtifactSkills struct {
 	DefToArtifacts map[provider.SkillDef]artifact.ArtifactRef
 	AllowDefs      []provider.SkillDef
+	Values         []ResolvedArtifactSkill
 }
 
 func (s *Service) resolveArtifactSkills(
@@ -260,6 +327,7 @@ func (s *Service) resolveArtifactSkills(
 	}
 	resynced := map[root.RootID]error{}
 	unavailable := make([]artifact.ArtifactRef, 0)
+	readyRefs := make([]artifact.ArtifactRef, 0, len(refs))
 
 	for _, ref := range refs {
 		rootID, err := s.resolver.RootForArtifact(ctx, ref)
@@ -281,8 +349,29 @@ func (s *Service) resolveArtifactSkills(
 			}
 		}
 
-		value, err := s.resolver.ResolveArtifactSkill(ctx, ref)
-		if err != nil ||
+		readyRefs = append(readyRefs, ref)
+	}
+
+	values, err := s.resolver.ResolveArtifactSkills(ctx, readyRefs)
+	if err != nil {
+		return resolvedArtifactSkills{}, err
+	}
+	if len(values) != len(readyRefs) {
+		return resolvedArtifactSkills{}, fmt.Errorf(
+			"%w: Artifact Skill router returned an unexpected result count",
+			basespec.ErrInvalid,
+		)
+	}
+
+	for index, value := range values {
+		ref := readyRefs[index]
+		if value.Artifact != ref {
+			return resolvedArtifactSkills{}, fmt.Errorf(
+				"%w: Artifact Skill router resolved another Artifact",
+				basespec.ErrRefreshRequired,
+			)
+		}
+		if !value.Enabled ||
 			!s.runtime.IsRegistered(skillRuntime.SkillRegistration{
 				Definition: value.Definition,
 				Revision:   value.Version,
@@ -290,6 +379,7 @@ func (s *Service) resolveArtifactSkills(
 			unavailable = append(unavailable, ref)
 			continue
 		}
+
 		if previous, exists := output.DefToArtifacts[value.Definition]; exists &&
 			previous != value.Artifact {
 			return resolvedArtifactSkills{}, fmt.Errorf(
@@ -301,6 +391,7 @@ func (s *Service) resolveArtifactSkills(
 		}
 		output.DefToArtifacts[value.Definition] = value.Artifact
 		output.AllowDefs = append(output.AllowDefs, value.Definition)
+		output.Values = append(output.Values, value)
 	}
 	if len(unavailable) != 0 {
 		return resolvedArtifactSkills{}, unavailableArtifactSkillsError(

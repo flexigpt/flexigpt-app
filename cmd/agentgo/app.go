@@ -27,6 +27,9 @@ const (
 type App struct {
 	ctx context.Context
 
+	skillCatalogWarmupCancel context.CancelFunc
+	skillCatalogWarmupDone   chan struct{}
+
 	settingStoreAPI       *SettingStoreWrapper
 	conversationStoreAPI  *ConversationCollectionWrapper
 	modelPresetStoreAPI   *ModelPresetStoreWrapper
@@ -564,6 +567,8 @@ func (a *App) startup(ctx context.Context) { //nolint:all
 
 	SetWrappedProviderAppContext(a.aggregateAPI, a.ctx)
 
+	a.startSkillCatalogWarmup()
+
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)
 }
@@ -582,6 +587,8 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 
 // shutdown is called at application termination.
 func (a *App) shutdown(ctx context.Context) { //nolint:all
+	a.stopSkillCatalogWarmup()
+
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
 	if a.mcpAggregateAPI != nil {

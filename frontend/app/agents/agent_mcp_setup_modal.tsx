@@ -85,17 +85,6 @@ function AgentMCPSetupContent({
 	useEffect(() => {
 		let cancelled = false;
 
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setInstallation(null);
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setValues({});
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setLoadError('');
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setSaveError('');
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-adjust-state-on-prop-change
-		setIsLoading(true);
-
 		void mcpManagementAPI
 			.getMCPServerInstallation(artifact)
 			.then(value => {
@@ -380,7 +369,7 @@ export function AgentMCPSetupModal({ isOpen, descriptor, onClose }: AgentMCPSetu
 	const artifact = descriptor.artifact;
 
 	return (
-		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel>
+		<ModalDialog isOpen={isOpen} onClose={onClose}>
 			{artifact ? (
 				<AgentMCPSetupContent
 					key={`${artifact.rootID}:${artifact.artifactID}`}

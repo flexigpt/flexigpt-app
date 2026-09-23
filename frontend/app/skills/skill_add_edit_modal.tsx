@@ -321,6 +321,7 @@ function AddEditSkillModalContent({
 	const [documentLoading, setDocumentLoading] = useState(isEditMode);
 	const [documentLoaded, setDocumentLoaded] = useState(false);
 
+	const isEditDocumentReady = !isEditMode || (documentLoaded && !documentLoading);
 	const artifactSkill = initialData?.skill;
 	const artifactArguments = artifactSkill?.arguments ?? [];
 	const normalizedArtifactInsert = normalizeSkillInsert(artifactSkill?.insert);
@@ -447,7 +448,9 @@ function AddEditSkillModalContent({
 		return next;
 	};
 
-	const isAllValid = isViewMode ? true : !isSubmitting && Object.values(validateForm(formData)).every(error => !error);
+	const isAllValid =
+		isViewMode ||
+		(isEditDocumentReady && !isSubmitting && Object.values(validateForm(formData)).every(error => !error));
 
 	useEffect(() => {
 		if (!isAddMode) {
@@ -675,6 +678,11 @@ function AddEditSkillModalContent({
 			return;
 		}
 
+		if (isEditMode && !isEditDocumentReady) {
+			setSubmitError('The managed Skill document must finish loading before it can be saved.');
+			return;
+		}
+
 		setSubmitError('');
 
 		const nextErrors = validateForm(formData);
@@ -703,7 +711,7 @@ function AddEditSkillModalContent({
 					displayName: formData.displayName.trim(),
 					location: formData.location.trim(),
 				}
-			: (isAddMode && creationMode === 'create') || (isEditMode && documentLoaded)
+			: (isAddMode && creationMode === 'create') || isEditMode
 				? {
 						...common,
 						artifactID: createArtifactID,
@@ -959,6 +967,7 @@ function AddEditSkillModalContent({
 												onChange={e => {
 													setScaffoldArgumentsText(e.target.value);
 												}}
+												disabled={documentLoading || isSubmitting}
 												placeholder={'topic | Topic to explain | AI agents\ntext | Text to summarize |'}
 												spellCheck="false"
 											/>
@@ -990,6 +999,7 @@ function AddEditSkillModalContent({
 												onChange={e => {
 													setScaffoldBody(e.target.value);
 												}}
+												disabled={documentLoading || isSubmitting}
 												placeholder={
 													scaffoldInsert === SkillInsert.UserMessage
 														? 'Summarize the following text in a $tone tone:\n\n$text'
@@ -1512,7 +1522,9 @@ export function AddEditSkillModal(props: AddEditSkillModalProps) {
 	const requestedMode = props.mode ?? (props.initialData ? 'edit' : 'add');
 	const isLockedSkill =
 		requestedMode !== 'fork' &&
-		(Boolean(props.initialData?.skill?.isBuiltIn) || props.initialData?.skill?.type === SkillType.EmbeddedFS);
+		(Boolean(props.initialData?.skill?.isBuiltIn) ||
+			props.initialData?.skill?.type === SkillType.EmbeddedFS ||
+			(requestedMode === 'edit' && props.initialData?.skill?.isManaged === false));
 	const isViewMode = isLockedSkill || requestedMode === 'view';
 
 	return (

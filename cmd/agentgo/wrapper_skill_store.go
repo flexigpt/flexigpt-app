@@ -3,11 +3,14 @@ package main
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"sort"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -414,4 +417,60 @@ func (w *SkillStoreWrapper) close() {
 	}
 	w.api = nil
 	w.roots = nil
+}
+
+// startSkillCatalogWarmup runs only after protected topology hydration has
+// completed. It must not replace synchronous topology hydration because the
+// UI and other services require the protected Root and Source to exist.
+func (a *App) startSkillCatalogWarmup() {
+	if a == nil ||
+		a.skillAggregateAPI == nil ||
+		a.skillAggregateAPI.service == nil ||
+		a.skillCatalogWarmupCancel != nil {
+		return
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	service := a.skillAggregateAPI.service
+
+	a.skillCatalogWarmupCancel = cancel
+	a.skillCatalogWarmupDone = done
+
+	go func() {
+		defer close(done)
+
+		err := service.SyncRootCatalog(
+			ctx,
+			documentTopology.BuiltinRootID(),
+		)
+		if err != nil && ctx.Err() == nil {
+			slog.Warn(
+				"warm built-in Skill runtime catalog",
+				"error",
+				err,
+			)
+		}
+	}()
+}
+
+func (a *App) stopSkillCatalogWarmup() {
+	cancel := a.skillCatalogWarmupCancel
+	done := a.skillCatalogWarmupDone
+	a.skillCatalogWarmupCancel = nil
+	a.skillCatalogWarmupDone = nil
+
+	if cancel == nil {
+		return
+	}
+	cancel()
+	if done == nil {
+		return
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		slog.Warn("skill runtime catalog warmup did not stop before shutdown")
+	}
 }

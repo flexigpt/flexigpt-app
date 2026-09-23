@@ -37,12 +37,10 @@ func (s *Service) SyncCatalog(
 
 	values, err := source.Skills(ctx, id)
 	if err != nil {
-		cleanupErr := s.removeCatalogAtGeneration(
-			context.WithoutCancel(ctx),
-			id,
-			generation,
-		)
-		return errors.Join(err, cleanupErr)
+		// A failed observation is not evidence that the catalog is empty.
+		// Keep the last known-good registrations rather than unloading every
+		// Skill in this catalog because one Source is temporarily unavailable.
+		return err
 	}
 
 	return s.reconcileCatalogAtGeneration(ctx, id, generation, values)
@@ -66,12 +64,8 @@ func (s *Service) reconcileCatalogAtGeneration(
 
 	view, err := catalogViewFrom(values)
 	if err != nil {
-		cleanupErr := s.removeCatalogAtGeneration(
-			context.WithoutCancel(ctx),
-			id,
-			generation,
-		)
-		return errors.Join(err, cleanupErr)
+		// Preserve a valid prior catalog on malformed source output as well.
+		return err
 	}
 
 	s.catalogMu.Lock()

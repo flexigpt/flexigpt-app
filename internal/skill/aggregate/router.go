@@ -75,6 +75,33 @@ func (r *ArtifactRouter) ResolveArtifactSkill(
 	return r.resolveRecord(ctx, record)
 }
 
+// ResolveArtifactSkills materializes all requested Artifacts in one source
+// verification batch. This is the bulk counterpart to ResolveArtifactSkill.
+func (r *ArtifactRouter) ResolveArtifactSkills(
+	ctx context.Context,
+	refs []artifact.ArtifactRef,
+) ([]ResolvedArtifactSkill, error) {
+	records := make([]artifact.Artifact, 0, len(refs))
+	for _, ref := range refs {
+		if err := ref.Validate(); err != nil {
+			return nil, err
+		}
+		record, err := r.artifacts.Get(ctx, ref)
+		if err != nil {
+			return nil, err
+		}
+		if !skillDomain.IsSkillKind(record.Kind) {
+			return nil, fmt.Errorf(
+				"%w: Artifact %q is not a Skill",
+				basespec.ErrReferenceUnresolved,
+				ref.ArtifactID,
+			)
+		}
+		records = append(records, record)
+	}
+	return r.resolveRecords(ctx, records)
+}
+
 func (r *ArtifactRouter) ListRootSkills(
 	ctx context.Context,
 	rootID root.RootID,
@@ -87,22 +114,47 @@ func (r *ArtifactRouter) ListRootSkills(
 		return nil, err
 	}
 
-	output := make([]ResolvedArtifactSkill, 0, len(records))
+	candidates := make([]artifact.Artifact, 0, len(records))
 	for _, record := range records {
 		if !skillDomain.IsSkillKind(record.Kind) ||
-			record.State != artifact.StateAvailable {
+			record.State != artifact.StateAvailable ||
+			!record.Enabled {
 			continue
 		}
-		value, err := r.resolveRecord(ctx, record)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, value)
+		candidates = append(candidates, record)
 	}
+
+	output, err := r.resolveRecords(ctx, candidates)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := make(map[provider.SkillDef]artifact.ArtifactRef, len(output))
+	for _, value := range output {
+		if previous, duplicate := seen[value.Definition]; duplicate &&
+			previous != value.Artifact {
+			return nil, fmt.Errorf(
+				"%w: Artifact Skills %q and %q resolve to one runtime Skill",
+				basespec.ErrConflict,
+				previous.ArtifactID,
+				value.Artifact.ArtifactID,
+			)
+		}
+		seen[value.Definition] = value.Artifact
+	}
+
 	sort.Slice(output, func(left, right int) bool {
+		if output[left].Definition.Type != output[right].Definition.Type {
+			return output[left].Definition.Type <
+				output[right].Definition.Type
+		}
 		if output[left].Definition.Name != output[right].Definition.Name {
 			return output[left].Definition.Name <
 				output[right].Definition.Name
+		}
+		if output[left].Definition.Location != output[right].Definition.Location {
+			return output[left].Definition.Location <
+				output[right].Definition.Location
 		}
 		return output[left].Artifact.ArtifactID <
 			output[right].Artifact.ArtifactID
@@ -110,30 +162,69 @@ func (r *ArtifactRouter) ListRootSkills(
 	return output, nil
 }
 
+func (r *ArtifactRouter) resolveRecords(
+	ctx context.Context,
+	records []artifact.Artifact,
+) ([]ResolvedArtifactSkill, error) {
+	if len(records) == 0 {
+		return []ResolvedArtifactSkill{}, nil
+	}
+
+	materials, err := materialize.ResolveAll(ctx, r.resources, records)
+	if err != nil {
+		return nil, err
+	}
+	if len(materials) != len(records) {
+		return nil, fmt.Errorf(
+			"%w: Skill materializer returned an unexpected result count",
+			basespec.ErrInvalid,
+		)
+	}
+
+	output := make([]ResolvedArtifactSkill, 0, len(materials))
+	for index, material := range materials {
+		//nolint:gosec // Len equality is checked above.
+		record := records[index]
+		if material.Artifact != record.Ref() {
+			return nil, fmt.Errorf(
+				"%w: Skill materializer resolved another Artifact",
+				basespec.ErrRefreshRequired,
+			)
+		}
+
+		value := ResolvedArtifactSkill{
+			Artifact: record.Ref(),
+			Definition: provider.SkillDef{
+				Type:     fs.Type,
+				Name:     material.Document.Name,
+				Location: material.RuntimeLocation,
+			},
+			Version: "artifact-skill:" + string(material.VersionDigest),
+			Enabled: record.Enabled,
+		}
+		if err := value.Validate(); err != nil {
+			return nil, err
+		}
+		output = append(output, value)
+	}
+	return output, nil
+}
+
 func (r *ArtifactRouter) resolveRecord(
 	ctx context.Context,
 	record artifact.Artifact,
 ) (ResolvedArtifactSkill, error) {
-	material, err := materialize.Resolve(ctx, r.resources, record)
+	values, err := r.resolveRecords(ctx, []artifact.Artifact{record})
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
-	value := ResolvedArtifactSkill{
-		Artifact: material.Artifact,
-		Definition: provider.SkillDef{
-			Type:     fs.Type,
-			Name:     material.Document.Name,
-			Location: material.RuntimeLocation,
-		},
-		Version: "artifact-skill:" + string(
-			material.VersionDigest,
-		),
-		Enabled: record.Enabled,
+	if len(values) != 1 {
+		return ResolvedArtifactSkill{}, fmt.Errorf(
+			"%w: expected one resolved Skill",
+			basespec.ErrInvalid,
+		)
 	}
-	if err := value.Validate(); err != nil {
-		return ResolvedArtifactSkill{}, err
-	}
-	return value, nil
+	return values[0], nil
 }
 
 func (s ResolvedArtifactSkill) Validate() error {

@@ -322,6 +322,8 @@ export interface ISkillStoreAPI {
 export interface ISkillAggregateAPI {
 	resolveArtifactSkill(skill: ArtifactRef): Promise<ResolvedArtifactSkill>;
 
+	resolveArtifactSkills(skills: ArtifactRef[]): Promise<ResolvedArtifactSkill[]>;
+
 	listArtifactSkillRefs(filter: ArtifactSkillFilter): Promise<ArtifactRef[]>;
 
 	describeArtifactSkill(skill: ArtifactRef): Promise<ArtifactSkillSummary>;

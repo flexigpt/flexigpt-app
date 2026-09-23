@@ -82,6 +82,22 @@ func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 	)
 }
 
+// ResolveArtifactSkills resolves several durable ArtifactRefs in one call.
+// The aggregate synchronizes each owning Root once instead of once per Skill.
+func (w *SkillAggregateWrapper) ResolveArtifactSkills(
+	refs []artifact.ArtifactRef,
+) ([]skillAggregate.ResolvedArtifactSkill, error) {
+	return withSkillAggregate(
+		w,
+		func(service *skillAggregate.Service) ([]skillAggregate.ResolvedArtifactSkill, error) {
+			return service.ResolveArtifactSkills(
+				context.Background(),
+				refs,
+			)
+		},
+	)
+}
+
 // GetArtifactSkillsPrompt renders an ArtifactRef-scoped Skill prompt.
 // The caller supplies Artifact Store identities; the aggregate performs
 // runtime-definition resolution and root catalog synchronization.

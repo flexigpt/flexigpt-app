@@ -398,7 +398,7 @@ function AgentCollectionEditModal({
 	}
 
 	return (
-		<ModalDialog isOpen={true} onClose={onClose} blockCancel>
+		<ModalDialog isOpen={true} onClose={onClose}>
 			<AgentCollectionEditModalContent
 				key={`${collection.artifact.rootID}:${collection.artifact.id}:${collection.artifact.revision}`}
 				collection={collection}
