@@ -99,8 +99,8 @@ The MCP Store provides:
 
 - MCP Collection catalog and capability inspection.
 - Import of one MCP Server, one MCP Policy, or one MCP Plugin declaration package.
-- JSON and YAML interchange.
-- Canonical declaration export as JSON or YAML.
+- JSON and YAML import interchange.
+- Canonical YAML declaration export.
 - Create-only managed package publication.
 - File-based declaration revision through export, external editing, deletion, and re-import.
 - MCP Collection membership created by import rather than by a member editor.
@@ -118,7 +118,7 @@ The design must:
 
 - Reuse ordinary source-backed `mcp`, `mcp.policy`, and `plugin` Artifacts.
 - Preserve portable declaration ownership in Source content.
-- Support JSON and YAML as import and export interchange formats.
+- Support JSON and YAML as import interchange formats and canonical YAML export.
 - Make import and export the only user-facing way to author or revise managed MCP declarations.
 - Support both:
   - One standalone MCP Server declaration.
@@ -135,7 +135,7 @@ This HLD defines:
 
 - MCP Collection behavior and MCP-domain Plugin restrictions.
 - Import and export of `mcp`, `mcp.policy`, and MCP-domain `plugin` declarations.
-- JSON and YAML interchange behavior.
+- JSON and YAML import interchange and canonical YAML export behavior.
 - Managed package naming and publication policy.
 - File-import preview, commit, confirmation, conflict, and deletion behavior.
 - MCP Collection shell lifecycle.
@@ -166,6 +166,7 @@ This HLD does not define:
 - Automatic transfer of secrets or installation-local values to a new Artifact occurrence.
 - A visual MCP Server, MCP Policy, or Plugin declaration editor.
 - In-app YAML or JSON declaration editing.
+- Caller-selected JSON declaration export from the MCP Store.
 
 ## Desired user experience
 
@@ -182,7 +183,7 @@ A user can:
 - Inspect a Collection capability view that includes available, unavailable, and ambiguous direct relationships.
 - Inspect available MCP Server and MCP Policy declarations.
 - View declaration diagnostics and package provenance.
-- Export an available declaration as JSON or YAML.
+- Export an available declaration as YAML.
 - Enable or disable a Collection or available target through universal Artifact metadata.
 - Open a separate setup handoff for a resolved MCP Server.
 
@@ -245,7 +246,7 @@ A user changes an independently managed MCP Server or Policy by:
 
 ```text
 Export declaration
-  -> edit JSON or YAML outside the application
+  -> edit YAML outside the application
   -> delete the managed package
   -> import the revised declaration
 ```
@@ -408,7 +409,7 @@ Managed packages remain Source-backed packages. Package kinds are storage conven
 
 ## Interchange format and package format
 
-JSON and YAML are supported interchange formats.
+JSON and YAML are supported import interchange formats.
 
 The import format is determined from the selected file extension:
 
@@ -767,7 +768,7 @@ Resolution availability does not establish installation completion, connection c
 
 ### Export
 
-Available declarations can be exported in either canonical JSON or canonical YAML.
+Available declarations can be exported as canonical YAML.
 
 | Export target  | Exported root declaration |
 | -------------- | ------------------------- |
@@ -851,7 +852,7 @@ Enablement is not a substitute for declaration import, setup, or runtime behavio
 | ------------------------- | --------------------------------------------------------------------------------------------------- |
 | MCP Collections           | Browse, inspect, create shell, edit display metadata, enable, disable, guarded delete.              |
 | Import                    | Select JSON or YAML file, choose destination where required, preview, confirm, commit.              |
-| Export                    | Export available Server, Policy, or Plugin declaration as JSON or YAML.                             |
+| Export                    | Export available Server, Policy, or Plugin declaration as YAML.                                     |
 | Managed package lifecycle | Delete independently managed package or imported Plugin package through explicit lifecycle actions. |
 | Setup handoff             | Open a separate setup flow for a resolved MCP Server.                                               |
 
@@ -885,7 +886,7 @@ The MCP Store UI must not expose:
 | Update Collection metadata      | Updates limited display metadata only.                                                     |
 | Preview MCP import              | Validates JSON or YAML, computes package plan, returns diagnostics and signed preparation. |
 | Commit MCP import               | Publishes only the signed prepared declaration plan.                                       |
-| Export MCP declaration          | Returns canonical JSON or YAML for one available declaration.                              |
+| Export MCP declaration          | Returns canonical YAML for one available declaration.                                      |
 | Delete managed Server or Policy | Removes one independent package with optimistic concurrency.                               |
 | Delete imported Plugin package  | Removes one imported Plugin package with explicit package authorization.                   |
 | Set enabled                     | Uses universal Artifact enablement metadata.                                               |
@@ -969,15 +970,15 @@ The target MCP Store replaces declaration authoring with import and export. Exis
 
 ### Migration phases
 
-| Phase                      | Change                                                                                                                        | Result                                                            |
-| -------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| 1. Import foundation       | Add MCP JSON and YAML import parser, managed profiles, preview, signed preparation, package publisher, and exporter.          | New flow can coexist with legacy packages.                        |
-| 2. Package format support  | Add managed YAML document recognition for `mcp`, `mcp.policy`, and Plugin package documents.                                  | JSON and YAML imports can produce source-backed managed packages. |
-| 3. Read compatibility      | Treat legacy managed Servers, Policies, and Collections as readable and exportable.                                           | Existing users can inspect and export before changing anything.   |
-| 4. UI cutover              | Replace Add/Edit Server and Policy authoring controls with Import and Export actions.                                         | New declaration changes become file-based.                        |
-| 5. API restriction         | Remove frontend access to create, replace, upsert, attach, detach, and member-patching APIs.                                  | Low-level APIs become importer-only, migration-only, or internal. |
-| 6. Legacy package adoption | Permit explicit adoption only for byte-equivalent or semantically equivalent package content under a reviewed migration path. | Existing compatible packages can retain identity where safe.      |
-| 7. Retirement              | Remove legacy form drafts, manual declaration mutation endpoints, and obsolete Bundle terminology.                            | MCP Store reaches the desired import/export-only declaration UX.  |
+| Phase                   | Change                                                                                                                        | Result                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| Import foundation       | Add MCP JSON and YAML import parser, managed profiles, preview, signed preparation, package publisher, and YAML exporter.     | New flow can coexist with legacy packages.                        |
+| Package format support  | Add managed YAML document recognition for `mcp`, `mcp.policy`, and Plugin package documents.                                  | JSON and YAML imports can produce source-backed managed packages. |
+| Read compatibility      | Treat legacy managed Servers, Policies, and Collections as readable and exportable.                                           | Existing users can inspect and export before changing anything.   |
+| UI cutover              | Replace Add/Edit Server and Policy authoring controls with Import and Export actions.                                         | New declaration changes become file-based.                        |
+| API restriction         | Remove frontend access to create, replace, upsert, attach, detach, and member-patching APIs.                                  | Low-level APIs become importer-only, migration-only, or internal. |
+| Legacy package adoption | Permit explicit adoption only for byte-equivalent or semantically equivalent package content under a reviewed migration path. | Existing compatible packages can retain identity where safe.      |
+| Retirement              | Remove legacy form drafts, manual declaration mutation endpoints, and obsolete Bundle terminology.                            | MCP Store reaches the desired import/export-only declaration UX.  |
 
 ### Legacy data disposition
 
@@ -999,7 +1000,7 @@ The target MCP Store replaces declaration authoring with import and export. Exis
 
 ```text
 Export current MCP Server declaration
-  -> review or edit JSON or YAML outside the application
+  -> review or edit YAML outside the application
   -> select an MCP Collection
   -> import the declaration
   -> configure local setup for the new Artifact occurrence if required
@@ -1016,7 +1017,7 @@ If the old Server package remains present with the same Root-scoped identity, im
 
 ```text
 Export current MCP Policy declaration
-  -> edit JSON or YAML outside the application
+  -> edit YAML outside the application
   -> import into an MCP Collection
 
 or
@@ -1074,7 +1075,7 @@ Status terminology:
 | Capability                                           | Current status                | Desired status                        | Gap or required change                                                                    |
 | ---------------------------------------------------- | ----------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------- |
 | Portable `mcp`, `mcp.policy`, and `plugin` contracts | Available                     | Retained                              | No new portable MCP type is needed.                                                       |
-| Canonical JSON declaration decoding                  | Available                     | Retained                              | Reuse for MCP import and export.                                                          |
+| Canonical JSON declaration decoding                  | Available                     | Retained                              | Reuse for JSON MCP import and managed-package decoding.                                   |
 | Canonical YAML declaration decoding                  | Available                     | Retained                              | Wire managed MCP package discovery and publication to YAML forms.                         |
 | Standard `.mcp.json` repository decoding             | Available                     | Retained as repository ingestion only | Do not expose it as managed import until an explicit bulk-import design exists.           |
 | Managed MCP Server package publication               | Available                     | Retained behind importer only         | Remove direct user-facing create and replace paths.                                       |
@@ -1086,8 +1087,8 @@ Status terminology:
 | Standalone MCP Policy import                         | Not supported                 | Required                              | Implement file-based Policy authoring to replace manual upsert.                           |
 | MCP Plugin JSON import                               | Not supported                 | Required                              | Implement Plugin profile, contained declaration projection, and package publication.      |
 | MCP Plugin YAML import                               | Not supported                 | Required                              | Reuse canonical YAML decoder and Plugin package writer.                                   |
-| MCP declaration export as JSON                       | Not supported as MCP Store UI | Required                              | Add canonical declaration exporter.                                                       |
-| MCP declaration export as YAML                       | Not supported as MCP Store UI | Required                              | Add canonical YAML renderer and format selection.                                         |
+| MCP declaration export as JSON                       | Not supported as MCP Store UI | Excluded                              | JSON export is intentionally outside the MCP Store UI; retain JSON import only.           |
+| MCP declaration export as YAML                       | Not supported as MCP Store UI | Required                              | Add canonical YAML renderer.                                                              |
 | Relationship diagnostics during import               | Partial                       | Required                              | Reuse shared resolver inspection and add package-local Policy planning.                   |
 | Signed prepared import infrastructure                | Available generically         | Required for MCP importer             | Bind MCP-specific package and Collection state to prepared payloads.                      |
 | Create-only import behavior                          | Partial                       | Required                              | Existing replacement and upsert paths must not be used by normal import.                  |
