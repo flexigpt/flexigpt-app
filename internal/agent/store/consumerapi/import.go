@@ -6,9 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"path"
 	"sort"
-	"strings"
 	"time"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
@@ -148,11 +146,9 @@ func (a *API) PreviewAgentImport(
 			basespec.ErrInvalid,
 		)
 	}
-	if !isYAMLImportPath(request.Path) {
-		return AgentImportPreview{}, fmt.Errorf(
-			"%w: managed Agent import accepts YAML files only",
-			basespec.ErrInvalid,
-		)
+	inputFormat, err := managedAgentImportFormatForPath(request.Path)
+	if err != nil {
+		return AgentImportPreview{}, err
 	}
 	if request.ExpectedSourceDigest != "" {
 		if err := cryptoutil.ValidateDigest(
@@ -194,13 +190,13 @@ func (a *API) PreviewAgentImport(
 		return preview, nil
 	}
 
-	canonical, err := yamlutil.CanonicalObjectJSON(
+	canonical, err := canonicalManagedAgentImportDocument(
+		inputFormat,
 		sourceBytes,
-		basespec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		preview.Issues = append(preview.Issues, importIssue(
-			"agent.import.yaml-invalid",
+			inputFormat.invalidDocumentIssueCode(),
 			"",
 			err,
 		))
@@ -1579,15 +1575,4 @@ func compactStrings(
 		output = append(output, value)
 	}
 	return output
-}
-
-func isYAMLImportPath(
-	value string,
-) bool {
-	switch strings.ToLower(path.Ext(value)) {
-	case ".yaml", ".yml":
-		return true
-	default:
-		return false
-	}
 }

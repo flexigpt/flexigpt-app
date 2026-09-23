@@ -615,7 +615,7 @@ export default function AgentsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Agent Collections"
-					description="Import immutable Agent YAML recipes, inspect their declarations, configure MCP dependencies, and use them as reusable conversation starters."
+					description="Import immutable Agent JSON or YAML recipes, inspect their declarations, configure MCP dependencies, and use them as reusable conversation starters."
 					actions={
 						<>
 							<button

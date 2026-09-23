@@ -43,6 +43,8 @@ type AgentImportDestination struct {
 }
 
 type AgentImportPreviewRequest struct {
+	// Path is a transient selected .json, .yaml, or .yml input file path.
+	// Its extension selects the backend parser and is never persisted.
 	Path string `json:"path"`
 
 	Collection                 artifact.ArtifactRef `json:"collection"`
@@ -115,7 +117,10 @@ type AgentImportPreview struct {
 
 	SourceDigest     cryptoutil.Digest `json:"sourceDigest,omitempty"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
-	NormalizedYAML   string            `json:"normalizedYAML,omitempty"`
+
+	// NormalizedYAML is returned for JSON and YAML input alike. Managed Agent
+	// export intentionally remains YAML-only.
+	NormalizedYAML string `json:"normalizedYAML,omitempty"`
 
 	Agent               *AgentImportArtifactPreview  `json:"agent,omitempty"`
 	Destination         AgentImportDestination       `json:"destination"`

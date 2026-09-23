@@ -87,6 +87,10 @@ export interface AgentImportDestination {
 }
 
 export interface AgentImportPreviewRequest {
+	/**
+	 * Transient selected input path. The backend accepts `.json`, `.yaml`,
+	 * and `.yml`, selecting the parser from this extension.
+	 */
 	path: string;
 	collection: ArtifactRef;
 	expectedCollectionRevision: number;
@@ -156,6 +160,10 @@ export interface AgentImportPreview {
 
 	sourceDigest?: ArtifactDigest;
 	definitionDigest?: ArtifactDigest;
+
+	/**
+	 * Canonical YAML output for either JSON or YAML input.
+	 */
 	normalizedYAML?: string;
 
 	agent?: AgentImportArtifactPreview;

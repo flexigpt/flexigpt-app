@@ -2,7 +2,7 @@ The verified corrections affect Collection semantics, the completed frontend, im
 
 # Agent Store HLD
 
-Status: Current design and implemented user experience. Source-backed Agent catalog, Agent Collections, managed Agent import and export, protected built-in Agent packages, MCP setup UI, and read-only Agent inspection are available. Managed inline MCP credential-placement validation is partial: known sensitive environment and header positions are validated, while all command and URL credential placements are not comprehensively classified.
+Status: Current design and implemented user experience. Source-backed Agent catalog, Agent Collections, managed Agent JSON and YAML import and YAML export, protected built-in Agent packages, MCP setup UI, and read-only Agent inspection are available. Managed inline MCP credential-placement validation is partial: known sensitive environment and header positions are validated, while all command and URL credential placements are not comprehensively classified.
 
 Normative foundations:
 
@@ -13,22 +13,72 @@ This HLD defines Agent-specific Store policy, Agent Collection behavior, managed
 
 Portable declaration syntax, Source behavior, Artifact persistence, relationship resolution, fallback, selector behavior, resource verification, enablement, and composition semantics are inherited from the normative HLDs and are not redefined here.
 
-## Table of contents
+## Table of contents <!-- omit from toc -->
 
 - [Purpose](#purpose)
 - [Scope and boundaries](#scope-and-boundaries)
+  - [Goals](#goals)
+  - [In scope](#in-scope)
+  - [Out of scope](#out-of-scope)
 - [User experience](#user-experience)
+  - [Browse Agents and Collections](#browse-agents-and-collections)
+  - [Manage Collections](#manage-collections)
+  - [Import a managed Agent](#import-a-managed-agent)
+  - [Inspect, export, and delete a managed Agent](#inspect-export-and-delete-a-managed-agent)
+  - [Configure MCP setup](#configure-mcp-setup)
+  - [View a Composer starter projection](#view-a-composer-starter-projection)
 - [Architecture and ownership](#architecture-and-ownership)
+  - [Responsibility boundaries](#responsibility-boundaries)
+  - [Source-backed state](#source-backed-state)
+  - [Identity and local references](#identity-and-local-references)
 - [Agent Collections](#agent-collections)
+  - [Representation](#representation)
+  - [Baseline Collection](#baseline-collection)
+  - [Membership behavior](#membership-behavior)
+  - [Membership maintenance boundary](#membership-maintenance-boundary)
+  - [Collection deletion](#collection-deletion)
 - [Managed Agent authoring](#managed-agent-authoring)
+  - [Import and export are the managed authoring path](#import-and-export-are-the-managed-authoring-path)
+  - [Managed import profile](#managed-import-profile)
+  - [Validity categories](#validity-categories)
 - [Managed dependency lookup](#managed-dependency-lookup)
+  - [Managed scope normalization](#managed-scope-normalization)
+  - [Managed dependency targets](#managed-dependency-targets)
+  - [Inline MCP policy references](#inline-mcp-policy-references)
+  - [Informational dependency preflight](#informational-dependency-preflight)
 - [Import preview and commit](#import-preview-and-commit)
+  - [Import input](#import-input)
+  - [Preview](#preview)
+  - [Diagnostics](#diagnostics)
+  - [Signed preparation](#signed-preparation)
+  - [Commit](#commit)
+  - [Best-effort publication](#best-effort-publication)
+  - [Conflicts](#conflicts)
 - [Reads, resolution, export, and enablement](#reads-resolution-export-and-enablement)
+  - [Resolution](#resolution)
+  - [Collection inspection](#collection-inspection)
+  - [Export](#export)
+  - [Text materialization](#text-materialization)
+  - [Enablement](#enablement)
 - [Built-in Agents](#built-in-agents)
+  - [Protected package model](#protected-package-model)
+  - [Built-in package admission](#built-in-package-admission)
+  - [Protected Root behavior](#protected-root-behavior)
+  - [Current built-in Agent Collections](#current-built-in-agent-collections)
 - [Workspace, Composer, and runtime integration](#workspace-composer-and-runtime-integration)
+  - [Workspace integration](#workspace-integration)
+  - [Composer integration](#composer-integration)
+  - [MCP integration](#mcp-integration)
+  - [Runtime boundary](#runtime-boundary)
 - [Security and persistence](#security-and-persistence)
+  - [Persisted state](#persisted-state)
+  - [Non-persisted state](#non-persisted-state)
+  - [Credential boundary](#credential-boundary)
 - [Implementation mapping](#implementation-mapping)
 - [Current implementation status](#current-implementation-status)
+  - [Catalog and Collection capabilities](#catalog-and-collection-capabilities)
+  - [Managed import and export capabilities](#managed-import-and-export-capabilities)
+  - [Built-in, UI, and runtime capabilities](#built-in-ui-and-runtime-capabilities)
 
 ## Purpose
 
@@ -47,8 +97,8 @@ The Agent Store provides:
 
 - Agent catalog and typed resolution views.
 - Agent Collections backed by Agent-only Plugin Artifacts.
-- File-based managed Agent import.
-- Portable Agent export.
+- File-based managed Agent JSON and YAML import.
+- Portable Agent YAML export.
 - Managed Agent package lifecycle policy.
 - Built-in Agent package hydration and validation.
 - Agent and Collection enablement through universal Artifact metadata.
@@ -81,7 +131,7 @@ This HLD defines:
 - Agent catalog, read, resolution, export, and enablement behavior.
 - Agent-only managed Collection policy.
 - Baseline Agent Collection provisioning.
-- Managed Agent YAML import and deletion.
+- Managed Agent JSON and YAML import and deletion.
 - Managed Agent immutability after import.
 - Managed dependency scope normalization.
 - Client-carried signed import preparation.
@@ -105,6 +155,7 @@ This HLD does not define:
 - A visual Agent declaration editor.
 - In-place managed Agent declaration editing.
 - Managed Agent replacement or upsert.
+- Caller-selected JSON managed Agent export.
 - Generic import of arbitrary Artifact declaration types.
 - Linked-file synchronization or import-file watching.
 - Backend-held import sessions, commit-token registries, or replay receipts.
@@ -147,7 +198,7 @@ The user flow is:
 
 ```text
 Create or select an editable Agent Collection
-  -> choose one YAML file
+  -> choose one JSON or YAML file
   -> preview validation, normalized YAML, diagnostics, and conflicts
   -> accept required confirmations
   -> import into the selected Collection
@@ -528,7 +579,9 @@ Dependency state is not captured as a commit witness.
 
 ### Import input
 
-Managed import accepts one user-selected YAML file.
+Managed import accepts one user-selected JSON, YAML, or YML file.
+
+The selected extension determines the input parser. JSON and YAML normalize to the same canonical declaration form.
 
 The file input path is transient. It is not persisted in the managed Agent package or prepared import payload.
 
@@ -540,7 +593,7 @@ The import reader must:
 - Respect cancellation.
 - Return valid UTF-8 content.
 - Avoid logging declaration content.
-- Require one YAML object document.
+- Require one JSON object document for `.json`, or one YAML object document for `.yaml` and `.yml`.
 - Reject duplicate mapping keys and invalid YAML structure.
 
 ### Preview
@@ -548,7 +601,7 @@ The import reader must:
 Preview performs the following user-visible workflow:
 
 ```text
-Read selected YAML
+Read selected JSON or YAML
   -> calculate input digest
   -> validate portable Agent declaration
   -> validate managed import profile
@@ -737,7 +790,7 @@ Export preserves declaration shape:
 - Contained declarations remain contained.
 - Inline Text remains inline.
 - Inline MCP remains inline.
-- Managed scope normalization remains visible in managed Agent YAML.
+- Managed scope normalization remains visible in exported Agent declarations.
 - Repository and protected declarations retain their existing portable shape.
 
 Export excludes local and runtime state, including:
@@ -1009,16 +1062,18 @@ Status terminology:
 
 | Capability                                                | Status        | Notes                                                                                                  |
 | --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
-| YAML-only managed Agent import                            | Available     | Imports one selected YAML declaration file.                                                            |
+| JSON and YAML managed Agent import                        | Pending       | Desired format extension. Current implementation imports one selected YAML declaration file.           |
+| JSON and YAML managed Agent import                        | Available     | One selected `.json`, `.yaml`, or `.yml` declaration is parsed by its selected extension.              |
 | Strict managed Agent admission profile                    | Available     | Restricts managed members to inline Text, named dependencies, and inline MCP where allowed.            |
 | Managed scope normalization                               | Available     | Named managed Agent dependencies are persisted with `scope: builtin`.                                  |
 | Empty Agent import                                        | Available     | An Agent with no members is valid.                                                                     |
-| Preview with normalized YAML and diagnostics              | Available     | Shows errors, warnings, confirmations, conflicts, and projected Artifacts.                             |
+| Preview with normalized YAML and diagnostics              | Available     | JSON and YAML input share canonical validation; preview renders normalized YAML.                       |
 | Client-carried signed preparation                         | Available     | Prepared payloads are authenticated, expiring, and process-local.                                      |
 | Dependency observations without import gating             | Available     | Missing and ambiguous dependencies remain warnings.                                                    |
 | Create-only managed package publication                   | Available     | Replacement, merge, rename, and upsert are not supported.                                              |
 | Best-effort Collection membership and package publication | Available     | Dangling membership is preserved on package publication failure.                                       |
-| Managed Agent export                                      | Available     | Available Agents export canonical portable YAML without requiring complete resolution.                 |
+| YAML Managed Agent export                                 | Available     | Available Agents export canonical portable YAML without requiring complete resolution.                 |
+| JSON Managed Agent export                                 | Not supported | The management export surface intentionally remains YAML-only.                                         |
 | Managed Agent Text materialization                        | Available     | Verified backend materialization is available through Agent Store.                                     |
 | Managed inline MCP credential-placement validation        | Partial       | Sensitive environment and header positions are validated.                                              |
 | Complete URL and command credential classification        | Partial       | Import does not yet classify every credential-bearing URL or command position.                         |

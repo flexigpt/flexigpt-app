@@ -16,10 +16,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-// ExportAgent exports the canonical portable declaration for any available
-// Agent Artifact, including protected built-ins, managed imported Agents, and
+// ExportAgent exports canonical portable YAML for any available Agent Artifact,
+// including protected built-ins, managed imported Agents, and
 // repository-backed Agents. Export is read-only and does not imply that the
 // exported Agent is editable or importable as a managed Agent.
+// JSON export is intentionally not exposed by the management API.
 func (a *API) ExportAgent(
 	ctx context.Context,
 	request AgentExportRequest,

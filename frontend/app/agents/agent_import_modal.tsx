@@ -31,6 +31,10 @@ interface AgentImportModalProps {
 	onCommitted: (result: AgentImportCommitResult) => Promise<void>;
 }
 
+function isSupportedAgentImportPath(value: string): boolean {
+	return /\.(?:json|ya?ml)$/i.test(value);
+}
+
 function getIssueClass(severity: AgentImportIssueSeverity): string {
 	switch (severity) {
 		case AgentImportIssueSeverity.Error:
@@ -134,11 +138,18 @@ export function AgentImportModal({
 			const selectedPath = paths[0]?.trim();
 
 			if (selectedPath) {
-				setPath(selectedPath);
 				resetPreview();
+
+				if (!isSupportedAgentImportPath(selectedPath)) {
+					setPath('');
+					setError('Select a JSON or YAML Agent declaration file (.json, .yaml, or .yml).');
+					return;
+				}
+
+				setPath(selectedPath);
 			}
 		} catch (pickError) {
-			setError(getErrorMessage(pickError, 'Unable to select an Agent YAML file.'));
+			setError(getErrorMessage(pickError, 'Unable to select an Agent JSON or YAML file.'));
 		} finally {
 			setIsPickingFile(false);
 		}
@@ -151,7 +162,7 @@ export function AgentImportModal({
 		}
 
 		if (!path.trim()) {
-			setError('Select an Agent YAML file.');
+			setError('Select an Agent JSON or YAML declaration file.');
 			return;
 		}
 
@@ -217,7 +228,7 @@ export function AgentImportModal({
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title="Import Managed Agent"
-						description="Preview a YAML Agent declaration, accept required confirmations, then publish it into the selected Collection."
+						description="Preview a JSON or YAML Agent declaration, accept required confirmations, then publish it into the selected Collection."
 						onClose={onClose}
 						closeDisabled={isPreviewing || isCommitting}
 					/>
@@ -265,7 +276,7 @@ export function AgentImportModal({
 							) : null}
 						</ModalSection>
 
-						<ModalSection title="Agent YAML file">
+						<ModalSection title="Agent declaration file">
 							<ModalField label="Selected file" htmlFor="agent-import-path" required>
 								<div className="flex gap-2">
 									<input
@@ -273,7 +284,7 @@ export function AgentImportModal({
 										className="input min-w-0 flex-1 rounded-xl font-mono text-xs"
 										value={path}
 										readOnly
-										placeholder="Select a .yaml or .yml file"
+										placeholder="Select a .json, .yaml, or .yml file"
 									/>
 									<button
 										type="button"
