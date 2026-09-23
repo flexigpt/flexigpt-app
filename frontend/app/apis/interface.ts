@@ -1,4 +1,16 @@
 import type {
+	AgentExportResult,
+	AgentImportCommitRequest,
+	AgentImportCommitResult,
+	AgentImportDestination,
+	AgentImportPreview,
+	AgentImportPreviewRequest,
+	AgentResolution,
+	AgentTextMaterialization,
+	AgentView,
+	ListAgentsRequest,
+} from '@/spec/agent';
+import type {
 	ArtifactRef,
 	ArtifactRootID,
 	ArtifactSourceID,
@@ -7,12 +19,6 @@ import type {
 	StoreArtifact,
 	StoreArtifactSourceSummary,
 } from '@/spec/artifact';
-import type {
-	AssistantPreset,
-	AssistantPresetBundle,
-	AssistantPresetListItem,
-	PutAssistantPresetPayload,
-} from '@/spec/assistantpreset';
 import type {
 	Attachment,
 	AttachmentsDroppedPayload,
@@ -248,6 +254,50 @@ export interface IToolStoreAPI {
 	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
 }
 
+export interface IAgentStoreAPI {
+	listAgents(request: ListAgentsRequest): Promise<AgentView[]>;
+
+	listAgentsForManagement(): Promise<AgentView[]>;
+
+	getAgent(agent: ArtifactRef): Promise<AgentView>;
+
+	materializeAgentText(text: ArtifactRef): Promise<AgentTextMaterialization>;
+
+	resolveAgent(agent: ArtifactRef): Promise<AgentResolution>;
+
+	resolveAgentCapabilities(agent: ArtifactRef): Promise<CapabilityPlan>;
+
+	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
+
+	listAgentCollectionMembers(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;
+
+	createAgentCollection(request: CreateCollectionRequest): Promise<CollectionView>;
+
+	getAgentCollection(collection: ArtifactRef): Promise<CollectionView>;
+
+	listAgentCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;
+
+	updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
+
+	setAgentCollectionEnabled(
+		collection: ArtifactRef,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<CollectionView>;
+
+	deleteAgentCollection(collection: ArtifactRef, expectedRevision: number): Promise<void>;
+
+	listAgentImportDestinations(): Promise<AgentImportDestination[]>;
+
+	previewAgentImport(request: AgentImportPreviewRequest): Promise<AgentImportPreview>;
+
+	commitAgentImport(request: AgentImportCommitRequest): Promise<AgentImportCommitResult>;
+
+	exportAgent(agent: ArtifactRef): Promise<AgentExportResult>;
+
+	deleteManagedAgent(agent: ArtifactRef, expectedRevision: number): Promise<void>;
+}
+
 export interface ISkillStoreAPI {
 	addSkillCollectionMember(request: AddMemberRequest): Promise<CollectionView>;
 
@@ -478,65 +528,6 @@ export interface IAggregateAPI {
 	): Promise<CompletionResponseBody | undefined>;
 
 	cancelCompletion(requestId: string): Promise<void>;
-}
-
-export interface IAssistantPresetStoreAPI {
-	/** List assistant preset bundles, optionally filtered by IDs, disabled, and paginated. */
-	listAssistantPresetBundles(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ assistantPresetBundles: AssistantPresetBundle[]; nextPageToken?: string }>;
-
-	/** Create or update an assistant preset bundle. */
-	putAssistantPresetBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
-	): Promise<void>;
-
-	/** Patch (enable/disable) an assistant preset bundle. */
-	patchAssistantPresetBundle(bundleID: string, isEnabled: boolean): Promise<void>;
-
-	/** Delete an assistant preset bundle. */
-	deleteAssistantPresetBundle(bundleID: string): Promise<void>;
-
-	/** List assistant presets, optionally filtered by bundle IDs and paginated. */
-	listAssistantPresets(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		recommendedPageSize?: number,
-		pageToken?: string
-	): Promise<{ assistantPresetListItems: AssistantPresetListItem[]; nextPageToken?: string }>;
-
-	/** Create or update an assistant preset version. */
-	putAssistantPreset(
-		bundleID: string,
-		assistantPresetSlug: string,
-		version: string,
-		payload: PutAssistantPresetPayload
-	): Promise<void>;
-
-	/** Patch (enable/disable) an assistant preset version. */
-	patchAssistantPreset(
-		bundleID: string,
-		assistantPresetSlug: string,
-		version: string,
-		isEnabled: boolean
-	): Promise<void>;
-
-	/** Delete an assistant preset version. */
-	deleteAssistantPreset(bundleID: string, assistantPresetSlug: string, version: string): Promise<void>;
-
-	/** Get an assistant preset version. */
-	getAssistantPreset(
-		bundleID: string,
-		assistantPresetSlug: string,
-		version: string
-	): Promise<AssistantPreset | undefined>;
 }
 
 export interface IMCPStoreAPI {

@@ -4,36 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
 import type { IncludePreviousMessages, ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
-import type { Tool, ToolStoreChoice } from '@/spec/tool';
 import { ReasoningType } from '@/spec/inference';
 import { DefaultUIChatOptions } from '@/spec/modelpreset';
-import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
-import { getUUIDv7 } from '@/lib/uuid_utils';
-
-import type {
-	AssistantPresetOptionItem,
-	AssistantPresetPreparedApplication,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { loadSkillOptions, loadToolOptions } from '@/assistantpresets/lib/assistant_preset_catalog';
-import {
-	buildModelPresetRefKey,
-	buildSkillRefKey,
-	buildToolRefKey,
-} from '@/assistantpresets/lib/assistant_preset_utils';
-import {
-	normalizeAssistantPresetMCPContext,
-	normalizeAssistantPresetSkillRefs,
-	normalizeAssistantPresetToolChoices,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { useAssistantPresets } from '@/chats/composer/assistantpresets/use_assistant_presets';
 import {
 	getSupportedReasoningLevels,
 	sanitizeUIChatOptionByCapabilities,
 	supportsOutputVerbosity,
 } from '@/modelpresets/lib/capabilities_override';
 import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
-import { isSkillArtifactRef, normalizeSkillSelectionsToRefs } from '@/skills/lib/skill_identity_utils';
 
 type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
 
@@ -45,6 +24,7 @@ function loadChatInputOptionsCached(options?: { forceRefresh?: boolean }): Promi
 		if (chatInputOptionsCache) {
 			return Promise.resolve(chatInputOptionsCache);
 		}
+
 		if (chatInputOptionsPromise) {
 			return chatInputOptionsPromise;
 		}
@@ -56,33 +36,31 @@ function loadChatInputOptionsCached(options?: { forceRefresh?: boolean }): Promi
 		chatInputOptionsCache = result;
 		return result;
 	});
+
 	chatInputOptionsPromise = request;
 
-	void request.then(
-		() => {
-			if (chatInputOptionsPromise === request) {
-				chatInputOptionsPromise = undefined;
-			}
-		},
-		() => {
-			if (chatInputOptionsPromise === request) {
-				chatInputOptionsPromise = undefined;
-			}
+	void request.finally(() => {
+		if (chatInputOptionsPromise === request) {
+			chatInputOptionsPromise = undefined;
 		}
-	);
+	});
 
 	return request;
+}
+
+function hasOwn(value: object, key: string): boolean {
+	return Object.hasOwn(value, key);
 }
 
 function isHybridReasoningModel(model: UIChatOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
 }
 
-function hasOwn(obj: object, key: string): boolean {
-	return Object.hasOwn(obj, key);
+function pickUniqueModelOption(options: UIChatOption[]): UIChatOption | undefined {
+	return options.length === 1 ? options[0] : undefined;
 }
 
-function applyPersistedModelParamToSelectedModel(
+function applyPersistedModelParam(
 	base: UIChatOption,
 	modelParam?: ModelParam,
 	options?: { preserveName?: boolean }
@@ -98,6 +76,7 @@ function applyPersistedModelParamToSelectedModel(
 		maxOutputLength: modelParam.maxOutputLength,
 		timeout: modelParam.timeout,
 	};
+
 	if (options?.preserveName !== false) {
 		next.name = modelParam.name;
 	}
@@ -138,15 +117,7 @@ function applyPersistedModelParamToSelectedModel(
 		delete next.additionalParametersRawJSON;
 	}
 
-	// IMPORTANT:
-	// selectedModel.systemPrompt in UI state represents the model-default prompt.
-	// The restored effective conversation prompt is handled separately as a
-	// synthetic selectable prompt source ("previous convo system prompt").
 	return sanitizeUIChatOptionByCapabilities(next);
-}
-
-function pickUniqueModelOption(options: UIChatOption[]): UIChatOption | undefined {
-	return options.length === 1 ? options[0] : undefined;
 }
 
 function findRestorableModelOption(
@@ -158,52 +129,31 @@ function findRestorableModelOption(
 	const modelPresetID = modelPresetRef?.modelPresetID?.trim();
 	const modelName = modelParam?.name?.trim();
 
-	const providerScopedOptions = providerName
-		? allOptions.filter(option => option.providerName === providerName)
-		: allOptions;
+	const providerOptions = providerName ? allOptions.filter(option => option.providerName === providerName) : allOptions;
 
-	// 1) Strongest match: exact provider + preset id
 	if (providerName && modelPresetID) {
-		const exactRef = providerScopedOptions.find(option => option.modelPresetID === modelPresetID);
-		if (exactRef) {
-			return exactRef;
+		const direct = providerOptions.find(option => option.modelPresetID === modelPresetID);
+		if (direct) {
+			return direct;
 		}
 	}
 
-	// 2) If provider is known but preset id is stale/missing, prefer matching by
-	//    underlying model name ONLY within that provider, and only if unique.
 	if (providerName && modelName) {
-		const byProviderAndName = providerScopedOptions.filter(option => option.name === modelName);
-		const uniqueByProviderAndName = pickUniqueModelOption(byProviderAndName);
-		if (uniqueByProviderAndName) {
-			return uniqueByProviderAndName;
+		const byName = pickUniqueModelOption(providerOptions.filter(option => option.name === modelName));
+		if (byName) {
+			return byName;
 		}
 
-		// Secondary provider-scoped fallback in case very old persisted state used
-		// a display-ish name instead of the raw model name.
-		const byProviderAndDisplayName = providerScopedOptions.filter(option => option.modelDisplayName === modelName);
-		const uniqueByProviderAndDisplayName = pickUniqueModelOption(byProviderAndDisplayName);
-		if (uniqueByProviderAndDisplayName) {
-			return uniqueByProviderAndDisplayName;
-		}
-
-		// Ambiguous within provider -> do not guess.
-		return undefined;
+		return pickUniqueModelOption(providerOptions.filter(option => option.modelDisplayName === modelName));
 	}
 
-	// 3) No provider info: only accept globally unique matches.
 	if (modelName) {
-		const byGlobalName = allOptions.filter(option => option.name === modelName);
-		const uniqueByGlobalName = pickUniqueModelOption(byGlobalName);
-		if (uniqueByGlobalName) {
-			return uniqueByGlobalName;
+		const byName = pickUniqueModelOption(allOptions.filter(option => option.name === modelName));
+		if (byName) {
+			return byName;
 		}
 
-		const byGlobalDisplayName = allOptions.filter(option => option.modelDisplayName === modelName);
-		const uniqueByGlobalDisplayName = pickUniqueModelOption(byGlobalDisplayName);
-		if (uniqueByGlobalDisplayName) {
-			return uniqueByGlobalDisplayName;
-		}
+		return pickUniqueModelOption(allOptions.filter(option => option.modelDisplayName === modelName));
 	}
 
 	return undefined;
@@ -211,52 +161,24 @@ function findRestorableModelOption(
 
 function resolveRestoredSelectedModel(
 	allOptions: UIChatOption[],
-	fallbackSelectedModel: UIChatOption,
+	fallback: UIChatOption,
 	modelPresetRef?: ModelPresetRef,
 	modelParam?: ModelParam
 ): UIChatOption {
-	const resolvedOption = findRestorableModelOption(allOptions, modelPresetRef, modelParam);
-	if (resolvedOption) {
-		return applyPersistedModelParamToSelectedModel(resolvedOption, modelParam, {
+	const resolved = findRestorableModelOption(allOptions, modelPresetRef, modelParam);
+
+	if (resolved) {
+		return applyPersistedModelParam(resolved, modelParam, {
 			preserveName: true,
 		});
 	}
 
-	// IMPORTANT:
-	// If the exact conversation model preset is no longer selectable (disabled,
-	// deleted, no API key, etc.), do NOT project its stale provider/model IDs
-	// back into selectedModel. That re-selects a non-existent option in UI state.
-	//
-	// Also do not guess an arbitrary sibling model from the same provider and do
-	// not carry forward the stale `modelParam.name` onto a different live preset.
-	// Restore onto a real available option and only carry over non-identity
-	// advanced settings as best-effort state.
-	const fallbackAvailable = fallbackSelectedModel ?? allOptions[0] ?? DefaultUIChatOptions;
-	return applyPersistedModelParamToSelectedModel(fallbackAvailable, modelParam, {
+	return applyPersistedModelParam(fallback, modelParam, {
 		preserveName: false,
 	});
 }
 
-function getPresetToolModelCompatibilityError(toolDefinition: Tool, selectedModel: UIChatOption): string | undefined {
-	if (toolDefinition.type !== ToolImplType.SDK) {
-		return undefined;
-	}
-
-	const requiredSDKType = toolDefinition.sdkImpl?.sdkType?.trim();
-	const toolLabel = toolDefinition.displayName || toolDefinition.slug || toolDefinition.id;
-
-	if (!requiredSDKType) {
-		return `Tool "${toolLabel}" is missing SDK metadata and cannot be applied safely.`;
-	}
-
-	if (requiredSDKType !== (selectedModel.providerSDKType as string)) {
-		return `Tool "${toolLabel}" requires provider SDK "${requiredSDKType}", but the selected starting model uses "${selectedModel.providerSDKType}".`;
-	}
-
-	return undefined;
-}
-
-function buildFinalOptions(
+function buildChatOptions(
 	selectedModel: UIChatOption,
 	includePreviousMessages: IncludePreviousMessages,
 	isHybridReasoningEnabled: boolean
@@ -267,20 +189,23 @@ function buildFinalOptions(
 	};
 
 	if (selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && !isHybridReasoningEnabled) {
-		const modifiedOptions = { ...base };
-		delete modifiedOptions.reasoning;
+		const next = {
+			...base,
+		};
 
-		if (modifiedOptions.temperature === undefined) {
-			modifiedOptions.temperature = DefaultUIChatOptions.temperature;
+		delete next.reasoning;
+
+		if (next.temperature === undefined) {
+			next.temperature = DefaultUIChatOptions.temperature;
 		}
 
-		return sanitizeUIChatOptionByCapabilities(modifiedOptions);
+		return sanitizeUIChatOptionByCapabilities(next);
 	}
 
 	return sanitizeUIChatOptionByCapabilities(base);
 }
 
-export interface AssistantContextController {
+export interface ComposerContextController {
 	chatOptions: UIChatOption;
 
 	selectedModel: UIChatOption;
@@ -294,255 +219,146 @@ export interface AssistantContextController {
 	handleSetIsHybridReasoningEnabled: Dispatch<SetStateAction<boolean>>;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
 
-	setTemperature: (temp: number) => void;
-	setReasoningLevel: (level: ReasoningLevel) => void;
-	setHybridTokens: (tokens: number) => void;
-	setOutputVerbosity: (verbosity?: OutputVerbosity) => void;
+	setTemperature(temp: number): void;
+	setReasoningLevel(level: ReasoningLevel): void;
+	setHybridTokens(tokens: number): void;
+	setOutputVerbosity(verbosity?: OutputVerbosity): void;
 
-	assistantPresetOptions: AssistantPresetOptionItem[];
-	assistantPresetsLoading: boolean;
-	assistantPresetError: string | null;
-	refreshAssistantPresets: () => Promise<void>;
-	prepareAssistantPresetApplication: (presetKey: string) => Promise<AssistantPresetPreparedApplication | null>;
-	applyPreparedAssistantPreset: (prepared: AssistantPresetPreparedApplication) => void;
-
-	applyAdvancedModel: (updatedModel: UIChatOption) => void;
-
-	restoreConversationContext: (context: RestorableConversationContext) => UIChatOption | null;
-	resetForNewConversation: () => UIChatOption;
+	applyAdvancedModel(updatedModel: UIChatOption): void;
+	restoreConversationContext(context: RestorableConversationContext): UIChatOption | null;
+	resetForNewConversation(): UIChatOption;
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
 }
 
-export function useAssistantContextState(): AssistantContextController {
+export function useComposerContextState(): ComposerContextController {
 	const [selectedModel, setSelectedModel] = useState(DefaultUIChatOptions);
 	const [allOptions, setAllOptions] = useState([DefaultUIChatOptions]);
-	const [optionsLoaded, setOptionsLoaded] = useState(false);
-
+	const [modelOptionsLoaded, setModelOptionsLoaded] = useState(false);
 	const [isHybridReasoningEnabled, setIsHybridReasoningEnabled] = useState(true);
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIChatOptions.includePreviousMessages
 	);
 
 	const selectedModelRef = useRef(selectedModel);
-	const isHybridReasoningEnabledRef = useRef(isHybridReasoningEnabled);
 	const allOptionsRef = useRef(allOptions);
-	const defaultLoadedOptionRef = useRef(DefaultUIChatOptions);
-	const pendingRestoreContextRef = useRef<RestorableConversationContext | null>(null);
-
-	const {
-		presetOptions: rawAssistantPresetOptions,
-		loading: assistantPresetsLoading,
-		error: assistantPresetError,
-		refreshPresets: refreshAssistantPresets,
-	} = useAssistantPresets();
-
-	const assistantPresetOptions = useMemo(() => {
-		// Before model options finish loading, keep the raw preset catalog state.
-		if (!optionsLoaded) {
-			return rawAssistantPresetOptions;
-		}
-
-		const selectableModelPresetKeys = new Set(
-			allOptions.map(option =>
-				buildModelPresetRefKey({
-					providerName: option.providerName,
-					modelPresetID: option.modelPresetID,
-				})
-			)
-		);
-
-		return rawAssistantPresetOptions.map(option => {
-			if (!option.isSelectable) {
-				return option;
-			}
-
-			const startingModelPresetRef = option.preset.startingModelPresetRef;
-			if (!startingModelPresetRef) {
-				return option;
-			}
-
-			const modelKey = buildModelPresetRefKey(startingModelPresetRef);
-			if (selectableModelPresetKeys.has(modelKey)) {
-				return option;
-			}
-
-			return {
-				...option,
-				isSelectable: false,
-				availabilityReason: `Starting model preset "${modelKey}" is not currently selectable in chat (disabled, missing API key, or unavailable).`,
-			};
-		});
-	}, [allOptions, optionsLoaded, rawAssistantPresetOptions]);
-
-	const chatOptions = useMemo(
-		() => buildFinalOptions(selectedModel, includePreviousMessages, isHybridReasoningEnabled),
-		[includePreviousMessages, isHybridReasoningEnabled, selectedModel]
-	);
-
-	const applyRestoredConversationContext = useCallback(
-		(context: RestorableConversationContext, availableOptions: UIChatOption[]) => {
-			const nextSelectedModel = resolveRestoredSelectedModel(
-				availableOptions,
-				defaultLoadedOptionRef.current,
-				context.modelPresetRef,
-				context.modelParam
-			);
-
-			selectedModelRef.current = nextSelectedModel;
-			setSelectedModel(nextSelectedModel);
-
-			const nextHybridEnabled = isHybridReasoningModel(nextSelectedModel);
-			isHybridReasoningEnabledRef.current = nextHybridEnabled;
-			setIsHybridReasoningEnabled(nextHybridEnabled);
-
-			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-			return nextSelectedModel;
-		},
-		[]
-	);
-
-	const restoreConversationContext = useCallback(
-		(context: RestorableConversationContext) => {
-			pendingRestoreContextRef.current = context;
-			if (!optionsLoaded) {
-				return null;
-			}
-			const nextSelectedModel = applyRestoredConversationContext(context, allOptionsRef.current);
-			pendingRestoreContextRef.current = null;
-			return nextSelectedModel;
-		},
-		[applyRestoredConversationContext, optionsLoaded]
-	);
-
-	const resetForNewConversation = useCallback(() => {
-		pendingRestoreContextRef.current = null;
-
-		const nextSelectedModel = sanitizeUIChatOptionByCapabilities(
-			defaultLoadedOptionRef.current ?? allOptionsRef.current[0] ?? DefaultUIChatOptions
-		);
-		selectedModelRef.current = nextSelectedModel;
-		setSelectedModel(nextSelectedModel);
-
-		const nextHybridEnabled = isHybridReasoningModel(nextSelectedModel);
-		isHybridReasoningEnabledRef.current = nextHybridEnabled;
-		setIsHybridReasoningEnabled(nextHybridEnabled);
-
-		setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-		return nextSelectedModel;
-	}, []);
+	const defaultModelRef = useRef(DefaultUIChatOptions);
+	const hybridReasoningRef = useRef(isHybridReasoningEnabled);
+	const pendingRestoreRef = useRef<RestorableConversationContext | null>(null);
 
 	const applySelectedModel = useCallback(
 		(
-			action: SetStateAction<UIChatOption>,
+			update: SetStateAction<UIChatOption>,
 			options?: {
-				syncHybridFromModel?: boolean;
+				syncHybridReasoning?: boolean;
 			}
 		) => {
-			const currentSelectedModel = selectedModelRef.current;
-			const currentIsHybridReasoningEnabled = isHybridReasoningEnabledRef.current;
+			const current = selectedModelRef.current;
+			const next = typeof update === 'function' ? update(current) : update;
+			const nextHybrid =
+				options?.syncHybridReasoning === true ? isHybridReasoningModel(next) : hybridReasoningRef.current;
 
-			const nextSelectedModel =
-				typeof action === 'function'
-					? (action as (prevState: UIChatOption) => UIChatOption)(currentSelectedModel)
-					: action;
+			selectedModelRef.current = next;
+			hybridReasoningRef.current = nextHybrid;
 
-			const nextIsHybridReasoningEnabled = options?.syncHybridFromModel
-				? isHybridReasoningModel(nextSelectedModel)
-				: currentIsHybridReasoningEnabled;
-
-			// Keep refs in sync immediately so same-tick follow-up logic
-			// cannot read stale selected model / reasoning mode.
-			selectedModelRef.current = nextSelectedModel;
-			isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
-
-			setSelectedModel(nextSelectedModel);
-
-			if (nextIsHybridReasoningEnabled !== currentIsHybridReasoningEnabled) {
-				setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
-			}
+			setSelectedModel(next);
+			setIsHybridReasoningEnabled(nextHybrid);
 		},
 		[]
 	);
 
-	const applyLoadedChatOptions = useCallback(
-		(r: ChatInputOptionsResult) => {
-			const nextSelectedModel = sanitizeUIChatOptionByCapabilities(r.default);
-			const nextIsHybridReasoningEnabled = isHybridReasoningModel(nextSelectedModel);
-			setAllOptions(r.allOptions);
-			allOptionsRef.current = r.allOptions;
-			defaultLoadedOptionRef.current = nextSelectedModel;
-			setOptionsLoaded(true);
-			const pendingRestore = pendingRestoreContextRef.current;
-			if (pendingRestore) {
-				pendingRestoreContextRef.current = null;
-				applyRestoredConversationContext(pendingRestore, r.allOptions);
-				return;
-			}
-			selectedModelRef.current = nextSelectedModel;
-			isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
-			setSelectedModel(nextSelectedModel);
-			setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
-			setIncludePreviousMessages(nextSelectedModel.includePreviousMessages);
-		},
-		[applyRestoredConversationContext]
-	);
+	const applyRestoredContext = useCallback((context: RestorableConversationContext, options: UIChatOption[]) => {
+		const fallback = defaultModelRef.current ?? options[0] ?? DefaultUIChatOptions;
+		const next = resolveRestoredSelectedModel(options, fallback, context.modelPresetRef, context.modelParam);
+
+		selectedModelRef.current = next;
+		hybridReasoningRef.current = isHybridReasoningModel(next);
+
+		setSelectedModel(next);
+		setIsHybridReasoningEnabled(isHybridReasoningModel(next));
+		setIncludePreviousMessages(next.includePreviousMessages);
+
+		return next;
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
-		void (async () => {
-			try {
-				const r = await loadChatInputOptionsCached({ forceRefresh: true });
+
+		void loadChatInputOptionsCached({ forceRefresh: true })
+			.then(result => {
 				if (cancelled) {
 					return;
 				}
-				applyLoadedChatOptions(r);
-			} catch (error) {
-				if (!cancelled) {
-					console.error('Failed to load chat input options:', error);
+
+				const nextDefault = sanitizeUIChatOptionByCapabilities(result.default);
+
+				allOptionsRef.current = result.allOptions;
+				defaultModelRef.current = nextDefault;
+
+				setAllOptions(result.allOptions);
+				setModelOptionsLoaded(true);
+
+				const pendingRestore = pendingRestoreRef.current;
+				if (pendingRestore) {
+					pendingRestoreRef.current = null;
+					applyRestoredContext(pendingRestore, result.allOptions);
+					return;
 				}
-			}
-		})();
+
+				selectedModelRef.current = nextDefault;
+				hybridReasoningRef.current = isHybridReasoningModel(nextDefault);
+
+				setSelectedModel(nextDefault);
+				setIsHybridReasoningEnabled(isHybridReasoningModel(nextDefault));
+				setIncludePreviousMessages(nextDefault.includePreviousMessages);
+			})
+			.catch((error: unknown) => {
+				if (!cancelled) {
+					console.error('Failed to load Composer model options:', error);
+				}
+			});
+
 		return () => {
 			cancelled = true;
 		};
-	}, [applyLoadedChatOptions]);
+	}, [applyRestoredContext]);
 
 	const handleSetSelectedModel = useCallback(
-		(action: SetStateAction<UIChatOption>) => {
-			applySelectedModel(action, {
-				syncHybridFromModel: true,
+		(update: SetStateAction<UIChatOption>) => {
+			applySelectedModel(update, {
+				syncHybridReasoning: true,
 			});
 		},
 		[applySelectedModel]
 	);
 
-	const handleSetIsHybridReasoningEnabled = useCallback((action: SetStateAction<boolean>) => {
-		const currentIsHybridReasoningEnabled = isHybridReasoningEnabledRef.current;
-		const nextIsHybridReasoningEnabled =
-			typeof action === 'function' ? action(currentIsHybridReasoningEnabled) : action;
-		isHybridReasoningEnabledRef.current = nextIsHybridReasoningEnabled;
-		setIsHybridReasoningEnabled(nextIsHybridReasoningEnabled);
+	const handleSetIsHybridReasoningEnabled = useCallback((update: SetStateAction<boolean>) => {
+		const next = typeof update === 'function' ? update(hybridReasoningRef.current) : update;
+
+		hybridReasoningRef.current = next;
+		setIsHybridReasoningEnabled(next);
 	}, []);
 
 	const setTemperature = useCallback(
-		(temp: number) => {
-			const clampedTemp = Math.max(0, Math.min(1, temp));
-			applySelectedModel(prev => ({ ...prev, temperature: clampedTemp }));
+		(temperature: number) => {
+			applySelectedModel(current => ({
+				...current,
+				temperature: Math.max(0, Math.min(1, temperature)),
+			}));
 		},
 		[applySelectedModel]
 	);
 
 	const setReasoningLevel = useCallback(
-		(newLevel: ReasoningLevel) => {
-			applySelectedModel(prev => ({
-				...prev,
+		(level: ReasoningLevel) => {
+			applySelectedModel(current => ({
+				...current,
 				reasoning: {
 					type: ReasoningType.SingleWithLevels,
-					level: newLevel,
-					tokens: 1024,
-					summaryStyle: prev.reasoning?.summaryStyle,
+					level,
+					tokens: current.reasoning?.tokens ?? 1024,
+					summaryStyle: current.reasoning?.summaryStyle,
 				},
 			}));
 		},
@@ -551,270 +367,107 @@ export function useAssistantContextState(): AssistantContextController {
 
 	const setHybridTokens = useCallback(
 		(tokens: number) => {
-			applySelectedModel(prev => {
-				if (!prev.reasoning || prev.reasoning.type !== ReasoningType.HybridWithTokens) {
-					return prev;
+			applySelectedModel(current => {
+				if (current.reasoning?.type !== ReasoningType.HybridWithTokens) {
+					return current;
 				}
-				return { ...prev, reasoning: { ...prev.reasoning, tokens } };
+
+				return {
+					...current,
+					reasoning: {
+						...current.reasoning,
+						tokens,
+					},
+				};
 			});
 		},
 		[applySelectedModel]
 	);
 
 	const setOutputVerbosity = useCallback(
-		(verbosity?: OutputVerbosity) => {
-			applySelectedModel(prev => {
-				const next = { ...prev.outputParam };
+		(verbosity: OutputVerbosity) => {
+			applySelectedModel(current => {
+				const outputParam = {
+					...current.outputParam,
+				};
 
 				if (verbosity === undefined) {
-					delete next.verbosity;
+					delete outputParam.verbosity;
 				} else {
-					next.verbosity = verbosity;
+					outputParam.verbosity = verbosity;
 				}
 
-				const hasAny = !!next.verbosity || !!next.format;
-
 				return {
-					...prev,
-					outputParam: hasAny ? next : undefined,
+					...current,
+					outputParam: outputParam.verbosity || outputParam.format ? outputParam : undefined,
 				};
 			});
 		},
 		[applySelectedModel]
 	);
 
-	const prepareAssistantPresetApplication = useCallback(
-		async (presetKey: string): Promise<AssistantPresetPreparedApplication | null> => {
-			const option = assistantPresetOptions.find(item => item.key === presetKey);
-			if (!option) {
+	const applyAdvancedModel = useCallback(
+		(updated: UIChatOption) => {
+			applySelectedModel(sanitizeUIChatOptionByCapabilities(updated));
+		},
+		[applySelectedModel]
+	);
+
+	const restoreConversationContext = useCallback(
+		(context: RestorableConversationContext) => {
+			pendingRestoreRef.current = context;
+
+			if (!modelOptionsLoaded) {
 				return null;
 			}
 
-			const { preset } = option;
-
-			const nextStartingText = preset.startingText ?? '';
-			const hasStartingTextSelection = nextStartingText.trim().length > 0;
-
-			const currentSelectedModel = selectedModelRef.current;
-			let nextSelectedModel = currentSelectedModel;
-			let hasModelSelection = false;
-
-			if (preset.startingModelPresetRef) {
-				if (!optionsLoaded) {
-					throw new Error('Model presets are still loading. Try again in a moment.');
-				}
-
-				const matchedModel = allOptionsRef.current.find(
-					item =>
-						item.providerName === preset.startingModelPresetRef?.providerName &&
-						item.modelPresetID === preset.startingModelPresetRef?.modelPresetID
-				);
-
-				if (!matchedModel) {
-					throw new Error(
-						`Model preset "${preset.startingModelPresetRef.providerName}/${preset.startingModelPresetRef.modelPresetID}" is not currently selectable.`
-					);
-				}
-
-				nextSelectedModel = {
-					...matchedModel,
-				};
-				hasModelSelection = true;
-			}
-
-			const requestedToolSelections = preset.startingToolSelections ?? [];
-			const hasToolsSelection = requestedToolSelections.length > 0;
-			const conversationToolChoices: ToolStoreChoice[] = [];
-			const webSearchChoices: ToolStoreChoice[] = [];
-
-			if (hasToolsSelection) {
-				const toolOptions = await loadToolOptions();
-				const toolOptionByKey = new Map(toolOptions.map(item => [item.key, item] as const));
-				for (const selection of requestedToolSelections) {
-					const toolOption = toolOptionByKey.get(buildToolRefKey(selection.toolRef));
-					if (!toolOption || !toolOption.isSelectable) {
-						throw new Error(
-							toolOption?.availabilityReason ??
-								`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" is not currently available.`
-						);
-					}
-
-					const rawUserArgs = selection.toolChoicePatch?.userArgSchemaInstance?.trim();
-					if (rawUserArgs && !toolOption.hasUserArgSchema) {
-						throw new Error(
-							`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" no longer exposes user args, but this assistant preset still contains saved args for it.`
-						);
-					}
-
-					if (rawUserArgs) {
-						try {
-							JSON.parse(rawUserArgs);
-						} catch {
-							throw new Error(
-								`Tool "${selection.toolRef.bundleID}/${selection.toolRef.toolSlug}@${selection.toolRef.toolVersion}" contains invalid saved args JSON.`
-							);
-						}
-					}
-
-					const toolDefinition = toolOption.toolDefinition;
-					const compatibilityError = getPresetToolModelCompatibilityError(toolDefinition, nextSelectedModel);
-					if (compatibilityError) {
-						throw new Error(compatibilityError);
-					}
-
-					const toolChoice: ToolStoreChoice = {
-						choiceID: getUUIDv7(),
-						bundleID: selection.toolRef.bundleID,
-						toolID: toolDefinition.id,
-						toolSlug: toolDefinition.slug,
-						toolVersion: toolDefinition.version,
-						toolType: toolDefinition.llmToolType,
-						displayName: toolDefinition.displayName,
-						description: toolDefinition.description,
-						autoExecute: selection.toolChoicePatch?.autoExecute ?? toolDefinition.autoExecute,
-						userArgSchemaInstance: rawUserArgs || undefined,
-					};
-
-					if (toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
-						webSearchChoices.push(toolChoice);
-					} else {
-						conversationToolChoices.push(toolChoice);
-					}
-				}
-			}
-
-			const requestedSkillSels = preset.startingSkillSelections ?? [];
-
-			for (const selection of requestedSkillSels) {
-				if (!isSkillArtifactRef(selection.artifact)) {
-					throw new Error(
-						'Assistant preset contains an invalid Skill reference. ArtifactRef (rootID and artifactID) is required.'
-					);
-				}
-			}
-
-			const sessionSkillSels = requestedSkillSels.filter(selection => !selection.useAsInstructions);
-
-			// Preset semantics: empty or missing means "no opinion", not "clear current skills".
-			const hasSkillsSelection = sessionSkillSels.length > 0;
-			const enabledSkillRefs = hasSkillsSelection ? normalizeSkillSelectionsToRefs(sessionSkillSels) : [];
-			const activeSkillRefs = hasSkillsSelection
-				? normalizeSkillSelectionsToRefs(sessionSkillSels.filter(sel => sel.preLoadAsActive))
-				: [];
-
-			if (hasSkillsSelection) {
-				const skillOptions = await loadSkillOptions();
-				const skillOptionByKey = new Map(skillOptions.map(item => [item.key, item] as const));
-
-				const invalidSkillSel = sessionSkillSels.find(sel => {
-					const skillOption = skillOptionByKey.get(buildSkillRefKey(sel.artifact));
-					return !skillOption || !skillOption.isSelectable;
-				});
-
-				if (invalidSkillSel) {
-					const invalidSkillOption = skillOptionByKey.get(buildSkillRefKey(invalidSkillSel.artifact));
-					throw new Error(
-						invalidSkillOption?.availabilityReason ??
-							`Skill "${invalidSkillSel.artifact.rootID}/${invalidSkillSel.artifact.artifactID}" is not currently available.`
-					);
-				}
-			}
-
-			const mcpContext = normalizeAssistantPresetMCPContext(preset.startingMCPContext);
-			const hasMCPSelection = Boolean(mcpContext);
-
-			return {
-				presetKey,
-				option,
-				preset,
-				hasStartingTextSelection,
-				nextStartingText,
-				hasModelSelection,
-				nextSelectedModel,
-				hasIncludeModelSystemPromptSelection: false,
-				nextIncludeModelSystemPrompt: false,
-				hasInstructionSourceSelection: false,
-				nextSelectedInstructionSourceKeys: [],
-				preparedInstructionSources: [],
-				runtimeSelections: {
-					hasToolsSelection,
-					conversationToolChoices,
-					webSearchChoices,
-					hasSkillsSelection,
-					enabledSkillRefs,
-					activeSkillRefs,
-					hasMCPSelection,
-					mcpContext,
-				},
-				comparisonState: {
-					model: undefined,
-					instructions: undefined,
-					tools: hasToolsSelection
-						? {
-								conversationToolChoices: normalizeAssistantPresetToolChoices(conversationToolChoices),
-								webSearchChoices: normalizeAssistantPresetToolChoices(webSearchChoices),
-							}
-						: undefined,
-					skills: hasSkillsSelection ? normalizeAssistantPresetSkillRefs(enabledSkillRefs) : undefined,
-					mcp: hasMCPSelection ? mcpContext : undefined,
-				},
-			};
+			const selected = applyRestoredContext(context, allOptionsRef.current);
+			pendingRestoreRef.current = null;
+			return selected;
 		},
-		[assistantPresetOptions, optionsLoaded]
+		[applyRestoredContext, modelOptionsLoaded]
 	);
 
-	const applyPreparedAssistantPreset = useCallback(
-		(prepared: AssistantPresetPreparedApplication) => {
-			if (prepared.hasModelSelection) {
-				applySelectedModel(prepared.nextSelectedModel, {
-					syncHybridFromModel: true,
-				});
-			}
-		},
-		[applySelectedModel]
-	);
+	const resetForNewConversation = useCallback(() => {
+		pendingRestoreRef.current = null;
 
-	const applyAdvancedModel = useCallback(
-		(updatedModel: UIChatOption) => {
-			applySelectedModel(sanitizeUIChatOptionByCapabilities(updatedModel));
-		},
-		[applySelectedModel]
-	);
+		const next = sanitizeUIChatOptionByCapabilities(
+			defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIChatOptions
+		);
 
-	const verbosityEnabled = supportsOutputVerbosity(selectedModel.capabilitiesOverride);
-	const reasoningLevelOptions = getSupportedReasoningLevels(selectedModel.capabilitiesOverride);
+		selectedModelRef.current = next;
+		hybridReasoningRef.current = isHybridReasoningModel(next);
+
+		setSelectedModel(next);
+		setIsHybridReasoningEnabled(isHybridReasoningModel(next));
+		setIncludePreviousMessages(next.includePreviousMessages);
+
+		return next;
+	}, []);
+
+	const chatOptions = useMemo(
+		() => buildChatOptions(selectedModel, includePreviousMessages, isHybridReasoningEnabled),
+		[includePreviousMessages, isHybridReasoningEnabled, selectedModel]
+	);
 
 	return {
 		chatOptions,
-
 		selectedModel,
 		allOptions,
-		modelOptionsLoaded: optionsLoaded,
-
+		modelOptionsLoaded,
 		isHybridReasoningEnabled,
 		includePreviousMessages,
-
 		handleSetSelectedModel,
 		handleSetIsHybridReasoningEnabled,
 		setIncludePreviousMessages,
-
 		setTemperature,
 		setReasoningLevel,
 		setHybridTokens,
 		setOutputVerbosity,
-
-		assistantPresetOptions,
-		assistantPresetsLoading,
-		assistantPresetError,
-		refreshAssistantPresets,
-		prepareAssistantPresetApplication,
-		applyPreparedAssistantPreset,
-
 		applyAdvancedModel,
-
 		restoreConversationContext,
 		resetForNewConversation,
-		verbosityEnabled,
-		reasoningLevelOptions,
+		verbosityEnabled: supportsOutputVerbosity(selectedModel.capabilitiesOverride),
+		reasoningLevelOptions: getSupportedReasoningLevels(selectedModel.capabilitiesOverride),
 	};
 }

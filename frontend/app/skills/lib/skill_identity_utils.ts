@@ -1,7 +1,7 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { SkillListItem, SkillRef, SkillSelection } from '@/spec/skill';
+import type { SkillListItem, SkillRef } from '@/spec/skill';
 
-export function isSkillArtifactRef(ref: unknown): ref is ArtifactRef {
+function isSkillArtifactRef(ref: unknown): ref is ArtifactRef {
 	if (ref === null || typeof ref !== 'object') {
 		return false;
 	}
@@ -26,34 +26,6 @@ export function skillRefFromListItem(item: SkillListItem): SkillRef {
 	return item.skillDefinition.ref;
 }
 
-function toArtifactRef(ref: SkillRef): ArtifactRef | null {
-	if (!isSkillArtifactRef(ref)) {
-		return null;
-	}
-	return { rootID: ref.rootID, artifactID: ref.artifactID };
-}
-
-export function toArtifactRefs(refs: SkillRef[] | null | undefined): ArtifactRef[] {
-	if (!refs || refs.length === 0) {
-		return [];
-	}
-	const out: ArtifactRef[] = [];
-	const seen = new Set<string>();
-
-	for (const r of refs) {
-		const aRef = toArtifactRef(r);
-		if (!aRef) {
-			continue;
-		}
-		const key = `${aRef.rootID}:${aRef.artifactID}`;
-		if (!seen.has(key)) {
-			seen.add(key);
-			out.push(aRef);
-		}
-	}
-	return out;
-}
-
 export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[] {
 	const seen = new Set<string>();
 	const out: SkillRef[] = [];
@@ -70,13 +42,6 @@ export function dedupeSkillRefs(refs: SkillRef[] | null | undefined): SkillRef[]
 	}
 	return out;
 }
-
-export const normalizeSkillSelectionsToRefs = (sels: SkillSelection[] | null | undefined): SkillRef[] => {
-	const r = sels?.map(item => {
-		return item.artifact;
-	});
-	return normalizeSkillRefs(r ?? []);
-};
 
 export const normalizeSkillRefs = (refs: SkillRef[] | null | undefined): SkillRef[] => {
 	return dedupeSkillRefs(refs ?? []);

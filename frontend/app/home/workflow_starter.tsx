@@ -1,47 +1,39 @@
 import type { ReactNode } from 'react';
 import { FiAlertTriangle, FiCheckCircle, FiCode } from 'react-icons/fi';
 
-const SOFTWARE_ASSISTANTS_BUNDLE_ID = '019d676e-2533-7fdf-a0af-d3a571ab4f4f';
-
 export interface WorkflowStarter {
 	title: string;
 	description: string;
 	workflowID: string;
-	draft?: string;
+	agentName: string;
 	icon: ReactNode;
-	assistantPresetBundleID?: string;
-	assistantPresetSlug?: string;
-	assistantPresetVersion?: string;
 }
 
+/**
+ * These names are stable built-in Agent logical names. Their local Artifact
+ * refs are resolved at runtime from the Agent catalog, so home cards do not
+ * depend on generated or installation-specific Artifact IDs.
+ */
 export const workflowStarters: WorkflowStarter[] = [
 	{
 		title: 'Develop a Feature',
-		description: 'Implement a bounded code change from a repo path or attached files, using spec driven development',
+		description: 'Plan, implement, and verify a focused change using the repository or files you provide.',
 		workflowID: 'develop-feature',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'spec-driven-dev',
-		assistantPresetVersion: 'v1.0.0',
+		agentName: 'spec-driven-dev',
 		icon: <FiCode size={24} />,
 	},
 	{
 		title: 'Review Code',
-		description: 'Review the code or diff for correctness, security, reliability, maintainability, and test gaps',
+		description: 'Review a diff, changed files, or repository area for correctness, risk, and missing tests.',
 		workflowID: 'code-review',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'reviewing-code',
-		assistantPresetVersion: 'v1.0.0',
-
+		agentName: 'reviewing-code',
 		icon: <FiCheckCircle size={24} />,
 	},
 	{
 		title: 'Investigate a Bug',
-		description:
-			'Diagnose root cause and the smallest safe fix direction, from logs, errors, stack traces, failing outputs, code, and config',
+		description: 'Work from logs, errors, tests, code, and configuration to find the likely cause and next steps.',
 		workflowID: 'bug-investigation',
-		assistantPresetBundleID: SOFTWARE_ASSISTANTS_BUNDLE_ID,
-		assistantPresetSlug: 'bug-investigator',
-		assistantPresetVersion: 'v1.0.0',
+		agentName: 'bug-investigator',
 		icon: <FiAlertTriangle size={24} />,
 	},
 ];

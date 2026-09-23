@@ -6,10 +6,9 @@ import { generateTitle } from '@/lib/title_utils';
 
 const DEFAULT = 'New conversation';
 const MAX_PREVIEW = 120; // truncate long log lines
-
+const crop = (t: string) => (t.length > MAX_PREVIEW ? t.slice(0, MAX_PREVIEW) + ' ...' : t);
 /* ─── debug printer ──────────────────────────────────────────────── */
 function debugPrint(label: string, input: string, cand: TitleCandidate) {
-	const crop = (t: string) => (t.length > MAX_PREVIEW ? t.slice(0, MAX_PREVIEW) + ' ...' : t);
 	console.log(
 		`\n${label}\n` +
 			`  input (${input.length}):  ${crop(input)}\n` +

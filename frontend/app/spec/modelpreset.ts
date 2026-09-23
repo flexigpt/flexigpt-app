@@ -204,21 +204,6 @@ export interface UIChatOption extends ModelParam {
 	capabilitiesOverride?: ModelCapabilitiesOverride;
 }
 
-export interface AssistantModelPresetOption {
-	key: string;
-	label: string;
-
-	ref: ModelPresetRef;
-	providerPreset: ProviderPreset;
-	modelPreset: ModelPreset;
-
-	isBuiltIn: boolean;
-	isSelectable: boolean;
-	isProviderEnabled: boolean;
-	isModelEnabled: boolean;
-	availabilityReason?: string;
-}
-
 export const DefaultUIChatOptions: UIChatOption = {
 	...DefaultModelParams,
 	providerName: 'no-provider',

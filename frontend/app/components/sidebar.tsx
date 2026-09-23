@@ -79,11 +79,11 @@ export function Sidebar({ children }: SidebarProps) {
 					<div className="mb-8 flex-col p-0">
 						<li className="mt-4">
 							<Link
-								to="/assistantpresets/"
+								to="/agents/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
-								aria-label="Assistant Presets"
-								title="Assistant Presets"
+								aria-label="Agents"
+								title="Agents"
 							>
 								<FiLayers size={24} />
 							</Link>

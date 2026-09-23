@@ -8,6 +8,7 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -24,8 +25,9 @@ type API struct {
 	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
 	resources        compositionapi.ResourceAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
+	managedArtifacts compositionapi.ManagedArtifactAPI
+	texts            *materializetext.Adapter
 
 	collections         *collection.API
 	declarationResolver *resolve.Resolver
@@ -128,6 +130,11 @@ func New(
 		}
 	}
 
+	texts, err := materializetext.NewAdapter(resources)
+	if err != nil {
+		return nil, err
+	}
+
 	output := &API{
 		sources:           sources,
 		discovery:         discovery,
@@ -137,6 +144,7 @@ func New(
 		protection:        protection,
 		fallbackProviders: maps.Clone(config.fallbackProviders),
 
+		texts:               texts,
 		managedAgentProfile: managedAgentProfile,
 		importSigner:        importSigner,
 	}

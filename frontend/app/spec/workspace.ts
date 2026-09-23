@@ -56,7 +56,7 @@ export interface WorkspaceDirectoryRef {
 	rootID: ArtifactRootID;
 }
 
-export interface WorkspaceView {
+interface WorkspaceView {
 	artifact: StoreArtifact;
 	description?: string;
 }
@@ -124,7 +124,7 @@ export interface WorkspacePromptContribution {
 	truncated: boolean;
 }
 
-export interface WorkspacePromptDecision {
+interface WorkspacePromptDecision {
 	artifact: ArtifactRef;
 	status: WorkspacePromptCompositionStatus;
 	code?: string;
@@ -195,8 +195,6 @@ export interface WorkspaceConversationResourceSelectionRef {
 	artifactRevision?: number;
 }
 
-export type WorkspaceConversationSkillSelectionRef = WorkspaceConversationResourceSelectionRef;
-
 export interface WorkspaceConversationSelection {
 	workspace: ArtifactRef;
 	displayName?: string;
@@ -205,7 +203,7 @@ export interface WorkspaceConversationSelection {
 	skillRefs?: WorkspaceConversationResourceSelectionRef[];
 }
 
-export interface WorkspaceConversationContextUsage {
+interface WorkspaceConversationContextUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	locator?: ArtifactLocator;
@@ -220,7 +218,7 @@ export interface WorkspaceConversationContextUsage {
 	diagnostics?: ArtifactDiagnostic[];
 }
 
-export interface WorkspaceConversationSkillUsage {
+interface WorkspaceConversationSkillUsage {
 	artifact: ArtifactRef;
 	name?: string;
 	displayName?: string;

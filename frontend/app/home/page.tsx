@@ -9,7 +9,8 @@ import type { AuthKeyMeta } from '@/spec/setting';
 
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
-import { settingstoreAPI } from '@/apis/baseapi';
+import type { AgentCatalogOption } from '@/apis/agent_management';
+import { agentManagementAPI, settingstoreAPI } from '@/apis/baseapi';
 import { getAllProviderPresetsMap } from '@/apis/list_helper';
 
 import { PageFrame } from '@/components/page_frame';
@@ -45,6 +46,8 @@ export default function HomePage() {
 	const [settingsLoadedRequestId, setSettingsLoadedRequestId] = useState<number | null>(null);
 	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
 	const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+	const [agentOptions, setAgentOptions] = useState<AgentCatalogOption[]>([]);
+	const [agentsLoading, setAgentsLoading] = useState(true);
 
 	const settingsLoaded = settingsLoadedRequestId === settingsLoadRequestId;
 
@@ -91,6 +94,30 @@ export default function HomePage() {
 		};
 	}, []);
 
+	useEffect(() => {
+		let cancelled = false;
+
+		void agentManagementAPI
+			.listAgentCatalogOptions()
+			.then(options => {
+				if (!cancelled) {
+					setAgentOptions(options);
+				}
+			})
+			.catch((error: unknown) => {
+				console.error('Failed to load home Agent starters', error);
+			})
+			.finally(() => {
+				if (!cancelled) {
+					setAgentsLoading(false);
+				}
+			});
+
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
 	const configuredProviderNames = useMemo(() => getConfiguredProviderNames(authKeys), [authKeys]);
 	const hasUsableProviderKey = configuredProviderNames.length > 0;
 	const providerSummary = useMemo(
@@ -98,6 +125,16 @@ export default function HomePage() {
 		[configuredProviderNames, providerPresets]
 	);
 	const defaultProviderName = useMemo(() => pickDefaultProviderName(providerPresets), [providerPresets]);
+
+	const resolvedWorkflowStarters = useMemo(
+		() =>
+			workflowStarters.map(workflow => ({
+				workflow,
+				agent:
+					agentOptions.find(option => option.agent.builtIn && option.agent.name === workflow.agentName) ?? undefined,
+			})),
+		[agentOptions]
+	);
 
 	return (
 		<PageFrame>
@@ -122,15 +159,21 @@ export default function HomePage() {
 
 					<section className="mt-8 w-full">
 						<div className="mx-auto max-w-3xl text-center">
-							<h2 className="text-lg font-semibold">Start from workflow</h2>
+							<h2 className="text-lg font-semibold">Start with a proven workflow</h2>
 							<p className="text-base-content/70 text-xs">
-								Pick a high-impact starter to open Chats with the right assistant preset and a focused draft prompt.
+								Each starter loads the matching built-in Agent. Its own opening text and setup remain editable after
+								Chats opens.
 							</p>
 						</div>
 
 						<div className="mx-auto mt-4 grid w-full max-w-5xl grid-cols-1 gap-4 sm:grid-cols-3">
-							{workflowStarters.map(workflow => (
-								<WorkflowStarterCard key={workflow.workflowID} workflow={workflow} />
+							{resolvedWorkflowStarters.map(({ workflow, agent }) => (
+								<WorkflowStarterCard
+									key={workflow.workflowID}
+									workflow={workflow}
+									agent={agent}
+									loading={agentsLoading}
+								/>
 							))}
 						</div>
 					</section>
@@ -148,8 +191,8 @@ export default function HomePage() {
 								</div>
 							</Link>
 							<p className="text-base-content/70 text-xs">
-								Bundled guide for getting started, chat workflows, reusable context, providers, privacy, recipes, and
-								architecture.
+								Bundled guide for getting started, Chats, Agents, Workspaces, reusable context, providers, privacy, and
+								everyday tasks.
 							</p>
 						</div>
 

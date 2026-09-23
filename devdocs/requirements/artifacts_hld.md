@@ -1622,19 +1622,19 @@ MCP has no additional portable or Store-level effective-enabled field.
 
 ### 26.2 Local state ownership
 
-| Concern                       | Owner                          |
-| ----------------------------- | ------------------------------ |
-| Workspace directory enablement | Directory and policy Sources  |
-| Generic Artifact enablement   | Artifact record                |
-| MCP installation input values | MCP local installation data    |
-| MCP secret references         | MCP local installation data    |
-| Secret values                 | Secret storage                 |
-| OAuth tokens                  | MCP runtime and secret storage |
-| Selected MCP profile          | MCP local installation data    |
-| Additional local MCP policies | MCP local installation data    |
-| Prompt budget                 | Runtime configuration          |
-| Tool invocation arguments     | Runtime request                |
-| Model invocation values       | Runtime request                |
+| Concern                        | Owner                          |
+| ------------------------------ | ------------------------------ |
+| Workspace directory enablement | Directory and policy Sources   |
+| Generic Artifact enablement    | Artifact record                |
+| MCP installation input values  | MCP local installation data    |
+| MCP secret references          | MCP local installation data    |
+| Secret values                  | Secret storage                 |
+| OAuth tokens                   | MCP runtime and secret storage |
+| Selected MCP profile           | MCP local installation data    |
+| Additional local MCP policies  | MCP local installation data    |
+| Prompt budget                  | Runtime configuration          |
+| Tool invocation arguments      | Runtime request                |
+| Model invocation values        | Runtime request                |
 
 An intentional protected topology replacement may replace ArtifactRefs. Preserving local state across that operation requires an explicit migration or overlay policy.
 
@@ -2173,11 +2173,17 @@ The portable locator contract remains forward-compatible with these capabilities
 
 #### Authoring and frontend
 
-| Capability                                                               | Status   |
-| ------------------------------------------------------------------------ | -------- |
-| Mixed Plugin frontend authoring                                          | Deferred |
-| Managed authoring for Agent, Team, Loop, Workflow, Tool, Model, and Text | Deferred |
-| Standalone management UI for Agent, Team, Loop, and Workflow plans       | Deferred |
+| Capability                                                               | Status        |
+| ------------------------------------------------------------------------ | ------------- |
+| Mixed Plugin frontend authoring                                          | Deferred      |
+| Managed Agent Collection and import/export frontend                      | Available     |
+| Managed Agent Composer starter projection for mapped Model and Tool refs | Available     |
+| Agent Text materialization through Agent Store                           | Available     |
+| Agent Skill instruction rendering                                        | Available     |
+| Agent MCP Composer context projection                                    | Available     |
+| Artifact-backed Agent Model and Tool targets                             | Not supported |
+| Managed authoring for Team, Loop, Workflow, Tool, Model, and Text        | Deferred      |
+| Standalone management UI for Team, Loop, and Workflow plans              | Deferred      |
 
 #### Execution runtimes
 

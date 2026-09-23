@@ -39,7 +39,7 @@ function isPureUserTurn(message: ConversationMessage): boolean {
  *
  * A pure user turn is a user message that does NOT already contain tool outputs.
  * Tool-output followup user messages are not counted as standalone start turns,
- * because they depend on earlier assistant tool calls and the earlier user turn
+ * because they depend on earlier tool calls and the earlier user turn
  * that requested those tools.
  */
 function findRequestedPureUserStartIndex(
@@ -78,7 +78,7 @@ function findRequestedPureUserStartIndex(
  *
  * This intentionally keeps all earlier system/developer messages, even if they
  * were interleaved among older omitted turns. That is the safer bias:
- * instructions should be preserved, while older user/assistant/tool turns may
+ * instructions should be preserved, while older user/agent/tool turns may
  * be dropped according to the selected pure-user-turn boundary.
  *
  * Any provider-specific collapsing/merging of multiple system/developer blocks

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useState } from 'react';
 import { FiSliders } from 'react-icons/fi';
 
 import type { UIChatOption } from '@/spec/modelpreset';
@@ -7,17 +7,10 @@ import { ReasoningType } from '@/spec/inference';
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
-import type {
-	AssistantPresetOptionItem,
-	AssistantPresetPreparedApplication,
-} from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import type { AssistantPresetManagerState } from '@/chats/composer/assistantpresets/use_assistant_preset_manager';
-import type { AssistantContextController } from '@/chats/composer/contextarea/use_context_state';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { AgentManagerState } from '@/chats/composer/agents/use_agent_manager';
+import type { ComposerContextController } from '@/chats/composer/contextarea/use_context_state';
 import { AdvancedParamsModal } from '@/chats/composer/advancedparams/advanced_params_modal';
-import { AssistantPresetDropdown } from '@/chats/composer/assistantpresets/assistant_preset_dropdown';
-import { buildAssistantPresetModelComparisonState } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
-import { AssistantPresetViewModal } from '@/chats/composer/assistantpresets/assistant_preset_view_modal';
+import { AgentDropdown } from '@/chats/composer/agents/agent_dropdown';
 import { ModelDropdown } from '@/chats/composer/models/model_dropdown';
 import { OutputVerbosityDropdown } from '@/chats/composer/outputverbosities/output_verbosity_dropdown';
 import { PreviousMessagesDropdown } from '@/chats/composer/previousmessages/previous_messages_dropdown';
@@ -26,125 +19,17 @@ import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reason
 import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
 
-interface EditorContextBarProps {
-	context: AssistantContextController;
-	assistantPreset: AssistantPresetManagerState;
-	systemPrompt: Pick<
-		ComposerSystemPromptController,
-		| 'includeModelDefault'
-		| 'selectedInstructionSourceKeys'
-		| 'instructionSources'
-		| 'prepareAssistantPresetInstructionSources'
-	>;
+interface ContextBarProps {
+	context: ComposerContextController;
+	agent: AgentManagerState;
 }
 
-interface AssistantPresetViewState {
-	option: AssistantPresetOptionItem | null;
-	preparedApplication: AssistantPresetPreparedApplication | null;
-	isActivePreset: boolean;
-}
-
-export function EditorContextBar({ context, assistantPreset, systemPrompt }: EditorContextBarProps) {
+export function ContextBar({ context, agent }: ContextBarProps) {
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
-	const [isAssistantViewModalOpen, setIsAssistantViewModalOpen] = useState(false);
-
-	const [assistantPresetViewState, setAssistantPresetViewState] = useState<AssistantPresetViewState>({
-		option: null,
-		preparedApplication: null,
-		isActivePreset: false,
-	});
-	const assistantPresetViewRequestSeqRef = useRef(0);
-
-	const openAssistantPresetView = useCallback(
-		(option: AssistantPresetOptionItem) => {
-			const activePresetKey =
-				assistantPreset.selectedPresetKey ?? assistantPreset.appliedPresetApplication?.presetKey ?? null;
-			const isActivePreset = activePresetKey === option.key;
-			const initialPreparedApplication =
-				isActivePreset && assistantPreset.appliedPresetApplication?.presetKey === option.key
-					? assistantPreset.appliedPresetApplication
-					: null;
-
-			setAssistantPresetViewState({
-				option,
-				preparedApplication: initialPreparedApplication,
-				isActivePreset,
-			});
-			setIsAssistantViewModalOpen(true);
-
-			if (initialPreparedApplication || !option.isSelectable) {
-				assistantPresetViewRequestSeqRef.current += 1;
-				return;
-			}
-
-			const requestSeq = assistantPresetViewRequestSeqRef.current + 1;
-			assistantPresetViewRequestSeqRef.current = requestSeq;
-
-			void (async () => {
-				try {
-					const basePrepared = await context.prepareAssistantPresetApplication(option.key);
-					if (!basePrepared || assistantPresetViewRequestSeqRef.current !== requestSeq) {
-						return;
-					}
-
-					const preparedSystemPromptSelections = await systemPrompt.prepareAssistantPresetInstructionSources(
-						basePrepared.preset
-					);
-					const prepared: AssistantPresetPreparedApplication = {
-						...basePrepared,
-						hasIncludeModelSystemPromptSelection: preparedSystemPromptSelections.hasIncludeModelSystemPromptSelection,
-						nextIncludeModelSystemPrompt: preparedSystemPromptSelections.nextIncludeModelSystemPrompt,
-						hasInstructionSourceSelection: preparedSystemPromptSelections.hasInstructionSourceSelection,
-						nextSelectedInstructionSourceKeys: preparedSystemPromptSelections.nextSelectedInstructionSourceKeys,
-						preparedInstructionSources: preparedSystemPromptSelections.preparedInstructionSources,
-						comparisonState: {
-							...basePrepared.comparisonState,
-							model: buildAssistantPresetModelComparisonState(
-								basePrepared.preset,
-								basePrepared.nextSelectedModel,
-								preparedSystemPromptSelections.nextIncludeModelSystemPrompt
-							),
-							instructions: preparedSystemPromptSelections.hasInstructionSourceSelection
-								? [...preparedSystemPromptSelections.nextSelectedInstructionSourceKeys]
-								: undefined,
-						},
-					};
-
-					setAssistantPresetViewState(current =>
-						current.option?.key === option.key ? { ...current, preparedApplication: prepared } : current
-					);
-				} catch (error) {
-					console.error('Failed to prepare assistant preset preview:', error);
-				}
-			})();
-		},
-		[assistantPreset.appliedPresetApplication, assistantPreset.selectedPresetKey, context, systemPrompt]
-	);
 
 	return (
 		<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 p-1 xl:mx-4">
-			<AssistantPresetDropdown
-				presetOptions={assistantPreset.presetOptions}
-				selectedPresetKey={assistantPreset.selectedPresetKey}
-				selectedPreset={assistantPreset.selectedPreset}
-				loading={assistantPreset.loading}
-				error={assistantPreset.error}
-				actionError={assistantPreset.actionError}
-				isApplying={assistantPreset.isApplying}
-				basePresetKey={assistantPreset.basePresetKey}
-				selectedPresetModifiedLabels={assistantPreset.modificationSummary.modifiedLabels}
-				canResetToBasePreset={
-					assistantPreset.presetOptions.some(option => option.isSelectable) && !assistantPreset.isBasePresetSelected
-				}
-				onViewPreset={openAssistantPresetView}
-				onReapplySelectedPreset={() => {
-					return assistantPreset.reapplySelectedPreset();
-				}}
-				onResetToBasePreset={() => {
-					return assistantPreset.resetToBasePreset();
-				}}
-				onSelectPreset={assistantPreset.selectPreset}
-			/>
+			<AgentDropdown manager={agent} />
 
 			<ModelDropdown
 				selectedModel={context.selectedModel}
@@ -163,35 +48,44 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				context.isHybridReasoningEnabled ? (
 					<ReasoningTokensDropdown
 						tokens={context.selectedModel.reasoning.tokens}
-						setTokens={context.setHybridTokens}
+						setTokens={t => {
+							context.setHybridTokens(t);
+						}}
 					/>
 				) : (
 					<TemperatureDropdown
 						temperature={context.selectedModel.temperature ?? 0.1}
-						setTemperature={context.setTemperature}
+						setTemperature={t => {
+							context.setTemperature(t);
+						}}
 					/>
 				)
 			) : context.selectedModel.reasoning?.type === ReasoningType.SingleWithLevels ? (
 				<SingleReasoningDropdown
 					reasoningLevel={context.selectedModel.reasoning.level}
-					setReasoningLevel={context.setReasoningLevel}
+					setReasoningLevel={r => {
+						context.setReasoningLevel(r);
+					}}
 					levelOptions={context.reasoningLevelOptions}
 				/>
 			) : (
 				<TemperatureDropdown
 					temperature={context.selectedModel.temperature ?? 0.1}
-					setTemperature={context.setTemperature}
+					setTemperature={t => {
+						context.setTemperature(t);
+					}}
 				/>
 			)}
 
-			{context.verbosityEnabled && (
+			{context.verbosityEnabled ? (
 				<OutputVerbosityDropdown
 					sdkType={context.selectedModel.providerSDKType}
 					verbosity={context.selectedModel.outputParam?.verbosity}
-					setVerbosity={context.setOutputVerbosity}
-					disabled={!context.verbosityEnabled}
+					setVerbosity={o => {
+						context.setOutputVerbosity(o);
+					}}
 				/>
-			)}
+			) : null}
 
 			<PreviousMessagesDropdown value={context.includePreviousMessages} setValue={context.setIncludePreviousMessages} />
 
@@ -227,33 +121,11 @@ export function EditorContextBar({ context, assistantPreset, systemPrompt }: Edi
 				effectiveReasoningEnabled={
 					context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens
 						? context.isHybridReasoningEnabled
-						: !!context.selectedModel.reasoning
+						: Boolean(context.selectedModel.reasoning)
 				}
 				onSave={(updatedModel: UIChatOption) => {
 					context.applyAdvancedModel(updatedModel);
 				}}
-			/>
-
-			<AssistantPresetViewModal
-				isOpen={isAssistantViewModalOpen && assistantPresetViewState.option !== null}
-				onClose={() => {
-					assistantPresetViewRequestSeqRef.current += 1;
-					setIsAssistantViewModalOpen(false);
-					setAssistantPresetViewState({
-						option: null,
-						preparedApplication: null,
-						isActivePreset: false,
-					});
-				}}
-				viewedPreset={assistantPresetViewState.option}
-				viewedPresetApplication={assistantPresetViewState.preparedApplication}
-				isActivePresetView={assistantPresetViewState.isActivePreset}
-				currentRuntimeSnapshot={assistantPreset.runtimeSnapshot}
-				currentModel={context.selectedModel}
-				currentIncludeModelSystemPrompt={systemPrompt.includeModelDefault}
-				currentSelectedInstructionSourceKeys={systemPrompt.selectedInstructionSourceKeys}
-				instructionSources={systemPrompt.instructionSources}
-				modificationSummary={assistantPreset.modificationSummary}
 			/>
 		</div>
 	);

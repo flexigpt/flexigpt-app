@@ -1,286 +1,255 @@
-# Artifact-backed Agent Store HLD
+The verified corrections affect Collection semantics, the completed frontend, import behavior, MCP validation status, and the implementation-oriented sections. A diff would replace most of the document, so this is a full-file replacement.
 
-Status: Backend implementation and static built-in Assistant Preset conversion available; verification and consumer migration pending
+# Agent Store HLD
+
+Status: Current design and implemented user experience. Source-backed Agent catalog, Agent Collections, managed Agent import and export, protected built-in Agent packages, MCP setup UI, and read-only Agent inspection are available. Managed inline MCP credential-placement validation is partial: known sensitive environment and header positions are validated, while all command and URL credential placements are not comprehensively classified.
 
 Normative foundations:
 
 - [Portable Artifact Declaration Contracts HLD](./artifact_contracts_hld.md)
 - [Artifact Store, Resolution, and Ecosystem HLD](./artifacts_hld.md)
 
-This HLD defines only the Agent-specific Store and managed-authoring behavior. Declaration syntax, Source behavior, Artifact persistence, relationship resolution, fallback, enablement, and composition semantics are inherited from the two normative HLDs and are not redefined here.
+This HLD defines Agent-specific Store policy, Agent Collection behavior, managed Agent import and export, built-in Agent integration, and the management user experience.
 
-- [1. Purpose](#1-purpose)
-- [2. Goals and scope](#2-goals-and-scope)
-  - [2.1 Goals](#21-goals)
-  - [2.2 In scope](#22-in-scope)
-  - [2.3 Out of scope](#23-out-of-scope)
-- [3. Requirements](#3-requirements)
-  - [3.1 Declaration requirements](#31-declaration-requirements)
-  - [3.2 Storage requirements](#32-storage-requirements)
-  - [3.3 Agent Collection requirements](#33-agent-collection-requirements)
-  - [3.4 Resolution requirements](#34-resolution-requirements)
-  - [3.5 Breaking-change requirement](#35-breaking-change-requirement)
-- [4. Architecture and ownership](#4-architecture-and-ownership)
-  - [4.1 Component responsibilities](#41-component-responsibilities)
-  - [4.2 Persisted state](#42-persisted-state)
-  - [4.3 References](#43-references)
-- [5. Agent declaration usage](#5-agent-declaration-usage)
-  - [5.1 Agent example](#51-agent-example)
-  - [5.2 Agent-specific declaration rules](#52-agent-specific-declaration-rules)
-- [6. Agent Collections](#6-agent-collections)
-  - [6.1 Collection representation](#61-collection-representation)
-  - [6.2 Collection declaration](#62-collection-declaration)
-  - [6.3 Baseline Agent Collection](#63-baseline-agent-collection)
-  - [6.4 Membership behavior](#64-membership-behavior)
-  - [6.5 Collection deletion](#65-collection-deletion)
-- [7. Managed Agent authoring](#7-managed-agent-authoring)
-  - [7.1 Managed Source layout](#71-managed-source-layout)
-  - [7.2 Supported operations](#72-supported-operations)
-  - [7.3 Create Agent](#73-create-agent)
-  - [7.4 Attach an existing Agent](#74-attach-an-existing-agent)
-  - [7.5 Replace Agent](#75-replace-agent)
-  - [7.6 Detach and delete](#76-detach-and-delete)
-  - [7.7 Agent variants and versions](#77-agent-variants-and-versions)
-- [8. Agent reads and resolution](#8-agent-reads-and-resolution)
-  - [8.1 Read APIs](#81-read-apis)
-  - [8.2 Resolution result](#82-resolution-result)
-  - [8.3 Validation boundary](#83-validation-boundary)
-  - [8.4 Enablement](#84-enablement)
-- [9. Built-in Agents](#9-built-in-agents)
-  - [9.1 Package structure](#91-package-structure)
-  - [9.2 Package validation](#92-package-validation)
-  - [9.3 Protected Root behavior](#93-protected-root-behavior)
-- [10. Workspace and consumer integration](#10-workspace-and-consumer-integration)
-- [11. Implementation areas](#11-implementation-areas)
-- [12. Functional parity with Assistant Presets](#12-functional-parity-with-assistant-presets)
-- [13. Differences with respect to Assistant Presets](#13-differences-with-respect-to-assistant-presets)
-- [14. Runtime boundary](#14-runtime-boundary)
-- [15. Implementation status](#15-implementation-status)
+Portable declaration syntax, Source behavior, Artifact persistence, relationship resolution, fallback, selector behavior, resource verification, enablement, and composition semantics are inherited from the normative HLDs and are not redefined here.
 
-## 1. Purpose
+## Table of contents
 
-The Agent Store provides application-level management of source-backed Agent Artifacts.
+- [Purpose](#purpose)
+- [Scope and boundaries](#scope-and-boundaries)
+- [User experience](#user-experience)
+- [Architecture and ownership](#architecture-and-ownership)
+- [Agent Collections](#agent-collections)
+- [Managed Agent authoring](#managed-agent-authoring)
+- [Managed dependency lookup](#managed-dependency-lookup)
+- [Import preview and commit](#import-preview-and-commit)
+- [Reads, resolution, export, and enablement](#reads-resolution-export-and-enablement)
+- [Built-in Agents](#built-in-agents)
+- [Workspace, Composer, and runtime integration](#workspace-composer-and-runtime-integration)
+- [Security and persistence](#security-and-persistence)
+- [Implementation mapping](#implementation-mapping)
+- [Current implementation status](#current-implementation-status)
+
+## Purpose
+
+The Agent Store is the application-level catalog and lifecycle facade for source-backed `agent` Artifacts.
 
 The primary flow is:
 
 ```text
-Agent declaration
-  -> managed or repository Source
+Repository, managed, or protected Source
   -> Agent Definition and Artifact
   -> shared Agent resolver
-  -> declaration consumer
+  -> management UI, Composer projection, or runtime consumer
 ```
 
-The Agent Store adds:
+The Agent Store provides:
 
-- Managed Agent authoring.
-- Agent catalog APIs.
-- Agent-only collections backed by Plugins.
-- Built-in Agent packages.
-- Agent-specific management policy.
+- Agent catalog and typed resolution views.
+- Agent Collections backed by Agent-only Plugin Artifacts.
+- File-based managed Agent import.
+- Portable Agent export.
+- Managed Agent package lifecycle policy.
+- Built-in Agent package hydration and validation.
+- Agent and Collection enablement through universal Artifact metadata.
+- Verified materialization of Agent-owned Text Artifacts.
+- MCP setup handoff for resolved MCP Artifacts.
 
-It does not add another declaration format or another persistence system.
+The Agent Store does not add another Agent declaration format, persistence database, membership database, runtime model, or execution engine.
 
-## 2. Goals and scope
+## Scope and boundaries
 
-### 2.1 Goals
+### Goals
 
 The design must:
 
-- Reuse the current Artifact Store and resolver ecosystem.
+- Reuse the Artifact Store, Source model, and typed resolver ecosystem.
 - Store Agents as ordinary source-backed `agent` Artifacts.
-- Represent Agent collections using the existing `plugin` contract.
-- Replace Assistant Preset use cases using current Artifact concepts.
-- Use named, scoped, located, contained, and selector relationships as intended.
-- Keep Agent Store concerns separate from Agent runtime concerns.
-- Avoid Agent-specific copies of functionality already provided by Artifact Store.
+- Represent user-facing Agent Collections through ordinary `plugin` Artifacts.
+- Keep Agent declaration content portable and source-owned.
+- Require import and export for managed Agent declaration authoring.
+- Preserve partial relationship resolution and diagnostics.
+- Keep Collection membership independent from Agent ownership.
+- Keep declaration availability separate from runtime readiness.
+- Support protected built-in Agent packages without a separate Agent Root or overlay database.
+- Let users configure MCP installation-local state without changing Agent YAML.
 
-### 2.2 In scope
+### In scope
 
 This HLD defines:
 
-- Agent Store consumer APIs.
-- Managed Agent package authoring.
-- Agent-only Plugin management.
-- Agent catalog and collection views.
-- Agent enablement management.
-- Built-in Agent package integration.
-- Use of shared Agent and Plugin resolution.
-- Functional correspondence with Assistant Preset use cases.
+- Agent catalog, read, resolution, export, and enablement behavior.
+- Agent-only managed Collection policy.
+- Baseline Agent Collection provisioning.
+- Managed Agent YAML import and deletion.
+- Managed Agent immutability after import.
+- Managed dependency scope normalization.
+- Client-carried signed import preparation.
+- Best-effort Collection membership and Agent package publication.
+- Built-in Agent package admission and protected Root hydration.
+- Agent Text materialization.
+- MCP setup handoff after Agent import or inspection.
+- Read-only Composer starter projection.
+- Workspace and runtime integration boundaries.
 
-### 2.3 Out of scope
+### Out of scope
 
 This HLD does not define:
 
 - Agent execution.
-- Runtime launch inputs.
-- Runtime projections.
 - Conversation state.
-- Tool invocation arguments.
+- Model invocation values.
+- Tool user inputs or invocation arguments.
 - Skill execution or activation state.
-- MCP discovery, connection, prompts, resources, or conversation context.
-- Model provider readiness.
-- Workflow or Loop execution.
-- Assistant Preset compatibility APIs.
-- Assistant Preset wire aliases.
-- Automatic migration behavior.
-- Dual-read or dual-write behavior.
-- Agent release or version fields.
-- Additional sidecar files or storage Artifacts.
+- MCP connection health, discovered capability state, runtime invocation state, or readiness aggregation.
+- A visual Agent declaration editor.
+- In-place managed Agent declaration editing.
+- Managed Agent replacement or upsert.
+- Generic import of arbitrary Artifact declaration types.
+- Linked-file synchronization or import-file watching.
+- Backend-held import sessions, commit-token registries, or replay receipts.
+- Cross-package transactions spanning Collection and Agent package mutations.
+- Agent release or package version fields.
+- URL, Git, package, archive, or command locator materialization.
 
-## 3. Requirements
+## User experience
 
-### 3.1 Declaration requirements
+### Browse Agents and Collections
 
-Agent Store declarations must use the existing portable contracts.
+The Agent management experience presents Agent Collections and the currently available Agents selected by each Collection.
 
-An Agent declaration:
+A user can:
 
-- Uses `type: agent`.
-- Uses the current flat member grammar.
-- Uses Text for instruction and user-message content.
-- Uses Model, Tool, Skill, MCP, Plugin, and Agent relationships as defined by `agentv1`.
-- Uses `loop` or `workflow` only through the existing Agent program fields.
-- Does not contain Store IDs or runtime identities.
-- Does not contain declaration-instance schema or version fields.
+- Browse user-managed and protected built-in Agent Collections.
+- Expand a Collection to view its currently available Agent targets.
+- Inspect an Agent's metadata, declaration YAML, resolution state, and diagnostics.
+- View whether an Agent or Collection is enabled.
+- Export an available Agent.
+- Inspect MCP setup requirements for resolved MCP relationships.
 
-Agent relationships must not persist:
+The Collection list is an availability-oriented catalog. It shows currently available Agent Artifacts. A Collection capability inspection remains the statusful view for declared relationships that are unavailable or ambiguous.
 
-- Model preset references.
-- Tool Store references.
-- Skill `ArtifactRef` values.
-- MCP runtime server IDs.
-- Root IDs.
-- Source IDs.
+### Manage Collections
 
-### 3.2 Storage requirements
+A user can create an ordinary Agent Collection, edit its display metadata, enable or disable it, and delete it when it has no direct declared members.
 
-The Agent Store must use Artifact Store for:
+The baseline Collection is selectable as an import destination, but its logical identity and descriptive metadata are application-provisioned and are not edited through the management UI.
 
-- Roots.
-- Sources.
-- Definitions.
-- Agent Artifacts.
-- Plugin Artifacts.
-- Source bindings.
-- Verified resources.
-- Artifact enablement.
-- Artifact-local data where independently required by a consumer.
+Protected built-in Collections are read-only as declaration content. Their local enabled state remains configurable through the authorized Artifact metadata path.
 
-The Agent Store must not create:
+The management UI does not expose a standalone Agent membership editor, attach operation, or detach operation.
 
-- A separate Agent declaration database.
-- Agent membership rows.
-- Reverse membership records as authoritative state.
-- Agent-specific built-in overlay storage.
-- Runtime configuration files.
-- Agent publication descriptors.
-- Agent release metadata.
+Membership is created or preserved by managed Agent import. This is intentional: Agent declaration authoring is file-based, and Collection management does not become a free-form Agent composition editor.
 
-Managed Agent and Plugin declaration files are the only Agent Store source content required by this design.
+### Import a managed Agent
 
-### 3.3 Agent Collection requirements
-
-A user-facing Agent Collection must:
-
-- Be backed by a `plugin` Artifact.
-- Contain only Agent member relationships.
-- Support the Agent member forms allowed by the Plugin contract.
-- Use external located Agent membership for ordinary managed Agent creation.
-- Preserve unavailable and ambiguous memberships.
-- Permit one Agent to belong to multiple collections.
-- Keep collection enablement separate from Agent enablement.
-- Avoid ownership and cascading deletion.
-
-Managed Agent creation must explicitly identify its destination Agent Collection.
-
-### 3.4 Resolution requirements
-
-The Agent Store must use the shared typed resolvers.
-
-It must not implement separate lookup logic for:
-
-- Models.
-- Tools.
-- Skills.
-- MCP servers.
-- Plugins.
-- Nested Agents.
-- Loops.
-- Workflows.
-
-Agent reads may return the existing resolver result so consumers can observe:
-
-- Available relationships.
-- Unavailable relationships.
-- Ambiguous relationships.
-- Artifact-backed targets.
-- Mapped Tool or Model targets.
-- Relationship diagnostics.
-- Relationship `overrides`.
-- Relationship `use`.
-
-The Agent Store must not interpret declaration availability as runtime readiness.
-
-### 3.5 Breaking-change requirement
-
-The Agent Store is a new design, not a compatibility layer.
-
-It must not:
-
-- Expose Assistant Preset request or response types.
-- Accept Assistant Preset JSON.
-- Retain bundle, preset, slug-version, or legacy reference aliases.
-- Store compatibility-only fields.
-- Introduce fields solely to preserve old wire behavior.
-- Translate runtime state into Agent Store declaration state.
-- Add intermediate bridge records.
-
-Functional parity means that the former user use cases can be expressed through the new declaration, Store, resolver, and runtime boundaries. It does not mean API, code, identifier, storage, or wire parity.
-
-## 4. Architecture and ownership
-
-### 4.1 Component responsibilities
+The user flow is:
 
 ```text
-Agent Store consumer API
-  -> Agent Store domain policy
-    -> managed Source publisher
-    -> Artifact Store
-    -> Agent and Plugin resolvers
+Create or select an editable Agent Collection
+  -> choose one YAML file
+  -> preview validation, normalized YAML, diagnostics, and conflicts
+  -> accept required confirmations
+  -> import into the selected Collection
+  -> inspect the published Agent and configure MCP setup if needed
 ```
 
-| Component             | Responsibility                                                                                 |
-| --------------------- | ---------------------------------------------------------------------------------------------- |
-| Artifact Store        | Source-backed Definitions, Artifacts, resources, enablement, and local state                   |
-| Declaration contracts | Portable Agent, Plugin, Text, Model, Tool, Skill, MCP, Loop, and Workflow syntax               |
-| Shared resolvers      | Relationship lookup, locator handling, fallback, selectors, cycles, and diagnostics            |
-| Agent Store           | Managed Agent policy, Agent Collections, catalog APIs, and built-in Agent package registration |
-| Agent runtime         | Execution and all run-specific values                                                          |
+The preview shows the user:
 
-The Agent Store is therefore a domain facade over existing Artifact infrastructure.
+- The normalized declaration that will be published.
+- The resulting Definition digest.
+- Projected declaration Artifacts.
+- Import-blocking errors and conflicts.
+- Informational dependency availability.
+- Required confirmations.
+- MCP declarations that may need setup after publication.
 
-### 4.2 Persisted state
+An unavailable or ambiguous external dependency does not prevent import when the Agent declaration itself is structurally valid.
 
-Agent Store persistence consists of ordinary Source content:
+### Inspect, export, and delete a managed Agent
+
+Managed Agent declarations are immutable after import.
+
+A user changes a managed Agent by:
 
 ```text
-Managed Source
-  -> Plugin declaration files
-  -> Agent declaration files
+Export Agent YAML
+  -> edit outside the application
+  -> import under a new name
 ```
 
-Artifact Store derives and persists the corresponding Definitions and Artifacts.
+Or:
 
-Agent Collection membership remains inside the Plugin Definition. It is not copied into another database.
+```text
+Export Agent YAML
+  -> delete the managed Agent
+  -> edit outside the application
+  -> import again with the same name
+```
 
-Agent metadata such as `displayName`, `description`, `labels`, and `metadata` remains in the portable declaration.
+Deleting a managed Agent removes only its managed package. It does not remove Collection relationships. Those relationships become unavailable until an exact matching Agent is restored.
 
-Enablement remains in `Artifact.Enabled`.
+### Configure MCP setup
 
-### 4.3 References
+Import and Agent inspection can identify MCP declarations that require local setup.
 
-Portable declaration relationships use:
+For a resolved MCP Artifact, the MCP setup experience can collect or update:
+
+- Text and path installation inputs.
+- Secret-backed installation inputs.
+- OAuth client credential inputs.
+- Local MCP installation data.
+
+For an unresolved named MCP relationship, the user receives setup status and resolution diagnostics but cannot configure a missing Artifact.
+
+MCP setup does not modify Agent YAML. It does not occur during import and does not make import conditional on connection readiness.
+
+### View a Composer starter projection
+
+The Agent details experience can present a read-only Composer starter projection.
+
+The projection may show:
+
+- Resolved mapped or Artifact-backed Model and Tool selections.
+- Skill modes.
+- Rendered instruction Skill text.
+- MCP runtime selections.
+- Resolution and projection diagnostics.
+
+This is a read-only consumer projection. It is not an Agent declaration editor, replacement mechanism, or runtime readiness result.
+
+## Architecture and ownership
+
+### Responsibility boundaries
+
+| Concern                                                                      | Owner                   |
+| ---------------------------------------------------------------------------- | ----------------------- |
+| Portable declaration syntax and validation                                   | Declaration contracts   |
+| Roots, Sources, Definitions, Artifacts, resources, and enablement            | Artifact Store          |
+| Relationship lookup, fallback, locators, selectors, aliases, and diagnostics | Shared resolvers        |
+| Agent catalog policy, Collections, import/export, and managed lifecycle      | Agent Store             |
+| Agent package and Collection package publication                             | Managed Source workflow |
+| MCP installation values, secret references, OAuth, and profiles              | MCP management          |
+| Agent execution and conversation state                                       | Runtime consumers       |
+
+The Agent Store is a domain facade over existing Artifact infrastructure. It does not own a parallel declaration database, resolver, runtime, or membership store.
+
+### Source-backed state
+
+Managed state consists of ordinary Source-backed declaration packages.
+
+The important invariants are:
+
+- Agent Collections are independent Plugin declaration packages.
+- Managed Agents are independent Agent declaration packages.
+- Artifact Store derives Definitions and Artifacts from those packages.
+- Collection membership remains declaration content in the Collection's Plugin Definition.
+- No Agent membership rows, reverse-membership rows, ownership records, or Agent-specific sidecar files are created.
+- Physical package conventions do not introduce portable Agent release versions.
+
+### Identity and local references
+
+Portable relationships use the forms defined by the declaration contracts:
 
 ```text
 name
@@ -290,730 +259,787 @@ contained parameters
 selector base and filters
 ```
 
-Local Agent Store APIs may use an authorized `ArtifactRef` to address an existing local Artifact.
+Local management APIs may use an authorized `ArtifactRef` to address an existing Artifact. An `ArtifactRef` is an operation input and is never persisted in an Agent or Collection declaration.
 
-When an existing Artifact is attached to an Agent or Agent Collection, the persisted relationship must be converted to the appropriate portable relationship form. The local `ArtifactRef` is not written into the declaration.
+The Agent Store does not define an Agent release version.
 
-## 5. Agent declaration usage
+Distinct Agent configurations are represented by:
 
-### 5.1 Agent example
+- Distinct Agent names, which is the preferred managed form.
+- Distinct located occurrences when the same semantic name is intentionally used more than once.
 
-```yaml
-type: agent
-name: bug-investigator
-displayName: Bug Investigator
-description: Investigates failures using repository evidence.
+## Agent Collections
 
-members:
-  - type: text
-    name: investigation-rules
-    insert: instructions
-    parameters:
-      mediaType: text/markdown
-      content: |
-        Separate observations from assumptions.
-        Prefer the smallest safe change.
+### Representation
 
-  - type: text
-    name: investigation-request
-    insert: user-message
-    parameters:
-      mediaType: text/markdown
-      content: |
-        Investigate the current failure using available repository evidence.
-
-  - type: model
-    name: reasoning
-    overrides:
-      includeSystemPrompt: true
-
-  - type: tool
-    name: searchfiles
-    scope: builtin
-    overrides:
-      autoExecute: true
-
-  - type: tool
-    name: readfile
-    scope: builtin
-    overrides:
-      autoExecute: true
-
-  - type: skill
-    name: bug-investigation
-    locator: ../skills/bug-investigation/SKILL.md
-    use:
-      mode: active
-
-  - type: mcp
-    name: github
-```
-
-The Agent Store does not give special meaning to an initial user message. It is an ordinary Text member with `insert: user-message`.
-
-### 5.2 Agent-specific declaration rules
-
-The Agent Store relies on the existing Agent contract for member eligibility and validation.
-
-Agent-specific management must preserve:
-
-- Text `insert` identity.
-- Model `overrides.includeSystemPrompt`.
-- Tool `overrides.autoExecute`.
-- Skill `use.mode`.
-- MCP membership as a relationship to an MCP Artifact.
-- Optional Plugin and nested Agent composition.
-- Optional Loop or Workflow relationship.
-
-Named Model and Tool relationships may resolve through registered fallback providers.
-
-`scope: builtin` requests protected built-in lookup.
-
-A locator selects an exact declaration occurrence and does not fall back to another occurrence.
-
-No MCP-specific selection or discovery data belongs in the Agent declaration beyond the MCP contract itself.
-
-## 6. Agent Collections
-
-### 6.1 Collection representation
-
-An Agent Collection is an Agent Store domain view over a Plugin.
+An Agent Collection is an Agent Store view over an Agent-only Plugin Artifact.
 
 ```text
 Agent Collection
   -> Plugin Artifact
-  -> Agent-only direct members
+  -> direct named Agent relationships
 ```
 
-There is no `collection` Artifact type and no Agent-specific collection wire format.
+There is no portable `collection` Artifact type and no Agent-specific Collection declaration format.
 
-A Plugin qualifies as a managed Agent Collection when:
+A managed Agent Collection:
 
-- It is provisioned in the managed Agent collection domain.
-- Every direct member has `type: agent`.
+- Uses `type: plugin`.
+- Permits only direct `type: agent` members.
+- Permits only named external Agent member relationships.
+- May use an unlocated name, a located Agent occurrence, or `scope: builtin` where the Plugin contract permits it.
+- Does not permit contained Agent declarations.
+- Does not permit Agent selectors.
+- Does not own its selected Agents.
 
-A general mixed Plugin remains a Plugin and is not exposed as a managed Agent Collection.
+Managed Agent import always creates or preserves a located external Agent relationship.
 
-### 6.2 Collection declaration
+A general mixed Plugin remains a Plugin and is not exposed as an Agent Collection.
 
-```yaml
-type: plugin
-name: engineering-agents
-displayName: Engineering Agents
-description: Agents used for engineering work.
+### Baseline Collection
 
-members:
-  - type: agent
-    name: bug-investigator
-    locator: ../../agent/bug-investigator/agent.yaml
-
-  - type: agent
-    name: code-reviewer
-    locator: ../../agent/code-reviewer/agent.yaml
-```
-
-The Plugin contract remains authoritative for named, located, contained, and selector member behavior.
-
-Managed `CreateAgent` uses a located external relationship by default so the Agent remains independently managed and the collection selects the intended occurrence.
-
-### 6.3 Baseline Agent Collection
-
-Each supported user Root has one application-provisioned baseline Agent Collection:
+Each supported user Root has one application-provisioned baseline Agent Collection.
 
 ```text
 Logical name: agent-baseline
 Portable type: plugin
-Allowed member type: agent
+Direct member type: agent
 ```
 
-The baseline Agent Collection is:
+The baseline Collection:
 
-- Editable.
-- Non-renamable.
-- Non-deletable.
-- Explicitly selectable.
-- Not an implicit destination for Agent creation.
-- Not automatically selected by a Workspace.
-- Not automatically active.
+- Is an explicit import destination.
+- Can receive imported Agent memberships.
+- Is non-renamable.
+- Has application-provisioned display metadata.
+- Is non-deletable.
+- Is not automatically selected by a Workspace.
+- Is not automatically active.
+- Is not an implicit destination for import.
 
-Provisioning the baseline collection is an application Root lifecycle concern, not generic Artifact Store Root behavior.
+Baseline provisioning is an application Root lifecycle concern, not generic Artifact Store Root behavior.
 
-### 6.4 Membership behavior
+### Membership behavior
 
-Agent Collection relationships follow ordinary Plugin semantics.
+Collection membership follows ordinary Plugin composition semantics.
+
+| Event                                               | Result                                                               |
+| --------------------------------------------------- | -------------------------------------------------------------------- |
+| Agent is imported into a Collection                 | The Collection receives or preserves one located Agent relationship. |
+| Agent package is deleted                            | Declared Collection relationships remain and become unavailable.     |
+| Matching Agent package is restored                  | Exact dangling relationships become available again.                 |
+| Collection is deleted                               | Independent Agent packages remain available.                         |
+| Agent Source updates at the same located occurrence | The relationship continues to identify that occurrence.              |
+
+Collection membership does not:
+
+- Own an Agent package.
+- Change Agent metadata.
+- Change Agent enablement.
+- Configure MCP installation state.
+- Configure Agent runtime state.
+- Cascade deletion to an Agent.
+- Imply Workspace selection or runtime activation.
+
+### Membership maintenance boundary
+
+The current user management experience does not expose arbitrary Agent attach, detach, or member-editing operations.
+
+This means:
+
+- Import is the user-facing path that adds Agent membership.
+- Deleting an Agent intentionally leaves a dangling membership.
+- A dangling membership still counts as a direct member for Collection deletion.
+- An ordinary Collection with declared Agent relationships cannot be deleted until those relationships are removed through an authorized Collection maintenance path.
+- The management UI does not currently offer a standalone detach control.
+
+This boundary prevents Collection management from becoming a second Agent declaration editing system.
+
+### Collection deletion
+
+An ordinary managed Agent Collection can be deleted only when it has no direct declared Agent relationships.
+
+The deletion guard includes:
+
+- Available Agent relationships.
+- Unavailable Agent relationships.
+- Ambiguous Agent relationships.
+
+The backend deletion guard is authoritative even when the Collection catalog currently shows no available Agents.
+
+Baseline and protected built-in Collections cannot be deleted through user-managed APIs.
+
+## Managed Agent authoring
+
+### Import and export are the managed authoring path
+
+Managed Agent declaration authoring is file-based.
+
+The Agent Store does not expose:
+
+- A field-by-field Agent composer.
+- Declaration patching.
+- Member editing.
+- Agent rename.
+- Agent replacement.
+- Agent upsert.
+- In-app YAML editing.
+
+This restriction applies to managed Agent declarations. It does not remove the limited Collection lifecycle described in this HLD.
+
+### Managed import profile
+
+Managed import accepts a strict subset of the portable Agent contract.
+
+| Area                                                           | Managed admission rule                                                       |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Root                                                           | Must be one concrete `agent` declaration with a valid name.                  |
+| Root locator                                                   | Not allowed.                                                                 |
+| Loop or Workflow                                               | Not allowed.                                                                 |
+| Text                                                           | Must be contained inline Text.                                               |
+| Model                                                          | Must be a named external relationship.                                       |
+| Tool                                                           | Must be a named external relationship.                                       |
+| Skill                                                          | Must be a named external relationship.                                       |
+| MCP                                                            | Must be a named external relationship or a contained inline MCP declaration. |
+| MCP policy                                                     | Must be a named external Agent member relationship.                          |
+| Selectors                                                      | Not allowed.                                                                 |
+| Member locators                                                | Not allowed.                                                                 |
+| Nested Agent or Plugin composition                             | Not allowed.                                                                 |
+| Contained Model, Tool, Skill, Plugin, Agent, Loop, or Workflow | Not allowed.                                                                 |
+| Persisted local IDs or runtime state                           | Not allowed.                                                                 |
+| Installation values, secret values, and OAuth tokens           | Not allowed.                                                                 |
+
+An Agent with no members is valid.
+
+A contained Text declaration must:
+
+- Use `instructions` or `user-message` insertion.
+- Use inline content.
+- Not use a locator.
+- Not use source include or exclude patterns.
+
+A contained MCP declaration must:
+
+- Be a concrete MCP declaration.
+- Use valid stdio or streamable HTTP transport configuration.
+- Declare a command for stdio.
+- Declare a URL for streamable HTTP.
+- Contain installation-input definitions only, not installation values.
+- Contain no source locator or source server selector.
+- Contain no secret values, OAuth tokens, or runtime connection state.
+
+Tool `autoExecute: true` requires explicit confirmation.
+
+An inline stdio MCP declaration requires explicit confirmation.
+
+### Validity categories
+
+| Imported declaration state                             | Import result               |
+| ------------------------------------------------------ | --------------------------- |
+| Empty Agent                                            | Valid and importable.       |
+| Structurally valid Agent with unavailable dependencies | Valid and importable.       |
+| Structurally valid Agent with ambiguous dependencies   | Valid and importable.       |
+| Agent with malformed contained Text or MCP content     | Invalid and not importable. |
+| Agent with unsupported managed member form             | Invalid and not importable. |
+
+Imported declarations are never partially salvaged.
+
+The importer must not:
+
+- Drop invalid members.
+- Rewrite invalid members into another form.
+- Publish only a valid subset.
+- Silently remove malformed contained content.
+
+## Managed dependency lookup
+
+### Managed scope normalization
+
+A managed import may accept an omitted scope or `scope: builtin` for an allowed named Agent member dependency.
+
+Before digesting or publishing the Agent, the importer normalizes every allowed named external Agent member dependency to:
 
 ```text
-Member removed
-  -> Agent remains available
-
-Agent replaced at the same located occurrence
-  -> relationship continues to identify that occurrence
-
-Agent deleted
-  -> relationship remains declared
-  -> relationship becomes unavailable
-
-Collection deleted
-  -> independent Agents remain available
-
-Agent added to another collection
-  -> both relationships select the same Agent occurrence
+scope: builtin
 ```
 
-Collection enablement does not alter Agent enablement or resolution.
+The normalized declaration is used for:
 
-### 6.5 Collection deletion
+- Preview YAML.
+- Definition digest calculation.
+- Prepared import payloads.
+- Published package content.
+- Later export.
 
-An ordinary managed Agent Collection can be deleted only when it has no direct declared members.
+This prevents imported Agent members from silently resolving to arbitrary user Root Artifacts.
 
-The existing managed Plugin deletion rules apply:
+### Managed dependency targets
 
-- Unavailable members count.
-- Ambiguous members count.
-- Selectors count.
-- Contained members count.
-- Only direct members are checked.
-- Deleting the collection never deletes independent Agents.
-- The baseline collection cannot be deleted.
-- Built-in collection declarations cannot be deleted.
+| Dependency type           | Managed lookup behavior                                                               |
+| ------------------------- | ------------------------------------------------------------------------------------- |
+| `model`                   | Protected built-in Artifact first, then a registered mapped fallback where supported. |
+| `tool`                    | Protected built-in Artifact first, then a registered mapped fallback where supported. |
+| `skill`                   | Protected built-in Artifact only.                                                     |
+| `mcp`                     | Protected built-in Artifact only.                                                     |
+| `mcp.policy` Agent member | Protected built-in Artifact only.                                                     |
 
-## 7. Managed Agent authoring
+The Agent Store does not invent mapped targets.
 
-### 7.1 Managed Source layout
+### Inline MCP policy references
 
-A managed Agent Source follows the existing managed package model.
+An inline MCP may declare its own portable direct MCP policy reference.
 
-A representative layout is:
+That relation is owned by the MCP contract, not by the Agent member grammar. The portable MCP policy reference does not carry `scope`.
 
-```text
-user-agents/
-  plugin/
-    agent-baseline/
-      unversioned/
-        plugin.yaml
+Therefore:
 
-    engineering-agents/
-      unversioned/
-        plugin.yaml
+- Agent member scope normalization does not rewrite the MCP-owned policy reference.
+- The policy reference is structurally validated during import.
+- Preview may report an informational protected-policy observation.
+- No policy target snapshot is persisted in the imported Agent.
+- Post-publication resolution follows normal MCP policy resolution behavior.
 
-  agent/
-    bug-investigator/
-      unversioned/
-        agent.yaml
+This is intentionally distinct from a direct `mcp.policy` Agent member relationship.
 
-    code-reviewer/
-      unversioned/
-        agent.yaml
-```
+### Informational dependency preflight
 
-The exact storage keys are managed Source concerns.
+Preview resolves normalized Agent member dependencies and reports:
 
-The Plugin relationship locator is relative to the Plugin declaration occurrence and must remain inside the authorized Source boundary.
-
-No additional Agent Store file is required beside the Agent declaration.
-
-### 7.2 Supported operations
-
-The Agent Store exposes domain operations for:
-
-- Creating an empty Agent Collection.
-- Updating Agent Collection descriptive fields.
-- Listing Agent Collections.
-- Setting Agent Collection Artifact enablement.
-- Deleting an empty Agent Collection.
-- Creating a managed Agent in an explicitly selected collection.
-- Attaching an existing Agent to a collection.
-- Detaching an Agent from a collection.
-- Replacing a managed Agent package with explicit replacement intent.
-- Listing and reading Agents.
-- Setting Agent Artifact enablement.
-- Deleting a managed Agent package.
-- Listing direct Agent Collection memberships.
-
-These operations publish and reconcile Source content. They do not write composition state directly into Artifact Store records.
-
-### 7.3 Create Agent
-
-Managed Agent creation receives:
-
-```text
-Explicit Agent Collection ArtifactRef
-Expected Collection revision
-Portable Agent declaration
-Initial Artifact.Enabled value
-```
-
-The flow is:
-
-```text
-Validate selected Agent Collection
-  -> calculate managed Agent package location
-  -> add located external Agent membership
-  -> publish Agent declaration package
-  -> refresh affected managed Source
-  -> set initial Artifact.Enabled value
-  -> return Agent and Collection views
-```
-
-The selected Agent Collection is mandatory.
-
-There is no implicit baseline fallback.
-
-The publication behavior follows the existing managed Plugin, Skill, and MCP authoring model:
-
-- Equivalent retry is idempotent.
-- Non-equivalent existing package content requires explicit replacement.
-- A collection relationship may temporarily remain unavailable if target publication fails.
-- Retry uses the current collection revision.
-
-Repository-authored Agents may exist without belonging to a managed Agent Collection. The explicit collection requirement applies only to the managed Agent creation API.
-
-### 7.4 Attach an existing Agent
-
-The attach operation accepts:
-
-```text
-Editable Agent Collection
-Expected Collection revision
-Authorized existing Agent ArtifactRef
-```
-
-The Agent Store derives the persisted relationship:
-
-- Use a relative locator when the exact occurrence is representable from the collection Source.
-- Use `scope: builtin` for a protected built-in Agent.
-- Use a named relationship when Root-scoped symbolic lookup is the intended behavior.
-- Reject an attachment that would require an unsupported cross-Root reference.
-
-The supplied `ArtifactRef` is an operation input only.
-
-### 7.5 Replace Agent
-
-A managed Agent package may be replaced only with:
-
-- Explicit replacement intent.
-- The expected current package or Artifact revision.
-- A complete valid Agent declaration.
-
-Replacement publishes a new immutable Definition and updates the existing source-backed Agent occurrence.
-
-Changing `Artifact.Enabled` is not replacement and does not modify the Agent Definition.
-
-Renaming a managed Agent is not an in-place operation. A differently named Agent is created and collection relationships are updated explicitly.
-
-### 7.6 Detach and delete
-
-Detaching and deleting remain independent.
-
-```text
-Detach
-  -> remove collection relationship
-  -> preserve Agent package
-```
-
-```text
-Delete Agent
-  -> remove Agent package
-  -> preserve declared relationships
-  -> affected relationships become unavailable
-```
-
-The Agent Store must not silently detach an Agent from every collection as part of deletion.
-
-Built-in Agent packages cannot be replaced or deleted through user-managed APIs.
-
-### 7.7 Agent variants and versions
-
-The current portable contract has no Agent release version.
-
-The Agent Store does not add one.
-
-Several selectable Agent configurations are represented by:
-
-- Distinct Agent names, which is the preferred managed-authoring form.
-- Distinct located occurrences when the same semantic name is intentionally used more than once.
-
-Named lookup becomes ambiguous when several distinct occurrences with the same name are visible in one Root. Located relationships remain exact.
-
-Artifact Definitions are immutable, while explicit package replacement selects a new Definition for an existing Artifact occurrence.
-
-## 8. Agent reads and resolution
-
-### 8.1 Read APIs
-
-The Agent Store provides:
-
-- `GetAgent`.
-- `ListAgents`.
-- `ResolveAgent`.
-- `GetAgentCollection`.
-- `ListAgentCollections`.
-- `ListAgentCollectionMembers`.
-- `ListDirectAgentMemberships`.
-
-The APIs use Artifact Store identity, paging, provenance, and enablement instead of defining Assistant Preset IDs or page-token contracts.
-
-Agent lists may filter by:
-
-- Authorized Root.
-- Agent `ArtifactRef`.
-- Logical name.
-- Agent Collection.
-- Built-in provenance.
-- Artifact enablement.
-
-Collection membership lists retain unavailable and ambiguous relationships.
-
-### 8.2 Resolution result
-
-`ResolveAgent` delegates to the existing typed Agent resolver.
-
-The returned view contains the Agent Artifact and the shared resolution graph, including:
-
-- Declared members.
-- Relationship form and identity.
+- Declared type and name.
+- Normalized scope.
 - `available`, `unavailable`, or `ambiguous` status.
-- Artifact-backed target references.
-- Mapped Tool or Model targets.
-- Alias provenance when provided by the resolver.
-- Relationship `overrides`.
-- Relationship `use`.
+- Protected Artifact provenance when available.
+- Mapped target provenance when available.
+- Relationship diagnostics.
+
+Dependency resolution is informational.
+
+A structurally valid import must not fail solely because:
+
+- A named Model, Tool, Skill, MCP, or MCP policy is absent.
+- A named dependency is ambiguous.
+- A dependency Source is unavailable.
+- An external target declaration has a diagnostic.
+- A mapped Model or Tool target is unavailable.
+
+Dependency state is not captured as a commit witness.
+
+## Import preview and commit
+
+### Import input
+
+Managed import accepts one user-selected YAML file.
+
+The file input path is transient. It is not persisted in the managed Agent package or prepared import payload.
+
+The import reader must:
+
+- Read only the selected file.
+- Reject directories and unsupported special files.
+- Enforce bounded input size.
+- Respect cancellation.
+- Return valid UTF-8 content.
+- Avoid logging declaration content.
+- Require one YAML object document.
+- Reject duplicate mapping keys and invalid YAML structure.
+
+### Preview
+
+Preview performs the following user-visible workflow:
+
+```text
+Read selected YAML
+  -> calculate input digest
+  -> validate portable Agent declaration
+  -> validate managed import profile
+  -> normalize managed dependency scopes
+  -> validate contained Text and MCP declarations
+  -> calculate normalized Definition digest
+  -> inspect destination, identity, package, and membership conflicts
+  -> inspect dependency status
+  -> return preview and signed preparation when importable
+```
+
+Preview returns:
+
+- Normalized YAML.
+- Input and Definition digests.
+- Projected declaration Artifacts.
+- Destination Collection information.
+- Relationship observations.
+- MCP setup descriptors.
+- Restored dangling-membership information.
+- Import issues and conflicts.
+- Required confirmation codes.
+- A signed prepared payload when the import can proceed.
+
+### Diagnostics
+
+| Condition                                                | Result                 |
+| -------------------------------------------------------- | ---------------------- |
+| Invalid YAML or invalid Agent declaration                | Import-blocking error. |
+| Invalid managed member form                              | Import-blocking error. |
+| Invalid contained Text or MCP declaration                | Import-blocking error. |
+| Invalid destination Collection                           | Import-blocking error. |
+| Agent identity, package, or Collection-member conflict   | Import-blocking error. |
+| Dependency unavailable or ambiguous                      | Warning.               |
+| External dependency declaration unavailable or malformed | Warning.               |
+| Tool auto-execution                                      | Confirmation required. |
+| Inline stdio MCP                                         | Confirmation required. |
+
+### Signed preparation
+
+Preview produces a client-carried HMAC-signed prepared payload.
+
+The payload binds:
+
+- The normalized Agent declaration.
+- Input and Definition digests.
+- The selected Root, Source, and Collection.
+- The expected Collection revision.
+- The expected managed Source generation.
+- The managed package identity.
+- Required confirmation codes.
+- Expiration time.
+
+The payload does not contain:
+
+- The original import path.
+- Secret values.
+- OAuth tokens.
+- MCP installation values.
+- Backend-held prepared-import state.
+- Dependency witnesses.
+- Dependency revision snapshots.
+- Runtime readiness state.
+
+The prepared payload is authenticated, not encrypted.
+
+The signer is process-local. Application restart invalidates uncommitted prepared payloads.
+
+### Commit
+
+Commit verifies:
+
+- Payload authenticity and fingerprint.
+- Payload expiration.
+- Required confirmations.
+- Collection revision.
+- Managed Source generation.
+- Normalized declaration validity.
+- Current identity and package conflicts.
+- Current Collection membership conflicts.
+
+Commit does not:
+
+- Reread the original YAML file.
+- Accept replacement declaration content from the client.
+- Require dependencies to remain available.
+- Require MCP installation completion.
+- Attempt MCP connection.
+
+The commit sequence is:
+
+```text
+Verify prepared payload
+  -> revalidate destination state and conflicts
+  -> ensure Collection relationship
+  -> publish managed Agent package
+  -> reconcile managed Source state
+  -> return Agent, Collection, and MCP setup information
+```
+
+### Best-effort publication
+
+Collection membership and Agent package publication are separate Source operations.
+
+The combined import operation is intentionally not atomic.
+
+If membership succeeds and package publication fails:
+
+```text
+Collection relationship remains declared
+  -> relationship is unavailable
+  -> dangling membership records user intent
+  -> user may correct the problem and preview again
+```
+
+No rollback is required.
+
+### Conflicts
+
+Managed Agent identity is Root-scoped:
+
+```text
+Root
+  + type: agent
+  + logical name
+```
+
+Import blocks when:
+
+- An Agent with the same identity already exists.
+- A conflicting missing or unpurged Agent occurrence exists.
+- A protected built-in Agent reserves the requested name.
+- The target managed package is occupied.
+- A selected Collection already uses the Agent name for another direct relationship.
+- A contained Text or MCP declaration conflicts with an existing Root Artifact.
+- The package would require replacement.
+- The requested name cannot be used as a managed package identity.
+
+Managed import is create-only. It does not replace, merge, rename, or upsert packages.
+
+## Reads, resolution, export, and enablement
+
+### Resolution
+
+Agent reads use the shared typed Agent resolver.
+
+The resolved Agent view preserves:
+
+- Declared relationships.
+- Stable occurrence identity.
+- `available`, `unavailable`, or `ambiguous` status.
+- Artifact-backed targets.
+- Mapped Model and Tool targets.
+- Relationship behavior such as overrides and Skill use mode.
 - Diagnostics.
-- Optional Loop or Workflow relationship.
+- Optional Loop or Workflow relationships for general portable Agents.
 
-No Agent Store-specific runtime plan is introduced.
+Partial resolution is valid for inspection, export, and management.
 
-A consumer may request complete resolution using the shared completeness behavior. Partial resolution remains valid for inspection and editing.
+Consumers that require complete resolution use the shared completeness behavior.
 
-### 8.3 Validation boundary
+Declaration availability does not establish runtime readiness.
 
-The Agent Store validates:
+### Collection inspection
 
-- Agent declarations through the registered portable schema.
-- Agent Collection declarations through the Plugin schema.
-- The Agent-only managed collection restriction.
-- Managed package and locator safety.
-- Expected revisions for managed writes.
+The Agent catalog lists currently available direct Agent targets for a Collection.
 
-The shared resolver determines whether declared targets exist and are unambiguous.
+A Collection capability inspection provides the diagnostic view for all declared direct Agent relationships, including unavailable and ambiguous relationships.
 
-The Agent Store does not validate:
+This distinction allows the management UI to remain useful while preserving missing and conflicting user intent for inspection and recovery.
 
-- Model provider availability.
-- Tool execution readiness.
-- Tool user arguments.
-- Skill runtime arguments or resources.
-- MCP connection state.
-- MCP discovered Tools, resources, prompts, or digests.
-- MCP authentication.
-- Workflow executability.
+### Export
 
-A successful managed write may return an incomplete resolution result. The declaration remains valid and the missing relationship remains visible.
+Any available Agent can be exported as canonical portable YAML, including:
 
-Built-in package admission may require complete declaration resolution because shipped built-in content is expected to be internally consistent.
+- Managed imported Agents.
+- Protected built-in Agents.
+- Repository-backed Agents.
+- Source-selected Agent aliases.
+- Explicitly addressed contained Agents.
 
-### 8.4 Enablement
+Export does not require complete dependency resolution.
 
-Agents and Agent Collection Plugins use universal `Artifact.Enabled`.
+Export preserves declaration shape:
+
+- Contained declarations remain contained.
+- Inline Text remains inline.
+- Inline MCP remains inline.
+- Managed scope normalization remains visible in managed Agent YAML.
+- Repository and protected declarations retain their existing portable shape.
+
+Export excludes local and runtime state, including:
+
+- Collection membership.
+- Artifact, Root, and Source IDs.
+- Package addresses.
+- Artifact enablement.
+- Installation values.
+- Secret references and values.
+- OAuth tokens.
+- Selected profiles.
+- Connection state.
+- Readiness state.
+
+An export may include optional resolution diagnostics and MCP setup descriptors. Those diagnostics do not prevent export.
+
+### Text materialization
+
+Agent Store provides verified Text materialization for Text Artifacts referenced by Agent declarations.
+
+The operation:
+
+- Uses the Artifact Store verified-resource boundary.
+- Supports inline and source-backed Text according to the Text contract.
+- Returns materialized content with declaration identity and revision context.
+- Is not a generic filesystem-read capability.
+
+### Enablement
+
+Agents and Agent Collections use universal `Artifact.Enabled`.
 
 Enablement:
 
-- Does not change resolution.
-- Does not change collection membership.
-- Does not change the Definition digest.
-- Does not prevent declaration reads or edits.
-- May be used by catalog consumers for explicit enabled-only filtering.
+- Does not change declaration resolution.
+- Does not change Collection membership.
+- Does not change Definition content or digest.
+- Does not prevent Agent export.
+- Does not prevent authorized declaration reads.
+- May be used by consumers for enabled-only filtering.
 
-Disabling a collection does not disable its Agents.
+Disabling a Collection does not disable its Agents.
 
-Disabling an Agent does not remove it from collections.
+Disabling an Agent does not remove it from a Collection.
 
-Built-in Agent and Plugin enablement uses the authorized protected Artifact metadata path. No Agent-specific overlay database is introduced.
+Managed Agent YAML does not contain enablement state.
 
-## 9. Built-in Agents
+## Built-in Agents
 
-### 9.1 Package structure
+### Protected package model
 
-Built-in Agent packages use ordinary Plugin and Agent declarations.
+Built-in Agents use ordinary Plugin and Agent declarations in the shared protected Root.
 
-```text
-internal/artifactcontract/builtin/agents/
-  core-agents/
-    plugin.yaml
+A built-in Agent package contains:
 
-    base/
-      agent.yaml
+- One Agent Collection Plugin declaration.
+- Direct named, package-local Agent relationships.
+- One matching concrete Agent declaration for every declared Collection member.
+- No unreferenced package-local Agent declaration.
+- No source-selected Agent aliases at the package boundary.
 
-    local-reader/
-      agent.yaml
+The Collection and its Agents remain independent Artifacts even when distributed together.
 
-  software-development-agents/
-    plugin.yaml
+### Built-in package admission
 
-    bug-investigator/
-      agent.yaml
-```
+Built-in Agent package admission verifies:
 
-A built-in collection is a Plugin with Agent-only members:
+- Package Plugin and Agent declarations are valid.
+- The package Collection contains only named Agent relationships.
+- Every member locator remains inside the package.
+- Member names match their packaged Agent declarations.
+- Package Agent identities and declaration occurrences are unique.
+- Every packaged Agent declaration is referenced by the package Collection.
+- Required relationships resolve completely after hydration.
+- Package content contains no local Store identities, secrets, runtime state, or runtime credentials.
 
-```yaml
-type: plugin
-name: software-development-agents
-displayName: Software Development Agents
+Admission validates declaration resolution only. It does not require MCP connection, Tool execution, Skill execution, Model provider readiness, or Agent runtime readiness.
 
-members:
-  - type: agent
-    name: bug-investigator
-    locator: ./bug-investigator/agent.yaml
+### Protected Root behavior
 
-  - type: agent
-    name: code-reviewer
-    locator: ./code-reviewer/agent.yaml
-```
+Built-in Agent packages inherit protected Root behavior from the Artifact ecosystem.
 
-The Plugin and Agents are independent Artifacts even when distributed in the same package.
+Hydration must:
 
-### 9.2 Package validation
+- Reconcile known package content by package fingerprint.
+- Repair changed or incomplete known packages.
+- Remove stale known packages.
+- Preserve unchanged Artifact references where package content is unchanged.
+- Avoid resetting unrelated protected Artifact topology.
+- Avoid creating an Agent-specific protected Root or overlay database.
+- Avoid inferring ownership between a Collection and its Agents.
 
-The Agent built-in package validator verifies:
+Protected Agent package declaration content cannot be edited or deleted through user-managed Agent workflows.
 
-- Plugin and Agent declarations pass their registered schemas.
-- The package Plugin contains only Agent members.
-- Located Agent members remain within the package Source.
-- Located members identify the expected Agent names.
-- Required relationships resolve in the protected Root or through registered built-in fallback providers.
-- Duplicate managed Agent identities and relationships are rejected.
-- The package contains no Store IDs, runtime IDs, secrets, or runtime state.
+Protected Agent and Collection enablement remains locally configurable through authorized Artifact metadata.
 
-The validator uses Artifact resolution only. It does not perform MCP discovery, Skill execution checks, Tool execution checks, or Model provider checks.
+### Current built-in Agent Collections
 
-### 9.3 Protected Root behavior
+Current protected Agent package roots include:
 
-Built-in Agent packages join the existing shared protected Root.
+- `core-agents`
+- `software-development-agents`
+- `product-leadership-agents`
+- `technical-content-writing-agents`
+- `research-analysis-agents`
 
-They inherit package-scoped hydration, protected mutation policy, and local enablement behavior from the Artifact ecosystem HLD.
+## Workspace, Composer, and runtime integration
 
-Agent package hydration must not:
+### Workspace integration
 
-- Create a separate Agent Root.
-- Reset existing protected Skill or MCP topology.
-- Replace unchanged package ArtifactRefs.
-- Add a separate built-in Agent overlay Store.
-- Infer ownership between a built-in collection and its Agents.
-
-## 10. Workspace and consumer integration
-
-Workspace Agent selection already exists in the portable Workspace contract and shared resolver.
-
-```yaml
-type: workspace
-name: checkout-service
-
-members:
-  - type: agent
-    name: bug-investigator
-    locator: ./agents/bug-investigator.agent.yaml
-```
-
-No Workspace schema extension is required by the Agent Store.
-
-A Workspace or another consumer may:
+Workspace Agent selection remains part of the portable Workspace contract.
 
 ```text
 Resolve Workspace
-  -> obtain Agent relationship
-  -> resolve Agent
-  -> consume the shared Agent relationship graph
+  -> resolve explicitly selected Agent relationship
+  -> consume the shared Agent capability graph
 ```
 
-Agent Collections are not automatically selected by a Workspace.
+Agent Collections are catalog and organization constructs. They are not automatically selected by a Workspace.
 
-The baseline Agent Collection is not automatically selected.
+The baseline Collection is not automatically selected.
 
-Built-in Agents participate only through explicit named, scoped, or located relationships and the existing fallback rules.
+Protected built-in Agents participate only through explicit relationships and existing fallback behavior.
 
-## 11. Implementation areas
+### Composer integration
 
-Existing infrastructure reused without Agent-specific duplication:
+The Composer starter projection is a consumer of Agent resolution.
+
+It may project supported resolved Agent capabilities into a read-only starter view. It must:
+
+- Preserve relationship diagnostics.
+- Distinguish mapped and Artifact-backed targets.
+- Avoid changing Agent declarations.
+- Avoid claiming runtime readiness.
+- Avoid silently substituting unavailable relationships.
+
+The current Composer projection can render instruction Skill text and selected Model, Tool, Skill, and MCP information.
+
+It does not currently materialize every declared Text Artifact into the Composer preview.
+
+### MCP integration
+
+MCP management owns installation-local configuration and credentials.
+
+After Agent import or inspection:
 
 ```text
-internal/artifactcontract/declaration/
-  agentv1/
-  pluginv1/
-  textv1/
-  modelv1/
-  toolv1/
-  skillv1/
-  mcpv1/
-  loopv1/
-  workflowv1/
-
-internal/artifactcontract/resolve/
-  agent.go
-  plugin.go
-  root_fallback.go
-  model.go
-  tool.go
+Resolved MCP Artifact
+  -> inspect installation declarations
+  -> collect local values or secret references
+  -> perform OAuth setup where applicable
+  -> select local profile
+  -> connect through MCP runtime flows
 ```
 
-Agent-specific implementation belongs under:
+These actions do not modify the Agent declaration.
 
-```text
-internal/agent/store/
-  builtin/
-  consumerapi/
-  domain/
-
-cmd/agentgo/
-  wrapper_agentstore.go
-```
-
-The backend implementation provides:
-
-- Agent Store consumer requests, responses, catalog reads, and shared resolver access.
-- Agent-only managed Plugin Collection policy.
-- Baseline Agent Collection provisioning for user Roots.
-- Managed Agent package creation, explicit replacement, and removal.
-- Portable named, located, contained, selector, and `scope: builtin` collection relationships.
-- Built-in Agent package embedding, validation, package-scoped hydration, stale-package removal, and final resolution validation.
-- Agent and Agent Collection enablement through universal `Artifact.Enabled`.
-- Application composition and backend wrapper initialization.
-
-No new portable declaration type, Agent runtime package, publication descriptor, or Agent-specific persistence database is required.
-
-## 12. Functional parity with Assistant Presets
-
-Functional parity means that the user intent previously served by Assistant Presets remains expressible in the new architecture. It does not imply old API, wire, identifier, or storage behavior.
-
-| Former use case                                  | New representation or owner                                |
-| ------------------------------------------------ | ---------------------------------------------------------- |
-| Group assistant configurations                   | Agent Collection backed by a Plugin                        |
-| Create and edit a group                          | Managed Plugin authoring                                   |
-| Require an explicit destination group            | Explicit Agent Collection in managed `CreateAgent`         |
-| Enable or disable a group                        | Plugin Artifact `Enabled`                                  |
-| Prevent deletion of a non-empty group            | Managed Plugin direct-member deletion guard                |
-| Create a reusable assistant configuration        | Portable Agent declaration                                 |
-| Display a name and description                   | Agent `displayName` and `description`                      |
-| Enable or disable one configuration              | Agent Artifact `Enabled`                                   |
-| List built-in and user configurations            | Agent Artifact catalog                                     |
-| Read built-in configuration as read-only         | Agent in the protected built-in Root                       |
-| Locally enable or disable built-in content       | Protected Agent or Plugin Artifact `Enabled`               |
-| Supply an initial user message                   | Text member with `insert: user-message`                    |
-| Supply reusable instructions                     | Text members with `insert: instructions`                   |
-| Select a Model                                   | Model member                                               |
-| Include the selected Model system prompt         | Model `overrides.includeSystemPrompt`                      |
-| Select Tools                                     | Tool members                                               |
-| Express Tool auto-execution intent               | Tool `overrides.autoExecute`                               |
-| Select Skills                                    | Skill members                                              |
-| Make a Skill available                           | Skill `use.mode: available`                                |
-| Preload a Skill as active                        | Skill `use.mode: active`                                   |
-| Use a Skill as instructions                      | Skill `use.mode: instructions`                             |
-| Include an MCP server capability                 | MCP member                                                 |
-| Select a specific source-backed occurrence       | Located relationship                                       |
-| Select protected built-in content                | `scope: builtin`                                           |
-| Select existing Tool or Model Store content      | Registered named fallback provider                         |
-| Verify that selected declarations exist          | Shared Agent relationship resolution                       |
-| Report missing selections                        | Unavailable relationship diagnostics                       |
-| Report conflicting selections                    | Ambiguous relationship diagnostics                         |
-| Keep several selectable configurations           | Distinct Agent names or distinct located Agent occurrences |
-| Preserve immutable declaration content           | Immutable Artifact Definitions                             |
-| Update a managed configuration explicitly        | Managed package replacement with expected revision         |
-| Attach one configuration to several groups       | One Agent referenced by several Plugins                    |
-| Remove from a group without deleting             | Detach Plugin relationship                                 |
-| Delete an Agent without composition ownership    | Remove Agent package and leave relationships unavailable   |
-| Supply Tool user values                          | Agent runtime input, not Agent Store state                 |
-| Supply MCP selected Tools, resources, or prompts | Agent runtime input, not Agent Store state                 |
-| Preserve runtime ordering where required         | Agent runtime request, not declaration member order        |
-
-The former Store mixed declaration and runtime concerns. The new design satisfies those use cases through their intended owners rather than preserving that mixture.
-
-## 13. Differences with respect to Assistant Presets
-
-The Agent Store is intentionally different from the Assistant Preset Store:
-
-- An Agent is a portable Artifact declaration, not a custom preset JSON record.
-- An Agent Collection is a Plugin, not a bundle record or `collection` Artifact.
-- There are no Assistant Preset IDs, slugs, versions, aliases, or compatibility endpoints.
-- There is no Agent Store `initialText` field. Initial user content is Text with `insert: user-message`.
-- There is no stored `startingMCPContext`. MCP runtime context belongs to the runtime.
-- There are no persisted model preset, Tool, Skill Artifact, or MCP runtime references in Agent declarations.
-- Tool and Model Store integration uses registered fallback providers.
-- Exact source-backed selection uses locators.
-- Protected built-in selection uses `scope: builtin`.
-- Agent member arrays are not runtime-ordered selections.
-- Missing relationships remain visible through partial resolution instead of being hidden.
-- Artifact enablement does not alter declaration resolution.
-- Collection membership does not own or delete Agents.
-- Managed Agent replacement uses Artifact Source publication and immutable Definitions.
-- No additional sidecar file, publication record, release record, or Agent-specific database is introduced.
-- No compatibility, migration, or dual-storage design is part of this HLD.
-
-## 14. Runtime boundary
+### Runtime boundary
 
 The Agent Store ends at the resolved Agent declaration graph.
 
-A future Agent runtime may define its own request types for:
+Runtime consumers own:
 
+- Prompt assembly and budgets.
 - User messages.
-- Tool user inputs.
-- Tool invocation arguments.
-- MCP conversation context.
 - Model invocation values.
-- Skill activation state.
-- Workflow or Loop execution.
+- Tool inputs and invocation arguments.
+- MCP runtime context and connection state.
+- Skill activation.
+- Loop and Workflow execution.
+- Scheduling, retries, cancellation, and output handling.
 - Conversation and execution state.
 
-Those values must not be persisted as Agent Store declaration state.
+## Security and persistence
 
-The runtime consumes the shared Agent resolver result, including relationship availability, target provenance, `overrides`, `use`, and diagnostics. It is responsible for deciding whether the resolved declarations are executable in the current runtime environment.
+### Persisted state
 
-## 15. Implementation status
+The feature persists normal Artifact ecosystem state:
+
+- Managed Agent packages.
+- Managed Collection package changes.
+- Definitions and Artifacts.
+- Source generation and Source reconciliation state.
+- Artifact enablement.
+- MCP local installation data through MCP management.
+- Secret references through MCP and secret-storage APIs.
+
+### Non-persisted state
+
+The feature does not persist:
+
+- Original import paths.
+- Backend prepared-import records.
+- Commit-token registries.
+- Source file content outside the managed package.
+- Dependency witnesses.
+- Dependency revision snapshots.
+- Agent readiness.
+- MCP installation values in Agent YAML.
+- Secret values in Agent YAML.
+- OAuth tokens in Agent YAML.
+- Collection membership inside Agent YAML.
+
+### Credential boundary
+
+Portable Agent YAML must not contain secret values.
+
+Current managed inline MCP validation rejects literal credential-like values in recognized sensitive positions, including:
+
+- Root MCP environment variables.
+- Root MCP headers.
+- Stdio connection-profile environment variables.
+- HTTP connection-profile headers.
+- Invalid OAuth client-credential input declarations.
+
+The current validation does not provide complete credential detection for:
+
+- Command arguments.
+- URLs.
+- URL query values.
+- URL user information.
+- Other transport-specific credential conventions.
+
+Users must not treat managed Agent import as a general secret-scanning mechanism.
+
+## Implementation mapping
+
+| Requirement area                 | Implementation mapping                                                                                                                             |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Portable Agent and Plugin syntax | Existing declaration contracts and schema validation.                                                                                              |
+| Managed import restrictions      | A non-portable managed admission profile layered over the portable Agent contract.                                                                 |
+| Source-backed persistence        | Existing managed Source publication and Artifact Store reconciliation.                                                                             |
+| Import integrity                 | Client-carried HMAC-signed prepared payload with expiry and destination revision checks.                                                           |
+| Dependency inspection            | Shared typed resolver with protected built-in scope and mapped fallback support where registered.                                                  |
+| Collection policy                | Agent Collection domain restricts managed Collection members to named Agent relationships.                                                         |
+| Built-in content                 | Protected package hydration, package verification, and final complete-resolution admission.                                                        |
+| Management UI                    | Collection management, import preview and confirmation, Agent inspection/export, enablement, deletion, Composer projection, and MCP setup handoff. |
+| MCP local configuration          | Existing MCP management and secret-storage boundaries.                                                                                             |
+
+No Agent-specific declaration database, relationship database, sidecar file, runtime package, or protected overlay Store is required.
+
+## Current implementation status
 
 Status terminology:
 
-- `Available` means a backend implementation path exists.
-- `Pending` means verification, migration, or an approved follow-up remains.
-- `Deferred` means intentionally outside the current Agent Store boundary.
-- Status does not assert that all repository-wide builds, tests, generated bindings, static analysis, or migration verification has completed.
+- `Available` means the current product path is implemented.
+- `Partial` means the feature exists with an intentionally bounded current scope.
+- `Pending` means approved verification or coverage work remains.
+- `Deferred` means intentionally outside current scope.
+- `Not supported` means the behavior is not exposed by the current product.
+- Status does not assert completion of all repository-wide builds, tests, static analysis, or end-to-end verification.
 
-| Capability                                              | Status     | Notes                                                                                                         |
-| ------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------------------------- |
-| Source-backed Agent Artifact catalog                    | Available  | Reads use the existing Artifact Store and Agent contract.                                                     |
-| Shared Agent resolution and capability plans            | Available  | Uses the existing typed resolver and fallback registrations.                                                  |
-| Agent-only Plugin Collection domain                     | Available  | Managed Collections permit named, contained, and selector Agent members.                                      |
-| Agent Collection baseline provisioning                  | Available  | One editable non-deletable `agent-baseline` Plugin is provisioned per user Root.                              |
-| Managed Agent creation                                  | Available  | Requires explicit Agent Collection selection and creates a located external membership.                       |
-| Managed Agent replacement                               | Available  | Requires expected Artifact revision and source generation.                                                    |
-| Managed Agent deletion                                  | Available  | Removes the package, preserves relationships, and purges the removed root Agent Artifact.                     |
-| Agent attach and detach                                 | Available  | Same-Root, protected built-in, and unsupported cross-Root cases are handled explicitly.                       |
-| Agent and Collection enablement                         | Available  | Uses universal `Artifact.Enabled`; enablement does not alter resolution.                                      |
-| Built-in Agent package hydration                        | Available  | Uses the shared protected Root and package hydration markers.                                                 |
-| Built-in package resolution admission                   | Available  | Final hydration requires complete Plugin capability resolution.                                               |
-| Built-in Agent local enablement                         | Available  | Uses protected Artifact metadata mutation, without an Agent overlay Store.                                    |
-| Built-in Assistant Preset conversion                    | Available  | Built-in presets are represented as protected Plugin and Agent packages using `plugin.yaml` and `agent.yaml`. |
-| Built-in Agent package layout                           | Available  | Each package uses `plugin.yaml` and direct `<agent-name>/agent.yaml` children.                                |
-| Legacy Tool selection conversion                        | Available  | Legacy Tool slugs become named Tool relationships with `overrides.autoExecute`.                               |
-| Legacy starter text conversion                          | Available  | Starter text becomes contained Text with `insert: user-message`.                                              |
-| Legacy core Skill conversion                            | Available  | `markdown-output`, `use-explicit-tools-batched`, and `grounded-local-work` map to `use.mode: instructions`.   |
-| Legacy active Skill conversion                          | Available  | Every supplied specialist Skill ArtifactRef maps to a protected named Skill with `use.mode: active`.          |
-| Legacy Model system-prompt preference                   | Not needed | Supplied presets had no selected Model reference, so the boolean had no portable target relationship.         |
-| Assistant Preset compatibility endpoint                 | Removed    | The Agent Store exposes no Assistant Preset request or response type.                                         |
-| Agent-specific persistence database                     | Removed    | Only ordinary Artifact Store metadata and managed Source packages are used.                                   |
-| Agent runtime                                           | Deferred   | Execution, runtime inputs, state, scheduling, and invocation remain outside Agent Store.                      |
-| URL, Git, package, archive, and command materialization | Deferred   | Portable locators remain supported declaration data.                                                          |
-| Test and acceptance coverage                            | Pending    | Unit, integration, hydration-recovery, concurrency, and end-to-end coverage remain to be added.               |
-| Frontend and Wails binding migration                    | Pending    | The backend wrapper exists; frontend exposure and binding generation must be completed.                       |
-| Legacy Assistant Preset retirement                      | Pending    | Existing callers must migrate before legacy Store removal.                                                    |
-| Atomic membership and package publication               | Pending    | Current approved behavior preserves an unavailable relationship if independent package publication fails.     |
+### Catalog and Collection capabilities
 
-Built-in Agent package roots currently include:
+| Capability                                   | Status        | Notes                                                                                     |
+| -------------------------------------------- | ------------- | ----------------------------------------------------------------------------------------- |
+| Source-backed Agent catalog                  | Available     | Uses ordinary Agent Artifacts and typed resolver output.                                  |
+| Agent resolution with partial diagnostics    | Available     | Available, unavailable, and ambiguous relationships remain observable.                    |
+| Agent Collection catalog and management UI   | Available     | Supports browse, create, metadata update, enablement, details, and guarded deletion.      |
+| Agent-only managed Collection policy         | Available     | Direct members are named external Agent relationships only.                               |
+| Baseline Agent Collection provisioning       | Available     | One selectable, non-deletable baseline Collection is provisioned per supported user Root. |
+| Collection capability inspection             | Available     | Preserves direct relationship diagnostics beyond currently available catalog entries.     |
+| Direct Agent membership editor               | Not supported | Import is the current user-facing membership creation path.                               |
+| Direct Agent attach and detach operations    | Not supported | No standalone management UI or Agent Store surface is exposed.                            |
+| Managed Agent deletion preserving membership | Available     | Deletion leaves declared relationships unavailable.                                       |
+| Agent and Collection enablement              | Available     | Uses universal `Artifact.Enabled` and does not alter resolution.                          |
 
-```text
-core-agents
-software-development-agents
-product-leadership-agents
-technical-content-writing-agents
-research-analysis-agents
-```
+### Managed import and export capabilities
 
-Every former built-in Assistant Preset is represented by one protected Agent Artifact. Legacy Artifact IDs, bundle IDs, versions, timestamps, and Assistant Preset compatibility fields are not persisted in Agent declarations.
+| Capability                                                | Status        | Notes                                                                                                  |
+| --------------------------------------------------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| YAML-only managed Agent import                            | Available     | Imports one selected YAML declaration file.                                                            |
+| Strict managed Agent admission profile                    | Available     | Restricts managed members to inline Text, named dependencies, and inline MCP where allowed.            |
+| Managed scope normalization                               | Available     | Named managed Agent dependencies are persisted with `scope: builtin`.                                  |
+| Empty Agent import                                        | Available     | An Agent with no members is valid.                                                                     |
+| Preview with normalized YAML and diagnostics              | Available     | Shows errors, warnings, confirmations, conflicts, and projected Artifacts.                             |
+| Client-carried signed preparation                         | Available     | Prepared payloads are authenticated, expiring, and process-local.                                      |
+| Dependency observations without import gating             | Available     | Missing and ambiguous dependencies remain warnings.                                                    |
+| Create-only managed package publication                   | Available     | Replacement, merge, rename, and upsert are not supported.                                              |
+| Best-effort Collection membership and package publication | Available     | Dangling membership is preserved on package publication failure.                                       |
+| Managed Agent export                                      | Available     | Available Agents export canonical portable YAML without requiring complete resolution.                 |
+| Managed Agent Text materialization                        | Available     | Verified backend materialization is available through Agent Store.                                     |
+| Managed inline MCP credential-placement validation        | Partial       | Sensitive environment and header positions are validated.                                              |
+| Complete URL and command credential classification        | Partial       | Import does not yet classify every credential-bearing URL or command position.                         |
+| Protected scope pinning for an inline MCP policy field    | Partial       | The MCP policy field has no portable scope and follows normal MCP policy resolution after publication. |
+| Managed Agent visual editor                               | Not supported | Managed declarations are immutable after import.                                                       |
+| Generic Artifact import                                   | Not supported | Import is limited to the managed Agent profile.                                                        |
+| Cross-package atomic import transaction                   | Not supported | Best-effort publication is intentional.                                                                |
+| Linked-file synchronization                               | Not supported | Imported content is published into managed Source packages.                                            |
+
+### Built-in, UI, and runtime capabilities
+
+| Capability                                                      | Status    | Notes                                                                                                                   |
+| --------------------------------------------------------------- | --------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Built-in Agent package embedding and hydration                  | Available | Uses the shared protected Root and package-scoped reconciliation.                                                       |
+| Built-in package structural validation                          | Available | Requires local named package members and complete post-hydration resolution.                                            |
+| Stale known built-in package removal                            | Available | Reconciles known package state without sweeping unrelated protected content.                                            |
+| Protected Agent and Collection local enablement                 | Available | Uses protected Artifact metadata without an Agent overlay Store.                                                        |
+| Managed Collection and import/export frontend                   | Available | Users can manage Collections, preview import, commit import, inspect Agents, export, enable, and delete managed Agents. |
+| MCP setup frontend                                              | Available | Resolved MCP Artifacts can be configured through MCP management flows.                                                  |
+| Read-only Composer starter projection                           | Available | Shows supported resolved Model, Tool, Skill, MCP, and instruction Skill information.                                    |
+| Composer materialization of every Text Artifact                 | Partial   | Text materialization exists in Agent Store but is not fully consumed by the current Composer preview.                   |
+| Test and acceptance coverage                                    | Pending   | Unit, integration, hydration recovery, concurrency, and end-to-end verification remain to be completed.                 |
+| Agent runtime                                                   | Deferred  | Execution, runtime inputs, state, scheduling, and invocation remain outside Agent Store.                                |
+| URL, Git, package, archive, and command locator materialization | Deferred  | Portable locator representation remains available through declaration contracts.                                        |

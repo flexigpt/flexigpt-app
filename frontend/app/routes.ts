@@ -5,7 +5,7 @@ import { index, route } from '@react-router/dev/routes';
 export default [
 	index('./home/page.tsx'),
 	route('chats', './chats/page.tsx'),
-	route('assistantpresets', './assistantpresets/page.tsx'),
+	route('agents', './agents/page.tsx'),
 	route('mcpservers', './mcpservers/page.tsx'),
 	route('tools', './tools/page.tsx'),
 	route('skills', './skills/page.tsx'),

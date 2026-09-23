@@ -1,22 +1,12 @@
-export interface ChatWorkflowStarterAssistantPresetRef {
-	bundleID: string;
-	assistantPresetSlug: string;
-	assistantPresetVersion: string;
-}
+import type { ArtifactRef } from '@/spec/artifact';
 
 export interface ChatWorkflowStarter {
 	workflowID?: string;
 	draft: string;
-	assistantPreset?: ChatWorkflowStarterAssistantPresetRef;
+	agent?: ArtifactRef;
 }
 
-const WORKFLOW_STARTER_QUERY_KEYS = [
-	'workflow',
-	'draft',
-	'assistantPresetBundleID',
-	'assistantPresetSlug',
-	'assistantPresetVersion',
-] as const;
+const WORKFLOW_STARTER_QUERY_KEYS = ['workflow', 'draft', 'agentRootID', 'agentArtifactID'] as const;
 
 function readTrimmedSearchParam(searchParams: URLSearchParams, key: string): string {
 	return searchParams.get(key)?.trim() ?? '';
@@ -26,27 +16,24 @@ export function parseChatWorkflowStarterSearchParams(searchParams: URLSearchPara
 	const workflowID = readTrimmedSearchParam(searchParams, 'workflow');
 	const draft = searchParams.get('draft') ?? '';
 
-	const assistantPresetBundleID = readTrimmedSearchParam(searchParams, 'assistantPresetBundleID');
-	const assistantPresetSlug = readTrimmedSearchParam(searchParams, 'assistantPresetSlug');
-	const assistantPresetVersion = readTrimmedSearchParam(searchParams, 'assistantPresetVersion');
+	const agentRootID = readTrimmedSearchParam(searchParams, 'agentRootID');
+	const agentArtifactID = readTrimmedSearchParam(searchParams, 'agentArtifactID');
 
-	const hasStarterSignal =
-		workflowID || draft.trim() || assistantPresetBundleID || assistantPresetSlug || assistantPresetVersion;
+	const hasStarterSignal = workflowID || draft.trim() || agentRootID || agentArtifactID;
 
 	if (!hasStarterSignal) {
 		return null;
 	}
 
-	const hasCompleteAssistantPresetRef = assistantPresetBundleID && assistantPresetSlug && assistantPresetVersion;
+	const hasCompleteAgentRef = agentRootID && agentArtifactID;
 
 	return {
 		workflowID: workflowID || undefined,
 		draft,
-		assistantPreset: hasCompleteAssistantPresetRef
+		agent: hasCompleteAgentRef
 			? {
-					bundleID: assistantPresetBundleID,
-					assistantPresetSlug,
-					assistantPresetVersion,
+					rootID: agentRootID,
+					artifactID: agentArtifactID,
 				}
 			: undefined,
 	};

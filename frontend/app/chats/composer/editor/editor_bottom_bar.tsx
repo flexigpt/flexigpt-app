@@ -12,7 +12,7 @@ import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ComposerWorkspaceController } from '@/chats/composer/workspaces/use_composer_workspace';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
@@ -78,7 +78,7 @@ interface EditorBottomBarProps {
 	onEnableAllSkills: () => void;
 	onDisableAllSkills: () => void;
 	onRefreshSkills: () => Promise<void>;
-	systemPrompt: ComposerSystemPromptController;
+	systemPrompt: AgentSystemPromptController;
 	workspaceActiveSkillRefs: SkillRef[];
 	setWorkspaceActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;

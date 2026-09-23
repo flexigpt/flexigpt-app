@@ -1,6 +1,7 @@
 package consumerapi
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -23,6 +24,18 @@ type AgentView struct {
 type AgentResolution struct {
 	Agent        AgentView              `json:"agent"`
 	Capabilities resolve.CapabilityPlan `json:"capabilities"`
+}
+
+type AgentTextMaterialization struct {
+	Artifact         artifact.ArtifactRef     `json:"artifact"`
+	ArtifactRevision uint64                   `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
+	Name             basespec.LogicalName     `json:"name"`
+	Insert           declaration.InsertTarget `json:"insert"`
+	MediaType        string                   `json:"mediaType,omitempty"`
+	Content          string                   `json:"content"`
+	Locator          basespec.Locator         `json:"locator"`
+	BuiltIn          bool                     `json:"builtIn"`
 }
 
 type ListAgentsRequest struct {

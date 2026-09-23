@@ -20,7 +20,6 @@ import type { ArtifactMembershipView, CollectionCapabilityPlan, CollectionView }
 import type { ToolOutputUnion } from '@/spec/tool';
 
 export type SkillRef = ArtifactRef;
-export type SkillBundleRef = ArtifactCollectionRef;
 
 export const SKILLS_AUTOEXEC_TOOL_CHOICES = new Set([
 	'builtin.skills-load',
@@ -45,12 +44,6 @@ export enum SkillBundleAttachmentRole {
 	External = 'external',
 	Imported = 'imported',
 	Library = 'library',
-}
-
-export interface SkillSelection {
-	artifact: ArtifactRef;
-	preLoadAsActive: boolean;
-	useAsInstructions: boolean;
 }
 
 export interface SkillArgument {
@@ -117,7 +110,7 @@ export interface SkillResourceInfo {
 	moreLocations: boolean;
 }
 
-export interface RuntimeSkillListItem {
+interface RuntimeSkillListItem {
 	skillRef: ArtifactRef;
 	name?: string;
 	displayName?: string;
@@ -189,27 +182,6 @@ export interface RuntimeSkillRenderResult {
 	warnings?: string[];
 }
 
-/**
- * A selectable installed Skill Bundle Artifact for management UIs such as
- * Assistant Presets. Workspace Skills are deliberately not represented here:
- * they are selected through a Workspace conversation selection instead.
- */
-export interface AssistantSkillOption {
-	key: string;
-	sel: SkillSelection;
-	skillDefinition: Skill;
-
-	bundleSlug: string;
-	bundleDisplayName: string;
-
-	isBuiltIn: boolean;
-	isBundleEnabled: boolean;
-	isSkillEnabled: boolean;
-	isSelectable: boolean;
-	availabilityReason?: string;
-	label: string;
-}
-
 export interface RenderSkillResponse {
 	text: string;
 	insert: SkillInsert;
@@ -235,7 +207,7 @@ export interface InvokeSkillToolResponse {
 /**
  * Management-only projection over Artifact Store Skill entities.
  *
- * Durable identity remains `ArtifactRef` and `SkillBundleRef`. These views
+ * Durable identity remains `ArtifactRef` and `ArtifactCollectionRef`. These views
  * exist so management components do not need to duplicate joins between
  * Bundle, Artifact, and runtime metadata.
  */
@@ -304,7 +276,7 @@ export interface SkillBundle {
 	schemaVersion: string;
 	id: string;
 	rootID: string;
-	ref: SkillBundleRef;
+	ref: ArtifactCollectionRef;
 	revision: number;
 	slug: string;
 	logicalVersion?: string;
@@ -491,11 +463,4 @@ export interface SkillManagementView {
 	capabilities: CapabilityPlan;
 	runtimeSummary?: ArtifactSkillSummary;
 	runtimeError?: string;
-}
-
-export interface SkillRuntimeManagementView {
-	session?: RuntimeSkillSession;
-	skills: RuntimeSkillRecord[];
-	rendered?: RuntimeSkillRenderResult;
-	invocation?: InvokeSkillToolResponse;
 }

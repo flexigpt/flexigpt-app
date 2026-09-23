@@ -166,6 +166,17 @@ func (w *AgentStoreWrapper) GetAgent(
 	)
 }
 
+func (w *AgentStoreWrapper) MaterializeAgentText(
+	ref artifact.ArtifactRef,
+) (agentConsumerAPI.AgentTextMaterialization, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentTextMaterialization, error) {
+			return api.MaterializeAgentText(context.Background(), ref)
+		},
+	)
+}
+
 func (w *AgentStoreWrapper) ResolveAgent(
 	ref artifact.ArtifactRef,
 ) (agentConsumerAPI.AgentResolution, error) {
@@ -235,6 +246,20 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 		w,
 		func(api *agentConsumerAPI.API) ([]collection.CollectionView, error) {
 			return api.ListAgentCollections(context.Background(), rootID)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) ListAgentCollectionMembers(
+	ref artifact.ArtifactRef,
+) (collection.CollectionCapabilityPlan, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (collection.CollectionCapabilityPlan, error) {
+			return api.ListAgentCollectionMembers(
+				context.Background(),
+				ref,
+			)
 		},
 	)
 }
@@ -354,7 +379,7 @@ func (w *AgentStoreWrapper) CommitAgentImport(
 	)
 }
 
-func (w *AgentStoreWrapper) ExportManagedAgent(
+func (w *AgentStoreWrapper) ExportAgent(
 	request agentConsumerAPI.AgentExportRequest,
 ) (agentConsumerAPI.AgentExportResult, error) {
 	return withAgentStore(
@@ -363,7 +388,7 @@ func (w *AgentStoreWrapper) ExportManagedAgent(
 			agentConsumerAPI.AgentExportResult,
 			error,
 		) {
-			return api.ExportManagedAgent(context.Background(), request)
+			return api.ExportAgent(context.Background(), request)
 		},
 	)
 }

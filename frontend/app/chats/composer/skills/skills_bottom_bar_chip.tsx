@@ -32,7 +32,7 @@ import {
 	useSearchableMenuState,
 } from '@/components/searchmenu/searchable_menu_utils';
 
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import {
 	getSkillInstructionPromptEligibilityReason,
 	isInstructionInsertSkill,
@@ -274,7 +274,7 @@ function AddInstructionSkillModalContent({
 				displayName: displayName.trim() || normalizedName,
 				description:
 					initialDraft?.description ||
-					`Instruction skill created from the composer. Use when these instructions should guide the assistant.`,
+					`Instruction skill created from the composer. Use when these instructions should guide the agent.`,
 				insert: SkillInsert.Instructions,
 				arguments: [],
 				tags: ['composer'],
@@ -404,7 +404,7 @@ function AddInstructionSkillModalContent({
 						onChange={event => {
 							setBody(event.target.value);
 						}}
-						placeholder="Write standing assistant instructions here..."
+						placeholder="Write standing agent instructions here..."
 						spellCheck="false"
 					/>
 					{bodyError ? <div className="text-error mt-1 text-xs">{bodyError}</div> : null}
@@ -457,7 +457,7 @@ export function SkillsBottomBarChip({
 	onEnableAll: () => void;
 	onDisableAll: () => void;
 	onRefreshSkills: () => Promise<void>;
-	systemPrompt: ComposerSystemPromptController;
+	systemPrompt: AgentSystemPromptController;
 	isInputLocked?: boolean;
 }) {
 	const internalMenu = useMenuStore({ placement: 'top', focusLoop: true });
@@ -709,7 +709,7 @@ export function SkillsBottomBarChip({
 					body: rendered.text || `Forked from "${sourceLabel}". Replace this placeholder with instructions.`,
 					description:
 						item.skillDefinition.description ||
-						`Forked from ${sourceLabel}. Use when these instructions should guide the assistant.`,
+						`Forked from ${sourceLabel}. Use when these instructions should guide the agent.`,
 				});
 				setIsAddInstructionOpen(true);
 				menu.hide();

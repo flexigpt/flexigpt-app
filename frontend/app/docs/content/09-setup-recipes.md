@@ -1,6 +1,6 @@
 # Setup Recipes
 
-These recipes are app and workflow setup flows. They help you configure providers, local endpoints, assistant presets, tools, and skills.
+These recipes are app and workflow setup flows. They help you configure providers, local endpoints, Agents, Workspaces, tools, Skills, and connected services.
 
 For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 
@@ -8,7 +8,8 @@ For outcome-based LLM tasks, see [Everyday Recipes](/docs?doc=everyday-recipes).
 
 - [Use FlexiGPT with OpenRouter](#use-flexigpt-with-openrouter)
 - [Use FlexiGPT with local models](#use-flexigpt-with-local-models)
-- [Create your first assistant preset](#create-your-first-assistant-preset)
+- [Import your first Agent](#import-your-first-agent)
+- [Set up your first Workspace](#set-up-your-first-workspace)
 - [Create your first tool-assisted workflow](#create-your-first-tool-assisted-workflow)
 - [Create your first skill-backed workflow](#create-your-first-skill-backed-workflow)
 - [Create your first MCP-backed workflow](#create-your-first-mcp-backed-workflow)
@@ -115,37 +116,27 @@ Safety check:
 - test with harmless content first
 - for the full provider-first flow, see [Local LLM Setup](/docs?doc=local-llm-setup)
 
-## Create your first assistant preset
+## Import your first Agent
 
-Use this when you keep rebuilding the same setup by hand.
+Use this when you want a reusable starting point for a type of work.
 
 Goal:
 
-- Create a reusable assistant preset that starts a documentation review workflow.
+- Import an Agent file and use it in Chats.
 
 Steps:
 
-1. Open **Assistant Presets**.
-2. Click **Add Bundle** if you do not already have a custom bundle.
-3. Use:
-   - bundle slug: `my-assistants`
-   - display name: `My Assistants`
-4. Expand the custom bundle.
-5. Click **Add Assistant Preset**.
-6. Fill:
-   - display name: `Docs Reviewer`
-   - slug: `docs-reviewer`
-   - version: `v1.0.0`
-   - enabled: on
-7. Add starting text if you want the composer to open with a reusable first draft.
-8. Select a starting model preset.
-9. Add the skills that should come with the preset.
-10. Use template-style skills for reusable starter drafts and instruction-only skills for durable behavior rules.
-11. Leave tools empty for the first version if you do not need them yet.
-12. Save.
-13. Open **Chats**.
-14. Select the new assistant preset.
-15. Click **View** in the assistant dropdown to inspect what it supplies.
+1. Open **Agents**.
+2. Create or choose a Collection.
+3. Select **Import Agent**.
+4. Choose an Agent `.yaml` or `.yml` file.
+5. Review the preview.
+6. Read any warnings and confirmation requests.
+7. Confirm the import.
+8. Open **Chats**.
+9. Open the **Agent** menu.
+10. Select the imported Agent.
+11. Review and change the draft or context before sending.
 
 Test prompt:
 
@@ -154,17 +145,29 @@ Test prompt:
 
 Expected result:
 
-- the assistant preset seeds the selected sections
-- starting text appears as an editable draft when configured
-- you can still change model, skills, tools, and attachments after applying it
+- the Agent can add a useful starting model, instructions, Skills, tools, and connected services
+- opening text appears as an editable draft when configured
+- you can still change model, Skills, tools, Workspaces, and attachments after loading it
 
-Next version ideas:
+To change an imported Agent:
 
-- stricter instruction-only skill
-- local reader skill
-- manual read-only tools
-- different output verbosity
-- lower temperature or stronger reasoning
+1. export it
+2. edit it in your editor
+3. import it under a new name
+
+Or remove the managed copy first, then import the edited file again with the same name.
+
+## Set up your first Workspace
+
+1. Open **Workspaces**.
+2. Add the repository or folder.
+3. Review the discovered Workspace.
+4. Open **Chats**.
+5. Open the composer **Workspace** picker.
+6. Select the repository setup.
+7. Add or remove context before sending.
+
+Use a Workspace for project context and an Agent for a starting way of working.
 
 ## Create your first tool-assisted workflow
 
@@ -177,7 +180,7 @@ Goal:
 Steps:
 
 1. Open **Chats**.
-2. Choose a normal assistant preset first.
+2. Choose an Agent if a starting setup would help.
 3. Open the **Tools** picker in the composer bottom bar.
 4. Attach a read-oriented or low-risk tool.
 5. Keep auto-execute off for the first run.
@@ -234,14 +237,12 @@ Starter prompt:
     Use the enabled skill workflow where helpful.
     Explain the steps you are taking and call out any assumptions or missing context.
 
-Add the skill to an assistant preset:
+To reuse the Skill setup often:
 
-1. Open **Assistant Presets**.
-2. Create a new version of your custom assistant preset.
-3. Add the skill under **Enabled Skills**.
-4. Turn on **Preload as active** if you want it active immediately.
-5. Save.
-6. Apply the preset in Chats and use **View** to confirm the skill selection.
+1. Add the Skill to an Agent file.
+2. Import the Agent into **Agents**.
+3. Load the Agent in Chats.
+4. Confirm the Skill selection in the composer.
 
 ## Create your first MCP-backed workflow
 

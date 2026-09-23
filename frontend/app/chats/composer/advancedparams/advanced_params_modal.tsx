@@ -137,6 +137,17 @@ function HelpHint({ content }: { content: string }) {
 	);
 }
 
+const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
+	const n = parsePositiveIntAllowBlank(value);
+	if (n === undefined) {
+		return undefined;
+	}
+	if (!Number.isFinite(n)) {
+		return `${field} must be a positive integer.`;
+	}
+	return undefined;
+};
+
 function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onSave }: AdvancedParamsModalInnerProps) {
 	const { requestClose } = useModalDialogController();
 	const maxPromptLengthInputRef = useRef<HTMLInputElement | null>(null);
@@ -260,17 +271,6 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			window.cancelAnimationFrame(raf2);
 		};
 	}, []);
-
-	const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
-		const n = parsePositiveIntAllowBlank(value);
-		if (n === undefined) {
-			return undefined;
-		}
-		if (!Number.isFinite(n)) {
-			return `${field} must be a positive integer.`;
-		}
-		return undefined;
-	};
 
 	const updateField = (
 		field: 'maxPromptLength' | 'maxOutputLength' | 'timeout',

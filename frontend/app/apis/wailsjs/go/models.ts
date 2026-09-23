@@ -1332,40 +1332,6 @@ export namespace collection {
 		    return a;
 		}
 	}
-	export class MemberMutationResult {
-	    collection: CollectionView;
-	    index: number;
-	    created: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new MemberMutationResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], CollectionView);
-	        this.index = source["index"];
-	        this.created = source["created"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	export class RemoveMemberRequest {
 	    collection: artifact.ArtifactRef;
@@ -1442,6 +1408,226 @@ export namespace collection {
 
 export namespace consumerapi {
 	
+	export class AgentExportRequest {
+	    agent: artifact.ArtifactRef;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentExportRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentMCPSetupInput {
+	    name: string;
+	    kind: string;
+	    label?: string;
+	    description?: string;
+	    required: boolean;
+	    clientSecretRequired: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMCPSetupInput(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.kind = source["kind"];
+	        this.label = source["label"];
+	        this.description = source["description"];
+	        this.required = source["required"];
+	        this.clientSecretRequired = source["clientSecretRequired"];
+	    }
+	}
+	export class AgentMCPSetupDescriptor {
+	    occurrencePath: string;
+	    name: string;
+	    artifact?: artifact.ArtifactRef;
+	    transport?: string;
+	    command?: string;
+	    url?: string;
+	    authMode?: string;
+	    inputs?: AgentMCPSetupInput[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentMCPSetupDescriptor(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.occurrencePath = source["occurrencePath"];
+	        this.name = source["name"];
+	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.transport = source["transport"];
+	        this.command = source["command"];
+	        this.url = source["url"];
+	        this.authMode = source["authMode"];
+	        this.inputs = this.convertValues(source["inputs"], AgentMCPSetupInput);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentExportResult {
+	    type: string;
+	    name: string;
+	    mediaType: string;
+	    suggestedFileName: string;
+	    content: string;
+	    contentDigest: string;
+	    definitionDigest: string;
+	    artifactRevision: number;
+	    builtIn: boolean;
+	    managed: boolean;
+	    resolution?: resolve.CapabilityPlan;
+	    resolutionIssue?: resolve.ResolutionIssue;
+	    mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentExportResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.mediaType = source["mediaType"];
+	        this.suggestedFileName = source["suggestedFileName"];
+	        this.content = source["content"];
+	        this.contentDigest = source["contentDigest"];
+	        this.definitionDigest = source["definitionDigest"];
+	        this.artifactRevision = source["artifactRevision"];
+	        this.builtIn = source["builtIn"];
+	        this.managed = source["managed"];
+	        this.resolution = this.convertValues(source["resolution"], resolve.CapabilityPlan);
+	        this.resolutionIssue = this.convertValues(source["resolutionIssue"], resolve.ResolutionIssue);
+	        this.mcpSetupDescriptors = this.convertValues(source["mcpSetupDescriptors"], AgentMCPSetupDescriptor);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentImportArtifactPreview {
+	    occurrencePath: string;
+	    type: string;
+	    name: string;
+	    logicalVersion?: string;
+	    definitionDigest: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportArtifactPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.occurrencePath = source["occurrencePath"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.logicalVersion = source["logicalVersion"];
+	        this.definitionDigest = source["definitionDigest"];
+	    }
+	}
+	export class AgentImportCommitRequest {
+	    prepared: string;
+	    preparedFingerprint: string;
+	    acceptedConfirmationCodes?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportCommitRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prepared = source["prepared"];
+	        this.preparedFingerprint = source["preparedFingerprint"];
+	        this.acceptedConfirmationCodes = source["acceptedConfirmationCodes"];
+	    }
+	}
+	export class AgentRestoredMembership {
+	    collection: artifact.ArtifactRef;
+	    path: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentRestoredMembership(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.path = source["path"];
+	        this.message = source["message"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class AgentView {
 	    artifact: artifact.Artifact;
 	    name: string;
@@ -1482,6 +1668,272 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class AgentImportCommitResult {
+	    agent: AgentView;
+	    collection: collection.CollectionView;
+	    restoredMemberships?: AgentRestoredMembership[];
+	    mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
+	    preparedFingerprint: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportCommitResult(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.agent = this.convertValues(source["agent"], AgentView);
+	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.restoredMemberships = this.convertValues(source["restoredMemberships"], AgentRestoredMembership);
+	        this.mcpSetupDescriptors = this.convertValues(source["mcpSetupDescriptors"], AgentMCPSetupDescriptor);
+	        this.preparedFingerprint = source["preparedFingerprint"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentImportConflict {
+	    code: string;
+	    path?: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportConflict(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.path = source["path"];
+	        this.message = source["message"];
+	    }
+	}
+	export class AgentImportDestination {
+	    rootID: string;
+	    rootDisplayName?: string;
+	    sourceID: string;
+	    collection: collection.CollectionView;
+	    collectionRevision: number;
+	    collectionName: string;
+	    collectionDisplayName: string;
+	    baseline: boolean;
+	    enabled: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportDestination(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.rootDisplayName = source["rootDisplayName"];
+	        this.sourceID = source["sourceID"];
+	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	        this.collectionRevision = source["collectionRevision"];
+	        this.collectionName = source["collectionName"];
+	        this.collectionDisplayName = source["collectionDisplayName"];
+	        this.baseline = source["baseline"];
+	        this.enabled = source["enabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentImportIssue {
+	    code: string;
+	    severity: string;
+	    path?: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportIssue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.severity = source["severity"];
+	        this.path = source["path"];
+	        this.message = source["message"];
+	    }
+	}
+	export class AgentImportRelationship {
+	    path: string;
+	    type: string;
+	    name: string;
+	    scope?: string;
+	    status: string;
+	    artifact?: artifact.ArtifactRef;
+	    mapped?: resolve.MappedTarget;
+	    code?: string;
+	    message?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportRelationship(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.scope = source["scope"];
+	        this.status = source["status"];
+	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentImportPreview {
+	    prepared?: string;
+	    preparedFingerprint?: string;
+	    // Go type: time
+	    expiresAt: any;
+	    sourceDigest?: string;
+	    definitionDigest?: string;
+	    normalizedYAML?: string;
+	    agent?: AgentImportArtifactPreview;
+	    destination: AgentImportDestination;
+	    projectedArtifacts?: AgentImportArtifactPreview[];
+	    relationships?: AgentImportRelationship[];
+	    conflicts?: AgentImportConflict[];
+	    restoredMemberships?: AgentRestoredMembership[];
+	    mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
+	    canImport: boolean;
+	    requiresConfirmation: boolean;
+	    requiredConfirmationCodes?: string[];
+	    issues?: AgentImportIssue[];
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportPreview(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.prepared = source["prepared"];
+	        this.preparedFingerprint = source["preparedFingerprint"];
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	        this.sourceDigest = source["sourceDigest"];
+	        this.definitionDigest = source["definitionDigest"];
+	        this.normalizedYAML = source["normalizedYAML"];
+	        this.agent = this.convertValues(source["agent"], AgentImportArtifactPreview);
+	        this.destination = this.convertValues(source["destination"], AgentImportDestination);
+	        this.projectedArtifacts = this.convertValues(source["projectedArtifacts"], AgentImportArtifactPreview);
+	        this.relationships = this.convertValues(source["relationships"], AgentImportRelationship);
+	        this.conflicts = this.convertValues(source["conflicts"], AgentImportConflict);
+	        this.restoredMemberships = this.convertValues(source["restoredMemberships"], AgentRestoredMembership);
+	        this.mcpSetupDescriptors = this.convertValues(source["mcpSetupDescriptors"], AgentMCPSetupDescriptor);
+	        this.canImport = source["canImport"];
+	        this.requiresConfirmation = source["requiresConfirmation"];
+	        this.requiredConfirmationCodes = source["requiredConfirmationCodes"];
+	        this.issues = this.convertValues(source["issues"], AgentImportIssue);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class AgentImportPreviewRequest {
+	    path: string;
+	    collection: artifact.ArtifactRef;
+	    expectedCollectionRevision: number;
+	    expectedSourceDigest?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AgentImportPreviewRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.path = source["path"];
+	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
+	        this.expectedSourceDigest = source["expectedSourceDigest"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
 	export class AgentResolution {
 	    agent: AgentView;
 	    capabilities: resolve.CapabilityPlan;
@@ -1515,20 +1967,32 @@ export namespace consumerapi {
 		}
 	}
 	
-	export class AttachAgentToCollectionRequest {
-	    collection: artifact.ArtifactRef;
-	    expectedRevision: number;
-	    agent: artifact.ArtifactRef;
+	export class AgentTextMaterialization {
+	    artifact: artifact.ArtifactRef;
+	    artifactRevision: number;
+	    definitionDigest: string;
+	    name: string;
+	    insert: string;
+	    mediaType?: string;
+	    content: string;
+	    locator: string;
+	    builtIn: boolean;
 	
 	    static createFrom(source: any = {}) {
-	        return new AttachAgentToCollectionRequest(source);
+	        return new AgentTextMaterialization(source);
 	    }
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifactRevision = source["artifactRevision"];
+	        this.definitionDigest = source["definitionDigest"];
+	        this.name = source["name"];
+	        this.insert = source["insert"];
+	        this.mediaType = source["mediaType"];
+	        this.content = source["content"];
+	        this.locator = source["locator"];
+	        this.builtIn = source["builtIn"];
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1549,6 +2013,7 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	
 	export class CollectionPage {
 	    items: collection.CollectionView[];
 	    nextPageToken?: string;
@@ -1619,180 +2084,6 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class ManagedAgentMember {
-	    form: string;
-	    type: string;
-	    name?: string;
-	    locator?: declaration.Locator;
-	    scope?: string;
-	    server?: string;
-	    insert?: string;
-	    parameters?: Record<string, any>;
-	    base?: declaration.Locator;
-	    include?: string[];
-	    exclude?: string[];
-	    nameInclude?: string[];
-	    nameExclude?: string[];
-	    overrides?: Record<string, any>;
-	    use?: Record<string, any>;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentMember(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.form = source["form"];
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.locator = this.convertValues(source["locator"], declaration.Locator);
-	        this.scope = source["scope"];
-	        this.server = source["server"];
-	        this.insert = source["insert"];
-	        this.parameters = source["parameters"];
-	        this.base = this.convertValues(source["base"], declaration.Locator);
-	        this.include = source["include"];
-	        this.exclude = source["exclude"];
-	        this.nameInclude = source["nameInclude"];
-	        this.nameExclude = source["nameExclude"];
-	        this.overrides = source["overrides"];
-	        this.use = source["use"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ManagedAgentDocument {
-	    name: string;
-	    displayName?: string;
-	    description?: string;
-	    labels?: Record<string, string>;
-	    metadata?: Record<string, any>;
-	    members?: ManagedAgentMember[];
-	    loop?: ManagedAgentMember;
-	    workflow?: ManagedAgentMember;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentDocument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.labels = source["labels"];
-	        this.metadata = source["metadata"];
-	        this.members = this.convertValues(source["members"], ManagedAgentMember);
-	        this.loop = this.convertValues(source["loop"], ManagedAgentMember);
-	        this.workflow = this.convertValues(source["workflow"], ManagedAgentMember);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ManagedAgentCreateRequest {
-	    collection: artifact.ArtifactRef;
-	    expectedCollectionRevision: number;
-	    document: ManagedAgentDocument;
-	    enabled: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentCreateRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
-	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
-	        this.document = this.convertValues(source["document"], ManagedAgentDocument);
-	        this.enabled = source["enabled"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ManagedAgentCreateResult {
-	    agent: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
-	    collection: collection.CollectionView;
-	    membershipCreated: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentCreateResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.agent = this.convertValues(source["agent"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
-	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
-	        this.membershipCreated = source["membershipCreated"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ManagedAgentDeleteRequest {
 	    agent: artifact.ArtifactRef;
 	    expectedRevision: number;
@@ -1805,74 +2096,6 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	
-	export class ManagedAgentReplaceRequest {
-	    agent: artifact.ArtifactRef;
-	    expectedRevision: number;
-	    document: ManagedAgentDocument;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentReplaceRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
-	        this.expectedRevision = source["expectedRevision"];
-	        this.document = this.convertValues(source["document"], ManagedAgentDocument);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ManagedAgentReplaceResult {
-	    agent: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedAgentReplaceResult(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.agent = this.convertValues(source["agent"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -4067,6 +4290,21 @@ export namespace resolve {
 		    }
 		    return a;
 		}
+	}
+	
+	export class ResolutionIssue {
+	    code: string;
+	    message: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolutionIssue(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.code = source["code"];
+	        this.message = source["message"];
+	    }
 	}
 
 }

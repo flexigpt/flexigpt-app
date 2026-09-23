@@ -21,11 +21,11 @@
 		"build:win": "cd ./cmd/agentgo && pnpm -F frontend run build:wails && pnpm run check:version && wails build -m -v 2 -clean -s -skipbindings -nsis -platform windows/amd64 -ldflags=\"-X main.Version=%VERSION_TAG%\"",
 		"licenses:gen": "bash ./build/licenses/gen_licenses.sh"
 	},
-	"packageManager": "pnpm@11.20.0+sha512.9a6f330a95b66446ea088faf1521405a8a01f07fde7124cc9958dfed52d4bb436737e65b08f85f37b46fcba375092558ac51262b816844b22f63406ed166bfee",
+	"packageManager": "pnpm@12.6.0+sha512.3ef68f951cb111ac204b4a5a16f0b2ddf0da56a96e0413e81d855d9f0b55ef926714709028e1cd00c405c2c5fb7b9e8ec4dc46777c805d0373c2f2ff00fd20ec",
 	"devDependencies": {
-		"browserslist": "^4.28.9",
+		"browserslist": "^4.29.0",
 		"fs-extra": "^11.4.0",
-		"oxlint": "^1.82.0",
-		"oxlint-tsgolint": "^7.0.2001"
+		"oxlint": "^1.85.0",
+		"oxlint-tsgolint": "^7.0.2002"
 	}
 }

@@ -139,18 +139,6 @@ export function getSkillInstructionPromptEligibilityReason(
 	return undefined;
 }
 
-export function getSkillPreloadEligibilityReason(skill: Pick<Skill, 'insert' | 'arguments'>): string | undefined {
-	if (!isInstructionInsertSkill(skill)) {
-		return 'Only instruction skills can be enabled in a skill session.';
-	}
-
-	if (skillArgumentCount(skill) > 0) {
-		return 'Argument-backed skills cannot be preloaded as active session skills from presets.';
-	}
-
-	return undefined;
-}
-
 export function getSkillArgumentCountLabel(args?: SkillArgument[] | null): string {
 	const count = args?.length ?? 0;
 	return count === 0 ? 'No args' : `${count} arg${count === 1 ? '' : 's'}`;

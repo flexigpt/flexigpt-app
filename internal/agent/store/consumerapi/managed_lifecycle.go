@@ -75,13 +75,6 @@ func (a *API) DeleteManagedAgent(
 	)
 }
 
-func (a *API) loadExportableManagedAgent(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (editableManagedAgent, error) {
-	return a.loadManagedAgent(ctx, ref, 0, false)
-}
-
 func (a *API) loadEditableManagedAgent(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

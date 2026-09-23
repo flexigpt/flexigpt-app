@@ -1,29 +1,15 @@
-import type { JSONRawString } from '@/lib/jsonschema_utils';
-import { getUUIDv7 } from '@/lib/uuid_utils';
-
 export type ArtifactRootID = string;
 export type ArtifactSourceID = string;
-export type ArtifactCollectionID = string;
-export type ArtifactID = string;
-export type ArtifactStorageKey = string;
-
-/**
- * Creates an opaque, storage-safe local key for a newly allocated Artifact
- * Store Root or Source. This is intentionally not a user-facing identifier,
- * bundle key, filesystem path, or portable package address.
- */
-export function newArtifactStorageKey(): ArtifactStorageKey {
-	return `s${getUUIDv7().replaceAll('-', '').toLowerCase()}`;
-}
+type ArtifactCollectionID = string;
+type ArtifactID = string;
+type ArtifactStorageKey = string;
 
 /**
  * Artifact kinds and Source kinds are registry-extensible backend identifiers.
  * They intentionally remain strings rather than frontend enums.
  */
 export type ArtifactKind = string;
-type ArtifactCollectionKind = string;
-type ArtifactSourceKind = string;
-type ArtifactAttachmentRole = string;
+
 export type ArtifactLocator = string;
 export type ArtifactDigest = string;
 
@@ -39,13 +25,7 @@ export enum ArtifactState {
 	Incompatible = 'incompatible',
 }
 
-export enum ArtifactOccurrenceState {
-	Valid = 'valid',
-	Invalid = 'invalid',
-	Missing = 'missing',
-}
-
-export enum ArtifactDiagnosticSeverity {
+enum ArtifactDiagnosticSeverity {
 	Error = 'error',
 	Warning = 'warning',
 	Info = 'info',
@@ -80,76 +60,6 @@ export interface ArtifactDiagnostic {
 	location?: ArtifactDiagnosticLocation;
 }
 
-export interface ArtifactCollection {
-	id: ArtifactCollectionID;
-	rootID: ArtifactRootID;
-	kind: ArtifactCollectionKind;
-	displayName: string;
-	description?: string;
-	enabled: boolean;
-	revision: number;
-	createdAt: string;
-	modifiedAt: string;
-	retiredAt?: string;
-}
-
-export interface ArtifactCollectionAttachment {
-	rootID: ArtifactRootID;
-	collectionID: ArtifactCollectionID;
-	sourceID: ArtifactSourceID;
-	role: ArtifactAttachmentRole;
-	enabled: boolean;
-	revision: number;
-	createdAt: string;
-	modifiedAt: string;
-}
-
-export interface ArtifactRecord {
-	id: ArtifactID;
-	rootID: ArtifactRootID;
-	collectionID: ArtifactCollectionID;
-	binding: ArtifactSourceBinding;
-	kind: ArtifactKind;
-	name: string;
-	enabled: boolean;
-	adoption: ArtifactAdoptionMode;
-	resolvedDefinition?: ArtifactDigest;
-	state: ArtifactState;
-	diagnostics?: ArtifactDiagnostic[];
-	revision: number;
-	createdAt: string;
-	modifiedAt: string;
-}
-
-export interface ArtifactSourceSummary {
-	id: ArtifactSourceID;
-	rootID: ArtifactRootID;
-	rootStorageKey: ArtifactStorageKey;
-	storageKey: ArtifactStorageKey;
-	kind: ArtifactSourceKind;
-	displayName: string;
-	enabled: boolean;
-	revision: number;
-	createdAt: string;
-	modifiedAt: string;
-	retiredAt?: string;
-}
-
-/**
- * Semantic identity of a managed package. This replaces physical managed
- * source directory addressing at the API boundary.
- */
-export interface ManagedPackageAddress {
-	kind: string;
-	name: string;
-	version: string;
-}
-
-export interface ManagedSourcePackageFile {
-	locator: ArtifactLocator;
-	content: Uint8Array;
-}
-
 export interface ArtifactSourceBinding {
 	sourceID: ArtifactSourceID;
 	locator: ArtifactLocator;
@@ -157,28 +67,7 @@ export interface ArtifactSourceBinding {
 	expectedKind: ArtifactKind;
 }
 
-interface ArtifactDefinitionSelector {
-	kind: ArtifactKind;
-	logicalName?: string;
-	versionConstraint?: string;
-	labels?: Record<string, string>;
-}
-
-export interface ArtifactDefinitionView {
-	digest: ArtifactDigest;
-	kind: ArtifactKind;
-	schemaID: string;
-	schemaVersion: string;
-	logicalName: string;
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-	body: JSONRawString;
-	dependencies?: ArtifactDefinitionSelector[];
-}
-
-export interface StoreArtifactBinding {
+interface StoreArtifactBinding {
 	sourceID: ArtifactSourceID;
 	locator: ArtifactLocator;
 	subresourceLocator?: ArtifactLocator;
@@ -209,41 +98,20 @@ export interface StoreArtifactAddress {
 	logicalName: string;
 }
 
-export interface StoreArtifactDefinition {
-	digest: ArtifactDigest;
-	kind: ArtifactKind;
-	schemaID: string;
-	schemaVersion: string;
-	logicalName: string;
-	logicalVersion?: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-	body: number[];
-	dependencies?: StoreArtifactDefinitionSelector[];
-}
-
-export interface StoreArtifactDefinitionSelector {
-	kind: ArtifactKind;
-	logicalName?: string;
-	versionConstraint?: string;
-	labels?: Record<string, string>;
-}
-
-export interface StoreDirectoryRoot {
+interface StoreDirectoryRoot {
 	root: ArtifactLocator;
 	recursive?: boolean;
 	includePatterns?: string[];
 	excludePatterns?: string[];
 }
 
-export interface StoreDecoderHint {
+interface StoreDecoderHint {
 	locator: ArtifactLocator;
 	recursive?: boolean;
 	decoderIDs: string[];
 }
 
-export interface StoreDiscoverySpec {
+interface StoreDiscoverySpec {
 	explicitLocators?: ArtifactLocator[];
 	directoryRoots?: StoreDirectoryRoot[];
 	decoderHints?: StoreDecoderHint[];
@@ -283,21 +151,9 @@ export interface StoreArtifactRoot {
 	retiredAt?: string;
 }
 
-export interface StoreArtifactRootDraft {
-	id: ArtifactRootID;
-	storageKey: ArtifactStorageKey;
-	displayName: string;
-	description?: string;
-}
-
 export interface StoreManagedPackageFile {
 	locator: ArtifactLocator;
 	content: number[];
-}
-
-export interface StoreArtifactResolution {
-	artifact: ArtifactRef;
-	definition?: StoreArtifactDefinition;
 }
 
 export interface MappedTarget {

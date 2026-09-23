@@ -74,6 +74,10 @@ Practical rules:
 - required arguments block send until they are filled
 - keep instructions on only when they help the task
 - refresh discovery on the server page when the server contents change
+- an Agent can select a connected service as part of its starting setup
+- if an Agent shows **Configure**, finish the local setup before using that service
+
+Agent setup never shares secret values through the Agent file.
 
 ## Safety and trust
 

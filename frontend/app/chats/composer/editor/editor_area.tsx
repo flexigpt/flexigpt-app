@@ -47,18 +47,18 @@ import { useEnterSubmit } from '@/hooks/use_enter_submit';
 
 import { HoverTip } from '@/components/hover_tip';
 
-import type { AssistantPresetRuntimeSnapshot } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import type { AgentRuntimeSnapshot } from '@/chats/composer/agents/agent_runtime';
 import type {
 	AssistantTurnFinishedPayload,
 	EditorExternalMessage,
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
-import type { ComposerSystemPromptController } from '@/chats/composer/skills/use_composer_system_prompt';
+import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
-import { mapAssistantPresetWebSearchTemplatesToChoices } from '@/chats/composer/assistantpresets/assistant_preset_runtime';
+import { mapWebSearchTemplatesToChoices } from '@/chats/composer/agents/agent_runtime';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
@@ -120,7 +120,7 @@ export interface EditorAreaHandle {
 	setWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyAttachmentsDrop: (payload: AttachmentsDroppedPayload) => void;
 	setSkillStateFromMessage: (enabledRefs: SkillRef[], activeRefs: SkillRef[], options?: SkillStateApplyOptions) => void;
-	setInstalledSkillStateFromPreset: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
+	setInstalledSkillStateFromAgent: (enabledRefs: SkillRef[], activeRefs: SkillRef[]) => void;
 	setWorkspaceSelectionFromMessage: (selection?: WorkspaceConversationSelection, syncSkills?: boolean) => void;
 	finishAssistantTurn: (payload: AssistantTurnFinishedPayload) => void;
 }
@@ -132,10 +132,10 @@ interface EditorAreaProps {
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
 	onRequestStop: () => void;
-	onAssistantPresetRuntimeStateChange?: (snapshot: AssistantPresetRuntimeSnapshot) => void;
+	onAgentRuntimeStateChange?: (snapshot: AgentRuntimeSnapshot) => void;
 	editingMessageId: string | null;
 	cancelEditing: () => void;
-	systemPrompt: ComposerSystemPromptController;
+	systemPrompt: AgentSystemPromptController;
 }
 
 function isAutoExecutableToolChoice(choice: ToolStoreChoice): boolean {
@@ -285,7 +285,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		shortcutConfig,
 		onSubmit,
 		onRequestStop,
-		onAssistantPresetRuntimeStateChange,
+		onAgentRuntimeStateChange,
 		editingMessageId,
 		cancelEditing,
 		systemPrompt,
@@ -1749,7 +1749,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
 				void applySkillSelectionState(enabledRefs, activeRefs, options);
 			},
-			setInstalledSkillStateFromPreset: (enabledRefs, activeRefs) => {
+			setInstalledSkillStateFromAgent: (enabledRefs, activeRefs) => {
 				void applyInstalledSkillSelectionState(enabledRefs, activeRefs, {
 					syncSession: SkillSessionSyncMode.EnsureIfEnabled,
 				});
@@ -1852,9 +1852,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!isInputLocked;
 
 	useEffect(() => {
-		onAssistantPresetRuntimeStateChange?.({
+		onAgentRuntimeStateChange?.({
 			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
-			webSearchChoices: mapAssistantPresetWebSearchTemplatesToChoices(webSearchTemplates),
+			webSearchChoices: mapWebSearchTemplatesToChoices(webSearchTemplates),
 			enabledSkillRefs: installedEnabledSkillRefs,
 			activeSkillRefs: installedActiveSkillRefs,
 			mcpContext: mcp.mcpContext,
@@ -1864,7 +1864,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		installedEnabledSkillRefs,
 		installedActiveSkillRefs,
 		mcp.mcpContext,
-		onAssistantPresetRuntimeStateChange,
+		onAgentRuntimeStateChange,
 		webSearchTemplates,
 	]);
 
@@ -1963,8 +1963,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 								<HoverTip
 									content={
 										autoExecStopRequested
-											? 'Auto-exec stop armed for the next assistant tool-call batch'
-											: 'Stop auto-exec for the next assistant tool-call batch'
+											? 'Auto-exec stop armed for the next tool-call batch'
+											: 'Stop auto-exec for the next tool-call batch'
 									}
 									placement="left"
 								>

@@ -39,7 +39,8 @@ Stored locally by default:
 
 - conversations and local history search data
 - model presets and provider metadata
-- assistant presets
+- Agent Collections and Agent files
+- Workspace setup
 - tool definitions
 - skill definitions and hydrated built-in skill files when needed
 - app settings metadata
@@ -106,14 +107,15 @@ The app also stores local data for:
 - settings metadata
 - provider and model presets
 - tool bundles and tool definitions
-- assistant presets
+- Agent Collections and Agent files
+- Workspace setup
 - skill bundles and skills
 - bundled docs shipped inside the app
 - logs and local indexes
 
 ### Bundled app data
 
-Built-in providers, model presets, tools, skills, assistant presets, and docs ship with the app. Your local changes and user-created entries are stored separately from bundled defaults.
+Built-in providers, model presets, tools, Skills, Agents, and docs ship with the app. Your local changes and your own entries are stored separately from bundled defaults.
 
 ## Storage locations
 

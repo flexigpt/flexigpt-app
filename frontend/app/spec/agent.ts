@@ -1,32 +1,61 @@
-import type { ArtifactRef, ArtifactRootID, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
 import type {
-	ArtifactMembershipView,
-	CollectionCapabilityPlan,
-	CollectionView,
-	DeclarationLocator,
-	MemberMutationResult,
-} from '@/spec/collection';
+	ArtifactDigest,
+	ArtifactRef,
+	ArtifactRootID,
+	ArtifactSourceID,
+	CapabilityPlan,
+	MappedTarget,
+	StoreArtifact,
+} from '@/spec/artifact';
+import type { CollectionView } from '@/spec/collection';
+import type { MCPHTTPAuthMode, MCPInputKind, MCPTransportType } from '@/spec/mcp';
 
-export interface AgentDocument {
-	type: string;
-	name: string;
-	displayName?: string;
-	description?: string;
-	labels?: Record<string, string>;
-	locator?: DeclarationLocator;
-	metadata?: Record<string, number[]>;
-	members?: unknown[];
-	loop?: unknown;
-	workflow?: unknown;
+export enum AgentImportIssueSeverity {
+	Error = 'error',
+	Confirmation = 'confirmation',
+	Warning = 'warning',
+	Information = 'information',
+}
+
+export enum AgentTextInsert {
+	Instructions = 'instructions',
+	Warning = 'warning',
+	Information = 'information',
+	UserMessage = 'user-message',
+}
+
+export enum AgentImportRelationshipStatus {
+	Available = 'available',
+	Unavailable = 'unavailable',
+	Ambiguous = 'ambiguous',
 }
 
 export interface AgentView {
 	artifact: StoreArtifact;
+
 	name: string;
 	displayName: string;
 	description?: string;
+
 	builtIn: boolean;
 	managed: boolean;
+}
+
+export interface AgentResolution {
+	agent: AgentView;
+	capabilities: CapabilityPlan;
+}
+
+export interface AgentTextMaterialization {
+	artifact: ArtifactRef;
+	artifactRevision: number;
+	definitionDigest: ArtifactDigest;
+	name: string;
+	insert: AgentTextInsert;
+	mediaType?: string;
+	content: string;
+	locator: string;
+	builtIn: boolean;
 }
 
 export interface ListAgentsRequest {
@@ -37,50 +66,144 @@ export interface ListAgentsRequest {
 	enabled?: boolean;
 }
 
-export interface AttachAgentToCollectionRequest {
-	collection: ArtifactRef;
-	expectedRevision: number;
-	agent: ArtifactRef;
+interface AgentImportIssue {
+	code: string;
+	severity: AgentImportIssueSeverity;
+	path?: string;
+	message: string;
 }
 
-export interface ManagedAgentCreateRequest {
-	collection: ArtifactRef;
-	expectedCollectionRevision: number;
-	document: AgentDocument;
+export interface AgentImportDestination {
+	rootID: ArtifactRootID;
+	rootDisplayName?: string;
+	sourceID: ArtifactSourceID;
+	collection: CollectionView;
+
+	collectionRevision: number;
+	collectionName: string;
+	collectionDisplayName: string;
+	baseline: boolean;
 	enabled: boolean;
 }
 
-export interface ManagedAgentCreateResult {
-	agent: StoreArtifact;
-	address: StoreArtifactAddress;
-	collection: CollectionView;
-	membershipCreated: boolean;
+export interface AgentImportPreviewRequest {
+	path: string;
+	collection: ArtifactRef;
+	expectedCollectionRevision: number;
+	expectedSourceDigest?: ArtifactDigest;
 }
 
-export interface ManagedAgentDeleteRequest {
-	agent: ArtifactRef;
-	expectedRevision: number;
+interface AgentImportArtifactPreview {
+	occurrencePath: string;
+	type: string;
+	name: string;
+	logicalVersion?: string;
+	definitionDigest: ArtifactDigest;
 }
 
-export interface ManagedAgentReplaceRequest {
-	agent: ArtifactRef;
-	expectedRevision: number;
-	document: AgentDocument;
+export interface AgentImportRelationship {
+	path: string;
+	type: string;
+	name: string;
+	scope?: string;
+	status: AgentImportRelationshipStatus;
+
+	artifact?: ArtifactRef;
+	mapped?: MappedTarget;
+
+	code?: string;
+	message?: string;
 }
 
-export interface ManagedAgentReplaceResult {
-	agent: StoreArtifact;
-	address: StoreArtifactAddress;
+interface AgentImportConflict {
+	code: string;
+	path?: string;
+	message: string;
 }
 
-export interface AgentManagementView {
+interface AgentRestoredMembership {
+	collection: ArtifactRef;
+	path: string;
+	message: string;
+}
+
+interface AgentMCPSetupInput {
+	name: string;
+	kind: MCPInputKind;
+	label?: string;
+	description?: string;
+	required: boolean;
+	clientSecretRequired: boolean;
+}
+
+export interface AgentMCPSetupDescriptor {
+	occurrencePath: string;
+	name: string;
+	artifact?: ArtifactRef;
+
+	transport?: MCPTransportType;
+	command?: string;
+	url?: string;
+	authMode?: MCPHTTPAuthMode;
+
+	inputs?: AgentMCPSetupInput[];
+}
+
+export interface AgentImportPreview {
+	prepared?: string;
+	preparedFingerprint?: ArtifactDigest;
+	expiresAt?: string;
+
+	sourceDigest?: ArtifactDigest;
+	definitionDigest?: ArtifactDigest;
+	normalizedYAML?: string;
+
+	agent?: AgentImportArtifactPreview;
+	destination: AgentImportDestination;
+	projectedArtifacts?: AgentImportArtifactPreview[];
+	relationships?: AgentImportRelationship[];
+	conflicts?: AgentImportConflict[];
+	restoredMemberships?: AgentRestoredMembership[];
+	mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
+
+	canImport: boolean;
+	requiresConfirmation: boolean;
+	requiredConfirmationCodes?: string[];
+	issues?: AgentImportIssue[];
+}
+
+export interface AgentImportCommitRequest {
+	prepared: string;
+	preparedFingerprint: ArtifactDigest;
+	acceptedConfirmationCodes?: string[];
+}
+
+export interface AgentImportCommitResult {
 	agent: AgentView;
-	directMemberships: ArtifactMembershipView[];
-	capabilities: CapabilityPlan;
+	collection: CollectionView;
+	restoredMemberships?: AgentRestoredMembership[];
+	mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
+	preparedFingerprint: ArtifactDigest;
 }
 
-export interface AgentCollectionManagementView {
-	collection: CollectionView;
-	capabilities: CollectionCapabilityPlan;
-	mutation?: MemberMutationResult;
+interface AgentResolutionIssue {
+	code: string;
+	message: string;
+}
+
+export interface AgentExportResult {
+	type: string;
+	name: string;
+	mediaType: string;
+	suggestedFileName: string;
+	content: string;
+	contentDigest: ArtifactDigest;
+	definitionDigest: ArtifactDigest;
+	artifactRevision: number;
+	builtIn: boolean;
+	managed: boolean;
+
+	resolution?: CapabilityPlan;
+	resolutionIssue?: AgentResolutionIssue;
+	mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
 }

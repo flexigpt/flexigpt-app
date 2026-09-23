@@ -2,7 +2,7 @@
 
 These recipes are outcome-based. They focus on work you want done by the model.
 
-For setup tasks such as OpenRouter, local models, creating assistant presets, tools, or skills, see [Setup Recipes](/docs?doc=setup-recipes).
+For setup tasks such as OpenRouter, local models, importing Agents, tools, or Skills, see [Setup Recipes](/docs?doc=setup-recipes).
 
 ## Table of contents <!-- omit from toc -->
 
@@ -24,8 +24,8 @@ For reliable results:
 - change one layer at a time
 - keep attachments focused
 - keep **Previous user turns** intentional
-- inspect assistant preset details before assuming what it does
-- when a workflow card or assistant preset pre-fills starting text, replace the placeholder line (between <>) with your real task
+- inspect Agent details before assuming what they set up
+- when a workflow card or Agent provides opening text, replace it with your real task
 - start tools in manual mode
 - use local providers only after confirming the endpoint is actually local
 
@@ -36,7 +36,7 @@ Use this when you want FlexiGPT to inspect a repo, scope a bounded change, edit 
 Suggested setup:
 
 - Home starter: **Develop a Feature**
-- Assistant preset: **Spec Driven Development**
+- Agent: **Spec Driven Development**
 - Context: repo path, changed files, issue text, requirements, screenshots, failing tests, or design notes
 - Tools: read/write/shell capable preset, with write and shell calls reviewed manually
 - Previous user turns: usually `0` or `1`
@@ -90,7 +90,7 @@ Use this for correctness, maintainability, security, reliability, and test-risk 
 
 Suggested setup:
 
-- Assistant preset: Reviewing Code
+- Agent: **Reviewing Code**
 - Context: changed files, diff, PR description, tests, logs
 - Tools: read-only tools if useful
 - Previous user turns: small and intentional
@@ -117,7 +117,7 @@ Use this when you have logs, stack traces, failing tests, or confusing behavior.
 
 Suggested setup:
 
-- Assistant preset: Bug Investigator or Spec Driven Development
+- Agent: **Bug Investigator** or **Spec Driven Development**
 - Context: stack trace, logs, failing command, relevant code, recent diff
 - Tools: manual first
 
@@ -189,7 +189,7 @@ Steps:
 
 1. Open **Chats**.
 2. Start a fresh chat or duplicate the task in another tab.
-3. Choose an assistant preset if needed.
+3. Choose an Agent if needed.
 4. Set **Previous user turns** to a fixed value.
 5. Add the same attachments.
 6. Add the same tools, skills, and web-search setting.
@@ -201,7 +201,7 @@ Steps:
 
 Keep constant:
 
-- assistant preset
+- Agent
 - draft text
 - attachments and attachment modes
 - previous user turns

@@ -27,7 +27,6 @@ import { MCPManagementAPI } from '@/apis/mcp_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
-import { WailsAgentStoreAPI } from '@/apis/wailsapi/agent_store';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
@@ -40,13 +39,12 @@ import { WorkspaceManagementAPI } from '@/apis/workspace_management';
 
 export let log: ILogger;
 
-export let agentStoreAPI: IAgentStoreAPI;
-export let agentManagementAPI: AgentManagementAPI;
 export let attachmentsDropAPI: IAttachmentsDropAPI;
 export let backendAPI: IBackendAPI;
 export let conversationStoreAPI: IConversationStoreAPI;
 export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
+
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 
 export let toolStoreAPI: IToolStoreAPI;
@@ -66,6 +64,9 @@ let workspaceStoreAPI: IWorkspaceStoreAPI;
 let workspaceRuntimeAPI: IWorkspaceRuntimeAPI;
 export let workspaceManagementAPI: WorkspaceManagementAPI;
 
+export let agentStoreAPI: IAgentStoreAPI;
+export let agentManagementAPI: AgentManagementAPI;
+
 // Conditional initialization
 if (IS_WAILS_PLATFORM) {
 	// Initialize with Wails implementations
@@ -77,12 +78,13 @@ if (IS_WAILS_PLATFORM) {
 	conversationStoreAPI = new wailsImpl.WailsConversationStoreAPI();
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
+
 	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
+
+	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
+
 	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
 	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
-
-	agentStoreAPI = new WailsAgentStoreAPI();
-	agentManagementAPI = new AgentManagementAPI(agentStoreAPI, toolStoreAPI, modelPresetStoreAPI);
 
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
@@ -104,6 +106,14 @@ if (IS_WAILS_PLATFORM) {
 		mcpRuntimeAPI,
 		toolStoreAPI,
 		modelPresetStoreAPI
+	);
+
+	agentManagementAPI = new AgentManagementAPI(
+		agentStoreAPI,
+		toolStoreAPI,
+		modelPresetStoreAPI,
+		mcpManagementAPI,
+		skillManagementAPI
 	);
 
 	workspaceStoreAPI = new WailsWorkspaceStoreAPI();

@@ -153,7 +153,7 @@ Recommended flow:
 9. Add, copy, or edit model presets under the forked provider.
 10. Select the forked model preset in **Chats** and send a tiny test prompt.
 
-Keep provider IDs stable after use. Chats, assistant presets, and model references may depend on them.
+Keep provider IDs stable after use. Chats, Agents, and saved model choices may depend on them.
 
 ## Custom compatible endpoints
 
@@ -174,7 +174,7 @@ When adding or forking a custom provider, check:
 - default headers are valid JSON if provided
 - at least one model preset exists under the provider
 
-Keep provider IDs stable because chats, assistant presets, and model refs may depend on them.
+Keep provider IDs stable because chats, Agents, and saved model choices may depend on them.
 
 ## Local OpenAI-compatible servers
 
@@ -258,7 +258,7 @@ Possible differences:
 If a workflow breaks after switching models, inspect:
 
 - selected provider/model
-- assistant preset modified state
+- selected Agent
 - web-search chip
 - tool chips
 - advanced parameters

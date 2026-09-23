@@ -102,7 +102,7 @@ export enum MCPToolRisk {
 	OpenWorld = 'openWorld',
 }
 
-export enum MCPTaskSupport {
+enum MCPTaskSupport {
 	Forbidden = 'forbidden',
 	Optional = 'optional',
 	Required = 'required',
@@ -151,7 +151,7 @@ export enum MCPCompletionRefType {
 	Prompt = 'prompt',
 }
 
-export interface MCPServerPolicy {
+interface MCPServerPolicy {
 	defaultApprovalRule: MCPApprovalRule;
 	defaultExecutionMode: MCPExecutionMode;
 	requireApprovalForUnknownRisk: boolean;
@@ -159,7 +159,7 @@ export interface MCPServerPolicy {
 	requireApprovalForDestructive: boolean;
 }
 
-export interface MCPToolPolicyOverride {
+interface MCPToolPolicyOverride {
 	toolName: string;
 	approvalRule?: MCPApprovalRule;
 	executionMode?: MCPExecutionMode;
@@ -193,7 +193,7 @@ export interface MCPServerData {
 	additionalPolicies?: ArtifactRef[];
 }
 
-export interface MCPServerCapabilitiesSummary {
+interface MCPServerCapabilitiesSummary {
 	tools?: boolean;
 	toolsListChanged?: boolean;
 	resources?: boolean;
@@ -206,7 +206,7 @@ export interface MCPServerCapabilitiesSummary {
 	extensions?: Record<string, any>;
 }
 
-export interface MCPToolAnnotations {
+interface MCPToolAnnotations {
 	destructiveHint?: boolean;
 	idempotentHint: boolean;
 	openWorldHint?: boolean;
@@ -214,7 +214,7 @@ export interface MCPToolAnnotations {
 	title?: string;
 }
 
-export interface MCPToolAppInfo {
+interface MCPToolAppInfo {
 	resourceUri?: string;
 	visibility?: MCPAppVisibility[];
 }
@@ -334,14 +334,14 @@ export interface MCPConversationContext {
 	prompts?: MCPPromptSelection[];
 }
 
-export interface MCPIcon {
+interface MCPIcon {
 	src: string;
 	mimeType?: string;
 	sizes?: string[];
 	theme?: string;
 }
 
-export interface MCPResourceContents {
+interface MCPResourceContents {
 	uri: string;
 	mimeType?: string;
 	text?: string;
@@ -365,12 +365,12 @@ export interface MCPContent {
 	icons?: MCPIcon[];
 }
 
-export interface MCPPromptMessage {
+interface MCPPromptMessage {
 	role: string;
 	content: MCPContent;
 }
 
-export interface MCPToolCallProvenance {
+interface MCPToolCallProvenance {
 	server: MCPRuntimeServerID;
 	catalog: MCPRuntimeCatalogID;
 	serverDisplayName?: string;
@@ -525,13 +525,13 @@ export function isMCPApprovalRule(value: unknown): value is MCPApprovalRule {
 	return typeof value === 'string' && Object.values(MCPApprovalRule).includes(value as MCPApprovalRule);
 }
 
-export enum MCPPlatform {
+enum MCPPlatform {
 	Linux = 'linux',
 	Darwin = 'darwin',
 	Windows = 'windows',
 }
 
-export interface MCPServerCore {
+interface MCPServerCore {
 	type: MCPServerType;
 	command?: string;
 	args?: string[];
@@ -540,7 +540,7 @@ export interface MCPServerCore {
 	headers?: Record<string, string>;
 }
 
-export interface MCPServerInclude {
+interface MCPServerInclude {
 	tools?: string[];
 	resources?: string[];
 	prompts?: string[];
@@ -552,7 +552,7 @@ export interface MCPAuthenticationDeclaration {
 	clientIDMetadataDocumentURL?: string;
 }
 
-export interface MCPInputDeclaration {
+interface MCPInputDeclaration {
 	kind: MCPInputKind;
 	label?: string;
 	description?: string;
@@ -563,37 +563,37 @@ export interface MCPInputDeclaration {
 	clientSecretRequired?: boolean;
 }
 
-export interface MCPInstallationDeclaration {
+interface MCPInstallationDeclaration {
 	note?: string;
 	inputs?: Record<string, MCPInputDeclaration>;
 	allowEnvironment?: string[];
 }
 
-export interface MCPStdioProfile {
+interface MCPStdioProfile {
 	command?: string;
 	args?: string[];
 	env?: Record<string, string>;
 	removeEnv?: string[];
 }
 
-export interface MCPHTTPProfile {
+interface MCPHTTPProfile {
 	url?: string;
 	headers?: Record<string, string>;
 	removeHeaders?: string[];
 }
 
-export interface MCPConnectionProfile {
+interface MCPConnectionProfile {
 	platforms?: MCPPlatform[];
 	stdio?: MCPStdioProfile;
 	http?: MCPHTTPProfile;
 }
 
-export interface MCPServerPolicyReference {
+interface MCPServerPolicyReference {
 	name: string;
 	required: boolean;
 }
 
-export interface MCPServerConfiguration {
+interface MCPServerConfiguration {
 	timeoutMS?: number;
 	auth: MCPAuthenticationDeclaration;
 	install: MCPInstallationDeclaration;
@@ -666,7 +666,7 @@ export interface MCPEffectivePolicy {
 	digest: string;
 }
 
-export interface MCPRuntimeImplementationInfo {
+interface MCPRuntimeImplementationInfo {
 	name?: string;
 	version?: string;
 }
@@ -688,11 +688,6 @@ export interface MCPServerRuntimeSnapshot {
 	promptCount: number;
 	snapshotDigest?: string;
 }
-
-export type MCPToolCapabilityPage = MCPDiscoveryPage<MCPToolCapability>;
-export type MCPResourcePage = MCPDiscoveryPage<MCPResourceRef>;
-export type MCPResourceTemplatePage = MCPDiscoveryPage<MCPResourceTemplateRef>;
-export type MCPPromptPage = MCPDiscoveryPage<MCPPromptRef>;
 
 export interface MCPCompleteArgumentRequestBody {
 	refType: MCPCompletionRefType;
@@ -811,7 +806,7 @@ export interface MCPHTTPSecretDraft {
 	deleteExisting: boolean;
 }
 
-export interface MCPOAuthClientCredentialsDraft {
+interface MCPOAuthClientCredentialsDraft {
 	inputName?: string;
 	existingSecretRef?: string;
 	secretJSON: string;

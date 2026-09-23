@@ -6,7 +6,7 @@ import type {
 	StoreArtifact,
 } from '@/spec/artifact';
 
-export interface DeclarationLocator {
+interface DeclarationLocator {
 	kind?: string;
 	path?: string;
 	url?: string;
@@ -20,7 +20,7 @@ export interface DeclarationLocator {
 	command?: string;
 }
 
-export interface CollectionMemberReference {
+interface CollectionMemberReference {
 	type: string;
 	name?: string;
 	insert?: string;
@@ -29,7 +29,7 @@ export interface CollectionMemberReference {
 	server?: string;
 }
 
-export interface CollectionMemberView {
+interface CollectionMemberView {
 	type: string;
 	name?: string;
 	insert?: string;
@@ -70,12 +70,6 @@ export interface CollectionCapabilityPlan {
 	complete: boolean;
 }
 
-export interface MemberMutationResult {
-	collection: CollectionView;
-	index: number;
-	created: boolean;
-}
-
 export interface CreateCollectionRequest {
 	rootID: ArtifactRootID;
 	sourceID?: ArtifactSourceID;
@@ -94,12 +88,6 @@ export interface UpdateCollectionRequest {
 export interface DeleteCollectionRequest {
 	collection: ArtifactRef;
 	expectedRevision: number;
-}
-
-export interface AddEntryRequest {
-	collection: ArtifactRef;
-	expectedRevision: number;
-	entry: unknown;
 }
 
 export interface AddMemberRequest {

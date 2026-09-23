@@ -410,6 +410,11 @@ function getInitialModelPresetFormData(
 	};
 }
 
+const numPlaceholder = (field: keyof typeof AddModeDefaults) => {
+	const v = AddModeDefaults[field];
+	return v === undefined || typeof v === 'object' ? 'Default: N/A' : `Default: ${String(v)}`;
+};
+
 function AddEditModelPresetModalContent({
 	onSubmit,
 	providerName,
@@ -775,11 +780,6 @@ function AddEditModelPresetModalContent({
 		}
 		return Object.keys(buildPatchPayload()).length > 0;
 	}, [buildPatchPayload, isEditMode]);
-
-	const numPlaceholder = (field: keyof typeof AddModeDefaults) => {
-		const v = AddModeDefaults[field];
-		return v === undefined || typeof v === 'object' ? 'Default: N/A' : `Default: ${String(v)}`;
-	};
 
 	const submitForm = async () => {
 		if (isReadOnly) {

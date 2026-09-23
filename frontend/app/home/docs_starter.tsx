@@ -5,20 +5,20 @@ import type { NavCardProps } from '@/home/nav_card';
 export const docsStarters: NavCardProps[] = [
 	{
 		title: 'Getting Started',
-		description:
-			'Connect a provider key, choose a model or assistant preset, add context, and send your first request.',
+		description: 'Connect a provider, choose a model or Agent, add useful context, and send your first request.',
 		to: '/docs/?doc=getting-started',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
-		title: 'Chat Workspace',
-		description: 'Use tabs, search, the timeline, model controls, assistant presets, and send/edit flows.',
-		to: '/docs/?doc=chat-workspace',
+		title: 'Agents',
+		description:
+			'Use reusable Agent files as starting points for development, review, investigation, writing, research, and planning.',
+		to: '/docs/?doc=agents',
 		icon: <FiMessageSquare size={18} />,
 	},
 	{
 		title: 'Composer Context',
-		description: 'Attach files, folders, URLs, tools, skills, and web search to the current message.',
+		description: 'Add files, Workspaces, tools, Skills, connected services, and web search to the current message.',
 		to: '/docs/?doc=composer-context',
 		icon: <FiLayers size={18} />,
 	},

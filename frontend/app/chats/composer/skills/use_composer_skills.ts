@@ -67,11 +67,11 @@ interface UseComposerSkillsResult {
 }
 
 function workspaceRefKey(workspace?: WorkspaceRef): string {
-	return workspace ? `${workspace.rootID}:${workspace.collectionID}` : '';
+	return workspace ? `${workspace.rootID}:${workspace.artifactID}` : '';
 }
 
 function workspaceRefsEqual(left?: WorkspaceRef, right?: WorkspaceRef): boolean {
-	return left?.rootID === right?.rootID && left?.collectionID === right?.collectionID;
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 function stringSetsEqual(left: ReadonlySet<string>, right: ReadonlySet<string>): boolean {

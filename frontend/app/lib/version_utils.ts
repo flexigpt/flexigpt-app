@@ -135,20 +135,6 @@ export function isSemverVersion(v: string): boolean {
 	return parseSemver(v) !== null;
 }
 
-export function compareVersionStrings(left: string, right: string): number {
-	const leftSemver = parseSemver(left);
-	const rightSemver = parseSemver(right);
-
-	if (leftSemver && rightSemver) {
-		return compareSemver(leftSemver, rightSemver);
-	}
-
-	return left.localeCompare(right, undefined, {
-		numeric: true,
-		sensitivity: 'base',
-	});
-}
-
 /**
  * If `current` is semver-like (`v1.2.3`, `1.2.3`, `1.2.3-alpha`, `1.2.3+build`),
  * returns the next stable minor (`v1.3.0` / `1.3.0`).
