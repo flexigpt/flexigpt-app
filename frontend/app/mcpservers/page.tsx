@@ -872,7 +872,7 @@ export default function MCPServersPage() {
 				/>
 
 				<ManagementPageContent width="wide">
-					{isInitialLoading ? <Loader text="Loading MCP bundle index..." /> : null}
+					{isInitialLoading ? <Loader text="Loading MCP Bundles..." /> : null}
 
 					{pageLoadError ? (
 						<ManagementResourceError

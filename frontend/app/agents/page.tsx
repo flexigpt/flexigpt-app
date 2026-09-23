@@ -715,7 +715,6 @@ export default function AgentsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
-								disabled={pageData.importDestinations.length === 0}
 								onClick={() => {
 									setIsCreateCollectionOpen(true);
 								}}

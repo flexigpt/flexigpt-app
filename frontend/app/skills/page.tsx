@@ -590,7 +590,7 @@ export default function SkillsPage() {
 	);
 
 	if (isLoading && !hasResolved && bundles.length === 0) {
-		return <Loader text="Loading skill bundles…" />;
+		return <Loader text="Loading skill Bundles…" />;
 	}
 
 	return (
