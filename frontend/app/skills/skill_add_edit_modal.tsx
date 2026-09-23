@@ -282,7 +282,7 @@ function AddEditSkillModalContent({
 	const isViewMode = effectiveMode === 'view';
 	const isEditMode = effectiveMode === 'edit';
 	const isAddMode = effectiveMode === 'add';
-
+	const shouldLoadManagedDocument = Boolean(initialData?.skill.isManaged) && (isEditMode || isViewMode);
 	const [creationMode, setCreationMode] = useState<'create' | 'register'>('create');
 	const isRegisteringFolder = isAddMode && creationMode === 'register';
 
@@ -318,7 +318,7 @@ function AddEditSkillModalContent({
 	);
 	const [scaffoldCopied, setScaffoldCopied] = useState(false);
 	const [locationCopied, setLocationCopied] = useState(false);
-	const [documentLoading, setDocumentLoading] = useState(isEditMode);
+	const [documentLoading, setDocumentLoading] = useState(shouldLoadManagedDocument);
 	const [documentLoaded, setDocumentLoaded] = useState(false);
 
 	const isEditDocumentReady = !isEditMode || (documentLoaded && !documentLoading);
@@ -467,7 +467,7 @@ function AddEditSkillModalContent({
 	}, [isAddMode]);
 
 	useEffect(() => {
-		if (!isEditMode || !initialData) {
+		if (!shouldLoadManagedDocument || !initialData) {
 			return;
 		}
 
@@ -508,7 +508,7 @@ function AddEditSkillModalContent({
 		return () => {
 			cancelled = true;
 		};
-	}, [initialData, isEditMode]);
+	}, [initialData, shouldLoadManagedDocument]);
 
 	const prefillCandidates = prefillSkills ?? existingSkills;
 	const copyableSkills = useMemo(

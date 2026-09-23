@@ -12,6 +12,14 @@ application:
     artifactStoreStagingDirectory: "staging"
     artifactStoreManifestTemporaryName: "store.json.tmp-"
 
+  userRoot:
+    id: "0192c4c0-0000-7000-8000-000000000002"
+    storageKey: "user-artifacts"
+    displayName: "User Artifacts"
+    description: "Retained mutable application Artifact namespace."
+    protected: false
+    retained: true
+
 builtin:
   root:
     id: "0192c4c0-0000-7000-8000-000000000001"

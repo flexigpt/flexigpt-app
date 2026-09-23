@@ -296,7 +296,7 @@ export function SkillBundleCard({
 							<FiEye size={16} />
 							<span>Details</span>
 						</button>
-						{bundle.isEditable ? (
+						{bundle.isEditable && !bundle.isBaseline ? (
 							<>
 								<button
 									type="button"
@@ -330,6 +330,7 @@ export function SkillBundleCard({
 								</button>
 							</>
 						) : null}
+
 						{bundle.isDeletable ? (
 							<button
 								type="button"

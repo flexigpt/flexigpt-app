@@ -49,44 +49,54 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 	useEffect(() => {
 		let cancelled = false;
 
-		void agentStoreAPI
-			.resolveAgent(agentRef)
-			.then(value => {
+		const resolveFallback = async () => {
+			if (cancelled) {
+				return;
+			}
+			try {
+				const value = await agentStoreAPI.resolveAgent(agentRef);
 				if (!cancelled) {
 					setResolution(value);
 				}
-			})
-			.catch((error: unknown) => {
+			} catch (error) {
 				if (!cancelled) {
 					setResolutionError(getErrorMessage(error, 'Agent declarations could not be resolved.'));
 				}
-			});
-
-		return () => {
-			cancelled = true;
+			}
 		};
-	}, [agentRef]);
 
-	useEffect(() => {
-		let cancelled = false;
-
-		void agentStoreAPI
-			.exportAgent(agentRef)
-			.then(value => {
-				if (!cancelled) {
-					setExportResult(value);
+		void (async () => {
+			try {
+				const value = await agentStoreAPI.exportAgent(agentRef);
+				if (cancelled) {
+					return;
 				}
-			})
-			.catch((error: unknown) => {
+
+				setExportResult(value);
+				if (value.resolution) {
+					setResolution({
+						agent,
+						capabilities: value.resolution,
+					});
+					return;
+				}
+
+				if (value.resolutionIssue) {
+					setResolutionError(value.resolutionIssue.message);
+				}
+				await resolveFallback();
+			} catch (error) {
 				if (!cancelled) {
 					setExportError(getErrorMessage(error, 'Managed Agent YAML could not be loaded.'));
 				}
-			});
+				await resolveFallback();
+			}
+		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [agentRef]);
+	}, [agent, agentRef]);
 
 	const saveYAML = async () => {
 		if (!exportResult || isSavingYAML) {

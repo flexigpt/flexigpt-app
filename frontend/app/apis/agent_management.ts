@@ -244,6 +244,8 @@ function availabilityIssueForOccurrence(occurrence: CapabilityOccurrence): Agent
 }
 
 export class AgentManagementAPI {
+	private readonly collectionAgentLoads = new Map<string, Promise<AgentView[]>>();
+
 	constructor(
 		private readonly agents: IAgentStoreAPI,
 		private readonly tools: IToolStoreAPI,
@@ -311,11 +313,25 @@ export class AgentManagementAPI {
 		collection: CollectionView,
 		signal: AbortSignal
 	): Promise<Pick<AgentCollectionData, 'agents' | 'agentsLoaded' | 'agentLoadError'>> {
-		try {
-			const agents = await this.agents.listAgents({
+		const key = agentCollectionKey(collection);
+		let load = this.collectionAgentLoads.get(key);
+		if (!load) {
+			load = this.agents.listAgents({
 				rootID: collection.artifact.rootID,
 				collection: agentCollectionRef(collection),
 			});
+			this.collectionAgentLoads.set(key, load);
+
+			const clear = () => {
+				if (this.collectionAgentLoads.get(key) === load) {
+					this.collectionAgentLoads.delete(key);
+				}
+			};
+			void load.then(clear, clear);
+		}
+
+		try {
+			const agents = await load;
 			throwIfAborted(signal);
 
 			return {

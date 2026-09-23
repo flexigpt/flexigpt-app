@@ -64,7 +64,8 @@ type builtinSourceWire struct {
 
 type builtinTopologyWire struct {
 	Application struct {
-		Storage map[string]string `json:"storage"`
+		Storage  map[string]string `json:"storage"`
+		UserRoot builtinRootWire   `json:"userRoot"`
 	} `json:"application"`
 
 	Builtin struct {
@@ -80,8 +81,11 @@ type builtinTopologyConfig struct {
 	sourceNameByRole     map[string]string
 	embeddedPackageRoots map[string]basespec.Locator
 	applicationStorage   map[ApplicationStorageKey]string
-	protected            bool
-	retained             bool
+
+	userRoot         root.RootDraft
+	userRootRetained bool
+	builtinProtected bool
+	builtinRetained  bool
 }
 
 var configuredBuiltinTopology = mustLoadBuiltinTopology(
@@ -97,6 +101,18 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 
 func BuiltinRootID() root.RootID {
 	return configuredBuiltinTopology.declaration.Root.ID
+}
+
+func UserRootDraft() root.RootDraft {
+	return configuredBuiltinTopology.userRoot
+}
+
+func UserRootID() root.RootID {
+	return configuredBuiltinTopology.userRoot.ID
+}
+
+func ManagementRootIDs() []root.RootID {
+	return []root.RootID{BuiltinRootID(), UserRootID()}
 }
 
 func BuiltinSource(
@@ -210,26 +226,36 @@ func ApplicationStorageNames() []string {
 }
 
 func ProtectedRootIDs() []root.RootID {
-	if !configuredBuiltinTopology.protected {
+	if !configuredBuiltinTopology.builtinProtected {
 		return nil
 	}
 	return []root.RootID{BuiltinRootID()}
 }
 
 func RetainedRootDrafts() []root.RootDraft {
-	if !configuredBuiltinTopology.retained {
-		return nil
+	output := make([]root.RootDraft, 0, 2)
+	if configuredBuiltinTopology.builtinRetained {
+		output = append(
+			output,
+			configuredBuiltinTopology.declaration.Root,
+		)
 	}
-	return []root.RootDraft{
-		configuredBuiltinTopology.declaration.Root,
+	if configuredBuiltinTopology.userRootRetained {
+		output = append(
+			output,
+			configuredBuiltinTopology.userRoot,
+		)
 	}
+	return output
 }
 
 func RetainedRootIDs() []root.RootID {
-	if !configuredBuiltinTopology.retained {
-		return nil
+	drafts := RetainedRootDrafts()
+	output := make([]root.RootID, 0, len(drafts))
+	for _, draft := range drafts {
+		output = append(output, draft.ID)
 	}
-	return []root.RootID{BuiltinRootID()}
+	return output
 }
 
 func ValidateApplicationTopology() error {
@@ -270,6 +296,31 @@ func loadBuiltinTopology(
 		basespec.MaxDefinitionBytes,
 	); err != nil {
 		return builtinTopologyConfig{}, err
+	}
+
+	userRoot := root.RootDraft{
+		ID:          wire.Application.UserRoot.ID,
+		StorageKey:  wire.Application.UserRoot.StorageKey,
+		DisplayName: wire.Application.UserRoot.DisplayName,
+		Description: wire.Application.UserRoot.Description,
+	}
+	if err := validateConfiguredRoot(
+		"application user Root",
+		userRoot,
+	); err != nil {
+		return builtinTopologyConfig{}, err
+	}
+	if wire.Application.UserRoot.Protected {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: application user Root cannot be protected",
+			basespec.ErrInvalid,
+		)
+	}
+	if !wire.Application.UserRoot.Retained {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: application user Root must be retained",
+			basespec.ErrInvalid,
+		)
 	}
 
 	storage, err := parseApplicationStorage(
@@ -387,10 +438,18 @@ func loadBuiltinTopology(
 	if err := declaration.Validate(); err != nil {
 		return builtinTopologyConfig{}, err
 	}
+	if userRoot.ID == declaration.Root.ID ||
+		userRoot.StorageKey == declaration.Root.StorageKey {
+		return builtinTopologyConfig{}, fmt.Errorf(
+			"%w: built-in and user Roots must have distinct identities and storage keys",
+			basespec.ErrConflict,
+		)
+	}
 	for _, sourceValue := range declaration.Sources {
-		if declaration.Root.ID == root.RootID(sourceValue.ID) {
+		if declaration.Root.ID == root.RootID(sourceValue.ID) ||
+			userRoot.ID == root.RootID(sourceValue.ID) {
 			return builtinTopologyConfig{}, fmt.Errorf(
-				"%w: built-in Root and Source IDs must differ",
+				"%w: application Root and Source IDs must differ",
 				basespec.ErrConflict,
 			)
 		}
@@ -447,9 +506,35 @@ func loadBuiltinTopology(
 		sourceNameByRole:     sourceNameByRole,
 		embeddedPackageRoots: embeddedRoots,
 		applicationStorage:   storage,
-		protected:            wire.Builtin.Root.Protected,
-		retained:             wire.Builtin.Root.Retained,
+		userRoot:             userRoot,
+		userRootRetained:     wire.Application.UserRoot.Retained,
+		builtinProtected:     wire.Builtin.Root.Protected,
+		builtinRetained:      wire.Builtin.Root.Retained,
 	}, nil
+}
+
+func validateConfiguredRoot(
+	label string,
+	value root.RootDraft,
+) error {
+	if err := value.ID.Validate(); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	if err := value.StorageKey.Validate(); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	if err := basespec.ValidateRequiredText(
+		label+" display name",
+		value.DisplayName,
+		basespec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	return basespec.ValidateOptionalText(
+		label+" description",
+		value.Description,
+		basespec.MaxDescriptionBytes,
+	)
 }
 
 func parseApplicationStorage(

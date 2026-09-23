@@ -35,7 +35,7 @@ import {
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
 
-const SKILL_BUNDLE_DATA_CACHE_TTL_MS = 60 * 60 * 1000;
+const SKILL_BUNDLE_DATA_CACHE_TTL_MS = 5 * 60 * 1000;
 
 interface SkillBundleDataCache {
 	data: BundleData[];
@@ -93,18 +93,11 @@ function buildSkillBundleData(
  * and in the conversation Workspace selector.
  */
 async function fetchSkillBundleData(): Promise<BundleData[]> {
-	const skillBundles = await skillManagementAPI.listSkillBundles(undefined, true);
+	const { skillBundles, skillListItems } = await skillManagementAPI.loadManagementPageData(true, true);
 	if (skillBundles.length === 0) {
 		return [];
 	}
 
-	// One request for all bundle IDs avoids relisting roots and bundles once
-	// for every bundle.
-	const skillListItems = await skillManagementAPI.listSkills(
-		skillBundles.map(bundle => bundle.id),
-		true,
-		true
-	);
 	return buildSkillBundleData(skillBundles, skillListItems);
 }
 
@@ -178,14 +171,44 @@ export default function SkillsPage() {
 	const [bundleToDelete, setBundleToDelete] = useState<SkillBundle | null>(null);
 	const [isDeletingBundle, setIsDeletingBundle] = useState(false);
 	const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+	const [creationRootID, setCreationRootID] = useState('');
 
 	const isMountedRef = useRef(false);
 	const bundleRefreshRequestIdRef = useRef<Record<string, number>>({});
 
-	const existingBundleSlugs = useMemo(() => bundles.map(bundleData => bundleData.bundle.slug), [bundles]);
-	const existingBundleNames = useMemo(
-		() => bundles.map(bundleData => (bundleData.bundle.displayName ?? bundleData.bundle.slug).trim()),
+	const creationRoots = useMemo(
+		() =>
+			[
+				...new Map(
+					bundles
+						.filter(bundleData => bundleData.bundle.isBaseline && !bundleData.bundle.isBuiltIn)
+						.map(
+							bundleData =>
+								[
+									bundleData.bundle.rootID,
+									{
+										rootID: bundleData.bundle.rootID,
+										label: bundleData.bundle.rootID,
+									},
+								] as const
+						)
+				).values(),
+			].toSorted((left, right) => left.label.localeCompare(right.label)),
 		[bundles]
+	);
+	const existingBundleSlugs = useMemo(
+		() =>
+			bundles
+				.filter(bundleData => bundleData.bundle.rootID === creationRootID)
+				.map(bundleData => bundleData.bundle.slug),
+		[bundles, creationRootID]
+	);
+	const existingBundleNames = useMemo(
+		() =>
+			bundles
+				.filter(bundleData => bundleData.bundle.rootID === creationRootID)
+				.map(bundleData => (bundleData.bundle.displayName ?? bundleData.bundle.slug).trim()),
+		[bundles, creationRootID]
 	);
 	const allSkills = useMemo(() => bundles.flatMap(bundleData => bundleData.skills), [bundles]);
 	const allSkillItems = useMemo<SkillItem[]>(
@@ -292,6 +315,14 @@ export default function SkillsPage() {
 			isMountedRef.current = false;
 		};
 	}, []);
+
+	useEffect(() => {
+		if (creationRoots.some(value => value.rootID === creationRootID)) {
+			return;
+		}
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-chain-state-updates
+		setCreationRootID(creationRoots[0]?.rootID ?? '');
+	}, [creationRootID, creationRoots]);
 
 	useEffect(() => {
 		if (hasResolved && !pageLoadError && !isLoading && !isRefreshing) {
@@ -546,8 +577,12 @@ export default function SkillsPage() {
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
+				if (!creationRootID) {
+					throw new Error('No user Skill baseline Root is available.');
+				}
+
 				const id = getUUIDv7();
-				await skillManagementAPI.putSkillBundle(id, slug, display, true, description);
+				await skillManagementAPI.putSkillBundle(id, creationRootID, slug, display, true, description);
 				try {
 					await reloadPageData();
 				} catch (refreshError) {
@@ -564,7 +599,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[reloadPageData]
+		[creationRootID, reloadPageData]
 	);
 
 	const handleEditBundle = useCallback(
@@ -600,16 +635,37 @@ export default function SkillsPage() {
 					title="Skills and Templates"
 					description="Manage instruction skills, user-message templates, arguments, resources, and runtime presence."
 					actions={
-						<button
-							type="button"
-							className="btn btn-ghost rounded-xl"
-							onClick={() => {
-								setIsAddModalOpen(true);
-							}}
-						>
-							<FiPlus size={18} />
-							<span>Add Bundle</span>
-						</button>
+						<>
+							{creationRoots.length > 1 ? (
+								<select
+									className="select select-sm max-w-72 rounded-xl font-mono"
+									aria-label="Skill Bundle Root"
+									value={creationRootID}
+									onChange={event => {
+										setCreationRootID(event.currentTarget.value);
+									}}
+								>
+									{creationRoots.map(value => (
+										<option key={value.rootID} value={value.rootID}>
+											{value.label}
+										</option>
+									))}
+								</select>
+							) : null}
+
+							<button
+								type="button"
+								className="btn btn-ghost rounded-xl"
+								disabled={!creationRootID}
+								title={!creationRootID ? 'No user Skill baseline Root is available.' : undefined}
+								onClick={() => {
+									setIsAddModalOpen(true);
+								}}
+							>
+								<FiPlus size={18} />
+								<span>Add Bundle</span>
+							</button>
+						</>
 					}
 				/>
 

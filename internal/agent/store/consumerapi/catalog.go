@@ -19,6 +19,11 @@ func agentBuiltinRootID() root.RootID {
 	return documentTopology.BuiltinRootID()
 }
 
+type agentSourceCacheKey struct {
+	rootID   root.RootID
+	sourceID source.SourceID
+}
+
 func (a *API) GetAgent(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -129,6 +134,9 @@ func (a *API) ListAgents(
 	}
 
 	seen := make(map[artifact.ArtifactRef]struct{}, len(records))
+	sourceCache := make(
+		map[agentSourceCacheKey]source.Summary,
+	)
 	output := make([]AgentView, 0, len(records))
 	for _, record := range records {
 		if !agentDomain.IsAgentKind(record.Kind) {
@@ -147,7 +155,11 @@ func (a *API) ListAgents(
 		}
 		seen[record.Ref()] = struct{}{}
 
-		view, err := a.agentView(ctx, record)
+		view, err := a.agentViewWithSourceCache(
+			ctx,
+			record,
+			sourceCache,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -281,6 +293,14 @@ func (a *API) agentView(
 	ctx context.Context,
 	record artifact.Artifact,
 ) (AgentView, error) {
+	return a.agentViewWithSourceCache(ctx, record, nil)
+}
+
+func (a *API) agentViewWithSourceCache(
+	ctx context.Context,
+	record artifact.Artifact,
+	sourceCache map[agentSourceCacheKey]source.Summary,
+) (AgentView, error) {
 	if !agentDomain.IsAgentKind(record.Kind) {
 		return AgentView{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
@@ -323,13 +343,23 @@ func (a *API) agentView(
 	}
 
 	view.Description = document.Description
-	sourceValue, err := a.sources.Get(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
-	if err != nil {
-		return AgentView{}, err
+	key := agentSourceCacheKey{
+		rootID:   record.RootID,
+		sourceID: record.Binding.SourceID,
+	}
+	sourceValue, found := sourceCache[key]
+	if !found {
+		sourceValue, err = a.sources.Get(
+			ctx,
+			record.RootID,
+			record.Binding.SourceID,
+		)
+		if err != nil {
+			return AgentView{}, err
+		}
+		if sourceCache != nil {
+			sourceCache[key] = sourceValue
+		}
 	}
 	if sourceValue.Kind != source.SourceKindManagedDirectory ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||

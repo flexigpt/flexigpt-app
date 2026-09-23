@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiDownload, FiEdit2, FiEye, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentView } from '@/spec/agent';
 import type { CollectionView } from '@/spec/collection';
 import { ArtifactState } from '@/spec/artifact';
 
+import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
@@ -50,6 +51,68 @@ import { PageFrame } from '@/components/page_frame';
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
 import { formatDateish, textToBase64 } from '@/agents/lib/agent_management_utils';
+
+const AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS = 5 * 60 * 1000;
+
+interface AgentManagementPageDataCache {
+	data: AgentManagementPageData;
+	loadedAt: number;
+}
+
+interface AgentManagementPageDataLoad {
+	generation: number;
+	promise: Promise<AgentManagementPageData>;
+}
+
+let agentManagementPageDataCache: AgentManagementPageDataCache | undefined;
+let agentManagementPageDataLoad: AgentManagementPageDataLoad | undefined;
+let agentManagementPageDataCacheGeneration = 0;
+
+function invalidateAgentManagementPageDataCache() {
+	agentManagementPageDataCacheGeneration += 1;
+	agentManagementPageDataCache = undefined;
+}
+
+function rememberAgentManagementPageData(data: AgentManagementPageData) {
+	agentManagementPageDataCacheGeneration += 1;
+	agentManagementPageDataCache = {
+		data,
+		loadedAt: Date.now(),
+	};
+}
+
+async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
+	throwIfAborted(signal);
+
+	const cached = agentManagementPageDataCache;
+	if (cached && Date.now() - cached.loadedAt <= AGENT_MANAGEMENT_PAGE_CACHE_TTL_MS) {
+		return cached.data;
+	}
+
+	const generation = agentManagementPageDataCacheGeneration;
+	let load = agentManagementPageDataLoad;
+	if (!load || load.generation !== generation) {
+		const promise = agentManagementAPI.loadManagementPageData(new AbortController().signal).then(data => {
+			if (agentManagementPageDataCacheGeneration === generation) {
+				agentManagementPageDataCache = { data, loadedAt: Date.now() };
+			}
+			return data;
+		});
+		load = { generation, promise };
+		agentManagementPageDataLoad = load;
+
+		const clear = () => {
+			if (agentManagementPageDataLoad?.promise === promise) {
+				agentManagementPageDataLoad = undefined;
+			}
+		};
+		void promise.then(clear, clear);
+	}
+
+	const data = await load.promise;
+	throwIfAborted(signal);
+	return data;
+}
 
 interface AgentCollectionCardProps {
 	data: AgentCollectionData;
@@ -437,27 +500,9 @@ function AgentCollectionEditModal({
 	);
 }
 
-function userAgentRootID(destinations: AgentImportDestination[]): string {
-	const rootIDs = new Set(
-		destinations
-			.filter(
-				destination => destination.baseline && destination.collection.editable && !destination.collection.deletable
-			)
-			.map(destination => destination.rootID)
-	);
-
-	if (rootIDs.size !== 1) {
-		throw new Error(
-			'The user Agent Root could not be identified. Expected exactly one editable baseline Agent Collection.'
-		);
-	}
-
-	return [...rootIDs][0];
-}
-
 // oxlint-disable-next-line no-restricted-exports
 export default function AgentsPage() {
-	const loadPageData = useCallback((signal: AbortSignal) => agentManagementAPI.loadManagementPageData(signal), []);
+	const loadPageData = useCallback((signal: AbortSignal) => loadAgentManagementPageData(signal), []);
 	const {
 		data: pageData,
 		error: pageLoadError,
@@ -467,7 +512,7 @@ export default function AgentsPage() {
 		reloadOrThrow,
 		setData: setPageData,
 	} = useAsyncResource(loadPageData, {
-		initialData: EMPTY_AGENT_MANAGEMENT_PAGE_DATA as AgentManagementPageData,
+		initialData: agentManagementPageDataCache?.data ?? (EMPTY_AGENT_MANAGEMENT_PAGE_DATA as AgentManagementPageData),
 	});
 
 	const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
@@ -481,9 +526,31 @@ export default function AgentsPage() {
 	const [isDeletingAgent, setIsDeletingAgent] = useState(false);
 	const [isDeletingCollection, setIsDeletingCollection] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
+	const [collectionCreationRootID, setCollectionCreationRootID] = useState('');
 
 	const mountedRef = useRef(false);
 	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
+
+	const collectionCreationRoots = useMemo(
+		() =>
+			[
+				...new Map(
+					pageData.importDestinations
+						.filter(destination => destination.baseline)
+						.map(
+							destination =>
+								[
+									destination.rootID,
+									{
+										rootID: destination.rootID,
+										label: destination.rootDisplayName || destination.rootID,
+									},
+								] as const
+						)
+				).values(),
+			].toSorted((left, right) => left.label.localeCompare(right.label)),
+		[pageData.importDestinations]
+	);
 
 	useEffect(() => {
 		mountedRef.current = true;
@@ -492,6 +559,26 @@ export default function AgentsPage() {
 			agentLoadRequestIDRef.current = {};
 		};
 	}, []);
+
+	useEffect(() => {
+		if (collectionCreationRoots.some(value => value.rootID === collectionCreationRootID)) {
+			return;
+		}
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-chain-state-updates
+		setCollectionCreationRootID(collectionCreationRoots[0]?.rootID ?? '');
+	}, [collectionCreationRootID, collectionCreationRoots]);
+
+	useEffect(() => {
+		if (
+			hasResolved &&
+			!pageLoadError &&
+			!isLoading &&
+			!isRefreshing &&
+			pageData.collections.every(value => !value.isLoadingAgents)
+		) {
+			rememberAgentManagementPageData(pageData);
+		}
+	}, [hasResolved, isLoading, isRefreshing, pageData, pageLoadError]);
 
 	const showAlert = (message: string) => {
 		setAlertMessage(message);
@@ -539,6 +626,7 @@ export default function AgentsPage() {
 
 	const refreshPage = useCallback(async () => {
 		try {
+			invalidateAgentManagementPageDataCache();
 			agentLoadRequestIDRef.current = {};
 			await reloadOrThrow();
 		} catch (error) {
@@ -576,10 +664,12 @@ export default function AgentsPage() {
 
 	const createCollection = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
-			const rootID = userAgentRootID(pageData.importDestinations);
+			if (!collectionCreationRootID) {
+				throw new Error('No user Agent baseline Root is available.');
+			}
 
 			await agentStoreAPI.createAgentCollection({
-				rootID,
+				rootID: collectionCreationRootID,
 				name: slug,
 				displayName,
 				description,
@@ -587,7 +677,7 @@ export default function AgentsPage() {
 
 			await refreshPage();
 		},
-		[pageData.importDestinations, refreshPage]
+		[collectionCreationRootID, refreshPage]
 	);
 
 	const updateCollection = useCallback(
@@ -699,6 +789,23 @@ export default function AgentsPage() {
 					description="Import immutable Agent JSON or YAML recipes, inspect their declarations, configure MCP dependencies, and use them as reusable conversation starters."
 					actions={
 						<>
+							{collectionCreationRoots.length > 1 ? (
+								<select
+									className="select select-sm max-w-72 rounded-xl"
+									aria-label="Agent Collection Root"
+									value={collectionCreationRootID}
+									onChange={event => {
+										setCollectionCreationRootID(event.currentTarget.value);
+									}}
+								>
+									{collectionCreationRoots.map(value => (
+										<option key={value.rootID} value={value.rootID}>
+											{value.label}
+										</option>
+									))}
+								</select>
+							) : null}
+
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
@@ -715,6 +822,8 @@ export default function AgentsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
+								disabled={!collectionCreationRootID}
+								title={!collectionCreationRootID ? 'No user Agent baseline Root is available.' : undefined}
 								onClick={() => {
 									setIsCreateCollectionOpen(true);
 								}}
@@ -769,8 +878,12 @@ export default function AgentsPage() {
 						setIsCreateCollectionOpen(false);
 					}}
 					onSubmit={createCollection}
-					existingSlugs={pageData.collections.map(data => data.collection.name)}
-					existingDisplayNames={pageData.collections.map(data => collectionDisplayName(data.collection))}
+					existingSlugs={pageData.collections
+						.filter(data => data.collection.artifact.rootID === collectionCreationRootID)
+						.map(data => data.collection.name)}
+					existingDisplayNames={pageData.collections
+						.filter(data => data.collection.artifact.rootID === collectionCreationRootID)
+						.map(data => collectionDisplayName(data.collection))}
 					failureMessage="Failed to create Agent Collection."
 				/>
 
