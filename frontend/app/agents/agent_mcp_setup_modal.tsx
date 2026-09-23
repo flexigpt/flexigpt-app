@@ -6,6 +6,8 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type { MCPSetupSubmissionValue, MCPStoreServerInstallationView } from '@/spec/mcp';
 import { MCPHTTPAuthMode, MCPInputKind } from '@/spec/mcp';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { mcpManagementAPI } from '@/apis/baseapi';
 
 import { ModalActions } from '@/components/modal/modal_actions';
@@ -14,7 +16,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { formatArtifactRef, getErrorMessage } from '@/agents/lib/agent_management';
+import { formatArtifactRef } from '@/agents/lib/agent_management_utils';
 
 interface AgentMCPSetupModalProps {
 	isOpen: boolean;

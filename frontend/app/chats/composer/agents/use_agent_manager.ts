@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { UIChatOption } from '@/spec/modelpreset';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import type { AgentCatalogOption, PreparedAgentStarter } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
@@ -34,14 +36,6 @@ export interface AgentManagerState {
 	selectAgent(agentRef: ArtifactRef): Promise<boolean>;
 	ensureDefaultAgent(): Promise<boolean>;
 	clearAgentTracking(): void;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-
-	return fallback;
 }
 
 function agentKey(ref: ArtifactRef): string {

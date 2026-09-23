@@ -2,6 +2,8 @@ import type { DialogHTMLAttributes, ReactNode } from 'react';
 import { useRef, useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -41,12 +43,6 @@ interface ModalConfirmDialogProps {
 	cancelButtonClassName?: string;
 	onCancel?: DialogHTMLAttributes<HTMLDialogElement>['onCancel'];
 	dialogProps?: NativeDialogProps;
-}
-
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error && error.message.trim()
-		? error.message
-		: 'The requested action could not be completed.';
 }
 
 function isPromiseLike(value: unknown): value is PromiseLike<void> {
@@ -154,7 +150,7 @@ function ModalConfirmDialogContent({
 						confirmingRef.current = false;
 						if (!unmountingRef.current) {
 							setIsConfirming(false);
-							setConfirmError(getErrorMessage(failure));
+							setConfirmError(getErrorMessage(failure, 'unexpected error'));
 						}
 					};
 

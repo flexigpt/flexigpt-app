@@ -13,6 +13,7 @@ import type { AuthKeyMeta } from '@/spec/setting';
 import { SDK_DISPLAY_NAME } from '@/spec/inference';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
@@ -58,13 +59,6 @@ interface ProviderPresetCardProps {
 	) => Promise<void>;
 	onDeleteModel: (provider: ProviderName, modelPresetID: ModelPresetID) => Promise<void>;
 	onProviderAuthKeyChanged: (provider: ProviderName) => Promise<void>;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return fallback;
 }
 
 export function ProviderPresetCard({

@@ -1,6 +1,6 @@
 type: agent
 name: base
-displayName: Base Assistant
+displayName: Base Agent
 description: Built-in default Agent with plain Markdown response formatting.
 labels:
   category: core

@@ -6,13 +6,12 @@ import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
+import { agentArtifactRef } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
 import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
-
-import { agentArtifactRef } from '@/agents/lib/agent_management';
 
 interface AgentRecipePreviewProps {
 	agent: AgentView;

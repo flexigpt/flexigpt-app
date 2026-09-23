@@ -24,6 +24,8 @@ import type {
 } from '@/spec/mcp';
 import { MCPAuthHealthState, MCPServerStatus } from '@/spec/mcp';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import { getMCPServerSetupStatus, isServerOperational, serverDisplayName } from '@/apis/mcp_management';
@@ -90,14 +92,6 @@ interface MCPServerEditorState {
 interface MCPSetupTarget {
 	server: MCPServerView;
 	connectAfterSave: boolean;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-
-	return fallback;
 }
 
 export function MCPBundleCard({

@@ -22,6 +22,7 @@ import {
 	MCPTransportType,
 } from '@/spec/mcp';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
 import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
@@ -48,16 +49,6 @@ type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources
 
 const MCP_CONNECTION_POLL_MS = 500;
 const MCP_CONNECTION_TIMEOUT_MS = 11 * 60 * 1000;
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim().length > 0) {
-		return error.message;
-	}
-	if (typeof error === 'string' && error.trim().length > 0) {
-		return error.trim();
-	}
-	return fallback;
-}
 
 interface NormalizedMCPDiscoveryList<T> {
 	items: T[];

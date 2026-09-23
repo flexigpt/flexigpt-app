@@ -4,6 +4,8 @@ import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiGitBranch, FiPlus, FiRefr
 import type { Skill, SkillBundle } from '@/spec/skill';
 import { SkillInsert, SkillPresenceStatus } from '@/spec/skill';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -88,10 +90,6 @@ function PresenceStatusBadge({ skill }: { skill: Skill }) {
 			{label}
 		</StatusBadge>
 	);
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	return error instanceof Error && error.message.trim() ? error.message : fallback;
 }
 
 export function SkillBundleCard({

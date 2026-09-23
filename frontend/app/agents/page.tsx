@@ -5,9 +5,23 @@ import type { AgentImportCommitResult, AgentImportDestination, AgentView } from 
 import type { CollectionView } from '@/spec/collection';
 import { ArtifactState } from '@/spec/artifact';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
+import type { AgentCollectionData, AgentManagementPageData } from '@/apis/agent_management';
+import {
+	agentArtifactRef,
+	agentCollectionKey,
+	agentCollectionRef,
+	agentDisplayName,
+	canDeleteAgentCollection,
+	canEditAgentCollectionMetadata,
+	collectionDisplayName,
+	EMPTY_AGENT_MANAGEMENT_PAGE_DATA,
+	isBuiltInAgentCollection,
+} from '@/apis/agent_management';
+import { agentManagementAPI, agentStoreAPI, backendAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -33,24 +47,9 @@ import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 import { PageFrame } from '@/components/page_frame';
 
-import type { AgentCollectionData, AgentManagementPageData } from '@/agents/lib/agent_management';
 import { AgentDetailsModal } from '@/agents/agent_details_modal';
 import { AgentImportModal } from '@/agents/agent_import_modal';
-import {
-	agentArtifactRef,
-	agentCollectionKey,
-	agentCollectionRef,
-	agentDisplayName,
-	canDeleteAgentCollection,
-	canEditAgentCollectionMetadata,
-	collectionDisplayName,
-	EMPTY_AGENT_MANAGEMENT_PAGE_DATA,
-	formatDateish,
-	getErrorMessage,
-	isBuiltInAgentCollection,
-	loadAgentManagementPageData,
-	textToBase64,
-} from '@/agents/lib/agent_management';
+import { formatDateish, textToBase64 } from '@/agents/lib/agent_management_utils';
 
 interface AgentCollectionCardProps {
 	data: AgentCollectionData;
@@ -430,7 +429,7 @@ function userAgentRootID(destinations: AgentImportDestination[]): string {
 
 // oxlint-disable-next-line no-restricted-exports
 export default function AgentsPage() {
-	const loadPageData = useCallback((signal: AbortSignal) => loadAgentManagementPageData(signal), []);
+	const loadPageData = useCallback((signal: AbortSignal) => agentManagementAPI.loadManagementPageData(signal), []);
 	const {
 		data: pageData,
 		error: pageLoadError,

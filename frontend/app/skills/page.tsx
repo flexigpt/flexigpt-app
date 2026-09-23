@@ -5,6 +5,7 @@ import type { SkillBundle } from '@/spec/skill';
 import { SkillInsert } from '@/spec/skill';
 
 import { throwIfAborted } from '@/lib/async_utils';
+import { getErrorMessage } from '@/lib/error_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
@@ -33,13 +34,6 @@ import {
 } from '@/skills/lib/skill_artifact_utils';
 import { sortBundleData } from '@/skills/lib/skill_bundle_utils';
 import { SkillBundleCard } from '@/skills/skill_bundle_card';
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return fallback;
-}
 
 const SKILL_BUNDLE_DATA_CACHE_TTL_MS = 60 * 60 * 1000;
 

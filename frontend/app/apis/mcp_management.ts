@@ -66,6 +66,7 @@ import {
 	MCPTrustLevel as MCPTrustLevelValue,
 } from '@/spec/mcp';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 
 import type {
@@ -104,13 +105,6 @@ function cloneJSON<T>(value: T): T {
 
 function artifactRefKey(value: ArtifactRef): string {
 	return `${value.rootID}:${value.artifactID}`;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return fallback;
 }
 
 function sameJSON(left: unknown, right: unknown): boolean {

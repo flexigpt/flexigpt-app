@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { MCPApprovalResolutionResult, MCPApprovalSummary } from '@/spec/mcp';
 import { MCPApprovalResolution } from '@/spec/mcp';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { mcpManagementAPI } from '@/apis/baseapi';
 
 export interface MCPApprovalRequest {
@@ -17,10 +19,6 @@ interface PendingMCPApprovalRequest {
 	request: MCPApprovalRequest;
 	resolve: (result: MCPApprovalResolutionResult) => void;
 	reject: (error: Error) => void;
-}
-
-function getErrorMessage(error: unknown): string {
-	return error instanceof Error && error.message.trim() ? error.message : 'Failed to resolve MCP approval.';
 }
 
 export function useMCPApproval() {
@@ -107,7 +105,7 @@ export function useMCPApproval() {
 				scheduleNextApproval();
 			} catch (error) {
 				if (activeApprovalRef.current === active) {
-					setApprovalError(getErrorMessage(error));
+					setApprovalError(getErrorMessage(error, 'failed to get MCP approval'));
 				}
 			} finally {
 				if (resolvingApprovalIDRef.current === active.request.approvalID) {

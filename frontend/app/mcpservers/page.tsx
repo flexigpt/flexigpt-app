@@ -15,6 +15,7 @@ import type {
 import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
+import { getErrorMessage } from '@/lib/error_utils';
 
 import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
 import { getAuthMode, requireMCPRuntimeServerID } from '@/apis/mcp_management';
@@ -60,14 +61,6 @@ function sleep(ms: number): Promise<void> {
 	return new Promise(resolve => {
 		window.setTimeout(resolve, ms);
 	});
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-
-	return fallback;
 }
 
 function getMatchingAuthHealth(server: MCPServerView, value: MCPAuthHealth | undefined): MCPAuthHealth | undefined {

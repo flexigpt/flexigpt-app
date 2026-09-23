@@ -9,6 +9,8 @@ import type {
 } from '@/spec/unified_diff';
 import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
 import { aggregateAPI } from '@/apis/baseapi';
 
 import type { HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
@@ -33,7 +35,6 @@ import {
 	buildFileStatusCounts,
 	buildUnifiedDiffTextForTarget,
 	filterDiffOwnedCandidatePaths,
-	getErrorMessage,
 	haveSharedPathIdentity,
 	isTerminalUnifiedDiffStatus,
 	parseUnifiedDiffForUI,
@@ -897,7 +898,7 @@ export function DiffApplyControl({
 				setControlState(previous => ({
 					...previous,
 					status: 'blocked',
-					error: getErrorMessage(error),
+					error: getErrorMessage(error, 'unexpected error'),
 				}));
 				return undefined;
 			}
@@ -1072,7 +1073,7 @@ export function DiffApplyControl({
 			setControlState(previous => ({
 				...previous,
 				status: 'blocked',
-				error: getErrorMessage(error),
+				error: getErrorMessage(error, 'unexpected error'),
 			}));
 		}
 	};

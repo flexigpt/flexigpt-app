@@ -5,6 +5,7 @@ import type { Tool, ToolBundle } from '@/spec/tool';
 import { ToolImplType } from '@/spec/tool';
 
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
+import { getErrorMessage } from '@/lib/error_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
@@ -28,13 +29,6 @@ interface BundleData {
 	tools: Tool[];
 	toolLoadError?: string;
 }
-
-const getErrorMessage = (err: unknown, fallback: string) => {
-	if (err instanceof Error && err.message.trim()) {
-		return err.message;
-	}
-	return fallback;
-};
 
 async function loadToolBundleData(signal: AbortSignal): Promise<BundleData[]> {
 	const toolBundles = await getAllToolBundles(undefined, true);

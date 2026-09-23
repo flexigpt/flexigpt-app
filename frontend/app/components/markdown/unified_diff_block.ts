@@ -1806,10 +1806,3 @@ export function getPathIdentity(value: string | undefined | null): string {
 		.replaceAll(/\/+/g, '/')
 		.replace(/^(?:\.\/)+/, '');
 }
-
-export function getErrorMessage(error: unknown): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return 'Unexpected error while checking or applying unified diff.';
-}

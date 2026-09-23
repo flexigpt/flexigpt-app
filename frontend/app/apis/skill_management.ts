@@ -43,6 +43,7 @@ import {
 } from '@/spec/skill';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
+import { getErrorMessage } from '@/lib/error_utils';
 
 import type {
 	IModelPresetStoreAPI,
@@ -58,13 +59,6 @@ function artifactRefKey(ref: ArtifactRef): string {
 
 function runtimeDefinitionKey(definition: RuntimeSkillDefinition): string {
 	return `${definition.type}\u0000${definition.name}\u0000${definition.location}`;
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return fallback;
 }
 
 function emptyResources(): Skill['resources'] {

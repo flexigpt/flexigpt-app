@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { FiAlertCircle, FiDownload, FiFileText, FiServer } from 'react-icons/fi';
 
 import type { AgentExportResult, AgentMCPSetupDescriptor, AgentResolution, AgentView } from '@/spec/agent';
-import { AgentImportRelationshipStatus } from '@/spec/agent';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
+import { agentArtifactRef, agentDisplayName } from '@/apis/agent_management';
 import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
 
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -16,29 +18,16 @@ import { ModalSection } from '@/components/modal/modal_section';
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
 import {
-	agentArtifactRef,
-	agentDisplayName,
 	formatArtifactRef,
 	formatDateish,
-	getErrorMessage,
+	getAgentRelationshipBadgeClass,
 	textToBase64,
-} from '@/agents/lib/agent_management';
+} from '@/agents/lib/agent_management_utils';
 
 interface AgentDetailsModalProps {
 	isOpen: boolean;
 	agent: AgentView | null;
 	onClose: () => void;
-}
-
-function getOccurrenceBadgeClass(status: string): string {
-	switch (status) {
-		case AgentImportRelationshipStatus.Available.toString():
-			return 'badge-success';
-		case AgentImportRelationshipStatus.Ambiguous.toString():
-			return 'badge-warning';
-		default:
-			return 'badge-error';
-	}
 }
 
 export function AgentDetailsModal({ isOpen, agent, onClose }: AgentDetailsModalProps) {
@@ -266,7 +255,7 @@ export function AgentDetailsModal({ isOpen, agent, onClose }: AgentDetailsModalP
 														{occurrence.type}
 														{occurrence.name ? `: ${occurrence.name}` : ''}
 													</span>
-													<span className={`badge badge-sm ${getOccurrenceBadgeClass(occurrence.status)}`}>
+													<span className={`badge badge-sm ${getAgentRelationshipBadgeClass(occurrence.status)}`}>
 														{occurrence.status}
 													</span>
 													{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}

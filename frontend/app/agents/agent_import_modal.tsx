@@ -7,8 +7,11 @@ import type {
 	AgentImportPreview,
 	AgentImportRelationship,
 } from '@/spec/agent';
-import { AgentImportIssueSeverity, AgentImportRelationshipStatus } from '@/spec/agent';
+import { AgentImportIssueSeverity } from '@/spec/agent';
 
+import { getErrorMessage } from '@/lib/error_utils';
+
+import { agentCollectionKey, collectionDisplayName } from '@/apis/agent_management';
 import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
@@ -18,13 +21,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import {
-	agentCollectionKey,
-	collectionDisplayName,
-	formatArtifactRef,
-	formatDateish,
-	getErrorMessage,
-} from '@/agents/lib/agent_management';
+import { formatArtifactRef, formatDateish, getAgentRelationshipBadgeClass } from '@/agents/lib/agent_management_utils';
 
 interface AgentImportModalProps {
 	isOpen: boolean;
@@ -44,17 +41,6 @@ function getIssueClass(severity: AgentImportIssueSeverity): string {
 			return 'alert-warning';
 		default:
 			return 'alert-info';
-	}
-}
-
-function getRelationshipBadgeClass(status: AgentImportRelationshipStatus): string {
-	switch (status) {
-		case AgentImportRelationshipStatus.Available:
-			return 'badge-success';
-		case AgentImportRelationshipStatus.Ambiguous:
-			return 'badge-warning';
-		default:
-			return 'badge-error';
 	}
 }
 
@@ -389,7 +375,7 @@ export function AgentImportModal({
 														<span className="font-medium">
 															{relationship.type}: {relationship.name}
 														</span>
-														<span className={`badge badge-sm ${getRelationshipBadgeClass(relationship.status)}`}>
+														<span className={`badge badge-sm ${getAgentRelationshipBadgeClass(relationship.status)}`}>
 															{relationship.status}
 														</span>
 													</div>

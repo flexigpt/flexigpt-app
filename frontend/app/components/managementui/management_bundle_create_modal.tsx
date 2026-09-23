@@ -2,6 +2,7 @@ import type { SubmitEventHandler } from 'react';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { validateSlug } from '@/lib/text_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
@@ -50,13 +51,6 @@ function normalizeBundleSlugInput(value: string): string {
 
 function normalizeIdentity(value: string): string {
 	return value.trim().toLowerCase();
-}
-
-function getErrorMessage(error: unknown, fallback: string): string {
-	if (error instanceof Error && error.message.trim()) {
-		return error.message;
-	}
-	return fallback;
 }
 
 function validateBundleForm(
