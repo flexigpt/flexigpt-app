@@ -1,6 +1,6 @@
 // oxlint-disable typescript/parameter-properties
 import type { AgentImportDestination, AgentResolution, AgentView } from '@/spec/agent';
-import type { ArtifactRef, ArtifactRootID, CapabilityOccurrence, MappedTarget } from '@/spec/artifact';
+import type { ArtifactRef, CapabilityOccurrence, MappedTarget } from '@/spec/artifact';
 import type { CollectionView } from '@/spec/collection';
 import type { MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
@@ -12,7 +12,7 @@ import { MCPToolExposure } from '@/spec/mcp';
 import { SkillInsert } from '@/spec/skill';
 import { ToolImplType } from '@/spec/tool';
 
-import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
+import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
@@ -20,11 +20,11 @@ import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolStoreAPI } from '@/apis
 
 type AgentStarterIssueSeverity = 'error' | 'warning';
 
-const COLLECTION_LOAD_CONCURRENCY = 4;
-
 export interface AgentCollectionData {
 	collection: CollectionView;
 	agents: AgentView[];
+	agentsLoaded: boolean;
+	isLoadingAgents: boolean;
 	importDestination?: AgentImportDestination;
 	agentLoadError?: string;
 }
@@ -253,40 +253,19 @@ export class AgentManagementAPI {
 	) {}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
-		const [allAgents, importDestinations] = await Promise.all([
-			this.agents.listAgentsForManagement(),
+		const [collectionValues, importDestinations] = await Promise.all([
+			this.agents.listAgentCollectionsForManagement(),
 			this.agents.listAgentImportDestinations(),
 		]);
 		throwIfAborted(signal);
 
-		const rootIDs = new Set<ArtifactRootID>();
-
-		for (const agent of allAgents) {
-			rootIDs.add(agent.artifact.rootID);
-		}
-
-		for (const destination of importDestinations) {
-			rootIDs.add(destination.rootID);
-			rootIDs.add(destination.collection.artifact.rootID);
-		}
-
-		const collectionLists = await mapWithConcurrency(
-			[...rootIDs],
-			COLLECTION_LOAD_CONCURRENCY,
-			rootID => this.agents.listAgentCollections(rootID),
-			signal
-		);
-		throwIfAborted(signal);
-
 		const collectionsByKey = new Map<string, CollectionView>();
 
-		for (const collection of collectionLists.flat()) {
+		for (const collection of collectionValues) {
 			collectionsByKey.set(agentCollectionKey(collection), collection);
 		}
-
 		for (const destination of importDestinations) {
 			const key = agentCollectionKey(destination.collection);
-
 			if (!collectionsByKey.has(key)) {
 				collectionsByKey.set(key, destination.collection);
 			}
@@ -296,38 +275,16 @@ export class AgentManagementAPI {
 			importDestinations.map(destination => [agentCollectionKey(destination.collection), destination] as const)
 		);
 
-		const collections = await mapWithConcurrency(
-			[...collectionsByKey.values()],
-			COLLECTION_LOAD_CONCURRENCY,
-			async collection => {
-				try {
-					const agents = await this.agents.listAgents({
-						rootID: collection.artifact.rootID,
-						collection: agentCollectionRef(collection),
-					});
-					throwIfAborted(signal);
-
-					return {
-						collection,
-						agents,
-						importDestination: destinationByCollectionKey.get(agentCollectionKey(collection)),
-					};
-				} catch (error) {
-					throwIfAborted(signal);
-
-					return {
-						collection,
-						agents: [],
-						importDestination: destinationByCollectionKey.get(agentCollectionKey(collection)),
-						agentLoadError: getErrorMessage(error, 'Agents could not be loaded for this Collection.'),
-					};
-				}
-			},
-			signal
-		);
-
 		return {
-			collections: collections.toSorted((left, right) => compareCollections(left.collection, right.collection)),
+			collections: [...collectionsByKey.values()]
+				.map(collection => ({
+					collection,
+					agents: [],
+					agentsLoaded: false,
+					isLoadingAgents: false,
+					importDestination: destinationByCollectionKey.get(agentCollectionKey(collection)),
+				}))
+				.toSorted((left, right) => compareCollections(left.collection, right.collection)),
 			importDestinations: [...importDestinations].toSorted((left, right) => {
 				const rootCompare = (left.rootDisplayName || left.rootID).localeCompare(
 					right.rootDisplayName || right.rootID,
@@ -348,6 +305,32 @@ export class AgentManagementAPI {
 				);
 			}),
 		};
+	}
+
+	async loadCollectionAgents(
+		collection: CollectionView,
+		signal: AbortSignal
+	): Promise<Pick<AgentCollectionData, 'agents' | 'agentsLoaded' | 'agentLoadError'>> {
+		try {
+			const agents = await this.agents.listAgents({
+				rootID: collection.artifact.rootID,
+				collection: agentCollectionRef(collection),
+			});
+			throwIfAborted(signal);
+
+			return {
+				agents,
+				agentsLoaded: true,
+			};
+		} catch (error) {
+			throwIfAborted(signal);
+
+			return {
+				agents: [],
+				agentsLoaded: false,
+				agentLoadError: getErrorMessage(error, 'Agents could not be loaded for this Collection.'),
+			};
+		}
 	}
 
 	async listAgentCatalogOptions(): Promise<AgentCatalogOption[]> {
@@ -398,6 +381,10 @@ export class AgentManagementAPI {
 
 	async prepareAgentStarter(agentRef: ArtifactRef): Promise<PreparedAgentStarter> {
 		const resolution = await this.agents.resolveAgent(agentRef);
+		return this.prepareAgentStarterFromResolution(resolution);
+	}
+
+	async prepareAgentStarterFromResolution(resolution: AgentResolution): Promise<PreparedAgentStarter> {
 		const issues: AgentStarterIssue[] = [];
 
 		const toolSelections = new Map<string, AgentPreparedToolSelection>();

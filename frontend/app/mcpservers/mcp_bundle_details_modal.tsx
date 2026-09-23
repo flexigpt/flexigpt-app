@@ -9,9 +9,16 @@ interface MCPBundleDetailsModalProps {
 	onClose: () => void;
 	bundle: MCPBundleView | null;
 	serverCount: number;
+	serversLoaded: boolean;
 }
 
-export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: MCPBundleDetailsModalProps) {
+export function MCPBundleDetailsModal({
+	isOpen,
+	onClose,
+	bundle,
+	serverCount,
+	serversLoaded,
+}: MCPBundleDetailsModalProps) {
 	if (!isOpen || !bundle) {
 		return null;
 	}
@@ -21,7 +28,9 @@ export function MCPBundleDetailsModal({ isOpen, onClose, bundle, serverCount }: 
 			isOpen={isOpen}
 			onClose={onClose}
 			title="MCP Bundle Details"
-			description={`${serverCount} configured server${serverCount === 1 ? '' : 's'}`}
+			description={
+				serversLoaded ? `${serverCount} configured server${serverCount === 1 ? '' : 's'}` : 'Server contents not loaded'
+			}
 			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.collection.artifact.revision}`}
 		>
 			<ManagementInfoGrid>

@@ -121,24 +121,33 @@ export class MCPAppPostMessageBridge {
 			try {
 				const resp = await this.onRequest(data);
 				this.post(resp);
-			} catch (err) {
+			} catch {
 				this.post({
 					jsonrpc: '2.0',
 					id: data.id,
 					error: {
 						code: -32603,
-						message: err instanceof Error ? err.message : 'Internal host error',
+						message: 'Internal host error',
 					},
 				});
 			}
 			return;
 		}
 		if (isJSONRPCNotification(data)) {
-			this.onNotification(data);
+			try {
+				this.onNotification(data);
+			} catch {
+				// A malformed or unexpected notification must not create an
+				// unhandled rejection in the window message listener.
+			}
 		}
 	}
 
 	private post(msg: JSONRPCMessage) {
+		if (this.disposed) {
+			return;
+		}
+
 		try {
 			this.iframe.contentWindow?.postMessage(msg, '*');
 		} catch {

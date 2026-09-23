@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiDownload, FiEdit2, FiEye, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentView } from '@/spec/agent';
@@ -53,7 +53,7 @@ import { formatDateish, textToBase64 } from '@/agents/lib/agent_management_utils
 
 interface AgentCollectionCardProps {
 	data: AgentCollectionData;
-	onRefresh: () => Promise<void>;
+	onLoadAgents: (collection: CollectionView) => Promise<void>;
 	onViewCollection: (collection: CollectionView) => void;
 	onEditCollection: (collection: CollectionView) => void;
 	onDeleteCollection: (collection: CollectionView) => void;
@@ -67,7 +67,7 @@ interface AgentCollectionCardProps {
 
 function AgentCollectionCard({
 	data,
-	onRefresh,
+	onLoadAgents,
 	onViewCollection,
 	onEditCollection,
 	onDeleteCollection,
@@ -81,6 +81,12 @@ function AgentCollectionCard({
 	const [isExpanded, setIsExpanded] = useState(false);
 	const collection = data.collection;
 	const builtIn = isBuiltInAgentCollection(collection);
+	const loadAgents = () => {
+		if (data.agentsLoaded || data.isLoadingAgents) {
+			return;
+		}
+		void onLoadAgents(collection);
+	};
 
 	return (
 		<ManagementBundleCard
@@ -106,10 +112,20 @@ function AgentCollectionCard({
 					className="btn btn-sm btn-ghost rounded-xl"
 					aria-expanded={isExpanded}
 					onClick={() => {
-						setIsExpanded(previous => !previous);
+						const next = !isExpanded;
+						setIsExpanded(next);
+						if (next) {
+							loadAgents();
+						}
 					}}
 				>
-					<span>Agents: {data.agents.length}</span>
+					<span>
+						{data.isLoadingAgents
+							? 'Loading Agents...'
+							: data.agentsLoaded
+								? `Agents: ${data.agents.length}`
+								: 'Agents: not loaded'}
+					</span>
 					{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 				</button>
 			}
@@ -167,7 +183,7 @@ function AgentCollectionCard({
 						<button
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
-							disabled={data.agents.length > 0 || Boolean(data.agentLoadError)}
+							disabled={!data.agentsLoaded || data.agents.length > 0 || Boolean(data.agentLoadError)}
 							onClick={() => {
 								onDeleteCollection(collection);
 							}}
@@ -189,7 +205,7 @@ function AgentCollectionCard({
 						type="button"
 						className="btn btn-sm rounded-xl"
 						onClick={() => {
-							void onRefresh();
+							void onLoadAgents(collection);
 						}}
 					>
 						Retry
@@ -199,80 +215,92 @@ function AgentCollectionCard({
 
 			{isExpanded ? (
 				<div className="mt-6 space-y-3">
-					{data.agents.map(agent => (
-						<ManagementItemCard
-							key={`${agent.artifact.rootID}:${agent.artifact.id}`}
-							title={agentDisplayName(agent)}
-							subtitle={`${agent.name} / ${agent.artifact.rootID}/${agent.artifact.id}`}
-							description={agent.description}
-							status={
-								<>
-									<StatusBadge tone={agent.artifact.enabled ? 'success' : 'neutral'}>
-										{agent.artifact.enabled ? 'Enabled' : 'Disabled'}
-									</StatusBadge>
-									{agent.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
-									{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
-								</>
-							}
-							metadata={
-								<>
-									<MetadataPill label="State">{agent.artifact.state}</MetadataPill>
-									<MetadataPill label="Revision">{agent.artifact.revision}</MetadataPill>
-								</>
-							}
-						>
-							<ActionRow
-								leading={
-									<EnabledControl
-										id={`agent-${agent.artifact.rootID}-${agent.artifact.id}`}
-										checked={agent.artifact.enabled}
-										onChange={() => {
-											void onToggleAgentEnabled(agent, !agent.artifact.enabled);
-										}}
-									/>
-								}
-							>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										onViewAgent(agent);
-									}}
+					{!data.agentsLoaded ? (
+						<ManagementEmptyState>
+							{data.isLoadingAgents
+								? 'Loading Agents in this Collection...'
+								: data.agentLoadError
+									? 'Agent contents are unavailable.'
+									: 'Expand this Collection to load its Agents.'}
+						</ManagementEmptyState>
+					) : null}
+
+					{data.agentsLoaded
+						? data.agents.map(agent => (
+								<ManagementItemCard
+									key={`${agent.artifact.rootID}:${agent.artifact.id}`}
+									title={agentDisplayName(agent)}
+									subtitle={`${agent.name} / ${agent.artifact.rootID}/${agent.artifact.id}`}
+									description={agent.description}
+									status={
+										<>
+											<StatusBadge tone={agent.artifact.enabled ? 'success' : 'neutral'}>
+												{agent.artifact.enabled ? 'Enabled' : 'Disabled'}
+											</StatusBadge>
+											{agent.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+											{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
+										</>
+									}
+									metadata={
+										<>
+											<MetadataPill label="State">{agent.artifact.state}</MetadataPill>
+											<MetadataPill label="Revision">{agent.artifact.revision}</MetadataPill>
+										</>
+									}
 								>
-									<FiEye size={15} />
-									<span>View</span>
-								</button>
-
-								{agent.artifact.state === ArtifactState.Available ? (
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											void onExportAgent(agent);
-										}}
+									<ActionRow
+										leading={
+											<EnabledControl
+												id={`agent-${agent.artifact.rootID}-${agent.artifact.id}`}
+												checked={agent.artifact.enabled}
+												onChange={() => {
+													void onToggleAgentEnabled(agent, !agent.artifact.enabled);
+												}}
+											/>
+										}
 									>
-										<FiDownload size={15} />
-										<span>Export</span>
-									</button>
-								) : null}
+										<button
+											type="button"
+											className="btn btn-sm btn-ghost rounded-xl"
+											onClick={() => {
+												onViewAgent(agent);
+											}}
+										>
+											<FiEye size={15} />
+											<span>View</span>
+										</button>
 
-								{agent.managed && !agent.builtIn ? (
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										onClick={() => {
-											onDeleteAgent(agent);
-										}}
-									>
-										<FiTrash2 size={15} />
-										<span>Delete</span>
-									</button>
-								) : null}
-							</ActionRow>
-						</ManagementItemCard>
-					))}
+										{agent.artifact.state === ArtifactState.Available ? (
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													void onExportAgent(agent);
+												}}
+											>
+												<FiDownload size={15} />
+												<span>Export</span>
+											</button>
+										) : null}
 
-					{data.agents.length === 0 ? (
+										{agent.managed && !agent.builtIn ? (
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												onClick={() => {
+													onDeleteAgent(agent);
+												}}
+											>
+												<FiTrash2 size={15} />
+												<span>Delete</span>
+											</button>
+										) : null}
+									</ActionRow>
+								</ManagementItemCard>
+							))
+						: null}
+
+					{data.agentsLoaded && data.agents.length === 0 ? (
 						<ManagementEmptyState>No currently available Agents in this Collection.</ManagementEmptyState>
 					) : null}
 				</div>
@@ -437,6 +465,7 @@ export default function AgentsPage() {
 		isRefreshing,
 		hasResolved,
 		reloadOrThrow,
+		setData: setPageData,
 	} = useAsyncResource(loadPageData, {
 		initialData: EMPTY_AGENT_MANAGEMENT_PAGE_DATA as AgentManagementPageData,
 	});
@@ -453,12 +482,64 @@ export default function AgentsPage() {
 	const [isDeletingCollection, setIsDeletingCollection] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
 
+	const mountedRef = useRef(false);
+	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
+
+	useEffect(() => {
+		mountedRef.current = true;
+		return () => {
+			mountedRef.current = false;
+			agentLoadRequestIDRef.current = {};
+		};
+	}, []);
+
 	const showAlert = (message: string) => {
 		setAlertMessage(message);
 	};
 
+	const loadCollectionAgents = useCallback(
+		async (collection: CollectionView) => {
+			const key = agentCollectionKey(collection);
+			const requestID = (agentLoadRequestIDRef.current[key] ?? 0) + 1;
+			agentLoadRequestIDRef.current[key] = requestID;
+
+			setPageData(previous => ({
+				...previous,
+				collections: previous.collections.map(value =>
+					agentCollectionKey(value.collection) === key
+						? {
+								...value,
+								isLoadingAgents: true,
+								agentLoadError: undefined,
+							}
+						: value
+				),
+			}));
+
+			const result = await agentManagementAPI.loadCollectionAgents(collection, new AbortController().signal);
+			if (!mountedRef.current || agentLoadRequestIDRef.current[key] !== requestID) {
+				return;
+			}
+
+			setPageData(previous => ({
+				...previous,
+				collections: previous.collections.map(value =>
+					agentCollectionKey(value.collection) === key
+						? {
+								...value,
+								...result,
+								isLoadingAgents: false,
+							}
+						: value
+				),
+			}));
+		},
+		[setPageData]
+	);
+
 	const refreshPage = useCallback(async () => {
 		try {
+			agentLoadRequestIDRef.current = {};
 			await reloadOrThrow();
 		} catch (error) {
 			showAlert(getErrorMessage(error, 'Agent management data could not be refreshed.'));
@@ -556,7 +637,7 @@ export default function AgentsPage() {
 			return;
 		}
 
-		if (collectionData?.agentLoadError || (collectionData?.agents.length ?? 0) > 0) {
+		if (!collectionData?.agentsLoaded || collectionData.agentLoadError || collectionData.agents.length > 0) {
 			showAlert('Reload and remove all currently available Agents before deleting this Collection.');
 			setCollectionToDelete(null);
 			return;
@@ -664,7 +745,7 @@ export default function AgentsPage() {
 						<AgentCollectionCard
 							key={agentCollectionKey(data.collection)}
 							data={data}
-							onRefresh={refreshPage}
+							onLoadAgents={loadCollectionAgents}
 							onViewCollection={setCollectionToView}
 							onEditCollection={setCollectionToEdit}
 							onDeleteCollection={setCollectionToDelete}

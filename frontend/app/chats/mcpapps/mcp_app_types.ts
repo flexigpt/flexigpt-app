@@ -43,33 +43,59 @@ export const JSONRPC_ERR_METHOD_NOT_FOUND = -32601;
 export const JSONRPC_ERR_INVALID_PARAMS = -32602;
 export const JSONRPC_ERR_BLOCKED_BY_POLICY = -32001;
 
-export function isJSONRPCResponse(value: unknown): value is JSONRPCResponse {
-	if (!value || typeof value !== 'object') {
-		return false;
-	}
-	const m = value as Partial<JSONRPCResponse> & { method?: unknown };
+function isJSONRPCObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isJSONRPCID(value: unknown): value is number | string {
+	return typeof value === 'string' || (typeof value === 'number' && Number.isFinite(value));
+}
+
+function isJSONRPCError(value: unknown): value is NonNullable<JSONRPCResponse['error']> {
 	return (
-		m.jsonrpc === '2.0' &&
-		(typeof m.id === 'number' || typeof m.id === 'string') &&
-		!('method' in m) &&
-		('result' in m || 'error' in m)
+		isJSONRPCObject(value) &&
+		typeof value.code === 'number' &&
+		Number.isInteger(value.code) &&
+		typeof value.message === 'string'
 	);
 }
 
-export function isJSONRPCRequest(value: unknown): value is JSONRPCRequest {
-	if (!value || typeof value !== 'object') {
+function hasOwn(value: object, key: PropertyKey): boolean {
+	return Object.hasOwn(value, key);
+}
+
+export function isJSONRPCResponse(value: unknown): value is JSONRPCResponse {
+	if (
+		!isJSONRPCObject(value) ||
+		value.jsonrpc !== '2.0' ||
+		!hasOwn(value, 'id') ||
+		!isJSONRPCID(value.id) ||
+		hasOwn(value, 'method')
+	) {
 		return false;
 	}
-	const m = value as Partial<JSONRPCRequest>;
-	return m.jsonrpc === '2.0' && (typeof m.id === 'number' || typeof m.id === 'string') && typeof m.method === 'string';
+
+	const hasResult = hasOwn(value, 'result');
+	const hasError = hasOwn(value, 'error');
+	if (hasResult === hasError) {
+		return false;
+	}
+
+	return !hasError || isJSONRPCError(value.error);
+}
+
+export function isJSONRPCRequest(value: unknown): value is JSONRPCRequest {
+	return (
+		isJSONRPCObject(value) &&
+		value.jsonrpc === '2.0' &&
+		hasOwn(value, 'id') &&
+		isJSONRPCID(value.id) &&
+		typeof value.method === 'string'
+	);
 }
 
 export function isJSONRPCNotification(value: unknown): value is JSONRPCNotification {
-	if (!value || typeof value !== 'object') {
-		return false;
-	}
-	const m = value as Partial<JSONRPCNotification>;
-	return m.jsonrpc === '2.0' && typeof m.method === 'string' && !('id' in m);
+	return isJSONRPCObject(value) && value.jsonrpc === '2.0' && typeof value.method === 'string' && !hasOwn(value, 'id');
 }
 
 /** Build an instance from a tool output that has app render info. */

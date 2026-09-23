@@ -1,12 +1,11 @@
 import { useCallback } from 'react';
 import { FiAlertCircle, FiCheck, FiServer, FiTool, FiZap } from 'react-icons/fi';
 
-import type { AgentView } from '@/spec/agent';
+import type { AgentResolution } from '@/spec/agent';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import { agentArtifactRef } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
 import { ManagementItemCard } from '@/components/managementui/management_item_card';
@@ -14,15 +13,18 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
 interface AgentRecipePreviewProps {
-	agent: AgentView;
+	resolution: AgentResolution | null;
 }
 
-export function AgentRecipePreview({ agent }: AgentRecipePreviewProps) {
+export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 	const loadRecipe = useCallback(
 		async (_signal: AbortSignal) => {
-			return agentManagementAPI.prepareAgentStarter(agentArtifactRef(agent));
+			if (!resolution) {
+				return null;
+			}
+			return agentManagementAPI.prepareAgentStarterFromResolution(resolution);
 		},
-		[agent]
+		[resolution]
 	);
 
 	const {
@@ -32,6 +34,12 @@ export function AgentRecipePreview({ agent }: AgentRecipePreviewProps) {
 	} = useAsyncResource(loadRecipe, {
 		initialData: null,
 	});
+
+	if (!resolution) {
+		return (
+			<div className="text-base-content/70 text-sm">Resolve the Agent declarations before preparing the recipe.</div>
+		);
+	}
 
 	if (isLoading && !recipe) {
 		return <div className="text-base-content/70 text-sm">Preparing Composer starter recipe...</div>;

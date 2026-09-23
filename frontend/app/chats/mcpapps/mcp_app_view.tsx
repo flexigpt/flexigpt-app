@@ -168,6 +168,13 @@ function formatApprovalPreview(value: unknown): string {
 	}
 }
 
+function formatModelContextUpdatePreview(update: MCPAppModelContextUpdatePayload): string {
+	return formatApprovalPreview({
+		...(update.content === undefined ? {} : { content: update.content }),
+		...(update.structuredContent === undefined ? {} : { structuredContent: update.structuredContent }),
+	});
+}
+
 function disposeMCPAppBridge(bridge: MCPAppPostMessageBridge, resourceUri: string, reason: string): void {
 	try {
 		void bridge.sendRequest('ui/resource-teardown', { resourceUri, reason }, 500).catch(() => undefined);
@@ -187,6 +194,7 @@ function getMCPAppViewKey(instance: MCPAppInstance): string {
 		instance.resourceUri,
 		instance.toolName,
 		instance.toolUseID,
+		instance.callID,
 	]);
 }
 
@@ -259,6 +267,7 @@ export function MCPAppView(props: MCPAppViewProps) {
 }
 
 function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_APP_HEIGHT }: MCPAppViewProps) {
+	const [routerInstance] = useState(() => instance);
 	const [loadedResource, setLoadedResource] = useState<LoadedMCPAppResource | null>(null);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [pendingURL, setPendingURL] = useState<string | null>(null);
@@ -387,12 +396,12 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				return false;
 			}
 
+			if (approvalResolverRef.current) {
+				return false;
+			}
 			const safeURL = normalizeSafeExternalURL(url);
 			if (!safeURL) {
 				setBlockedLink({ url, reason: 'unsafe' });
-				return false;
-			}
-			if (approvalResolverRef.current) {
 				return false;
 			}
 			if (!effectiveAppsPolicy.requireApprovalForOpenLink) {
@@ -437,11 +446,13 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		() =>
 			// oxlint-disable-next-line react/refs
 			new MCPAppRPCRouter({
-				instance,
+				instance: routerInstance,
+				allowAppInitiatedToolCalls: effectiveAppsPolicy.enabled && effectiveAppsPolicy.allowAppInitiatedToolCalls,
+				isActive: () => mountedRef.current,
 				requestOpenLinkApproval,
 				requestMCPApproval: mcpApproval.requestMCPApproval,
 				requestUIMessageApproval: async message => {
-					if (approvalResolverRef.current) {
+					if (!mountedRef.current || approvalResolverRef.current) {
 						return false;
 					}
 					return await new Promise<boolean>(resolve => {
@@ -450,9 +461,12 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 					});
 				},
 				onUIMessage: message => {
-					dispatchMCPAppUIMessage(instance, message);
+					dispatchMCPAppUIMessage(routerInstance, message);
 				},
 				requestModelContextUpdateApproval: async update => {
+					if (!mountedRef.current) {
+						return false;
+					}
 					if (!effectiveAppsPolicy.requireApprovalForContextUpdates) {
 						return true;
 					}
@@ -466,15 +480,16 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 					});
 				},
 				onModelContextUpdate: update => {
-					dispatchMCPAppModelContextUpdate(instance, update);
+					dispatchMCPAppModelContextUpdate(routerInstance, update);
 				},
-				onAppLog: () => {},
 			}),
 		[
+			effectiveAppsPolicy.allowAppInitiatedToolCalls,
+			effectiveAppsPolicy.enabled,
 			effectiveAppsPolicy.requireApprovalForContextUpdates,
-			instance,
 			mcpApproval.requestMCPApproval,
 			requestOpenLinkApproval,
+			routerInstance,
 		]
 	);
 
@@ -712,17 +727,15 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 						return;
 					}
 
-					void (async () => {
-						try {
-							backendAPI.openURL(url);
-							resolver(true);
-						} catch {
-							if (mountedRef.current) {
-								setBlockedLink({ url, reason: 'open-failed' });
-							}
-							resolver(false);
+					try {
+						backendAPI.openURL(url);
+						resolver(true);
+					} catch {
+						if (mountedRef.current) {
+							setBlockedLink({ url, reason: 'open-failed' });
 						}
-					})();
+						resolver(false);
+					}
 				}}
 				onClose={() => {
 					const resolver = approvalResolverRef.current;
@@ -754,7 +767,7 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 				isOpen={pendingContextUpdate !== null}
 				title="Allow MCP App model context?"
 				message={`The MCP App for ${serverLabel} wants to add this context to the next model request:\n\n${
-					pendingContextUpdate ? formatApprovalPreview(pendingContextUpdate) : ''
+					pendingContextUpdate ? formatModelContextUpdatePreview(pendingContextUpdate) : ''
 				}`}
 				confirmButtonText="Allow"
 				onConfirm={() => {

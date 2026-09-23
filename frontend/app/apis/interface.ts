@@ -244,6 +244,8 @@ export interface IAgentStoreAPI {
 
 	listAgentCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;
 
+	listAgentCollectionsForManagement(): Promise<CollectionView[]>;
+
 	updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
 
 	setAgentCollectionEnabled(

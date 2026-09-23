@@ -24,6 +24,8 @@ export function ListAgentCollectionMembers(arg1:artifact.ArtifactRef):Promise<co
 
 export function ListAgentCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
 
+export function ListAgentCollectionsForManagement():Promise<Array<collection.CollectionView>>;
+
 export function ListAgentImportDestinations():Promise<Array<consumerapi.AgentImportDestination>>;
 
 export function ListAgents(arg1:consumerapi.ListAgentsRequest):Promise<Array<consumerapi.AgentView>>;

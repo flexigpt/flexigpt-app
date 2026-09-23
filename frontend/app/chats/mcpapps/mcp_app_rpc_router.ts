@@ -72,6 +72,9 @@ function normalizeToolCallResultForApp(resp: InvokeMCPToolResponseBody | undefin
 
 export interface MCPAppRouterDeps {
 	instance: MCPAppInstance;
+	allowAppInitiatedToolCalls: boolean;
+	/** Returns false after the owning App view has been torn down. */
+	isActive?: () => boolean;
 	/** Returns true if the user approves opening this URL. */
 	requestOpenLinkApproval: (url: string) => Promise<boolean>;
 	requestMCPApproval?: (request: MCPApprovalRequest) => Promise<MCPApprovalResolutionResult>;
@@ -79,8 +82,6 @@ export interface MCPAppRouterDeps {
 	onUIMessage?: (message: MCPAppUIMessage) => void;
 	requestModelContextUpdateApproval?: (update: MCPAppModelContextUpdatePayload) => Promise<boolean>;
 	onModelContextUpdate?: (update: MCPAppModelContextUpdatePayload) => void;
-	/** Routes a "log" notification from the app for the diagnostics surface. */
-	onAppLog?: (level: string, data: unknown) => void;
 }
 
 /**
@@ -90,34 +91,41 @@ export interface MCPAppRouterDeps {
  *   - tools/call        (forwarded to backend with source="app")
  *   - resources/read    (same server only)
  *   - ui/open-link      (with user approval)
+ *   - ui/message        (with user approval)
+ *   - ui/update-model-context
+ *   - ui/request-display-mode
  *
  * Everything else returns method-not-found. The backend is the final
  * authority on policy decisions; this router is just a guard rail.
  */
 export class MCPAppRPCRouter {
 	private readonly deps: MCPAppRouterDeps;
-	private toolCallQueue: Promise<void> = Promise.resolve();
+	private interactiveRequestQueue: Promise<void> = Promise.resolve();
 
 	constructor(deps: MCPAppRouterDeps) {
 		this.deps = deps;
 	}
 
 	async handle(req: JSONRPCRequest): Promise<JSONRPCResponse> {
+		if (!this.isActive()) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
+		}
+
 		switch (req.method) {
 			case 'ping':
 				return { jsonrpc: '2.0', id: req.id, result: {} };
 			case 'tools/call':
-				return this.enqueueToolCall(req);
+				return this.enqueueInteractiveRequest(req, () => this.handleToolCall(req));
 			case 'resources/read':
 				return this.handleResourceRead(req);
 			case 'ui/open-link':
-				return this.handleOpenLink(req);
+				return this.enqueueInteractiveRequest(req, () => this.handleOpenLink(req));
 			case 'ui/request-display-mode':
 				return this.handleDisplayMode(req);
 			case 'ui/message':
-				return this.handleUIMessage(req);
+				return this.enqueueInteractiveRequest(req, () => this.handleUIMessage(req));
 			case 'ui/update-model-context':
-				return this.handleUpdateModelContext(req);
+				return this.enqueueInteractiveRequest(req, () => this.handleUpdateModelContext(req));
 
 			default:
 				return {
@@ -128,16 +136,27 @@ export class MCPAppRPCRouter {
 		}
 	}
 
-	private enqueueToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
-		const run = this.toolCallQueue.then(
-			() => this.handleToolCall(req),
-			() => this.handleToolCall(req)
-		);
-		this.toolCallQueue = run.then(
+	private isActive(): boolean {
+		return this.deps.isActive?.() ?? true;
+	}
+
+	private enqueueInteractiveRequest(
+		req: JSONRPCRequest,
+		handler: () => Promise<JSONRPCResponse>
+	): Promise<JSONRPCResponse> {
+		const run = () => {
+			if (!this.isActive()) {
+				return Promise.resolve(errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active'));
+			}
+			return handler();
+		};
+
+		const queued = this.interactiveRequestQueue.then(run, run);
+		this.interactiveRequestQueue = queued.then(
 			() => undefined,
 			() => undefined
 		);
-		return run;
+		return queued;
 	}
 
 	private async handleToolCall(req: JSONRPCRequest): Promise<JSONRPCResponse> {
@@ -155,6 +174,10 @@ export class MCPAppRPCRouter {
 			}
 			args = params.arguments;
 		}
+		if (!this.deps.allowAppInitiatedToolCalls) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'App-initiated tool calls are disabled');
+		}
+
 		const { server, instanceID } = this.deps.instance;
 		const callReq: InvokeMCPToolRequestBody = {
 			source: MCPInvocationSource.App,
@@ -170,6 +193,9 @@ export class MCPAppRPCRouter {
 		if (!evaluation) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
 		}
+		if (!this.isActive()) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
+		}
 		if (evaluation.decision === MCPApprovalDecision.Denied) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Denied by policy');
 		}
@@ -178,13 +204,16 @@ export class MCPAppRPCRouter {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, evaluation.reason || 'Approval required');
 			}
 
-			const approval = this.deps.requestMCPApproval
-				? await this.deps.requestMCPApproval({
-						approvalID: evaluation.approvalID,
-						summary: evaluation.summary,
-						reason: evaluation.reason,
-					})
-				: await mcpManagementAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
+			let approval: MCPApprovalResolutionResult;
+			try {
+				approval = await this.deps.requestMCPApproval({
+					approvalID: evaluation.approvalID,
+					summary: evaluation.summary,
+					reason: evaluation.reason,
+				});
+			} catch {
+				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'Tool approval was closed');
+			}
 
 			if (approval.decision !== MCPApprovalDecision.Allowed) {
 				return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied this tool call');
@@ -198,6 +227,10 @@ export class MCPAppRPCRouter {
 			if (approval.token) {
 				callReq.approvalToken = approval.token;
 			}
+		}
+
+		if (!this.isActive()) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
 		}
 
 		try {
@@ -259,6 +292,9 @@ export class MCPAppRPCRouter {
 		if (!approved) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied adding this message');
 		}
+		if (!this.isActive()) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
+		}
 
 		this.deps.onUIMessage?.(message);
 		return { jsonrpc: '2.0', id: req.id, result: {} };
@@ -307,6 +343,9 @@ export class MCPAppRPCRouter {
 
 		if (!approved) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'User denied the model context update');
+		}
+		if (!this.isActive()) {
+			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP App view is no longer active');
 		}
 
 		this.deps.onModelContextUpdate?.(update);

@@ -38,9 +38,23 @@ export interface MCPAppInitializeResult {
 
 function getPreferredTheme(): 'light' | 'dark' {
 	if (typeof document !== 'undefined') {
+		const computedScheme = document.defaultView
+			?.getComputedStyle(document.documentElement)
+			.colorScheme.trim()
+			.toLowerCase();
+		if (computedScheme === 'dark') {
+			return 'dark';
+		}
+		if (computedScheme === 'light') {
+			return 'light';
+		}
+
 		const attr = document.documentElement.dataset.theme;
 		if (attr && /dark/i.test(attr)) {
 			return 'dark';
+		}
+		if (attr && /light/i.test(attr)) {
+			return 'light';
 		}
 	}
 	if (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches) {
@@ -59,14 +73,8 @@ export function buildMCPAppHostContext(opts?: {
 		protocolVersion: '2026-01-26',
 		hostCapabilities: {
 			openLinks: {},
-			serverResources: {
-				listChanged: true,
-			},
-			serverTools: opts?.allowToolCalls
-				? {
-						listChanged: true,
-					}
-				: undefined,
+			serverResources: {},
+			serverTools: opts?.allowToolCalls ? {} : undefined,
 			sandbox: {},
 		},
 		hostInfo: {

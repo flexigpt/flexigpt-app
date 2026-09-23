@@ -630,85 +630,6 @@ func (a *API) GetManagedSkillDocument(
 	)
 }
 
-func (a *API) getManagedSkillDocument(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (skillDomain.ManagedSkillDocument, error) {
-	value, err := a.GetSkill(ctx, ref)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	sourceValue, err := a.sources.Get(
-		ctx,
-		value.RootID,
-		value.Binding.SourceID,
-	)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: only managed Skills expose editable Skill documents",
-			basespec.ErrUnsupported,
-		)
-	}
-	if value.Binding.SubresourceLocator != "" {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: managed Skill must originate at a configured package document",
-			basespec.ErrUnsupported,
-		)
-	}
-	if _, err := skillDomain.ManagedPackageAddressFromSkillLocator(
-		value.Binding.Locator,
-	); err != nil {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: only application-managed Skill packages expose editable documents",
-			basespec.ErrUnsupported,
-		)
-	}
-
-	resolved, err := a.resources.ResolveArtifact(
-		ctx,
-		ref,
-		resource.ResolveOptions{},
-	)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	entry, err := a.resources.ReadSourceEntry(
-		ctx,
-		value.RootID,
-		value.Binding.SourceID,
-		value.Binding.Locator,
-		basespec.MaxCandidateBytes,
-	)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	if value.SourceContentDigest == nil ||
-		entry.Digest != *value.SourceContentDigest ||
-		entry.SourceRevision !=
-			resolved.RefreshState.SourceRevision ||
-		entry.SourceGeneration !=
-			resolved.RefreshState.SourceGeneration {
-		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
-			"%w: Skill Source changed while reading managed document",
-			basespec.ErrRefreshRequired,
-		)
-	}
-	doc, _, err := skillDomain.ParseSkillDocument(
-		entry.Content,
-		string(value.LogicalName),
-	)
-	if err != nil {
-		return skillDomain.ManagedSkillDocument{}, err
-	}
-	return skillDomain.ManagedSkillDocument{
-		Artifact: value,
-		Document: doc,
-	}, nil
-}
-
 func (a *API) PurgeSkill(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -814,6 +735,85 @@ func (a *API) ResolveSkillCapabilities(
 			)
 		},
 	)
+}
+
+func (a *API) getManagedSkillDocument(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (skillDomain.ManagedSkillDocument, error) {
+	value, err := a.GetSkill(ctx, ref)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	sourceValue, err := a.sources.Get(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	if sourceValue.Kind != source.SourceKindManagedDirectory {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: only managed Skills expose editable Skill documents",
+			basespec.ErrUnsupported,
+		)
+	}
+	if value.Binding.SubresourceLocator != "" {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: managed Skill must originate at a configured package document",
+			basespec.ErrUnsupported,
+		)
+	}
+	if _, err := skillDomain.ManagedPackageAddressFromSkillLocator(
+		value.Binding.Locator,
+	); err != nil {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: only application-managed Skill packages expose editable documents",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	resolved, err := a.resources.ResolveArtifact(
+		ctx,
+		ref,
+		resource.ResolveOptions{},
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	entry, err := a.resources.ReadSourceEntry(
+		ctx,
+		value.RootID,
+		value.Binding.SourceID,
+		value.Binding.Locator,
+		basespec.MaxCandidateBytes,
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	if value.SourceContentDigest == nil ||
+		entry.Digest != *value.SourceContentDigest ||
+		entry.SourceRevision !=
+			resolved.RefreshState.SourceRevision ||
+		entry.SourceGeneration !=
+			resolved.RefreshState.SourceGeneration {
+		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
+			"%w: Skill Source changed while reading managed document",
+			basespec.ErrRefreshRequired,
+		)
+	}
+	doc, _, err := skillDomain.ParseSkillDocument(
+		entry.Content,
+		string(value.LogicalName),
+	)
+	if err != nil {
+		return skillDomain.ManagedSkillDocument{}, err
+	}
+	return skillDomain.ManagedSkillDocument{
+		Artifact: value,
+		Document: doc,
+	}, nil
 }
 
 func (a *API) ensureSkillBaselineCollection(

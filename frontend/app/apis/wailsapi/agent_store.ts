@@ -30,6 +30,7 @@ import {
 	GetAgentCollection,
 	ListAgentCollectionMembers,
 	ListAgentCollections,
+	ListAgentCollectionsForManagement,
 	ListAgentImportDestinations,
 	ListAgents,
 	ListAgentsForManagement,
@@ -111,6 +112,13 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		return wailsObjectArrayOrEmpty<CollectionView>(
 			await ListAgentCollections(rootID as Parameters<typeof ListAgentCollections>[0]),
 			'ListAgentCollections'
+		);
+	}
+
+	async listAgentCollectionsForManagement(): Promise<CollectionView[]> {
+		return wailsObjectArrayOrEmpty<CollectionView>(
+			await ListAgentCollectionsForManagement(),
+			'ListAgentCollectionsForManagement'
 		);
 	}
 

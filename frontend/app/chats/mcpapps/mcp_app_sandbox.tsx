@@ -1,4 +1,5 @@
-import { forwardRef, useEffect, useRef } from 'react';
+import type { ForwardedRef } from 'react';
+import { forwardRef, useCallback, useMemo, useRef } from 'react';
 
 interface MCPAppSandboxProps {
 	html: string;
@@ -7,6 +8,16 @@ interface MCPAppSandboxProps {
 	onIframeReady: (iframe: HTMLIFrameElement) => void;
 	height?: number;
 	allow?: string;
+}
+
+function assignForwardedRef<T>(ref: ForwardedRef<T>, value: T | null): void {
+	if (typeof ref === 'function') {
+		ref(value);
+		return;
+	}
+	if (ref) {
+		ref.current = value;
+	}
 }
 
 /**
@@ -19,46 +30,44 @@ interface MCPAppSandboxProps {
  */
 export const MCPAppSandbox = forwardRef<HTMLIFrameElement, MCPAppSandboxProps>(function MCPAppSandbox(
 	{ html, csp, title, onIframeReady, height = 480, allow },
-	_ref
+	forwardedRef
 ) {
-	const iframeRef = useRef<HTMLIFrameElement | null>(null);
+	const notifiedIframeRef = useRef<HTMLIFrameElement | null>(null);
+	const setIframeRef = useCallback(
+		(iframe: HTMLIFrameElement | null) => {
+			assignForwardedRef(forwardedRef, iframe);
+			if (!iframe || notifiedIframeRef.current === iframe) {
+				return;
+			}
 
-	useEffect(() => {
-		const el = iframeRef.current;
-		if (!el) {
-			return;
-		}
-		onIframeReady(el);
-	}, [onIframeReady]);
-
-	const wrapped = injectCSPMeta(html, csp);
+			notifiedIframeRef.current = iframe;
+			onIframeReady(iframe);
+		},
+		[forwardedRef, onIframeReady]
+	);
+	const wrapped = useMemo(() => injectCSPMeta(html, csp), [csp, html]);
 
 	return (
 		<iframe
-			ref={iframeRef}
+			ref={setIframeRef}
 			title={title}
 			srcDoc={wrapped}
 			sandbox="allow-scripts"
 			referrerPolicy="no-referrer"
 			allow={allow}
 			loading="lazy"
-			className="bg-base-100 border-base-content/10 w-full rounded-2xl border"
+			className="bg-base-100 w-full rounded-2xl"
 			style={{ height, border: '0' }}
 		/>
 	);
 });
 
 function injectCSPMeta(html: string, csp: string): string {
-	const meta = `<meta http-equiv="Content-Security-Policy" content="${escapeAttr(csp)}">`;
-	if (/<head[^>]*>/i.test(html)) {
-		return html.replace(/<head[^>]*>/i, match => `${match}\n${meta}`);
-	}
-	if (/<html[^>]*>/i.test(html)) {
-		return html.replace(/<html[^>]*>/i, match => `${match}\n<head>${meta}</head>`);
-	}
-	return `<!DOCTYPE html><html><head>${meta}</head><body>${html}</body></html>`;
-}
+	const parsed = new DOMParser().parseFromString(html, 'text/html');
+	const meta = parsed.createElement('meta');
+	meta.httpEquiv = 'Content-Security-Policy';
+	meta.content = csp;
+	parsed.head.prepend(meta);
 
-function escapeAttr(value: string): string {
-	return value.replaceAll('&', '&amp;').replaceAll('"', '&quot;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+	return `<!DOCTYPE html>\n${parsed.documentElement.outerHTML}`;
 }

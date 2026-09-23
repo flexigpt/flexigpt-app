@@ -38,6 +38,10 @@ export function ListAgentCollections(arg1) {
   return window['go']['main']['AgentStoreWrapper']['ListAgentCollections'](arg1);
 }
 
+export function ListAgentCollectionsForManagement() {
+  return window['go']['main']['AgentStoreWrapper']['ListAgentCollectionsForManagement']();
+}
+
 export function ListAgentImportDestinations() {
   return window['go']['main']['AgentStoreWrapper']['ListAgentImportDestinations']();
 }

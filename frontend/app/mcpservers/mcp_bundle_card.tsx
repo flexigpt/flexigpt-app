@@ -66,7 +66,9 @@ interface MCPBundleCardProps {
 	readErrorsByArtifactID?: Record<string, MCPServerReadErrors | undefined>;
 	serverLoadError?: string;
 	isLoadingServers?: boolean;
+	serversLoaded: boolean;
 
+	onLoadServers: () => Promise<void>;
 	onRefreshServers: () => Promise<void>;
 	onToggleBundleEnabled: (bundle: MCPBundleView, enabled: boolean) => Promise<void>;
 	onToggleServerEnabled: (bundle: MCPBundleView, server: MCPServerView, enabled: boolean) => Promise<void>;
@@ -103,6 +105,8 @@ export function MCPBundleCard({
 	readErrorsByArtifactID = {},
 	serverLoadError,
 	isLoadingServers = false,
+	serversLoaded,
+	onLoadServers,
 	onRefreshServers,
 	onToggleBundleEnabled,
 	onToggleServerEnabled,
@@ -137,6 +141,12 @@ export function MCPBundleCard({
 	const refresh = () => {
 		void runAction('bundle:refresh', onRefreshServers).catch((error: unknown) => {
 			showAlert(getErrorMessage(error, 'Failed to reload MCP servers.'));
+		});
+	};
+
+	const loadServers = () => {
+		void runAction('bundle:load', onLoadServers).catch((error: unknown) => {
+			showAlert(getErrorMessage(error, 'Failed to load MCP servers.'));
 		});
 	};
 
@@ -175,10 +185,20 @@ export function MCPBundleCard({
 						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={isExpanded}
 						onClick={() => {
-							setIsExpanded(previous => !previous);
+							const next = !isExpanded;
+							setIsExpanded(next);
+							if (next && !serversLoaded && !isLoadingServers) {
+								loadServers();
+							}
 						}}
 					>
-						<span>{isLoadingServers ? 'Loading servers...' : `Servers: ${servers.length}`}</span>
+						<span>
+							{isLoadingServers
+								? 'Loading servers...'
+								: serversLoaded
+									? `Servers: ${servers.length}`
+									: 'Servers: not loaded'}
+						</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
 				}
@@ -213,7 +233,7 @@ export function MCPBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.editable || Boolean(serverLoadError)}
+									disabled={!bundle.editable || !serversLoaded || Boolean(serverLoadError)}
 									onClick={() => {
 										setServerEditor({});
 									}}
@@ -225,7 +245,7 @@ export function MCPBundleCard({
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
-									disabled={!bundle.deletable || servers.length > 0 || Boolean(serverLoadError)}
+									disabled={!bundle.deletable || !serversLoaded || servers.length > 0 || Boolean(serverLoadError)}
 									onClick={() => {
 										onDeleteBundleRequested(bundle);
 									}}
@@ -258,7 +278,17 @@ export function MCPBundleCard({
 
 				{isExpanded ? (
 					<div className="mt-6 space-y-3">
-						{servers.length === 0 ? (
+						{!serversLoaded ? (
+							<ManagementEmptyState>
+								{isLoadingServers
+									? 'Loading MCP servers...'
+									: serverLoadError
+										? 'Server contents are unavailable.'
+										: 'Expand this Bundle to load its MCP servers.'}
+							</ManagementEmptyState>
+						) : null}
+
+						{serversLoaded && servers.length === 0 ? (
 							<ManagementEmptyState>
 								{isLoadingServers
 									? 'Loading MCP servers...'
@@ -266,7 +296,7 @@ export function MCPBundleCard({
 										? 'Server contents are unavailable.'
 										: 'No MCP servers in this bundle.'}
 							</ManagementEmptyState>
-						) : (
+						) : serversLoaded ? (
 							servers.map(server => {
 								const artifactID = server.ref.artifactID;
 								const runtime = runtimeByArtifactID[artifactID];
@@ -499,7 +529,7 @@ export function MCPBundleCard({
 									</ManagementItemCard>
 								);
 							})
-						)}
+						) : null}
 					</div>
 				) : null}
 			</ManagementBundleCard>
@@ -542,6 +572,7 @@ export function MCPBundleCard({
 				}}
 				bundle={bundle}
 				serverCount={servers.length}
+				serversLoaded={serversLoaded}
 			/>
 
 			<MCPServerDetailsModal

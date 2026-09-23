@@ -66,6 +66,7 @@ import {
 	MCPTrustLevel as MCPTrustLevelValue,
 } from '@/spec/mcp';
 
+import { mapWithConcurrency } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 
@@ -80,6 +81,7 @@ import type {
 const MANAGEMENT_PAGE_SIZE = 100;
 const MAX_MANAGEMENT_PAGE_HOPS = 10_000;
 const PLACEHOLDER_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+const MCP_SERVER_MANAGEMENT_CONCURRENCY = 4;
 
 interface MCPSecretTarget {
 	kind: MCPSecretKind;
@@ -658,14 +660,12 @@ export class MCPManagementAPI {
 			}
 		}
 
-		const values = await Promise.all(
-			[...serverRefs.values()].map(async ref => {
-				const management = await this.getMCPServerManagementView(ref);
-				const policyName = management.installation.document.configuration.policy?.name;
+		const values = await mapWithConcurrency([...serverRefs.values()], MCP_SERVER_MANAGEMENT_CONCURRENCY, async ref => {
+			const management = await this.getMCPServerManagementView(ref);
+			const policyName = management.installation.document.configuration.policy?.name;
 
-				return this.toServerView(management, bundle.ref, policyName ? policyRefsByName.get(policyName) : undefined);
-			})
-		);
+			return this.toServerView(management, bundle.ref, policyName ? policyRefsByName.get(policyName) : undefined);
+		});
 
 		return values.toSorted((left, right) =>
 			serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, {

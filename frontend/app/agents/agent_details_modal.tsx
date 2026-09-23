@@ -144,7 +144,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 							title="Composer starter recipe"
 							description="This frontend projection resolves mapped Models and Tools, Skill modes, and MCP runtime identities."
 						>
-							<AgentRecipePreview agent={agent} />
+							<AgentRecipePreview resolution={resolution} />
 						</ModalSection>
 
 						<ModalSection

@@ -155,6 +155,50 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 	)
 }
 
+// ListAgentCollectionsForManagement returns every Agent Collection across
+// every Root. This avoids frontend root discovery through an unrelated global
+// Agent list and ensures empty Collections remain visible.
+func (w *AgentStoreWrapper) ListAgentCollectionsForManagement() (
+	[]collection.CollectionView,
+	error,
+) {
+	return middleware.WithRecoveryResp(
+		func() ([]collection.CollectionView, error) {
+			if w == nil || w.api == nil || w.roots == nil {
+				return nil, basespec.ErrClosed
+			}
+
+			roots, err := w.roots.List(context.Background())
+			if err != nil {
+				return nil, err
+			}
+
+			output := make([]collection.CollectionView, 0)
+			for _, rootValue := range roots {
+				values, err := w.api.ListAgentCollections(
+					context.Background(),
+					rootValue.ID,
+				)
+				if err != nil {
+					return nil, err
+				}
+				output = append(output, values...)
+			}
+
+			sort.Slice(output, func(left, right int) bool {
+				if output[left].Artifact.RootID != output[right].Artifact.RootID {
+					return output[left].Artifact.RootID < output[right].Artifact.RootID
+				}
+				if output[left].Name != output[right].Name {
+					return output[left].Name < output[right].Name
+				}
+				return output[left].Artifact.ID < output[right].Artifact.ID
+			})
+			return output, nil
+		},
+	)
+}
+
 func (w *AgentStoreWrapper) GetAgent(
 	ref artifact.ArtifactRef,
 ) (agentConsumerAPI.AgentView, error) {
