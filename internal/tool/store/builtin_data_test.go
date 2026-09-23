@@ -737,6 +737,49 @@ func Test_NewBuiltInToolData_SyntheticFS_FilenameSlugVersionMismatch(t *testing.
 	}
 }
 
+func Test_NewBuiltInToolData_SyntheticFS_RejectsLegacyHTTPTool(t *testing.T) {
+	if runtime.GOOS == windows {
+		t.Skip("custom fs test has some overlay race in win")
+	}
+
+	bundleID := uuidutil.NewUUIDv7()
+	slug := demo
+	dir := fmt.Sprintf("%s_%s", bundleID, slug)
+
+	fileName, rawTool, _ := buildTool(t, slug, "v1")
+
+	var document map[string]any
+	if err := json.Unmarshal(rawTool, &document); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	document["type"] = "http"
+
+	legacyHTTPTool, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+
+	fsys := fstest.MapFS{
+		builtin.BuiltInToolBundlesJSON: {
+			Data: buildToolManifest(bundleID, slug),
+		},
+		dir: &fstest.MapFile{
+			Mode: fs.ModeDir,
+		},
+		dir + "/" + fileName: {
+			Data: legacyHTTPTool,
+		},
+	}
+
+	_, err = newToolFromFS(t, fsys)
+	if err == nil {
+		t.Fatal("NewBuiltInToolData() succeeded for legacy HTTP tool")
+	}
+	if !strings.Contains(err.Error(), "only go and sdk are supported") {
+		t.Fatalf("NewBuiltInToolData() error = %v", err)
+	}
+}
+
 // Test when two tools in the same bundle share the same tool ID.
 func Test_NewBuiltInToolData_SyntheticFS_DuplicateToolID(t *testing.T) {
 	if runtime.GOOS == windows {
