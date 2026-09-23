@@ -2,27 +2,7 @@ package spec
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
-
-type PutToolBundleRequestBody struct {
-	Slug        bundleitemutils.BundleSlug `json:"slug"                  required:"true"`
-	DisplayName string                     `json:"displayName"           required:"true"`
-	IsEnabled   bool                       `json:"isEnabled"             required:"true"`
-	Description string                     `json:"description,omitempty"`
-}
-
-type PutToolBundleRequest struct {
-	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
-	Body     *PutToolBundleRequestBody
-}
-
-type PutToolBundleResponse struct{}
-
-type DeleteToolBundleRequest struct {
-	BundleID bundleitemutils.BundleID `path:"bundleID" required:"true"`
-}
-type DeleteToolBundleResponse struct{}
 
 type PatchToolBundleRequestBody struct {
 	IsEnabled bool `json:"isEnabled" required:"true"`
@@ -60,39 +40,6 @@ type ListToolBundlesResponse struct {
 	Body *ListToolBundlesResponseBody
 }
 
-type PutToolRequestBody struct {
-	DisplayName string   `json:"displayName"           required:"true"`
-	Description string   `json:"description,omitempty"`
-	Tags        []string `json:"tags,omitempty"`
-	IsEnabled   bool     `json:"isEnabled"             required:"true"`
-
-	UserCallable bool `json:"userCallable" required:"true"`
-	LLMCallable  bool `json:"llmCallable"  required:"true"`
-	AutoExecReco bool `json:"autoExecute"  required:"true"`
-
-	// Take inputs as strings that we can then validate as a json object and put a tool.
-	ArgSchema jsonutil.JSONRawString `json:"argSchema" required:"true"`
-
-	Type     ToolImplType  `json:"type"               required:"true"`
-	HTTPImpl *HTTPToolImpl `json:"httpImpl,omitempty" required:"true"`
-}
-
-type PutToolRequest struct {
-	BundleID bundleitemutils.BundleID    `path:"bundleID" required:"true"`
-	ToolSlug bundleitemutils.ItemSlug    `path:"toolSlug" required:"true"`
-	Version  bundleitemutils.ItemVersion `path:"version"  required:"true"`
-	Body     *PutToolRequestBody
-}
-
-type PutToolResponse struct{}
-
-type DeleteToolRequest struct {
-	BundleID bundleitemutils.BundleID    `path:"bundleID" required:"true"`
-	ToolSlug bundleitemutils.ItemSlug    `path:"toolSlug" required:"true"`
-	Version  bundleitemutils.ItemVersion `path:"version"  required:"true"`
-}
-type DeleteToolResponse struct{}
-
 type PatchToolRequestBody struct {
 	IsEnabled bool `json:"isEnabled" required:"true"`
 }
@@ -121,8 +68,7 @@ type ToolPageToken struct {
 	IncludeDisabled     bool                       `json:"d,omitempty"`    //nolint:tagliatelle // PageToken specific.
 	BundleIDs           []bundleitemutils.BundleID `json:"ids,omitempty"`  //nolint:tagliatelle // PageToken specific.
 	Tags                []string                   `json:"tags,omitempty"` //nolint:tagliatelle // PageToken specific.
-	BuiltInDone         bool                       `json:"bd,omitempty"`   //nolint:tagliatelle // PageToken specific. // Built-ins already emitted?
-	DirTok              string                     `json:"dt,omitempty"`   //nolint:tagliatelle // PageToken specific. // Directory-store cursor.
+	Offset              int                        `json:"o,omitempty"`    //nolint:tagliatelle // Built-in result offset.
 }
 
 type ListToolsRequest struct {

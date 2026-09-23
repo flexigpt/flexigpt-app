@@ -8038,58 +8038,6 @@ export namespace spec {
 	
 	    }
 	}
-	export class DeleteToolBundleRequest {
-	    BundleID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteToolBundleRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	    }
-	}
-	export class DeleteToolBundleResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteToolBundleResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class DeleteToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteToolRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	    }
-	}
-	export class DeleteToolResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new DeleteToolResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
 	
 	
 	export class GetAuthKeyRequest {
@@ -8570,114 +8518,6 @@ export namespace spec {
 	        this.sdkType = source["sdkType"];
 	    }
 	}
-	export class HTTPResponse {
-	    successCodes?: number[];
-	    errorMode?: string;
-	    bodyOutputMode?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new HTTPResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.successCodes = source["successCodes"];
-	        this.errorMode = source["errorMode"];
-	        this.bodyOutputMode = source["bodyOutputMode"];
-	    }
-	}
-	export class HTTPAuth {
-	    type: string;
-	    in?: string;
-	    name?: string;
-	    valueTemplate: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new HTTPAuth(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.in = source["in"];
-	        this.name = source["name"];
-	        this.valueTemplate = source["valueTemplate"];
-	    }
-	}
-	export class HTTPRequest {
-	    method?: string;
-	    urlTemplate: string;
-	    query?: Record<string, string>;
-	    headers?: Record<string, string>;
-	    body?: string;
-	    auth?: HTTPAuth;
-	    timeoutMS?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new HTTPRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.method = source["method"];
-	        this.urlTemplate = source["urlTemplate"];
-	        this.query = source["query"];
-	        this.headers = source["headers"];
-	        this.body = source["body"];
-	        this.auth = this.convertValues(source["auth"], HTTPAuth);
-	        this.timeoutMS = source["timeoutMS"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class HTTPToolImpl {
-	    request: HTTPRequest;
-	    response: HTTPResponse;
-	
-	    static createFrom(source: any = {}) {
-	        return new HTTPToolImpl(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.request = this.convertValues(source["request"], HTTPRequest);
-	        this.response = this.convertValues(source["response"], HTTPResponse);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class GoToolImpl {
 	    func: string;
 	
@@ -8706,7 +8546,6 @@ export namespace spec {
 	    llmToolType: string;
 	    type: string;
 	    goImpl?: GoToolImpl;
-	    httpImpl?: HTTPToolImpl;
 	    sdkImpl?: SDKToolImpl;
 	    isEnabled: boolean;
 	    isBuiltIn: boolean;
@@ -8736,7 +8575,6 @@ export namespace spec {
 	        this.llmToolType = source["llmToolType"];
 	        this.type = source["type"];
 	        this.goImpl = this.convertValues(source["goImpl"], GoToolImpl);
-	        this.httpImpl = this.convertValues(source["httpImpl"], HTTPToolImpl);
 	        this.sdkImpl = this.convertValues(source["sdkImpl"], SDKToolImpl);
 	        this.isEnabled = source["isEnabled"];
 	        this.isBuiltIn = source["isBuiltIn"];
@@ -8796,10 +8634,6 @@ export namespace spec {
 	
 	
 	
-	
-	
-	
-	
 	export class InvokeGoOptions {
 	    timeoutMS?: number;
 	
@@ -8812,25 +8646,8 @@ export namespace spec {
 	        this.timeoutMS = source["timeoutMS"];
 	    }
 	}
-	export class InvokeHTTPOptions {
-	    timeoutMS?: number;
-	    extraHeaders?: Record<string, string>;
-	    secrets?: Record<string, string>;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeHTTPOptions(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.timeoutMS = source["timeoutMS"];
-	        this.extraHeaders = source["extraHeaders"];
-	        this.secrets = source["secrets"];
-	    }
-	}
 	export class InvokeToolRequestBody {
 	    args: string;
-	    httpOptions?: InvokeHTTPOptions;
 	    goOptions?: InvokeGoOptions;
 	
 	    static createFrom(source: any = {}) {
@@ -8840,7 +8657,6 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.args = source["args"];
-	        this.httpOptions = this.convertValues(source["httpOptions"], InvokeHTTPOptions);
 	        this.goOptions = this.convertValues(source["goOptions"], InvokeGoOptions);
 	    }
 	
@@ -9239,8 +9055,6 @@ export namespace spec {
 	    createdAt: any;
 	    // Go type: time
 	    modifiedAt: any;
-	    // Go type: time
-	    softDeletedAt?: any;
 	
 	    static createFrom(source: any = {}) {
 	        return new ToolBundle(source);
@@ -9257,7 +9071,6 @@ export namespace spec {
 	        this.isBuiltIn = source["isBuiltIn"];
 	        this.createdAt = this.convertValues(source["createdAt"], null);
 	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.softDeletedAt = this.convertValues(source["softDeletedAt"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -10193,166 +10006,6 @@ export namespace spec {
 	
 	    static createFrom(source: any = {}) {
 	        return new PutMessagesToConversationResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class PutToolBundleRequestBody {
-	    slug: string;
-	    displayName: string;
-	    isEnabled: boolean;
-	    description?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolBundleRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.slug = source["slug"];
-	        this.displayName = source["displayName"];
-	        this.isEnabled = source["isEnabled"];
-	        this.description = source["description"];
-	    }
-	}
-	export class PutToolBundleRequest {
-	    BundleID: string;
-	    Body?: PutToolBundleRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolBundleRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.Body = this.convertValues(source["Body"], PutToolBundleRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PutToolBundleResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolBundleResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class PutToolRequestBody {
-	    displayName: string;
-	    description?: string;
-	    tags?: string[];
-	    isEnabled: boolean;
-	    userCallable: boolean;
-	    llmCallable: boolean;
-	    autoExecute: boolean;
-	    argSchema: string;
-	    type: string;
-	    httpImpl?: HTTPToolImpl;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.tags = source["tags"];
-	        this.isEnabled = source["isEnabled"];
-	        this.userCallable = source["userCallable"];
-	        this.llmCallable = source["llmCallable"];
-	        this.autoExecute = source["autoExecute"];
-	        this.argSchema = source["argSchema"];
-	        this.type = source["type"];
-	        this.httpImpl = this.convertValues(source["httpImpl"], HTTPToolImpl);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class PutToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	    Body?: PutToolRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	        this.Body = this.convertValues(source["Body"], PutToolRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PutToolResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PutToolResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {

@@ -2,171 +2,478 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
-	"os"
 	"path/filepath"
-	"runtime/debug"
 	"slices"
 	"sort"
 	"strings"
-	"sync"
 	"time"
-
-	"github.com/flexigpt/mapstore-go"
-	"github.com/flexigpt/mapstore-go/jsonencdec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
-	fetchBatchTools       = 512            // Directory-store batch size.
-	maxPageSizeTools      = 256            // Hard page limit.
-	defPageSizeTools      = 25             // Default page size.
-	softDeleteGraceTools  = 48 * time.Hour // Soft-delete grace interval.
-	cleanupIntervalTools  = 24 * time.Hour // Sweep interval.
+	maxPageSizeTools      = 256
+	defPageSizeTools      = 25
 	builtInSnapshotMaxAge = time.Hour
 )
 
 var (
 	errInvalidRequest        = errors.New("invalid request")
 	errInvalidDir            = errors.New("invalid directory")
-	errConflict              = errors.New("resource already exists")
 	errBuiltInBundleNotFound = errors.New("bundle not found in built-in data")
 	errBundleNotFound        = errors.New("bundle not found")
-	errBundleDisabled        = errors.New("bundle is disabled")
-	errBundleDeleting        = errors.New("bundle is being deleted")
-	errBundleNotEmpty        = errors.New("bundle still contains tools")
 	errToolNotFound          = errors.New("tool not found")
-	errBuiltInReadOnly       = errors.New("built-in resource is read-only")
 )
 
-// ToolStore provides CRUD, soft-delete and optional FTS for Tool bundles.
+// ToolStore exposes only the immutable built-in tool catalogue and its
+// enable/disable overlay. User-authored bundles and tools are unsupported.
 type ToolStore struct {
-	baseDir string
-
-	// Meta-data and raw file stores.
-	bundleStore *mapstore.MapFileStore
-	toolStore   *mapstore.MapDirectoryStore
-
-	// Built-in overlay.
+	baseDir     string
 	builtinData *BuiltInToolData
-
-	pp mapstore.PartitionProvider
-
-	slugLock *slugLocks
-
-	// Cleanup loop plumbing.
-	cleanOnce sync.Once
-	cleanKick chan struct{}
-	cleanCtx  context.Context
-	cleanStop context.CancelFunc
-	wg        sync.WaitGroup
-
-	// Sweep coordination with CRUD ops.
-	sweepMu sync.RWMutex
 }
 
 // Option configures a ToolStore instance.
 type Option func(*ToolStore) error
 
-// NewToolStore initialises a ToolStore rooted at baseDir.
+// NewToolStore initializes the built-in tool catalogue and overlay.
 func NewToolStore(baseDir string, opts ...Option) (*ToolStore, error) {
-	ts := &ToolStore{
+	store := &ToolStore{
 		baseDir: filepath.Clean(baseDir),
-		pp:      &bundleitemutils.BundlePartitionProvider{},
 	}
-	for _, o := range opts {
-		if err := o(ts); err != nil {
+	for _, option := range opts {
+		if err := option(store); err != nil {
 			return nil, err
 		}
 	}
-	ctx := context.Background()
 
-	// Built-in overlay.
-	bi, err := NewBuiltInToolData(ctx, ts.baseDir, builtInSnapshotMaxAge, WithLLMToolsGoBuiltins(true))
-	if err != nil {
-		return nil, err
-	}
-	ts.builtinData = bi
-
-	// Bundle meta-file.
-	def, _ := jsonencdec.StructWithJSONTagsToMap(
-		spec.AllBundles{Bundles: map[bundleitemutils.BundleID]spec.ToolBundle{}},
-	)
-	ts.bundleStore, err = mapstore.NewMapFileStore(
-		filepath.Join(ts.baseDir, spec.ToolBundlesMetaFileName),
-		def,
-		jsonencdec.JSONEncoderDecoder{},
-		mapstore.WithCreateIfNotExists(true),
-		mapstore.WithFileAutoFlush(true),
-		mapstore.WithFileLogger(slog.Default()),
+	builtinData, err := NewBuiltInToolData(
+		context.Background(),
+		store.baseDir,
+		builtInSnapshotMaxAge,
+		WithLLMToolsGoBuiltins(true),
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Directory store.
-	dirOpts := []mapstore.DirOption{mapstore.WithDirLogger(slog.Default())}
-	ts.toolStore, err = mapstore.NewMapDirectoryStore(
-		ts.baseDir,
-		true,
-		ts.pp,
-		jsonencdec.JSONEncoderDecoder{},
-		dirOpts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	ts.slugLock = newSlugLocks()
-	ts.startCleanupLoop()
-
-	slog.Info("tool-store ready", "baseDir", ts.baseDir)
-	return ts, nil
+	store.builtinData = builtinData
+	return store, nil
 }
 
-// Close shuts down the background sweep.
+// Close releases the built-in overlay resources.
 func (ts *ToolStore) Close() {
-	if ts == nil {
+	if ts == nil || ts.builtinData == nil {
 		return
 	}
-	if ts.cleanStop != nil {
-		ts.cleanStop()
-	}
-	ts.wg.Wait()
-
-	if ts.builtinData != nil {
-		_ = ts.builtinData.Close()
-	}
-	if ts.bundleStore != nil {
-		_ = ts.bundleStore.Close()
-	}
-	if ts.toolStore != nil {
-		_ = ts.toolStore.CloseAll()
-	}
+	_ = ts.builtinData.Close()
+	ts.builtinData = nil
 }
 
-// ListBuiltInTools returns every built-in Tool snapshot, including disabled
-// bundles and Tools. The returned values are independent copies.
+// ListBuiltInTools returns every built-in Tool, including disabled items.
 func (ts *ToolStore) ListBuiltInTools(
 	ctx context.Context,
 ) ([]spec.ToolListItem, error) {
+	items, _, err := ts.allBuiltInToolItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// PatchToolBundle changes only the enablement overlay of a built-in bundle.
+func (ts *ToolStore) PatchToolBundle(
+	ctx context.Context,
+	req *spec.PatchToolBundleRequest,
+) (*spec.PatchToolBundleResponse, error) {
+	if req == nil || req.Body == nil || req.BundleID == "" {
+		return nil, fmt.Errorf("%w: bundleID required", errInvalidRequest)
+	}
 	if ts == nil || ts.builtinData == nil {
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
+	}
+	if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err != nil {
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
+	}
+	if _, err := ts.builtinData.SetToolBundleEnabled(
+		ctx,
+		req.BundleID,
+		req.Body.IsEnabled,
+	); err != nil {
+		return nil, err
+	}
+	return &spec.PatchToolBundleResponse{}, nil
+}
+
+// PatchTool changes only the enablement overlay of a built-in tool.
+func (ts *ToolStore) PatchTool(
+	ctx context.Context,
+	req *spec.PatchToolRequest,
+) (*spec.PatchToolResponse, error) {
+	if req == nil || req.Body == nil ||
+		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
 		return nil, fmt.Errorf(
+			"%w: bundleID, toolSlug, version required",
+			errInvalidRequest,
+		)
+	}
+	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
+		return nil, err
+	}
+	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
+		return nil, err
+	}
+
+	bundle, isBuiltIn, err := ts.GetAnyToolBundle(ctx, req.BundleID)
+	if err != nil {
+		return nil, err
+	}
+	if !isBuiltIn {
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
+	}
+
+	if _, err := ts.builtinData.SetToolEnabled(
+		ctx,
+		bundle.ID,
+		req.ToolSlug,
+		req.Version,
+		req.Body.IsEnabled,
+	); err != nil {
+		return nil, err
+	}
+	return &spec.PatchToolResponse{}, nil
+}
+
+// ListToolBundles lists built-in bundles only.
+func (ts *ToolStore) ListToolBundles(
+	ctx context.Context,
+	req *spec.ListToolBundlesRequest,
+) (*spec.ListToolBundlesResponse, error) {
+	var (
+		pageSize        = defPageSizeTools
+		includeDisabled bool
+		wantIDs         = map[bundleitemutils.BundleID]struct{}{}
+		cursorMod       time.Time
+		cursorID        bundleitemutils.BundleID
+	)
+
+	if req != nil && req.PageToken != "" {
+		token, err := jsonutil.Base64JSONDecode[spec.BundlePageToken](
+			req.PageToken,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: invalid bundle page token: %w",
+				errInvalidRequest,
+				err,
+			)
+		}
+
+		pageSize = token.PageSize
+		if pageSize <= 0 || pageSize > maxPageSizeTools {
+			pageSize = defPageSizeTools
+		}
+		includeDisabled = token.IncludeDisabled
+		if token.CursorMod != "" {
+			cursorMod, _ = time.Parse(time.RFC3339Nano, token.CursorMod)
+			cursorID = token.CursorID
+		}
+		for _, id := range token.BundleIDs {
+			wantIDs[id] = struct{}{}
+		}
+	} else if req != nil {
+		if req.PageSize > 0 && req.PageSize <= maxPageSizeTools {
+			pageSize = req.PageSize
+		}
+		includeDisabled = req.IncludeDisabled
+		for _, id := range req.BundleIDs {
+			wantIDs[id] = struct{}{}
+		}
+	}
+
+	bundles, _, err := ts.builtInSnapshot(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]spec.ToolBundle, 0, len(bundles))
+	for _, bundle := range bundles {
+		if !bundle.IsBuiltIn {
+			continue
+		}
+		if len(wantIDs) != 0 {
+			if _, found := wantIDs[bundle.ID]; !found {
+				continue
+			}
+		}
+		if !includeDisabled && !bundle.IsEnabled {
+			continue
+		}
+		filtered = append(filtered, bundle)
+	}
+
+	sort.Slice(filtered, func(left, right int) bool {
+		if filtered[left].ModifiedAt.Equal(filtered[right].ModifiedAt) {
+			return string(filtered[left].ID) < string(filtered[right].ID)
+		}
+		return filtered[left].ModifiedAt.After(filtered[right].ModifiedAt)
+	})
+
+	start := 0
+	if cursorID != "" {
+		for index, bundle := range filtered {
+			if bundle.ModifiedAt.Equal(cursorMod) &&
+				bundle.ID == cursorID {
+				start = index + 1
+				break
+			}
+		}
+	}
+	if start > len(filtered) {
+		start = len(filtered)
+	}
+
+	end := min(start+pageSize, len(filtered))
+
+	var nextToken *string
+	if end < len(filtered) {
+		ids := make([]bundleitemutils.BundleID, 0, len(wantIDs))
+		for id := range wantIDs {
+			ids = append(ids, id)
+		}
+		slices.Sort(ids)
+
+		encoded := jsonutil.Base64JSONEncode(spec.BundlePageToken{
+			BundleIDs:       ids,
+			IncludeDisabled: includeDisabled,
+			PageSize:        pageSize,
+			CursorMod:       filtered[end-1].ModifiedAt.Format(time.RFC3339Nano),
+			CursorID:        filtered[end-1].ID,
+		})
+		nextToken = &encoded
+	}
+
+	return &spec.ListToolBundlesResponse{
+		Body: &spec.ListToolBundlesResponseBody{
+			ToolBundles:   filtered[start:end],
+			NextPageToken: nextToken,
+		},
+	}, nil
+}
+
+// GetTool retrieves a built-in tool version.
+func (ts *ToolStore) GetTool(
+	ctx context.Context,
+	req *spec.GetToolRequest,
+) (*spec.GetToolResponse, error) {
+	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
+		return nil, fmt.Errorf(
+			"%w: bundleID, toolSlug, version required",
+			errInvalidRequest,
+		)
+	}
+	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
+		return nil, err
+	}
+	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
+		return nil, err
+	}
+
+	bundle, isBuiltIn, err := ts.GetAnyToolBundle(ctx, req.BundleID)
+	if err != nil {
+		return nil, err
+	}
+	if !isBuiltIn {
+		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
+	}
+
+	tool, err := ts.builtinData.GetBuiltInTool(
+		ctx,
+		bundle.ID,
+		req.ToolSlug,
+		req.Version,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if !tool.IsBuiltIn {
+		return nil, fmt.Errorf(
+			"%w: non-built-in tool returned for %s/%s@%s",
+			errToolNotFound,
+			req.BundleID,
+			req.ToolSlug,
+			req.Version,
+		)
+	}
+
+	return &spec.GetToolResponse{Body: &tool}, nil
+}
+
+// ListTools lists built-in tools only.
+func (ts *ToolStore) ListTools(
+	ctx context.Context,
+	req *spec.ListToolsRequest,
+) (*spec.ListToolsResponse, error) {
+	token := spec.ToolPageToken{}
+	if req != nil && req.PageToken != "" {
+		decoded, err := jsonutil.Base64JSONDecode[spec.ToolPageToken](
+			req.PageToken,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: invalid tool page token: %w",
+				errInvalidRequest,
+				err,
+			)
+		}
+		token = decoded
+	} else if req != nil {
+		token.RecommendedPageSize = req.RecommendedPageSize
+		token.IncludeDisabled = req.IncludeDisabled
+		token.BundleIDs = slices.Clone(req.BundleIDs)
+		slices.Sort(token.BundleIDs)
+		token.Tags = slices.Clone(req.Tags)
+		sort.Strings(token.Tags)
+	}
+
+	pageSize := token.RecommendedPageSize
+	if pageSize <= 0 || pageSize > maxPageSizeTools {
+		pageSize = defPageSizeTools
+	}
+
+	bundleFilter := make(map[bundleitemutils.BundleID]struct{}, len(token.BundleIDs))
+	for _, id := range token.BundleIDs {
+		bundleFilter[id] = struct{}{}
+	}
+	tagFilter := make(map[string]struct{}, len(token.Tags))
+	for _, tag := range token.Tags {
+		tagFilter[tag] = struct{}{}
+	}
+
+	items, bundles, err := ts.allBuiltInToolItems(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	filtered := make([]spec.ToolListItem, 0, len(items))
+	for _, item := range items {
+		bundle, found := bundles[item.BundleID]
+		if !found || !bundle.IsBuiltIn {
+			continue
+		}
+		if len(bundleFilter) != 0 {
+			if _, found := bundleFilter[item.BundleID]; !found {
+				continue
+			}
+		}
+		if !token.IncludeDisabled &&
+			(!bundle.IsEnabled || !item.ToolDefinition.IsEnabled) {
+			continue
+		}
+		if len(tagFilter) != 0 {
+			matched := false
+			for _, tag := range item.ToolDefinition.Tags {
+				if _, found := tagFilter[tag]; found {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		filtered = append(filtered, item)
+	}
+
+	if token.Offset < 0 || token.Offset > len(filtered) {
+		return nil, fmt.Errorf("%w: invalid tool page offset", errInvalidRequest)
+	}
+
+	start := token.Offset
+	end := min(start+pageSize, len(filtered))
+
+	var nextToken *string
+	if end < len(filtered) {
+		token.Offset = end
+		encoded := jsonutil.Base64JSONEncode(token)
+		nextToken = &encoded
+	}
+
+	return &spec.ListToolsResponse{
+		Body: &spec.ListToolsResponseBody{
+			ToolListItems: filtered[start:end],
+			NextPageToken: nextToken,
+		},
+	}, nil
+}
+
+// GetAnyToolBundle returns a built-in bundle only.
+func (ts *ToolStore) GetAnyToolBundle(
+	ctx context.Context,
+	id bundleitemutils.BundleID,
+) (spec.ToolBundle, bool, error) {
+	if id == "" {
+		return spec.ToolBundle{}, false, fmt.Errorf(
+			"%w: bundleID required",
+			errInvalidRequest,
+		)
+	}
+	if ts == nil || ts.builtinData == nil {
+		return spec.ToolBundle{}, false, fmt.Errorf(
+			"%w: %s",
+			errBundleNotFound,
+			id,
+		)
+	}
+
+	bundle, err := ts.builtinData.GetBuiltInToolBundle(ctx, id)
+	if err != nil {
+		return spec.ToolBundle{}, false, fmt.Errorf(
+			"%w: %s",
+			errBundleNotFound,
+			id,
+		)
+	}
+	if !bundle.IsBuiltIn {
+		return spec.ToolBundle{}, false, fmt.Errorf(
+			"%w: %s",
+			errBundleNotFound,
+			id,
+		)
+	}
+
+	return bundle, true, nil
+}
+
+func (ts *ToolStore) builtInSnapshot(
+	ctx context.Context,
+) (
+	bundles map[bundleitemutils.BundleID]spec.ToolBundle,
+	tools map[bundleitemutils.BundleID]map[bundleitemutils.ItemID]spec.Tool,
+	err error,
+) {
+	if ts == nil || ts.builtinData == nil {
+		return nil, nil, fmt.Errorf(
 			"%w: built-in Tool data is unavailable",
 			errToolNotFound,
 		)
 	}
+	return ts.builtinData.ListBuiltInToolData(ctx)
+}
 
-	bundles, tools, err := ts.builtinData.ListBuiltInToolData(ctx)
+func (ts *ToolStore) allBuiltInToolItems(
+	ctx context.Context,
+) (
+	[]spec.ToolListItem,
+	map[bundleitemutils.BundleID]spec.ToolBundle,
+	error,
+) {
+	bundles, tools, err := ts.builtInSnapshot(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	bundleIDs := make([]bundleitemutils.BundleID, 0, len(bundles))
@@ -175,7 +482,7 @@ func (ts *ToolStore) ListBuiltInTools(
 	}
 	slices.Sort(bundleIDs)
 
-	output := make([]spec.ToolListItem, 0)
+	items := make([]spec.ToolListItem, 0)
 	for _, bundleID := range bundleIDs {
 		bundle := bundles[bundleID]
 		if !bundle.IsBuiltIn {
@@ -198,8 +505,8 @@ func (ts *ToolStore) ListBuiltInTools(
 			if !tool.IsBuiltIn {
 				continue
 			}
-			output = append(output, spec.ToolListItem{
-				BundleID:       bundle.ID,
+			items = append(items, spec.ToolListItem{
+				BundleID:       bundleID,
 				BundleSlug:     bundle.Slug,
 				ToolSlug:       tool.Slug,
 				ToolVersion:    tool.Version,
@@ -208,889 +515,6 @@ func (ts *ToolStore) ListBuiltInTools(
 			})
 		}
 	}
-	return output, nil
-}
 
-// PutToolBundle creates or replaces a bundle.
-func (ts *ToolStore) PutToolBundle(
-	ctx context.Context, req *spec.PutToolBundleRequest,
-) (*spec.PutToolBundleResponse, error) {
-	if req == nil || req.Body == nil ||
-		req.BundleID == "" || req.Body.Slug == "" || req.Body.DisplayName == "" {
-		return nil, fmt.Errorf("%w: id, slug & displayName required", errInvalidRequest)
-	}
-	if err := bundleitemutils.ValidateBundleSlug(req.Body.Slug); err != nil {
-		return nil, err
-	}
-
-	// Built-ins are immutable.
-	if ts.builtinData != nil {
-		if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err == nil {
-			return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
-		}
-	}
-
-	ts.sweepMu.Lock()
-	defer ts.sweepMu.Unlock()
-
-	all, err := ts.readAllBundles(false)
-	if err != nil {
-		return nil, err
-	}
-
-	now := time.Now().UTC()
-	createdAt := now
-	if ex, ok := all.Bundles[req.BundleID]; ok && !ex.CreatedAt.IsZero() {
-		createdAt = ex.CreatedAt
-	}
-
-	b := spec.ToolBundle{
-		SchemaVersion: spec.SchemaVersion,
-		ID:            req.BundleID,
-		Slug:          req.Body.Slug,
-		DisplayName:   req.Body.DisplayName,
-		Description:   req.Body.Description,
-		IsEnabled:     req.Body.IsEnabled,
-		IsBuiltIn:     false,
-		CreatedAt:     createdAt,
-		ModifiedAt:    now,
-		SoftDeletedAt: nil,
-	}
-
-	all.Bundles[req.BundleID] = b
-	if err := ts.writeAllBundles(all); err != nil {
-		return nil, err
-	}
-	slog.Info("putToolBundle", "bundleID", req.BundleID)
-	return &spec.PutToolBundleResponse{}, nil
-}
-
-// PatchToolBundle toggles the enabled flag.
-func (ts *ToolStore) PatchToolBundle(
-	ctx context.Context, req *spec.PatchToolBundleRequest,
-) (*spec.PatchToolBundleResponse, error) {
-	if req == nil || req.Body == nil || req.BundleID == "" {
-		return nil, fmt.Errorf("%w: bundleID required", errInvalidRequest)
-	}
-
-	// Built-in?
-	if ts.builtinData != nil {
-		if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err == nil {
-			if _, err := ts.builtinData.SetToolBundleEnabled(ctx, req.BundleID, req.Body.IsEnabled); err != nil {
-				return nil, err
-			}
-			slog.Info(
-				"patchToolBundle (builtin)",
-				"id",
-				req.BundleID,
-				"enabled",
-				req.Body.IsEnabled,
-			)
-			return &spec.PatchToolBundleResponse{}, nil
-		}
-	}
-
-	ts.sweepMu.Lock()
-	defer ts.sweepMu.Unlock()
-
-	all, err := ts.readAllBundles(false)
-	if err != nil {
-		return nil, err
-	}
-	bl, ok := all.Bundles[req.BundleID]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
-	}
-	bl.IsEnabled = req.Body.IsEnabled
-	bl.ModifiedAt = time.Now().UTC()
-	all.Bundles[req.BundleID] = bl
-	if err := ts.writeAllBundles(all); err != nil {
-		return nil, err
-	}
-	slog.Info("patchToolBundle", "id", req.BundleID, "enabled", req.Body.IsEnabled)
-	return &spec.PatchToolBundleResponse{}, nil
-}
-
-// DeleteToolBundle performs soft delete (only if empty).
-func (ts *ToolStore) DeleteToolBundle(
-	ctx context.Context, req *spec.DeleteToolBundleRequest,
-) (*spec.DeleteToolBundleResponse, error) {
-	if req == nil || req.BundleID == "" {
-		return nil, fmt.Errorf("%w: bundleID required", errInvalidRequest)
-	}
-
-	// Built-ins are immutable.
-	if ts.builtinData != nil {
-		if _, err := ts.builtinData.GetBuiltInToolBundle(ctx, req.BundleID); err == nil {
-			return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
-		}
-	}
-
-	ts.sweepMu.Lock()
-	defer ts.sweepMu.Unlock()
-
-	all, err := ts.readAllBundles(false)
-	if err != nil {
-		return nil, err
-	}
-	b, ok := all.Bundles[req.BundleID]
-	if !ok {
-		return nil, fmt.Errorf("%w: %s", errBundleNotFound, req.BundleID)
-	}
-	if isSoftDeletedTool(b) {
-		return nil, fmt.Errorf("%w: %s", errBundleDeleting, req.BundleID)
-	}
-
-	dirInfo, derr := bundleitemutils.BuildBundleDir(b.ID, b.Slug)
-	if derr != nil {
-		return nil, derr
-	}
-	files, _, err := ts.toolStore.ListFiles(
-		mapstore.ListingConfig{FilterPartitions: []string{dirInfo.DirName}, PageSize: 1}, "",
-	)
-	if err != nil {
-		return nil, err
-	}
-	if len(files) > 0 {
-		return nil, fmt.Errorf("%w: %s", errBundleNotEmpty, req.BundleID)
-	}
-
-	now := time.Now().UTC()
-	b.IsEnabled = false
-	b.SoftDeletedAt = &now
-	all.Bundles[req.BundleID] = b
-	if err := ts.writeAllBundles(all); err != nil {
-		return nil, err
-	}
-
-	ts.kickCleanupLoop()
-	slog.Info("deleteToolBundle", "bundleID", req.BundleID)
-	return &spec.DeleteToolBundleResponse{}, nil
-}
-
-// ListToolBundles returns bundles with filtering & pagination.
-func (ts *ToolStore) ListToolBundles(
-	ctx context.Context, req *spec.ListToolBundlesRequest,
-) (*spec.ListToolBundlesResponse, error) {
-	var (
-		pageSize        = defPageSizeTools
-		includeDisabled bool
-		wantIDs         = map[bundleitemutils.BundleID]struct{}{}
-		cursorMod       time.Time
-		cursorID        bundleitemutils.BundleID
-	)
-
-	// Token overrides parameters.
-	if req != nil && req.PageToken != "" {
-		if tok, err := jsonutil.Base64JSONDecode[spec.BundlePageToken](req.PageToken); err == nil {
-			pageSize = tok.PageSize
-			if pageSize <= 0 || pageSize > maxPageSizeTools {
-				pageSize = defPageSizeTools
-			}
-			includeDisabled = tok.IncludeDisabled
-			if tok.CursorMod != "" {
-				cursorMod, _ = time.Parse(time.RFC3339Nano, tok.CursorMod)
-				cursorID = tok.CursorID
-			}
-			for _, id := range tok.BundleIDs {
-				wantIDs[id] = struct{}{}
-			}
-		}
-	} else if req != nil { // First page.
-		if req.PageSize > 0 && req.PageSize <= maxPageSizeTools {
-			pageSize = req.PageSize
-		}
-		includeDisabled = req.IncludeDisabled
-		for _, id := range req.BundleIDs {
-			wantIDs[id] = struct{}{}
-		}
-	}
-
-	// Collect bundles (built-in + user).
-	bundles := make([]spec.ToolBundle, 0)
-	if ts.builtinData != nil {
-		bi, _, _ := ts.builtinData.ListBuiltInToolData(ctx)
-		for _, b := range bi {
-			bundles = append(bundles, b)
-		}
-	}
-	user, err := ts.readAllBundles(false)
-	if err != nil {
-		return nil, err
-	}
-	for _, b := range user.Bundles {
-		if isSoftDeletedTool(b) {
-			continue
-		}
-		bundles = append(bundles, b)
-	}
-
-	// Filtering.
-	filtered := make([]spec.ToolBundle, 0, len(bundles))
-	for _, b := range bundles {
-		if len(wantIDs) > 0 {
-			if _, ok := wantIDs[b.ID]; !ok {
-				continue
-			}
-		}
-		if !includeDisabled && !b.IsEnabled {
-			continue
-		}
-		filtered = append(filtered, b)
-	}
-
-	sort.Slice(filtered, func(i, j int) bool {
-		if filtered[i].ModifiedAt.Equal(filtered[j].ModifiedAt) {
-			return filtered[i].ID < filtered[j].ID
-		}
-		return filtered[i].ModifiedAt.After(filtered[j].ModifiedAt)
-	})
-
-	start := 0
-	if !cursorMod.IsZero() || cursorID != "" {
-		for i, b := range filtered {
-			if b.ModifiedAt.Before(cursorMod) ||
-				(b.ModifiedAt.Equal(cursorMod) && b.ID == cursorID) {
-				start = i + 1
-				break
-			}
-		}
-	}
-	end := min(start+pageSize, len(filtered))
-
-	var nextTok *string
-	if end < len(filtered) {
-		ids := make([]bundleitemutils.BundleID, 0, len(wantIDs))
-		for id := range wantIDs {
-			ids = append(ids, id)
-		}
-		slices.Sort(ids)
-
-		next := jsonutil.Base64JSONEncode(spec.BundlePageToken{
-			BundleIDs:       ids,
-			IncludeDisabled: includeDisabled,
-			PageSize:        pageSize,
-			CursorMod:       filtered[end-1].ModifiedAt.Format(time.RFC3339Nano),
-			CursorID:        filtered[end-1].ID,
-		})
-		nextTok = &next
-	}
-
-	return &spec.ListToolBundlesResponse{
-		Body: &spec.ListToolBundlesResponseBody{
-			ToolBundles:   filtered[start:end],
-			NextPageToken: nextTok,
-		},
-	}, nil
-}
-
-// PutTool creates a new tool version (immutable). Only HTTPImpl function tools are allowed to be added as of now.
-func (ts *ToolStore) PutTool(
-	ctx context.Context, req *spec.PutToolRequest,
-) (*spec.PutToolResponse, error) {
-	if req == nil || req.Body == nil ||
-		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
-	}
-	if req.Body.Type != spec.ToolTypeHTTP {
-		return nil, fmt.Errorf("%w: only custom http tools can be added", errInvalidRequest)
-	}
-	if !req.Body.UserCallable && !req.Body.LLMCallable {
-		return nil, fmt.Errorf("%w: a tool needs to be callable", errInvalidRequest)
-	}
-
-	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
-		return nil, err
-	}
-	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
-		return nil, err
-	}
-
-	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
-	if err != nil {
-		return nil, err
-	}
-	if isBI {
-		return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
-	}
-	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", errBundleDisabled, req.BundleID)
-	}
-
-	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-
-	// Per-slug lock.
-	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
-	lock.Lock()
-	defer lock.Unlock()
-
-	finf, _ := bundleitemutils.BuildItemFileInfo(req.ToolSlug, req.Version)
-	list, _, _ := ts.toolStore.ListFiles(
-		mapstore.ListingConfig{
-			FilterPartitions: []string{dirInfo.DirName},
-			FilenamePrefix:   finf.FileName,
-			PageSize:         10,
-		}, "",
-	)
-	for _, ex := range list {
-		if filepath.Base(ex.BaseRelativePath) == finf.FileName {
-			return nil, fmt.Errorf("%w: slug+version exists", errConflict)
-		}
-	}
-
-	now := time.Now().UTC()
-	uuid := uuidutil.NewUUIDv7()
-	argSchemaStr := req.Body.ArgSchema
-	if argSchemaStr == "" {
-		argSchemaStr = "{}"
-	}
-
-	t := spec.Tool{
-		SchemaVersion: spec.SchemaVersion,
-		ID:            bundleitemutils.ItemID(uuid),
-		Slug:          req.ToolSlug,
-		Version:       req.Version,
-		DisplayName:   req.Body.DisplayName,
-		Description:   req.Body.Description,
-		Tags:          req.Body.Tags,
-
-		UserCallable: req.Body.UserCallable,
-		LLMCallable:  req.Body.LLMCallable,
-		AutoExecReco: req.Body.AutoExecReco,
-
-		ArgSchema: json.RawMessage(argSchemaStr),
-
-		LLMToolType: spec.ToolStoreChoiceTypeFunction,
-		Type:        req.Body.Type,
-		HTTPImpl:    req.Body.HTTPImpl,
-		IsEnabled:   req.Body.IsEnabled,
-		IsBuiltIn:   false,
-		CreatedAt:   now,
-		ModifiedAt:  now,
-	}
-
-	if err := t.Validate(); err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	mp, _ := jsonencdec.StructWithJSONTagsToMap(t)
-	if err := ts.toolStore.SetFileData(
-		bundleitemutils.GetBundlePartitionFileKey(finf.FileName, dirInfo.DirName),
-		mp,
-	); err != nil {
-		return nil, err
-	}
-	slog.Info("putTool", "bundleID", req.BundleID, "slug", req.ToolSlug, "ver", req.Version)
-	return &spec.PutToolResponse{}, nil
-}
-
-// PatchTool toggles enabled flag on a tool version.
-func (ts *ToolStore) PatchTool(
-	ctx context.Context, req *spec.PatchToolRequest,
-) (*spec.PatchToolResponse, error) {
-	if req == nil || req.Body == nil ||
-		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
-	}
-	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
-		return nil, err
-	}
-	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
-		return nil, err
-	}
-
-	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
-	if err != nil {
-		return nil, err
-	}
-	if isBI {
-		_, err := ts.builtinData.SetToolEnabled(ctx,
-			bundle.ID, req.ToolSlug, req.Version, req.Body.IsEnabled,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		slog.Info("patchTool (builtin)", "bundleID", req.BundleID, "slug", req.ToolSlug,
-			"ver", req.Version, "enabled", req.Body.IsEnabled)
-		return &spec.PatchToolResponse{}, nil
-	}
-	if !bundle.IsEnabled {
-		return nil, fmt.Errorf("%w: %s", errBundleDisabled, req.BundleID)
-	}
-
-	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
-	lock.Lock()
-	defer lock.Unlock()
-
-	finf, _ := bundleitemutils.BuildItemFileInfo(req.ToolSlug, req.Version)
-	key := bundleitemutils.GetBundlePartitionFileKey(finf.FileName, dirInfo.DirName)
-
-	raw, err := ts.toolStore.GetFileData(key, false)
-	if err != nil {
-		return nil, err
-	}
-	var tool spec.Tool
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &tool); err != nil {
-		return nil, err
-	}
-	tool.IsEnabled = req.Body.IsEnabled
-	tool.ModifiedAt = time.Now().UTC()
-
-	mp, _ := jsonencdec.StructWithJSONTagsToMap(tool)
-	if err := ts.toolStore.SetFileData(key, mp); err != nil {
-		return nil, err
-	}
-
-	slog.Info("patchTool", "bundleID", req.BundleID, "slug", req.ToolSlug,
-		"ver", req.Version, "enabled", req.Body.IsEnabled)
-	return &spec.PatchToolResponse{}, nil
-}
-
-// DeleteTool removes a tool version permanently.
-func (ts *ToolStore) DeleteTool(
-	ctx context.Context, req *spec.DeleteToolRequest,
-) (*spec.DeleteToolResponse, error) {
-	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
-	}
-	if err := bundleitemutils.ValidateItemSlug(req.ToolSlug); err != nil {
-		return nil, err
-	}
-	if err := bundleitemutils.ValidateItemVersion(req.Version); err != nil {
-		return nil, err
-	}
-	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
-	if err != nil {
-		return nil, err
-	}
-	if isBI {
-		return nil, fmt.Errorf("%w: bundleID %q", errBuiltInReadOnly, req.BundleID)
-	}
-
-	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
-	lock.Lock()
-	defer lock.Unlock()
-
-	finf, _ := bundleitemutils.BuildItemFileInfo(req.ToolSlug, req.Version)
-	if err := ts.toolStore.DeleteFile(
-		bundleitemutils.GetBundlePartitionFileKey(finf.FileName, dirInfo.DirName),
-	); err != nil {
-		return nil, err
-	}
-	slog.Info("deleteTool", "bundleID", req.BundleID, "slug", req.ToolSlug, "ver", req.Version)
-	return &spec.DeleteToolResponse{}, nil
-}
-
-// GetTool retrieves a specific tool version.
-func (ts *ToolStore) GetTool(
-	ctx context.Context, req *spec.GetToolRequest,
-) (*spec.GetToolResponse, error) {
-	if req == nil || req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
-		return nil, fmt.Errorf("%w: bundleID, toolSlug, version required", errInvalidRequest)
-	}
-	bundle, isBI, err := ts.GetAnyToolBundle(ctx, req.BundleID)
-	if err != nil {
-		return nil, err
-	}
-	if isBI {
-		tool, err := ts.builtinData.GetBuiltInTool(ctx, bundle.ID, req.ToolSlug, req.Version)
-		if err != nil {
-			return nil, err
-		}
-		return &spec.GetToolResponse{Body: &tool}, nil
-	}
-	dirInfo, _ := bundleitemutils.BuildBundleDir(bundle.ID, bundle.Slug)
-	lock := ts.slugLock.LockKey(bundle.ID, req.ToolSlug)
-	lock.RLock()
-	defer lock.RUnlock()
-
-	finf, _, err := ts.findTool(dirInfo, req.ToolSlug, req.Version)
-	if err != nil {
-		return nil, err
-	}
-	raw, err := ts.toolStore.GetFileData(
-		bundleitemutils.GetBundlePartitionFileKey(finf.FileName, dirInfo.DirName), false,
-	)
-	if err != nil {
-		return nil, err
-	}
-	var t spec.Tool
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &t); err != nil {
-		return nil, err
-	}
-	return &spec.GetToolResponse{Body: &t}, nil
-}
-
-// ListTools enumerates every stored tool version subject to filters.
-func (ts *ToolStore) ListTools(
-	ctx context.Context, req *spec.ListToolsRequest,
-) (*spec.ListToolsResponse, error) {
-	// Initialise / resume paging.
-	tok := spec.ToolPageToken{}
-	if req != nil && req.PageToken != "" {
-		_ = func() error {
-			t, err := jsonutil.Base64JSONDecode[spec.ToolPageToken](req.PageToken)
-			if err == nil {
-				tok = t
-			}
-			return err
-		}()
-	}
-	if req != nil && req.PageToken == "" {
-		tok.RecommendedPageSize = req.RecommendedPageSize
-		tok.IncludeDisabled = req.IncludeDisabled
-		tok.BundleIDs = slices.Clone(req.BundleIDs)
-		slices.Sort(tok.BundleIDs)
-		tok.Tags = slices.Clone(req.Tags)
-		sort.Strings(tok.Tags)
-	}
-
-	pageHint := tok.RecommendedPageSize
-	if pageHint <= 0 || pageHint > maxPageSizeTools {
-		pageHint = defPageSizeTools
-	}
-
-	// Constant filters.
-	bFilter := map[bundleitemutils.BundleID]struct{}{}
-	for _, id := range tok.BundleIDs {
-		bFilter[id] = struct{}{}
-	}
-	tagFilter := map[string]struct{}{}
-	for _, t := range tok.Tags {
-		tagFilter[t] = struct{}{}
-	}
-
-	include := func(bid bundleitemutils.BundleID, tool *spec.Tool) bool {
-		if len(bFilter) > 0 {
-			if _, ok := bFilter[bid]; !ok {
-				return false
-			}
-		}
-		if !tok.IncludeDisabled && !tool.IsEnabled {
-			return false
-		}
-		if len(tagFilter) > 0 {
-			match := false
-			for _, tg := range tool.Tags {
-				if _, ok := tagFilter[tg]; ok {
-					match = true
-					break
-				}
-			}
-			if !match {
-				return false
-			}
-		}
-		return true
-	}
-
-	var out []spec.ToolListItem
-	scannedUsers := false
-
-	// Built-ins first.
-	if ts.builtinData == nil {
-		tok.BuiltInDone = true
-	} else if !tok.BuiltInDone {
-		biBundles, biTools, _ := ts.builtinData.ListBuiltInToolData(ctx)
-
-		bidList := make([]bundleitemutils.BundleID, 0, len(biBundles))
-		for bid := range biBundles {
-			bidList = append(bidList, bid)
-		}
-		slices.Sort(bidList)
-
-		for _, bid := range bidList {
-			bundle := biBundles[bid]
-
-			// Enforce bundle filter and enabled-state.
-			if len(bFilter) > 0 {
-				if _, ok := bFilter[bid]; !ok {
-					continue
-				}
-			}
-			if !tok.IncludeDisabled && !bundle.IsEnabled {
-				continue
-			}
-
-			bslug := bundle.Slug
-
-			ids := make([]bundleitemutils.ItemID, 0, len(biTools[bid]))
-			for tid := range biTools[bid] {
-				ids = append(ids, tid)
-			}
-			slices.SortFunc(ids, func(a, b bundleitemutils.ItemID) int {
-				return strings.Compare(string(a), string(b))
-			})
-			for _, tid := range ids {
-				tool := biTools[bid][tid]
-				if include(bid, &tool) {
-					out = append(out, spec.ToolListItem{
-						BundleID:       bid,
-						BundleSlug:     bslug,
-						ToolSlug:       tool.Slug,
-						ToolVersion:    tool.Version,
-						IsBuiltIn:      true,
-						ToolDefinition: tool,
-					})
-				}
-			}
-		}
-		tok.BuiltInDone = true
-	}
-
-	allUserBundles, err := ts.readAllBundles(false)
-	if err != nil {
-		return nil, err
-	}
-	userBundles := allUserBundles.Bundles
-
-	// User tools until pageHint filled.
-	for len(out) < pageHint {
-		files, next, err := ts.toolStore.ListFiles(
-			mapstore.ListingConfig{
-				PageSize:  fetchBatchTools,
-				SortOrder: mapstore.SortOrderDescending,
-			}, tok.DirTok,
-		)
-		if err != nil {
-			return nil, err
-		}
-		for _, f := range files {
-			fn := filepath.Base(f.BaseRelativePath)
-			dir := filepath.Base(filepath.Dir(f.BaseRelativePath))
-
-			if _, err := bundleitemutils.ParseItemFileName(fn); err != nil {
-				continue
-			}
-			bdi, err := bundleitemutils.ParseBundleDir(dir)
-			if err != nil {
-				continue
-			}
-			bundle, ok := userBundles[bdi.ID]
-			if !ok || isSoftDeletedTool(bundle) {
-				// Unknown or soft-deleted bundle; skip its tools.
-				continue
-			}
-			if len(bFilter) > 0 {
-				if _, ok := bFilter[bdi.ID]; !ok {
-					continue
-				}
-			}
-			if !tok.IncludeDisabled && !bundle.IsEnabled {
-				continue
-			}
-
-			raw, err := ts.toolStore.GetFileData(
-				bundleitemutils.GetBundlePartitionFileKey(fn, dir), false,
-			)
-			if err != nil {
-				continue
-			}
-			var tool spec.Tool
-			if err := jsonencdec.MapToStructWithJSONTags(raw, &tool); err != nil {
-				continue
-			}
-			if !include(bdi.ID, &tool) {
-				continue
-			}
-			out = append(out, spec.ToolListItem{
-				BundleID:       bdi.ID,
-				BundleSlug:     bdi.Slug,
-				ToolSlug:       tool.Slug,
-				ToolVersion:    tool.Version,
-				IsBuiltIn:      false,
-				ToolDefinition: tool,
-			})
-		}
-		tok.DirTok = next
-		scannedUsers = true
-		if tok.DirTok == "" {
-			break
-		}
-	}
-
-	var nextTok *string
-	if tok.DirTok != "" || !scannedUsers { // Need more pages.
-		s := jsonutil.Base64JSONEncode(tok)
-		nextTok = &s
-	}
-
-	return &spec.ListToolsResponse{
-		Body: &spec.ListToolsResponseBody{
-			ToolListItems: out,
-			NextPageToken: nextTok,
-		},
-	}, nil
-}
-
-// GetAnyToolBundle returns either a built-in or user bundle by ID.
-func (ts *ToolStore) GetAnyToolBundle(
-	ctx context.Context,
-	id bundleitemutils.BundleID,
-) (spec.ToolBundle, bool, error) {
-	if ts.builtinData != nil {
-		if b, err := ts.builtinData.GetBuiltInToolBundle(ctx, id); err == nil {
-			return b, true, nil
-		}
-	}
-	b, err := ts.getUserBundle(id)
-	return b, false, err
-}
-
-// findTool locates (slug, version) inside the given bundle directory.
-func (ts *ToolStore) findTool(
-	bdi bundleitemutils.BundleDirInfo,
-	slug bundleitemutils.ItemSlug,
-	version bundleitemutils.ItemVersion,
-) (bundleitemutils.FileInfo, string, error) {
-	if slug == "" || version == "" {
-		return bundleitemutils.FileInfo{}, "", errInvalidRequest
-	}
-	fi, err := bundleitemutils.BuildItemFileInfo(slug, version)
-	if err != nil {
-		return fi, "", err
-	}
-	key := bundleitemutils.GetBundlePartitionFileKey(fi.FileName, bdi.DirName)
-	raw, err := ts.toolStore.GetFileData(key, false)
-	if err != nil {
-		return fi, "", fmt.Errorf("%w: %s", errToolNotFound, slug)
-	}
-	if s, _ := raw["slug"].(string); s != string(slug) {
-		return fi, "", fmt.Errorf("%w: %s", errToolNotFound, slug)
-	}
-	return fi, filepath.Join(bdi.DirName, fi.FileName), nil
-}
-
-// getUserBundle fetches a non-soft-deleted user bundle.
-func (ts *ToolStore) getUserBundle(id bundleitemutils.BundleID) (spec.ToolBundle, error) {
-	all, err := ts.readAllBundles(false)
-	if err != nil {
-		return spec.ToolBundle{}, err
-	}
-	b, ok := all.Bundles[id]
-	if !ok {
-		return spec.ToolBundle{}, fmt.Errorf("%w: %s", errBundleNotFound, id)
-	}
-	if isSoftDeletedTool(b) {
-		return b, fmt.Errorf("%w: %s", errBundleDeleting, id)
-	}
-	return b, nil
-}
-
-func (ts *ToolStore) startCleanupLoop() {
-	ts.cleanOnce.Do(func() {
-		ts.cleanKick = make(chan struct{}, 1)
-		ts.cleanCtx, ts.cleanStop = context.WithCancel(context.Background())
-		ts.wg.Go(func() {
-			tick := time.NewTicker(cleanupIntervalTools)
-			defer tick.Stop()
-			defer func() {
-				if r := recover(); r != nil {
-					slog.Error(
-						"panic in tool-bundle sweep",
-						"err",
-						r,
-						"stack",
-						string(debug.Stack()),
-					)
-				}
-			}()
-
-			ts.sweepSoftDeleted()
-
-			for {
-				select {
-				case <-ts.cleanCtx.Done():
-					return
-				case <-tick.C:
-				case <-ts.cleanKick:
-				}
-				ts.sweepSoftDeleted()
-			}
-		})
-	})
-}
-
-// sweepSoftDeleted hard-deletes bundles whose grace period expired.
-func (ts *ToolStore) sweepSoftDeleted() {
-	ts.sweepMu.Lock()
-	defer ts.sweepMu.Unlock()
-
-	all, err := ts.readAllBundles(false)
-	if err != nil {
-		slog.Error("sweepSoftDeleted/readAllBundles", "err", err)
-		return
-	}
-	now := time.Now().UTC()
-	changed := false
-
-	for id, b := range all.Bundles {
-		if b.SoftDeletedAt == nil || b.SoftDeletedAt.IsZero() {
-			continue
-		}
-		if now.Sub(*b.SoftDeletedAt) < softDeleteGraceTools {
-			continue
-		}
-
-		dirInfo, _ := bundleitemutils.BuildBundleDir(b.ID, b.Slug)
-		files, _, err := ts.toolStore.ListFiles(
-			mapstore.ListingConfig{FilterPartitions: []string{dirInfo.DirName}, PageSize: 1}, "",
-		)
-		if err != nil || len(files) > 0 {
-			slog.Warn("sweepSoftDeleted: bundle not empty", "bundleID", id)
-			continue
-		}
-
-		delete(all.Bundles, id)
-		changed = true
-		_ = os.RemoveAll(filepath.Join(ts.baseDir, dirInfo.DirName))
-		slog.Info("hard-deleted bundle", "bundleID", id)
-	}
-
-	if changed {
-		if err := ts.writeAllBundles(all); err != nil {
-			slog.Error("sweepSoftDeleted/writeAllBundles", "err", err)
-		}
-	}
-}
-
-// kickCleanupLoop triggers an immediate sweep.
-func (ts *ToolStore) kickCleanupLoop() {
-	select {
-	case ts.cleanKick <- struct{}{}:
-	default:
-	}
-}
-
-func (ts *ToolStore) readAllBundles(force bool) (spec.AllBundles, error) {
-	raw, err := ts.bundleStore.GetAll(force)
-	if err != nil {
-		return spec.AllBundles{}, err
-	}
-	var ab spec.AllBundles
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &ab); err != nil {
-		return ab, err
-	}
-	return ab, nil
-}
-
-func (ts *ToolStore) writeAllBundles(ab spec.AllBundles) error {
-	mp, _ := jsonencdec.StructWithJSONTagsToMap(ab)
-	return ts.bundleStore.SetAll(mp)
-}
-
-func SetPreparedData(ts *ToolStore, fileName, dirName string, data map[string]any) error {
-	// Only for test runtime. Not to be exported as a store method anywhere.
-	return ts.toolStore.SetFileData(
-		bundleitemutils.GetBundlePartitionFileKey(fileName, dirName),
-		data,
-	)
-}
-
-// isSoftDeletedTool returns true if bundle is in soft-deleted state.
-func isSoftDeletedTool(b spec.ToolBundle) bool {
-	return b.SoftDeletedAt != nil && !b.SoftDeletedAt.IsZero()
+	return items, bundles, nil
 }

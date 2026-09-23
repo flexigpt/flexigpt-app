@@ -34,53 +34,16 @@ export interface ToolStoreChoice {
 
 export enum ToolImplType {
 	Go = 'go',
-	HTTP = 'http',
 	SDK = 'sdk',
 }
 
 interface GoToolImpl {
-	/** Fully-qualified registration key, e.g. "github.com/acme/flexigpt/tools.Weather" */
+	/** Built-in Go registry key. */
 	func: string;
 }
 
 interface SDKToolImpl {
-	// SDKType can be ProviderSDKType.
 	sdkType: string;
-}
-
-interface HTTPAuth {
-	type: string;
-	in?: string; // "header" | "query" (apiKey only)
-	name?: string;
-	valueTemplate: string; // may contain ${SECRET}
-}
-
-interface HTTPRequest {
-	method?: string; // default "GET"
-	urlTemplate: string; // http(s)://… may contain ${var}
-	query?: Record<string, string>; // k:${var}
-	headers?: Record<string, string>; // k:${var}
-	body?: string; // raw or template
-	auth?: HTTPAuth;
-	timeoutMS?: number; // default 10_000
-}
-
-export enum HTTPBodyOutputMode {
-	Auto = 'auto',
-	Text = 'text',
-	File = 'file',
-	Image = 'image',
-}
-
-interface HTTPResponse {
-	successCodes?: number[]; // default: 2xx
-	errorMode?: string; // "fail"(dflt) | "empty"
-	bodyOutputMode?: HTTPBodyOutputMode;
-}
-
-export interface HTTPToolImpl {
-	request: HTTPRequest;
-	response: HTTPResponse;
 }
 
 export enum ToolOutputKind {
@@ -135,7 +98,6 @@ export interface Tool {
 	llmToolType: ToolStoreChoiceType;
 	type: ToolImplType;
 	goImpl?: GoToolImpl;
-	httpImpl?: HTTPToolImpl;
 	sdkImpl?: SDKToolImpl;
 
 	isEnabled: boolean;
@@ -156,7 +118,6 @@ export interface ToolBundle {
 	isBuiltIn: boolean;
 	createdAt: string;
 	modifiedAt: string;
-	softDeletedAt?: string;
 }
 
 export interface ToolListItem {

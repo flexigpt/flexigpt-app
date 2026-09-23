@@ -1,11 +1,5 @@
 import type { ToolOutputUnion } from '@/spec/tool';
 
-export interface InvokeHTTPOptions {
-	timeoutMS?: number;
-	extraHeaders?: Record<string, string>;
-	secrets?: Record<string, string>;
-}
-
 export interface InvokeGoOptions {
 	timeoutMS?: number;
 }

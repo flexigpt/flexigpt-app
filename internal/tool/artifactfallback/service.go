@@ -13,8 +13,8 @@ import (
 	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 )
 
-// Service resolves legacy built-in ToolStore Tools as mapped Artifact targets
-// and translates mapped targets back into legacy ToolStore references.
+// Service resolves built-in ToolStore tools as mapped Artifact targets and
+// translates mapped targets back into built-in ToolStore references.
 type Service struct {
 	store *toolStore.ToolStore
 
@@ -97,8 +97,8 @@ func (s *Service) ResolveFallback(
 	}, true, nil
 }
 
-// ResolveTarget translates a Tool mapped target into the legacy ToolRef used
-// by existing ToolStore, inference, and conversation flows.
+// ResolveTarget translates a built-in Tool mapped target into the ToolRef used
+// by ToolStore, inference, and conversation flows.
 func (s *Service) ResolveTarget(
 	ctx context.Context,
 	target resolve.MappedTarget,

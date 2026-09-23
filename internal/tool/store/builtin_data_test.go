@@ -899,7 +899,6 @@ func buildValidTool(t *testing.T, slug, ver, id string) spec.Tool {
 		LLMToolType:   spec.ToolStoreChoiceTypeFunction,
 		Type:          spec.ToolTypeGo,
 		GoImpl:        &spec.GoToolImpl{Func: "github.com/acme/flexigpt/tools.Demo"},
-		HTTPImpl:      nil,
 		IsEnabled:     true,
 		IsBuiltIn:     true,
 		CreatedAt:     now,

@@ -8,15 +8,7 @@ import (
 )
 
 const (
-	ToolBundlesMetaFileName      = "tools.bundles.json"
-	ToolDBFileName               = "tools.fts.sqlite"
 	ToolBuiltInOverlayDBFileName = "toolsbuiltin.overlay.sqlite"
-
-	DefaultHTTPTimeoutMS = 10_000
-	JSONEncoding         = "json"
-	TextEncoding         = "text"
-	DefaultHTTPEncoding  = JSONEncoding
-	DefaultHTTPErrorMode = "fail"
 
 	// SchemaVersion  - Current on-disk schema version.
 	SchemaVersion = "2025-07-01"
@@ -25,9 +17,8 @@ const (
 type ToolImplType string
 
 const (
-	ToolTypeGo   ToolImplType = "go"
-	ToolTypeHTTP ToolImplType = "http"
-	ToolTypeSDK  ToolImplType = "sdk"
+	ToolTypeGo  ToolImplType = "go"
+	ToolTypeSDK ToolImplType = "sdk"
 )
 
 // GoToolImpl - Register-by-name pattern for Go tools.
@@ -42,48 +33,6 @@ type GoToolImpl struct {
 type SDKToolImpl struct {
 	// SDKType can be ProviderSDKType.
 	SDKType string `json:"sdkType"`
-}
-
-// HTTPAuth - Simple auth descriptor (can be extended later).
-type HTTPAuth struct {
-	Type          string `json:"type"`
-	In            string `json:"in,omitempty"`   // "header" | "query"  (apiKey only)
-	Name          string `json:"name,omitempty"` // header/query key
-	ValueTemplate string `json:"valueTemplate"`  // may contain ${SECRET}
-}
-type HTTPRequest struct {
-	Method      string            `json:"method,omitempty"`    // default "GET"
-	URLTemplate string            `json:"urlTemplate"`         // http(s)://… may contain ${var}
-	Query       map[string]string `json:"query,omitempty"`     // k:${var}
-	Headers     map[string]string `json:"headers,omitempty"`   // k:${var}
-	Body        string            `json:"body,omitempty"`      // raw or template
-	Auth        *HTTPAuth         `json:"auth,omitempty"`      // see below
-	TimeoutMS   int               `json:"timeoutMS,omitempty"` // default 10 000
-}
-
-// HTTPBodyOutputMode - how to map HTTP response body into tool outputs.
-// "" / "auto" (default): infer from Content-Type.
-// "text": always a single text block.
-// "file": always a single file block.
-// "image": always a single image block.
-type HTTPBodyOutputMode string
-
-const (
-	HTTPBodyOutputModeAuto  HTTPBodyOutputMode = "auto"
-	HTTPBodyOutputModeText  HTTPBodyOutputMode = "text"
-	HTTPBodyOutputModeFile  HTTPBodyOutputMode = "file"
-	HTTPBodyOutputModeImage HTTPBodyOutputMode = "image"
-)
-
-type HTTPResponse struct {
-	SuccessCodes   []int              `json:"successCodes,omitempty"` // default: any 2xx
-	ErrorMode      string             `json:"errorMode,omitempty"`    // "fail"(dflt) | "empty"
-	BodyOutputMode HTTPBodyOutputMode `json:"bodyOutputMode,omitempty"`
-}
-
-type HTTPToolImpl struct {
-	Request  HTTPRequest  `json:"request"`
-	Response HTTPResponse `json:"response"`
 }
 
 type ToolRef struct {
@@ -112,12 +61,12 @@ type Tool struct {
 	AutoExecReco bool `json:"autoExecute"`
 
 	// ArgSchema describes the JSON arguments that are passed when the tool is invoked (by the LLM or via InvokeTool).
-	// This is primarily used for Go/HTTP tools.
+	// This is primarily used for Go tools.
 	ArgSchema json.RawMessage `json:"argSchema"`
 
 	// UserArgSchema, if present, describes an additional per-choice configuration object that the UI may collect when
 	// enabling the tool for a model.
-	// For SDK-backed server tools this typically encodes provider-specific options (e.g., web-search settings).
+	// For SDK-backed API tools this typically encodes provider-specific options.
 	UserArgSchema json.RawMessage `json:"userArgSchema,omitempty"`
 
 	// LLMToolType captures the semantic kind of this tool from the model's point of view, e.g. "function", "custom",
@@ -125,10 +74,9 @@ type Tool struct {
 	// This value should always be one of ToolStoreChoiceType values.
 	LLMToolType ToolStoreChoiceType `json:"llmToolType"`
 
-	Type     ToolImplType  `json:"type"`
-	GoImpl   *GoToolImpl   `json:"goImpl,omitempty"`
-	HTTPImpl *HTTPToolImpl `json:"httpImpl,omitempty"`
-	SDKImpl  *SDKToolImpl  `json:"sdkImpl,omitempty"`
+	Type    ToolImplType `json:"type"`
+	GoImpl  *GoToolImpl  `json:"goImpl,omitempty"`
+	SDKImpl *SDKToolImpl `json:"sdkImpl,omitempty"`
 
 	IsEnabled  bool      `json:"isEnabled"`
 	IsBuiltIn  bool      `json:"isBuiltIn"`
@@ -144,11 +92,10 @@ type ToolBundle struct {
 	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
 
-	IsEnabled     bool       `json:"isEnabled"`
-	IsBuiltIn     bool       `json:"isBuiltIn"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	ModifiedAt    time.Time  `json:"modifiedAt"`
-	SoftDeletedAt *time.Time `json:"softDeletedAt,omitempty"`
+	IsEnabled  bool      `json:"isEnabled"`
+	IsBuiltIn  bool      `json:"isBuiltIn"`
+	CreatedAt  time.Time `json:"createdAt"`
+	ModifiedAt time.Time `json:"modifiedAt"`
 }
 
 type AllBundles struct {

@@ -213,6 +213,9 @@ function rawJSONFromWails(value: unknown, field: string): JSONRawString {
 	return serialized;
 }
 
+// Wails transports this source as a string. The Go jsonutil package unwraps
+// that outer string before passing it to a typed tool argument decoder.
+// Do not JSON.stringify this value again.
 export function rawJSONToWails(value: JSONRawString, field: string): string {
 	if (typeof value !== 'string') {
 		throw new TypeError(`${field} must be valid JSON.`);
@@ -235,17 +238,4 @@ export function jsonObjectFromWails(value: unknown, field: string): JSONSchema {
 	}
 
 	return parsed as JSONSchema;
-}
-
-export function jsonObjectToWails(value: JSONSchema, field: string): string {
-	if (value === null || Array.isArray(value) || typeof value !== 'object') {
-		throw new Error(`${field} must be a JSON object.`);
-	}
-
-	const serialized = JSON.stringify(value);
-	if (serialized === undefined) {
-		throw new Error(`${field} must be a JSON object.`);
-	}
-
-	return serialized;
 }

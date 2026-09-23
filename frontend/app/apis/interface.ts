@@ -107,8 +107,8 @@ import type {
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
 } from '@/spec/skill';
-import type { HTTPToolImpl, Tool, ToolBundle, ToolImplType, ToolListItem, ToolRef, ToolStoreChoice } from '@/spec/tool';
-import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
+import type { Tool, ToolBundle, ToolListItem, ToolRef, ToolStoreChoice } from '@/spec/tool';
+import type { InvokeGoOptions, InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
 	WorkspaceArtifactView,
@@ -124,7 +124,7 @@ import type {
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
 
-import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
+import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 export interface ILogger {
 	log(...args: unknown[]): void;
@@ -201,20 +201,8 @@ export interface IToolStoreAPI {
 		pageToken?: string
 	): Promise<{ toolBundles: ToolBundle[]; nextPageToken?: string }>;
 
-	/** Create or update a tool bundle. */
-	putToolBundle(
-		bundleID: string,
-		slug: string,
-		displayName: string,
-		isEnabled: boolean,
-		description?: string
-	): Promise<void>;
-
 	/** Patch (enable/disable) a tool bundle. */
 	patchToolBundle(bundleID: string, isEnabled: boolean): Promise<void>;
-
-	/** Delete a tool bundle. */
-	deleteToolBundle(bundleID: string): Promise<void>;
 
 	/** List tools, optionally filtered by bundleIDs, tags, etc. */
 	listTools(
@@ -225,31 +213,10 @@ export interface IToolStoreAPI {
 		pageToken?: string
 	): Promise<{ toolListItems: ToolListItem[]; nextPageToken?: string }>;
 
-	/** Create or update a tool. */
-	putTool(
-		bundleID: string,
-		toolSlug: string,
-		version: string,
-		displayName: string,
-		isEnabled: boolean,
-		userCallable: boolean,
-		llmCallable: boolean,
-		autoExecute: boolean,
-		argSchema: JSONSchema,
-		type: ToolImplType,
-		httpImpl?: HTTPToolImpl,
-		description?: string,
-		tags?: string[]
-	): Promise<void>;
-
-	/** Patch (enable/disable) a tool version. */
-	patchTool(bundleID: string, toolSlug: string, version: string, isEnabled: boolean): Promise<void>;
-
-	/** Delete a tool version. */
-	deleteTool(bundleID: string, toolSlug: string, version: string): Promise<void>;
-
 	/** Get a tool version. */
 	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
+
+	patchTool(bundleID: string, toolSlug: string, version: string, isEnabled: boolean): Promise<void>;
 
 	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
 }
@@ -463,7 +430,6 @@ export interface IToolRuntimeAPI {
 		toolSlug: string,
 		version: string,
 		args?: JSONRawString,
-		httpOptions?: InvokeHTTPOptions,
 		goOptions?: InvokeGoOptions
 	): Promise<InvokeToolResponse>;
 }

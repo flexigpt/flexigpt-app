@@ -10,6 +10,44 @@ import (
 
 type JSONRawString string
 
+// DecodeJSONStringRaw decodes a JSON document transported as JSONRawString.
+//
+// Wails transports JSON source strings as a quoted JSON string. Decode that
+// outer string first, then return the inner JSON document as RawMessage.
+// Direct raw JSON values are also accepted for non-Wails callers.
+func DecodeJSONStringRaw(value JSONRawString) (json.RawMessage, error) {
+	raw := bytes.TrimSpace([]byte(value))
+	if len(raw) == 0 {
+		return nil, errors.New("raw JSON string is empty")
+	}
+
+	var encoded string
+	if err := json.Unmarshal(raw, &encoded); err == nil {
+		decoded := bytes.TrimSpace([]byte(encoded))
+		if json.Valid(decoded) {
+			raw = decoded
+		}
+	}
+
+	if !json.Valid(raw) {
+		return nil, errors.New("invalid raw JSON string")
+	}
+
+	return json.RawMessage(append([]byte(nil), raw...)), nil
+}
+
+// DecodeJSONStringRawInto decodes a Wails JSON source string into T.
+func DecodeJSONStringRawInto[T any](value JSONRawString) (T, error) {
+	var zero T
+
+	raw, err := DecodeJSONStringRaw(value)
+	if err != nil {
+		return zero, err
+	}
+
+	return DecodeJSONRaw[T](raw)
+}
+
 func (value JSONRawString) MarshalJSON() ([]byte, error) {
 	raw := bytes.TrimSpace([]byte(value))
 	if len(raw) == 0 {

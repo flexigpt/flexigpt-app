@@ -1,4 +1,4 @@
-import type { InvokeGoOptions, InvokeHTTPOptions, InvokeToolResponse } from '@/spec/toolruntime';
+import type { InvokeGoOptions, InvokeToolResponse } from '@/spec/toolruntime';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
@@ -13,7 +13,6 @@ export class WailsToolRuntimeAPI implements IToolRuntimeAPI {
 		toolSlug: string,
 		version: string,
 		args?: JSONRawString,
-		httpOptions?: InvokeHTTPOptions,
 		goOptions?: InvokeGoOptions
 	): Promise<InvokeToolResponse> {
 		const req = {
@@ -22,7 +21,6 @@ export class WailsToolRuntimeAPI implements IToolRuntimeAPI {
 			Version: version,
 			Body: {
 				args: rawJSONToWails(args ?? '{}', 'tool arguments'),
-				httpOptions: httpOptions as spec.InvokeHTTPOptions | undefined,
 				goOptions: goOptions as spec.InvokeGoOptions | undefined,
 			} as spec.InvokeToolRequestBody,
 		} as spec.InvokeToolRequest;

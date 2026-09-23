@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
@@ -14,6 +13,9 @@ import (
 func (t *Tool) Validate() error {
 	if t == nil {
 		return errors.New("tool is nil")
+	}
+	if !t.IsBuiltIn {
+		return errors.New("only built-in tools are supported")
 	}
 	if t.SchemaVersion != SchemaVersion {
 		return fmt.Errorf(
@@ -63,33 +65,14 @@ func (t *Tool) Validate() error {
 		if t.GoImpl == nil || strings.TrimSpace(t.GoImpl.Func) == "" {
 			return errors.New("goImpl.func is required for type 'go'")
 		}
-		if t.HTTPImpl != nil {
-			return errors.New("httpImpl must be unset for type 'go'")
-		}
 		if t.SDKImpl != nil {
 			return errors.New("sdkImpl must be unset for type 'go'")
-		}
-	case ToolTypeHTTP:
-		if t.HTTPImpl == nil {
-			return errors.New("httpImpl is required for type 'http'")
-		}
-		if t.GoImpl != nil {
-			return errors.New("goImpl must be unset for type 'http'")
-		}
-		if t.SDKImpl != nil {
-			return errors.New("sdkImpl must be unset for type 'http'")
-		}
-		if err := t.HTTPImpl.Validate(); err != nil {
-			return errors.New("invalid implementation for type 'http'")
 		}
 	case ToolTypeSDK:
 		// SDK-backed tools are surfaced to the provider SDK as
 		// server tools; they are not invoked via ToolStore.
 		if t.GoImpl != nil {
 			return errors.New("goImpl must be unset for type 'sdk'")
-		}
-		if t.HTTPImpl != nil {
-			return errors.New("httpImpl must be unset for type 'sdk'")
 		}
 		if t.SDKImpl == nil {
 			return errors.New("sdk metadata is required for type 'sdk'")
@@ -98,58 +81,14 @@ func (t *Tool) Validate() error {
 			return errors.New("sdk.sdkType is required for type 'sdk'")
 		}
 	default:
-		return fmt.Errorf("invalid type %q", t.Type)
+		return fmt.Errorf(
+			"unsupported built-in tool type %q; only go and sdk are supported",
+			t.Type,
+		)
 	}
 
 	if err := bundleitemutils.ValidateTags(t.Tags); err != nil {
 		return err
-	}
-	return nil
-}
-
-func (impl *HTTPToolImpl) Validate() error {
-	if impl == nil {
-		return errors.New("httpImpl is nil")
-	}
-	if strings.TrimSpace(impl.Request.URLTemplate) == "" {
-		return errors.New("httpImpl.request.urlTemplate is empty")
-	}
-	// Enforce method sanity if set.
-	if impl.Request.Method != "" {
-		m := strings.ToUpper(strings.TrimSpace(impl.Request.Method))
-		switch m {
-		case http.MethodGet,
-			http.MethodPost,
-			http.MethodPut,
-			http.MethodPatch,
-			http.MethodDelete,
-			http.MethodHead,
-			http.MethodOptions:
-			// Ok.
-		default:
-			return fmt.Errorf("unsupported http method: %s", m)
-		}
-	}
-	// SuccessCodes sanity.
-	for _, c := range impl.Response.SuccessCodes {
-		if c < 100 || c > 599 {
-			return fmt.Errorf("invalid success code: %d", c)
-		}
-	}
-	if impl.Response.ErrorMode != "" {
-		em := strings.ToLower(impl.Response.ErrorMode)
-		if em != "fail" && em != "empty" {
-			return fmt.Errorf("invalid errorMode: %s", impl.Response.ErrorMode)
-		}
-	}
-	switch impl.Response.BodyOutputMode {
-	case "", HTTPBodyOutputModeAuto,
-		HTTPBodyOutputModeText,
-		HTTPBodyOutputModeFile,
-		HTTPBodyOutputModeImage:
-		// Ok.
-	default:
-		return fmt.Errorf("invalid bodyOutputMode: %s", impl.Response.BodyOutputMode)
 	}
 	return nil
 }

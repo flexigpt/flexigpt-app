@@ -39,22 +39,6 @@ func InitToolStoreWrapper(
 	return nil
 }
 
-func (tbw *ToolStoreWrapper) PutToolBundle(
-	req *spec.PutToolBundleRequest,
-) (*spec.PutToolBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutToolBundleResponse, error) {
-		return tbw.store.PutToolBundle(context.Background(), req)
-	})
-}
-
-func (tbw *ToolStoreWrapper) DeleteToolBundle(
-	req *spec.DeleteToolBundleRequest,
-) (*spec.DeleteToolBundleResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteToolBundleResponse, error) {
-		return tbw.store.DeleteToolBundle(context.Background(), req)
-	})
-}
-
 func (tbw *ToolStoreWrapper) PatchToolBundle(
 	req *spec.PatchToolBundleRequest,
 ) (*spec.PatchToolBundleResponse, error) {
@@ -68,22 +52,6 @@ func (tbw *ToolStoreWrapper) ListToolBundles(
 ) (*spec.ListToolBundlesResponse, error) {
 	return middleware.WithRecoveryResp(func() (*spec.ListToolBundlesResponse, error) {
 		return tbw.store.ListToolBundles(context.Background(), req)
-	})
-}
-
-func (tbw *ToolStoreWrapper) PutTool(
-	req *spec.PutToolRequest,
-) (*spec.PutToolResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.PutToolResponse, error) {
-		return tbw.store.PutTool(context.Background(), req)
-	})
-}
-
-func (tbw *ToolStoreWrapper) DeleteTool(
-	req *spec.DeleteToolRequest,
-) (*spec.DeleteToolResponse, error) {
-	return middleware.WithRecoveryResp(func() (*spec.DeleteToolResponse, error) {
-		return tbw.store.DeleteTool(context.Background(), req)
 	})
 }
 

@@ -1,7 +1,7 @@
 const HTTP_HEADER_NAME_RE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 const HTTP_HEADER_CONTROL_CHAR_RE = /[\r\n\u0000]/;
 
-export const REDACTED_HTTP_VALUE = '[configured]';
+const REDACTED_HTTP_VALUE = '[configured]';
 
 function isIPv4LoopbackHost(host: string): boolean {
 	const parts = host.split('.').map(Number);
@@ -64,26 +64,6 @@ export function validateHTTPURLSecurity(raw: string, fieldLabel = 'URL'): string
 	}
 }
 
-/**
- * Applies URL security checks to an HTTP tool URL template while preventing
- * model-controlled substitutions in the scheme or network authority.
- */
-export function validateHTTPURLTemplateSecurity(raw: string, fieldLabel = 'URL'): string | undefined {
-	const schemeSeparator = raw.indexOf('://');
-	if (schemeSeparator >= 0) {
-		const authorityStart = schemeSeparator + 3;
-		const relativeAuthorityEnd = raw.slice(authorityStart).search(/[/?#]/);
-		const authorityEnd = relativeAuthorityEnd < 0 ? raw.length : authorityStart + relativeAuthorityEnd;
-		const authority = new Set(raw.slice(authorityStart, authorityEnd));
-
-		if (authority.has('${') || authority.has('{{')) {
-			return `${fieldLabel} must not contain substitutions in the host, port, or user-info section.`;
-		}
-	}
-
-	return validateHTTPURLSecurity(raw, fieldLabel);
-}
-
 export function validateHTTPHeaderName(name: string, fieldLabel = 'Header name'): string | undefined {
 	const normalized = name.trim();
 	if (!normalized) {
@@ -122,7 +102,7 @@ function parseJSONObject(raw: string, label: string): Record<string, unknown> {
 	return parsed as Record<string, unknown>;
 }
 
-export function parseStringRecordJSON(raw: string, label: string): Record<string, string> {
+function parseStringRecordJSON(raw: string, label: string): Record<string, string> {
 	const parsed = parseJSONObject(raw, label);
 	const result: Record<string, string> = {};
 
@@ -163,31 +143,6 @@ export function parseHTTPHeadersJSON(raw: string, label = 'Headers'): Record<str
 	}
 
 	return headers;
-}
-
-export function parseHTTPStatusCodes(raw: string): number[] | undefined {
-	const value = raw.trim();
-	if (!value) {
-		return undefined;
-	}
-
-	const codes = value
-		.split(',')
-		.map(part => part.trim())
-		.filter(Boolean)
-		.map(part => {
-			if (!/^\d{3}$/.test(part)) {
-				throw new Error('Success codes must be comma-separated HTTP status codes.');
-			}
-
-			const code = Number(part);
-			if (!Number.isInteger(code) || code < 100 || code > 599) {
-				throw new Error('HTTP success codes must be between 100 and 599.');
-			}
-			return code;
-		});
-
-	return [...new Set(codes)];
 }
 
 function isSensitiveHTTPHeaderName(name: string): boolean {

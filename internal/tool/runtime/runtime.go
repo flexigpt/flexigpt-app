@@ -2,7 +2,6 @@ package runtime
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -12,15 +11,15 @@ import (
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
 	"github.com/flexigpt/flexigpt-app/internal/tool/store"
 
-	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/httprunner"
 	"github.com/flexigpt/flexigpt-app/internal/tool/runtime/spec"
 )
 
-// ToolRuntime executes tools (HTTP/Go) using tool definitions retrieved from ToolStore.
+// ToolRuntime executes built-in Go tools retrieved from ToolStore.
 type ToolRuntime struct {
 	store *store.ToolStore
 }
@@ -31,12 +30,15 @@ func NewToolRuntime(s *store.ToolStore) *ToolRuntime {
 
 // InvokeTool locates a tool version in the ToolStore and executes it according to its type.
 // - Validates request, slug/version.
-// - Enforces bundle/tool enabled state.
-// - Dispatches to HTTP or Go runner with functional options constructed from the request body.
+// - Enforces built-in bundle/tool enabled state.
+// - Dispatches only built-in Go tools.
 func (rt *ToolRuntime) InvokeTool(
 	ctx context.Context,
 	req *spec.InvokeToolRequest,
 ) (*spec.InvokeToolResponse, error) {
+	if rt == nil || rt.store == nil {
+		return nil, errors.New("tool runtime is not initialized")
+	}
 	if req == nil || req.Body == nil ||
 		req.BundleID == "" || req.ToolSlug == "" || req.Version == "" {
 		return nil, errors.New(
@@ -50,12 +52,21 @@ func (rt *ToolRuntime) InvokeTool(
 		return nil, err
 	}
 
-	args := json.RawMessage(req.Body.Args)
+	args, err := jsonutil.DecodeJSONStringRaw(req.Body.Args)
+	if err != nil {
+		return nil, fmt.Errorf("invalid tool arguments: %w", err)
+	}
 
 	// Load bundle and tool definitions from the store.
 	bundle, isBuiltIn, err := rt.store.GetAnyToolBundle(ctx, req.BundleID)
 	if err != nil {
 		return nil, err
+	}
+	if !isBuiltIn || !bundle.IsBuiltIn {
+		return nil, fmt.Errorf(
+			"only built-in tools can be invoked: %s",
+			req.BundleID,
+		)
 	}
 	if !bundle.IsEnabled {
 		return nil, fmt.Errorf("bundle is disabled: %s", req.BundleID)
@@ -72,6 +83,9 @@ func (rt *ToolRuntime) InvokeTool(
 	tool := gtResp.Body
 	if tool == nil {
 		return nil, errors.New("tool not found: nil tool body")
+	}
+	if !tool.IsBuiltIn {
+		return nil, errors.New("only built-in tools can be invoked")
 	}
 	if !tool.IsEnabled {
 		return nil, fmt.Errorf(
@@ -95,26 +109,6 @@ func (rt *ToolRuntime) InvokeTool(
 	)
 
 	switch tool.Type {
-	case toolSpec.ToolTypeHTTP:
-		var hopts []httprunner.HTTPOption
-		if req.Body.HTTPOptions != nil {
-			if req.Body.HTTPOptions.TimeoutMS > 0 {
-				hopts = append(hopts, httprunner.WithHTTPTimeoutMS(req.Body.HTTPOptions.TimeoutMS))
-			}
-			if len(req.Body.HTTPOptions.ExtraHeaders) > 0 {
-				hopts = append(hopts, httprunner.WithHTTPExtraHeaders(req.Body.HTTPOptions.ExtraHeaders))
-			}
-			if len(req.Body.HTTPOptions.Secrets) > 0 {
-				hopts = append(hopts, httprunner.WithHTTPSecrets(req.Body.HTTPOptions.Secrets))
-			}
-		}
-
-		r, configErr := httprunner.NewHTTPToolRunner(*tool.HTTPImpl, hopts...)
-		if configErr != nil {
-			return nil, configErr
-		}
-		outputs, md, err = r.Run(ctx, args)
-
 	case toolSpec.ToolTypeGo:
 		var gopts []llmtools.CallOption
 		if req.Body.GoOptions != nil && req.Body.GoOptions.TimeoutMS > 0 {
@@ -136,9 +130,9 @@ func (rt *ToolRuntime) InvokeTool(
 		}
 
 	case toolSpec.ToolTypeSDK:
-		// SDK-backed tools are not invoked through ToolRuntime; they are surfaced to the model as provider server
-		// tools.
-		return nil, fmt.Errorf("unsupported tool type for InvokeTool: %s", tool.Type)
+		return nil, errors.New(
+			"API-backed tools are invoked by provider inference, not InvokeTool",
+		)
 
 	default:
 		return nil, fmt.Errorf("unsupported tool type: %s", tool.Type)

@@ -6,18 +6,6 @@ import (
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
 
-// InvokeHTTPOptions contains options specific to HTTP tool invocations.
-// These are part of the HTTP request body.
-type InvokeHTTPOptions struct {
-	// Overrides the tool-level HTTP timeout (in milliseconds). Optional.
-	TimeoutMS int `json:"timeoutMS,omitempty"`
-	// ExtraHeaders will be merged into the outgoing request headers (taking precedence).
-	ExtraHeaders map[string]string `json:"extraHeaders,omitempty"`
-	// Secrets are key->value mappings used for template substitution in HTTP request
-	// components (e.g. ${SECRET}). Optional.
-	Secrets map[string]string `json:"secrets,omitempty"`
-}
-
 // InvokeGoOptions contains options specific to Go tool invocations.
 type InvokeGoOptions struct {
 	// Overrides the tool invocation timeout (in milliseconds). Optional.
@@ -25,13 +13,14 @@ type InvokeGoOptions struct {
 }
 
 // InvokeToolRequestBody is the body for invoking a tool.
+//
+// Args is JSON source. Wails transports it as a quoted string and the runtime
+// unwraps it through jsonutil.DecodeJSONStringRaw before invoking the tool.
 type InvokeToolRequestBody struct {
-	// Arguments passed to the tool. Must be JSON-serializable.
+	// Arguments passed to the built-in Go tool.
 	Args jsonutil.JSONRawString `json:"args" required:"true"`
 
-	// Tool-type-specific options (only one of these is used depending on the tool type).
-	HTTPOptions *InvokeHTTPOptions `json:"httpOptions,omitempty"`
-	GoOptions   *InvokeGoOptions   `json:"goOptions,omitempty"`
+	GoOptions *InvokeGoOptions `json:"goOptions,omitempty"`
 }
 
 type InvokeToolRequest struct {

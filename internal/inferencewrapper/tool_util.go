@@ -2,7 +2,6 @@ package inferencewrapper
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -114,7 +113,7 @@ func hydrateToolChoice(
 	}
 
 	switch tool.Type {
-	case toolSpec.ToolTypeGo, toolSpec.ToolTypeHTTP:
+	case toolSpec.ToolTypeGo:
 		argSchema, err := decodeToolArgSchema(jsonutil.JSONRawString(tool.ArgSchema))
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -139,12 +138,16 @@ func hydrateToolChoice(
 			var cfg inferenceSpec.WebSearchToolChoiceItem
 			rawCfg := strings.TrimSpace(string(sc.UserArgSchemaInstance))
 			if rawCfg != "" {
-				if err := json.Unmarshal([]byte(rawCfg), &cfg); err != nil {
+				decoded, err := jsonutil.DecodeJSONStringRawInto[inferenceSpec.WebSearchToolChoiceItem](
+					sc.UserArgSchemaInstance,
+				)
+				if err != nil {
 					return nil, fmt.Errorf(
 						"invalid config for webSearch tool %s/%s@%s: %w",
 						sc.BundleID, sc.ToolSlug, sc.ToolVersion, err,
 					)
 				}
+				cfg = decoded
 			}
 			tc.Type = inferenceSpec.ToolTypeWebSearch
 			tc.WebSearchArguments = &cfg
@@ -170,10 +173,12 @@ func decodeToolArgSchema(raw jsonutil.JSONRawString) (map[string]any, error) {
 	if s == "" {
 		return getEmptySchema(), nil
 	}
-	var schema map[string]any
-	if err := json.Unmarshal([]byte(s), &schema); err != nil {
+
+	schema, err := jsonutil.DecodeJSONStringRawInto[map[string]any](raw)
+	if err != nil {
 		return nil, err
 	}
+
 	if len(schema) == 0 {
 		schema = getEmptySchema()
 	}

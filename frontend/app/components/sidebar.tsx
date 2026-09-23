@@ -123,17 +123,6 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
-								to="/tools/"
-								className="flex size-12 items-center justify-center rounded-full p-0"
-								onClick={toggle}
-								aria-label="Tools"
-								title="Tools"
-							>
-								<FiTool size={24} />
-							</Link>
-						</li>
-						<li className="mt-4">
-							<Link
 								to="/modelpresets/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
@@ -141,6 +130,17 @@ export function Sidebar({ children }: SidebarProps) {
 								title="Model Presets"
 							>
 								<FiSliders size={24} />
+							</Link>
+						</li>
+						<li className="mt-4">
+							<Link
+								to="/tools/"
+								className="flex size-12 items-center justify-center rounded-full p-0"
+								onClick={toggle}
+								aria-label="Tools"
+								title="Tools"
+							>
+								<FiTool size={24} />
 							</Link>
 						</li>
 						<li className="mt-4">
