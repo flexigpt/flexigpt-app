@@ -4,7 +4,7 @@
 [![lint](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/lint.yml)
 [![test](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/flexigpt/flexigpt-app/actions/workflows/test.yml)
 
-FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable tools, skills, model choices, assistants/agents, and private local history across multiple LLM providers.
+FlexiGPT is a local-first BYOK AI workspace for power users and teams who need repeatable LLM workflows with model choices, Agents, Workspaces, MCP servers, tools, Skills, and private local history across multiple providers.
 
 ## Who FlexiGPT is for
 
@@ -17,9 +17,9 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
 
 ## What are you doing?
 
-- Writing the whole LLM setup down as plain, versionable files: models, prompts, MCP servers, skills, assistants, files, and workspace context. Open and spec driven, no provider or platform lock-in.
+- Writing the whole LLM setup down as plain, versionable files: models, prompts, Agents, MCP servers, Skills, tools, files, and Workspace context. Open and spec driven, no provider or platform lock-in.
 - Assembling every request from that setup, with its exact input inspectable before it is sent. Nothing gets injected behind your back.
-- Controlling every action: you declare what runs automatically, what asks first, and what is never allowed. Pause automatic execution mid task, change input, resume as needed. Per tool, per assistant, per workspace.
+- Controlling every action: you declare what runs automatically, what asks first, and what is never allowed. Pause automatic execution mid task, change input, resume as needed. Per tool, per Agent, per Workspace.
 - Keeping a record of each run - input, output, and what it changed - so it can be reviewed, diffed, and repeated.
 - Exposing all of it through one uniform interface, so any application can drive the same setup.
 - Building use-case UIs on top of that interface, starting with chat.
@@ -47,17 +47,18 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
    - For local endpoints that require a non-empty key, add a harmless placeholder key for the local provider.
 3. Open **Model Presets**. Enable a built-in provider/model or fork a provider preset for your endpoint.
 4. Open **Chats**.
-5. Start from a built-in assistant preset or choose a model preset directly.
+5. Choose a built-in Agent for a reusable starting setup, or choose a model preset directly.
 6. Attach files, folders, notes, PDFs, URLs, or code when the model needs source material.
-7. Send.
+7. Optionally select a **Workspace** for recurring repository or folder context, or an already configured **MCP server** for connected tools, resources, or prompts.
+8. Send.
 
 Good first workflows:
 
 - Use a home screen workflow card such as Develop a Feature, Review Code, or Investigate a Bug.
 - Attach only the relevant source material.
-- For code changes, start with a repo path or changed files and let the Feature Developer workflow inspect, scope, implement, and verify the change.
-- Send the prefilled prompt as-is or adjust it for your task.
-- Reuse or customize the assistant preset once the workflow fits your style.
+- For code changes, start with a repo path or changed files and let the **Spec Driven Development** Agent inspect, scope, implement, and verify the change.
+- Review the prefilled opening text and adjust it for your task before sending.
+- Export, edit, and import an Agent when you need a durable variation.
 
 FlexiGPT does not bill you directly. Usage costs and limits come from the provider account behind the key you configure.
 
@@ -71,7 +72,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ![Rich chat rendering with Mermaid](images/mermaid.png)
 
-![Reusable assistant presets and workflow setup](images/assistants.png)
+![Reusable Agents and workflow setup](images/assistants.png)
 
 ![Local settings and provider auth keys](images/settings.png)
 
@@ -89,16 +90,18 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ### Repeatable AI workspace
 
-- One interface for chats, tabs, reusable assistant presets, model presets, attachments, tools, skills, search, and exports.
-- Build repeatable workflows by combining model choices, attachments, tools, and skills.
+- One interface for chats, tabs, reusable Agents, Workspaces, MCP servers, model presets, attachments, tools, Skills, search, and exports.
+- Build repeatable workflows by combining Agents, Workspaces, model choices, attachments, tools, Skills, and connected services.
 - Skills can seed starter drafts, carry instruction-only behavior, or manage reusable workflow state.
 - Switch providers or models as you iterate.
 - Multi-tab conversations with local history search and resume flows.
 - Export the current conversation as JSON.
 
-### Assistants, tools, and agentic workflows with human-in-loop controls
+### Agents, Workspaces, MCP servers, and human-in-the-loop tools
 
-- Assistant presets bundle starting text, model choice, tools, and skills into reusable starting setups.
+- Agents can prepare a model choice, instructions, opening text, tools, Skills, and connected services without locking the chat.
+- Workspaces provide reusable repository or folder context without reattaching the same project material.
+- MCP servers can contribute selected tools, resources, resource templates, prompts, and instructions from configured local or remote services.
 - Tools can be attached per conversation or per message and configured for manual review or auto-execution.
 - When an eligible auto-execute tool is called, FlexiGPT can run it and submit the result back to the model.
 - Keep tools manual when you want tighter control over execution.
@@ -116,7 +119,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Local conversation storage and full-text search.
 - File, folder, image, PDF, and URL attachments.
 - Bundled offline docs shipped inside the app.
-- Conversations, workflow catalogs, and configuration are stored locally.
+- Conversations, Agent Collections, Agent files, Workspace setup, MCP server catalogs, and configuration are stored locally.
 - Selected request context is sent to the provider or endpoint you choose when you send.
 - Use your own provider accounts. FlexiGPT does not proxy or bill model usage.
 
@@ -125,13 +128,13 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Develop bounded features and enhancements from local repo context with a spec, implementation steps, edits, and focused verification.
 - Review code, diffs, and PRs for correctness, security, reliability, maintainability, and test gaps.
 - Investigate bugs from logs, stack traces, failing outputs, source files, and config.
-- Refactor code, design tests, implement tests, explore codebases, and review architecture with built-in software assistant presets.
-- Use read-only presets for review/investigation and write/shell-capable presets for implementation, with manual review for write and shell tools.
+- Refactor code, design tests, implement tests, explore codebases, and review architecture with built-in software Agents.
+- Use read-only Agents for review/investigation and write/shell-capable Agents for implementation, with manual review for write and shell tools.
 
 ### Built-in product, research, and technical-writing workflows
 
-- Built-in assistants cover PRD/MRD writing, decision records, user feedback analysis, roadmap prioritization, delivery risk review, and stakeholder status updates.
-- Technical-writing assistants cover docs audits, docs authoring, API reference, release notes, and troubleshooting guides.
+- Built-in Agents cover PRD/MRD writing, decision records, user feedback analysis, roadmap prioritization, delivery risk review, and stakeholder status updates.
+- Technical-writing Agents cover docs audits, docs authoring, API reference, release notes, and troubleshooting guides.
 
 ## Documentation
 
@@ -150,6 +153,8 @@ Start here:
 Context and reusable setup:
 
 - [Composer Context](./frontend/app/docs/content/04-composer-context.md)
+- [Agents](./frontend/app/docs/content/11-agents.md)
+- [Workspaces](./frontend/app/docs/content/12-workspaces.md)
 - [MCP Servers](./frontend/app/docs/content/10-mcp-servers.md)
 - [Reusable Catalogs](./frontend/app/docs/content/05-reusable-catalogs.md)
 
@@ -157,20 +162,13 @@ Setup, safety, and help:
 
 - [Providers and Models](./frontend/app/docs/content/06-providers-and-models.md)
 - [Privacy, Data, and Troubleshooting](./frontend/app/docs/content/07-privacy-data-and-troubleshooting.md)
-- [Local LLM Setup](./frontend/app/docs/content/16-local-llm-setup.md)
+- [Local LLM Setup](./frontend/app/docs/content/14-local-llm-setup.md)
 
 Recipes:
 
 - [Everyday Recipes](./frontend/app/docs/content/08-everyday-recipes.md)
-- [Unified Diff Apply](./frontend/app/docs/content/15-unified-diff-apply.md)
+- [Unified Diff Apply](./frontend/app/docs/content/13-unified-diff-apply.md)
 - [Setup Recipes](./frontend/app/docs/content/09-setup-recipes.md)
-
-Architecture reference:
-
-- [Architecture Overview](./frontend/app/docs/content/11-architecture-overview.md)
-- [Backend Roles and Responsibilities](./frontend/app/docs/content/12-backend-roles-and-responsibilities.md)
-- [Frontend Roles and Responsibilities](./frontend/app/docs/content/13-frontend-roles-and-responsibilities.md)
-- [Chats Workspace and Composer Design](./frontend/app/docs/content/14-chats-workspace-and-composer-design.md)
 
 ## Built with
 

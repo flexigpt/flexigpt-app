@@ -284,7 +284,7 @@ If the request works but quality is weak, try:
 - higher prompt/output limits
 - fewer stale previous user turns
 - more focused attachments
-- stronger instruction skill or assistant preset
+- stronger instruction skill or Agent
 - lower temperature for stricter work
 - stronger reasoning level if supported
 
@@ -295,7 +295,7 @@ If tools or web search do not appear, check:
 - web-search tool compatibility
 - tool bundle enabled
 - tool enabled
-- assistant preset availability reason
+- Agent availability reason
 - model capability support
 
 If local model output is strange, try:

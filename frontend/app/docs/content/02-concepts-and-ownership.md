@@ -8,7 +8,7 @@ This page gives the vocabulary and explains which page owns each part. Detailed 
 
 - [Mental model](#mental-model)
 - [Main terms](#main-terms)
-- [Assistant preset versus model preset](#assistant-preset-versus-model-preset)
+- [Agent versus model preset](#agent-versus-model-preset)
 - [Context and execution](#context-and-execution)
 - [History](#history)
 - [Built-in content and your content](#built-in-content-and-your-content)
@@ -23,8 +23,8 @@ A chat turn is assembled in layers:
    - The API family or endpoint that receives the request.
 2. **Model preset**
    - The provider/model choice and request defaults.
-3. **Assistant setup**
-   - Optional starter workflow: starting text, model, tools, and skills.
+3. **Agent setup**
+   - Optional starter workflow: model, instructions, opening text, tools, Skills, and connected services.
 4. **Conversation history**
    - Earlier turns included by **Previous user turns**.
 5. **Current message**
@@ -38,7 +38,7 @@ When a result changes, compare these layers one at a time.
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint.       |
 | **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.                 |
-| **Assistant preset**         | A reusable starter setup that can apply starting text, a model preset, tool selections, web search choices, and skill selections.                                                                  |
+| **Agent**                    | A reusable starting setup that can apply a model choice, instructions, opening text, tools, Skills, and connected services.                                                                        |
 | **Instruction context**      | Durable system instruction context built from the selected model default and instruction-only skill sources. The model default comes first; selected sources are then combined in selection order. |
 | **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                      |
 | **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                                 |
@@ -47,19 +47,19 @@ When a result changes, compare these layers one at a time.
 | **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                               |
 | **Previous user turns**      | The history window for the next request.                                                                                                                                                           |
 
-## Assistant preset versus model preset
+## Agent versus model preset
 
 Use a **model preset** when the question is:
 
 > Which provider, model, and request parameters should run this turn?
 
-Use an **assistant preset** when the question is:
+Use an **Agent** when the question is:
 
 > What kind of workflow should I start from?
 
-An assistant preset is a starter recipe, not a locked mode. After applying one, you can still change the model, instructions, tools, skills, attachments, web search, and history setting. If the preset defines starting text, treat it as a replaceable first draft rather than a locked prompt.
+An Agent is a starter recipe, not a locked mode. After loading one, you can still change the model, instructions, tools, Skills, attachments, web search, and history setting. Treat opening text as an editable first draft rather than a locked prompt.
 
-The detailed rules for assistant preset contents, empty sections, modified state, inspection, and versioning live in [Reusable Catalogs](/docs?doc=reusable-catalogs#assistant-presets).
+The detailed rules for Agent contents, importing, exporting, inspection, and management live in [Agents](/docs?doc=agents#what-an-agent-can-set-up).
 
 ## Context and execution
 
@@ -100,7 +100,7 @@ FlexiGPT ships with built-in:
 - tools
 - skills
 - MCP server catalogs
-- assistant presets
+- Agents
 - docs
 
 Built-in content is generally read-only. You can usually enable or disable it, but not edit its definition directly.
@@ -108,29 +108,26 @@ For local LLM providers, treat built-ins as starting points: copy/fork the provi
 
 Your local content is stored locally and can be created, edited, deleted, and versioned depending on the page.
 
-For versioned domains such as skills and assistant presets:
-
-- editing a custom item creates a new version
-- slugs are stable within a version series
-- built-in items cannot be edited into new custom versions directly unless you create or fork local content where the UI supports it
+To customize an Agent, export it, edit the file in your editor, and import it under a new name, or replace the managed copy.
+See [Agents](/docs?doc=agents#manage-agents) for the management flow.
 
 ## Page ownership map
 
-| Goal                                                                   | Page                                       |
-| ---------------------------------------------------------------------- | ------------------------------------------ |
-| Do active work with a model                                            | **Chats**                                  |
-| Attach files, folders, URLs, tools, skills, or web search to a message | **Chats -> Composer**                      |
-| Select MCP server context for a turn                                   | **Chats -> MCP**                           |
-| Start from a reusable assistant workflow                               | **Chats -> Assistant dropdown**            |
-| Create or version assistant presets                                    | **Assistant Presets**                      |
-| Create or maintain tool definitions                                    | **Tools**                                  |
-| Enable a tool for a conversation                                       | **Chats -> Tools** or an assistant preset  |
-| Create or maintain skill definitions                                   | **Skills**                                 |
-| Enable skills for a conversation                                       | **Chats -> Skills** or an assistant preset |
-| Create or maintain MCP server catalogs                                 | **MCP Servers**                            |
-| Configure providers and model presets                                  | **Model Presets**                          |
-| Add provider keys, theme, and debug settings                           | **Settings**                               |
-| Search and reopen old conversations                                    | **Chats**                                  |
+| Goal                                                                   | Page                            |
+| ---------------------------------------------------------------------- | ------------------------------- |
+| Do active work with a model                                            | **Chats**                       |
+| Attach files, folders, URLs, tools, skills, or web search to a message | **Chats -> Composer**           |
+| Select MCP server context for a turn                                   | **Chats -> MCP**                |
+| Start from a reusable Agent workflow                                   | **Chats -> Agent menu**         |
+| Import, export, enable, or manage Agents                               | **Agents**                      |
+| Create or maintain tool definitions                                    | **Tools**                       |
+| Enable a tool for a conversation                                       | **Chats -> Tools** or an Agent  |
+| Create or maintain skill definitions                                   | **Skills**                      |
+| Enable skills for a conversation                                       | **Chats -> Skills** or an Agent |
+| Create or maintain MCP server catalogs                                 | **MCP Servers**                 |
+| Configure providers and model presets                                  | **Model Presets**               |
+| Add provider keys, theme, and debug settings                           | **Settings**                    |
+| Search and reopen old conversations                                    | **Chats**                       |
 
 ## Decision guide
 
@@ -141,6 +138,6 @@ For versioned domains such as skills and assistant presets:
 | Bring exact source material         | attachments                        |
 | Give the model execution ability    | tools                              |
 | Use a structured workflow mode      | skills                             |
-| Rebuild the same setup often        | assistant preset                   |
+| Rebuild the same setup often        | Agent                              |
 | Avoid stale context                 | Previous user turns                |
 | Keep work local-only                | provider endpoint and tool choices |

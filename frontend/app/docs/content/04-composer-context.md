@@ -107,7 +107,7 @@ Keep these states separate:
 
 Tools can be made available by:
 
-- an assistant preset
+- an Agent
 - conversation-level tool selection
 - per-message attached tool selection
 - skills
@@ -175,7 +175,7 @@ When you send with enabled skills, FlexiGPT may create or refresh a skill sessio
 
 Selected instruction-only sources are independent of template text and are assembled with the selected model default as described in [Templates and instruction sources](#templates-and-instruction-sources).
 
-Assistant presets can enable skills and mark some as **preload as active**.
+Agents can enable Skills and mark some ready to use immediately.
 
 ## MCP servers
 
@@ -216,8 +216,8 @@ Use it to inspect and remove context before sending.
 
 ## Recommended pattern
 
-1. choose an assistant preset if you want a starter workflow
-2. replace any preset starting-text placeholder with your task
+1. choose an Agent if you want a starter workflow
+2. replace any Agent opening-text placeholder with your task
 3. confirm provider/model
 4. keep **Previous user turns** small and intentional
 5. attach only the source material that matters

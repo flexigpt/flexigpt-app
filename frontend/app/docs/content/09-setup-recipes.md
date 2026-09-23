@@ -110,7 +110,7 @@ Expectations:
 Safety check:
 
 - local-first only means local inference when the selected provider origin is actually local
-- provider IDs should stay stable after chats or assistant presets use them
+- provider IDs should stay stable after Chats or Agents use them
 - use harmless placeholder keys for dummy local auth instead of real production API keys
 - confirm the local server is not proxying to a remote service
 - test with harmless content first
@@ -213,7 +213,7 @@ Use this when you want a reusable workflow mode across turns.
 
 Goal:
 
-- Enable a skill in a conversation and optionally add it to an assistant preset.
+- Enable a Skill in a conversation and optionally add it to an Agent.
 
 Skills can fill three roles:
 

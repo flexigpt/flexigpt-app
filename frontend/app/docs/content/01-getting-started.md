@@ -1,6 +1,6 @@
 # Getting Started
 
-FlexiGPT is a local-first BYOK AI workspace for repeatable LLM work. You bring provider keys or local endpoints, then combine models, assistant presets, attachments, tools, and skills inside a local desktop app.
+FlexiGPT is a local-first BYOK AI workspace for repeatable LLM work. You bring provider keys or local endpoints, then combine models, Agents, attachments, tools, and Skills inside a local desktop app.
 
 This page is the shortest path to a useful first request.
 
@@ -32,7 +32,7 @@ This page is the shortest path to a useful first request.
 
 Good first test: `Reply with one sentence confirming the model is working.`
 
-Once that works, attach source material or use a starter assistant preset.
+Once that works, attach source material or use a starter Agent.
 
 ## Choose your first path
 
@@ -41,7 +41,7 @@ Once that works, attach source material or use a starter assistant preset.
 | Use a normal hosted model               | Add the key in **Settings**, enable the model in **Model Presets**, then use **Chats**.                                                   |
 | Try many hosted models through one key  | Use OpenRouter. See [Providers and Models](/docs?doc=providers-and-models#openrouter).                                                    |
 | Use a local model server                | Start from a built-in local provider, copy/fork the provider first, then adjust models. See [Local LLM Setup](/docs?doc=local-llm-setup). |
-| Start from a known workflow             | Choose a home screen workflow card or an assistant preset in **Chats**.                                                                   |
+| Start from a known workflow             | Choose a home screen workflow card or an Agent in **Chats**.                                                                              |
 | Work with private or sensitive material | Read [Privacy, Data, and Troubleshooting](/docs?doc=privacy-data-and-troubleshooting) before sending.                                     |
 
 ## What to look at before sending
@@ -50,8 +50,8 @@ Before each important request, check these layers:
 
 1. **Provider/model**
    - Which endpoint receives the request?
-2. **Assistant preset**
-   - Did you apply a starter workflow?
+2. **Agent**
+   - Did you load a starter workflow?
 3. **Instructions and skills**
    - Are model defaults or active skills changing the request behavior?
 4. **Current message**
@@ -97,7 +97,8 @@ In the message timeline you can usually:
 - Learn the vocabulary and page ownership: [Concepts and Ownership](/docs?doc=concepts-and-ownership)
 - Learn the main work surface: [Chat Workspace](/docs?doc=chat-workspace)
 - Learn how to add files, prompts, tools, skills, and web search: [Composer Context](/docs?doc=composer-context)
-- Learn how to maintain reusable assistant presets and catalogs: [Reusable Catalogs](/docs?doc=reusable-catalogs)
+- Learn how to use and manage reusable starting points: [Agents](/docs?doc=agents)
+- Learn how to maintain reusable tools, Skills, model presets, and settings: [Reusable Catalogs](/docs?doc=reusable-catalogs)
 - Configure providers and local models: [Providers and Models](/docs?doc=providers-and-models)
 - Try outcome-based tasks: [Everyday Recipes](/docs?doc=everyday-recipes)
 

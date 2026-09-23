@@ -66,14 +66,14 @@ Use this when you want to understand an unfamiliar file.
 
 Suggested setup:
 
-- Assistant preset: Local Reader or similar reader preset
+- Agent: **Local Reader** or a similar reader Agent
 - Context: one file first
 - Previous user turns: usually `0` or `1`
 
 Steps:
 
 1. Open **Chats**.
-2. Apply a reader-style assistant preset.
+2. Load a reader-style Agent.
 3. Attach one file.
 4. Confirm attachment mode is readable.
 5. Send a focused request.
@@ -133,7 +133,7 @@ Use this for system boundaries, coupling, ownership, or design risk.
 
 Suggested setup:
 
-- Assistant preset: Designing System Architecture
+- Agent: **Designing System Architecture**
 - Context: README, architecture docs, code map, API contracts, constraints
 
 Equivalent prompt if starting from blank:
@@ -148,7 +148,7 @@ Use this for README text, usage docs, API docs, or internal guides.
 
 Suggested setup:
 
-- Assistant preset: Docs Writer or Local Reader
+- Agent: **Docs Writer** or **Local Reader**
 - Context: source files, existing docs, examples, screenshots, command output
 
 Equivalent prompt if starting from blank:
@@ -163,7 +163,7 @@ Use this for notes, URLs, PDFs, or copied source material.
 
 Suggested setup:
 
-- Assistant preset: Research Brief Writer
+- Agent: **Research Brief Writer**
 - Optional: provider-supported web search if current information matters
 
 Equivalent prompt if starting from blank:

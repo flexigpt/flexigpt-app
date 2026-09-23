@@ -3,7 +3,6 @@
 ## Laundry list
 
 - [ ] in go 1.27 here is some issue related to double escaped strings. you need to clean json first and then decode actually. need to debug deeply
-- [ ] there is some workspace specific metadata extension and mcp extensions added. need to verify what they are and how.
 - [ ] in diff ui, when there is streaming ongoing the diffs in previous message say need info and dont resolve paths or apply.
 - [ ] if a new file creation is there in diff of multi files it doesnt work.
 - [ ] the modal has bugs when multi file things are done. msotly some files are nto shown at all. some files which are shown may or may not be dry run. the error in file is displayed at top and nto near dry run or same file. apply file similalry at top is problematic in message.
@@ -16,8 +15,8 @@
 - [x] skill page perf is bad as of now
 
 - [x] calling "initialize": sending "initialize": rejected by transport: authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response
-
 - [x] "local host not ready yet" display in the mcp authz modal.
+- [x] there is some workspace specific metadata extension and mcp extensions added. need to verify what they are and how.
 
 ## M-3
 

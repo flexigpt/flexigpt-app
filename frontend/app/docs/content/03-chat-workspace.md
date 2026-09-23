@@ -1,6 +1,6 @@
 # Chat Workspace
 
-The **Chats** page is the main place where FlexiGPT turns reusable setup into work. It brings together tabs, local conversation search, the message timeline, model controls, assistant presets, the composer, streaming responses, and edit/resend flows.
+The **Chats** page is the main place where FlexiGPT turns reusable setup into work. It brings together tabs, local conversation search, the message timeline, model controls, Agents, the composer, streaming responses, and edit/resend flows.
 
 This page is about working in the chat workspace. For the details of attachments, tools, skills, and web search inside the composer, see [Composer Context](/docs?doc=composer-context).
 
@@ -9,7 +9,7 @@ This page is about working in the chat workspace. For the details of attachments
 - [Normal chat flow](#normal-chat-flow)
 - [Workspace areas](#workspace-areas)
 - [Control bar](#control-bar)
-- [Assistant preset dropdown](#assistant-preset-dropdown)
+- [Agent menu](#agent-menu)
 - [Composer context entry points](#composer-context-entry-points)
 - [Sending and stopping](#sending-and-stopping)
 - [Reading results](#reading-results)
@@ -20,7 +20,7 @@ This page is about working in the chat workspace. For the details of attachments
 ## Normal chat flow
 
 1. Open **Chats** or choose a home screen workflow card.
-2. Pick an assistant preset if you want a known workflow shape.
+2. Choose an Agent if you want a known workflow shape.
 3. Confirm the model preset and provider.
 4. Set **Previous user turns** intentionally.
 5. Add only the context the task needs.
@@ -40,7 +40,7 @@ The Chats workspace coordinates:
 - streaming responses
 - composer draft state
 - model and parameter controls
-- assistant preset application
+- Agent application
 - message editing and replay
 - conversation export
 
@@ -52,7 +52,7 @@ The request control bar sits above the editor and controls how the next turn run
 
 | Control                      | What it affects                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| **Assistant**                | Applies a starter recipe for starting text, model, instructions, tools, web search, and skills.                   |
+| **Agent**                    | Loads a starter setup for model, instructions, opening text, tools, Skills, and connected services.               |
 | **Model**                    | Chooses the provider/model preset.                                                                                |
 | **Temperature or reasoning** | Controls model style or reasoning behavior where supported.                                                       |
 | **Effort/verbosity**         | Controls output verbosity where supported.                                                                        |
@@ -61,27 +61,27 @@ The request control bar sits above the editor and controls how the next turn run
 
 Use this bar when changing how the turn runs. Use the editor when changing what you are asking.
 
-## Assistant preset dropdown
+## Agent menu
 
-Assistant presets are starter recipes. They seed the composer, but they do not lock the conversation.
+Agents are starter recipes. Loading one seeds the chat, but does not lock the conversation.
 
-In Chats, the assistant preset dropdown can show:
+In Chats, the **Agent** menu lets you:
 
-- the selected preset
-- whether it is **In sync** or **Modified**
-- which preset-managed sections changed
-- actions to view, reset, reapply, or clear to base
+- choose an available Agent
+- inspect its setup and diagnostics
+- review the draft and context it adds before sending
 
-Use **View** to inspect what a preset contributes to the current chat. The detailed rules for preset contents and versioning live in [Reusable Catalogs](/docs?doc=reusable-catalogs#assistant-presets).
+Use the [Agents](/docs?doc=agents) page to manage Collections, import or export Agent files, and enable or disable Agents.
 
-Expected behavior:
+Depending on its contents, loading an Agent can:
 
-- if a preset defines starting text, applying it can seed the composer draft
-- if a preset defines a model, applying it selects that model preset
-- if a preset defines instruction templates, it selects those saved instruction sources
-- if a preset defines tools or web search, it applies those selections
-- if a preset defines skills, it enables those skills and may mark some active
-- if a preset has no opinion about a section, applying it usually leaves that section alone
+- select a model preset
+- add instructions to the chat
+- seed editable opening text when the composer is empty
+- make tools available to the model
+- enable Skills, with some ready to use immediately
+- select connected services or prompt you to finish local setup
+- leave any area it does not define unchanged
 
 ## Composer context entry points
 
@@ -170,10 +170,10 @@ Stay in Chats for active work.
 
 Leave Chats when maintaining reusable building blocks:
 
-| Goal                                  | Page              |
-| ------------------------------------- | ----------------- |
-| Create or version an assistant preset | Assistant Presets |
-| Add or maintain tool definitions      | Tools             |
-| Add or maintain skills                | Skills            |
-| Change providers or model presets     | Model Presets     |
-| Add provider keys or debug settings   | Settings          |
+| Goal                                       | Page          |
+| ------------------------------------------ | ------------- |
+| Import, export, enable, or manage an Agent | Agents        |
+| Add or maintain tool definitions           | Tools         |
+| Add or maintain skills                     | Skills        |
+| Change providers or model presets          | Model Presets |
+| Add provider keys or debug settings        | Settings      |
