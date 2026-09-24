@@ -151,16 +151,16 @@ export default function MCPServersPage() {
 	}, [bundles]);
 
 	useEffect(() => {
+		const prefetchedKeys = bundlePrefetchKeysRef.current;
+		const inFlightLoads = bundleLoadInFlightRef.current;
 		mountedRef.current = true;
 
 		return () => {
 			mountedRef.current = false;
 			loadIDRef.current += 1;
 			bundleLoadEpochRef.current += 1;
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			bundlePrefetchKeysRef.current.clear();
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			bundleLoadInFlightRef.current.clear();
+			prefetchedKeys.clear();
+			inFlightLoads.clear();
 		};
 	}, []);
 
@@ -287,10 +287,10 @@ export default function MCPServersPage() {
 		setPageLoadError(undefined);
 
 		try {
-			const settingsPromise = mcpManagementAPI.getMCPGlobalSettings();
-			const [bundleResult, pendingResult] = await Promise.allSettled([
+			const [bundleResult, pendingResult, settingsResult] = await Promise.allSettled([
 				mcpManagementAPI.listMCPBundles(),
 				mcpManagementAPI.listPendingMCPOAuthAuthorizations(),
+				mcpManagementAPI.getMCPGlobalSettings(),
 			]);
 
 			if (bundleResult.status === 'rejected') {
@@ -303,6 +303,9 @@ export default function MCPServersPage() {
 			const warningsNext = [
 				pendingResult.status === 'rejected'
 					? getErrorMessage(pendingResult.reason, 'Pending OAuth authorizations could not be loaded.')
+					: undefined,
+				settingsResult.status === 'rejected'
+					? getErrorMessage(settingsResult.reason, 'MCP OAuth settings could not be loaded.')
 					: undefined,
 			].filter((value): value is string => Boolean(value));
 
@@ -319,10 +322,11 @@ export default function MCPServersPage() {
 				const sameRevision = existing?.bundle.collection.artifact.revision === bundle.collection.artifact.revision;
 
 				if (existing && sameRevision && existing.serversLoaded) {
-					return Object.assign(existing, {
+					return {
+						...existing,
 						bundle,
 						isLoadingServers: false,
-					});
+					};
 				}
 
 				return {
@@ -340,21 +344,9 @@ export default function MCPServersPage() {
 			setWarnings(warningsNext);
 			loadedOnceRef.current = true;
 			setIsInitialLoading(false);
-
-			void settingsPromise
-				.then(value => {
-					if (mountedRef.current && loadIDRef.current === requestID) {
-						setSettings(value);
-					}
-				})
-				.catch((error: unknown) => {
-					if (!mountedRef.current || loadIDRef.current !== requestID) {
-						return;
-					}
-
-					const warning = getErrorMessage(error, 'MCP OAuth settings could not be loaded.');
-					setWarnings(previous => (previous.includes(warning) ? previous : [...previous, warning]));
-				});
+			if (settingsResult.status === 'fulfilled') {
+				setSettings(settingsResult.value);
+			}
 		} catch (error) {
 			if (!mountedRef.current || loadIDRef.current !== requestID) {
 				return;
@@ -371,6 +363,7 @@ export default function MCPServersPage() {
 	}, []);
 
 	useEffect(() => {
+		// oxlint-disable-next-line react/set-state-in-effect
 		void fetchAll().catch(() => undefined);
 	}, [fetchAll]);
 
@@ -388,7 +381,7 @@ export default function MCPServersPage() {
 					item => item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
 				);
 				if (!existing) {
-					throw new Error('MCP Bundle is no longer available.');
+					throw new Error('MCP Collection is no longer available.');
 				}
 				if (!mountedRef.current) {
 					return;
@@ -437,7 +430,7 @@ export default function MCPServersPage() {
 											readErrorsByArtifactID: {},
 											serversLoaded: false,
 											isLoadingServers: false,
-											serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Bundle.'),
+											serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Collection.'),
 										}
 									: item
 							)
@@ -497,7 +490,7 @@ export default function MCPServersPage() {
 			);
 
 			if (!parent) {
-				throw new Error('MCP Bundle is no longer available.');
+				throw new Error('MCP Collection is no longer available.');
 			}
 
 			const refreshed = await readServerStatus([server]);
@@ -873,7 +866,7 @@ export default function MCPServersPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="MCP Servers"
-					description="Configure artifact-backed MCP Bundles, server Definitions, installation-local secrets, runtime state, and policy."
+					description="Organize MCP servers in Collections and configure their connections, credentials, runtime state, and tool policies."
 					width="wide"
 					leadingActions={
 						<button
@@ -896,13 +889,13 @@ export default function MCPServersPage() {
 							}}
 						>
 							<FiPlus size={18} />
-							<span>Add Bundle</span>
+							<span>Add Collection</span>
 						</button>
 					}
 				/>
 
 				<ManagementPageContent width="wide">
-					{isInitialLoading ? <Loader text="Loading MCP Bundles..." /> : null}
+					{isInitialLoading ? <Loader text="Loading MCP Collections..." /> : null}
 
 					{pageLoadError ? (
 						<ManagementResourceError
@@ -920,7 +913,7 @@ export default function MCPServersPage() {
 					))}
 
 					{!isInitialLoading && bundles.length === 0 ? (
-						<p className="mt-8 text-center text-sm">No MCP Bundles configured yet.</p>
+						<p className="mt-8 text-center text-sm">No MCP Collections configured yet.</p>
 					) : null}
 
 					{bundles.map(bundleData => (
@@ -1017,7 +1010,7 @@ export default function MCPServersPage() {
 								item.bundle.ref.artifactID === bundleToDelete.ref.artifactID
 						);
 						if (!current?.serversLoaded || current.serverLoadError || current.servers.length > 0) {
-							setAlertMessage('Load the Bundle and remove all currently available MCP servers before deleting it.');
+							setAlertMessage('Load the Collection and remove all currently available MCP servers before deleting it.');
 							return;
 						}
 
@@ -1033,21 +1026,21 @@ export default function MCPServersPage() {
 							setIsDeletingBundle(false);
 						}
 					}}
-					title="Delete MCP Bundle"
-					message={`Delete empty MCP Bundle "${bundleToDelete?.displayName ?? ''}"? Remove all server and policy Artifacts first.`}
+					title="Delete MCP Collection"
+					message={`Delete empty MCP Collection "${bundleToDelete?.displayName ?? ''}"? Remove all servers first.`}
 					confirmButtonText={isDeletingBundle ? 'Deleting...' : 'Delete'}
 				/>
 
 				<ManagementBundleCreateModal
 					isOpen={isAddBundleOpen}
-					title="Add MCP Bundle"
-					entityLabel="MCP Bundle"
+					title="Add MCP Collection"
+					entityLabel="MCP Collection"
 					onClose={() => {
 						setIsAddBundleOpen(false);
 					}}
 					onSubmit={handleSaveBundle}
 					existingSlugs={bundles.map(bundle => bundle.bundle.logicalName)}
-					failureMessage="Failed to create MCP Bundle."
+					failureMessage="Failed to create MCP Collection."
 				/>
 
 				<MCPSettingsModal

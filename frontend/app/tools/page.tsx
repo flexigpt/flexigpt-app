@@ -88,10 +88,11 @@ export default function ToolsPage() {
 			setBundles(previous =>
 				(previous ?? []).map(bundleData =>
 					bundleData.bundle.id === bundleID
-						? Object.assign(bundleData, {
+						? {
+								...bundleData,
 								tools: freshTools,
 								toolLoadError: undefined,
-							})
+							}
 						: bundleData
 				)
 			);
@@ -111,12 +112,13 @@ export default function ToolsPage() {
 			setBundles(previous =>
 				(previous ?? []).map(item =>
 					item.bundle.id === bundleID
-						? Object.assign(item, {
+						? {
+								...item,
 								bundle: {
 									...item.bundle,
 									isEnabled: enabled,
 								},
-							})
+							}
 						: item
 				)
 			);
@@ -139,7 +141,8 @@ export default function ToolsPage() {
 			setBundles(previous =>
 				(previous ?? []).map(item =>
 					item.bundle.id === bundleID
-						? Object.assign(item, {
+						? {
+								...item,
 								tools: item.tools.map(candidate =>
 									candidate.id === tool.id
 										? {
@@ -148,7 +151,7 @@ export default function ToolsPage() {
 											}
 										: candidate
 								),
-							})
+							}
 						: item
 				)
 			);

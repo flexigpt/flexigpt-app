@@ -1,20 +1,12 @@
 import type { AgentImportRelationshipStatus } from '@/spec/agent';
-import type { ArtifactRef } from '@/spec/artifact';
-
-export function formatArtifactRef(ref?: ArtifactRef): string {
-	if (!ref) {
-		return '—';
-	}
-
-	return `${ref.rootID}/${ref.artifactID}`;
-}
 
 export function formatDateish(value: string | Date | undefined | null): string {
 	if (!value) {
 		return '—';
 	}
 
-	return value instanceof Date ? value.toISOString() : value;
+	const date = value instanceof Date ? value : new Date(value);
+	return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
 }
 
 export function textToBase64(value: string): string {

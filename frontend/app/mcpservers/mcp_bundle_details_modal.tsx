@@ -12,6 +12,11 @@ interface MCPBundleDetailsModalProps {
 	serversLoaded: boolean;
 }
 
+function formatTimestamp(value: string | Date): string {
+	const date = value instanceof Date ? value : new Date(value);
+	return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+}
+
 export function MCPBundleDetailsModal({
 	isOpen,
 	onClose,
@@ -27,7 +32,7 @@ export function MCPBundleDetailsModal({
 		<ManagementDetailsModal
 			isOpen={isOpen}
 			onClose={onClose}
-			title="MCP Bundle Details"
+			title="MCP Collection Details"
 			description={
 				serversLoaded ? `${serverCount} configured server${serverCount === 1 ? '' : 's'}` : 'Server contents not loaded'
 			}
@@ -38,26 +43,15 @@ export function MCPBundleDetailsModal({
 				<ManagementInfoRow label="Logical Name" mono>
 					{bundle.logicalName}
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Collection ID" mono>
-					{bundle.ref.artifactID}
-				</ManagementInfoRow>
-				<ManagementInfoRow label="Root ID" mono>
-					{bundle.ref.rootID}
-				</ManagementInfoRow>
-				<ManagementInfoRow label="Collection Revision">{bundle.collection.artifact.revision}</ManagementInfoRow>
-				<ManagementInfoRow label="Managed Source ID" mono>
-					{bundle.collection.artifact.binding.sourceID}
-				</ManagementInfoRow>
-				<ManagementInfoRow label="Editable">{bundle.editable ? 'Yes' : 'No'}</ManagementInfoRow>
-				<ManagementInfoRow label="Deletable">{bundle.deletable ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Baseline">{bundle.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Servers">{serversLoaded ? serverCount : 'Not loaded'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Created">{bundle.collection.artifact.createdAt.toLocaleString()}</ManagementInfoRow>
-				<ManagementInfoRow label="Modified">{bundle.collection.artifact.modifiedAt.toLocaleString()}</ManagementInfoRow>
+				<ManagementInfoRow label="Created">{formatTimestamp(bundle.collection.artifact.createdAt)}</ManagementInfoRow>
+				<ManagementInfoRow label="Modified">{formatTimestamp(bundle.collection.artifact.modifiedAt)}</ManagementInfoRow>
 			</ManagementInfoGrid>
 		</ManagementDetailsModal>
 	);

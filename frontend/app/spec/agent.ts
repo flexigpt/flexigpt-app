@@ -105,7 +105,7 @@ interface AgentImportArtifactPreview {
 	definitionDigest: ArtifactDigest;
 }
 
-export interface AgentImportRelationship {
+interface AgentImportRelationship {
 	path: string;
 	type: string;
 	name: string;

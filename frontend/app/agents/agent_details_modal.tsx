@@ -17,12 +17,7 @@ import { ModalSection } from '@/components/modal/modal_section';
 
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
-import {
-	formatArtifactRef,
-	formatDateish,
-	getAgentRelationshipBadgeClass,
-	textToBase64,
-} from '@/agents/lib/agent_management_utils';
+import { formatDateish, getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/lib/agent_management_utils';
 
 interface AgentDetailsModalProps {
 	isOpen: boolean;
@@ -45,6 +40,8 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 	const [setupDescriptor, setSetupDescriptor] = useState<AgentMCPSetupDescriptor | null>(null);
 
 	const agentRef = useMemo(() => agentArtifactRef(agent), [agent]);
+	const displayName = agentDisplayName(agent);
+	const secondaryName = displayName === agent.name ? undefined : agent.name;
 
 	useEffect(() => {
 		let cancelled = false;
@@ -57,6 +54,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 				const value = await agentStoreAPI.resolveAgent(agentRef);
 				if (!cancelled) {
 					setResolution(value);
+					setResolutionError('');
 				}
 			} catch (error) {
 				if (!cancelled) {
@@ -78,6 +76,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 						agent,
 						capabilities: value.resolution,
 					});
+					setResolutionError('');
 					return;
 				}
 
@@ -126,11 +125,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 		<>
 			<div className="modal-box bg-base-200 max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-5xl overflow-hidden rounded-2xl p-0">
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
-					<ModalHeader
-						title={agentDisplayName(agent)}
-						description={`${agent.name} · ${formatArtifactRef(agentArtifactRef(agent))}`}
-						onClose={onClose}
-					/>
+					<ModalHeader title={displayName} description={secondaryName} onClose={onClose} />
 
 					<div className="space-y-5">
 						<ModalSection title="Agent metadata">
@@ -183,10 +178,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 
 							{exportResult ? (
 								<div className="space-y-3">
-									<div className="flex flex-wrap items-center justify-between gap-2">
-										<div className="text-base-content/70 text-xs">
-											Definition: <span className="font-mono">{exportResult.definitionDigest}</span>
-										</div>
+									<div className="flex justify-end">
 										<button
 											type="button"
 											className="btn btn-sm btn-ghost rounded-xl"
@@ -241,34 +233,24 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 													{occurrence.type}
 													{occurrence.name ? `: ${occurrence.name}` : ''}
 												</span>
-												<span className={`badge badge-sm ${getAgentRelationshipBadgeClass(occurrence.status)}`}>
+												<span
+													className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(occurrence.status)}`}
+												>
 													{occurrence.status}
 												</span>
 												{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
 											</div>
 
-											<div className="text-base-content/70 mt-1 font-mono text-xs">{occurrence.path}</div>
-
 											{occurrence.scope ? (
 												<div className="text-base-content/70 mt-1 text-xs">Scope: {occurrence.scope}</div>
 											) : null}
 
-											{occurrence.artifact ? (
-												<div className="text-base-content/70 mt-1 text-xs">
-													Artifact: {formatArtifactRef(occurrence.artifact)}
-												</div>
-											) : null}
-
 											{occurrence.mapped ? (
-												<div className="text-base-content/70 mt-1 text-xs">
-													Mapped target: {occurrence.mapped.provider}/{occurrence.mapped.identifier}
-												</div>
+												<div className="text-base-content/70 mt-1 text-xs">Resolved to: {occurrence.mapped.name}</div>
 											) : null}
 
-											{occurrence.code || occurrence.message ? (
-												<div className="text-warning mt-2 text-xs">
-													{[occurrence.code, occurrence.message].filter(Boolean).join(': ')}
-												</div>
+											{occurrence.message ? (
+												<div className="text-warning mt-2 text-xs">{occurrence.message}</div>
 											) : null}
 										</div>
 									))}
@@ -299,7 +281,6 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 													<FiServer size={15} />
 													<span>{descriptor.name}</span>
 												</div>
-												<div className="text-base-content/70 mt-1 font-mono text-xs">{descriptor.occurrencePath}</div>
 												<div className="text-base-content/70 mt-1 text-xs">
 													{descriptor.transport || 'named MCP relationship'}
 													{descriptor.authMode ? ` · ${descriptor.authMode}` : ''}

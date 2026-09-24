@@ -178,7 +178,7 @@ export function SkillBundleCard({
 
 	const requestDeleteSkill = (skill: Skill) => {
 		if (!bundle.isEditable) {
-			setAlertMsg('This Skill Bundle only supports enable and disable actions.');
+			setAlertMsg('This Skill Collection only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
@@ -207,13 +207,13 @@ export function SkillBundleCard({
 
 	const openSkillModal = (mode: SkillModalMode, skill?: Skill) => {
 		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEnabled) {
-			setAlertMsg('Enable the bundle before creating, editing, or forking a skill.');
+			setAlertMsg('Enable the Collection before creating, editing, or forking a skill.');
 			setShowAlert(true);
 			return;
 		}
 
 		if ((mode === 'add' || mode === 'edit' || mode === 'fork') && !bundle.isEditable) {
-			setAlertMsg('This Skill Bundle only supports enable and disable actions.');
+			setAlertMsg('This Skill Collection only supports enable and disable actions.');
 			setShowAlert(true);
 			return;
 		}
@@ -233,7 +233,7 @@ export function SkillBundleCard({
 		try {
 			await runAction('bundle:refresh', onRefreshSkills);
 		} catch (error) {
-			setAlertMsg(getErrorMessage(error, 'Failed to reload bundle skills.'));
+			setAlertMsg(getErrorMessage(error, 'Failed to reload Collection skills.'));
 			setShowAlert(true);
 		}
 	};
@@ -247,11 +247,7 @@ export function SkillBundleCard({
 		<>
 			<ManagementBundleCard
 				title={bundle.displayName || bundle.slug}
-				identity={
-					<span className="font-mono">
-						{bundle.slug} / {bundle.id}
-					</span>
-				}
+				identity={<span className="font-mono">{bundle.slug}</span>}
 				description={bundle.description}
 				status={
 					<>
@@ -311,7 +307,7 @@ export function SkillBundleCard({
 									}}
 								>
 									<FiEdit2 size={16} />
-									<span>Edit Bundle</span>
+									<span>Edit Collection</span>
 								</button>
 								<button
 									type="button"
@@ -346,7 +342,7 @@ export function SkillBundleCard({
 								}}
 							>
 								<FiTrash2 size={16} />
-								<span>Delete Bundle</span>
+								<span>Delete Collection</span>
 							</button>
 						) : null}
 					</>
@@ -355,7 +351,7 @@ export function SkillBundleCard({
 				{skillLoadError ? (
 					<div className="alert alert-warning mt-3 rounded-2xl text-sm">
 						<div className="grow">
-							<div className="font-semibold">Skills could not be loaded for this bundle</div>
+							<div className="font-semibold">Skills could not be loaded for this Collection</div>
 							<div>{skillLoadError}</div>
 						</div>
 						<button
@@ -453,7 +449,7 @@ export function SkillBundleCard({
 													}}
 													disabled={!bundle.isEnabled}
 													busy={isPending(`${skill.id}:toggle`)}
-													title={!bundle.isEnabled ? 'Enable the bundle first.' : undefined}
+													title={!bundle.isEnabled ? 'Enable the Collection first.' : undefined}
 												/>
 											}
 										>
@@ -477,7 +473,7 @@ export function SkillBundleCard({
 												disabled={!bundle.isEditable || !skill.isManaged || skillHasResources(skill)}
 												title={
 													!bundle.isEditable
-														? 'This Skill Bundle only supports enable and disable actions.'
+														? 'This Skill Collection only supports enable and disable actions.'
 														: !skill.isManaged
 															? 'Only managed Skills can be edited. Fork this Skill to create a managed copy.'
 															: skillHasResources(skill)
@@ -517,7 +513,7 @@ export function SkillBundleCard({
 								);
 							})}
 
-							{skills.length === 0 ? <ManagementEmptyState>No skills in this bundle.</ManagementEmptyState> : null}
+							{skills.length === 0 ? <ManagementEmptyState>No skills in this Collection.</ManagementEmptyState> : null}
 
 							{skills.length > 0 && visibleSkills.length === 0 ? (
 								<ManagementEmptyState>No skills match the current filters.</ManagementEmptyState>
@@ -537,7 +533,7 @@ export function SkillBundleCard({
 				}}
 				onConfirm={confirmDeleteSkill}
 				title="Delete Skill"
-				message={`Delete skill "${skillToDelete?.displayName ?? skillToDelete?.name ?? ''}"? This cannot be undone.`}
+				message={`Delete skill "${skillToDelete?.displayName || skillToDelete?.name || ''}"? This cannot be undone.`}
 				confirmButtonText="Delete"
 			/>
 

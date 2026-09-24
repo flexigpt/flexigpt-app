@@ -16,12 +16,43 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { formatArtifactRef } from '@/agents/lib/agent_management_utils';
-
 interface AgentMCPSetupModalProps {
 	isOpen: boolean;
 	descriptor: AgentMCPSetupDescriptor | null;
 	onClose: () => void;
+}
+
+function inputKindLabel(kind: MCPInputKind): string {
+	switch (kind) {
+		case MCPInputKind.Secret:
+			return 'Secret';
+		case MCPInputKind.OAuthClientCredentials:
+			return 'OAuth client credentials';
+		case MCPInputKind.Path:
+			return 'Path';
+		default:
+			return 'Text';
+	}
+}
+
+function setupValuesForInstallation(
+	installation: MCPStoreServerInstallationView
+): Record<string, MCPSetupSubmissionValue> {
+	const values: Record<string, MCPSetupSubmissionValue> = {};
+
+	for (const [name, declaration] of Object.entries(installation.document.configuration.install.inputs ?? {})) {
+		const binding = installation.installation.inputs?.[name];
+
+		if (declaration.kind === MCPInputKind.Text || declaration.kind === MCPInputKind.Path) {
+			values[name] = {
+				value: binding?.value ?? '',
+			};
+		} else {
+			values[name] = {};
+		}
+	}
+
+	return values;
 }
 
 function UnresolvedMCPSetupContent({
@@ -45,14 +76,8 @@ function UnresolvedMCPSetupContent({
 				</div>
 
 				<ModalSection title="Declared MCP relationship">
-					<div className="space-y-2 text-sm">
-						<div>
-							<span className="font-medium">Occurrence:</span>{' '}
-							<span className="font-mono">{descriptor.occurrencePath}</span>
-						</div>
-						<div>
-							<span className="font-medium">Name:</span> {descriptor.name}
-						</div>
+					<div className="text-sm">
+						<span className="font-medium">Dependency:</span> {descriptor.name}
 					</div>
 				</ModalSection>
 
@@ -92,22 +117,8 @@ function AgentMCPSetupContent({
 					return;
 				}
 
-				const nextValues: Record<string, MCPSetupSubmissionValue> = {};
-
-				for (const [name, declaration] of Object.entries(value.document.configuration.install.inputs ?? {})) {
-					const binding = value.installation.inputs?.[name];
-
-					if (declaration.kind === MCPInputKind.Text || declaration.kind === MCPInputKind.Path) {
-						nextValues[name] = {
-							value: binding?.value ?? '',
-						};
-					} else {
-						nextValues[name] = {};
-					}
-				}
-
 				setInstallation(value);
-				setValues(nextValues);
+				setValues(setupValuesForInstallation(value));
 			})
 			.catch((error: unknown) => {
 				if (!cancelled) {
@@ -136,30 +147,40 @@ function AgentMCPSetupContent({
 		}
 
 		return inputEntries.flatMap(([name, declaration]) => {
+			const submitted = values[name] ?? {};
+			const binding = installation.installation.inputs?.[name];
+			const label = declaration.label || name;
+
+			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
+				const hasClientID = Boolean(submitted.clientID?.trim());
+				const hasClientSecret = Boolean(submitted.clientSecret?.trim());
+				const hasSubmission = hasClientID || hasClientSecret;
+
+				if (hasSubmission) {
+					return hasClientID && (!declaration.clientSecretRequired || hasClientSecret) ? [] : [label];
+				}
+
+				if (!declaration.required) {
+					return [];
+				}
+
+				return binding?.secretRef?.trim() ? [] : [label];
+			}
+
 			if (!declaration.required) {
 				return [];
 			}
 
-			const submitted = values[name] ?? {};
-			const binding = installation.installation.inputs?.[name];
-
 			switch (declaration.kind) {
 				case MCPInputKind.Text:
 				case MCPInputKind.Path:
-					return submitted.value?.trim() || binding?.value?.trim() || declaration.default?.trim() ? [] : [name];
+					return submitted.value?.trim() || binding?.value?.trim() || declaration.default?.trim() ? [] : [label];
 
 				case MCPInputKind.Secret:
-					return submitted.value?.trim() || binding?.secretRef?.trim() ? [] : [name];
-
-				case MCPInputKind.OAuthClientCredentials:
-					return submitted.clientID?.trim() && (!declaration.clientSecretRequired || submitted.clientSecret?.trim())
-						? []
-						: binding?.secretRef?.trim()
-							? []
-							: [name];
+					return submitted.value?.trim() || binding?.secretRef?.trim() ? [] : [label];
 
 				default:
-					return [name];
+					return [label];
 			}
 		});
 	}, [inputEntries, installation, values]);
@@ -181,6 +202,7 @@ function AgentMCPSetupContent({
 			await mcpManagementAPI.applyMCPServerSetup(artifact, values, false);
 			const refreshed = await mcpManagementAPI.getMCPServerInstallation(artifact);
 			setInstallation(refreshed);
+			setValues(setupValuesForInstallation(refreshed));
 		} catch (error) {
 			setSaveError(getErrorMessage(error, 'Failed to save MCP installation settings.'));
 		} finally {
@@ -193,7 +215,11 @@ function AgentMCPSetupContent({
 			<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 				<ModalHeader
 					title={`MCP Setup: ${descriptor.name}`}
-					description={installation?.document.displayName || formatArtifactRef(artifact)}
+					description={
+						installation?.document.displayName && installation.document.displayName !== descriptor.name
+							? installation.document.displayName
+							: undefined
+					}
 					onClose={onClose}
 					closeDisabled={isSaving}
 				/>
@@ -244,9 +270,12 @@ function AgentMCPSetupContent({
 															<div>
 																<div className="font-medium">{label}</div>
 																<div className="text-base-content/70 text-xs">
-																	{name}
-																	{declaration.required ? ' · required' : ''}
-																	{configured ? ' · configured' : ''}
+																	{[
+																		declaration.required ? 'Required' : 'Optional',
+																		configured ? 'Configured' : undefined,
+																	]
+																		.filter(Boolean)
+																		.join(' · ')}
 																</div>
 															</div>
 														</div>
@@ -300,7 +329,11 @@ function AgentMCPSetupContent({
 													key={name}
 													label={`${label}${declaration.required ? ' *' : ''}`}
 													htmlFor={`agent-mcp-input-${name}`}
-													hint={[declaration.description, declaration.kind, configured ? 'configured' : undefined]
+													hint={[
+														declaration.description,
+														inputKindLabel(declaration.kind),
+														configured ? 'Configured' : undefined,
+													]
 														.filter(Boolean)
 														.join(' · ')}
 												>

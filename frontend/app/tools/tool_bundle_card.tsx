@@ -34,17 +34,6 @@ function implementationLabel(tool: Tool): string {
 	}
 }
 
-function implementationIdentity(tool: Tool): string | undefined {
-	switch (tool.type) {
-		case ToolImplType.Go:
-			return tool.goImpl?.func;
-		case ToolImplType.SDK:
-			return tool.sdkImpl?.sdkType;
-		default:
-			return undefined;
-	}
-}
-
 export function ToolBundleCard({
 	bundle,
 	tools,
@@ -92,11 +81,7 @@ export function ToolBundleCard({
 		<>
 			<ManagementBundleCard
 				title={bundle.displayName || bundle.slug}
-				identity={
-					<span className="font-mono">
-						{bundle.slug} / {bundle.id}
-					</span>
-				}
+				identity={<span className="font-mono">{bundle.slug}</span>}
 				description={bundle.description}
 				status={
 					<>
@@ -168,7 +153,6 @@ export function ToolBundleCard({
 					<div className="mt-6 space-y-3">
 						{tools.map(tool => {
 							const toolToggleKey = `${tool.id}:toggle`;
-							const identity = implementationIdentity(tool);
 
 							return (
 								<ManagementItemCard
@@ -189,11 +173,6 @@ export function ToolBundleCard({
 											<MetadataPill label="Implementation">{implementationLabel(tool)}</MetadataPill>
 											<MetadataPill label="User callable">{tool.userCallable ? 'Yes' : 'No'}</MetadataPill>
 											<MetadataPill label="Model callable">{tool.llmCallable ? 'Yes' : 'No'}</MetadataPill>
-											{identity ? (
-												<MetadataPill label="Built-in ID">
-													<span className="font-mono">{identity}</span>
-												</MetadataPill>
-											) : null}
 										</>
 									}
 								>

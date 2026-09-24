@@ -211,12 +211,9 @@ export function skillMatchesSearch(skill: Skill, rawQuery: string): boolean {
 		skill.slug,
 		skill.description,
 		skill.type,
-		skill.location,
 		skill.insert,
-		skill.digest,
 		skill.presence?.status,
 		...(skill.runtimeWarnings ?? []),
-		...(skill.resources?.locations ?? []),
 		...(skill.tags ?? []),
 		...(skill.arguments ?? []).flatMap(arg => [arg.name, arg.description, arg.default]),
 	]
@@ -225,18 +222,6 @@ export function skillMatchesSearch(skill: Skill, rawQuery: string): boolean {
 		.toLowerCase();
 
 	return haystack.includes(query);
-}
-
-export function stringifySkillFrontmatter(rawFrontmatter?: Record<string, any> | null): string {
-	if (!rawFrontmatter || Object.keys(rawFrontmatter).length === 0) {
-		return '';
-	}
-
-	try {
-		return JSON.stringify(rawFrontmatter, null, 2);
-	} catch {
-		return '';
-	}
 }
 
 export function formatSkillArgumentList(args?: SkillArgument[] | null): string[] {

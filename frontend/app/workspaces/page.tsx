@@ -91,9 +91,7 @@ export default function WorkspaceDirectoryManagement() {
 		return directories.filter(directory =>
 			[
 				directory.root.displayName,
-				directory.root.id,
 				directory.directorySource.displayName,
-				directory.policyID,
 				...directory.workspaces.map(entry => entry.workspace.artifact.displayName),
 				...directory.workspaces.map(entry => entry.workspace.artifact.logicalName),
 				...directory.workspaces.map(entry => entry.manifestLocator),
@@ -283,7 +281,7 @@ export default function WorkspaceDirectoryManagement() {
 							Remove <span className="font-semibold">{directoryToRemove?.root.displayName}</span>?
 						</p>
 						<p className="text-base-content/70">
-							This removes the local Workspace Root and Source registrations. Repository files are never deleted.
+							This removes the directory from FlexiGPT. Repository files are never deleted.
 						</p>
 					</div>
 				}

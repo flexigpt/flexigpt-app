@@ -14,8 +14,6 @@ import { serverDraftFromView } from '@/apis/mcp_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
-import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
-import { ManagementInfoRow } from '@/components/managementui/management_info_row';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
@@ -392,7 +390,7 @@ function AddEditMCPServerModalContent({
 		const logicalName = next.logicalName.trim();
 
 		if (!logicalName) {
-			validation.logicalName = 'Logical name is required.';
+			validation.logicalName = 'Name is required.';
 		} else {
 			const error = validateSlug(logicalName);
 			if (error) {
@@ -469,26 +467,34 @@ function AddEditMCPServerModalContent({
 					validation.httpAPIKey = 'API key header name is required.';
 				} else if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(next.httpAPIKeyHeaderName.trim())) {
 					validation.httpAPIKey = 'API key header name contains invalid characters.';
-				} else if (!initialDraft.httpAPIKey?.existingSecretRef && !next.httpAPIKeyValue) {
+				} else if (
+					(!initialDraft.httpAPIKey?.existingSecretRef || next.httpAPIKeyDeleteExisting) &&
+					!next.httpAPIKeyValue
+				) {
 					validation.httpAPIKey = 'API key value is required.';
 				}
 			}
 
-			if (
-				next.httpAuthMode === MCPHTTPAuthMode.ClientCredentials &&
-				!initialDraft.httpOAuthClientCredentials.existingSecretRef &&
-				!next.httpOAuthCredentialsJSON.trim()
-			) {
-				validation.httpCredentials = 'Client credentials auth requires an OAuth client credential secret.';
-			}
+			const usesOAuthCredentials =
+				next.httpAuthMode === MCPHTTPAuthMode.ClientCredentials ||
+				(next.httpAuthMode === MCPHTTPAuthMode.OAuth && next.httpUseOAuthClientCredentials);
 
-			const credentialsError = parseOAuthCredentials(
-				next.httpOAuthCredentialsJSON,
-				next.httpAuthMode === MCPHTTPAuthMode.ClientCredentials
-			);
+			if (usesOAuthCredentials) {
+				const keepsExistingCredentials =
+					Boolean(initialDraft.httpOAuthClientCredentials.existingSecretRef) && !next.httpOAuthDeleteExisting;
 
-			if (credentialsError) {
-				validation.httpCredentials = credentialsError;
+				if (!keepsExistingCredentials && !next.httpOAuthCredentialsJSON.trim()) {
+					validation.httpCredentials = 'OAuth client credentials are required.';
+				}
+
+				const credentialsError = parseOAuthCredentials(
+					next.httpOAuthCredentialsJSON,
+					next.httpAuthMode === MCPHTTPAuthMode.ClientCredentials
+				);
+
+				if (credentialsError) {
+					validation.httpCredentials = credentialsError;
+				}
 			}
 
 			if (next.httpAuthMode === MCPHTTPAuthMode.OAuth && next.httpClientIDMetadataDocumentURL.trim()) {
@@ -605,8 +611,8 @@ function AddEditMCPServerModalContent({
 					title={isEdit ? 'Edit MCP Server' : 'Add MCP Server'}
 					description={
 						isEdit
-							? 'Update the portable server Definition and its installation-local secret bindings.'
-							: `Add a server to ${bundle.displayName}. Secrets remain outside the portable MCP document.`
+							? 'Update the server definition and its locally stored credentials.'
+							: `Add a server to ${bundle.displayName}. Secrets are stored locally and separately from the server definition.`
 					}
 					onClose={() => {
 						requestClose();
@@ -624,11 +630,25 @@ function AddEditMCPServerModalContent({
 						) : null}
 
 						<ModalSection title="Identity and availability">
+							<ModalField label="Display Name" htmlFor="mcp-display-name" required error={errors.displayName}>
+								<input
+									id="mcp-display-name"
+									type="text"
+									name="displayName"
+									value={form.displayName}
+									disabled={isSubmitting}
+									autoComplete="off"
+									spellCheck="false"
+									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+									onChange={handleInput}
+								/>
+							</ModalField>
+
 							<ModalField
-								label="Logical Name"
+								label="Name"
 								htmlFor="mcp-logical-name"
 								required
-								hint="Portable logical name inside this MCP Bundle. It cannot be changed after creation."
+								hint="Stable name inside this MCP Collection. It cannot be changed after creation."
 								error={errors.logicalName}
 							>
 								<input
@@ -642,20 +662,6 @@ function AddEditMCPServerModalContent({
 									autoComplete="off"
 									spellCheck="false"
 									className={`input w-full rounded-xl ${errors.logicalName ? 'input-error' : ''}`}
-									onChange={handleInput}
-								/>
-							</ModalField>
-
-							<ModalField label="Display Name" htmlFor="mcp-display-name" required error={errors.displayName}>
-								<input
-									id="mcp-display-name"
-									type="text"
-									name="displayName"
-									value={form.displayName}
-									disabled={isSubmitting}
-									autoComplete="off"
-									spellCheck="false"
-									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
 									onChange={handleInput}
 								/>
 							</ModalField>
@@ -1124,7 +1130,7 @@ function AddEditMCPServerModalContent({
 
 						<ModalSection
 							title="Default tool policy"
-							description="The policy is stored as an inline MCP Policy Artifact in the Bundle document."
+							description="This policy controls the default behavior of tools exposed by this server."
 						>
 							<ModalField label="Execution">
 								<Dropdown
@@ -1266,21 +1272,6 @@ function AddEditMCPServerModalContent({
 								/>
 							</ModalField>
 						</ModalSection>
-
-						{initialServer ? (
-							<ModalSection title="Artifact metadata">
-								<ManagementInfoGrid>
-									<ManagementInfoRow label="Artifact ID" mono>
-										{initialServer.ref.artifactID}
-									</ManagementInfoRow>
-									<ManagementInfoRow label="Root ID" mono>
-										{initialServer.ref.rootID}
-									</ManagementInfoRow>
-									<ManagementInfoRow label="Artifact Revision">{initialServer.artifact.revision}</ManagementInfoRow>
-									<ManagementInfoRow label="Built-in">{initialServer.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
-								</ManagementInfoGrid>
-							</ModalSection>
-						) : null}
 					</div>
 
 					<ModalActions>

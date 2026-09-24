@@ -21,7 +21,7 @@ function WorkspaceDirectoryRegistrationModalContent({
 	onClose,
 	onRegister,
 	title = 'Add Workspace Directory',
-	description = 'Choose one repository directory. FlexiGPT creates or reuses its Workspace Root and discovers effective Workspaces.',
+	description = 'Choose one repository directory. FlexiGPT discovers the effective Workspaces available there.',
 }: Omit<WorkspaceDirectoryRegistrationModalProps, 'isOpen'>) {
 	const [path, setPath] = useState('');
 	const [error, setError] = useState('');
@@ -52,13 +52,16 @@ function WorkspaceDirectoryRegistrationModalContent({
 		setError('');
 		setIsSubmitting(true);
 
-		void onRegister(selectedPath)
-			.catch((cause: unknown) => {
-				setError(cause instanceof Error ? cause.message : 'Workspace directory registration failed.');
-			})
-			.finally(() => {
+		void onRegister(selectedPath).then(
+			() => {
 				setIsSubmitting(false);
-			});
+				onClose();
+			},
+			(cause: unknown) => {
+				setError(cause instanceof Error ? cause.message : 'Workspace directory registration failed.');
+				setIsSubmitting(false);
+			}
+		);
 	};
 
 	return (
@@ -129,10 +132,7 @@ export function WorkspaceDirectoryRegistrationModal(props: WorkspaceDirectoryReg
 		<ModalDialog isOpen onClose={props.onClose} blockCancel>
 			<WorkspaceDirectoryRegistrationModalContent
 				onClose={props.onClose}
-				onRegister={async path => {
-					await props.onRegister(path);
-					props.onClose();
-				}}
+				onRegister={props.onRegister}
 				title={props.title}
 				description={props.description}
 			/>

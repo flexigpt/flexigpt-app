@@ -1,12 +1,7 @@
 import { useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFileText, FiUpload } from 'react-icons/fi';
 
-import type {
-	AgentImportCommitResult,
-	AgentImportDestination,
-	AgentImportPreview,
-	AgentImportRelationship,
-} from '@/spec/agent';
+import type { AgentImportCommitResult, AgentImportDestination, AgentImportPreview } from '@/spec/agent';
 import { AgentImportIssueSeverity } from '@/spec/agent';
 
 import { getErrorMessage } from '@/lib/error_utils';
@@ -21,7 +16,7 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-import { formatArtifactRef, formatDateish, getAgentRelationshipBadgeClass } from '@/agents/lib/agent_management_utils';
+import { formatDateish, getAgentRelationshipBadgeClass } from '@/agents/lib/agent_management_utils';
 
 interface AgentImportModalProps {
 	isOpen: boolean;
@@ -48,16 +43,22 @@ function getIssueClass(severity: AgentImportIssueSeverity): string {
 	}
 }
 
-function relationshipTarget(relationship: AgentImportRelationship): string | undefined {
-	if (relationship.artifact) {
-		return formatArtifactRef(relationship.artifact);
+function getDestinationLabel(destination: AgentImportDestination): string {
+	const collectionName = collectionDisplayName(destination.collection);
+	const rootName = destination.rootDisplayName?.trim();
+
+	if (!rootName || rootName === collectionName) {
+		return collectionName;
 	}
 
-	if (relationship.mapped) {
-		return `${relationship.mapped.provider}/${relationship.mapped.identifier}`;
-	}
+	return `${rootName} / ${collectionName}`;
+}
 
-	return undefined;
+function getConfirmationMessage(preview: AgentImportPreview, code: string): string {
+	return (
+		preview.issues?.find(issue => issue.code === code)?.message ??
+		'This declaration requires explicit acceptance before import.'
+	);
 }
 
 interface AgentImportModalContentProps {
@@ -237,18 +238,13 @@ function AgentImportModalContent({
 											return 'Select an Agent Collection';
 										}
 
-										return `${destination.rootDisplayName || destination.rootID} / ${collectionDisplayName(
-											destination.collection
-										)}`;
+										return getDestinationLabel(destination);
 									}}
 								/>
 							</ModalField>
 
-							{selectedDestination ? (
-								<div className="text-base-content/70 text-xs">
-									Collection revision: {selectedDestination.collectionRevision}
-									{selectedDestination.baseline ? ' · Baseline Collection' : ''}
-								</div>
+							{selectedDestination?.baseline ? (
+								<div className="text-base-content/70 text-xs">Baseline Collection</div>
 							) : null}
 						</ModalSection>
 
@@ -294,21 +290,17 @@ function AgentImportModalContent({
 								<ModalSection title="Preview summary">
 									<div className="grid gap-3 text-sm sm:grid-cols-2">
 										<div className="border-base-content/10 rounded-2xl border p-3">
-											<div className="text-base-content/70 text-xs">Can import</div>
+											<div className="text-base-content/70 text-xs">Ready to import</div>
 											<div className={preview.canImport ? 'text-success font-medium' : 'text-error font-medium'}>
 												{preview.canImport ? 'Yes' : 'No'}
 											</div>
 										</div>
 										<div className="border-base-content/10 rounded-2xl border p-3">
-											<div className="text-base-content/70 text-xs">Definition digest</div>
-											<div className="truncate font-mono text-xs">{preview.definitionDigest || '—'}</div>
-										</div>
-										<div className="border-base-content/10 rounded-2xl border p-3">
-											<div className="text-base-content/70 text-xs">Projected Artifacts</div>
+											<div className="text-base-content/70 text-xs">Items to import</div>
 											<div>{preview.projectedArtifacts?.length ?? 0}</div>
 										</div>
 										<div className="border-base-content/10 rounded-2xl border p-3">
-											<div className="text-base-content/70 text-xs">Prepared payload expires</div>
+											<div className="text-base-content/70 text-xs">Preview expires</div>
 											<div className="text-xs">{formatDateish(preview.expiresAt)}</div>
 										</div>
 									</div>
@@ -324,9 +316,7 @@ function AgentImportModalContent({
 												>
 													<FiAlertCircle size={16} />
 													<div>
-														<div className="font-medium">{issue.code}</div>
 														<div>{issue.message}</div>
-														{issue.path ? <div className="mt-1 font-mono text-xs">{issue.path}</div> : null}
 													</div>
 												</div>
 											))}
@@ -344,7 +334,6 @@ function AgentImportModalContent({
 												>
 													<FiAlertCircle size={16} />
 													<div>
-														<div className="font-medium">{conflict.code}</div>
 														<div>{conflict.message}</div>
 													</div>
 												</div>
@@ -354,7 +343,7 @@ function AgentImportModalContent({
 								) : null}
 
 								{preview.relationships?.length ? (
-									<ModalSection title="Managed dependency observations">
+									<ModalSection title="Dependencies">
 										<div className="space-y-2">
 											{preview.relationships.map(relationship => (
 												<div key={relationship.path} className="border-base-content/10 rounded-2xl border p-3">
@@ -362,15 +351,14 @@ function AgentImportModalContent({
 														<span className="font-medium">
 															{relationship.type}: {relationship.name}
 														</span>
-														<span className={`badge badge-sm ${getAgentRelationshipBadgeClass(relationship.status)}`}>
+														<span
+															className={`badge badge-sm capitalize ${getAgentRelationshipBadgeClass(relationship.status)}`}
+														>
 															{relationship.status}
 														</span>
 													</div>
-													<div className="text-base-content/70 mt-1 font-mono text-xs">{relationship.path}</div>
-													{relationshipTarget(relationship) ? (
-														<div className="text-base-content/70 mt-1 text-xs">
-															Target: {relationshipTarget(relationship)}
-														</div>
+													{relationship.scope ? (
+														<div className="text-base-content/70 mt-1 text-xs">Scope: {relationship.scope}</div>
 													) : null}
 													{relationship.message ? (
 														<div className="text-warning mt-1 text-xs">{relationship.message}</div>
@@ -426,10 +414,7 @@ function AgentImportModalContent({
 															});
 														}}
 													/>
-													<span className="text-base-content/70 text-xs">
-														This declaration requires explicit acceptance before import.
-													</span>
-													<div className="font-mono text-sm">{code}</div>
+													<span className="text-sm">{getConfirmationMessage(preview, code)}</span>
 												</label>
 											))}
 										</div>

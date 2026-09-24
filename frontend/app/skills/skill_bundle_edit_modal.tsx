@@ -46,7 +46,7 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 			})
 			.catch((error: unknown) => {
 				if (!unmountingRef.current) {
-					setSubmitError(error instanceof Error ? error.message : 'Skill Bundle could not be updated.');
+					setSubmitError(error instanceof Error ? error.message : 'Skill Collection could not be updated.');
 				}
 			})
 			.finally(() => {
@@ -59,8 +59,8 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 	return (
 		<div className="modal-box bg-base-200 flex max-h-[calc(100dvh-1rem)] w-[calc(100%-1rem)] max-w-2xl flex-col overflow-hidden rounded-2xl p-0">
 			<ModalHeader
-				title="Edit Skill Bundle"
-				description="Update local Bundle presentation. Logical identity and Artifact Store ownership remain unchanged."
+				title="Edit Skill Collection"
+				description="Update the Collection display name and description. Its stable name remains unchanged."
 				onClose={requestClose}
 				closeDisabled={isSubmitting}
 			/>
@@ -77,8 +77,8 @@ function SkillBundleEditModalContent({ bundle, onSubmit }: Omit<SkillBundleEditM
 					</div>
 				) : null}
 
-				<ModalSection title="Bundle identity">
-					<ModalField label="Logical name">
+				<ModalSection title="Collection details">
+					<ModalField label="Name">
 						<div className="input bg-base-300 flex items-center rounded-xl font-mono text-sm">{bundle.slug}</div>
 					</ModalField>
 

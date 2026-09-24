@@ -474,10 +474,6 @@ export function requireMCPRuntimeServerID(server: MCPServerView): MCPRuntimeServ
 	return server.runtimeServerID;
 }
 
-export function serverRefLabel(server: MCPServerView): string {
-	return `${server.ref.rootID}/${server.ref.artifactID}`;
-}
-
 export function serverSetupInputs(server: MCPServerView): MCPSetupInputView[] {
 	if (!server.document) {
 		return [];
@@ -855,15 +851,20 @@ export class MCPManagementAPI {
 			}
 
 			if (declaration.kind === MCPInputKindValue.OAuthClientCredentials) {
-				const hasCredentials = Boolean(submitted?.clientID?.trim() || submitted?.clientSecret);
+				const hasClientID = Boolean(submitted?.clientID?.trim());
+				const hasClientSecret = Boolean(submitted?.clientSecret);
+				const hasCredentials = hasClientID || hasClientSecret;
 
 				if (hasCredentials) {
-					if (!submitted?.clientID?.trim()) {
+					if (!hasClientID) {
 						throw new Error(`OAuth input "${inputName}" requires a client ID.`);
+					}
+					if (declaration.clientSecretRequired && !hasClientSecret) {
+						throw new Error(`OAuth input "${inputName}" requires a client secret when replacing its credentials.`);
 					}
 
 					const secret = JSON.stringify({
-						clientID: submitted.clientID.trim(),
+						clientID: submitted.clientID?.trim(),
 						...(submitted.clientSecret
 							? {
 									clientSecret: submitted.clientSecret,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FiAlertCircle, FiChevronDown, FiChevronUp, FiFileText, FiRefreshCw, FiTrash2 } from 'react-icons/fi';
 
 import type { WorkspaceArtifactView, WorkspaceDirectoryView } from '@/spec/workspace';
@@ -46,33 +46,39 @@ export function WorkspaceDirectoryCard({
 	const [expanded, setExpanded] = useState(false);
 	const [artifacts, setArtifacts] = useState<WorkspaceArtifactView[] | null>(null);
 	const [artifactError, setArtifactError] = useState('');
+	const [isLoadingArtifacts, setIsLoadingArtifacts] = useState(false);
 	const [busy, setBusy] = useState('');
 	const [actionError, setActionError] = useState('');
 
 	const loadArtifacts = useCallback(async () => {
+		if (isLoadingArtifacts) {
+			return;
+		}
+
 		setArtifactError('');
+		setIsLoadingArtifacts(true);
 
 		try {
 			setArtifacts(await workspaceManagementAPI.listWorkspaceDirectoryArtifacts(directory.ref));
 		} catch (cause) {
 			setArtifactError(cause instanceof Error ? cause.message : 'Discovered declarations could not be loaded.');
+		} finally {
+			setIsLoadingArtifacts(false);
 		}
-	}, [directory.ref]);
-
-	useEffect(() => {
-		if (expanded && artifacts === null && !artifactError) {
-			// oxlint-disable-next-line react/set-state-in-effect
-			void loadArtifacts();
-		}
-	}, [artifactError, artifacts, expanded, loadArtifacts]);
+	}, [directory.ref, isLoadingArtifacts]);
 
 	const mutateDirectory = async (key: string, action: () => Promise<WorkspaceDirectoryView>) => {
 		setActionError('');
 		setBusy(key);
 
 		try {
-			onChanged(await action());
-			setArtifacts(null);
+			const updated = await action();
+			onChanged(updated);
+			if (expanded) {
+				await loadArtifacts();
+			} else {
+				setArtifacts(null);
+			}
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Workspace directory operation failed.');
 		} finally {
@@ -113,7 +119,7 @@ export function WorkspaceDirectoryCard({
 	return (
 		<ManagementBundleCard
 			title={directory.root.displayName}
-			identity={<span className="font-mono text-xs">{directory.root.id}</span>}
+			identity={<span className="text-xs">{directory.directorySource.displayName}</span>}
 			description="Repository-oriented Workspace directory"
 			status={
 				<>
@@ -130,19 +136,16 @@ export function WorkspaceDirectoryCard({
 					type="button"
 					className="btn btn-sm btn-ghost rounded-xl"
 					onClick={() => {
-						setExpanded(value => !value);
+						const next = !expanded;
+						setExpanded(next);
+						if (next && artifacts === null) {
+							void loadArtifacts();
+						}
 					}}
 				>
 					{expanded ? 'Hide details' : 'Manage'}
 					{expanded ? <FiChevronUp size={15} /> : <FiChevronDown size={15} />}
 				</button>
-			}
-			metadata={
-				<>
-					<MetadataPill label="Policy">{directory.policyID}</MetadataPill>
-					<MetadataPill label="Policy version">{directory.policyVersion}</MetadataPill>
-					<MetadataPill label="Directory Source">{directory.directorySource.displayName}</MetadataPill>
-				</>
 			}
 			actions={
 				<>
@@ -272,7 +275,6 @@ export function WorkspaceDirectoryCard({
 										<>
 											<MetadataPill label="Declaration">{artifact.logicalName}</MetadataPill>
 											<MetadataPill label="State">{artifact.state}</MetadataPill>
-											<MetadataPill label="Revision">{artifact.revision}</MetadataPill>
 										</>
 									}
 								/>
@@ -289,22 +291,26 @@ export function WorkspaceDirectoryCard({
 							<div>
 								<div className="text-sm font-semibold">Discovered declarations</div>
 								<div className="text-base-content/60 text-xs">
-									Artifact enablement is the only individual Workspace runtime enablement control.
+									Each discovered declaration can be enabled or disabled individually.
 								</div>
 							</div>
 							<button
 								type="button"
 								className="btn btn-sm btn-ghost rounded-xl"
+								disabled={isLoadingArtifacts}
 								onClick={() => {
 									void loadArtifacts();
 								}}
 							>
 								<FiRefreshCw size={14} />
-								Reload declarations
+								{isLoadingArtifacts ? 'Loading...' : 'Reload declarations'}
 							</button>
 						</div>
 
 						{artifactError ? <div className="alert alert-warning rounded-2xl text-sm">{artifactError}</div> : null}
+						{isLoadingArtifacts && artifacts === null ? (
+							<div className="text-base-content/60 text-sm">Loading declarations...</div>
+						) : null}
 
 						{artifacts?.map(artifact => (
 							<ManagementItemCard
@@ -328,7 +334,6 @@ export function WorkspaceDirectoryCard({
 									<>
 										<MetadataPill label="Type">{artifact.kind}</MetadataPill>
 										<MetadataPill label="Name">{artifact.logicalName}</MetadataPill>
-										<MetadataPill label="Source">{artifact.sourceID}</MetadataPill>
 									</>
 								}
 							>
@@ -341,7 +346,7 @@ export function WorkspaceDirectoryCard({
 											void setArtifactEnabled(artifact, !artifact.enabled);
 										}}
 									>
-										{artifact.enabled ? 'Disable Artifact' : 'Enable Artifact'}
+										{artifact.enabled ? 'Disable declaration' : 'Enable declaration'}
 									</button>
 									{artifact.kind === 'mcp' ? (
 										<span className="text-base-content/60 text-xs">
@@ -368,7 +373,6 @@ export function WorkspaceDirectoryCard({
 								>
 									<div className="flex flex-wrap gap-2">
 										<StatusBadge tone={diagnosticTone(diagnostic.severity)}>{diagnostic.severity}</StatusBadge>
-										<MetadataPill label="Code">{diagnostic.code}</MetadataPill>
 									</div>
 									<div className="mt-2">{diagnostic.message}</div>
 									{diagnostic.location?.locator ? (

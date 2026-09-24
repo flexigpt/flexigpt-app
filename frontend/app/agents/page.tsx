@@ -154,11 +154,7 @@ function AgentCollectionCard({
 	return (
 		<ManagementBundleCard
 			title={collectionDisplayName(collection)}
-			identity={
-				<span className="font-mono">
-					{collection.name} / {collection.artifact.rootID}
-				</span>
-			}
+			identity={<span className="font-mono">{collection.name}</span>}
 			description={collection.description}
 			status={
 				<>
@@ -293,7 +289,7 @@ function AgentCollectionCard({
 								<ManagementItemCard
 									key={`${agent.artifact.rootID}:${agent.artifact.id}`}
 									title={agentDisplayName(agent)}
-									subtitle={`${agent.name} / ${agent.artifact.rootID}/${agent.artifact.id}`}
+									subtitle={agent.name === agentDisplayName(agent) ? undefined : agent.name}
 									description={agent.description}
 									status={
 										<>
@@ -304,12 +300,7 @@ function AgentCollectionCard({
 											{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
 										</>
 									}
-									metadata={
-										<>
-											<MetadataPill label="State">{agent.artifact.state}</MetadataPill>
-											<MetadataPill label="Revision">{agent.artifact.revision}</MetadataPill>
-										</>
-									}
+									metadata={<MetadataPill label="State">{agent.artifact.state}</MetadataPill>}
 								>
 									<ActionRow
 										leading={
@@ -546,7 +537,7 @@ export default function AgentsPage() {
 									collection.artifact.rootID,
 									{
 										rootID: collection.artifact.rootID,
-										label: collection.artifact.rootID,
+										label: collectionDisplayName(collection),
 									},
 								] as const
 						)
@@ -555,23 +546,21 @@ export default function AgentsPage() {
 		[pageData.collections]
 	);
 
+	const effectiveCollectionCreationRootID = collectionCreationRoots.some(
+		value => value.rootID === collectionCreationRootID
+	)
+		? collectionCreationRootID
+		: (collectionCreationRoots[0]?.rootID ?? '');
+
 	useEffect(() => {
+		const prefetchedKeys = agentPrefetchKeysRef.current;
 		mountedRef.current = true;
 		return () => {
 			mountedRef.current = false;
 			agentLoadRequestIDRef.current = {};
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			agentPrefetchKeysRef.current.clear();
+			prefetchedKeys.clear();
 		};
 	}, []);
-
-	useEffect(() => {
-		if (collectionCreationRoots.some(value => value.rootID === collectionCreationRootID)) {
-			return;
-		}
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-		setCollectionCreationRootID(collectionCreationRoots[0]?.rootID ?? '');
-	}, [collectionCreationRootID, collectionCreationRoots]);
 
 	useEffect(() => {
 		if (
@@ -709,8 +698,12 @@ export default function AgentsPage() {
 
 	const createCollection = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
+			if (!effectiveCollectionCreationRootID) {
+				throw new Error('No editable Agent Collection group is available.');
+			}
+
 			await agentStoreAPI.createAgentCollection({
-				rootID: collectionCreationRootID,
+				rootID: effectiveCollectionCreationRootID,
 				name: slug,
 				displayName,
 				description,
@@ -718,7 +711,7 @@ export default function AgentsPage() {
 
 			await refreshPage();
 		},
-		[collectionCreationRootID, refreshPage]
+		[effectiveCollectionCreationRootID, refreshPage]
 	);
 
 	const updateCollection = useCallback(
@@ -833,8 +826,8 @@ export default function AgentsPage() {
 							{collectionCreationRoots.length > 1 ? (
 								<select
 									className="select select-sm max-w-72 rounded-xl"
-									aria-label="Agent Collection Root"
-									value={collectionCreationRootID}
+									aria-label="Agent Collection group"
+									value={effectiveCollectionCreationRootID}
 									onChange={event => {
 										setCollectionCreationRootID(event.currentTarget.value);
 									}}
@@ -863,6 +856,10 @@ export default function AgentsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
+								disabled={!effectiveCollectionCreationRootID}
+								title={
+									!effectiveCollectionCreationRootID ? 'No editable Agent Collection group is available.' : undefined
+								}
 								onClick={() => {
 									setIsCreateCollectionOpen(true);
 								}}
@@ -918,10 +915,10 @@ export default function AgentsPage() {
 					}}
 					onSubmit={createCollection}
 					existingSlugs={pageData.collections
-						.filter(data => data.collection.artifact.rootID === collectionCreationRootID)
+						.filter(data => data.collection.artifact.rootID === effectiveCollectionCreationRootID)
 						.map(data => data.collection.name)}
 					existingDisplayNames={pageData.collections
-						.filter(data => data.collection.artifact.rootID === collectionCreationRootID)
+						.filter(data => data.collection.artifact.rootID === effectiveCollectionCreationRootID)
 						.map(data => collectionDisplayName(data.collection))}
 					failureMessage="Failed to create Agent Collection."
 				/>
@@ -970,12 +967,6 @@ export default function AgentsPage() {
 							<ManagementInfoRow label="Display Name">{collectionDisplayName(collectionToView)}</ManagementInfoRow>
 							<ManagementInfoRow label="Name" mono>
 								{collectionToView.name}
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Artifact ID" mono>
-								{collectionToView.artifact.id}
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Root ID" mono>
-								{collectionToView.artifact.rootID}
 							</ManagementInfoRow>
 							<ManagementInfoRow label="Built-in">
 								{isBuiltInAgentCollection(collectionToView) ? 'Yes' : 'No'}

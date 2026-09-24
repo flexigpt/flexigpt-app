@@ -32,7 +32,6 @@ function requireWailsDate(value: unknown, field: string): Date {
 
 function conversationFromWails(value: unknown): StoreConversation {
 	const body = requireWailsBody(value as Record<string, unknown> | null | undefined, 'GetConversation');
-	// oxlint-disable-next-line oxc/no-map-spread
 	const messages = wailsObjectArrayOrEmpty(body.messages, 'GetConversation.messages').map((message, index) => {
 		return {
 			...message,

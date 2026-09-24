@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { FiAlertCircle, FiCheck, FiServer, FiTool, FiZap } from 'react-icons/fi';
+import { FiAlertCircle, FiCheck, FiTool, FiZap } from 'react-icons/fi';
 
 import type { AgentResolution } from '@/spec/agent';
 import { ToolStoreChoiceType } from '@/spec/tool';
@@ -58,6 +58,11 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 		return null;
 	}
 
+	const modelRelationship = recipe.resolution.capabilities.occurrences.find(
+		occurrence => occurrence.type === 'model' && occurrence.status === 'available'
+	);
+	const modelLabel = modelRelationship?.mapped?.name || modelRelationship?.name;
+
 	return (
 		<div className="space-y-3">
 			<div className={`alert ${recipe.canApply ? 'alert-success' : 'alert-warning'} rounded-2xl text-sm`}>
@@ -72,11 +77,7 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 			<div className="grid gap-3 md:grid-cols-2">
 				<ManagementItemCard
 					title="Model"
-					subtitle={
-						recipe.modelPresetRef
-							? `${recipe.modelPresetRef.providerName}/${recipe.modelPresetRef.modelPresetID}`
-							: 'No Agent Model selection'
-					}
+					subtitle={recipe.modelPresetRef ? modelLabel || 'Selected model' : 'No Agent model selection'}
 					metadata={
 						recipe.includeModelSystemPrompt !== undefined ? (
 							<MetadataPill label="Include model system prompt">
@@ -140,9 +141,8 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 				<div className="alert alert-warning rounded-2xl text-sm">
 					<FiAlertCircle size={15} />
 					<span>
-						{recipe.textArtifacts.length} Text Artifact
-						{recipe.textArtifacts.length === 1 ? '' : 's'} could not be materialized through the current Agent frontend
-						API.
+						{recipe.textArtifacts.length} text declaration{recipe.textArtifacts.length === 1 ? '' : 's'} cannot
+						currently be added to this conversation starter.
 					</span>
 				</div>
 			) : null}
@@ -158,26 +158,10 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 						>
 							<FiAlertCircle size={15} />
 							<div>
-								<div className="font-medium">{item.code}</div>
 								<div>{item.message}</div>
-								{item.path ? <div className="mt-1 font-mono text-xs">{item.path}</div> : null}
 							</div>
 						</div>
 					))}
-				</div>
-			) : null}
-
-			{recipe.mcpContext?.servers.length ? (
-				<div className="border-base-content/10 rounded-2xl border p-3">
-					<div className="mb-2 flex items-center gap-2 text-sm font-semibold">
-						<FiServer size={14} />
-						MCP runtime selections
-					</div>
-					<div className="space-y-1 font-mono text-xs">
-						{recipe.mcpContext.servers.map(server => (
-							<div key={server.server}>{server.server}</div>
-						))}
-					</div>
 				</div>
 			) : null}
 

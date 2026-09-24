@@ -393,7 +393,7 @@ const oxcRules: DummyRuleMap = {
 
 	// Perf. Default on.
 	'oxc/no-accumulating-spread': 'off',
-	'oxc/no-map-spread': 'error',
+	'oxc/no-map-spread': 'off',
 };
 
 const unicornRules: DummyRuleMap = {

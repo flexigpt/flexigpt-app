@@ -123,11 +123,9 @@ function MCPOAuthAuthorizationModalContent({
 							</div>
 
 							{authorizationURL ? (
-								<div>
-									<div className="text-base-content/70 mb-1 text-xs font-semibold uppercase">Authorization URL</div>
-									<div className="bg-base-300 max-h-32 overflow-auto rounded-2xl p-3 text-xs break-all">
-										{authorizationURL}
-									</div>
+								<div className="alert alert-info rounded-2xl text-sm">
+									<FiExternalLink size={14} />
+									<span>The authorization page is ready to open.</span>
 								</div>
 							) : isPreparing ? (
 								<div className="alert alert-info rounded-2xl text-sm">

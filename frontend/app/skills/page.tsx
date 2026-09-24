@@ -193,7 +193,7 @@ export default function SkillsPage() {
 									bundleData.bundle.rootID,
 									{
 										rootID: bundleData.bundle.rootID,
-										label: bundleData.bundle.rootID,
+										label: bundleData.bundle.displayName || bundleData.bundle.slug,
 									},
 								] as const
 						)
@@ -201,19 +201,23 @@ export default function SkillsPage() {
 			].toSorted((left, right) => left.label.localeCompare(right.label)),
 		[bundles]
 	);
+	const effectiveCreationRootID = creationRoots.some(value => value.rootID === creationRootID)
+		? creationRootID
+		: (creationRoots[0]?.rootID ?? '');
+
 	const existingBundleSlugs = useMemo(
 		() =>
 			bundles
-				.filter(bundleData => bundleData.bundle.rootID === creationRootID)
+				.filter(bundleData => bundleData.bundle.rootID === effectiveCreationRootID)
 				.map(bundleData => bundleData.bundle.slug),
-		[bundles, creationRootID]
+		[bundles, effectiveCreationRootID]
 	);
 	const existingBundleNames = useMemo(
 		() =>
 			bundles
-				.filter(bundleData => bundleData.bundle.rootID === creationRootID)
+				.filter(bundleData => bundleData.bundle.rootID === effectiveCreationRootID)
 				.map(bundleData => (bundleData.bundle.displayName ?? bundleData.bundle.slug).trim()),
-		[bundles, creationRootID]
+		[bundles, effectiveCreationRootID]
 	);
 	const allSkills = useMemo(() => bundles.flatMap(bundleData => bundleData.skills), [bundles]);
 	const allSkillItems = useMemo<SkillItem[]>(
@@ -254,7 +258,7 @@ export default function SkillsPage() {
 				value: 'all' as const,
 				label: 'All skills',
 				count: allSkills.length,
-				description: 'Show every skill record in every bundle.',
+				description: 'Show every skill in every Collection.',
 			},
 			{
 				value: SkillInsert.Instructions,
@@ -302,7 +306,7 @@ export default function SkillsPage() {
 				);
 			} catch (err) {
 				console.error('Refresh bundle skills failed:', err);
-				const message = getErrorMessage(err, 'Failed to load this bundle’s skills.');
+				const message = getErrorMessage(err, 'Failed to load this Collection’s skills.');
 
 				if (isMountedRef.current && bundleRefreshRequestIdRef.current[bundleID] === requestId) {
 					setBundles(previous =>
@@ -319,21 +323,13 @@ export default function SkillsPage() {
 	);
 
 	useEffect(() => {
+		const prefetchedBundles = bundleRuntimePrefetchRef.current;
 		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
-			// oxlint-disable-next-line react-hooks/exhaustive-deps
-			bundleRuntimePrefetchRef.current.clear();
+			prefetchedBundles.clear();
 		};
 	}, []);
-
-	useEffect(() => {
-		if (creationRoots.some(value => value.rootID === creationRootID)) {
-			return;
-		}
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
-		setCreationRootID(creationRoots[0]?.rootID ?? '');
-	}, [creationRootID, creationRoots]);
 
 	useEffect(() => {
 		if (hasResolved && !pageLoadError && !isLoading && !isRefreshing) {
@@ -624,19 +620,19 @@ export default function SkillsPage() {
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
-				if (!creationRootID) {
-					throw new Error('No user Skill baseline Root is available.');
+				if (!effectiveCreationRootID) {
+					throw new Error('No editable Skill Collection is available.');
 				}
 
 				const id = getUUIDv7();
-				await skillManagementAPI.putSkillBundle(id, creationRootID, slug, display, true, description);
+				await skillManagementAPI.putSkillBundle(id, effectiveCreationRootID, slug, display, true, description);
 				try {
 					await reloadPageData();
 				} catch (refreshError) {
 					console.error('Skill bundle was created but refresh failed:', refreshError);
 					if (isMountedRef.current) {
 						setAlertMsg(
-							'Skill bundle was created, but the page could not be refreshed. Reload before making destructive changes.'
+							'Skill Collection was created, but the page could not be refreshed. Reload before making destructive changes.'
 						);
 						setShowAlert(true);
 					}
@@ -646,7 +642,7 @@ export default function SkillsPage() {
 				throw err;
 			}
 		},
-		[creationRootID, reloadPageData]
+		[effectiveCreationRootID, reloadPageData]
 	);
 
 	const handleEditBundle = useCallback(
@@ -672,7 +668,7 @@ export default function SkillsPage() {
 	);
 
 	if (isLoading && !hasResolved && bundles.length === 0) {
-		return <Loader text="Loading skill Bundles…" />;
+		return <Loader text="Loading Skill Collections..." />;
 	}
 
 	return (
@@ -685,9 +681,9 @@ export default function SkillsPage() {
 						<>
 							{creationRoots.length > 1 ? (
 								<select
-									className="select select-sm max-w-72 rounded-xl font-mono"
-									aria-label="Skill Bundle Root"
-									value={creationRootID}
+									className="select select-sm max-w-72 rounded-xl"
+									aria-label="Skill Collection group"
+									value={effectiveCreationRootID}
 									onChange={event => {
 										setCreationRootID(event.currentTarget.value);
 									}}
@@ -703,14 +699,14 @@ export default function SkillsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
-								disabled={!creationRootID}
-								title={!creationRootID ? 'No user Skill baseline Root is available.' : undefined}
+								disabled={!effectiveCreationRootID}
+								title={!effectiveCreationRootID ? 'No editable Skill Collection is available.' : undefined}
 								onClick={() => {
 									setIsAddModalOpen(true);
 								}}
 							>
 								<FiPlus size={18} />
-								<span>Add Bundle</span>
+								<span>Add Collection</span>
 							</button>
 						</>
 					}
@@ -762,7 +758,7 @@ export default function SkillsPage() {
 								onChange={e => {
 									setSearchQuery(e.target.value);
 								}}
-								placeholder="Search name, slug, description, location, tags, arguments…"
+								placeholder="Search names, descriptions, tags, and arguments..."
 								spellCheck="false"
 							/>
 							{searchQuery ? (
@@ -806,7 +802,7 @@ export default function SkillsPage() {
 						</label>
 
 						<div className="text-base-content/70 flex items-center justify-end text-xs lg:col-span-3">
-							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} bundle
+							{visibleSkillCount} matching skill{visibleSkillCount === 1 ? '' : 's'} across {bundles.length} Collection
 							{bundles.length === 1 ? '' : 's'}
 						</div>
 
@@ -862,7 +858,7 @@ export default function SkillsPage() {
 					</div>
 
 					<div className="flex flex-col space-y-4 pb-8">
-						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No skill bundles configured yet.</p>}
+						{bundles.length === 0 && <p className="mt-8 text-center text-sm">No Skill Collections configured yet.</p>}
 
 						{bundles.map(bundleData => (
 							<SkillBundleCard
@@ -902,23 +898,23 @@ export default function SkillsPage() {
 					title="Delete Skill Bundle"
 					message={
 						bundleToDelete
-							? `Delete empty bundle "${bundleToDelete.displayName || bundleToDelete.slug}"? Remove all skills from the bundle first.`
-							: 'Delete this empty skill bundle?'
+							? `Delete empty Collection "${bundleToDelete.displayName || bundleToDelete.slug}"? Remove all skills from the Collection first.`
+							: 'Delete this empty Skill Collection?'
 					}
 					confirmButtonText="Delete"
 				/>
 
 				<ManagementBundleCreateModal
 					isOpen={isAddModalOpen}
-					title="Add Skill Bundle"
-					entityLabel="Skill bundle"
+					title="Add Skill Collection"
+					entityLabel="Skill Collection"
 					onClose={() => {
 						setIsAddModalOpen(false);
 					}}
 					onSubmit={handleAddBundle}
 					existingSlugs={existingBundleSlugs}
 					existingDisplayNames={existingBundleNames}
-					failureMessage="Failed to create skill bundle."
+					failureMessage="Failed to create Skill Collection."
 				/>
 
 				<ActionDeniedAlertModal

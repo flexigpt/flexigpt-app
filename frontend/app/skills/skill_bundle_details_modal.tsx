@@ -30,22 +30,15 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 		<ManagementDetailsModal
 			isOpen={isOpen}
 			onClose={onClose}
-			title="Skill Bundle Details"
+			title="Skill Collection Details"
 			modalKey={`skill-bundle:${bundle.id}:${bundle.modifiedAt}`}
 		>
-			<ModalSection title="Bundle metadata">
+			<ModalSection title="Collection details">
 				<ManagementInfoGrid>
 					<ManagementInfoRow label="Display Name">{bundle.displayName || '—'}</ManagementInfoRow>
-					<ManagementInfoRow label="Slug" mono>
+					<ManagementInfoRow label="Name" mono>
 						{bundle.slug}
 					</ManagementInfoRow>
-					<ManagementInfoRow label="ID" mono>
-						{bundle.id}
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Root ID" mono>
-						{bundle.rootID}
-					</ManagementInfoRow>
-					<ManagementInfoRow label="Collection revision">{bundle.revision}</ManagementInfoRow>
 					<ManagementInfoRow label="Built-in">{bundle.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Enabled">{bundle.isEnabled ? 'Yes' : 'No'}</ManagementInfoRow>
 					<ManagementInfoRow label="Description">
@@ -56,7 +49,7 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 				</ManagementInfoGrid>
 			</ModalSection>
 
-			<ModalSection title="Artifact Sources">
+			<ModalSection title="Sources">
 				{bundle.attachments.length > 0 ? (
 					<div className="space-y-2">
 						{bundle.attachments.map(attachment => (
@@ -67,7 +60,6 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 									{attachment.sourceKind ? <MetadataPill label="Kind">{attachment.sourceKind}</MetadataPill> : null}
 								</div>
 								<div className="mt-2 text-sm">{attachment.sourceDisplayName || 'Attached Source'}</div>
-								<div className="text-base-content/60 mt-1 font-mono text-xs break-all">{attachment.sourceID}</div>
 							</div>
 						))}
 					</div>
@@ -103,14 +95,9 @@ export function SkillBundleDetailsModal({ isOpen, onClose, bundle, skills }: Ski
 						Instruction skills affect session state. User-message skills render into the composer or user message body
 						and are not active session skills.
 					</ManagementInfoRow>
-					<ManagementInfoRow label="Prompt migration note">
-						A prompt-like template should be a filesystem skill whose <span className="font-mono">SKILL.md</span>
-						frontmatter contains <span className="font-mono">insert: user-message</span>. Its declared arguments replace
-						the old prompt variable form.
-					</ManagementInfoRow>
 					<ManagementInfoRow label="Resource note">
 						Managed creation writes only SKILL.md. Add extra resources to the skill folder, then re-enable the skill or
-						restart the app to refresh runtime metadata.
+						refresh the owning Skill Collection.
 					</ManagementInfoRow>
 				</ManagementInfoGrid>
 			</ModalSection>

@@ -21,7 +21,7 @@ interface WorkspaceDefaultPolicyModalProps {
 	onClose: () => void;
 }
 
-export function WorkspaceDefaultPolicyModal({ isOpen, onClose }: WorkspaceDefaultPolicyModalProps) {
+function WorkspaceDefaultPolicyModalContent({ onClose }: Pick<WorkspaceDefaultPolicyModalProps, 'onClose'>) {
 	const loadPolicy = useCallback(async (signal: AbortSignal): Promise<WorkspaceDefaultPolicyView> => {
 		const policy = await workspaceManagementAPI.getWorkspaceDefaultPolicy();
 		throwIfAborted(signal);
@@ -38,10 +38,6 @@ export function WorkspaceDefaultPolicyModal({ isOpen, onClose }: WorkspaceDefaul
 		initialData: null as WorkspaceDefaultPolicyView | null,
 	});
 	const [copied, setCopied] = useState(false);
-
-	if (!isOpen) {
-		return null;
-	}
 
 	const copy = async () => {
 		if (!policy) {
@@ -78,21 +74,6 @@ export function WorkspaceDefaultPolicyModal({ isOpen, onClose }: WorkspaceDefaul
 
 					{policy ? (
 						<>
-							<div className="border-base-content/10 bg-base-100 grid gap-3 rounded-2xl border p-4 text-sm sm:grid-cols-3">
-								<div>
-									<div className="text-base-content/60 text-xs">Policy ID</div>
-									<div className="font-mono text-xs break-all">{policy.policyID}</div>
-								</div>
-								<div>
-									<div className="text-base-content/60 text-xs">Version</div>
-									<div>{policy.policyVersion}</div>
-								</div>
-								<div>
-									<div className="text-base-content/60 text-xs">Digest</div>
-									<div className="font-mono text-xs break-all">{policy.policyDigest}</div>
-								</div>
-							</div>
-
 							<ModalSection title="How to customize a repository">
 								<ul className="text-base-content/70 list-disc space-y-1 pl-5 text-sm">
 									<li>Copy this document to `workspace.yaml` in the repository root.</li>
@@ -124,4 +105,12 @@ export function WorkspaceDefaultPolicyModal({ isOpen, onClose }: WorkspaceDefaul
 			</div>
 		</ModalDialog>
 	);
+}
+
+export function WorkspaceDefaultPolicyModal({ isOpen, onClose }: WorkspaceDefaultPolicyModalProps) {
+	if (!isOpen) {
+		return null;
+	}
+
+	return <WorkspaceDefaultPolicyModalContent onClose={onClose} />;
 }

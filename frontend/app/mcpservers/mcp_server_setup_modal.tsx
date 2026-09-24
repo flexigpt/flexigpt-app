@@ -74,30 +74,37 @@ function MCPServerSetupModalContent({
 	const validate = (): string | undefined => {
 		for (const input of inputs) {
 			const row = rows[input.name] ?? emptyRow();
+			const label = input.declaration.label || input.name;
 			const existingConfigured =
 				!reset &&
 				(input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path
 					? Boolean(input.boundValue?.trim() || input.declaration.default?.trim())
 					: Boolean(input.boundSecretRef?.trim()));
 
+			if (input.declaration.kind === MCPInputKind.OAuthClientCredentials) {
+				const hasClientID = Boolean(row.clientID.trim());
+				const hasClientSecret = Boolean(row.clientSecret.trim());
+
+				if (hasClientID || hasClientSecret) {
+					if (!hasClientID) {
+						return `"${label}" requires a Client ID.`;
+					}
+					if (input.declaration.clientSecretRequired && !hasClientSecret) {
+						return `"${label}" requires a Client Secret when replacing its credentials.`;
+					}
+				} else if (input.declaration.required && !existingConfigured) {
+					return `"${label}" requires a Client ID.`;
+				}
+
+				continue;
+			}
+
 			if (!input.declaration.required || existingConfigured) {
 				continue;
 			}
 
-			if (input.declaration.kind === MCPInputKind.OAuthClientCredentials) {
-				if (!row.clientID.trim()) {
-					return `"${input.declaration.label || input.name}" requires a Client ID.`;
-				}
-
-				if (input.declaration.clientSecretRequired && !row.clientSecret.trim()) {
-					return `"${input.declaration.label || input.name}" requires a Client Secret.`;
-				}
-
-				continue;
-			}
-
 			if (!row.value.trim()) {
-				return `"${input.declaration.label || input.name}" is required.`;
+				return `"${label}" is required.`;
 			}
 		}
 
@@ -170,7 +177,7 @@ function MCPServerSetupModalContent({
 				<div className="app-scrollbar-thin max-h-[calc(100dvh-1rem)] overflow-y-auto p-4 sm:p-6">
 					<ModalHeader
 						title={`Configure ${server.displayName}`}
-						description="Values are stored in Artifact-local installation data. Stored secret values are never displayed."
+						description="Values are stored locally for this server. Stored secret values are never displayed."
 						onClose={() => {
 							requestClose();
 						}}
@@ -210,7 +217,9 @@ function MCPServerSetupModalContent({
 												{label}
 												{input.declaration.required ? ' *' : ''}
 											</div>
-											<div className="text-base-content/60 font-mono text-xs">{input.name}</div>
+											{input.declaration.label ? null : (
+												<div className="text-base-content/60 text-xs">{input.name}</div>
+											)}
 										</div>
 										<span className="badge badge-xs rounded-xl">{inputKindLabel(input.declaration.kind)}</span>
 									</div>
@@ -275,9 +284,7 @@ function MCPServerSetupModalContent({
 											<span />
 										)}
 										{input.boundSecretRef || input.boundValue ? (
-											<span className="text-base-content/60 text-xs">
-												{isSecret ? 'Configured. Leave blank to keep it.' : 'Configured. Leave blank to keep it.'}
-											</span>
+											<span className="text-base-content/60 text-xs">Configured. Leave blank to keep it.</span>
 										) : null}
 									</div>
 								</div>
@@ -295,7 +302,7 @@ function MCPServerSetupModalContent({
 										setReset(event.target.checked);
 									}}
 								/>
-								<span className="text-sm">Reset existing built-in installation bindings</span>
+								<span className="text-sm">Reset saved values that are not supplied here</span>
 							</label>
 						) : null}
 

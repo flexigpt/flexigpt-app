@@ -92,6 +92,7 @@ function WorkspaceMCPSetupForm({
 		for (const [name, declaration] of Object.entries(inputs)) {
 			const row = rows[name] ?? emptyRow();
 			const existing = installation.installation.inputs?.[name];
+			const label = declaration.label || name;
 
 			const configured =
 				!reset &&
@@ -99,22 +100,30 @@ function WorkspaceMCPSetupForm({
 					? Boolean(existing?.value?.trim() || declaration.default?.trim())
 					: Boolean(existing?.secretRef?.trim()));
 
+			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
+				const hasClientID = Boolean(row.clientID.trim());
+				const hasClientSecret = Boolean(row.clientSecret.trim());
+
+				if (hasClientID || hasClientSecret) {
+					if (!hasClientID) {
+						return `"${label}" requires a Client ID.`;
+					}
+					if (declaration.clientSecretRequired && !hasClientSecret) {
+						return `"${label}" requires a Client Secret when replacing its credentials.`;
+					}
+				} else if (declaration.required && !configured) {
+					return `"${label}" requires a Client ID.`;
+				}
+
+				continue;
+			}
+
 			if (!declaration.required || configured) {
 				continue;
 			}
 
-			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
-				if (!row.clientID.trim()) {
-					return `"${declaration.label || name}" requires a Client ID.`;
-				}
-				if (declaration.clientSecretRequired && !row.clientSecret.trim()) {
-					return `"${declaration.label || name}" requires a Client Secret.`;
-				}
-				continue;
-			}
-
 			if (!row.value.trim()) {
-				return `"${declaration.label || name}" is required.`;
+				return `"${label}" is required.`;
 			}
 		}
 
@@ -163,18 +172,17 @@ function WorkspaceMCPSetupForm({
 
 		setIsSubmitting(true);
 
-		void mcpManagementAPI
-			.applyMCPServerSetup(artifact, submissionValues(), reset)
-			.then(() => {
+		void mcpManagementAPI.applyMCPServerSetup(artifact, submissionValues(), reset).then(
+			() => {
+				setIsSubmitting(false);
 				onSaved?.();
 				onClose();
-			})
-			.catch((error: unknown) => {
+			},
+			(error: unknown) => {
 				setSubmitError(error instanceof Error ? error.message : 'MCP setup could not be saved.');
-			})
-			.finally(() => {
 				setIsSubmitting(false);
-			});
+			}
+		);
 	};
 
 	return (
@@ -212,7 +220,7 @@ function WorkspaceMCPSetupForm({
 										{declaration.label || name}
 										{declaration.required ? ' *' : ''}
 									</div>
-									<div className="text-base-content/60 font-mono text-xs">{name}</div>
+									{declaration.label ? null : <div className="text-base-content/60 text-xs">{name}</div>}
 								</div>
 								<span className="badge badge-ghost badge-xs">{inputKindLabel(declaration.kind)}</span>
 							</div>
@@ -297,7 +305,7 @@ function WorkspaceMCPSetupForm({
 								setReset(event.currentTarget.checked);
 							}}
 						/>
-						<span className="text-sm">Reset stored built-in installation bindings that are not supplied</span>
+						<span className="text-sm">Reset saved values that are not supplied here</span>
 					</label>
 				) : null}
 

@@ -12,12 +12,12 @@ import type {
 	MCPServerView,
 	MCPToolCapability,
 } from '@/spec/mcp';
-import { MCPToolRisk } from '@/spec/mcp';
+import { MCPServerType, MCPToolRisk } from '@/spec/mcp';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
-import { requireMCPRuntimeServerID, serverRefLabel } from '@/apis/mcp_management';
+import { getAuthMode, requireMCPRuntimeServerID } from '@/apis/mcp_management';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -31,11 +31,13 @@ import {
 	getEffectiveMCPServerStatus,
 	getMCPApprovalRuleLabel,
 	getMCPExecutionModeLabel,
+	getMCPHTTPAuthModeLabel,
 	getMCPServerAuthHealthBadgeClass,
 	getMCPServerAuthHealthLabel,
 	getMCPStatusBadgeClass,
 	getMCPStatusLabel,
 	getMCPToolRiskLabel,
+	getMCPTrustLevelLabel,
 } from '@/mcpservers/lib/mcp_server_utils';
 
 interface MCPServerDetailsModalProps {
@@ -53,18 +55,6 @@ interface DiscoveryData {
 	resourceTemplates: MCPResourceTemplateRef[];
 	prompts: MCPPromptRef[];
 	error?: string;
-}
-
-function JSONBlock({ value }: { value: unknown }) {
-	if (value === undefined || value === null) {
-		return <span>—</span>;
-	}
-
-	return (
-		<pre className="bg-base-300 max-h-72 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-			{JSON.stringify(value, null, 2)}
-		</pre>
-	);
 }
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -145,7 +135,7 @@ function MCPServerDetailsModalContent({
 		[hasDiscoverySnapshot, server]
 	);
 
-	const { data, isLoading } = useAsyncResource(loadDiscovery, {
+	const { data, error, isLoading } = useAsyncResource(loadDiscovery, {
 		initialData: {
 			tools: [],
 			resources: [],
@@ -154,14 +144,29 @@ function MCPServerDetailsModalContent({
 		},
 	});
 
+	const discoveryErrorMessage =
+		data.error || (error instanceof Error ? error.message : error ? 'Discovery data could not be loaded.' : undefined);
 	const status = getEffectiveMCPServerStatus(server, runtime?.status);
-
+	const policy = server.policy?.body;
+	const transport =
+		server.document?.mcpServer.type === MCPServerType.Stdio
+			? 'Stdio'
+			: server.document
+				? 'Streamable HTTP'
+				: 'Unavailable';
+	const approvalRequirements = policy
+		? [
+				policy.defaultPolicy.requireApprovalForUnknownRisk ? 'Unknown risk' : undefined,
+				policy.defaultPolicy.requireApprovalForWrite ? 'Write actions' : undefined,
+				policy.defaultPolicy.requireApprovalForDestructive ? 'Destructive actions' : undefined,
+			].filter(Boolean)
+		: [];
 	return (
 		<ManagementDetailsModal
 			isOpen={true}
 			onClose={onClose}
-			title="MCP Server Details"
-			description={`${server.displayName} in ${bundle.displayName}`}
+			title={server.displayName}
+			description={`MCP server in ${bundle.displayName}`}
 			modalKey={`mcp-server:${server.ref.rootID}:${server.ref.artifactID}:${server.artifact.revision}`}
 			width="wide"
 			height="tall"
@@ -173,20 +178,20 @@ function MCPServerDetailsModalContent({
 				</div>
 			) : null}
 
-			<ModalSection title="Artifact and installation">
+			<ModalSection title="Server overview">
 				<ManagementInfoGrid>
 					<Field label="Display Name">{server.displayName}</Field>
-					<Field label="Logical Name">{server.logicalName}</Field>
-					<Field label="Artifact Ref">
-						<span className="font-mono text-xs">{serverRefLabel(server)}</span>
-					</Field>
-					<Field label="Artifact Revision">{server.artifact.revision}</Field>
+					<Field label="Name">{server.logicalName}</Field>
+					<Field label="Collection">{bundle.displayName}</Field>
+					<Field label="Description">{server.document?.description || 'No description'}</Field>
+					<Field label="Transport">{transport}</Field>
+					<Field label="Authentication">{getMCPHTTPAuthModeLabel(getAuthMode(server))}</Field>
 					<Field label="Built-in">{server.builtIn ? 'Yes' : 'No'}</Field>
 					<Field label="Enabled">{server.enabled ? 'Yes' : 'No'}</Field>
 					<Field label="Created">{server.artifact.createdAt.toLocaleString()}</Field>
 					<Field label="Modified">{server.artifact.modifiedAt.toLocaleString()}</Field>
 
-					<Field label="Runtime">
+					<Field label="Connection">
 						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(status)}`}>{getMCPStatusLabel(status)}</span>
 						{runtime?.lastError ? <div className="text-error mt-1 text-xs">{runtime.lastError}</div> : null}
 					</Field>
@@ -198,58 +203,50 @@ function MCPServerDetailsModalContent({
 						{authHealth?.lastError ? <div className="text-error mt-1 text-xs">{authHealth.lastError}</div> : null}
 					</Field>
 
-					<Field label="Runtime Config">
-						<JSONBlock
-							value={{
-								core: server.document?.mcpServer,
-								auth: server.document?.configuration.auth,
-								install: server.document?.configuration.install,
-								connectionProfiles: server.document?.configuration.connectionProfiles,
-							}}
-						/>
+					<Field label="Server implementation">
+						{runtime?.serverInfo?.name
+							? `${runtime.serverInfo.name}${runtime.serverInfo.version ? ` ${runtime.serverInfo.version}` : ''}`
+							: 'Not reported'}
 					</Field>
 
-					<Field label="Installation Data">
-						<JSONBlock
-							value={{
-								schemaVersion: server.installation?.schemaVersion,
-								selectedConnectionProfile: server.installation?.selectedConnectionProfile,
-								inputs: Object.fromEntries(
-									Object.entries(server.installation?.inputs ?? {}).map(([name, binding]) => [
-										name,
-										binding.secretRef ? { secretRef: '[configured]' } : binding,
-									])
-								),
-								additionalPolicies: server.installation?.additionalPolicies,
-							}}
-						/>
-					</Field>
-
-					<Field label="Effective Policy">
-						<JSONBlock value={server.policy?.body} />
-					</Field>
-
-					<Field label="Server Info">
-						<JSONBlock value={runtime?.serverInfo} />
-					</Field>
-
-					<Field label="Capabilities">
-						<JSONBlock value={runtime?.serverCapabilities} />
+					<Field label="Available capabilities">
+						<div className="flex flex-wrap gap-1">
+							<MetadataPill label="Tools">{runtime?.toolCount ?? 0}</MetadataPill>
+							<MetadataPill label="Resources">{runtime?.resourceCount ?? 0}</MetadataPill>
+							<MetadataPill label="Templates">{runtime?.resourceTemplateCount ?? 0}</MetadataPill>
+							<MetadataPill label="Prompts">{runtime?.promptCount ?? 0}</MetadataPill>
+						</div>
 					</Field>
 
 					<Field label="Instructions">
-						<div className="whitespace-pre-wrap">{runtime?.instructions || '—'}</div>
+						<div className="whitespace-pre-wrap">{runtime?.instructions || 'No server instructions'}</div>
 					</Field>
 				</ManagementInfoGrid>
 			</ModalSection>
+			{policy ? (
+				<ModalSection title="Tool policy">
+					<ManagementInfoGrid>
+						<Field label="Trust">{getMCPTrustLevelLabel(policy.trustLevel)}</Field>
+						<Field label="Default approval">{getMCPApprovalRuleLabel(policy.defaultPolicy.defaultApprovalRule)}</Field>
+						<Field label="Default execution">
+							{getMCPExecutionModeLabel(policy.defaultPolicy.defaultExecutionMode)}
+						</Field>
+						<Field label="Approval required for">
+							{approvalRequirements.length > 0 ? approvalRequirements.join(', ') : 'No additional categories'}
+						</Field>
+						<Field label="Tool overrides">{Object.keys(policy.toolPolicies ?? {}).length}</Field>
+						<Field label="MCP Apps">{policy.appsPolicy.enabled ? 'Enabled' : 'Disabled'}</Field>
+					</ManagementInfoGrid>
+				</ModalSection>
+			) : null}
 
-			<ModalSection title="Discovery" description="Current process-local discovery snapshot.">
+			<ModalSection title="Discovery" description="Tools, resources, templates, and prompts currently available.">
 				{isLoading ? <div className="text-center text-sm">Loading discovery cache…</div> : null}
 
-				{data.error ? (
+				{discoveryErrorMessage ? (
 					<div className="alert alert-warning mb-4 rounded-2xl text-sm">
 						<FiAlertCircle size={14} />
-						<span>{data.error}</span>
+						<span>{discoveryErrorMessage}</span>
 					</div>
 				) : null}
 

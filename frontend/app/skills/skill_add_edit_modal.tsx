@@ -39,7 +39,6 @@ import {
 	getSkillResourceTooltip,
 	normalizeSkillInsert,
 	normalizeSkillSourceTags,
-	stringifySkillFrontmatter,
 } from '@/skills/lib/skill_artifact_utils';
 
 export interface SkillUpsertInput extends Partial<Skill> {
@@ -93,9 +92,8 @@ interface SkillFormData {
 }
 
 const skillTypeDropdownItems: Record<SkillType, { isEnabled: boolean; displayName: string }> = {
-	[SkillType.FS]: { isEnabled: true, displayName: 'Filesystem (fs)' },
-	// UI restriction: EmbeddedFS skills are built-in; not allowed to be created/edited.
-	[SkillType.EmbeddedFS]: { isEnabled: false, displayName: 'EmbeddedFS (embeddedfs)' },
+	[SkillType.FS]: { isEnabled: true, displayName: 'Filesystem' },
+	[SkillType.EmbeddedFS]: { isEnabled: false, displayName: 'Built-in' },
 };
 
 const skillInsertDropdownItems = {
@@ -323,10 +321,9 @@ function AddEditSkillModalContent({
 
 	const isEditDocumentReady = !isEditMode || (documentLoaded && !documentLoading);
 	const artifactSkill = initialData?.skill;
-	const artifactArguments = artifactSkill?.arguments ?? [];
+	const artifactArguments = useMemo(() => artifactSkill?.arguments ?? [], [artifactSkill?.arguments]);
 	const normalizedArtifactInsert = normalizeSkillInsert(artifactSkill?.insert);
 	const artifactArgumentLines = formatSkillArgumentList(artifactSkill?.arguments);
-	const artifactFrontmatter = stringifySkillFrontmatter(artifactSkill?.rawFrontmatter);
 	const scaffoldArgumentError = validateScaffoldArgumentLines(scaffoldArgumentsText);
 
 	const { requestClose, unmountingRef } = useModalDialogController();
@@ -376,7 +373,7 @@ function AddEditSkillModalContent({
 			} else {
 				const clash = existingSkills.some(x => x.skill.slug === v && x.skill.id !== initialData?.skill.id);
 				if (clash) {
-					nextErrors.slug = 'Slug already in use in this bundle.';
+					nextErrors.slug = 'Name already in use in this Collection.';
 				} else {
 					nextErrors = omitManyKeys(nextErrors, ['slug']);
 				}
@@ -388,7 +385,7 @@ function AddEditSkillModalContent({
 				x => normalizeForUniq(x.skill.name) === norm && x.skill.id !== initialData?.skill.id
 			);
 			if (clash) {
-				nextErrors.name = 'Skill name must be unique within the bundle.';
+				nextErrors.name = 'Skill name must be unique within the Collection.';
 			} else if (!SKILL_ARTIFACT_NAME_RE.test(v)) {
 				nextErrors.name =
 					'Skill name must use lowercase letters, numbers, and hyphens, start with a letter or number, and be at most 64 characters.';
@@ -450,6 +447,7 @@ function AddEditSkillModalContent({
 
 	const isAllValid =
 		isViewMode ||
+		// oxlint-disable-next-line react/immutability
 		(isEditDocumentReady && !isSubmitting && Object.values(validateForm(formData)).every(error => !error));
 
 	useEffect(() => {
@@ -472,8 +470,6 @@ function AddEditSkillModalContent({
 		}
 
 		let cancelled = false;
-
-		setDocumentLoading(true);
 
 		void skillManagementAPI
 			.getManagedSkillDocument(initialData.bundleID, initialData.skill.id)
@@ -556,7 +552,6 @@ function AddEditSkillModalContent({
 		setPreviewArgs(buildSkillPreviewArgs(artifactArguments));
 		setPreviewResult(null);
 		setPreviewError('');
-		// oxlint-disable-next-line react-hooks/exhaustive-deps
 	}, [artifactArguments]);
 
 	const handleRenderPreview = useCallback(async () => {
@@ -916,10 +911,10 @@ function AddEditSkillModalContent({
 							</div>
 						)}
 
-						{((isAddMode && creationMode === 'create') || isEditMode) && (
+						{((isAddMode && creationMode === 'create') || isEditMode || (isViewMode && shouldLoadManagedDocument)) && (
 							<div className="collapse-arrow border-base-content/10 bg-base-100 collapse rounded-2xl border">
 								<input type="checkbox" defaultChecked />
-								<div className="collapse-title text-sm font-semibold">Managed SKILL.md content</div>
+								<div className="collapse-title text-sm font-semibold">Skill content</div>
 								<div className="collapse-content space-y-4 text-sm">
 									<div className="grid grid-cols-12 items-start gap-2">
 										<div className="label col-span-12 sm:col-span-3">
@@ -940,7 +935,7 @@ function AddEditSkillModalContent({
 												filterDisabled={false}
 												title="Select insert behavior"
 												getDisplayName={key => skillInsertDropdownItems[key]?.displayName ?? key}
-												disabled={documentLoading}
+												disabled={documentLoading || isViewMode}
 											/>
 											{documentLoading ? (
 												<div className="text-base-content/60 text-xs">Loading managed Skill document...</div>
@@ -967,7 +962,7 @@ function AddEditSkillModalContent({
 												onChange={e => {
 													setScaffoldArgumentsText(e.target.value);
 												}}
-												disabled={documentLoading || isSubmitting}
+												disabled={documentLoading || isSubmitting || isViewMode}
 												placeholder={'topic | Topic to explain | AI agents\ntext | Text to summarize |'}
 												spellCheck="false"
 											/>
@@ -999,7 +994,7 @@ function AddEditSkillModalContent({
 												onChange={e => {
 													setScaffoldBody(e.target.value);
 												}}
-												disabled={documentLoading || isSubmitting}
+												disabled={documentLoading || isSubmitting || isViewMode}
 												placeholder={
 													scaffoldInsert === SkillInsert.UserMessage
 														? 'Summarize the following text in a $tone tone:\n\n$text'
@@ -1031,14 +1026,34 @@ function AddEditSkillModalContent({
 							</div>
 						)}
 
-						<ModalSection title={isRegisteringFolder ? 'Folder source' : 'Identity'}>
+						<ModalSection title={isRegisteringFolder ? 'Folder source' : 'Identity and source'}>
 							{!isRegisteringFolder ? (
 								<>
+									<ModalField
+										label="Display Name"
+										htmlFor="skill-display-name"
+										hint="Falls back to the skill name when empty."
+										error={errors.displayName}
+									>
+										<input
+											id="skill-display-name"
+											type="text"
+											name="displayName"
+											value={formData.displayName}
+											onChange={handleInput}
+											readOnly={isViewMode}
+											className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+											spellCheck="false"
+											autoComplete="off"
+											aria-invalid={Boolean(errors.displayName)}
+										/>
+									</ModalField>
+
 									<ModalField
 										label="Name"
 										htmlFor="skill-name"
 										required
-										hint="Artifact name from SKILL.md."
+										hint="Stable skill name from SKILL.md."
 										error={errors.name}
 									>
 										<input
@@ -1060,7 +1075,7 @@ function AddEditSkillModalContent({
 										label="Slug"
 										htmlFor="skill-slug"
 										required
-										hint="Store identifier within this bundle."
+										hint="Stable name within this Collection."
 										error={errors.slug}
 									>
 										<input
@@ -1114,9 +1129,7 @@ function AddEditSkillModalContent({
 										type="text"
 										name="location"
 										value={
-											isAddMode && creationMode === 'create'
-												? 'Managed automatically in Artifact Store'
-												: formData.location
+											isAddMode && creationMode === 'create' ? 'Managed automatically by FlexiGPT' : formData.location
 										}
 										onChange={handleInput}
 										readOnly={isViewMode || (isAddMode && creationMode === 'create')}
@@ -1139,31 +1152,27 @@ function AddEditSkillModalContent({
 							</ModalField>
 						</ModalSection>
 
-						<ModalSection title={isRegisteringFolder ? 'Source presentation' : 'Presentation'}>
-							<ModalField
-								label={isRegisteringFolder ? 'Source name' : 'Display Name'}
-								htmlFor="skill-display-name"
-								required={isRegisteringFolder}
-								hint={
-									isRegisteringFolder
-										? 'Label for this discovered filesystem source.'
-										: 'Falls back to the skill name when empty.'
-								}
-								error={errors.displayName}
-							>
-								<input
-									id="skill-display-name"
-									type="text"
-									name="displayName"
-									value={formData.displayName}
-									onChange={handleInput}
-									readOnly={isViewMode}
-									className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
-									spellCheck="false"
-									autoComplete="off"
-									aria-invalid={Boolean(errors.displayName)}
-								/>
-							</ModalField>
+						<ModalSection title={isRegisteringFolder ? 'Source presentation' : 'Details'}>
+							{isRegisteringFolder ? (
+								<ModalField
+									label="Source name"
+									htmlFor="skill-display-name"
+									required
+									hint="Label for this discovered filesystem source."
+									error={errors.displayName}
+								>
+									<input
+										id="skill-display-name"
+										type="text"
+										name="displayName"
+										value={formData.displayName}
+										onChange={handleInput}
+										className={`input w-full rounded-xl ${errors.displayName ? 'input-error' : ''}`}
+										spellCheck="false"
+										autoComplete="off"
+									/>
+								</ModalField>
+							) : null}
 
 							{!isRegisteringFolder ? (
 								<>
@@ -1216,9 +1225,9 @@ function AddEditSkillModalContent({
 
 						{artifactSkill && !isForkMode && (
 							<>
-								<ModalSection title="Artifact metadata">
+								<ModalSection title="Skill behavior">
 									<ManagementInfoGrid>
-										<ManagementInfoRow label="Artifact fields" className="sm:grid-cols-1">
+										<ManagementInfoRow label="Behavior" className="sm:grid-cols-1">
 											<div className="grid grid-cols-12 gap-2 text-sm">
 												<div className="col-span-3 font-semibold">Insert</div>
 												<div className="col-span-9 space-y-1">
@@ -1277,9 +1286,6 @@ function AddEditSkillModalContent({
 													) : null}
 												</div>
 
-												<div className="col-span-3 font-semibold">Digest</div>
-												<div className="col-span-9 font-mono text-xs break-all">{artifactSkill.digest || '-'}</div>
-
 												<div className="col-span-3 font-semibold">Runtime warnings</div>
 												<div className="col-span-9 space-y-1">
 													{artifactSkill.runtimeWarnings?.length ? (
@@ -1292,32 +1298,18 @@ function AddEditSkillModalContent({
 														<div className="text-base-content/70 text-xs">No runtime warnings recorded.</div>
 													)}
 												</div>
-
-												<div className="col-span-3 font-semibold">Raw frontmatter</div>
-												<div className="col-span-9">
-													{artifactFrontmatter ? (
-														<pre className="bg-base-100 max-h-56 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
-															{artifactFrontmatter}
-														</pre>
-													) : (
-														<div className="text-base-content/70 text-xs">No raw frontmatter captured.</div>
-													)}
-												</div>
 											</div>
 										</ManagementInfoRow>
 									</ManagementInfoGrid>
 								</ModalSection>
 
-								<ModalSection title="Store metadata">
+								<ModalSection title="Source and status">
 									<ManagementInfoGrid>
-										<ManagementInfoRow label="ID" mono>
-											{artifactSkill.id}
+										<ManagementInfoRow label="Type">
+											{skillTypeDropdownItems[artifactSkill.type].displayName}
 										</ManagementInfoRow>
-										<ManagementInfoRow label="Schema version">{artifactSkill.schemaVersion}</ManagementInfoRow>
-										<ManagementInfoRow label="Type">{artifactSkill.type}</ManagementInfoRow>
 										<ManagementInfoRow label="Location">
 											<div className="space-y-2">
-												<div className="col-span-3 font-semibold">Type</div>
 												<div className="flex flex-wrap items-center gap-2">
 													<span className="break-all">{artifactSkill.location || '-'}</span>
 													{artifactSkill.location ? (
@@ -1329,7 +1321,7 @@ function AddEditSkillModalContent({
 												</div>
 												<div className="text-base-content/70 mt-1 text-xs">
 													To update resources or edit SKILL.md directly, change files in this folder and then use
-													Refresh on the owning Skill Bundle.
+													Refresh on the owning Skill Collection.
 												</div>
 											</div>
 										</ManagementInfoRow>
@@ -1345,8 +1337,8 @@ function AddEditSkillModalContent({
 											)}
 										</ManagementInfoRow>
 										<ManagementInfoRow label="Built-in">{artifactSkill.isBuiltIn ? 'Yes' : 'No'}</ManagementInfoRow>
-										<ManagementInfoRow label="Presence">
-											{artifactSkill.presence?.status ?? 'unknown'}
+										<ManagementInfoRow label="Status">
+											<span className="capitalize">{artifactSkill.presence?.status ?? 'Unknown'}</span>
 										</ManagementInfoRow>
 										<ManagementInfoRow label="Created">{artifactSkill.createdAt}</ManagementInfoRow>
 										<ManagementInfoRow label="Modified">{artifactSkill.modifiedAt}</ManagementInfoRow>

@@ -165,11 +165,7 @@ export function MCPBundleCard({
 		<>
 			<ManagementBundleCard
 				title={bundle.displayName}
-				identity={
-					<span className="font-mono">
-						{bundle.logicalName} / {bundle.ref.artifactID}
-					</span>
-				}
+				identity={<span className="font-mono">{bundle.logicalName}</span>}
 				description={bundle.description}
 				status={
 					<>
@@ -210,7 +206,7 @@ export function MCPBundleCard({
 						busy={isPending('bundle:toggle')}
 						onChange={enabled => {
 							void runAction('bundle:toggle', () => onToggleBundleEnabled(bundle, enabled)).catch((error: unknown) => {
-								showAlert(getErrorMessage(error, 'Failed to change MCP bundle state.'));
+								showAlert(getErrorMessage(error, 'Failed to change MCP Collection state.'));
 							});
 						}}
 					/>
@@ -251,7 +247,7 @@ export function MCPBundleCard({
 									}}
 								>
 									<FiTrash2 size={16} />
-									<span>Delete Bundle</span>
+									<span>Delete Collection</span>
 								</button>
 							</>
 						) : null}
@@ -284,7 +280,7 @@ export function MCPBundleCard({
 									? 'Loading MCP servers...'
 									: serverLoadError
 										? 'Server contents are unavailable.'
-										: 'Expand this Bundle to load its MCP servers.'}
+										: 'Expand this Collection to load its MCP servers.'}
 							</ManagementEmptyState>
 						) : null}
 
@@ -294,7 +290,7 @@ export function MCPBundleCard({
 									? 'Loading MCP servers...'
 									: serverLoadError
 										? 'Server contents are unavailable.'
-										: 'No MCP servers in this bundle.'}
+										: 'No MCP servers in this Collection.'}
 							</ManagementEmptyState>
 						) : serversLoaded ? (
 							servers.map(server => {
@@ -321,7 +317,9 @@ export function MCPBundleCard({
 												</StatusBadge>
 												{setup.hasInputs ? (
 													<StatusBadge tone={setup.complete ? 'neutral' : 'warning'}>
-														{setup.complete ? 'Setup ✓' : `Setup ${setup.requiredConfigured}/${setup.requiredTotal}`}
+														{setup.complete
+															? 'Setup complete'
+															: `Setup ${setup.requiredConfigured}/${setup.requiredTotal}`}
 													</StatusBadge>
 												) : null}
 												<StatusBadge className={getMCPServerAuthHealthBadgeClass(server, authHealth)}>
@@ -331,7 +329,6 @@ export function MCPBundleCard({
 										}
 										metadata={
 											<>
-												<MetadataPill label="Artifact">{artifactID}</MetadataPill>
 												<MetadataPill label="Tools">{runtime?.toolCount ?? '—'}</MetadataPill>
 												<MetadataPill label="Resources">{runtime?.resourceCount ?? '—'}</MetadataPill>
 												<MetadataPill label="Prompts">{runtime?.promptCount ?? '—'}</MetadataPill>
