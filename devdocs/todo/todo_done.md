@@ -1078,3 +1078,11 @@
 
 - [x] MCP flows review and harden and more automatic in places where it is a bit jerky today.
 - [x] there is a significant slowdown during streaming now.
+
+- [x] skill page perf is bad as of now
+- [x] remove tool http support.
+- [x] calling "initialize": sending "initialize": rejected by transport: authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response authorization server does not advertise RFC 9207 iss parameter support but iss was received in the authorization response
+- [x] "local host not ready yet" display in the mcp authz modal.
+- [x] there is some workspace specific metadata extension and mcp extensions added. need to verify what they are and how.
+- [x] assistant preset to agent migration
+- [x] pull artifactstore into main
