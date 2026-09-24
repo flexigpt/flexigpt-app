@@ -58,7 +58,7 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 		return null;
 	}
 
-	const modelRelationship = recipe.resolution.capabilities.occurrences.find(
+	const modelRelationship = (recipe.resolution.capabilities?.occurrences ?? []).find(
 		occurrence => occurrence.type === 'model' && occurrence.status === 'available'
 	);
 	const modelLabel = modelRelationship?.mapped?.name || modelRelationship?.name;

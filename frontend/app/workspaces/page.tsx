@@ -41,9 +41,9 @@ async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<Workspa
 		});
 		throwIfAborted(signal);
 
-		items.push(...page.items);
+		items.push(...(page?.items ?? []));
 
-		if (!page.nextCursor) {
+		if (!page?.nextCursor) {
 			return items.toSorted((left, right) =>
 				left.root.displayName.localeCompare(right.root.displayName, undefined, {
 					sensitivity: 'base',

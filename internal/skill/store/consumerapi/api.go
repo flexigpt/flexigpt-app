@@ -437,7 +437,8 @@ func (a *API) ReplaceManagedSkill(
 	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
 		return ManagedSkillReplaceResult{}, basespec.ErrConflict
 	}
-	if !collectionView.Editable {
+	if !collectionView.Editable &&
+		!collectionView.Baseline {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill Collection is read-only",
 			basespec.ErrUnsupported,

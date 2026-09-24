@@ -195,12 +195,10 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 			policy: MCPEffectivePolicy;
 		}>
 	> {
-		return requiredObject<
-			Array<{
-				installation: MCPStoreServerInstallationView;
-				policy: MCPEffectivePolicy;
-			}>
-		>(
+		return wailsObjectArrayOrEmpty<{
+			installation: MCPStoreServerInstallationView;
+			policy: MCPEffectivePolicy;
+		}>(
 			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
 			'ListMCPCollectionServers'
 		);

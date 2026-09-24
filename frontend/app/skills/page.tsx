@@ -47,13 +47,22 @@ interface SkillBundleDataLoad {
 	promise: Promise<BundleData[]>;
 }
 
+interface SkillRuntimeMetadataLoad {
+	generation: number;
+	promise: Promise<BundleData[]>;
+}
+
 let skillBundleDataCache: SkillBundleDataCache | undefined;
 let skillBundleDataLoad: SkillBundleDataLoad | undefined;
 let skillBundleDataCacheGeneration = 0;
+let skillRuntimeMetadataLoad: SkillRuntimeMetadataLoad | undefined;
+let skillRuntimeMetadataGeneration = 0;
 
 function invalidateSkillBundleDataCache() {
 	skillBundleDataCacheGeneration += 1;
+	skillRuntimeMetadataGeneration += 1;
 	skillBundleDataCache = undefined;
+	skillRuntimeMetadataLoad = undefined;
 }
 
 function rememberSkillBundleData(data: BundleData[]) {
@@ -103,6 +112,32 @@ async function fetchSkillBundleData(): Promise<BundleData[]> {
 	}
 
 	return buildSkillBundleData(skillBundles, skillListItems, false);
+}
+
+function loadSkillRuntimeMetadata(): SkillRuntimeMetadataLoad {
+	const generation = skillRuntimeMetadataGeneration;
+	let load = skillRuntimeMetadataLoad;
+
+	if (!load || load.generation !== generation) {
+		const promise = skillManagementAPI
+			.loadManagementPageData(true, true)
+			.then(({ skillBundles, skillListItems }) => buildSkillBundleData(skillBundles, skillListItems, true));
+
+		load = {
+			generation,
+			promise,
+		};
+		skillRuntimeMetadataLoad = load;
+
+		const clear = () => {
+			if (skillRuntimeMetadataLoad?.promise === promise) {
+				skillRuntimeMetadataLoad = undefined;
+			}
+		};
+		void promise.then(clear, clear);
+	}
+
+	return load;
 }
 
 async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
@@ -179,7 +214,7 @@ export default function SkillsPage() {
 
 	const isMountedRef = useRef(false);
 	const bundleRefreshRequestIdRef = useRef<Record<string, number>>({});
-	const bundleRuntimePrefetchRef = useRef<Set<string>>(new Set());
+	const runtimeMetadataRequestIDRef = useRef(0);
 
 	const creationRoots = useMemo(
 		() =>
@@ -323,11 +358,10 @@ export default function SkillsPage() {
 	);
 
 	useEffect(() => {
-		const prefetchedBundles = bundleRuntimePrefetchRef.current;
 		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
-			prefetchedBundles.clear();
+			runtimeMetadataRequestIDRef.current += 1;
 		};
 	}, []);
 
@@ -338,40 +372,59 @@ export default function SkillsPage() {
 	}, [bundles, hasResolved, isLoading, isRefreshing, pageLoadError]);
 
 	useEffect(() => {
-		if (!hasResolved || pageLoadError) {
+		if (!hasResolved || pageLoadError || bundles.every(bundle => bundle.runtimeMetadataLoaded)) {
 			return;
 		}
 
-		const candidates = bundles.filter(
-			value =>
-				!value.runtimeMetadataLoaded && !value.skillLoadError && !bundleRuntimePrefetchRef.current.has(value.bundle.id)
-		);
-		if (candidates.length === 0) {
-			return;
-		}
+		const requestID = runtimeMetadataRequestIDRef.current + 1;
+		runtimeMetadataRequestIDRef.current = requestID;
+		const load = loadSkillRuntimeMetadata();
 
-		for (const value of candidates) {
-			bundleRuntimePrefetchRef.current.add(value.bundle.id);
-		}
-
-		let cursor = 0;
-		const worker = async () => {
-			while (cursor < candidates.length) {
-				const index = cursor;
-				cursor += 1;
-
-				try {
-					await refreshBundleSkills(candidates[index].bundle.id, false);
-				} catch {
-					// refreshBundleSkills records the bundle-local error. Do
-					// not automatically retry in a render loop.
+		void load.promise
+			.then(hydrated => {
+				if (
+					!isMountedRef.current ||
+					runtimeMetadataRequestIDRef.current !== requestID ||
+					skillRuntimeMetadataGeneration !== load.generation
+				) {
+					return;
 				}
-			}
-		};
 
-		const workerCount = Math.min(2, candidates.length);
-		void Promise.all(Array.from({ length: workerCount }, () => worker()));
-	}, [bundles, hasResolved, pageLoadError, refreshBundleSkills]);
+				const byBundleID = new Map(hydrated.map(bundle => [bundle.bundle.id, bundle] as const));
+
+				setBundles(current =>
+					current.map(bundle => {
+						const next = byBundleID.get(bundle.bundle.id);
+						if (!next) {
+							return bundle;
+						}
+
+						const nextSkillsByID = new Map(next.skills.map(skill => [skill.id, skill] as const));
+						const skills = bundle.skills.map(skill => {
+							const hydratedSkill = nextSkillsByID.get(skill.id);
+							if (!hydratedSkill || hydratedSkill.revision < skill.revision) {
+								return skill;
+							}
+							return hydratedSkill;
+						});
+
+						return {
+							...bundle,
+							bundle: next.bundle.revision >= bundle.bundle.revision ? next.bundle : bundle.bundle,
+							skills,
+							runtimeMetadataLoaded: skills.length === next.skills.length,
+						};
+					})
+				);
+			})
+			.catch((error: unknown) => {
+				if (!isMountedRef.current) {
+					return;
+				}
+				setAlertMsg(getErrorMessage(error, 'Skill runtime details could not be loaded.'));
+				setShowAlert(true);
+			});
+	}, [bundles, hasResolved, pageLoadError, setBundles]);
 
 	const handleBundleEnableChange = useCallback(
 		async (bundleID: string, nextEnabled: boolean) => {
@@ -620,10 +673,6 @@ export default function SkillsPage() {
 	const handleAddBundle = useCallback(
 		async (slug: string, display: string, description?: string) => {
 			try {
-				if (!effectiveCreationRootID) {
-					throw new Error('No editable Skill Collection is available.');
-				}
-
 				const id = getUUIDv7();
 				await skillManagementAPI.putSkillBundle(id, effectiveCreationRootID, slug, display, true, description);
 				try {
@@ -699,8 +748,6 @@ export default function SkillsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
-								disabled={!effectiveCreationRootID}
-								title={!effectiveCreationRootID ? 'No editable Skill Collection is available.' : undefined}
 								onClick={() => {
 									setIsAddModalOpen(true);
 								}}

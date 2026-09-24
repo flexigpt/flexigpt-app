@@ -516,10 +516,12 @@ export class SkillManagementAPI {
 		description?: string
 	): Promise<void> {
 		const collections = await this.store.listSkillCollectionsForManagement();
-		const hasBaseline = collections.some(collection => collection.baseline && collection.artifact.rootID === rootID);
-		if (!hasBaseline) {
+		const hasRequestedBaseline =
+			rootID !== '' && collections.some(collection => collection.baseline && collection.artifact.rootID === rootID);
+		if (rootID !== '' && !hasRequestedBaseline) {
 			throw new Error('The selected Root does not have a user Skill baseline.');
 		}
+
 		let created = await this.store.createSkillCollection({
 			rootID,
 			name: slug,

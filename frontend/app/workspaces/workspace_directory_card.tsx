@@ -115,11 +115,15 @@ export function WorkspaceDirectoryCard({
 	const hasManifestDiagnostic = directory.diagnostics?.some(
 		diagnostic => diagnostic.code === 'workspace.manifest-invalid'
 	);
+	const directoryIdentity =
+		directory.directorySource.displayName === directory.root.displayName
+			? undefined
+			: directory.directorySource.displayName;
 
 	return (
 		<ManagementBundleCard
 			title={directory.root.displayName}
-			identity={<span className="text-xs">{directory.directorySource.displayName}</span>}
+			identity={directoryIdentity ? <span className="text-xs">{directoryIdentity}</span> : null}
 			description="Repository-oriented Workspace directory"
 			status={
 				<>
@@ -252,11 +256,13 @@ export function WorkspaceDirectoryCard({
 
 						{directory.workspaces.map(entry => {
 							const artifact = entry.workspace.artifact;
+							const title = artifact.displayName || artifact.logicalName;
+							const showLogicalName = artifact.logicalName !== title;
 
 							return (
 								<ManagementItemCard
 									key={artifact.id}
-									title={artifact.displayName || artifact.logicalName}
+									title={title}
 									description={entry.workspace.description}
 									subtitle={
 										<span className="font-mono text-xs">{entry.manifestLocator ?? artifact.binding.locator}</span>
@@ -273,7 +279,7 @@ export function WorkspaceDirectoryCard({
 									}
 									metadata={
 										<>
-											<MetadataPill label="Declaration">{artifact.logicalName}</MetadataPill>
+											{showLogicalName ? <MetadataPill label="Declaration">{artifact.logicalName}</MetadataPill> : null}
 											<MetadataPill label="State">{artifact.state}</MetadataPill>
 										</>
 									}
@@ -312,51 +318,57 @@ export function WorkspaceDirectoryCard({
 							<div className="text-base-content/60 text-sm">Loading declarations...</div>
 						) : null}
 
-						{artifacts?.map(artifact => (
-							<ManagementItemCard
-								key={artifact.artifact.artifactID}
-								title={artifact.displayName || artifact.logicalName}
-								subtitle={
-									<span className="font-mono text-xs">
-										{artifact.locator}
-										{artifact.subresourceLocator ? ` / ${artifact.subresourceLocator}` : ''}
-									</span>
-								}
-								status={
-									<>
-										<StatusBadge tone={artifact.enabled ? 'success' : 'warning'}>
-											{artifact.enabled ? 'Enabled' : 'Disabled'}
-										</StatusBadge>
-										<StatusBadge>{artifact.state}</StatusBadge>
-									</>
-								}
-								metadata={
-									<>
-										<MetadataPill label="Type">{artifact.kind}</MetadataPill>
-										<MetadataPill label="Name">{artifact.logicalName}</MetadataPill>
-									</>
-								}
-							>
-								<ActionRow>
-									<button
-										type="button"
-										className="btn btn-sm btn-ghost rounded-xl"
-										disabled={busy === `artifact:${artifact.artifact.artifactID}`}
-										onClick={() => {
-											void setArtifactEnabled(artifact, !artifact.enabled);
-										}}
+						{artifacts?.map(artifact =>
+							(() => {
+								const title = artifact.displayName || artifact.logicalName;
+								const showLogicalName = artifact.logicalName !== title;
+								return (
+									<ManagementItemCard
+										key={artifact.artifact.artifactID}
+										title={title}
+										subtitle={
+											<span className="font-mono text-xs">
+												{artifact.locator}
+												{artifact.subresourceLocator ? ` / ${artifact.subresourceLocator}` : ''}
+											</span>
+										}
+										status={
+											<>
+												<StatusBadge tone={artifact.enabled ? 'success' : 'warning'}>
+													{artifact.enabled ? 'Enabled' : 'Disabled'}
+												</StatusBadge>
+												<StatusBadge>{artifact.state}</StatusBadge>
+											</>
+										}
+										metadata={
+											<>
+												<MetadataPill label="Type">{artifact.kind}</MetadataPill>
+												{showLogicalName ? <MetadataPill label="Name">{artifact.logicalName}</MetadataPill> : null}
+											</>
+										}
 									>
-										{artifact.enabled ? 'Disable declaration' : 'Enable declaration'}
-									</button>
-									{artifact.kind === 'mcp' ? (
-										<span className="text-base-content/60 text-xs">
-											MCP secrets and installation inputs are managed in MCP management and are never exposed by
-											Workspace APIs.
-										</span>
-									) : null}
-								</ActionRow>
-							</ManagementItemCard>
-						))}
+										<ActionRow>
+											<button
+												type="button"
+												className="btn btn-sm btn-ghost rounded-xl"
+												disabled={busy === `artifact:${artifact.artifact.artifactID}`}
+												onClick={() => {
+													void setArtifactEnabled(artifact, !artifact.enabled);
+												}}
+											>
+												{artifact.enabled ? 'Disable declaration' : 'Enable declaration'}
+											</button>
+											{artifact.kind === 'mcp' ? (
+												<span className="text-base-content/60 text-xs">
+													MCP secrets and installation inputs are managed in MCP management and are never exposed by
+													Workspace APIs.
+												</span>
+											) : null}
+										</ActionRow>
+									</ManagementItemCard>
+								);
+							})()
+						)}
 
 						{artifacts !== null && artifacts.length === 0 ? (
 							<ManagementEmptyState>No Workspace declarations were discovered.</ManagementEmptyState>

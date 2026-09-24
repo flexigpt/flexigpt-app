@@ -314,9 +314,31 @@ func (w *SkillStoreWrapper) PurgeSkill(
 func (w *SkillStoreWrapper) CreateSkillCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) (collection.CollectionView, error) {
-		return api.CreateSkillCollection(context.Background(), request)
-	})
+	return middleware.WithRecoveryResp(
+		func() (collection.CollectionView, error) {
+			if w == nil || w.api == nil {
+				return collection.CollectionView{}, basespec.ErrClosed
+			}
+
+			// A blank RootID means the retained user Artifact Root. The Skill
+			// management page must not disable Collection creation merely
+			// because asynchronous baseline discovery is incomplete.
+			if request.RootID == "" {
+				if w.roots == nil {
+					return collection.CollectionView{}, basespec.ErrClosed
+				}
+				if _, err := w.roots.Create(
+					context.Background(),
+					documentTopology.UserRootDraft(),
+				); err != nil {
+					return collection.CollectionView{}, err
+				}
+				request.RootID = documentTopology.UserRootID()
+			}
+
+			return w.api.CreateSkillCollection(context.Background(), request)
+		},
+	)
 }
 
 func (w *SkillStoreWrapper) ResolveSkillCollection(

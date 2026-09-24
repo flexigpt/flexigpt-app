@@ -183,7 +183,8 @@ func (a *API) ReplaceManagedMCP(
 	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
 		return ManagedMCPReplaceResult{}, basespec.ErrConflict
 	}
-	if !collectionView.Editable {
+	if !collectionView.Editable &&
+		!collectionView.Baseline {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Collection is read-only",
 			basespec.ErrUnsupported,

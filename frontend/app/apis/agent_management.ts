@@ -417,7 +417,7 @@ export class AgentManagementAPI {
 					agent,
 					displayName,
 					description: agent.description,
-					label: `${displayName} (${agent.name})`,
+					label: displayName === agent.name ? displayName : `${displayName} (${agent.name})`,
 					isSelectable,
 					availabilityReason,
 				};
@@ -459,7 +459,7 @@ export class AgentManagementAPI {
 		let modelPresetRef: ModelPresetRef | undefined;
 		let includeModelSystemPrompt: boolean | undefined;
 
-		for (const occurrence of resolution.capabilities.occurrences) {
+		for (const occurrence of resolution.capabilities?.occurrences ?? []) {
 			if (!isAvailableOccurrence(occurrence)) {
 				issues.push(availabilityIssueForOccurrence(occurrence));
 				continue;

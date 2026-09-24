@@ -120,6 +120,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 	};
 
 	const setupDescriptors = exportResult?.mcpSetupDescriptors ?? [];
+	const occurrences = resolution?.capabilities?.occurrences ?? [];
 
 	return (
 		<>
@@ -226,7 +227,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 											: 'Some Agent declarations are unavailable or ambiguous.'}
 									</div>
 
-									{resolution.capabilities.occurrences.map(occurrence => (
+									{occurrences.map(occurrence => (
 										<div key={occurrence.path} className="border-base-content/10 rounded-2xl border p-3">
 											<div className="flex flex-wrap items-center gap-2">
 												<span className="font-medium">
@@ -255,7 +256,7 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 										</div>
 									))}
 
-									{resolution.capabilities.occurrences.length === 0 ? (
+									{occurrences.length === 0 ? (
 										<div className="text-base-content/70 text-sm">This Agent has no declared capabilities.</div>
 									) : null}
 								</div>

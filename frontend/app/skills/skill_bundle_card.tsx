@@ -247,7 +247,11 @@ export function SkillBundleCard({
 		<>
 			<ManagementBundleCard
 				title={bundle.displayName || bundle.slug}
-				identity={<span className="font-mono">{bundle.slug}</span>}
+				identity={
+					bundle.displayName && bundle.displayName !== bundle.slug ? (
+						<span className="font-mono">{bundle.slug}</span>
+					) : null
+				}
 				description={bundle.description}
 				status={
 					<>
@@ -297,18 +301,20 @@ export function SkillBundleCard({
 							<FiEye size={16} />
 							<span>Details</span>
 						</button>
-						{bundle.isEditable && !bundle.isBaseline ? (
+						{bundle.isEditable ? (
 							<>
-								<button
-									type="button"
-									className="btn btn-sm btn-ghost rounded-xl"
-									onClick={() => {
-										setIsBundleEditOpen(true);
-									}}
-								>
-									<FiEdit2 size={16} />
-									<span>Edit Collection</span>
-								</button>
+								{!bundle.isBaseline ? (
+									<button
+										type="button"
+										className="btn btn-sm btn-ghost rounded-xl"
+										onClick={() => {
+											setIsBundleEditOpen(true);
+										}}
+									>
+										<FiEdit2 size={16} />
+										<span>Edit Collection</span>
+									</button>
+								) : null}
 								<button
 									type="button"
 									className="btn btn-sm btn-ghost rounded-xl"
@@ -385,6 +391,7 @@ export function SkillBundleCard({
 
 						<div className="space-y-3">
 							{visibleSkills.map(skill => {
+								const title = skill.displayName || skill.name || skill.slug;
 								const insert = normalizeSkillInsert(skill.insert).value;
 								const instructionUseReason = getSkillInstructionPromptEligibilityReason(skill);
 
@@ -398,8 +405,12 @@ export function SkillBundleCard({
 								return (
 									<ManagementItemCard
 										key={skill.id}
-										title={skill.displayName || skill.name || skill.slug}
-										subtitle={`${skill.slug} / ${skill.name}`}
+										title={title}
+										subtitle={
+											[skill.name, skill.slug]
+												.filter((value, index, values) => value && value !== title && values.indexOf(value) === index)
+												.join(' · ') || undefined
+										}
 										description={skill.description}
 										status={
 											<>

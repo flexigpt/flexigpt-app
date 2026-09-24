@@ -144,6 +144,9 @@ function AgentCollectionCard({
 	const [isExpanded, setIsExpanded] = useState(false);
 	const collection = data.collection;
 	const builtIn = isBuiltInAgentCollection(collection);
+	const displayName = collectionDisplayName(collection);
+	const secondaryName = displayName === collection.name ? undefined : collection.name;
+
 	const loadAgents = () => {
 		if (data.agentsLoaded || data.isLoadingAgents) {
 			return;
@@ -153,8 +156,8 @@ function AgentCollectionCard({
 
 	return (
 		<ManagementBundleCard
-			title={collectionDisplayName(collection)}
-			identity={<span className="font-mono">{collection.name}</span>}
+			title={displayName}
+			identity={secondaryName ? <span className="font-mono">{secondaryName}</span> : null}
 			description={collection.description}
 			status={
 				<>
@@ -521,6 +524,7 @@ export default function AgentsPage() {
 
 	const mountedRef = useRef(false);
 	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
+	const agentLoadEpochRef = useRef(0);
 	const agentPrefetchKeysRef = useRef<Set<string>>(new Set());
 	const agentCatalogWarmupStartedRef = useRef(false);
 
@@ -558,6 +562,7 @@ export default function AgentsPage() {
 		return () => {
 			mountedRef.current = false;
 			agentLoadRequestIDRef.current = {};
+			agentLoadEpochRef.current += 1;
 			prefetchedKeys.clear();
 		};
 	}, []);
@@ -581,6 +586,7 @@ export default function AgentsPage() {
 	const loadCollectionAgents = useCallback(
 		async (collection: CollectionView) => {
 			const key = agentCollectionKey(collection);
+			const epoch = agentLoadEpochRef.current;
 			const requestID = (agentLoadRequestIDRef.current[key] ?? 0) + 1;
 			agentLoadRequestIDRef.current[key] = requestID;
 
@@ -597,8 +603,22 @@ export default function AgentsPage() {
 				),
 			}));
 
-			const result = await agentManagementAPI.loadCollectionAgents(collection, new AbortController().signal);
-			if (!mountedRef.current || agentLoadRequestIDRef.current[key] !== requestID) {
+			let result: Pick<AgentCollectionData, 'agents' | 'agentsLoaded' | 'agentLoadError'>;
+			try {
+				result = await agentManagementAPI.loadCollectionAgents(collection, new AbortController().signal);
+			} catch (error) {
+				result = {
+					agents: [],
+					agentsLoaded: false,
+					agentLoadError: getErrorMessage(error, 'Agents could not be loaded for this Collection.'),
+				};
+			}
+
+			if (
+				!mountedRef.current ||
+				agentLoadEpochRef.current !== epoch ||
+				agentLoadRequestIDRef.current[key] !== requestID
+			) {
 				return;
 			}
 
@@ -659,7 +679,7 @@ export default function AgentsPage() {
 		try {
 			invalidateAgentManagementPageDataCache();
 			agentManagementAPI.invalidateAgentCatalog();
-			agentLoadRequestIDRef.current = {};
+			agentLoadEpochRef.current += 1;
 			agentPrefetchKeysRef.current.clear();
 			agentCatalogWarmupStartedRef.current = false;
 			await reloadOrThrow();
@@ -698,12 +718,8 @@ export default function AgentsPage() {
 
 	const createCollection = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
-			if (!effectiveCollectionCreationRootID) {
-				throw new Error('No editable Agent Collection group is available.');
-			}
-
 			await agentStoreAPI.createAgentCollection({
-				rootID: effectiveCollectionCreationRootID,
+				rootID: effectiveCollectionCreationRootID ? effectiveCollectionCreationRootID : '',
 				name: slug,
 				displayName,
 				description,
@@ -856,10 +872,6 @@ export default function AgentsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
-								disabled={!effectiveCollectionCreationRootID}
-								title={
-									!effectiveCollectionCreationRootID ? 'No editable Agent Collection group is available.' : undefined
-								}
 								onClick={() => {
 									setIsCreateCollectionOpen(true);
 								}}

@@ -137,6 +137,7 @@ export function MCPBundleCard({
 	const clearAlert = () => {
 		setAlertMessage('');
 	};
+	const bundleIdentity = bundle.displayName === bundle.logicalName ? undefined : bundle.logicalName;
 
 	const refresh = () => {
 		void runAction('bundle:refresh', onRefreshServers).catch((error: unknown) => {
@@ -165,7 +166,7 @@ export function MCPBundleCard({
 		<>
 			<ManagementBundleCard
 				title={bundle.displayName}
-				identity={<span className="font-mono">{bundle.logicalName}</span>}
+				identity={bundleIdentity ? <span className="font-mono">{bundleIdentity}</span> : null}
 				description={bundle.description}
 				status={
 					<>
@@ -304,12 +305,14 @@ export function MCPBundleCard({
 								const connecting = status === MCPServerStatus.Connecting;
 								const operational = isServerOperational(server);
 								const authPending = authHealth?.state === MCPAuthHealthState.AuthorizationPending;
+								const title = serverDisplayName(server);
+								const subtitle = title === server.logicalName ? undefined : server.logicalName;
 
 								return (
 									<ManagementItemCard
 										key={`${server.ref.rootID}:${artifactID}`}
-										title={serverDisplayName(server)}
-										subtitle={server.logicalName}
+										title={title}
+										subtitle={subtitle}
 										status={
 											<>
 												<StatusBadge className={getMCPStatusBadgeClass(status)}>
