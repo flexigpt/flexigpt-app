@@ -517,6 +517,13 @@ export interface IMCPStoreAPI {
 
 	getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView>;
 
+	listMCPCollectionServers(collection: ArtifactRef): Promise<
+		Array<{
+			installation: MCPStoreServerInstallationView;
+			policy: MCPEffectivePolicy;
+		}>
+	>;
+
 	listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]>;
 
 	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;

@@ -4,9 +4,11 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
@@ -16,6 +18,7 @@ import (
 type MCPStoreWrapper struct {
 	api        *mcpConsumerAPI.API
 	management *mcpConsumerAPI.MCPListService
+	roots      compositionapi.RootAPI
 }
 
 func withMCPStore[T any](
@@ -125,6 +128,23 @@ func (w *MCPStoreWrapper) GetMCPServerInstallation(
 	})
 }
 
+func (w *MCPStoreWrapper) ListMCPCollectionServers(
+	collectionRef artifact.ArtifactRef,
+) ([]mcpConsumerAPI.MCPCollectionServerView, error) {
+	return withMCPStore(
+		w,
+		func(api *mcpConsumerAPI.API) (
+			[]mcpConsumerAPI.MCPCollectionServerView,
+			error,
+		) {
+			return api.ListMCPCollectionServers(
+				context.Background(),
+				collectionRef,
+			)
+		},
+	)
+}
+
 func (w *MCPStoreWrapper) GetMCPPolicy(
 	ref artifact.ArtifactRef,
 ) (mcpConsumerAPI.PolicyView, error) {
@@ -144,9 +164,34 @@ func (w *MCPStoreWrapper) ResolveMCPArtifactCapabilities(
 func (w *MCPStoreWrapper) CreateMCPCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
-		return api.CreateMCPCollection(context.Background(), request)
-	})
+	return middleware.WithRecoveryResp(
+		func() (collection.CollectionView, error) {
+			if w == nil || w.api == nil {
+				return collection.CollectionView{}, basespec.ErrClosed
+			}
+
+			// A blank RootID means "create in the retained user Root". The
+			// management page must not be unable to create a custom MCP Bundle
+			// merely because its baseline discovery has not completed.
+			if request.RootID == "" {
+				if w.roots == nil {
+					return collection.CollectionView{}, basespec.ErrClosed
+				}
+				if _, err := w.roots.Create(
+					context.Background(),
+					documentTopology.UserRootDraft(),
+				); err != nil {
+					return collection.CollectionView{}, err
+				}
+				request.RootID = documentTopology.UserRootID()
+			}
+
+			return w.api.CreateMCPCollection(
+				context.Background(),
+				request,
+			)
+		},
+	)
 }
 
 func (w *MCPStoreWrapper) GetMCPCollection(
@@ -254,4 +299,5 @@ func (w *MCPStoreWrapper) close() {
 	}
 	w.api = nil
 	w.management = nil
+	w.roots = nil
 }

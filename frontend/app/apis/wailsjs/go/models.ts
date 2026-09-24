@@ -2084,6 +2084,76 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class ServerInstallationView {
+	    artifact: artifact.Artifact;
+	    document: server.ServerDocument;
+	    installation: server.ServerData;
+	    installationRevision: number;
+	    builtIn: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerInstallationView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.document = this.convertValues(source["document"], server.ServerDocument);
+	        this.installation = this.convertValues(source["installation"], server.ServerData);
+	        this.installationRevision = source["installationRevision"];
+	        this.builtIn = source["builtIn"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPCollectionServerView {
+	    installation: ServerInstallationView;
+	    policy: policy.Effective;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPCollectionServerView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.installation = this.convertValues(source["installation"], ServerInstallationView);
+	        this.policy = this.convertValues(source["policy"], policy.Effective);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ManagedAgentDeleteRequest {
 	    agent: artifact.ArtifactRef;
 	    expectedRevision: number;
@@ -2526,44 +2596,7 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class ServerInstallationView {
-	    artifact: artifact.Artifact;
-	    document: server.ServerDocument;
-	    installation: server.ServerData;
-	    installationRevision: number;
-	    builtIn: boolean;
 	
-	    static createFrom(source: any = {}) {
-	        return new ServerInstallationView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.document = this.convertValues(source["document"], server.ServerDocument);
-	        this.installation = this.convertValues(source["installation"], server.ServerData);
-	        this.installationRevision = source["installationRevision"];
-	        this.builtIn = source["builtIn"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ServerPage {
 	    items: artifact.Artifact[];
 	    nextPageToken?: string;

@@ -208,10 +208,19 @@ func pageAcrossRoots[T any](
 	output := make([]T, 0, cursor.PageSize)
 
 	for _, rootValue := range roots {
+		// Earlier Roots cannot contribute another item after the cursor. Skip
+		// their Store list calls entirely instead of relisting them on every
+		// subsequent management page.
+		if cursor.AfterRoot != "" &&
+			rootValue.ID < root.RootID(cursor.AfterRoot) {
+			continue
+		}
+
 		values, err := list(ctx, rootValue.ID)
 		if err != nil {
 			return nil, "", err
 		}
+
 		sort.Slice(values, func(left, right int) bool {
 			return lessPageKey(key(values[left]), key(values[right]))
 		})

@@ -10,7 +10,12 @@ import type {
 	RemoveMemberRequest,
 	UpdateCollectionRequest,
 } from '@/spec/collection';
-import type { MCPManagementPage, MCPStorePolicyView, MCPStoreServerInstallationView } from '@/spec/mcp';
+import type {
+	MCPEffectivePolicy,
+	MCPManagementPage,
+	MCPStorePolicyView,
+	MCPStoreServerInstallationView,
+} from '@/spec/mcp';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
@@ -24,6 +29,7 @@ import {
 	GetMCPServerInstallation,
 	ListMCPCollectionMemberships,
 	ListMCPCollections,
+	ListMCPCollectionServers,
 	ListMCPCollectionsPage,
 	ListMCPPolicies,
 	ListMCPServers,
@@ -180,6 +186,23 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		return requiredObject<CollectionView>(
 			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
 			'UpdateMCPCollection'
+		);
+	}
+
+	async listMCPCollectionServers(collection: ArtifactRef): Promise<
+		Array<{
+			installation: MCPStoreServerInstallationView;
+			policy: MCPEffectivePolicy;
+		}>
+	> {
+		return requiredObject<
+			Array<{
+				installation: MCPStoreServerInstallationView;
+				policy: MCPEffectivePolicy;
+			}>
+		>(
+			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
+			'ListMCPCollectionServers'
 		);
 	}
 }

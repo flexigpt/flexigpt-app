@@ -22,6 +22,8 @@ export function GetMCPServerInstallation(arg1:artifact.ArtifactRef):Promise<cons
 
 export function ListMCPCollectionMemberships(arg1:artifact.ArtifactRef):Promise<Array<collection.ArtifactMembershipView>>;
 
+export function ListMCPCollectionServers(arg1:artifact.ArtifactRef):Promise<Array<consumerapi.MCPCollectionServerView>>;
+
 export function ListMCPCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
 
 export function ListMCPCollectionsPage(arg1:number,arg2:string):Promise<consumerapi.CollectionPage>;

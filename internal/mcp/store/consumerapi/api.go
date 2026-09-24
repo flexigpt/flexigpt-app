@@ -14,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -202,6 +203,39 @@ func (a *API) GetServerInstallation(
 	}, nil
 }
 
+// ListMCPCollectionServers loads all currently available MCP servers reachable
+// from one MCP Collection. It is the list-screen bulk counterpart to
+// GetServerInstallation and GetMCPEffectivePolicy.
+//
+// The whole operation shares one verified Artifact Store source session. This
+// prevents the frontend from reopening and re-verifying the same managed
+// Source once per MCP card.
+func (a *API) ListMCPCollectionServers(
+	ctx context.Context,
+	collectionRef artifact.ArtifactRef,
+) ([]MCPCollectionServerView, error) {
+	if a == nil ||
+		a.collections == nil ||
+		a.resources == nil ||
+		a.declarationResolver == nil {
+		return nil, basespec.ErrClosed
+	}
+	if err := collectionRef.Validate(); err != nil {
+		return nil, err
+	}
+
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) ([]MCPCollectionServerView, error) {
+			return a.listMCPCollectionServers(
+				sessionCtx,
+				collectionRef,
+			)
+		},
+	)
+}
+
 func (a *API) GetMCPPolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -388,6 +422,91 @@ func (a *API) ResolveArtifactCapabilities(
 		return resolve.CapabilityPlan{}, basespec.ErrClosed
 	}
 	return a.declarationResolver.ResolveCapabilities(ctx, ref)
+}
+
+func (a *API) listMCPCollectionServers(
+	ctx context.Context,
+	collectionRef artifact.ArtifactRef,
+) ([]MCPCollectionServerView, error) {
+	if _, err := a.collections.Read(ctx, collectionRef); err != nil {
+		return nil, err
+	}
+
+	plan, err := a.declarationResolver.ResolvePluginCapabilities(
+		ctx,
+		collectionRef,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	refs := make(map[artifact.ArtifactRef]struct{})
+	for _, occurrence := range plan.Occurrences {
+		if occurrence.Type != declaration.TypeMCP ||
+			occurrence.Status != resolve.ResolutionAvailable ||
+			occurrence.Artifact == nil {
+			continue
+		}
+		refs[*occurrence.Artifact] = struct{}{}
+	}
+
+	ordered := make([]artifact.ArtifactRef, 0, len(refs))
+	for ref := range refs {
+		ordered = append(ordered, ref)
+	}
+	sort.Slice(ordered, func(left, right int) bool {
+		if ordered[left].RootID != ordered[right].RootID {
+			return ordered[left].RootID < ordered[right].RootID
+		}
+		return ordered[left].ArtifactID < ordered[right].ArtifactID
+	})
+
+	output := make([]MCPCollectionServerView, 0, len(ordered))
+	for _, ref := range ordered {
+		material, err := a.resolveServerMaterial(ctx, ref)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"load MCP Collection server %q: %w",
+				ref.ArtifactID,
+				err,
+			)
+		}
+
+		policyValue, err := a.effectivePolicy(
+			ctx,
+			material.Resource.Artifact.Ref(),
+			material.Document,
+			material.Installation.AdditionalPolicies,
+		)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"resolve MCP Collection server policy %q: %w",
+				ref.ArtifactID,
+				err,
+			)
+		}
+
+		output = append(output, MCPCollectionServerView{
+			Installation: ServerInstallationView{
+				Artifact:             material.Resource.Artifact.Clone(),
+				Document:             material.Document,
+				Installation:         material.Installation,
+				InstallationRevision: material.InstallationWriteRevision,
+				BuiltIn:              material.BuiltIn,
+			},
+			Policy: policyValue,
+		})
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		leftArtifact := output[left].Installation.Artifact
+		rightArtifact := output[right].Installation.Artifact
+		if leftArtifact.LogicalName != rightArtifact.LogicalName {
+			return leftArtifact.LogicalName < rightArtifact.LogicalName
+		}
+		return leftArtifact.ID < rightArtifact.ID
+	})
+	return output, nil
 }
 
 func (a *API) ensureBuiltInSourceCurrent(

@@ -27,6 +27,14 @@ type ServerInstallationView struct {
 	BuiltIn              bool   `json:"builtIn"`
 }
 
+// MCPCollectionServerView is the management-list projection for one available
+// MCP Server reachable from a Collection. It deliberately excludes secrets,
+// materialized connection values, runtime status, and discovery payloads.
+type MCPCollectionServerView struct {
+	Installation ServerInstallationView `json:"installation"`
+	Policy       mcpPolicy.Effective    `json:"policy"`
+}
+
 type PolicyView struct {
 	Artifact artifact.Artifact   `json:"artifact"`
 	Body     mcpPolicy.MCPPolicy `json:"body"`

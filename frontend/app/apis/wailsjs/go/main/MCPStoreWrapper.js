@@ -34,6 +34,10 @@ export function ListMCPCollectionMemberships(arg1) {
   return window['go']['main']['MCPStoreWrapper']['ListMCPCollectionMemberships'](arg1);
 }
 
+export function ListMCPCollectionServers(arg1) {
+  return window['go']['main']['MCPStoreWrapper']['ListMCPCollectionServers'](arg1);
+}
+
 export function ListMCPCollections(arg1) {
   return window['go']['main']['MCPStoreWrapper']['ListMCPCollections'](arg1);
 }

@@ -208,6 +208,7 @@ func InitMCPWrappers(
 
 	storeWrapper.api = storeAPI
 	storeWrapper.management = m
+	storeWrapper.roots = roots
 
 	runtimeWrapper.runtime = runtimeManager
 	runtimeWrapper.toolBridge = toolBridge

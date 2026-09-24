@@ -644,27 +644,16 @@ export class MCPManagementAPI {
 	}
 
 	async listMCPServers(bundle: MCPBundleView): Promise<MCPServerView[]> {
-		const collection = await this.getMCPCollectionManagementView(bundle.ref);
-		const serverRefs = new Map<string, ArtifactRef>();
-		const policyRefsByName = new Map<string, ArtifactRef>();
+		const records = (await this.store.listMCPCollectionServers(bundle.ref)) ?? [];
+		const values = await mapWithConcurrency(records, MCP_SERVER_MANAGEMENT_CONCURRENCY, async record => {
+			const installation = record.installation;
+			const ref: ArtifactRef = {
+				rootID: installation.artifact.rootID,
+				artifactID: installation.artifact.id,
+			};
+			const runtimeServerID = await this.aggregate.runtimeServerIDForArtifact(ref);
 
-		for (const occurrence of collection.capabilities.occurrences) {
-			if (occurrence.status !== 'available' || !occurrence.artifact) {
-				continue;
-			}
-			if (occurrence.type === 'mcp') {
-				serverRefs.set(artifactRefKey(occurrence.artifact), occurrence.artifact);
-			}
-			if (occurrence.type === 'mcp.policy' && occurrence.name) {
-				policyRefsByName.set(occurrence.name, occurrence.artifact);
-			}
-		}
-
-		const values = await mapWithConcurrency([...serverRefs.values()], MCP_SERVER_MANAGEMENT_CONCURRENCY, async ref => {
-			const management = await this.getMCPServerManagementView(ref);
-			const policyName = management.installation.document.configuration.policy?.name;
-
-			return this.toServerView(management, bundle.ref, policyName ? policyRefsByName.get(policyName) : undefined);
+			return this.toServerView(installation, bundle.ref, record.policy, runtimeServerID);
 		});
 
 		return values.toSorted((left, right) =>
@@ -675,19 +664,8 @@ export class MCPManagementAPI {
 	}
 
 	async createMCPBundle(logicalName: string, displayName: string, description?: string): Promise<MCPBundleView> {
-		const collections = await this.listMCPCollectionsForManagement();
-		const roots = new Set(
-			collections
-				.filter(value => value.baseline && value.editable && !value.deletable)
-				.map(value => value.artifact.rootID)
-		);
-
-		if (roots.size !== 1) {
-			throw new Error('Expected exactly one editable MCP baseline Collection.');
-		}
-
 		const collection = await this.store.createMCPCollection({
-			rootID: [...roots][0],
+			rootID: '',
 			name: logicalName,
 			displayName,
 			description,
@@ -1057,6 +1035,10 @@ export class MCPManagementAPI {
 		return this.runtime.connectMCPServer(server);
 	}
 
+	startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
+		return this.runtime.startMCPServerConnect(server);
+	}
+
 	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void> {
 		return this.runtime.disconnectMCPServer(server);
 	}
@@ -1187,7 +1169,7 @@ export class MCPManagementAPI {
 	}
 
 	private toBundleView(collection: CollectionView): MCPBundleView {
-		const builtIn = !collection.editable && !collection.deletable;
+		const builtIn = !collection.baseline && !collection.editable && !collection.deletable;
 
 		return {
 			collection,
@@ -1200,25 +1182,24 @@ export class MCPManagementAPI {
 			description: collection.description,
 			enabled: collection.artifact.enabled,
 			builtIn,
-			editable: collection.editable,
-			deletable: collection.deletable,
+			editable: collection.baseline || collection.editable,
+			deletable: !collection.baseline && collection.deletable,
 			baseline: collection.baseline,
 		};
 	}
 
 	private toServerView(
-		management: MCPServerManagementView,
+		installation: MCPStoreServerInstallationView,
 		bundle: ArtifactRef,
-		policyRef?: ArtifactRef
+		policy: MCPEffectivePolicy,
+		runtimeServerID: MCPRuntimeServerID
 	): MCPServerView {
-		const installation = management.installation;
-
 		return {
 			ref: {
 				rootID: installation.artifact.rootID,
 				artifactID: installation.artifact.id,
 			},
-			runtimeServerID: management.runtimeServerID,
+			runtimeServerID,
 			artifact: installation.artifact,
 			bundle,
 			logicalName: installation.document.logicalName,
@@ -1228,9 +1209,9 @@ export class MCPManagementAPI {
 			installationRevision: installation.installationRevision,
 			enabled: installation.artifact.enabled,
 			builtIn: installation.builtIn,
-			policy: management.policy,
-			policyRef,
-			loadError: management.runtimeError ?? management.authHealthError,
+			policy,
+			policyRef: undefined,
+			loadError: undefined,
 		};
 	}
 
@@ -1246,9 +1227,10 @@ export class MCPManagementAPI {
 
 		for (let hop = 0; hop < MAX_MANAGEMENT_PAGE_HOPS; hop += 1) {
 			const page = await load(pageToken);
-			output.push(...page.items);
+			const items = page?.items ?? [];
+			output.push(...items);
 
-			if (!page.nextPageToken) {
+			if (!page?.nextPageToken) {
 				return output;
 			}
 			if (seenTokens.has(page.nextPageToken)) {
