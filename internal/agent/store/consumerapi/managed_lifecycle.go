@@ -17,9 +17,10 @@ type editableManagedAgent struct {
 	generation string
 }
 
-// DeleteManagedAgent removes only the managed Agent package. It deliberately
-// does not detach Collection relationships, which become unavailable until an
-// exact Agent occurrence is restored.
+// DeleteManagedAgent removes the managed Agent package and purges every
+// Artifact emitted from its package document. It deliberately does not detach
+// Collection relationships, which become unavailable until an exact Agent
+// occurrence is restored.
 func (a *API) DeleteManagedAgent(
 	ctx context.Context,
 	request ManagedAgentDeleteRequest,
@@ -58,21 +59,75 @@ func (a *API) DeleteManagedAgent(
 		return err
 	}
 
-	missing, err := a.artifacts.Get(ctx, request.Agent)
-	if err != nil {
-		return err
+	return a.purgeRemovedManagedAgentArtifacts(
+		ctx,
+		current.artifact,
+		request.Agent,
+	)
+}
+
+func (a *API) purgeRemovedManagedAgentArtifacts(
+	ctx context.Context,
+	current artifact.Artifact,
+	rootRef artifact.ArtifactRef,
+) error {
+	if a == nil || a.artifacts == nil {
+		return basespec.ErrClosed
 	}
-	if missing.State != artifact.StateMissing {
+
+	records, err := a.artifacts.ListBySource(
+		ctx,
+		current.RootID,
+		current.Binding.SourceID,
+	)
+	if err != nil {
 		return fmt.Errorf(
-			"%w: removed managed Agent Artifact is not missing",
-			basespec.ErrConflict,
+			"list removed managed Agent package Artifacts: %w",
+			err,
 		)
 	}
-	return a.artifacts.Purge(
-		ctx,
-		request.Agent,
-		missing.Revision,
-	)
+
+	packageRecords := make([]artifact.Artifact, 0)
+	rootFound := false
+	for _, record := range records {
+		if record.Binding.Locator != current.Binding.Locator {
+			continue
+		}
+		if record.State != artifact.StateMissing {
+			return fmt.Errorf(
+				"%w: removed managed Agent package Artifact %q is not missing",
+				basespec.ErrConflict,
+				record.ID,
+			)
+		}
+		if record.Ref() == rootRef {
+			rootFound = true
+		}
+		packageRecords = append(packageRecords, record)
+	}
+
+	if !rootFound {
+		return fmt.Errorf(
+			"%w: removed managed Agent Artifact %q was not found",
+			basespec.ErrConflict,
+			rootRef.ArtifactID,
+		)
+	}
+
+	for _, record := range packageRecords {
+		if err := a.artifacts.Purge(
+			ctx,
+			record.Ref(),
+			record.Revision,
+		); err != nil {
+			return fmt.Errorf(
+				"purge removed managed Agent package Artifact %q: %w",
+				record.ID,
+				err,
+			)
+		}
+	}
+	return nil
 }
 
 func (a *API) loadEditableManagedAgent(
