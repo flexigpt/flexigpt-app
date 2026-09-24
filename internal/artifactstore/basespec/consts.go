@@ -48,7 +48,7 @@ const (
 	ArtifactStoreStagingDirectoryName  = "staging"
 	ArtifactStoreManifestTemporaryName = "store.json.tmp-"
 
-	ArtifactStoreFormat        = "flexigpt-artifactstore/v3"
+	ArtifactStoreFormat        = "flexigpt-artifactstore/v1"
 	ArtifactStoreContentLayout = "source-packages/v1"
 
 	ArtifactStoreDirectoryMode = 0o750

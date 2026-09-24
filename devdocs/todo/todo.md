@@ -7,6 +7,7 @@
 - [ ] in diff ui, when there is streaming ongoing the diffs in previous message say need info and dont resolve paths or apply.
 - [ ] if a new file creation is there in diff of multi files it doesnt work.
 - [ ] the modal has bugs when multi file things are done. mostly some files are nto shown at all. some files which are shown may or may not be dry run. the error in file is displayed at top and nto near dry run or same file. apply file similalry at top is problematic in message.
+- [ ] copy button in different tab seems to lag when there is some other streaming etc going on.
 
 - Testing
   - [ ] test enhanced mcp apps.

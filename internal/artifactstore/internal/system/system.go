@@ -561,10 +561,14 @@ func (c *Components) publishManagedPackage(
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if publication.ExpectedGeneration == "" {
-		publication.ExpectedGeneration = beforeGeneration
-	}
 
+	// An empty ExpectedGeneration is intentional. It means create-only
+	// publication: an exact same-content package is an idempotent replay,
+	// while different content at an existing address must conflict.
+	//
+	// "managedartifact.Service" supplies an expected generation when the caller
+	// explicitly allows automatic replacement. Other callers such as managed
+	// Collection updates provide their own compare-and-swap generation.
 	generation, err := c.managedSources.PublishPackage(
 		ctx,
 		value,

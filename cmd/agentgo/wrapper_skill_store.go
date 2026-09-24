@@ -320,19 +320,10 @@ func (w *SkillStoreWrapper) CreateSkillCollection(
 				return collection.CollectionView{}, basespec.ErrClosed
 			}
 
-			// A blank RootID means the retained user Artifact Root. The Skill
-			// management page must not disable Collection creation merely
-			// because asynchronous baseline discovery is incomplete.
+			// A blank RootID is UI request routing to the retained user Root.
+			// "compositionapi.Open" owns retained Root creation during startup;
+			// an ordinary management request must not mutate topology.
 			if request.RootID == "" {
-				if w.roots == nil {
-					return collection.CollectionView{}, basespec.ErrClosed
-				}
-				if _, err := w.roots.Create(
-					context.Background(),
-					documentTopology.UserRootDraft(),
-				); err != nil {
-					return collection.CollectionView{}, err
-				}
 				request.RootID = documentTopology.UserRootID()
 			}
 

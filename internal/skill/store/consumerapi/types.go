@@ -28,12 +28,16 @@ type SkillPathRegistrationResult struct {
 }
 
 type ManagedSkillCreateRequest struct {
-	Collection                 artifact.ArtifactRef        `json:"collection"`
-	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision"`
-	SkillName                  string                      `json:"skillName"`
-	SKILLMD                    []byte                      `json:"skillMD,omitempty"`
-	Files                      []source.ManagedPackageFile `json:"files,omitempty"`
-	Enabled                    bool                        `json:"enabled"`
+	Collection                 artifact.ArtifactRef `json:"collection"`
+	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
+	SkillName                  string               `json:"skillName"`
+
+	// SKILLMD and Files describe the logical Agent Skill directory supplied by
+	// the caller. Files must contain SKILL.md at the logical package root.
+	// The Store owns physical managed-package layout beneath that directory.
+	SKILLMD []byte                      `json:"skillMD,omitempty"`
+	Files   []source.ManagedPackageFile `json:"files,omitempty"`
+	Enabled bool                        `json:"enabled"`
 }
 
 type ManagedSkillCreateResult struct {
@@ -61,14 +65,18 @@ type BuiltInSkillPackageInstallRequest struct {
 }
 
 type ManagedSkillReplaceRequest struct {
-	Collection                 artifact.ArtifactRef        `json:"collection"`
-	ExpectedCollectionRevision uint64                      `json:"expectedCollectionRevision"`
-	Artifact                   artifact.ArtifactRef        `json:"artifact"`
-	ExpectedArtifactRevision   uint64                      `json:"expectedArtifactRevision"`
-	SkillName                  string                      `json:"skillName"`
-	SKILLMD                    []byte                      `json:"skillMD,omitempty"`
-	Files                      []source.ManagedPackageFile `json:"files,omitempty"`
-	Enabled                    bool                        `json:"enabled"`
+	Collection                 artifact.ArtifactRef `json:"collection"`
+	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
+	Artifact                   artifact.ArtifactRef `json:"artifact"`
+	ExpectedArtifactRevision   uint64               `json:"expectedArtifactRevision"`
+	SkillName                  string               `json:"skillName"`
+
+	// SKILLMD and Files describe the logical Agent Skill directory supplied by
+	// the caller. Files must contain SKILL.md at the logical package root.
+	// The Store owns physical managed-package layout beneath that directory.
+	SKILLMD []byte                      `json:"skillMD,omitempty"`
+	Files   []source.ManagedPackageFile `json:"files,omitempty"`
+	Enabled bool                        `json:"enabled"`
 }
 
 type ManagedSkillReplaceResult struct {

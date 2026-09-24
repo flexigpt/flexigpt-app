@@ -139,5 +139,6 @@ func FilesystemSourceStorageKey(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
-	return basespec.StorageKey(prefix + "-" + digest[:24])
+
+	return basespec.StorageKey(prefix + "-hash" + digest[:24])
 }

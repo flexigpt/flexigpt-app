@@ -103,8 +103,8 @@ var BuiltInDefaultModelPresetIDs = map[inferenceSpec.ProviderName]modelpreset.Mo
 	modelpreset.ProviderQwen:            modelpreset.PresetQwen38Max,
 	modelpreset.ProviderSGLang:          modelpreset.PresetDeepSeekR18B,
 	modelpreset.ProviderVLLM:            modelpreset.PresetQwen3VL30BA3B,
-	modelpreset.ProviderXAI:             modelpreset.PresetGrok46,
-	modelpreset.ProviderXiaomi:          modelpreset.PresetMiMoV25Pro,
+	modelpreset.ProviderXAI:             modelpreset.PresetGrok47,
+	modelpreset.ProviderXiaomi:          modelpreset.PresetMiMoV26Pro,
 	modelpreset.ProviderZAI:             modelpreset.PresetGLM53,
 	modelpreset.ProviderZAICodingPlan:   modelpreset.PresetGLM53,
 }

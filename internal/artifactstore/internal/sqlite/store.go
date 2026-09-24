@@ -18,11 +18,10 @@ type Store struct {
 }
 
 const (
-	schemaMarkerTable   = "artifact_store_v3"
-	legacyMarkerTableV2 = "artifact_store_v2"
+	schemaMarkerTable = "artifact_store_v1"
 )
 
-var schemaV3RequiredTables = []string{
+var schemaV1RequiredTables = []string{
 	"artifact_roots",
 	"artifact_topology_hydrations",
 	"artifact_sources",
@@ -95,11 +94,11 @@ func initializeSchema(
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	v3Exists, err := tableExistsTx(ctx, tx, schemaMarkerTable)
+	v1Exists, err := tableExistsTx(ctx, tx, schemaMarkerTable)
 	if err != nil {
 		return err
 	}
-	if v3Exists {
+	if v1Exists {
 		if _, err := tx.ExecContext(
 			ctx,
 			`CREATE TABLE IF NOT EXISTS artifact_topology_package_hydrations (
@@ -114,48 +113,33 @@ func initializeSchema(
 		); err != nil {
 			return err
 		}
-		if err := verifySchemaV3Tx(ctx, tx); err != nil {
+		if err := verifySchemaV1Tx(ctx, tx); err != nil {
 			return err
 		}
 		return tx.Commit()
 	}
 
-	v2Exists, err := tableExistsTx(
-		ctx,
-		tx,
-		legacyMarkerTableV2,
-	)
-	if err != nil {
-		return err
-	}
-	if v2Exists {
-		return fmt.Errorf(
-			"%w: Artifact Store metadata is v2; use the v3 Artifact Store directory",
-			basespec.ErrUnsupported,
-		)
-	}
-
 	if _, err := tx.ExecContext(ctx, sqliteSchema); err != nil {
 		return fmt.Errorf(
-			"initialize Artifact Store v3 schema: %w",
+			"initialize Artifact Store v1 schema: %w",
 			err,
 		)
 	}
 	return tx.Commit()
 }
 
-func verifySchemaV3Tx(
+func verifySchemaV1Tx(
 	ctx context.Context,
 	tx *sql.Tx,
 ) error {
-	for _, table := range schemaV3RequiredTables {
+	for _, table := range schemaV1RequiredTables {
 		exists, err := tableExistsTx(ctx, tx, table)
 		if err != nil {
 			return err
 		}
 		if !exists {
 			return fmt.Errorf(
-				"%w: Artifact Store database does not match v3 schema",
+				"%w: Artifact Store database does not match v1 schema",
 				basespec.ErrUnsupported,
 			)
 		}

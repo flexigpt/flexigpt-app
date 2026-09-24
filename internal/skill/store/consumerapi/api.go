@@ -309,6 +309,13 @@ func (a *API) CreateManagedSkill(
 	if err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
+	storageFiles, err := skillDomain.ManagedSkillStorageFiles(
+		packageAddress,
+		files,
+	)
+	if err != nil {
+		return ManagedSkillCreateResult{}, err
+	}
 	locator, err := skillDomain.ManagedPackageLocatorForSkill(
 		packageAddress,
 	)
@@ -365,7 +372,7 @@ func (a *API) CreateManagedSkill(
 			ExpectedDefinition:  definitionValue.Digest,
 			Package: source.ManagedPackagePublication{
 				Address: packageAddress,
-				Files:   files,
+				Files:   storageFiles,
 			},
 		},
 	)
@@ -546,6 +553,14 @@ func (a *API) ReplaceManagedSkill(
 		)
 	}
 
+	storageFiles, err := skillDomain.ManagedSkillStorageFiles(
+		currentAddress,
+		files,
+	)
+	if err != nil {
+		return ManagedSkillReplaceResult{}, err
+	}
+
 	inspection, err := a.discovery.InspectSource(
 		ctx,
 		current.RootID,
@@ -575,7 +590,7 @@ func (a *API) ReplaceManagedSkill(
 			Package: source.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: inspection.State.SourceGeneration,
-				Files:              files,
+				Files:              storageFiles,
 			},
 			AllowPackageReplacement: true,
 		},

@@ -676,10 +676,14 @@ func readCollectionViewOf(
 	if err != nil {
 		return CollectionView{}, err
 	}
-
+	displayName := document.DisplayName
+	if displayName == "" {
+		displayName = record.DisplayName
+	}
 	view := CollectionView{
 		Artifact:    record.Clone(),
 		Name:        basespec.LogicalName(document.Name),
+		DisplayName: displayName,
 		Description: document.Description,
 		Editable:    editable,
 		Deletable:   deletable,

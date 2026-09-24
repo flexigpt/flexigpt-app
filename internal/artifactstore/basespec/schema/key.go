@@ -10,8 +10,7 @@ import (
 type (
 	// Kind is the entity-neutral kind portion of a schema key.
 	//
-	// The Entity field determines the validation domain for Kind. The v3
-	// Store currently registers Artifact schemas only.
+	// The Entity field determines the validation domain for Kind. The store currently registers Artifact schemas only.
 	Kind string
 
 	EntityType string

@@ -313,6 +313,11 @@ type resolvedArtifactSkills struct {
 	Values         []ResolvedArtifactSkill
 }
 
+type unavailableArtifactSkill struct {
+	ref   artifact.ArtifactRef
+	cause error
+}
+
 func (s *Service) resolveArtifactSkills(
 	ctx context.Context,
 	refs []artifact.ArtifactRef,
@@ -326,25 +331,52 @@ func (s *Service) resolveArtifactSkills(
 		),
 	}
 	resynced := map[root.RootID]error{}
-	unavailable := make([]artifact.ArtifactRef, 0)
+	unavailable := make([]unavailableArtifactSkill, 0)
 	readyRefs := make([]artifact.ArtifactRef, 0, len(refs))
+
+	recordUnavailable := func(
+		ref artifact.ArtifactRef,
+		cause error,
+	) {
+		unavailable = append(unavailable, unavailableArtifactSkill{
+			ref:   ref,
+			cause: cause,
+		})
+	}
 
 	for _, ref := range refs {
 		rootID, err := s.resolver.RootForArtifact(ctx, ref)
 		if err != nil {
-			unavailable = append(unavailable, ref)
+			recordUnavailable(
+				ref,
+				fmt.Errorf("resolve Artifact Root: %w", err),
+			)
 			continue
 		}
 		if previous, found := resynced[rootID]; found {
 			if previous != nil {
-				unavailable = append(unavailable, ref)
+				recordUnavailable(
+					ref,
+					fmt.Errorf(
+						"synchronize Root catalog %q: %w",
+						rootID,
+						previous,
+					),
+				)
 				continue
 			}
 		} else {
 			err := s.resyncRoot(ctx, rootID)
 			resynced[rootID] = err
 			if err != nil {
-				unavailable = append(unavailable, ref)
+				recordUnavailable(
+					ref,
+					fmt.Errorf(
+						"synchronize Root catalog %q: %w",
+						rootID,
+						err,
+					),
+				)
 				continue
 			}
 		}
@@ -371,12 +403,26 @@ func (s *Service) resolveArtifactSkills(
 				basespec.ErrRefreshRequired,
 			)
 		}
-		if !value.Enabled ||
-			!s.runtime.IsRegistered(skillRuntime.SkillRegistration{
-				Definition: value.Definition,
-				Revision:   value.Version,
-			}) {
-			unavailable = append(unavailable, ref)
+		if !value.Enabled {
+			recordUnavailable(
+				ref,
+				errors.New("artifact skill is disabled"),
+			)
+			continue
+		}
+
+		registration := skillRuntime.SkillRegistration{
+			Definition: value.Definition,
+			Revision:   value.Version,
+		}
+		if !s.runtime.IsRegistered(registration) {
+			recordUnavailable(
+				ref,
+				fmt.Errorf(
+					"runtime catalog did not register Skill revision %q",
+					value.Version,
+				),
+			)
 			continue
 		}
 
@@ -403,20 +449,37 @@ func (s *Service) resolveArtifactSkills(
 }
 
 func unavailableArtifactSkillsError(
-	refs []artifact.ArtifactRef,
+	unavailable []unavailableArtifactSkill,
 ) error {
-	sort.Slice(refs, func(left, right int) bool {
-		return artifactRefKey(refs[left]) <
-			artifactRefKey(refs[right])
+	sort.Slice(unavailable, func(left, right int) bool {
+		return artifactRefKey(unavailable[left].ref) <
+			artifactRefKey(unavailable[right].ref)
 	})
-	values := make([]string, 0, len(refs))
-	for _, ref := range refs {
-		values = append(values, artifactRefKey(ref))
+
+	refs := make([]string, 0, len(unavailable))
+	causes := make([]error, 0, len(unavailable))
+	for _, value := range unavailable {
+		key := artifactRefKey(value.ref)
+		refs = append(refs, key)
+		if value.cause == nil {
+			continue
+		}
+		causes = append(
+			causes,
+			fmt.Errorf("%s: %w", key, value.cause),
+		)
 	}
-	return fmt.Errorf(
+
+	summary := fmt.Errorf(
 		"%w: unavailable Artifact Skills: %s",
 		basespec.ErrReferenceUnresolved,
-		strings.Join(values, ", "),
+		strings.Join(refs, ", "),
+	)
+	if len(causes) == 0 {
+		return summary
+	}
+	return errors.Join(
+		append([]error{summary}, causes...)...,
 	)
 }
 

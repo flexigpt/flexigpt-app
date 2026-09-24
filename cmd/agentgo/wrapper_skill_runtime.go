@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
@@ -14,6 +15,24 @@ const skillRuntimeCloseTimeout = 30 * time.Second
 
 type SkillRuntimeWrapper struct {
 	service *skillRuntime.Service
+}
+
+func withSkillRuntime[T any](
+	w *SkillRuntimeWrapper,
+	fn func(*skillRuntime.Service) (T, error),
+) (T, error) {
+	return middleware.WithRecoveryResp(func() (T, error) {
+		var zero T
+		if w == nil {
+			return zero, basespec.ErrClosed
+		}
+
+		service := w.service
+		if service == nil {
+			return zero, basespec.ErrClosed
+		}
+		return fn(service)
+	})
 }
 
 func InitSkillRuntimeWrapper(
@@ -47,9 +66,13 @@ func InitSkillRuntimeWrapper(
 func (w *SkillRuntimeWrapper) CreateSkillSession(
 	request *skillRuntime.CreateSkillSessionRequest,
 ) (*skillRuntime.CreateSkillSessionResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.CreateSkillSessionResponse, error) {
-			return w.service.CreateSkillSession(
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.CreateSkillSessionResponse,
+			error,
+		) {
+			return service.CreateSkillSession(
 				context.Background(),
 				request,
 			)
@@ -60,9 +83,13 @@ func (w *SkillRuntimeWrapper) CreateSkillSession(
 func (w *SkillRuntimeWrapper) CloseSkillSession(
 	request *skillRuntime.CloseSkillSessionRequest,
 ) (*skillRuntime.CloseSkillSessionResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.CloseSkillSessionResponse, error) {
-			return w.service.CloseSkillSession(
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.CloseSkillSessionResponse,
+			error,
+		) {
+			return service.CloseSkillSession(
 				context.Background(),
 				request,
 			)
@@ -73,9 +100,13 @@ func (w *SkillRuntimeWrapper) CloseSkillSession(
 func (w *SkillRuntimeWrapper) GetSkillsPrompt(
 	request *skillRuntime.GetSkillsPromptRequest,
 ) (*skillRuntime.GetSkillsPromptResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.GetSkillsPromptResponse, error) {
-			return w.service.GetSkillsPrompt(
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.GetSkillsPromptResponse,
+			error,
+		) {
+			return service.GetSkillsPrompt(
 				context.Background(),
 				request,
 			)
@@ -86,9 +117,13 @@ func (w *SkillRuntimeWrapper) GetSkillsPrompt(
 func (w *SkillRuntimeWrapper) ListSkills(
 	request *skillRuntime.ListSkillsRequest,
 ) (*skillRuntime.ListSkillsResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.ListSkillsResponse, error) {
-			return w.service.ListSkills(context.Background(), request)
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.ListSkillsResponse,
+			error,
+		) {
+			return service.ListSkills(context.Background(), request)
 		},
 	)
 }
@@ -96,9 +131,13 @@ func (w *SkillRuntimeWrapper) ListSkills(
 func (w *SkillRuntimeWrapper) RenderSkill(
 	request *skillRuntime.RenderSkillRequest,
 ) (*skillRuntime.RenderSkillResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.RenderSkillResponse, error) {
-			return w.service.RenderSkill(context.Background(), request)
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.RenderSkillResponse,
+			error,
+		) {
+			return service.RenderSkill(context.Background(), request)
 		},
 	)
 }
@@ -106,9 +145,13 @@ func (w *SkillRuntimeWrapper) RenderSkill(
 func (w *SkillRuntimeWrapper) InvokeSkillTool(
 	request *skillRuntime.InvokeSkillToolRequest,
 ) (*skillRuntime.InvokeSkillToolResponse, error) {
-	return middleware.WithRecoveryResp(
-		func() (*skillRuntime.InvokeSkillToolResponse, error) {
-			return w.service.InvokeSkillTool(
+	return withSkillRuntime(
+		w,
+		func(service *skillRuntime.Service) (
+			*skillRuntime.InvokeSkillToolResponse,
+			error,
+		) {
+			return service.InvokeSkillTool(
 				context.Background(),
 				request,
 			)
