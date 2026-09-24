@@ -21,6 +21,7 @@ import (
 )
 
 type API struct {
+	roots            compositionapi.RootAPI
 	sources          compositionapi.SourceAPI
 	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
@@ -38,12 +39,25 @@ type API struct {
 }
 
 type apiOptions struct {
+	roots             compositionapi.RootAPI
 	locatorResolvers  []providerapi.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
+	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 	importSigner      *signer.Signer
 }
 
 type Option func(*apiOptions)
+
+// WithRoots enables consumer-facing cross-Root management operations and
+// default user-Root Collection creation. Explicit Root-scoped operations do
+// not require this option.
+func WithRoots(
+	value compositionapi.RootAPI,
+) Option {
+	return func(options *apiOptions) {
+		options.roots = value
+	}
+}
 
 func WithLocatorResolvers(
 	values []providerapi.LocatorResolverFactory,
@@ -70,6 +84,23 @@ func WithFallbackProviders(
 			len(values),
 		)
 		maps.Copy(options.fallbackProviders, values)
+	}
+}
+
+func WithTargetMappers(
+	values map[declaration.Type]resolve.ArtifactTargetMapper,
+) Option {
+	return func(options *apiOptions) {
+		if values == nil {
+			options.targetMappers = nil
+			return
+		}
+
+		options.targetMappers = make(
+			map[declaration.Type]resolve.ArtifactTargetMapper,
+			len(values),
+		)
+		maps.Copy(options.targetMappers, values)
 	}
 }
 
@@ -136,6 +167,7 @@ func New(
 	}
 
 	output := &API{
+		roots:             config.roots,
 		sources:           sources,
 		discovery:         discovery,
 		artifacts:         artifacts,
@@ -164,6 +196,7 @@ func New(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
+			TargetMappers:        config.targetMappers,
 			ProtectedBuiltinRoot: agentBuiltinRootID(),
 			Limits:               resolve.DefaultLimits(),
 		},

@@ -1,0 +1,24 @@
+type: plugin
+name: text
+displayName: Text utilities
+description: Common text processing helpers.
+
+members:
+  - type: tool
+    name: applyunifieddiff
+    scope: builtin
+  - type: tool
+    name: deletetext
+    scope: builtin
+  - type: tool
+    name: findtext
+    scope: builtin
+  - type: tool
+    name: inserttext
+    scope: builtin
+  - type: tool
+    name: readtextrange
+    scope: builtin
+  - type: tool
+    name: replacetext
+    scope: builtin

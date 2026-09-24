@@ -19,6 +19,9 @@ var embeddedAgentsFS embed.FS
 //go:embed mcps
 var embeddedMCPFS embed.FS
 
+//go:embed tools
+var embeddedToolsFS embed.FS
+
 //go:embed workspaces
 var embeddedWorkspacesFS embed.FS
 
@@ -44,6 +47,12 @@ func EmbeddedMCPPackages() (fs.FS, error) {
 	)
 }
 
+func EmbeddedToolPackages() (fs.FS, error) {
+	return EmbeddedPackages(
+		documentTopology.BuiltinEmbeddedPackageTools,
+	)
+}
+
 // EmbeddedWorkspacePackages exposes the base Workspace policy tree.
 // It is not installed as protected built-in content.
 func EmbeddedWorkspacePackages() (fs.FS, error) {
@@ -65,6 +74,8 @@ func EmbeddedPackages(packageSet string) (fs.FS, error) {
 		embedded = embeddedAgentsFS
 	case documentTopology.BuiltinEmbeddedPackageMCPs:
 		embedded = embeddedMCPFS
+	case documentTopology.BuiltinEmbeddedPackageTools:
+		embedded = embeddedToolsFS
 	default:
 		return nil, fmt.Errorf(
 			"%w: embedded package set %q is not compiled into the application",

@@ -19,6 +19,21 @@ const (
 	ToolSchemaVersion = declaration.SchemaVersionV1
 )
 
+type ImplementationKind string
+
+const (
+	ImplementationKindGo  ImplementationKind = "go"
+	ImplementationKindSDK ImplementationKind = "sdk"
+)
+
+type SDKToolType string
+
+const (
+	SDKToolTypeFunction  SDKToolType = "function"
+	SDKToolTypeCustom    SDKToolType = "custom"
+	SDKToolTypeWebSearch SDKToolType = "webSearch"
+)
+
 //go:embed tool-v1.schema.json
 var schemaJSON []byte
 
@@ -30,45 +45,27 @@ var ToolSchemaKey = schema.ArtifactKey(
 	ToolSchemaVersion,
 )
 
-type ToolDocument struct {
-	declaration.Header
-
-	UserCallable   bool             `json:"userCallable"`
-	LLMCallable    bool             `json:"llmCallable"`
-	AutoExecute    bool             `json:"autoExecute"`
-	LLMToolType    string           `json:"llmToolType"`
-	InputSchema    json.RawMessage  `json:"inputSchema"`
-	UserArgSchema  *json.RawMessage `json:"userArgSchema,omitempty"`
-	OutputSchema   *json.RawMessage `json:"outputSchema,omitempty"`
-	Implementation Implementation   `json:"implementation"`
-}
-
-type Implementation struct {
-	Kind string `json:"kind"`
+type ToolImplementation struct {
+	Kind ImplementationKind `json:"kind"`
 
 	Function string `json:"function,omitempty"`
 
-	Request  *HTTPRequest  `json:"request,omitempty"`
-	Response *HTTPResponse `json:"response,omitempty"`
-
-	Provider  string `json:"provider,omitempty"`
-	Operation string `json:"operation,omitempty"`
-
-	Command string            `json:"command,omitempty"`
-	Args    []string          `json:"args,omitempty"`
-	Env     map[string]string `json:"env,omitempty"`
+	SDKType     string      `json:"sdkType,omitempty"`
+	SDKToolType SDKToolType `json:"sdkToolType,omitempty"`
 }
 
-type HTTPRequest struct {
-	Method       string            `json:"method"`
-	URLTemplate  string            `json:"urlTemplate"`
-	Headers      map[string]string `json:"headers,omitempty"`
-	BodyTemplate string            `json:"bodyTemplate,omitempty"`
-}
+type ToolDocument struct {
+	declaration.Header
 
-type HTTPResponse struct {
-	SuccessCodes   []int  `json:"successCodes"`
-	BodyOutputMode string `json:"bodyOutputMode"`
+	Version     basespec.LogicalVersion `json:"version"`
+	Tags        []string                `json:"tags,omitempty"`
+	AutoExecute bool                    `json:"autoExecute"`
+
+	InputSchema   json.RawMessage  `json:"inputSchema"`
+	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`
+	OutputSchema  *json.RawMessage `json:"outputSchema,omitempty"`
+
+	Implementation ToolImplementation `json:"implementation"`
 }
 
 func ToolJSONSchema() []byte {
@@ -76,15 +73,9 @@ func ToolJSONSchema() []byte {
 }
 
 func DecodeToolJSON(raw []byte) (ToolDocument, error) {
-	return decodeTool(raw)
-}
-
-func DecodeToolEntry(
-	entry declaration.Entry,
-) (ToolDocument, error) {
 	var value ToolDocument
-	if err := declaration.DecodeEntryDocumentInto(
-		entry,
+	if err := declaration.DecodeDocumentInto(
+		raw,
 		compiledToolSchema,
 		&value,
 	); err != nil {
@@ -96,12 +87,12 @@ func DecodeToolEntry(
 	return value, nil
 }
 
-func decodeTool(
-	raw []byte,
+func DecodeToolEntry(
+	entry declaration.Entry,
 ) (ToolDocument, error) {
 	var value ToolDocument
-	if err := declaration.DecodeDocumentInto(
-		raw,
+	if err := declaration.DecodeEntryDocumentInto(
+		entry,
 		compiledToolSchema,
 		&value,
 	); err != nil {
@@ -136,14 +127,6 @@ func (v ToolDocument) CalculatedDigest() (
 }
 
 func (v ToolDocument) Validate() error {
-	return v.validate()
-}
-
-func (v ToolDocument) ValidateEntry() error {
-	return v.validate()
-}
-
-func (v ToolDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledToolSchema,
 		v,
@@ -151,6 +134,10 @@ func (v ToolDocument) validate() error {
 		return fmt.Errorf("tool schema: %w", err)
 	}
 	return v.validateFields()
+}
+
+func (v ToolDocument) ValidateEntry() error {
+	return v.Validate()
 }
 
 func (v ToolDocument) validateFields() error {
@@ -162,16 +149,18 @@ func (v ToolDocument) validateFields() error {
 	}
 	if v.Locator != nil {
 		return fmt.Errorf(
-			"%w: Tool implementation must use implementation, not a command locator",
+			"%w: Tool declarations do not support locator",
 			basespec.ErrInvalid,
 		)
 	}
-	if v.LLMToolType != "function" {
-		return fmt.Errorf(
-			"%w: unsupported Tool llmToolType %q",
-			basespec.ErrInvalid,
-			v.LLMToolType,
-		)
+	if err := basespec.ValidatePortableName(
+		"Tool version",
+		string(v.Version),
+	); err != nil {
+		return err
+	}
+	if err := validateTags(v.Tags); err != nil {
+		return err
 	}
 	if err := declaration.ValidateJSONSchemaValue(
 		"Tool inputSchema",
@@ -195,59 +184,56 @@ func (v ToolDocument) validateFields() error {
 			return err
 		}
 	}
-	return v.Implementation.Validate()
+	if err := v.Implementation.Validate(); err != nil {
+		return err
+	}
+	if v.Implementation.Kind != ImplementationKindSDK &&
+		v.UserArgSchema != nil {
+		return fmt.Errorf(
+			"%w: Tool userArgSchema is supported only for sdk Tools",
+			basespec.ErrInvalid,
+		)
+	}
+	return nil
 }
 
-func (v Implementation) Validate() error {
+func (v ToolImplementation) Validate() error {
 	switch v.Kind {
-	case "go":
-		if v.Function == "" {
-			return fmt.Errorf(
-				"%w: Go Tool implementation requires function",
-				basespec.ErrInvalid,
-			)
-		}
-	case "http":
-		if v.Request == nil || v.Response == nil {
-			return fmt.Errorf(
-				"%w: HTTP Tool implementation requires request and response",
-				basespec.ErrInvalid,
-			)
-		}
-		if err := v.Request.Validate(); err != nil {
-			return err
-		}
-		if err := v.Response.Validate(); err != nil {
-			return err
-		}
-	case "sdk":
-		if v.Provider == "" || v.Operation == "" {
-			return fmt.Errorf(
-				"%w: SDK Tool implementation requires provider and operation",
-				basespec.ErrInvalid,
-			)
-		}
-	case "command":
+	case ImplementationKindGo:
 		if err := basespec.ValidateRequiredText(
-			"Tool implementation command",
-			v.Command,
+			"Go Tool function",
+			v.Function,
 			basespec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
-		if err := declaration.ValidateTextSlice(
-			"Tool implementation args",
-			v.Args,
-			basespec.MaxURIBytes,
+		if v.SDKType != "" || v.SDKToolType != "" {
+			return fmt.Errorf(
+				"%w: Go Tool implementation cannot contain SDK fields",
+				basespec.ErrInvalid,
+			)
+		}
+		return nil
+
+	case ImplementationKindSDK:
+		if err := basespec.ValidateIdentifier(
+			"SDK Tool type",
+			v.SDKType,
+			basespec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
-		if err := declaration.ValidateStringMap(
-			"Tool implementation env",
-			v.Env,
-		); err != nil {
+		if err := v.SDKToolType.Validate(); err != nil {
 			return err
 		}
+		if v.Function != "" {
+			return fmt.Errorf(
+				"%w: SDK Tool implementation cannot contain Go function",
+				basespec.ErrInvalid,
+			)
+		}
+		return nil
+
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Tool implementation kind %q",
@@ -255,57 +241,49 @@ func (v Implementation) Validate() error {
 			v.Kind,
 		)
 	}
-	return nil
 }
 
-func (v HTTPRequest) Validate() error {
-	if err := basespec.ValidateRequiredText(
-		"Tool HTTP request method",
-		v.Method,
-		32,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"Tool HTTP request URL template",
-		v.URLTemplate,
-		basespec.MaxURIBytes,
-	); err != nil {
-		return err
-	}
-	if err := declaration.ValidateStringMap(
-		"Tool HTTP request headers",
-		v.Headers,
-	); err != nil {
-		return err
-	}
-	return declaration.ValidateOptionalContent(&v.BodyTemplate)
-}
-
-func (v HTTPResponse) Validate() error {
-	if len(v.SuccessCodes) == 0 {
-		return fmt.Errorf(
-			"%w: Tool HTTP response requires successCodes",
-			basespec.ErrInvalid,
-		)
-	}
-	for _, code := range v.SuccessCodes {
-		if code < 100 || code > 599 {
-			return fmt.Errorf(
-				"%w: invalid Tool HTTP success code %d",
-				basespec.ErrInvalid,
-				code,
-			)
-		}
-	}
-	switch v.BodyOutputMode {
-	case "json", "text", "bytes":
+func (v SDKToolType) Validate() error {
+	switch v {
+	case SDKToolTypeFunction,
+		SDKToolTypeCustom,
+		SDKToolTypeWebSearch:
 		return nil
 	default:
 		return fmt.Errorf(
-			"%w: invalid Tool HTTP bodyOutputMode %q",
+			"%w: unsupported SDK Tool type %q",
 			basespec.ErrInvalid,
-			v.BodyOutputMode,
+			v,
 		)
 	}
+}
+
+func validateTags(values []string) error {
+	if len(values) > basespec.MaxDefinitionDependencies {
+		return fmt.Errorf(
+			"%w: Tool tags exceed %d entries",
+			basespec.ErrInvalid,
+			basespec.MaxDefinitionDependencies,
+		)
+	}
+
+	seen := make(map[string]struct{}, len(values))
+	for index, value := range values {
+		if err := basespec.ValidateRequiredText(
+			"Tool tag",
+			value,
+			basespec.MaxLogicalNameBytes,
+		); err != nil {
+			return fmt.Errorf("tool tags[%d]: %w", index, err)
+		}
+		if _, duplicate := seen[value]; duplicate {
+			return fmt.Errorf(
+				"%w: Tool tag %q is repeated",
+				basespec.ErrIdentityConflict,
+				value,
+			)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
 }

@@ -50,8 +50,10 @@ builtin:
           - "mcpPolicies"
           - "agents"
           - "skillPackages"
+          - "tools"
 
   embeddedPackages:
     skills: "skills"
     agents: "agents"
     mcps: "mcps"
+    tools: "tools"

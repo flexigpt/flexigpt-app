@@ -23,6 +23,7 @@ const (
 	BuiltinEmbeddedPackageSkills = "skills"
 	BuiltinEmbeddedPackageAgents = "agents"
 	BuiltinEmbeddedPackageMCPs   = "mcps"
+	BuiltinEmbeddedPackageTools  = "tools"
 )
 
 type ApplicationStorageKey string
@@ -490,6 +491,7 @@ func loadBuiltinTopology(
 		BuiltinEmbeddedPackageSkills,
 		BuiltinEmbeddedPackageAgents,
 		BuiltinEmbeddedPackageMCPs,
+		BuiltinEmbeddedPackageTools,
 	} {
 		if _, found := embeddedRoots[required]; !found {
 			return builtinTopologyConfig{}, fmt.Errorf(

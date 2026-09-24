@@ -1,0 +1,30 @@
+type: plugin
+name: fs
+displayName: File-system utilities
+description: Common file-system helpers.
+
+members:
+  - type: tool
+    name: deletefile
+    scope: builtin
+  - type: tool
+    name: listdirectory
+    scope: builtin
+  - type: tool
+    name: mimeforextension
+    scope: builtin
+  - type: tool
+    name: mimeforpath
+    scope: builtin
+  - type: tool
+    name: readfile
+    scope: builtin
+  - type: tool
+    name: searchfiles
+    scope: builtin
+  - type: tool
+    name: statpath
+    scope: builtin
+  - type: tool
+    name: writefile
+    scope: builtin

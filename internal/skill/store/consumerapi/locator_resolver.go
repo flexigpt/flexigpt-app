@@ -17,6 +17,7 @@ import (
 type apiOptions struct {
 	locatorResolvers  []providerapi.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
+	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 }
 
 type Option func(*apiOptions)
@@ -46,6 +47,23 @@ func WithFallbackProviders(
 			len(values),
 		)
 		maps.Copy(options.fallbackProviders, values)
+	}
+}
+
+func WithTargetMappers(
+	values map[declaration.Type]resolve.ArtifactTargetMapper,
+) Option {
+	return func(options *apiOptions) {
+		if values == nil {
+			options.targetMappers = nil
+			return
+		}
+
+		options.targetMappers = make(
+			map[declaration.Type]resolve.ArtifactTargetMapper,
+			len(values),
+		)
+		maps.Copy(options.targetMappers, values)
 	}
 }
 

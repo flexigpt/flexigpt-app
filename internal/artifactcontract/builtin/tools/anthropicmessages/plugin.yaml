@@ -1,0 +1,9 @@
+type: plugin
+name: anthropicmessages
+displayName: Anthropic Messages Tools
+description: Built-in server Tools for Anthropic Messages.
+
+members:
+  - type: tool
+    name: anthropicwebsearch
+    scope: builtin

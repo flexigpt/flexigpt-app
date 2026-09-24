@@ -33,6 +33,17 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
+  tools:
+    - locator: "tool.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+    - locator: "tool.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "tool.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+
   agentMarkdown:
     - locator: "AGENT.md"
       format: "markdown"
@@ -97,6 +108,7 @@ documentUses:
     documentSets:
       - "collections"
       - "agents"
+      - "tools"
 
   mcpConfig:
     documentSets:
@@ -106,6 +118,16 @@ documentUses:
     documentSets:
       - "skillPackages"
     defaultLocator: "SKILL.md"
+
+  toolPackage:
+    documentSets:
+      - "tools"
+    defaultLocator: "tool.yaml"
+
+  toolCollection:
+    documentSets:
+      - "collections"
+    defaultLocator: "plugin.yaml"
 
   managedCollection:
     documentSets:

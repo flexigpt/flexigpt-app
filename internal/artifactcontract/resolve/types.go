@@ -45,6 +45,28 @@ type LocatorResolver interface {
 	) (artifact.ArtifactRef, error)
 }
 
+// ArtifactTargetRequest contains a source-backed terminal Artifact selected
+// by normal resolver lookup. A registered type mapper may replace it with a
+// mapped target before it reaches a consumer capability plan.
+type ArtifactTargetRequest struct {
+	Artifact   artifact.Artifact
+	Definition definition.Definition
+	Type       declaration.Type
+}
+
+// ArtifactTargetMapper projects one source-backed Artifact into a mapped
+// target. The mapper is registered by application composition for types that
+// intentionally expose a runtime capability rather than a raw Artifact.
+//
+// Returning handled=false leaves the ordinary Artifact target unchanged.
+// Returning handled=true with an error makes the relationship unavailable.
+type ArtifactTargetMapper interface {
+	MapArtifactTarget(
+		ctx context.Context,
+		request ArtifactTargetRequest,
+	) (MappedTarget, bool, error)
+}
+
 type Limits struct {
 	MaxDepth int
 	MaxNodes int
@@ -106,6 +128,10 @@ type ResolverOptions struct {
 	// type may register a provider when its resolver and consumer support it.
 	FallbackProviders map[declaration.Type]FallbackProvider
 
+	// TargetMappers project an Artifact-backed terminal target into a mapped
+	// target for selected declaration types.
+	TargetMappers map[declaration.Type]ArtifactTargetMapper
+
 	// Refresh is never used by normal resolution. It is used only by
 	// RefreshPlugin, RefreshAgent, RefreshTeam, and RefreshWorkspace.
 	Refresh RefreshCoordinator
@@ -118,6 +144,7 @@ type Resolver struct {
 	locators        LocatorResolver
 	sourceEntries   SourceEntryInspector
 	registry        *Registry
+	targetMappers   map[declaration.Type]ArtifactTargetMapper
 	builtinRoot     root.RootID
 	refresh         RefreshCoordinator
 	limits          Limits
@@ -173,12 +200,31 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 		}
 	}
 
+	targetMappers := make(
+		map[declaration.Type]ArtifactTargetMapper,
+		len(options.TargetMappers),
+	)
+	for declarationType, mapper := range options.TargetMappers {
+		if err := declarationType.Validate(); err != nil {
+			return nil, err
+		}
+		if mapper == nil {
+			return nil, fmt.Errorf(
+				"%w: Artifact target mapper for %q is nil",
+				basespec.ErrInvalid,
+				declarationType,
+			)
+		}
+		targetMappers[declarationType] = mapper
+	}
+
 	return &Resolver{
 		artifacts:       options.Artifacts,
 		sourceArtifacts: sourceArtifacts,
 		locators:        options.Locators,
 		sourceEntries:   sourceEntries,
 		registry:        registry,
+		targetMappers:   targetMappers,
 		builtinRoot:     options.ProtectedBuiltinRoot,
 		refresh:         options.Refresh,
 		limits:          limits,

@@ -3,184 +3,43 @@ package inferencewrapper
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
-	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
+
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
 )
 
 func buildToolChoices(
 	ctx context.Context,
-	ts *toolStore.ToolStore,
-	toolStoreChoices []toolSpec.ToolStoreChoice,
+	tools *toolnewAggregate.Service,
+	selections []toolnewAggregate.ToolSelection,
 ) ([]inferenceSpec.ToolChoice, error) {
-	out := make([]inferenceSpec.ToolChoice, 0)
-	if len(toolStoreChoices) == 0 {
+	if len(selections) == 0 {
 		return nil, nil
 	}
-
-	if ts == nil {
-		return nil, errors.New("tool store not configured for provider set")
+	if tools == nil {
+		return nil, errors.New(
+			"tool aggregate is not configured for provider set",
+		)
 	}
-
-	for _, sc := range toolStoreChoices {
-		if sc.ChoiceID == "" || sc.BundleID == "" || sc.ToolSlug == "" || strings.TrimSpace(sc.ToolVersion) == "" {
-			return nil, fmt.Errorf(
-				"invalid tool store choice: choiceID/bundleID/toolSlug/toolVersion required: %+v",
-				sc,
-			)
-		}
-		tc, err := hydrateToolChoice(ctx, ts, sc)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *tc)
-	}
-
-	if len(out) == 0 {
-		return nil, nil
-	}
-	return out, nil
+	return tools.HydrateInferenceToolChoices(ctx, selections)
 }
 
-// hydrateToolChoice loads the Tool definition from tool-store and converts it
-// into an inference-go ToolChoice. This is only called when we don't already
-// have a ToolChoice persisted in the conversation for the same tool.
-func hydrateToolChoice(
-	ctx context.Context,
-	ts *toolStore.ToolStore,
-	sc toolSpec.ToolStoreChoice,
-) (toolChoice *inferenceSpec.ToolChoice, err error) {
-	if sc.ChoiceID == "" {
-		return nil, errors.New("invalid choiceID for tool store choice")
-	}
-	if ts == nil {
-		return nil, errors.New("tool store not configured for provider set")
-	}
-	req := &toolSpec.GetToolRequest{
-		BundleID: sc.BundleID,
-		ToolSlug: sc.ToolSlug,
-		Version:  bundleitemutils.ItemVersion(sc.ToolVersion),
-	}
-	resp, err := ts.GetTool(ctx, req)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"failed to load tool %s/%s@%s: %w",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-			err,
-		)
-	}
-	if resp == nil || resp.Body == nil {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s not found",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-		)
-	}
-	tool := resp.Body
-	if !tool.IsEnabled {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s is disabled",
-			sc.BundleID,
-			sc.ToolSlug,
-			sc.ToolVersion,
-		)
-	}
-	if !tool.LLMCallable {
-		return nil, fmt.Errorf(
-			"tool %s/%s@%s is not LLM-callable",
-			sc.BundleID, sc.ToolSlug, sc.ToolVersion,
-		)
-	}
-	name := string(sc.ToolSlug)
-	desc := tool.Description
-	if desc == "" {
-		desc = sc.Description
-	}
-
-	tc := &inferenceSpec.ToolChoice{
-		Type:        inferenceSpec.ToolType(sc.ToolType),
-		ID:          sc.ChoiceID,
-		Name:        name,
-		Description: desc,
-	}
-
-	switch tool.Type {
-	case toolSpec.ToolTypeGo:
-		argSchema, err := decodeToolArgSchema(jsonutil.JSONRawString(tool.ArgSchema))
-		if err != nil {
-			return nil, fmt.Errorf(
-				"invalid argSchema for %s/%s@%s: %w",
-				sc.BundleID,
-				sc.ToolSlug,
-				sc.ToolVersion,
-				err,
-			)
-		}
-		tc.Arguments = argSchema
-
-	case toolSpec.ToolTypeSDK:
-		// SDK-backed server tools. Semantics come from sc.ToolType
-		// (e.g., "webSearch"), while implementation is described by
-		// tool.SDK and user configuration by tool.UserArgSchema plus
-		// sc.Config.
-		switch sc.ToolType {
-		case toolSpec.ToolStoreChoiceTypeWebSearch:
-			// Decode per-choice config (if any) and map to the
-			// inference-go WebSearchToolChoiceItem.
-			var cfg inferenceSpec.WebSearchToolChoiceItem
-			rawCfg := strings.TrimSpace(string(sc.UserArgSchemaInstance))
-			if rawCfg != "" {
-				decoded, err := jsonutil.DecodeJSONStringRawInto[inferenceSpec.WebSearchToolChoiceItem](
-					sc.UserArgSchemaInstance,
-				)
-				if err != nil {
-					return nil, fmt.Errorf(
-						"invalid config for webSearch tool %s/%s@%s: %w",
-						sc.BundleID, sc.ToolSlug, sc.ToolVersion, err,
-					)
-				}
-				cfg = decoded
-			}
-			tc.Type = inferenceSpec.ToolTypeWebSearch
-			tc.WebSearchArguments = &cfg
-
-		default:
-			// Future SDK-backed tool kinds (function/custom) could be added here.
-			// For now, we treat anything other than webSearch as unsupported.
-			return nil, fmt.Errorf(
-				"unsupported ToolType %q for sdk tool %s/%s@%s",
-				sc.ToolType, sc.BundleID, sc.ToolSlug, sc.ToolVersion,
-			)
-		}
-
-	default:
-		return nil, fmt.Errorf("unsupported tool impl type %q", tool.Type)
-	}
-
-	return tc, nil
-}
-
-func decodeToolArgSchema(raw jsonutil.JSONRawString) (map[string]any, error) {
-	s := strings.TrimSpace(string(raw))
-	if s == "" {
+// decodeToolArgSchema remains shared by Skill Tool choice construction.
+// Tool Store itself uses aggregate.toolArguments for Tool Artifact schemas.
+func decodeToolArgSchema(
+	raw jsonutil.JSONRawString,
+) (map[string]any, error) {
+	if len(raw) == 0 {
 		return getEmptySchema(), nil
 	}
-
 	schema, err := jsonutil.DecodeJSONStringRawInto[map[string]any](raw)
 	if err != nil {
 		return nil, err
 	}
-
 	if len(schema) == 0 {
-		schema = getEmptySchema()
+		return getEmptySchema(), nil
 	}
 	return schema, nil
 }

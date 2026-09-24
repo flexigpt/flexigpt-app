@@ -98,6 +98,7 @@ func New(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
+			TargetMappers:        config.targetMappers,
 			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
 			Limits:               resolve.DefaultLimits(),
 		},

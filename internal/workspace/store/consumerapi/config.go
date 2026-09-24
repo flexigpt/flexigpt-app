@@ -16,6 +16,7 @@ type Config struct {
 	LocatorResolvers   []providerapi.LocatorResolverFactory
 	ResolverLimits     resolve.Limits
 	FallbackProviders  map[declaration.Type]resolve.FallbackProvider
+	TargetMappers      map[declaration.Type]resolve.ArtifactTargetMapper
 	MCPServers         mcp.ServerResolver
 
 	// AdditionalDecoderHints lets application composition add dedicated
@@ -38,6 +39,14 @@ func (c Config) normalized() Config {
 		)
 		maps.Copy(output.FallbackProviders, c.FallbackProviders)
 	}
+	if c.TargetMappers != nil {
+		output.TargetMappers = make(
+			map[declaration.Type]resolve.ArtifactTargetMapper,
+			len(c.TargetMappers),
+		)
+		maps.Copy(output.TargetMappers, c.TargetMappers)
+	}
+
 	output.AdditionalDecoderHints = make(
 		[]source.DecoderHint,
 		len(c.AdditionalDecoderHints),

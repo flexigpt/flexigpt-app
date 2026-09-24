@@ -32,10 +32,8 @@ nodes:
     parameters:
       displayName: Validate Change
       description: Validates the final repository state.
-      userCallable: false
-      llmCallable: true
+      version: v1.0.0
       autoExecute: false
-      llmToolType: function
       inputSchema:
         type: object
       implementation:

@@ -24,6 +24,8 @@ const (
 	DocumentUseCanonicalJSON                           = "canonicalJSON"
 	DocumentUseMCPConfig                               = "mcpConfig"
 	DocumentUseSkillPackage                            = "skillPackage"
+	DocumentUseToolPackage                             = "toolPackage"
+	DocumentUseToolCollection                          = "toolCollection"
 	DocumentUseManagedCollection                       = "managedCollection"
 	DocumentUseAgentManagedCollection                  = "agentManagedCollection"
 	DocumentUseManagedAgent                            = "managedAgent"
@@ -273,6 +275,18 @@ func DefaultSkillPackageDocumentFile() basespec.Locator {
 
 func IsSkillPackageDocument(locator basespec.Locator) bool {
 	return IsDocument(locator, DocumentUseSkillPackage)
+}
+
+func ToolPackageDocumentFiles() []basespec.Locator {
+	return MustDocumentFiles(DocumentUseToolPackage)
+}
+
+func DefaultToolPackageDocumentFile() basespec.Locator {
+	return MustDefaultDocumentFile(DocumentUseToolPackage)
+}
+
+func IsToolPackageDocument(locator basespec.Locator) bool {
+	return IsDocument(locator, DocumentUseToolPackage)
 }
 
 func AgentDeclarationDocumentFiles() []basespec.Locator {
@@ -1250,6 +1264,8 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseCanonicalJSON,
 		DocumentUseMCPConfig,
 		DocumentUseSkillPackage,
+		DocumentUseToolPackage,
+		DocumentUseToolCollection,
 		DocumentUseManagedCollection,
 		DocumentUseAgentManagedCollection,
 		DocumentUseManagedAgent,
@@ -1269,6 +1285,8 @@ func validateRequiredContractBindings(value contractTopology) error {
 	}
 	for _, use := range []string{
 		DocumentUseSkillPackage,
+		DocumentUseToolPackage,
+		DocumentUseToolCollection,
 		DocumentUseManagedCollection,
 		DocumentUseAgentManagedCollection,
 		DocumentUseManagedAgent,

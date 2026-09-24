@@ -65,6 +65,7 @@ func InitSkillStoreWrapper(
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
+	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	locatorResolvers ...providerapi.LocatorResolverFactory,
 ) error {
 	if wrapper == nil ||
@@ -90,6 +91,9 @@ func InitSkillStoreWrapper(
 		),
 		skillConsumerAPI.WithFallbackProviders(
 			fallbackProviders,
+		),
+		skillConsumerAPI.WithTargetMappers(
+			targetMappers,
 		),
 	)
 	if err != nil {

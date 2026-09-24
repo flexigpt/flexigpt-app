@@ -40,11 +40,13 @@ type agentBaselineEnsurer interface {
 func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installerapi.API,
+	tools builtin.HydrationInstaller,
 	skills builtin.HydrationInstaller,
 	mcp builtin.HydrationInstaller,
 	agents builtin.HydrationInstaller,
 ) error {
 	if topologyAPI == nil ||
+		tools == nil ||
 		skills == nil ||
 		mcp == nil ||
 		agents == nil {
@@ -59,6 +61,9 @@ func EnsureBuiltinArtifactTopology(
 		topologyAPI,
 	)
 	if err != nil {
+		return err
+	}
+	if err := bootstrap.Register(tools); err != nil {
 		return err
 	}
 	if err := bootstrap.Register(skills); err != nil {
@@ -137,18 +142,25 @@ func EnsureUserArtifactBaselineCollections(
 // artifactFallbackProviders returns the fallback registrations that must be
 // supplied to every Artifact contract resolver used by application consumers.
 func artifactFallbackProviders(
-	tools *ToolStoreWrapper,
 	models *ModelPresetStoreWrapper,
 ) (map[declaration.Type]resolve.FallbackProvider, error) {
-	if tools == nil || tools.artifactFallback == nil {
-		return nil, errors.New("tool artifact fallback is not initialized")
-	}
 	if models == nil || models.artifactFallback == nil {
 		return nil, errors.New("model Preset artifact fallback is not initialized")
 	}
 
 	return map[declaration.Type]resolve.FallbackProvider{
-		declaration.TypeTool:  tools.artifactFallback,
 		declaration.TypeModel: models.artifactFallback,
 	}, nil
+}
+
+// artifactTargetMappers returns ArtifactRef-to-mapped-target adapters used by
+// Artifact consumers. Tool mapping belongs to the Tool aggregate because it
+// validates the Tool and its containing Tool Collection before mapping.
+func artifactTargetMappers(
+	tools *ToolNewAggregateWrapper,
+) (map[declaration.Type]resolve.ArtifactTargetMapper, error) {
+	if tools == nil {
+		return nil, errors.New("tool artifact target mapper aggregate is not initialized")
+	}
+	return tools.targetMappers()
 }

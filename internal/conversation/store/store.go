@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
@@ -452,6 +453,12 @@ func validateConversationV1(value *spec.Conversation) error {
 		); err != nil {
 			return err
 		}
+		if err := validateConversationToolSelections(
+			fmt.Sprintf("messages[%d].toolSelections", index),
+			message.ToolSelections,
+		); err != nil {
+			return err
+		}
 		if message.MCPContext != nil {
 			if err := mcpConversation.ValidateMCPConversationContext(
 				*message.MCPContext,
@@ -525,6 +532,41 @@ func validateConversationArtifactRefs(
 			return fmt.Errorf("%s[%d]: duplicate ArtifactRef", field, index)
 		}
 		seen[key] = struct{}{}
+	}
+	return nil
+}
+
+func validateConversationToolSelections(
+	field string,
+	values []toolnewAggregate.ToolSelection,
+) error {
+	choiceIDs := make(map[string]struct{}, len(values))
+	targets := make(map[string]struct{}, len(values))
+
+	for index, value := range values {
+		if err := value.Validate(); err != nil {
+			return fmt.Errorf("%s[%d]: %w", field, index, err)
+		}
+		if _, duplicate := choiceIDs[value.ChoiceID]; duplicate {
+			return fmt.Errorf(
+				"%s[%d]: duplicate Tool choice ID %q",
+				field,
+				index,
+				value.ChoiceID,
+			)
+		}
+		choiceIDs[value.ChoiceID] = struct{}{}
+
+		key := value.Target.Provider + "\x00" +
+			value.Target.Identifier
+		if _, duplicate := targets[key]; duplicate {
+			return fmt.Errorf(
+				"%s[%d]: duplicate Tool target",
+				field,
+				index,
+			)
+		}
+		targets[key] = struct{}{}
 	}
 	return nil
 }

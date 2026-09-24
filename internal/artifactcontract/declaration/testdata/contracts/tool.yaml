@@ -7,10 +7,8 @@ labels:
   owner: developer-tools
 metadata:
   acme.example/owner: developer-tools
-userCallable: false
-llmCallable: true
+version: v1.0.0
 autoExecute: false
-llmToolType: function
 inputSchema:
   type: object
   required:
@@ -18,12 +16,6 @@ inputSchema:
   properties:
     query:
       type: string
-userArgSchema:
-  type: object
-  properties:
-    maxResults:
-      type: integer
-      minimum: 1
 outputSchema:
   type: object
   properties:

@@ -38,7 +38,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 	schemas := schemasByType(t)
 	entries, err := fs.ReadDir(contractFixtures, contractFixtureDirectory)
 	if err != nil {
-		t.Fatalf("read contract fixtures: %v", err)
+		t.Fatalf("read contract fixtures err: %v", err)
 	}
 
 	names := make([]string, 0, len(entries))
@@ -128,7 +128,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			}
 
 			if err := decoder.ValidateEntryTree(entry); err != nil {
-				t.Fatalf("validate complete declaration tree: %v", err)
+				t.Fatalf("validate complete declaration tree err: %v", err)
 			}
 			named, err := declaration.WalkNamedEntries(entry)
 			if err != nil {

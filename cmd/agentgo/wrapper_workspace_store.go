@@ -31,6 +31,7 @@ func InitWorkspaceWrappers(
 	resources compositionapi.ResourceAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
+	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	mcpServers mcp.ServerResolver,
 	ensureArtifactBaselines func(context.Context, root.RootID) error,
 ) error {
@@ -48,6 +49,7 @@ func InitWorkspaceWrappers(
 		locatorResolvers...,
 	)
 	config.FallbackProviders = fallbackProviders
+	config.TargetMappers = targetMappers
 	config.MCPServers = mcpServers
 	api, err := workspaceConsumerAPI.NewStoreAPI(
 		sources,

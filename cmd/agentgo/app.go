@@ -27,24 +27,26 @@ const (
 type App struct {
 	ctx context.Context
 
-	settingStoreAPI       *SettingStoreWrapper
-	conversationStoreAPI  *ConversationCollectionWrapper
-	modelPresetStoreAPI   *ModelPresetStoreWrapper
-	toolStoreAPI          *ToolStoreWrapper
-	toolRuntimeAPI        *ToolRuntimeWrapper
-	agentStoreAPI         *AgentStoreWrapper
-	agentBuiltInInstaller builtin.HydrationInstaller
-	skillStoreAPI         *SkillStoreWrapper
-	skillBuiltInInstaller builtin.HydrationInstaller
-	skillAggregateAPI     *SkillAggregateWrapper
-	skillRuntimeAPI       *SkillRuntimeWrapper
-	mcpStoreAPI           *MCPStoreWrapper
-	mcpRuntimeAPI         *MCPRuntimeWrapper
-	mcpAggregateAPI       *MCPAggregateWrapper
-	mcpBuiltInInstaller   builtin.HydrationInstaller
-	aggregateAPI          *AggregrateWrapper
-	workspaceStoreAPI     *WorkspaceStoreWrapper
-	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
+	settingStoreAPI         *SettingStoreWrapper
+	conversationStoreAPI    *ConversationCollectionWrapper
+	modelPresetStoreAPI     *ModelPresetStoreWrapper
+	toolNewStoreAPI         *ToolNewStoreWrapper
+	toolNewRuntimeAPI       *ToolNewRuntimeWrapper
+	toolNewAggregateAPI     *ToolNewAggregateWrapper
+	toolNewBuiltInInstaller builtin.HydrationInstaller
+	agentStoreAPI           *AgentStoreWrapper
+	agentBuiltInInstaller   builtin.HydrationInstaller
+	skillStoreAPI           *SkillStoreWrapper
+	skillBuiltInInstaller   builtin.HydrationInstaller
+	skillAggregateAPI       *SkillAggregateWrapper
+	skillRuntimeAPI         *SkillRuntimeWrapper
+	mcpStoreAPI             *MCPStoreWrapper
+	mcpRuntimeAPI           *MCPRuntimeWrapper
+	mcpAggregateAPI         *MCPAggregateWrapper
+	mcpBuiltInInstaller     builtin.HydrationInstaller
+	aggregateAPI            *AggregrateWrapper
+	workspaceStoreAPI       *WorkspaceStoreWrapper
+	workspaceRuntimeAPI     *WorkspaceRuntimeWrapper
 
 	artifactStoreComposition *compositionapi.Store
 
@@ -53,7 +55,6 @@ type App struct {
 	settingsDirPath      string
 	conversationsDirPath string
 	modelPresetsDirPath  string
-	toolsDirPath         string
 	artifactStoreDirPath string
 }
 
@@ -85,10 +86,6 @@ func NewApp() *App {
 		app.dataBasePath,
 		storageName(documentTopology.ApplicationStorageModelPresetsDirectory),
 	)
-	app.toolsDirPath = filepath.Join(
-		app.dataBasePath,
-		storageName(documentTopology.ApplicationStorageToolsDirectory),
-	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
@@ -98,7 +95,6 @@ func NewApp() *App {
 
 	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
 		app.modelPresetsDirPath == "" ||
-		app.toolsDirPath == "" ||
 		app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
@@ -106,7 +102,6 @@ func NewApp() *App {
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
 			"modelPresetsDirPath", app.modelPresetsDirPath,
-			"toolsDirPath", app.toolsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -124,7 +119,9 @@ func NewApp() *App {
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
-	app.toolStoreAPI = &ToolStoreWrapper{}
+	app.toolNewStoreAPI = &ToolNewStoreWrapper{}
+	app.toolNewRuntimeAPI = &ToolNewRuntimeWrapper{}
+	app.toolNewAggregateAPI = &ToolNewAggregateWrapper{}
 	app.skillStoreAPI = &SkillStoreWrapper{}
 	app.skillAggregateAPI = &SkillAggregateWrapper{}
 	app.agentStoreAPI = &AgentStoreWrapper{}
@@ -132,7 +129,6 @@ func NewApp() *App {
 	app.mcpStoreAPI = &MCPStoreWrapper{}
 	app.mcpRuntimeAPI = &MCPRuntimeWrapper{}
 	app.mcpAggregateAPI = &MCPAggregateWrapper{}
-	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.aggregateAPI = &AggregrateWrapper{}
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
@@ -163,16 +159,6 @@ func NewApp() *App {
 		panic("failed to initialize app: could not create model presets directory")
 	}
 
-	if err := ensureAppPrivateDirectory(app.toolsDirPath); err != nil {
-
-		slog.Error(
-			"failed to create tools directory",
-			"tools path", app.toolsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create tools directory")
-	}
-
 	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
 
 		slog.Error(
@@ -189,7 +175,6 @@ func NewApp() *App {
 		"settingsDirPath", app.settingsDirPath,
 		"conversationsDirPath", app.conversationsDirPath,
 		"modelPresetsDirPath", app.modelPresetsDirPath,
-		"toolsDirPath", app.toolsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
@@ -222,25 +207,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
 
-	err = InitToolStoreWrapper(a.toolStoreAPI, a.toolsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize tool store",
-			"directory", a.toolsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: tool store initialization failed\n" + err.Error())
-	}
-
-	err = InitToolRuntimeWrapper(a.toolRuntimeAPI, a.toolStoreAPI.store)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize tool runtime",
-			"error", err,
-		)
-		panic("failed to initialize managers: tool runtime initialization failed\n" + err.Error())
-	}
-
 	err = InitModelPresetStoreWrapper(
 		a.modelPresetStoreAPI,
 		a.modelPresetsDirPath,
@@ -256,22 +222,6 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: model presets store initialization failed\n" + err.Error())
 	}
 	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
-
-	fallbackProviders, err := artifactFallbackProviders(
-		a.toolStoreAPI,
-		a.modelPresetStoreAPI,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Artifact fallback providers",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Artifact fallback providers failed\n" +
-				err.Error(),
-		)
-	}
 
 	artifactComposition, err := composeArtifactStore(
 		context.Background(),
@@ -292,6 +242,115 @@ func (a *App) initManagers() {
 
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
+	err = InitToolNewRuntimeWrapper(a.toolNewRuntimeAPI)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed Tool runtime",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool runtime initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	goTools, err := a.toolNewRuntimeAPI.goToolLocator()
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed Tool Go Tool locator",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool Go Tool locator initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	err = InitToolNewStoreWrapper(
+		a.toolNewStoreAPI,
+		artifactComposition.Sources,
+		artifactComposition.Discovery,
+		artifactComposition.Artifacts,
+		artifactComposition.ManagedArtifacts,
+		artifactComposition.Protection,
+		goTools,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed Tool Store",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool Store initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	err = InitToolNewAggregateWrapper(
+		a.toolNewAggregateAPI,
+		a.toolNewStoreAPI,
+		a.toolNewRuntimeAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed Tool aggregate",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool aggregate initialization failed\n" +
+				err.Error(),
+		)
+	}
+
+	a.toolNewBuiltInInstaller, err = NewToolNewBuiltInInstaller(
+		a.toolNewStoreAPI,
+		goTools,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Tool built-in installer",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Tool built-in installer initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("artifact-backed Tool store, runtime, and aggregate initialized")
+
+	fallbackProviders, err := artifactFallbackProviders(
+		a.modelPresetStoreAPI,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Artifact fallback providers",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Artifact fallback providers failed\n" +
+				err.Error(),
+		)
+	}
+
+	targetMappers, err := artifactTargetMappers(a.toolNewAggregateAPI)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize Artifact target mappers",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Artifact target mappers failed\n" +
+				err.Error(),
+		)
+	}
+
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
 		artifactComposition.Roots,
@@ -302,6 +361,7 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		fallbackProviders,
+		targetMappers,
 		artifactComposition.LocatorResolvers...,
 	)
 	if err != nil {
@@ -348,6 +408,7 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		fallbackProviders,
+		targetMappers,
 		artifactComposition.LocatorResolvers...,
 	)
 	if err != nil {
@@ -432,6 +493,7 @@ func (a *App) initManagers() {
 		artifactComposition.Protection,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
+		targetMappers,
 		a.settingStoreAPI.store,
 	)
 	if err != nil {
@@ -467,6 +529,7 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
+		targetMappers,
 		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID root.RootID) error {
 			return EnsureUserArtifactBaselineCollectionsForRoot(
@@ -490,6 +553,7 @@ func (a *App) initManagers() {
 	err = EnsureBuiltinArtifactTopology(
 		context.Background(),
 		a.artifactStoreComposition.Topology,
+		a.toolNewBuiltInInstaller,
 		a.skillBuiltInInstaller,
 		a.mcpBuiltInInstaller,
 		a.agentBuiltInInstaller,
@@ -542,7 +606,7 @@ func (a *App) initManagers() {
 		a.aggregateAPI,
 		a.modelPresetStoreAPI.store,
 		a.settingStoreAPI.store,
-		a.toolStoreAPI.store,
+		a.toolNewAggregateAPI.service,
 		a.skillAggregateAPI.service,
 		a.mcpRuntimeAPI.runtime,
 		workspaceConversationSource,
@@ -625,9 +689,19 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.skillStoreAPI != nil {
 		a.skillStoreAPI.close()
 	}
+	if a.toolNewAggregateAPI != nil {
+		a.toolNewAggregateAPI.close()
+	}
+	if a.toolNewStoreAPI != nil {
+		a.toolNewStoreAPI.close()
+	}
+	if a.toolNewRuntimeAPI != nil {
+		a.toolNewRuntimeAPI.close()
+	}
 	a.skillBuiltInInstaller = nil
 	a.mcpBuiltInInstaller = nil
 	a.agentBuiltInInstaller = nil
+	a.toolNewBuiltInInstaller = nil
 	if a.artifactStoreComposition != nil {
 		if err := a.artifactStoreComposition.Close(); err != nil {
 			slog.Error(
@@ -641,10 +715,6 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.modelPresetStoreAPI != nil {
 		a.modelPresetStoreAPI.close()
 	}
-	if a.toolStoreAPI != nil {
-		a.toolStoreAPI.close()
-	}
-
 	if a.conversationStoreAPI != nil {
 		a.conversationStoreAPI.close()
 	}

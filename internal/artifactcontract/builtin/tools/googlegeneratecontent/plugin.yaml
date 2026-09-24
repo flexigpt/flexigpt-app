@@ -1,0 +1,9 @@
+type: plugin
+name: googlegeneratecontent
+displayName: Google GenAI Tools
+description: Built-in server Tools for Google GenAI.
+
+members:
+  - type: tool
+    name: googlewebsearch
+    scope: builtin

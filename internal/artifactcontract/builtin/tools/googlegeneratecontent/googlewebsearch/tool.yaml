@@ -1,0 +1,48 @@
+type: tool
+name: googlewebsearch
+version: v1.0.0
+displayName: Google GenAI SDK Web Search
+description: Search the web for relevant content and use it in model output.
+tags:
+  - sdk
+  - search
+autoExecute: false
+
+inputSchema:
+  type: object
+  additionalProperties: false
+  properties: {}
+
+userArgSchema:
+  type: object
+  additionalProperties: false
+  properties:
+    maxUses:
+      type: integer
+    searchContextSize:
+      type: string
+    allowedDomains:
+      type: array
+      items:
+        type: string
+    blockedDomains:
+      type: array
+      items:
+        type: string
+    userLocation:
+      type: object
+      additionalProperties: false
+      properties:
+        city:
+          type: string
+        country:
+          type: string
+        region:
+          type: string
+        timezone:
+          type: string
+
+implementation:
+  kind: sdk
+  sdkType: providerSDKTypeGoogleGenerateContent
+  sdkToolType: webSearch

@@ -1,0 +1,9 @@
+type: plugin
+name: image
+displayName: Image utilities
+description: Common image helpers.
+
+members:
+  - type: tool
+    name: readimage
+    scope: builtin

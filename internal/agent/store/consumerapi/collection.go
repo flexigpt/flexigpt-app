@@ -18,6 +18,13 @@ func (a *API) CreateAgentCollection(
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
+	if request.RootID == "" {
+		rootID, err := a.ensureDefaultAgentCollectionRoot(ctx)
+		if err != nil {
+			return collection.CollectionView{}, err
+		}
+		request.RootID = rootID
+	}
 	return a.collections.Create(ctx, request)
 }
 

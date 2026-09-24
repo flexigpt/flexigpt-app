@@ -1,0 +1,9 @@
+type: plugin
+name: openairesponses
+displayName: OpenAI Responses Tools
+description: Built-in server Tools for OpenAI Responses.
+
+members:
+  - type: tool
+    name: openaiwebsearch
+    scope: builtin

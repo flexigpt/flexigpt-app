@@ -1,0 +1,69 @@
+type: plugin
+name: git
+displayName: Git utilities
+description: Common local Git helpers.
+
+members:
+  - type: tool
+    name: gitadd
+    scope: builtin
+  - type: tool
+    name: gitblame
+    scope: builtin
+  - type: tool
+    name: gitbranch
+    scope: builtin
+  - type: tool
+    name: gitchangedfiles
+    scope: builtin
+  - type: tool
+    name: gitcheckout
+    scope: builtin
+  - type: tool
+    name: gitcommit
+    scope: builtin
+  - type: tool
+    name: gitcreatebranch
+    scope: builtin
+  - type: tool
+    name: gitcreatetag
+    scope: builtin
+  - type: tool
+    name: gitdeletetag
+    scope: builtin
+  - type: tool
+    name: gitdiff
+    scope: builtin
+  - type: tool
+    name: gitfilehistory
+    scope: builtin
+  - type: tool
+    name: gitfindrepos
+    scope: builtin
+  - type: tool
+    name: gitgrep
+    scope: builtin
+  - type: tool
+    name: gitinit
+    scope: builtin
+  - type: tool
+    name: gitlisttree
+    scope: builtin
+  - type: tool
+    name: gitlog
+    scope: builtin
+  - type: tool
+    name: gitreadblob
+    scope: builtin
+  - type: tool
+    name: gitrepoinfo
+    scope: builtin
+  - type: tool
+    name: gitreset
+    scope: builtin
+  - type: tool
+    name: gitshow
+    scope: builtin
+  - type: tool
+    name: gittag
+    scope: builtin

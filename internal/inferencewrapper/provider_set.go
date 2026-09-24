@@ -23,7 +23,7 @@ import (
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
@@ -42,7 +42,7 @@ const (
 type ProviderSetAPI struct {
 	inner *inference.ProviderSetAPI
 
-	toolStore          *toolStore.ToolStore
+	toolnewAggregate   *toolnewAggregate.Service
 	mpStore            *modelpresetStore.ModelPresetStore
 	artifactSkills     *skillAggregate.Service
 	mcpInferenceBridge *MCPInferenceBridge
@@ -82,21 +82,21 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 
 // NewProviderSetAPI creates a new ProviderSetAPI wrapper.
 //
-//   - ts:   tool store used to hydrate ToolChoices when needed.
+//   - tools: Tool Aggregate used to hydrate ToolChoices when needed.
 //   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
 func NewProviderSetAPI(
-	ts *toolStore.ToolStore,
+	tools *toolnewAggregate.Service,
 	mps *modelpresetStore.ModelPresetStore,
 	artifactSkills *skillAggregate.Service,
 	mcpBridge *MCPInferenceBridge,
 	workspaceBridge *WorkspaceInferenceBridge,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if ts == nil || mps == nil || artifactSkills == nil || mcpBridge == nil || workspaceBridge == nil {
+	if tools == nil || mps == nil || artifactSkills == nil || mcpBridge == nil || workspaceBridge == nil {
 		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
-		toolStore:          ts,
+		toolnewAggregate:   tools,
 		mpStore:            mps,
 		artifactSkills:     artifactSkills,
 		mcpInferenceBridge: mcpBridge,
@@ -357,7 +357,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
-	toolChoices, err := buildToolChoices(ctx, ps.toolStore, body.ToolStoreChoices)
+	toolChoices, err := buildToolChoices(ctx, ps.toolnewAggregate, body.ToolSelections)
 	if err != nil {
 		return nil, err
 	}

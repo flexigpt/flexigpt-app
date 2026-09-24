@@ -7,31 +7,52 @@
 	"required": [
 		"type",
 		"name",
-		"userCallable",
-		"llmCallable",
+		"version",
 		"autoExecute",
-		"llmToolType",
 		"inputSchema",
 		"implementation"
 	],
 	"properties": {
 		"type": { "const": "tool" },
 		"name": { "$ref": "#/$defs/name" },
+		"version": { "$ref": "#/$defs/version" },
 		"displayName": { "$ref": "#/$defs/displayName" },
 		"description": { "$ref": "#/$defs/description" },
 		"labels": { "$ref": "#/$defs/labels" },
 		"metadata": { "$ref": "#/$defs/metadata" },
-		"userCallable": { "type": "boolean" },
-		"llmCallable": { "type": "boolean" },
-		"autoExecute": { "type": "boolean" },
-		"llmToolType": { "const": "function" },
-		"inputSchema": { "$ref": "#/$defs/jsonSchema" },
-		"userArgSchema": { "$ref": "#/$defs/jsonSchema" },
-		"outputSchema": { "$ref": "#/$defs/jsonSchema" },
-		"implementation": { "$ref": "#/$defs/implementation" }
+		"tags": {
+			"type": "array",
+			"maxItems": 4096,
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 256
+			}
+		},
+		"autoExecute": {
+			"type": "boolean"
+		},
+		"inputSchema": {
+			"$ref": "#/$defs/jsonSchema"
+		},
+		"userArgSchema": {
+			"$ref": "#/$defs/jsonSchema"
+		},
+		"outputSchema": {
+			"$ref": "#/$defs/jsonSchema"
+		},
+		"implementation": {
+			"$ref": "#/$defs/implementation"
+		}
 	},
 	"$defs": {
 		"name": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"version": {
 			"type": "string",
 			"minLength": 1,
 			"maxLength": 256
@@ -64,23 +85,14 @@
 			"additionalProperties": true
 		},
 		"jsonSchema": {
-			"oneOf": [{ "type": "object" }, { "type": "boolean" }]
-		},
-		"stringMap": {
-			"type": "object",
-			"maxProperties": 4096,
-			"additionalProperties": {
-				"type": "string",
-				"maxLength": 16384
-			}
-		},
-		"stringArray": {
-			"type": "array",
-			"maxItems": 4096,
-			"items": {
-				"type": "string",
-				"maxLength": 16384
-			}
+			"oneOf": [
+				{
+					"type": "object"
+				},
+				{
+					"type": "boolean"
+				}
+			]
 		},
 		"implementation": {
 			"oneOf": [
@@ -89,7 +101,9 @@
 					"additionalProperties": false,
 					"required": ["kind", "function"],
 					"properties": {
-						"kind": { "const": "go" },
+						"kind": {
+							"const": "go"
+						},
 						"function": {
 							"type": "string",
 							"minLength": 1,
@@ -100,84 +114,19 @@
 				{
 					"type": "object",
 					"additionalProperties": false,
-					"required": ["kind", "request", "response"],
+					"required": ["kind", "sdkType", "sdkToolType"],
 					"properties": {
-						"kind": { "const": "http" },
-						"request": {
-							"type": "object",
-							"additionalProperties": false,
-							"required": ["method", "urlTemplate"],
-							"properties": {
-								"method": {
-									"type": "string",
-									"minLength": 1,
-									"maxLength": 32
-								},
-								"urlTemplate": {
-									"type": "string",
-									"minLength": 1,
-									"maxLength": 16384
-								},
-								"headers": { "$ref": "#/$defs/stringMap" },
-								"bodyTemplate": {
-									"type": "string",
-									"maxLength": 4194304
-								}
-							}
+						"kind": {
+							"const": "sdk"
 						},
-						"response": {
-							"type": "object",
-							"additionalProperties": false,
-							"required": ["successCodes", "bodyOutputMode"],
-							"properties": {
-								"successCodes": {
-									"type": "array",
-									"minItems": 1,
-									"maxItems": 128,
-									"items": {
-										"type": "integer",
-										"minimum": 100,
-										"maximum": 599
-									}
-								},
-								"bodyOutputMode": {
-									"enum": ["json", "text", "bytes"]
-								}
-							}
+						"sdkType": {
+							"type": "string",
+							"minLength": 1,
+							"maxLength": 128
+						},
+						"sdkToolType": {
+							"enum": ["function", "custom", "webSearch"]
 						}
-					}
-				},
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["kind", "provider", "operation"],
-					"properties": {
-						"kind": { "const": "sdk" },
-						"provider": {
-							"type": "string",
-							"minLength": 1,
-							"maxLength": 256
-						},
-						"operation": {
-							"type": "string",
-							"minLength": 1,
-							"maxLength": 256
-						}
-					}
-				},
-				{
-					"type": "object",
-					"additionalProperties": false,
-					"required": ["kind", "command"],
-					"properties": {
-						"kind": { "const": "command" },
-						"command": {
-							"type": "string",
-							"minLength": 1,
-							"maxLength": 16384
-						},
-						"args": { "$ref": "#/$defs/stringArray" },
-						"env": { "$ref": "#/$defs/stringMap" }
 					}
 				}
 			]

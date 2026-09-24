@@ -1,0 +1,9 @@
+type: plugin
+name: web
+displayName: Web utilities
+description: Common web helpers to fetch and process pages.
+
+members:
+  - type: tool
+    name: fetchurl
+    scope: builtin

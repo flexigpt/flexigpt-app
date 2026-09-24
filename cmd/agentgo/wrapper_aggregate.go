@@ -25,7 +25,7 @@ import (
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	toolStore "github.com/flexigpt/flexigpt-app/internal/tool/store"
+	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -38,11 +38,11 @@ func init() {
 }
 
 type AggregrateWrapper struct {
-	modelPresetStore *modelpresetStore.ModelPresetStore
-	settingStore     *settingStore.SettingStore
-	toolStore        *toolStore.ToolStore
-	artifactSkills   *skillAggregate.Service
-	providersetAPI   *inferencewrapper.ProviderSetAPI
+	modelPresetStore     *modelpresetStore.ModelPresetStore
+	settingStore         *settingStore.SettingStore
+	toolAggregateService *toolnewAggregate.Service
+	artifactSkills       *skillAggregate.Service
+	providersetAPI       *inferencewrapper.ProviderSetAPI
 
 	appContext          context.Context
 	completionCancelMux sync.Mutex
@@ -54,7 +54,7 @@ func InitAggregrateWrapper(
 	agg *AggregrateWrapper,
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
-	ts *toolStore.ToolStore,
+	ts *toolnewAggregate.Service,
 	artifactSkills *skillAggregate.Service,
 	mr *mcpConnection.MCPRuntimeManager,
 	workspaceAPI workspaceConversation.WorkspaceSource,
@@ -63,7 +63,7 @@ func InitAggregrateWrapper(
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
-	agg.toolStore = ts
+	agg.toolAggregateService = ts
 	agg.modelPresetStore = mps
 	agg.settingStore = ss
 	agg.artifactSkills = artifactSkills
@@ -84,7 +84,7 @@ func InitAggregrateWrapper(
 	)
 
 	p, err := inferencewrapper.NewProviderSetAPI(
-		agg.toolStore,
+		agg.toolAggregateService,
 		agg.modelPresetStore,
 		agg.artifactSkills,
 		bridge,

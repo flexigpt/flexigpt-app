@@ -1,0 +1,12 @@
+type: plugin
+name: exec
+displayName: Command and script execution utilities
+description: Built-in command and script execution helpers.
+
+members:
+  - type: tool
+    name: runscript
+    scope: builtin
+  - type: tool
+    name: shellcommand
+    scope: builtin

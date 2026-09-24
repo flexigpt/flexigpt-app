@@ -7,7 +7,7 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-	toolSpec "github.com/flexigpt/flexigpt-app/internal/tool/spec"
+	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -59,13 +59,14 @@ type CompletionRequestBody struct {
 	//         the InputUnion for this turn.
 	Current conversationSpec.ConversationMessage `json:"current"`
 
-	// ToolStoreChoices is the set of tool-store handles that should be enabled
-	// for *this call*.
+	// ToolSelections is the set of mapped Tool targets that should be enabled
+	// for this call.
 	//
-	// The aggregator always hydrates ToolChoices from tool-store based on this
-	// slice; it does NOT infer tools from History[i].ToolChoices or Current.ToolChoices.
+	// The aggregator always hydrates ToolChoices from Tool Aggregate based on
+	// this slice. It does not infer tools from History[i].ToolChoices or
+	// Current.ToolChoices.
 	// (Those are persisted for UI/analytics only.)
-	ToolStoreChoices []toolSpec.ToolStoreChoice `json:"toolStoreChoices,omitempty"`
+	ToolSelections []toolnewAggregate.ToolSelection `json:"toolSelections,omitempty"`
 
 	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
 	SkillSessionID string                                  `json:"skillSessionID,omitempty"`

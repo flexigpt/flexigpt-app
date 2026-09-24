@@ -270,6 +270,38 @@ func (r *Resolver) resolveArtifact(
 		return nil, err
 	}
 
+	if mapper := r.targetMappers[loaded.declarationType]; mapper != nil {
+		mapped, handled, err := mapper.MapArtifactTarget(
+			ctx,
+			ArtifactTargetRequest{
+				Artifact:   loaded.record.Clone(),
+				Definition: loaded.definition.Clone(),
+				Type:       loaded.declarationType,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if handled {
+			if err := mapped.Validate(); err != nil {
+				return nil, err
+			}
+			if mapped.Type != loaded.declarationType ||
+				mapped.Name != loaded.record.LogicalName {
+				return nil, fmt.Errorf(
+					"%w: mapped target does not match Artifact identity",
+					basespec.ErrInvalid,
+				)
+			}
+			return &ResolvedEntry{
+				Type:              loaded.declarationType,
+				scopeRootID:       loaded.record.RootID,
+				DeclarationOrigin: pointerArtifact(loaded.record),
+				Mapped:            cloneMappedTarget(&mapped),
+			}, nil
+		}
+	}
+
 	node := &ResolvedEntry{
 		Type:              loaded.declarationType,
 		scopeRootID:       loaded.record.RootID,

@@ -42,6 +42,7 @@ func InitMCPWrappers(
 	protection compositionapi.ProtectionAPI,
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
+	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	settingsStore mcpAuthKeyStore,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil ||
@@ -82,6 +83,7 @@ func InitMCPWrappers(
 		mcpPolicy.Baseline(),
 		mcpConsumerAPI.WithLocatorResolvers(locatorResolvers),
 		mcpConsumerAPI.WithFallbackProviders(fallbackProviders),
+		mcpConsumerAPI.WithTargetMappers(targetMappers),
 	)
 	if err != nil {
 		return nil, err

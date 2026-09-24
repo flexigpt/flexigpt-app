@@ -1,0 +1,9 @@
+type: plugin
+name: openaichat
+displayName: OpenAI Chat Completion Tools
+description: Built-in server Tools for OpenAI Chat Completions.
+
+members:
+  - type: tool
+    name: openaichatwebsearch
+    scope: builtin
