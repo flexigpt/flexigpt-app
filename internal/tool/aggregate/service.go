@@ -9,14 +9,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	toolnewRuntime "github.com/flexigpt/flexigpt-app/internal/toolnew/runtime"
-	toolnewConsumerAPI "github.com/flexigpt/flexigpt-app/internal/toolnew/store/consumerapi"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type Service struct {
-	tools   *toolnewConsumerAPI.API
-	runtime *toolnewRuntime.Service
+	tools   *toolConsumerAPI.API
+	runtime *toolRuntime.Service
 }
 
 type InvokeRequest struct {
@@ -26,8 +26,8 @@ type InvokeRequest struct {
 }
 
 func New(
-	tools *toolnewConsumerAPI.API,
-	runtimeService *toolnewRuntime.Service,
+	tools *toolConsumerAPI.API,
+	runtimeService *toolRuntime.Service,
 ) (*Service, error) {
 	if tools == nil || runtimeService == nil {
 		return nil, fmt.Errorf(
@@ -76,14 +76,14 @@ func (s *Service) MapArtifactTarget(
 func (s *Service) ResolveMappedTool(
 	ctx context.Context,
 	target resolve.MappedTarget,
-) (toolnewDomain.ResolvedTool, error) {
+) (toolDomain.ResolvedTool, error) {
 	if s == nil || s.tools == nil {
-		return toolnewDomain.ResolvedTool{}, basespec.ErrClosed
+		return toolDomain.ResolvedTool{}, basespec.ErrClosed
 	}
 
 	value, err := DecodeTarget(target)
 	if err != nil {
-		return toolnewDomain.ResolvedTool{}, err
+		return toolDomain.ResolvedTool{}, err
 	}
 
 	resolved, err := s.tools.ResolveEnabledTool(
@@ -91,7 +91,7 @@ func (s *Service) ResolveMappedTool(
 		value.ToolArtifact,
 	)
 	if err != nil {
-		return toolnewDomain.ResolvedTool{}, err
+		return toolDomain.ResolvedTool{}, err
 	}
 
 	document := resolved.Tool.Document
@@ -99,7 +99,7 @@ func (s *Service) ResolveMappedTool(
 		resolved.Tool.Artifact.LogicalName != value.Name ||
 		string(document.Version) != value.Version ||
 		string(document.Implementation.Kind) != value.Implementation {
-		return toolnewDomain.ResolvedTool{}, fmt.Errorf(
+		return toolDomain.ResolvedTool{}, fmt.Errorf(
 			"%w: mapped Tool target no longer matches its Tool Artifact",
 			basespec.ErrReferenceUnresolved,
 		)
@@ -110,7 +110,7 @@ func (s *Service) ResolveMappedTool(
 func (s *Service) Invoke(
 	ctx context.Context,
 	request InvokeRequest,
-) (*toolnewRuntime.InvokeResponse, error) {
+) (*toolRuntime.InvokeResponse, error) {
 	if s == nil || s.runtime == nil {
 		return nil, basespec.ErrClosed
 	}
@@ -127,7 +127,7 @@ func (s *Service) Invoke(
 		)
 	}
 
-	return s.runtime.Invoke(ctx, toolnewRuntime.InvokeRequest{
+	return s.runtime.Invoke(ctx, toolRuntime.InvokeRequest{
 		Function:  resolved.Tool.Document.Implementation.Function,
 		Args:      request.Args,
 		TimeoutMS: request.TimeoutMS,

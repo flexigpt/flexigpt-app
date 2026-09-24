@@ -7,13 +7,13 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 )
 
 func buildToolChoices(
 	ctx context.Context,
-	tools *toolnewAggregate.Service,
-	selections []toolnewAggregate.ToolSelection,
+	tools *toolAggregate.Service,
+	selections []toolAggregate.ToolSelection,
 ) ([]inferenceSpec.ToolChoice, error) {
 	if len(selections) == 0 {
 		return nil, nil

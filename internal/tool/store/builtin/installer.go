@@ -13,18 +13,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	toolnewConsumerAPI "github.com/flexigpt/flexigpt-app/internal/toolnew/store/consumerapi"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type InstallerDependencies struct {
-	Tools    toolnewConsumerAPI.BuiltinStore
+	Tools    toolConsumerAPI.BuiltinStore
 	Packages fs.FS
-	GoTools  toolnewDomain.GoToolLocator
+	GoTools  toolDomain.GoToolLocator
 }
 
 type Installer struct {
-	tools         toolnewConsumerAPI.BuiltinStore
+	tools         toolConsumerAPI.BuiltinStore
 	rootID        root.RootID
 	sourceID      source.SourceID
 	prepared      []PreparedPackage
@@ -81,7 +81,7 @@ func NewInstaller(
 	slices.Sort(scopes)
 
 	fingerprint, err := topology.HydrationFingerprint(
-		toolnewDomain.HydrationSchemaVersion,
+		toolDomain.HydrationSchemaVersion,
 		topologyValue,
 	)
 	if err != nil {
@@ -99,7 +99,7 @@ func NewInstaller(
 }
 
 func (*Installer) BuiltInName() string {
-	return toolnewDomain.BuiltInInstallerName
+	return toolDomain.BuiltInInstallerName
 }
 
 func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
@@ -216,8 +216,8 @@ func (i *Installer) EnsurePackageHydration(
 		if err != nil {
 			return err
 		}
-		if address.Kind != toolnewDomain.ToolPackageKind &&
-			address.Kind != toolnewDomain.ToolCollectionPackageKind {
+		if address.Kind != toolDomain.ToolPackageKind &&
+			address.Kind != toolDomain.ToolCollectionPackageKind {
 			continue
 		}
 		if err := i.tools.RemoveBuiltInPackage(
@@ -264,7 +264,7 @@ func (i *Installer) installPreparedPackage(
 ) error {
 	return i.tools.InstallBuiltInPackage(
 		ctx,
-		toolnewConsumerAPI.BuiltInPackageInstallRequest{
+		toolConsumerAPI.BuiltInPackageInstallRequest{
 			RootID:              i.rootID,
 			SourceID:            i.sourceID,
 			Package:             value.Address,

@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -48,8 +48,8 @@ type ConversationMessage struct {
 
 	// Tool choices that were *available* when this turn ran.
 	// For the next completion, the app can choose to reuse or override these.
-	ToolChoices    []inferenceSpec.ToolChoice       `json:"toolChoices,omitempty"`
-	ToolSelections []toolnewAggregate.ToolSelection `json:"toolSelections,omitempty"`
+	ToolChoices    []inferenceSpec.ToolChoice    `json:"toolChoices,omitempty"`
+	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
 
 	MCPContext           *mcpConversation.MCPConversationContext    `json:"mcpContext,omitempty"`
 	MCPToolMappings      []mcpConversation.MCPProviderToolMapping   `json:"mcpToolMappings,omitempty"`

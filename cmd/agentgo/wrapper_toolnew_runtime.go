@@ -6,17 +6,17 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	"github.com/flexigpt/flexigpt-app/internal/toolnew/llmtoolsadapter"
-	toolnewRuntime "github.com/flexigpt/flexigpt-app/internal/toolnew/runtime"
+	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
+	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
 
-type ToolNewRuntimeWrapper struct {
+type ToolRuntimeWrapper struct {
 	adapter *llmtoolsadapter.Adapter
-	service *toolnewRuntime.Service
+	service *toolRuntime.Service
 }
 
-func InitToolNewRuntimeWrapper(
-	wrapper *ToolNewRuntimeWrapper,
+func InitToolRuntimeWrapper(
+	wrapper *ToolRuntimeWrapper,
 ) error {
 	if wrapper == nil {
 		return errors.New("tool runtime wrapper is required")
@@ -27,7 +27,7 @@ func InitToolNewRuntimeWrapper(
 		return err
 	}
 
-	service, err := toolnewRuntime.New(adapter)
+	service, err := toolRuntime.New(adapter)
 	if err != nil {
 		return err
 	}
@@ -37,9 +37,9 @@ func InitToolNewRuntimeWrapper(
 	return nil
 }
 
-func withToolNewRuntime[T any](
-	w *ToolNewRuntimeWrapper,
-	fn func(*toolnewRuntime.Service) (T, error),
+func withToolRuntime[T any](
+	w *ToolRuntimeWrapper,
+	fn func(*toolRuntime.Service) (T, error),
 ) (T, error) {
 	return middleware.WithRecoveryResp(func() (T, error) {
 		var zero T
@@ -51,15 +51,15 @@ func withToolNewRuntime[T any](
 }
 
 // InvokeTool is the low-level runtime endpoint. Normal frontend flows should
-// usually call ToolNewAggregateWrapper.InvokeMappedTool so artifact identity
+// usually call ToolAggregateWrapper.InvokeMappedTool so artifact identity
 // and enablement are resolved before execution.
-func (w *ToolNewRuntimeWrapper) InvokeTool(
-	request *toolnewRuntime.InvokeRequest,
-) (*toolnewRuntime.InvokeResponse, error) {
-	return withToolNewRuntime(
+func (w *ToolRuntimeWrapper) InvokeTool(
+	request *toolRuntime.InvokeRequest,
+) (*toolRuntime.InvokeResponse, error) {
+	return withToolRuntime(
 		w,
-		func(service *toolnewRuntime.Service) (
-			*toolnewRuntime.InvokeResponse,
+		func(service *toolRuntime.Service) (
+			*toolRuntime.InvokeResponse,
 			error,
 		) {
 			if request == nil {
@@ -73,7 +73,7 @@ func (w *ToolNewRuntimeWrapper) InvokeTool(
 // goToolLocator exposes the adapter only to application composition. It is
 // intentionally unexported so Wails does not generate a frontend endpoint for
 // the internal Go-tool registry.
-func (w *ToolNewRuntimeWrapper) goToolLocator() (
+func (w *ToolRuntimeWrapper) goToolLocator() (
 	*llmtoolsadapter.Adapter,
 	error,
 ) {
@@ -83,7 +83,7 @@ func (w *ToolNewRuntimeWrapper) goToolLocator() (
 	return w.adapter, nil
 }
 
-func (w *ToolNewRuntimeWrapper) close() {
+func (w *ToolRuntimeWrapper) close() {
 	if w == nil {
 		return
 	}

@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 func (a *API) installBuiltInPackage(
@@ -36,9 +36,9 @@ func (a *API) installBuiltInPackage(
 	}
 
 	switch request.ExpectedKind {
-	case toolnewDomain.ToolArtifactKind:
-		if request.Package.Kind != toolnewDomain.ToolPackageKind ||
-			request.DocumentFile != toolnewDomain.ToolDocumentFile() {
+	case toolDomain.ToolArtifactKind:
+		if request.Package.Kind != toolDomain.ToolPackageKind ||
+			request.DocumentFile != toolDomain.ToolDocumentFile() {
 			return fmt.Errorf(
 				"%w: built-in Tool package has invalid kind or document file",
 				basespec.ErrInvalid,
@@ -46,8 +46,8 @@ func (a *API) installBuiltInPackage(
 		}
 
 	case artifact.ArtifactKind(pluginv1.PluginType):
-		if request.Package.Kind != toolnewDomain.ToolCollectionPackageKind ||
-			request.DocumentFile != toolnewDomain.ToolCollectionDocumentFile() {
+		if request.Package.Kind != toolDomain.ToolCollectionPackageKind ||
+			request.DocumentFile != toolDomain.ToolCollectionDocumentFile() {
 			return fmt.Errorf(
 				"%w: built-in Tool Collection package has invalid kind or document file",
 				basespec.ErrInvalid,
@@ -91,7 +91,7 @@ func (a *API) installBuiltInPackage(
 	}
 
 	switch request.ExpectedKind {
-	case toolnewDomain.ToolArtifactKind:
+	case toolDomain.ToolArtifactKind:
 		_, err = a.GetTool(ctx, published.Artifact.Ref())
 	case artifact.ArtifactKind(pluginv1.PluginType):
 		_, err = a.GetToolCollection(ctx, published.Artifact.Ref())
@@ -117,8 +117,8 @@ func (a *API) removeBuiltInPackage(
 	if err := address.Validate(); err != nil {
 		return err
 	}
-	if address.Kind != toolnewDomain.ToolPackageKind &&
-		address.Kind != toolnewDomain.ToolCollectionPackageKind {
+	if address.Kind != toolDomain.ToolPackageKind &&
+		address.Kind != toolDomain.ToolCollectionPackageKind {
 		return fmt.Errorf(
 			"%w: package kind %q is not owned by Tool Store",
 			basespec.ErrInvalid,

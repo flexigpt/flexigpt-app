@@ -25,7 +25,7 @@ import (
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -40,7 +40,7 @@ func init() {
 type AggregrateWrapper struct {
 	modelPresetStore     *modelpresetStore.ModelPresetStore
 	settingStore         *settingStore.SettingStore
-	toolAggregateService *toolnewAggregate.Service
+	toolAggregateService *toolAggregate.Service
 	artifactSkills       *skillAggregate.Service
 	providersetAPI       *inferencewrapper.ProviderSetAPI
 
@@ -54,7 +54,7 @@ func InitAggregrateWrapper(
 	agg *AggregrateWrapper,
 	mps *modelpresetStore.ModelPresetStore,
 	ss *settingStore.SettingStore,
-	ts *toolnewAggregate.Service,
+	ts *toolAggregate.Service,
 	artifactSkills *skillAggregate.Service,
 	mr *mcpConnection.MCPRuntimeManager,
 	workspaceAPI workspaceConversation.WorkspaceSource,

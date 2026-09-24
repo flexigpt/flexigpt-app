@@ -10,23 +10,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	toolnewBuiltin "github.com/flexigpt/flexigpt-app/internal/toolnew/store/builtin"
-	toolnewConsumerAPI "github.com/flexigpt/flexigpt-app/internal/toolnew/store/consumerapi"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
-type ToolNewStoreWrapper struct {
-	api *toolnewConsumerAPI.API
+type ToolStoreWrapper struct {
+	api *toolConsumerAPI.API
 }
 
-func InitToolNewStoreWrapper(
-	wrapper *ToolNewStoreWrapper,
+func InitToolStoreWrapper(
+	wrapper *ToolStoreWrapper,
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
-	goTools toolnewDomain.GoToolLocator,
+	goTools toolDomain.GoToolLocator,
 ) error {
 	if wrapper == nil ||
 		sources == nil ||
@@ -38,7 +38,7 @@ func InitToolNewStoreWrapper(
 		return errors.New("tool store wrapper dependencies are incomplete")
 	}
 
-	api, err := toolnewConsumerAPI.New(
+	api, err := toolConsumerAPI.New(
 		sources,
 		discovery,
 		artifacts,
@@ -55,9 +55,9 @@ func InitToolNewStoreWrapper(
 	return nil
 }
 
-func NewToolNewBuiltInInstaller(
-	storeWrapper *ToolNewStoreWrapper,
-	goTools toolnewDomain.GoToolLocator,
+func NewToolBuiltInInstaller(
+	storeWrapper *ToolStoreWrapper,
+	goTools toolDomain.GoToolLocator,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || storeWrapper.api == nil {
 		return nil, basespec.ErrClosed
@@ -66,7 +66,7 @@ func NewToolNewBuiltInInstaller(
 		return nil, errors.New("tool built-in installer Go Tool locator is required")
 	}
 
-	tools, err := toolnewConsumerAPI.NewBuiltinStore(storeWrapper.api)
+	tools, err := toolConsumerAPI.NewBuiltinStore(storeWrapper.api)
 	if err != nil {
 		return nil, err
 	}
@@ -76,8 +76,8 @@ func NewToolNewBuiltInInstaller(
 		return nil, err
 	}
 
-	return toolnewBuiltin.NewInstaller(
-		toolnewBuiltin.InstallerDependencies{
+	return toolBuiltin.NewInstaller(
+		toolBuiltin.InstallerDependencies{
 			Tools:    tools,
 			Packages: packages,
 			GoTools:  goTools,
@@ -85,9 +85,9 @@ func NewToolNewBuiltInInstaller(
 	)
 }
 
-func withToolNewStore[T any](
-	w *ToolNewStoreWrapper,
-	fn func(*toolnewConsumerAPI.API) (T, error),
+func withToolStore[T any](
+	w *ToolStoreWrapper,
+	fn func(*toolConsumerAPI.API) (T, error),
 ) (T, error) {
 	return middleware.WithRecoveryResp(func() (T, error) {
 		var zero T
@@ -98,14 +98,14 @@ func withToolNewStore[T any](
 	})
 }
 
-func (w *ToolNewStoreWrapper) ListToolCollections() (
-	[]toolnewDomain.ToolCollection,
+func (w *ToolStoreWrapper) ListToolCollections() (
+	[]toolDomain.ToolCollection,
 	error,
 ) {
-	return withToolNewStore(
+	return withToolStore(
 		w,
-		func(api *toolnewConsumerAPI.API) (
-			[]toolnewDomain.ToolCollection,
+		func(api *toolConsumerAPI.API) (
+			[]toolDomain.ToolCollection,
 			error,
 		) {
 			return api.ListToolCollections(context.Background())
@@ -113,13 +113,13 @@ func (w *ToolNewStoreWrapper) ListToolCollections() (
 	)
 }
 
-func (w *ToolNewStoreWrapper) GetToolCollection(
+func (w *ToolStoreWrapper) GetToolCollection(
 	ref artifact.ArtifactRef,
-) (toolnewDomain.ToolCollection, error) {
-	return withToolNewStore(
+) (toolDomain.ToolCollection, error) {
+	return withToolStore(
 		w,
-		func(api *toolnewConsumerAPI.API) (
-			toolnewDomain.ToolCollection,
+		func(api *toolConsumerAPI.API) (
+			toolDomain.ToolCollection,
 			error,
 		) {
 			return api.GetToolCollection(context.Background(), ref)
@@ -127,25 +127,25 @@ func (w *ToolNewStoreWrapper) GetToolCollection(
 	)
 }
 
-func (w *ToolNewStoreWrapper) ListCollectionTools(
+func (w *ToolStoreWrapper) ListCollectionTools(
 	ref artifact.ArtifactRef,
-) ([]toolnewDomain.Tool, error) {
-	return withToolNewStore(
+) ([]toolDomain.Tool, error) {
+	return withToolStore(
 		w,
-		func(api *toolnewConsumerAPI.API) ([]toolnewDomain.Tool, error) {
+		func(api *toolConsumerAPI.API) ([]toolDomain.Tool, error) {
 			return api.ListTools(context.Background(), ref)
 		},
 	)
 }
 
-func (w *ToolNewStoreWrapper) SetToolEnabled(
+func (w *ToolStoreWrapper) SetToolEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolnewDomain.Tool, error) {
-	return withToolNewStore(
+) (toolDomain.Tool, error) {
+	return withToolStore(
 		w,
-		func(api *toolnewConsumerAPI.API) (toolnewDomain.Tool, error) {
+		func(api *toolConsumerAPI.API) (toolDomain.Tool, error) {
 			return api.SetToolEnabled(
 				context.Background(),
 				ref,
@@ -156,15 +156,15 @@ func (w *ToolNewStoreWrapper) SetToolEnabled(
 	)
 }
 
-func (w *ToolNewStoreWrapper) SetToolCollectionEnabled(
+func (w *ToolStoreWrapper) SetToolCollectionEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolnewDomain.ToolCollection, error) {
-	return withToolNewStore(
+) (toolDomain.ToolCollection, error) {
+	return withToolStore(
 		w,
-		func(api *toolnewConsumerAPI.API) (
-			toolnewDomain.ToolCollection,
+		func(api *toolConsumerAPI.API) (
+			toolDomain.ToolCollection,
 			error,
 		) {
 			return api.SetToolCollectionEnabled(
@@ -177,7 +177,7 @@ func (w *ToolNewStoreWrapper) SetToolCollectionEnabled(
 	)
 }
 
-func (w *ToolNewStoreWrapper) close() {
+func (w *ToolStoreWrapper) close() {
 	if w == nil {
 		return
 	}

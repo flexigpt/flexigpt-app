@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -33,7 +33,7 @@ type PreparedPackage struct {
 func PreparePackages(
 	ctx context.Context,
 	packages fs.FS,
-	goTools toolnewDomain.GoToolLocator,
+	goTools toolDomain.GoToolLocator,
 ) ([]PreparedPackage, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -80,11 +80,11 @@ func prepareCollectionDirectory(
 	ctx context.Context,
 	packages fs.FS,
 	collectionRoot basespec.Locator,
-	goTools toolnewDomain.GoToolLocator,
+	goTools toolDomain.GoToolLocator,
 	seenTools map[basespec.LogicalName]basespec.Locator,
 ) ([]PreparedPackage, error) {
 	pluginLocation := string(collectionRoot) + "/" +
-		string(toolnewDomain.ToolCollectionDocumentFile())
+		string(toolDomain.ToolCollectionDocumentFile())
 	pluginBytes, err := fs.ReadFile(packages, pluginLocation)
 	if err != nil {
 		return nil, fmt.Errorf(
@@ -109,7 +109,7 @@ func prepareCollectionDirectory(
 	if err != nil {
 		return nil, err
 	}
-	toolNames, err := toolnewDomain.ValidateToolCollectionDocument(
+	toolNames, err := toolDomain.ValidateToolCollectionDocument(
 		pluginDocument,
 	)
 	if err != nil {
@@ -201,7 +201,7 @@ func readStaticSDKTools(
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		if entry.Name() == string(toolnewDomain.ToolCollectionDocumentFile()) {
+		if entry.Name() == string(toolDomain.ToolCollectionDocumentFile()) {
 			continue
 		}
 		if !entry.IsDir() {
@@ -214,7 +214,7 @@ func readStaticSDKTools(
 		}
 
 		location := string(collectionRoot) + "/" + entry.Name() +
-			"/" + string(toolnewDomain.ToolDocumentFile())
+			"/" + string(toolDomain.ToolDocumentFile())
 		rawDocument, err := fs.ReadFile(packages, location)
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -270,7 +270,7 @@ func readStaticSDKTools(
 }
 
 func toolDocumentFromGoDescriptor(
-	value toolnewDomain.GoToolDescriptor,
+	value toolDomain.GoToolDescriptor,
 ) toolv1.ToolDocument {
 	return toolv1.ToolDocument{
 		Type:        toolv1.ToolType,
@@ -307,7 +307,7 @@ func prepareCollectionPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	address, err := toolnewDomain.ToolCollectionPackageAddress(
+	address, err := toolDomain.ToolCollectionPackageAddress(
 		basespec.LogicalName(document.Name),
 	)
 	if err != nil {
@@ -317,9 +317,9 @@ func prepareCollectionPackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: packageRoot,
 		Address:             address,
-		DocumentFile:        toolnewDomain.ToolCollectionDocumentFile(),
+		DocumentFile:        toolDomain.ToolCollectionDocumentFile(),
 		PackageFiles: []source.ManagedPackageFile{{
-			Locator: toolnewDomain.ToolCollectionDocumentFile(),
+			Locator: toolDomain.ToolCollectionDocumentFile(),
 			Content: raw,
 		}},
 		ExpectedKind: artifact.ArtifactKind(
@@ -349,7 +349,7 @@ func prepareToolPackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	address, err := toolnewDomain.ToolPackageAddress(
+	address, err := toolDomain.ToolPackageAddress(
 		basespec.LogicalName(document.Name),
 		document.Version,
 	)
@@ -360,12 +360,12 @@ func prepareToolPackage(
 	return PreparedPackage{
 		EmbeddedPackageRoot: collectionRoot,
 		Address:             address,
-		DocumentFile:        toolnewDomain.ToolDocumentFile(),
+		DocumentFile:        toolDomain.ToolDocumentFile(),
 		PackageFiles: []source.ManagedPackageFile{{
-			Locator: toolnewDomain.ToolDocumentFile(),
+			Locator: toolDomain.ToolDocumentFile(),
 			Content: raw,
 		}},
-		ExpectedKind:        toolnewDomain.ToolArtifactKind,
+		ExpectedKind:        toolDomain.ToolArtifactKind,
 		ExpectedLogicalName: basespec.LogicalName(document.Name),
 		ExpectedDefinition:  definitionValue.Digest,
 	}, nil

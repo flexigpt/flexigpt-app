@@ -10,19 +10,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
-	toolnewRuntime "github.com/flexigpt/flexigpt-app/internal/toolnew/runtime"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
+	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
-type ToolNewAggregateWrapper struct {
-	service *toolnewAggregate.Service
+type ToolAggregateWrapper struct {
+	service *toolAggregate.Service
 }
 
-func InitToolNewAggregateWrapper(
-	wrapper *ToolNewAggregateWrapper,
-	storeWrapper *ToolNewStoreWrapper,
-	runtimeWrapper *ToolNewRuntimeWrapper,
+func InitToolAggregateWrapper(
+	wrapper *ToolAggregateWrapper,
+	storeWrapper *ToolStoreWrapper,
+	runtimeWrapper *ToolRuntimeWrapper,
 ) error {
 	if wrapper == nil ||
 		storeWrapper == nil ||
@@ -33,7 +33,7 @@ func InitToolNewAggregateWrapper(
 		return basespec.ErrClosed
 	}
 
-	service, err := toolnewAggregate.New(
+	service, err := toolAggregate.New(
 		storeWrapper.api,
 		runtimeWrapper.service,
 	)
@@ -45,9 +45,9 @@ func InitToolNewAggregateWrapper(
 	return nil
 }
 
-func withToolNewAggregate[T any](
-	w *ToolNewAggregateWrapper,
-	fn func(*toolnewAggregate.Service) (T, error),
+func withToolAggregate[T any](
+	w *ToolAggregateWrapper,
+	fn func(*toolAggregate.Service) (T, error),
 ) (T, error) {
 	return middleware.WithRecoveryResp(func() (T, error) {
 		var zero T
@@ -58,13 +58,13 @@ func withToolNewAggregate[T any](
 	})
 }
 
-func (w *ToolNewAggregateWrapper) ResolveMappedTool(
+func (w *ToolAggregateWrapper) ResolveMappedTool(
 	target resolve.MappedTarget,
-) (toolnewDomain.ResolvedTool, error) {
-	return withToolNewAggregate(
+) (toolDomain.ResolvedTool, error) {
+	return withToolAggregate(
 		w,
-		func(service *toolnewAggregate.Service) (
-			toolnewDomain.ResolvedTool,
+		func(service *toolAggregate.Service) (
+			toolDomain.ResolvedTool,
 			error,
 		) {
 			return service.ResolveMappedTool(
@@ -75,13 +75,13 @@ func (w *ToolNewAggregateWrapper) ResolveMappedTool(
 	)
 }
 
-func (w *ToolNewAggregateWrapper) InvokeMappedTool(
-	request toolnewAggregate.InvokeRequest,
-) (*toolnewRuntime.InvokeResponse, error) {
-	return withToolNewAggregate(
+func (w *ToolAggregateWrapper) InvokeMappedTool(
+	request toolAggregate.InvokeRequest,
+) (*toolRuntime.InvokeResponse, error) {
+	return withToolAggregate(
 		w,
-		func(service *toolnewAggregate.Service) (
-			*toolnewRuntime.InvokeResponse,
+		func(service *toolAggregate.Service) (
+			*toolRuntime.InvokeResponse,
 			error,
 		) {
 			return service.Invoke(context.Background(), request)
@@ -89,12 +89,12 @@ func (w *ToolNewAggregateWrapper) InvokeMappedTool(
 	)
 }
 
-func (w *ToolNewAggregateWrapper) HydrateInferenceToolChoice(
-	selection toolnewAggregate.ToolSelection,
+func (w *ToolAggregateWrapper) HydrateInferenceToolChoice(
+	selection toolAggregate.ToolSelection,
 ) (inferenceSpec.ToolChoice, error) {
-	return withToolNewAggregate(
+	return withToolAggregate(
 		w,
-		func(service *toolnewAggregate.Service) (
+		func(service *toolAggregate.Service) (
 			inferenceSpec.ToolChoice,
 			error,
 		) {
@@ -106,7 +106,7 @@ func (w *ToolNewAggregateWrapper) HydrateInferenceToolChoice(
 	)
 }
 
-func (w *ToolNewAggregateWrapper) ready() error {
+func (w *ToolAggregateWrapper) ready() error {
 	if w == nil || w.service == nil {
 		return basespec.ErrClosed
 	}
@@ -116,7 +116,7 @@ func (w *ToolNewAggregateWrapper) ready() error {
 // targetMappers is composition-only. The aggregate owns ArtifactRef to mapped
 // target translation because it resolves enabled Tool Artifacts and their
 // containing Tool Collections.
-func (w *ToolNewAggregateWrapper) targetMappers() (
+func (w *ToolAggregateWrapper) targetMappers() (
 	map[declaration.Type]resolve.ArtifactTargetMapper,
 	error,
 ) {
@@ -129,7 +129,7 @@ func (w *ToolNewAggregateWrapper) targetMappers() (
 	}, nil
 }
 
-func (w *ToolNewAggregateWrapper) close() {
+func (w *ToolAggregateWrapper) close() {
 	if w == nil {
 		return
 	}

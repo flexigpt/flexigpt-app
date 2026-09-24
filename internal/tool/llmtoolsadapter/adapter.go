@@ -13,7 +13,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 var nonAutoGoFunctions = map[string]struct{}{
@@ -37,8 +37,8 @@ var nonAutoGoFunctions = map[string]struct{}{
 
 type Adapter struct {
 	registry   *llmtools.Registry
-	byFunction map[string]toolnewDomain.GoToolDescriptor
-	byName     map[basespec.LogicalName]toolnewDomain.GoToolDescriptor
+	byFunction map[string]toolDomain.GoToolDescriptor
+	byName     map[basespec.LogicalName]toolDomain.GoToolDescriptor
 }
 
 func New() (*Adapter, error) {
@@ -51,11 +51,11 @@ func New() (*Adapter, error) {
 	}
 
 	byFunction := make(
-		map[string]toolnewDomain.GoToolDescriptor,
+		map[string]toolDomain.GoToolDescriptor,
 		len(registry.Tools()),
 	)
 	byName := make(
-		map[basespec.LogicalName]toolnewDomain.GoToolDescriptor,
+		map[basespec.LogicalName]toolDomain.GoToolDescriptor,
 		len(registry.Tools()),
 	)
 
@@ -93,23 +93,23 @@ func New() (*Adapter, error) {
 func (a *Adapter) LookupGoTool(
 	ctx context.Context,
 	function string,
-) (toolnewDomain.GoToolDescriptor, error) {
+) (toolDomain.GoToolDescriptor, error) {
 	if a == nil || a.registry == nil {
-		return toolnewDomain.GoToolDescriptor{}, basespec.ErrClosed
+		return toolDomain.GoToolDescriptor{}, basespec.ErrClosed
 	}
 	if ctx == nil {
-		return toolnewDomain.GoToolDescriptor{}, fmt.Errorf(
+		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool lookup context is nil",
 			basespec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return toolnewDomain.GoToolDescriptor{}, err
+		return toolDomain.GoToolDescriptor{}, err
 	}
 
 	function = strings.TrimSpace(function)
 	if function == "" {
-		return toolnewDomain.GoToolDescriptor{}, fmt.Errorf(
+		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool function is required",
 			basespec.ErrInvalid,
 		)
@@ -117,7 +117,7 @@ func (a *Adapter) LookupGoTool(
 
 	value, found := a.byFunction[function]
 	if !found {
-		return toolnewDomain.GoToolDescriptor{}, fmt.Errorf(
+		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool function %q is not registered",
 			basespec.ErrReferenceUnresolved,
 			function,
@@ -129,20 +129,20 @@ func (a *Adapter) LookupGoTool(
 func (a *Adapter) LookupGoToolByName(
 	ctx context.Context,
 	name basespec.LogicalName,
-) (toolnewDomain.GoToolDescriptor, error) {
+) (toolDomain.GoToolDescriptor, error) {
 	if a == nil || a.registry == nil {
-		return toolnewDomain.GoToolDescriptor{}, basespec.ErrClosed
+		return toolDomain.GoToolDescriptor{}, basespec.ErrClosed
 	}
 	if err := name.Validate(); err != nil {
-		return toolnewDomain.GoToolDescriptor{}, err
+		return toolDomain.GoToolDescriptor{}, err
 	}
 	if err := ctx.Err(); err != nil {
-		return toolnewDomain.GoToolDescriptor{}, err
+		return toolDomain.GoToolDescriptor{}, err
 	}
 
 	value, found := a.byName[name]
 	if !found {
-		return toolnewDomain.GoToolDescriptor{}, fmt.Errorf(
+		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
 			"%w: Go Tool %q is not registered",
 			basespec.ErrReferenceUnresolved,
 			name,
@@ -180,11 +180,11 @@ func (a *Adapter) CallGoTool(
 
 func descriptorFor(
 	value llmtoolsSpec.Tool,
-) (toolnewDomain.GoToolDescriptor, error) {
+) (toolDomain.GoToolDescriptor, error) {
 	function := strings.TrimSpace(string(value.GoImpl.FuncID))
 	_, manual := nonAutoGoFunctions[function]
 
-	descriptor := toolnewDomain.GoToolDescriptor{
+	descriptor := toolDomain.GoToolDescriptor{
 		Function:    function,
 		Name:        basespec.LogicalName(value.Slug),
 		Version:     basespec.LogicalVersion(value.Version),
@@ -195,14 +195,14 @@ func descriptorFor(
 		InputSchema: append(json.RawMessage(nil), value.ArgSchema...),
 	}
 	if err := descriptor.Validate(); err != nil {
-		return toolnewDomain.GoToolDescriptor{}, err
+		return toolDomain.GoToolDescriptor{}, err
 	}
 	return descriptor, nil
 }
 
 func cloneDescriptor(
-	value toolnewDomain.GoToolDescriptor,
-) toolnewDomain.GoToolDescriptor {
+	value toolDomain.GoToolDescriptor,
+) toolDomain.GoToolDescriptor {
 	output := value
 	output.Tags = append([]string(nil), value.Tags...)
 	output.InputSchema = append(
@@ -212,13 +212,13 @@ func cloneDescriptor(
 	return output
 }
 
-func (a *Adapter) GoTools() []toolnewDomain.GoToolDescriptor {
+func (a *Adapter) GoTools() []toolDomain.GoToolDescriptor {
 	if a == nil {
 		return nil
 	}
 
 	output := make(
-		[]toolnewDomain.GoToolDescriptor,
+		[]toolDomain.GoToolDescriptor,
 		0,
 		len(a.byFunction),
 	)

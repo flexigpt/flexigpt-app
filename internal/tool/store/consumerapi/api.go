@@ -15,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type API struct {
@@ -26,7 +26,7 @@ type API struct {
 	protection       compositionapi.ProtectionAPI
 
 	builtinRoot root.RootID
-	goTools     toolnewDomain.GoToolLocator
+	goTools     toolDomain.GoToolLocator
 }
 
 func New(
@@ -36,7 +36,7 @@ func New(
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	builtinRoot root.RootID,
-	goTools toolnewDomain.GoToolLocator,
+	goTools toolDomain.GoToolLocator,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
@@ -73,7 +73,7 @@ func New(
 
 func (a *API) ListToolCollections(
 	ctx context.Context,
-) ([]toolnewDomain.ToolCollection, error) {
+) ([]toolDomain.ToolCollection, error) {
 	if a == nil {
 		return nil, basespec.ErrClosed
 	}
@@ -83,7 +83,7 @@ func (a *API) ListToolCollections(
 		return nil, err
 	}
 
-	output := make([]toolnewDomain.ToolCollection, 0)
+	output := make([]toolDomain.ToolCollection, 0)
 	for _, record := range records {
 		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
 			record.State != artifact.StateAvailable {
@@ -97,11 +97,11 @@ func (a *API) ListToolCollections(
 		if err != nil {
 			return nil, err
 		}
-		collection, err := toolnewDomain.DecodeToolCollection(
+		collection, err := toolDomain.DecodeToolCollection(
 			record,
 			definitionValue,
 		)
-		if errors.Is(err, toolnewDomain.ErrNotToolCollection) {
+		if errors.Is(err, toolDomain.ErrNotToolCollection) {
 			continue
 		}
 		if err != nil {
@@ -124,35 +124,35 @@ func (a *API) ListToolCollections(
 func (a *API) GetToolCollection(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (toolnewDomain.ToolCollection, error) {
+) (toolDomain.ToolCollection, error) {
 	if a == nil {
-		return toolnewDomain.ToolCollection{}, basespec.ErrClosed
+		return toolDomain.ToolCollection{}, basespec.ErrClosed
 	}
 	if err := a.requireBuiltinRef(ref); err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
 
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
-	return toolnewDomain.DecodeToolCollection(record, definitionValue)
+	return toolDomain.DecodeToolCollection(record, definitionValue)
 }
 
 func (a *API) ListTools(
 	ctx context.Context,
 	collectionRef artifact.ArtifactRef,
-) ([]toolnewDomain.Tool, error) {
+) ([]toolDomain.Tool, error) {
 	collection, err := a.GetToolCollection(ctx, collectionRef)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]toolnewDomain.Tool, 0, len(collection.ToolNames))
+	output := make([]toolDomain.Tool, 0, len(collection.ToolNames))
 	for _, name := range collection.ToolNames {
 		tool, err := a.toolByName(ctx, name)
 		if err != nil {
@@ -170,25 +170,25 @@ func (a *API) ListTools(
 func (a *API) GetTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (toolnewDomain.Tool, error) {
+) (toolDomain.Tool, error) {
 	if a == nil {
-		return toolnewDomain.Tool{}, basespec.ErrClosed
+		return toolDomain.Tool{}, basespec.ErrClosed
 	}
 	if err := a.requireBuiltinRef(ref); err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
-	tool, err := toolnewDomain.DecodeTool(record, definitionValue)
+	tool, err := toolDomain.DecodeTool(record, definitionValue)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 	return tool, a.validateGoTool(ctx, tool)
 }
@@ -196,10 +196,10 @@ func (a *API) GetTool(
 func (a *API) ResolveEnabledTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (toolnewDomain.ResolvedTool, error) {
+) (toolDomain.ResolvedTool, error) {
 	tool, err := a.GetTool(ctx, ref)
 	if err != nil {
-		return toolnewDomain.ResolvedTool{}, err
+		return toolDomain.ResolvedTool{}, err
 	}
 	return a.resolveEnabledTool(ctx, tool)
 }
@@ -209,9 +209,9 @@ func (a *API) SetToolEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolnewDomain.Tool, error) {
+) (toolDomain.Tool, error) {
 	if expectedRevision == 0 {
-		return toolnewDomain.Tool{}, fmt.Errorf(
+		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: expected Tool revision is required",
 			basespec.ErrInvalid,
 		)
@@ -219,10 +219,10 @@ func (a *API) SetToolEnabled(
 
 	tool, err := a.GetTool(ctx, ref)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 	if tool.Artifact.Revision != expectedRevision {
-		return toolnewDomain.Tool{}, basespec.ErrConflict
+		return toolDomain.Tool{}, basespec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -232,7 +232,7 @@ func (a *API) SetToolEnabled(
 		enabled,
 	)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 	tool.Artifact = updated.Clone()
 	return tool, nil
@@ -243,9 +243,9 @@ func (a *API) SetToolCollectionEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolnewDomain.ToolCollection, error) {
+) (toolDomain.ToolCollection, error) {
 	if expectedRevision == 0 {
-		return toolnewDomain.ToolCollection{}, fmt.Errorf(
+		return toolDomain.ToolCollection{}, fmt.Errorf(
 			"%w: expected Tool Collection revision is required",
 			basespec.ErrInvalid,
 		)
@@ -253,10 +253,10 @@ func (a *API) SetToolCollectionEnabled(
 
 	collection, err := a.GetToolCollection(ctx, ref)
 	if err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
 	if collection.Artifact.Revision != expectedRevision {
-		return toolnewDomain.ToolCollection{}, basespec.ErrConflict
+		return toolDomain.ToolCollection{}, basespec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -266,7 +266,7 @@ func (a *API) SetToolCollectionEnabled(
 		enabled,
 	)
 	if err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
 	collection.Artifact = updated.Clone()
 	return collection, nil
@@ -274,22 +274,22 @@ func (a *API) SetToolCollectionEnabled(
 
 func (a *API) resolveEnabledTool(
 	ctx context.Context,
-	tool toolnewDomain.Tool,
-) (toolnewDomain.ResolvedTool, error) {
+	tool toolDomain.Tool,
+) (toolDomain.ResolvedTool, error) {
 	collection, err := a.collectionForTool(
 		ctx,
 		tool.Artifact.LogicalName,
 	)
 	if err != nil {
-		return toolnewDomain.ResolvedTool{}, err
+		return toolDomain.ResolvedTool{}, err
 	}
 
-	resolved := toolnewDomain.ResolvedTool{
+	resolved := toolDomain.ResolvedTool{
 		Tool:       tool,
 		Collection: collection,
 	}
 	if !resolved.Enabled() {
-		return toolnewDomain.ResolvedTool{}, fmt.Errorf(
+		return toolDomain.ResolvedTool{}, fmt.Errorf(
 			"%w: Tool %q is disabled",
 			basespec.ErrReferenceUnresolved,
 			tool.Artifact.LogicalName,
@@ -301,18 +301,18 @@ func (a *API) resolveEnabledTool(
 func (a *API) toolByName(
 	ctx context.Context,
 	name basespec.LogicalName,
-) (toolnewDomain.Tool, error) {
+) (toolDomain.Tool, error) {
 	records, err := a.artifacts.FindByIdentity(
 		ctx,
 		a.builtinRoot,
-		toolnewDomain.ToolArtifactKind,
+		toolDomain.ToolArtifactKind,
 		name,
 	)
 	if err != nil {
-		return toolnewDomain.Tool{}, err
+		return toolDomain.Tool{}, err
 	}
 
-	candidates := make([]toolnewDomain.Tool, 0, len(records))
+	candidates := make([]toolDomain.Tool, 0, len(records))
 	for _, record := range records {
 		if record.State != artifact.StateAvailable {
 			continue
@@ -322,21 +322,21 @@ func (a *API) toolByName(
 			record.Ref(),
 		)
 		if err != nil {
-			return toolnewDomain.Tool{}, err
+			return toolDomain.Tool{}, err
 		}
-		tool, err := toolnewDomain.DecodeTool(record, definitionValue)
+		tool, err := toolDomain.DecodeTool(record, definitionValue)
 		if err != nil {
-			return toolnewDomain.Tool{}, err
+			return toolDomain.Tool{}, err
 		}
 		if err := a.validateGoTool(ctx, tool); err != nil {
-			return toolnewDomain.Tool{}, err
+			return toolDomain.Tool{}, err
 		}
 		candidates = append(candidates, tool)
 	}
 
 	switch len(candidates) {
 	case 0:
-		return toolnewDomain.Tool{}, fmt.Errorf(
+		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: built-in Tool %q is unavailable",
 			basespec.ErrReferenceUnresolved,
 			name,
@@ -344,7 +344,7 @@ func (a *API) toolByName(
 	case 1:
 		return candidates[0], nil
 	default:
-		return toolnewDomain.Tool{}, fmt.Errorf(
+		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: built-in Tool %q has %d matching Artifacts",
 			basespec.ErrIdentityConflict,
 			name,
@@ -356,13 +356,13 @@ func (a *API) toolByName(
 func (a *API) collectionForTool(
 	ctx context.Context,
 	name basespec.LogicalName,
-) (toolnewDomain.ToolCollection, error) {
+) (toolDomain.ToolCollection, error) {
 	collections, err := a.ListToolCollections(ctx)
 	if err != nil {
-		return toolnewDomain.ToolCollection{}, err
+		return toolDomain.ToolCollection{}, err
 	}
 
-	matches := make([]toolnewDomain.ToolCollection, 0, 1)
+	matches := make([]toolDomain.ToolCollection, 0, 1)
 	for _, collection := range collections {
 		if collection.HasTool(name) {
 			matches = append(matches, collection)
@@ -371,7 +371,7 @@ func (a *API) collectionForTool(
 
 	switch len(matches) {
 	case 0:
-		return toolnewDomain.ToolCollection{}, fmt.Errorf(
+		return toolDomain.ToolCollection{}, fmt.Errorf(
 			"%w: Tool %q has no Tool Collection",
 			basespec.ErrReferenceUnresolved,
 			name,
@@ -379,7 +379,7 @@ func (a *API) collectionForTool(
 	case 1:
 		return matches[0], nil
 	default:
-		return toolnewDomain.ToolCollection{}, fmt.Errorf(
+		return toolDomain.ToolCollection{}, fmt.Errorf(
 			"%w: Tool %q belongs to %d Tool Collections",
 			basespec.ErrIdentityConflict,
 			name,
@@ -422,7 +422,7 @@ func (a *API) requireBuiltinSource(
 
 func (a *API) validateGoTool(
 	ctx context.Context,
-	tool toolnewDomain.Tool,
+	tool toolDomain.Tool,
 ) error {
 	if tool.Document.Implementation.Kind != toolv1.ImplementationKindGo {
 		return nil

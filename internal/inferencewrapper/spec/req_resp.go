@@ -7,7 +7,7 @@ import (
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 
@@ -66,7 +66,7 @@ type CompletionRequestBody struct {
 	// this slice. It does not infer tools from History[i].ToolChoices or
 	// Current.ToolChoices.
 	// (Those are persisted for UI/analytics only.)
-	ToolSelections []toolnewAggregate.ToolSelection `json:"toolSelections,omitempty"`
+	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
 
 	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
 	SkillSessionID string                                  `json:"skillSessionID,omitempty"`

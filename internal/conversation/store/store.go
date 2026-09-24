@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	toolnewAggregate "github.com/flexigpt/flexigpt-app/internal/toolnew/aggregate"
+	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/dirpartition"
@@ -538,7 +538,7 @@ func validateConversationArtifactRefs(
 
 func validateConversationToolSelections(
 	field string,
-	values []toolnewAggregate.ToolSelection,
+	values []toolAggregate.ToolSelection,
 ) error {
 	choiceIDs := make(map[string]struct{}, len(values))
 	targets := make(map[string]struct{}, len(values))

@@ -157,7 +157,7 @@ func artifactFallbackProviders(
 // Artifact consumers. Tool mapping belongs to the Tool aggregate because it
 // validates the Tool and its containing Tool Collection before mapping.
 func artifactTargetMappers(
-	tools *ToolNewAggregateWrapper,
+	tools *ToolAggregateWrapper,
 ) (map[declaration.Type]resolve.ArtifactTargetMapper, error) {
 	if tools == nil {
 		return nil, errors.New("tool artifact target mapper aggregate is not initialized")

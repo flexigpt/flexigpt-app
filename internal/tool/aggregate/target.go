@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	toolnewDomain "github.com/flexigpt/flexigpt-app/internal/toolnew/store/domain"
+	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 const (
@@ -54,7 +54,7 @@ func (t TargetV1) Validate() error {
 }
 
 func NewMappedTarget(
-	value toolnewDomain.ResolvedTool,
+	value toolDomain.ResolvedTool,
 ) (resolve.MappedTarget, error) {
 	if !value.Enabled() {
 		return resolve.MappedTarget{}, fmt.Errorf(
