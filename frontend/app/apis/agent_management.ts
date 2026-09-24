@@ -20,6 +20,8 @@ import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolStoreAPI } from '@/apis
 
 type AgentStarterIssueSeverity = 'error' | 'warning';
 
+const AGENT_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
+
 export interface AgentCollectionData {
 	collection: CollectionView;
 	agents: AgentView[];
@@ -66,7 +68,9 @@ export function collectionDisplayName(collection: CollectionView): string {
 }
 
 export function isBuiltInAgentCollection(collection: CollectionView): boolean {
-	return !collection.editable && !collection.deletable;
+	// User baselines are non-deletable and can be metadata-read-only, but they
+	// are not protected built-in package Collections.
+	return !collection.baseline && !collection.editable && !collection.deletable;
 }
 
 export function canEditAgentCollectionMetadata(collection: CollectionView): boolean {
@@ -245,6 +249,8 @@ function availabilityIssueForOccurrence(occurrence: CapabilityOccurrence): Agent
 
 export class AgentManagementAPI {
 	private readonly collectionAgentLoads = new Map<string, Promise<AgentView[]>>();
+	private agentCatalogCache?: { agents: AgentView[]; loadedAt: number };
+	private agentCatalogLoad?: Promise<AgentView[]>;
 
 	constructor(
 		private readonly agents: IAgentStoreAPI,
@@ -254,13 +260,51 @@ export class AgentManagementAPI {
 		private readonly skills: AgentSkillRenderer
 	) {}
 
+	invalidateAgentCatalog(): void {
+		this.agentCatalogCache = undefined;
+	}
+
+	async preloadAgentCatalog(): Promise<void> {
+		await this.loadAgentCatalog();
+	}
+
+	private async loadAgentCatalog(): Promise<AgentView[]> {
+		const cached = this.agentCatalogCache;
+		if (cached && Date.now() - cached.loadedAt <= AGENT_CATALOG_CACHE_TTL_MS) {
+			return cached.agents;
+		}
+
+		if (!this.agentCatalogLoad) {
+			const load = this.agents.listAgentsForManagement().then(values => {
+				const agents = values ?? [];
+				this.agentCatalogCache = {
+					agents,
+					loadedAt: Date.now(),
+				};
+				return agents;
+			});
+
+			this.agentCatalogLoad = load;
+			const clear = () => {
+				if (this.agentCatalogLoad === load) {
+					this.agentCatalogLoad = undefined;
+				}
+			};
+			void load.then(clear, clear);
+		}
+
+		return this.agentCatalogLoad;
+	}
+
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
-		const [collectionValues, importDestinations] = await Promise.all([
+		const [collectionResult, destinationResult] = await Promise.all([
 			this.agents.listAgentCollectionsForManagement(),
 			this.agents.listAgentImportDestinations(),
 		]);
 		throwIfAborted(signal);
 
+		const collectionValues = collectionResult ?? [];
+		const importDestinations = destinationResult ?? [];
 		const collectionsByKey = new Map<string, CollectionView>();
 
 		for (const collection of collectionValues) {
@@ -331,7 +375,7 @@ export class AgentManagementAPI {
 		}
 
 		try {
-			const agents = await load;
+			const agents = (await load) ?? [];
 			throwIfAborted(signal);
 
 			return {
@@ -350,7 +394,7 @@ export class AgentManagementAPI {
 	}
 
 	async listAgentCatalogOptions(): Promise<AgentCatalogOption[]> {
-		const agents = await this.agents.listAgentsForManagement();
+		const agents = await this.loadAgentCatalog();
 
 		return agents
 			.map(agent => {

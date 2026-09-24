@@ -45,6 +45,7 @@ interface SkillBundleCardProps {
 	bundle: SkillBundle;
 	skills: Skill[];
 	skillLoadError?: string;
+	runtimeMetadataLoaded: boolean;
 	prefillSkills: SkillItem[];
 	onRefreshSkills: () => Promise<void>;
 	insertFilter: SkillInsertFilter;
@@ -96,6 +97,7 @@ export function SkillBundleCard({
 	bundle,
 	skills,
 	skillLoadError,
+	runtimeMetadataLoaded,
 	prefillSkills,
 	onRefreshSkills,
 	insertFilter,
@@ -257,6 +259,9 @@ export function SkillBundleCard({
 							{bundle.isEnabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
 						<StatusBadge>{bundle.isBuiltIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						{!runtimeMetadataLoaded && !skillLoadError ? (
+							<StatusBadge tone="neutral">Loading details</StatusBadge>
+						) : null}
 					</>
 				}
 				disclosure={

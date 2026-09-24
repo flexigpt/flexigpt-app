@@ -3,6 +3,7 @@ import type { Skill, SkillBundle } from '@/spec/skill';
 export interface BundleData {
 	bundle: SkillBundle;
 	skills: Skill[];
+	runtimeMetadataLoaded?: boolean;
 	skillLoadError?: string;
 }
 

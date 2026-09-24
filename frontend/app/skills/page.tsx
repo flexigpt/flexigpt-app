@@ -68,7 +68,8 @@ function rememberSkillBundleData(data: BundleData[]) {
 
 function buildSkillBundleData(
 	skillBundles: SkillBundle[],
-	skillListItems: Awaited<ReturnType<typeof skillManagementAPI.listSkills>>
+	skillListItems: Awaited<ReturnType<typeof skillManagementAPI.listSkills>>,
+	runtimeMetadataLoaded: boolean
 ): BundleData[] {
 	const skillsByBundleID = new Map<string, BundleData['skills']>();
 
@@ -83,6 +84,7 @@ function buildSkillBundleData(
 		skillBundles.map(bundle => ({
 			bundle,
 			skills: skillsByBundleID.get(bundle.id) ?? [],
+			runtimeMetadataLoaded,
 		}))
 	);
 }
@@ -93,12 +95,14 @@ function buildSkillBundleData(
  * and in the conversation Workspace selector.
  */
 async function fetchSkillBundleData(): Promise<BundleData[]> {
-	const { skillBundles, skillListItems } = await skillManagementAPI.loadManagementPageData(true, true);
+	// Load durable collection and Artifact state first. Runtime materialization
+	// is enriched per bundle after the page has rendered.
+	const { skillBundles, skillListItems } = await skillManagementAPI.loadManagementPageData(true, false);
 	if (skillBundles.length === 0) {
 		return [];
 	}
 
-	return buildSkillBundleData(skillBundles, skillListItems);
+	return buildSkillBundleData(skillBundles, skillListItems, false);
 }
 
 async function loadSkillBundleData(signal: AbortSignal): Promise<BundleData[]> {
@@ -175,6 +179,7 @@ export default function SkillsPage() {
 
 	const isMountedRef = useRef(false);
 	const bundleRefreshRequestIdRef = useRef<Record<string, number>>({});
+	const bundleRuntimePrefetchRef = useRef<Set<string>>(new Set());
 
 	const creationRoots = useMemo(
 		() =>
@@ -286,7 +291,12 @@ export default function SkillsPage() {
 				setBundles(prev =>
 					prev.map(bundleData =>
 						bundleData.bundle.id === bundleID
-							? { ...bundleData, skills: freshSkills, skillLoadError: undefined }
+							? {
+									...bundleData,
+									skills: freshSkills,
+									runtimeMetadataLoaded: true,
+									skillLoadError: undefined,
+								}
 							: bundleData
 					)
 				);
@@ -310,9 +320,10 @@ export default function SkillsPage() {
 
 	useEffect(() => {
 		isMountedRef.current = true;
-
 		return () => {
 			isMountedRef.current = false;
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			bundleRuntimePrefetchRef.current.clear();
 		};
 	}, []);
 
@@ -320,7 +331,7 @@ export default function SkillsPage() {
 		if (creationRoots.some(value => value.rootID === creationRootID)) {
 			return;
 		}
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-chain-state-updates
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 		setCreationRootID(creationRoots[0]?.rootID ?? '');
 	}, [creationRootID, creationRoots]);
 
@@ -329,6 +340,42 @@ export default function SkillsPage() {
 			rememberSkillBundleData(bundles);
 		}
 	}, [bundles, hasResolved, isLoading, isRefreshing, pageLoadError]);
+
+	useEffect(() => {
+		if (!hasResolved || pageLoadError) {
+			return;
+		}
+
+		const candidates = bundles.filter(
+			value =>
+				!value.runtimeMetadataLoaded && !value.skillLoadError && !bundleRuntimePrefetchRef.current.has(value.bundle.id)
+		);
+		if (candidates.length === 0) {
+			return;
+		}
+
+		for (const value of candidates) {
+			bundleRuntimePrefetchRef.current.add(value.bundle.id);
+		}
+
+		let cursor = 0;
+		const worker = async () => {
+			while (cursor < candidates.length) {
+				const index = cursor;
+				cursor += 1;
+
+				try {
+					await refreshBundleSkills(candidates[index].bundle.id, false);
+				} catch {
+					// refreshBundleSkills records the bundle-local error. Do
+					// not automatically retry in a render loop.
+				}
+			}
+		};
+
+		const workerCount = Math.min(2, candidates.length);
+		void Promise.all(Array.from({ length: workerCount }, () => worker()));
+	}, [bundles, hasResolved, pageLoadError, refreshBundleSkills]);
 
 	const handleBundleEnableChange = useCallback(
 		async (bundleID: string, nextEnabled: boolean) => {
@@ -823,6 +870,7 @@ export default function SkillsPage() {
 								bundle={bundleData.bundle}
 								skills={bundleData.skills}
 								skillLoadError={bundleData.skillLoadError}
+								runtimeMetadataLoaded={Boolean(bundleData.runtimeMetadataLoaded)}
 								prefillSkills={allSkillItems}
 								onRefreshSkills={() => {
 									return refreshBundleSkills(bundleData.bundle.id, !bundleData.bundle.isBuiltIn);

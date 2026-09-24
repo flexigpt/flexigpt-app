@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -264,10 +265,33 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 func (w *AgentStoreWrapper) CreateAgentCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
-	return withAgentStore(
-		w,
-		func(api *agentConsumerAPI.API) (collection.CollectionView, error) {
-			return api.CreateAgentCollection(context.Background(), request)
+	return middleware.WithRecoveryResp(
+		func() (collection.CollectionView, error) {
+			if w == nil || w.api == nil {
+				return collection.CollectionView{}, basespec.ErrClosed
+			}
+
+			// The global management page may be opened before its baseline
+			// discovery request finishes. An empty RootID means "use the
+			// retained application user Root", not "reject collection
+			// creation because a frontend cache is incomplete".
+			if request.RootID == "" {
+				if w.roots == nil {
+					return collection.CollectionView{}, basespec.ErrClosed
+				}
+				if _, err := w.roots.Create(
+					context.Background(),
+					documentTopology.UserRootDraft(),
+				); err != nil {
+					return collection.CollectionView{}, err
+				}
+				request.RootID = documentTopology.UserRootID()
+			}
+
+			return w.api.CreateAgentCollection(
+				context.Background(),
+				request,
+			)
 		},
 	)
 }

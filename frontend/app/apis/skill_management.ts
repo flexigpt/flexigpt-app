@@ -84,7 +84,9 @@ function presenceStatusFor(artifact: StoreArtifact): SkillPresenceStatus {
 }
 
 function isReadOnlyCollection(collection: CollectionView): boolean {
-	return !collection.editable && !collection.deletable;
+	// A user baseline is application-provisioned and non-deletable, but its
+	// managed Source and memberships are writable.
+	return !collection.baseline && !collection.editable && !collection.deletable;
 }
 
 function collectionRef(collection: CollectionView): ArtifactRef {
@@ -835,7 +837,9 @@ export class SkillManagementAPI {
 		const plan = await this.store.resolveSkillCollection(collectionRef(collection));
 		const refs = new Map<string, ArtifactRef>();
 
-		for (const occurrence of plan.occurrences) {
+		// Empty Collection capability plans can cross the Wails boundary as
+		// null. They represent an empty Collection, not a failed operation.
+		for (const occurrence of plan?.occurrences ?? []) {
 			if (occurrence.type !== 'skill' || occurrence.status !== 'available' || !occurrence.artifact) {
 				continue;
 			}
@@ -998,9 +1002,10 @@ export class SkillManagementAPI {
 
 		let records: RuntimeSkillRecord[];
 		try {
-			records = await this.runtime.listRuntimeSkills({
-				allowSkills: resolved.map(value => value.Definition),
-			});
+			records =
+				(await this.runtime.listRuntimeSkills({
+					allowSkills: resolved.map(value => value.Definition),
+				})) ?? [];
 		} catch (error) {
 			const message = getErrorMessage(error, 'Runtime metadata is unavailable.');
 			for (const value of resolved) {

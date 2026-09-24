@@ -418,8 +418,9 @@ func (w *SkillStoreWrapper) DeleteSkillCollection(
 	})
 }
 
-// startBuiltinCatalogWarmup starts only runtime catalog preparation. Protected
-// topology hydration remains synchronous and must complete before this method
+// startBuiltinCatalogWarmup starts runtime catalog preparation for the global
+// built-in and retained user management Roots. Protected topology hydration
+// remains synchronous and must complete before this method
 // is called.
 func (w *SkillStoreWrapper) startBuiltinCatalogWarmup(
 	syncRoot func(context.Context, root.RootID) error,
@@ -443,10 +444,19 @@ func (w *SkillStoreWrapper) startBuiltinCatalogWarmup(
 	go func() {
 		defer close(done)
 
-		err := syncRoot(ctx, documentTopology.BuiltinRootID())
-		if err != nil && ctx.Err() == nil {
+		for _, rootID := range documentTopology.ManagementRootIDs() {
+			if err := ctx.Err(); err != nil {
+				return
+			}
+
+			err := syncRoot(ctx, rootID)
+			if err == nil || ctx.Err() != nil {
+				continue
+			}
 			slog.Warn(
-				"warm built-in Skill runtime catalog",
+				"warm Skill runtime catalog",
+				"rootID",
+				rootID,
 				"error",
 				err,
 			)

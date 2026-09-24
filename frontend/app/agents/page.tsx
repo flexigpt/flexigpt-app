@@ -530,26 +530,29 @@ export default function AgentsPage() {
 
 	const mountedRef = useRef(false);
 	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
+	const agentPrefetchKeysRef = useRef<Set<string>>(new Set());
+	const agentCatalogWarmupStartedRef = useRef(false);
 
 	const collectionCreationRoots = useMemo(
 		() =>
 			[
 				...new Map(
-					pageData.importDestinations
-						.filter(destination => destination.baseline)
+					pageData.collections
+						.map(value => value.collection)
+						.filter(collection => collection.baseline && !isBuiltInAgentCollection(collection))
 						.map(
-							destination =>
+							collection =>
 								[
-									destination.rootID,
+									collection.artifact.rootID,
 									{
-										rootID: destination.rootID,
-										label: destination.rootDisplayName || destination.rootID,
+										rootID: collection.artifact.rootID,
+										label: collection.artifact.rootID,
 									},
 								] as const
 						)
 				).values(),
 			].toSorted((left, right) => left.label.localeCompare(right.label)),
-		[pageData.importDestinations]
+		[pageData.collections]
 	);
 
 	useEffect(() => {
@@ -557,6 +560,8 @@ export default function AgentsPage() {
 		return () => {
 			mountedRef.current = false;
 			agentLoadRequestIDRef.current = {};
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			agentPrefetchKeysRef.current.clear();
 		};
 	}, []);
 
@@ -564,7 +569,7 @@ export default function AgentsPage() {
 		if (collectionCreationRoots.some(value => value.rootID === collectionCreationRootID)) {
 			return;
 		}
-		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-chain-state-updates
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-chain-state-updates
 		setCollectionCreationRootID(collectionCreationRoots[0]?.rootID ?? '');
 	}, [collectionCreationRootID, collectionCreationRoots]);
 
@@ -624,10 +629,50 @@ export default function AgentsPage() {
 		[setPageData]
 	);
 
+	useEffect(() => {
+		if (!hasResolved || pageLoadError) {
+			return;
+		}
+
+		if (!agentCatalogWarmupStartedRef.current) {
+			agentCatalogWarmupStartedRef.current = true;
+			void agentManagementAPI.preloadAgentCatalog().catch(() => undefined);
+		}
+
+		const candidates = pageData.collections.filter(value => {
+			const key = agentCollectionKey(value.collection);
+			return (
+				!value.agentsLoaded && !value.isLoadingAgents && !value.agentLoadError && !agentPrefetchKeysRef.current.has(key)
+			);
+		});
+		if (candidates.length === 0) {
+			return;
+		}
+
+		for (const value of candidates) {
+			agentPrefetchKeysRef.current.add(agentCollectionKey(value.collection));
+		}
+
+		let cursor = 0;
+		const worker = async () => {
+			while (cursor < candidates.length) {
+				const index = cursor;
+				cursor += 1;
+				await loadCollectionAgents(candidates[index].collection);
+			}
+		};
+
+		const workerCount = Math.min(3, candidates.length);
+		void Promise.all(Array.from({ length: workerCount }, () => worker())).catch(() => undefined);
+	}, [hasResolved, loadCollectionAgents, pageData.collections, pageLoadError]);
+
 	const refreshPage = useCallback(async () => {
 		try {
 			invalidateAgentManagementPageDataCache();
+			agentManagementAPI.invalidateAgentCatalog();
 			agentLoadRequestIDRef.current = {};
+			agentPrefetchKeysRef.current.clear();
+			agentCatalogWarmupStartedRef.current = false;
 			await reloadOrThrow();
 		} catch (error) {
 			showAlert(getErrorMessage(error, 'Agent management data could not be refreshed.'));
@@ -664,10 +709,6 @@ export default function AgentsPage() {
 
 	const createCollection = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
-			if (!collectionCreationRootID) {
-				throw new Error('No user Agent baseline Root is available.');
-			}
-
 			await agentStoreAPI.createAgentCollection({
 				rootID: collectionCreationRootID,
 				name: slug,
@@ -822,8 +863,6 @@ export default function AgentsPage() {
 							<button
 								type="button"
 								className="btn btn-ghost rounded-xl"
-								disabled={!collectionCreationRootID}
-								title={!collectionCreationRootID ? 'No user Agent baseline Root is available.' : undefined}
 								onClick={() => {
 									setIsCreateCollectionOpen(true);
 								}}
