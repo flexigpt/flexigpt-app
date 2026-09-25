@@ -7,8 +7,8 @@ import type { MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_
 import { CopyButton } from '@/components/copy_button';
 import { DownloadButton } from '@/components/download_button';
 import { DiffApplyControl } from '@/components/markdown/diff_apply_control';
+import { looksLikeUnifiedDiff } from '@/components/markdown/diff_block';
 import { MermaidDiagram } from '@/components/markdown/mermaid_diagram_card';
-import { looksLikeUnifiedDiff } from '@/components/markdown/unified_diff_block';
 
 interface CodeProps {
 	language: string;
@@ -94,8 +94,19 @@ export function CodeBlock({
 
 	const [mermaidResult, setMermaidResult] = useState<MermaidResultState | null>(null);
 	const [expansionOverride, setExpansionOverride] = useState<ExpansionOverrideState | null>(null);
+	const lastSettledValueRef = useRef<string | null>(null);
+
+	useEffect(() => {
+		if (!isBusy) {
+			lastSettledValueRef.current = value;
+		}
+	}, [isBusy, value]);
 
 	const currentMermaidResult = isMermaid && mermaidResult?.key === codeBlockKey ? mermaidResult : null;
+	const hasPreviouslySettledValue =
+		// oxlint-disable-next-line react/refs
+		isBusy && lastSettledValueRef.current === value;
+	const diffControlsDisabled = disableControls && !hasPreviouslySettledValue;
 
 	const mermaidRenderStatus: MermaidRenderStatus =
 		!isMermaid || isBusy || !value.trim() ? 'idle' : currentMermaidResult?.status === 'error' ? 'error' : 'rendering';
@@ -118,8 +129,8 @@ export function CodeBlock({
 	const valueForHighlight = isBusy ? '' : value;
 	const html = useHighlight(valueForHighlight, language, shouldHighlight);
 	const isDiffLike = useMemo(
-		() => richCodeWorkActivated && !disableControls && looksLikeUnifiedDiff(value, language),
-		[disableControls, language, richCodeWorkActivated, value]
+		() => richCodeWorkActivated && !diffControlsDisabled && looksLikeUnifiedDiff(value, language),
+		[diffControlsDisabled, language, richCodeWorkActivated, value]
 	);
 
 	const highlightedHtml = html ?? '';
@@ -185,7 +196,7 @@ export function CodeBlock({
 								key={codeBlockKey}
 								language={language}
 								diffText={value}
-								isBusy={isBusy}
+								isBusy={diffControlsDisabled}
 								candidatePaths={diffCandidatePaths}
 								workspaceRoots={diffWorkspaceRoots}
 							/>

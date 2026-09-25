@@ -1,11 +1,9 @@
 import { FiAlertTriangle, FiChevronRight, FiInfo, FiX } from 'react-icons/fi';
 
-import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
+import type { ApplyUnifiedDiffDiagnostic } from '@/spec/unified_diff';
 import { ApplyUnifiedDiffDiagnosticLevel } from '@/spec/unified_diff';
 
-export type HeaderButtonTone = 'neutral' | 'success' | 'warning' | 'error' | 'info';
-
-export interface DiagnosticSeverityCounts {
+interface DiagnosticSeverityCounts {
 	total: number;
 	error: number;
 	warning: number;
@@ -20,7 +18,7 @@ interface DiagnosticPanelOptions {
 	footer?: string;
 }
 
-export function getHighestDiagnosticLevel(
+function getHighestDiagnosticLevel(
 	diagnostics: ApplyUnifiedDiffDiagnostic[]
 ): ApplyUnifiedDiffDiagnosticLevel | undefined {
 	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error)) {
@@ -38,7 +36,7 @@ export function getHighestDiagnosticLevel(
 	return undefined;
 }
 
-export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnostic[]): DiagnosticSeverityCounts {
+function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnostic[]): DiagnosticSeverityCounts {
 	const counts: DiagnosticSeverityCounts = {
 		total: diagnostics.length,
 		error: 0,
@@ -62,44 +60,6 @@ export function getDiagnosticSeverityCounts(diagnostics: ApplyUnifiedDiffDiagnos
 	}
 
 	return counts;
-}
-
-export function formatDiagnosticsTitle(diagnostics: ApplyUnifiedDiffDiagnostic[]): string {
-	const counts = getDiagnosticSeverityCounts(diagnostics);
-	if (counts.total === 0) {
-		return '';
-	}
-
-	const summary = [
-		counts.error > 0 ? `${counts.error} error${counts.error === 1 ? '' : 's'}` : undefined,
-		counts.warning > 0 ? `${counts.warning} warning${counts.warning === 1 ? '' : 's'}` : undefined,
-		counts.info > 0 ? `${counts.info} info` : undefined,
-	]
-		.filter(Boolean)
-		.join(', ');
-
-	const messages = diagnostics
-		.slice(0, 6)
-		.map(diagnostic => `${diagnostic.level}${diagnostic.code ? ` ${diagnostic.code}` : ''}: ${diagnostic.message}`);
-
-	if (diagnostics.length > 6) {
-		messages.push(`+${diagnostics.length - 6} more`);
-	}
-
-	return [`Patch diagnostics: ${summary}`, ...messages].join('\n');
-}
-
-export function getDiagnosticToneFromCounts(counts: DiagnosticSeverityCounts): HeaderButtonTone {
-	if (counts.error > 0) {
-		return 'error';
-	}
-	if (counts.warning > 0) {
-		return 'warning';
-	}
-	if (counts.info > 0) {
-		return 'info';
-	}
-	return 'neutral';
 }
 
 export function uniqueDiagnostics(
@@ -135,44 +95,6 @@ export function uniqueDiagnostics(
 	}
 
 	return out;
-}
-
-export function collectPatchLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
-	return uniqueDiagnostics(output?.diagnostics ?? []);
-}
-
-export function collectFileLevelDiagnostics(output?: ApplyUnifiedDiffOut): ApplyUnifiedDiffDiagnostic[] {
-	return uniqueDiagnostics((output?.files ?? []).flatMap(file => file.diagnostics ?? []));
-}
-
-function uniqueStringsFromDiagnostics(values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>): string[] {
-	const out: string[] = [];
-	const seen = new Set<string>();
-
-	for (const value of values) {
-		const trimmed = value?.message.trim();
-		if (!trimmed) {
-			continue;
-		}
-
-		const key = trimmed.replaceAll('\\', '/').replaceAll(/\/+/g, '/');
-
-		if (seen.has(key)) {
-			continue;
-		}
-
-		seen.add(key);
-		out.push(trimmed);
-	}
-
-	return out;
-}
-
-export function collectOutputDiagnostics(output?: ApplyUnifiedDiffOut): string[] {
-	return uniqueStringsFromDiagnostics([
-		...collectPatchLevelDiagnostics(output),
-		...collectFileLevelDiagnostics(output),
-	]);
 }
 
 function getDiagnosticDisplay(level: ApplyUnifiedDiffDiagnosticLevel) {
@@ -273,7 +195,7 @@ function renderCollapsedDiagnosticGroup({
 	);
 }
 
-export function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDiagnostic[]) {
+function renderDiagnosticSeveritySummary(diagnostics: ApplyUnifiedDiffDiagnostic[]) {
 	const counts = getDiagnosticSeverityCounts(diagnostics);
 	if (counts.total === 0) {
 		return null;

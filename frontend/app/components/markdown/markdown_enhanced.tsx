@@ -22,11 +22,10 @@ import supersub from 'remark-supersub';
 
 import { backendAPI } from '@/apis/baseapi';
 
-import { CustomMDLanguage } from '@/components/markdown/custom_md_utils';
 import { remarkInlineCodeMath, sanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
-import { CodeBlock } from '@/components/markdown/markdown_code_block';
+import { MarkdownCodeRenderer } from '@/components/markdown/markdown_code_renderer';
+import { MarkdownCodeRendererContext } from '@/components/markdown/markdown_code_renderer_context';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
-import { ThinkingFence } from '@/components/markdown/thinking_fence';
 
 const strictSchema = {
 	...defaultSchema,
@@ -51,12 +50,6 @@ const richRehypePlugins: PluggableList = [
 	rehypeSlug,
 	[rehypeKatex, rehypeKatexOptions] as const,
 ];
-
-interface CodeComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
-	inline?: boolean;
-	className?: string;
-	children?: ReactNode;
-}
 
 interface CustomComponentProps extends HTMLAttributes<HTMLElement>, ExtraProps {
 	className?: string;
@@ -101,6 +94,17 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 
 	const remarkPlugins = isBusy ? streamingRemarkPlugins : richRemarkPlugins;
 	const rehypePlugins = isBusy ? streamingRehypePlugins : richRehypePlugins;
+
+	const codeRendererSettings = useMemo(
+		() => ({
+			isBusy,
+			hideMermaidCode,
+			diffCandidatePaths,
+			diffWorkspaceRoots,
+			defaultCodeBlockExpanded,
+		}),
+		[defaultCodeBlockExpanded, diffCandidatePaths, diffWorkspaceRoots, hideMermaidCode, isBusy]
+	);
 
 	const components = useMemo(() => {
 		const renderHeading =
@@ -232,87 +236,17 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 				);
 			},
 
-			code: ({ node, inline, className, children, ...props }: CodeComponentProps) => {
-				if (inline || !className) {
-					return (
-						<code
-							{...props}
-							className={`bg-base-200 inline text-wrap wrap-break-word whitespace-pre-wrap ${className ?? ''}`}
-						>
-							{children}
-						</code>
-					);
-				}
-
-				const match = /lang-(\w+)/.exec(className || '') || /language-(\w+)/.exec(className || '');
-				const language = match && match[1] ? match[1] : 'text';
-
-				const raw =
-					typeof children === 'string'
-						? children
-						: Array.isArray(children)
-							? children.join('')
-							: children === null
-								? ''
-								: // oxlint-disable-next-line typescript/no-base-to-string
-									String(children);
-
-				const value = raw.replaceAll('\r\n', '\n').replace(/\n$/, '');
-
-				if (language === (CustomMDLanguage.ThinkingSummary as string)) {
-					return (
-						<ThinkingFence
-							detailsSummary={<span>Thinking Summary</span>}
-							text={value}
-							defaultOpen={isBusy}
-							streaming={isBusy}
-						/>
-					);
-				}
-
-				if (language === (CustomMDLanguage.Thinking as string)) {
-					return (
-						<ThinkingFence
-							detailsSummary={<span>Thinking</span>}
-							text={value}
-							defaultOpen={isBusy}
-							streaming={isBusy}
-						/>
-					);
-				}
-
-				// CodeBlock keeps changing fences on a stable plain-text path; highlighting
-				// and controls are enabled only after the stream settles.
-				return (
-					<CodeBlock
-						language={language}
-						value={value}
-						isBusy={isBusy}
-						hideMermaidCode={hideMermaidCode}
-						diffCandidatePaths={diffCandidatePaths}
-						diffWorkspaceRoots={diffWorkspaceRoots}
-						defaultExpanded={defaultCodeBlockExpanded}
-						disableControls={isBusy}
-					/>
-				);
-			},
+			code: MarkdownCodeRenderer,
 		};
-	}, [
-		align,
-		defaultCodeBlockExpanded,
-		diffCandidatePaths,
-		diffWorkspaceRoots,
-		hideH1Title,
-		hideMermaidCode,
-		isBusy,
-		onLinkClick,
-	]);
+	}, [align, hideH1Title, onLinkClick]);
 
 	return (
 		<MdErrorBoundary source={processedText}>
-			<Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} skipHtml={false}>
-				{processedText}
-			</Markdown>
+			<MarkdownCodeRendererContext.Provider value={codeRendererSettings}>
+				<Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} skipHtml={false}>
+					{processedText}
+				</Markdown>
+			</MarkdownCodeRendererContext.Provider>
 		</MdErrorBoundary>
 	);
 });

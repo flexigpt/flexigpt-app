@@ -19,7 +19,7 @@ export enum ApplyUnifiedDiffStatus {
 	Error = 'error',
 }
 
-export interface ApplyUnifiedDiffFileTarget {
+interface ApplyUnifiedDiffFileTarget {
 	fileKey?: string;
 	oldPath?: string;
 	newPath?: string;
@@ -34,7 +34,7 @@ export interface ApplyUnifiedDiffArgs {
 	candidatePaths?: string[];
 }
 
-export interface ApplyUnifiedDiffFileOut {
+interface ApplyUnifiedDiffFileOut {
 	ok: boolean;
 	fileKey: string;
 	oldPath?: string;

@@ -1,860 +1,427 @@
-import { useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
-
-import type { ApplyUnifiedDiffDiagnostic, ApplyUnifiedDiffFileTarget, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
-import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/unified_diff';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import type { DiagnosticSeverityCounts, HeaderButtonTone } from '@/components/markdown/diff_diagnostic';
-import type {
-	DiffApplyRunOptions,
-	EditableUnifiedDiffTarget,
-	parseUnifiedDiffForUI,
-} from '@/components/markdown/unified_diff_block';
+import type { DiffApplyController, DiffApplyFileView } from '@/components/markdown/diff_apply_controller';
 import {
-	collectFileLevelDiagnostics,
-	collectPatchLevelDiagnostics,
-	formatDiagnosticsTitle,
-	getDiagnosticSeverityCounts,
-	getDiagnosticToneFromCounts,
-	renderDiagnosticSeveritySummary,
-	renderDiagnosticsPanel,
-	uniqueDiagnostics,
-} from '@/components/markdown/diff_diagnostic';
-import {
-	absolutePathStrings,
-	buildEditableTargetsFromOutput,
-	buildFileStatusCounts,
-	getPathIdentity,
-	haveSharedPathIdentity,
-	isAbsolutePath,
-	isNewUnifiedDiffFile,
-	isTerminalUnifiedDiffStatus,
-	mergeNumberMax,
-	summaryLabel,
-	toAbsolutePath,
-	uniqueStrings,
-} from '@/components/markdown/unified_diff_block';
+	getInteractiveDiffTargetPath,
+	isNewInteractiveDiffFile,
+	MAX_INTERACTIVE_HUNK_PROBES,
+} from '@/components/markdown/diff_apply_model';
+import { renderDiagnosticsPanel, uniqueDiagnostics } from '@/components/markdown/diff_diagnostic';
 import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalBackdrop } from '@/components/modal/modal_backdrop';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 
-interface ModalRunningAction {
-	key: string;
-	kind: 'dry-run' | 'apply';
-}
-type TargetVisualState = 'neutral' | 'info' | 'success' | 'warning' | 'error';
-const DISPLAY_CANDIDATE_PATH_LIMIT = 32;
-
-interface DisplayCandidatePathList {
-	paths: string[];
-	total: number;
-	isLimited: boolean;
+interface DiffApplyModalProps {
+	isOpen: boolean;
+	onClose: () => void;
+	controller: DiffApplyController;
 }
 
-const displayCandidatePathCache = new WeakMap<EditableUnifiedDiffTarget, DisplayCandidatePathList>();
+interface LazyDetailsProps {
+	summary: ReactNode;
+	className?: string;
+	renderContent: () => ReactNode;
+}
 
-function getTargetCardClassName(visualState: TargetVisualState): string {
-	switch (visualState) {
+const DISPLAY_CANDIDATE_LIMIT = 24;
+
+function LazyDetails({ summary, className = '', renderContent }: LazyDetailsProps) {
+	const [isOpen, setIsOpen] = useState(false);
+
+	return (
+		<details
+			className={`group border-base-300 bg-base-100 overflow-hidden rounded-lg border ${className}`}
+			onToggle={event => {
+				setIsOpen(event.currentTarget.open);
+			}}
+		>
+			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold">
+				<span>{summary}</span>
+				<FiChevronRight size={12} className="text-base-content/50 transition-transform group-open:rotate-90" />
+			</summary>
+
+			{isOpen ? <div className="border-base-300 border-t px-3 py-2">{renderContent()}</div> : null}
+		</details>
+	);
+}
+
+function getStatusLabel(status: DiffApplyFileView['status']): string {
+	switch (status) {
+		case 'ready':
+			return 'ready';
+		case 'needs-info':
+			return 'needs path';
+		case 'blocked':
+			return 'blocked';
+		case 'applied':
+			return 'applied';
+		case 'already-applied':
+			return 'already applied';
+		case 'partial':
+			return 'partially applied';
 		default:
-			return 'border-base-300 bg-base-100';
+			return 'not checked';
 	}
 }
 
-function getTargetStatusBadgeClassName(visualState: TargetVisualState): string {
-	switch (visualState) {
-		case 'error':
-			return 'badge-error';
-		case 'warning':
-			return 'badge-warning';
-		case 'success':
+function getStatusClassName(status: DiffApplyFileView['status']): string {
+	switch (status) {
+		case 'ready':
+		case 'applied':
 			return 'badge-success';
-		case 'info':
+		case 'already-applied':
 			return 'badge-info';
-
+		case 'needs-info':
+		case 'partial':
+			return 'badge-warning';
+		case 'blocked':
+			return 'badge-error';
 		default:
 			return 'badge-ghost';
 	}
 }
 
-function getTargetStatusLabel(target: EditableUnifiedDiffTarget, missing: boolean): string {
-	if (target.status && isTerminalUnifiedDiffStatus(target.status)) {
-		return target.status.replaceAll('_', ' ');
+function getCardClassName(view: DiffApplyFileView): string {
+	if (view.status === 'blocked') {
+		return 'border-error/40 bg-error/5';
 	}
-	if (missing) {
-		return 'needs path';
+
+	if (view.status === 'needs-info' || view.status === 'partial') {
+		return 'border-warning/40 bg-warning/5';
 	}
-	if (target.status) {
-		return target.status.replaceAll('_', ' ');
-	}
-	if (target.ok === false) {
-		return 'blocked';
-	}
-	return 'pending';
+
+	return 'border-base-300 bg-base-100';
 }
 
-function getTargetDisplayPath(target: EditableUnifiedDiffTarget): string {
-	return (
-		toAbsolutePath(target.targetPath) || toAbsolutePath(target.resolvedPath) || target.fileKey || 'Target path required'
-	);
-}
-
-function getBadgeToneClassName(tone: HeaderButtonTone): string {
-	switch (tone) {
-		case 'success':
-			return 'badge-success';
-		case 'warning':
-			return 'badge-warning';
-		case 'error':
-			return 'badge-error';
-		case 'info':
-			return 'badge-info';
-
-		default:
-			return 'badge-ghost';
-	}
-}
-
-function getDiagnosticSummaryBadgeClassName(counts: DiagnosticSeverityCounts): string {
-	return getBadgeToneClassName(getDiagnosticToneFromCounts(counts));
-}
-
-function getModalTargetSectionKeys(target: EditableUnifiedDiffTarget): string[] {
-	return uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]);
-}
-
-function getModalTargetPatchPaths(target: EditableUnifiedDiffTarget): string[] {
-	return uniqueStrings([target.newPath, target.oldPath]).filter(path => path !== '/dev/null');
-}
-
-function getModalTargetResolvedPaths(target: EditableUnifiedDiffTarget): string[] {
-	return absolutePathStrings([target.resolvedPath, target.targetPath]);
-}
-
-function editableTargetsMatch(left: EditableUnifiedDiffTarget, right: EditableUnifiedDiffTarget): boolean {
-	const leftKeys = getModalTargetSectionKeys(left);
-	const rightKeys = getModalTargetSectionKeys(right);
-
-	if (leftKeys.some(key => rightKeys.includes(key))) {
-		return true;
-	}
-
-	const leftPatchPaths = getModalTargetPatchPaths(left);
-	const rightPatchPaths = getModalTargetPatchPaths(right);
-
-	if (leftPatchPaths.length > 0 && rightPatchPaths.length > 0) {
-		return haveSharedPathIdentity(leftPatchPaths, rightPatchPaths);
-	}
-
-	if (leftPatchPaths.length === 0 && rightPatchPaths.length === 0) {
-		return haveSharedPathIdentity(getModalTargetResolvedPaths(left), getModalTargetResolvedPaths(right));
-	}
-
-	return false;
-}
-
-function mergeEditableTargetForModal(
-	existing: EditableUnifiedDiffTarget | undefined,
-	target: EditableUnifiedDiffTarget
-): EditableUnifiedDiffTarget {
-	const targetPath = toAbsolutePath(target.targetPath);
-	const resolvedPath = toAbsolutePath(target.resolvedPath);
-	const knownTargetPaths = absolutePathStrings(target.knownTargetPaths ?? []);
-	const isNewFile = isNewUnifiedDiffFile(target);
-
-	if (!existing) {
-		return {
-			...target,
-			targetPath,
-			resolvedPath: resolvedPath || undefined,
-			candidatePaths: isNewFile
-				? absolutePathStrings([...knownTargetPaths, targetPath])
-				: absolutePathStrings([...knownTargetPaths, ...(target.candidatePaths ?? []), targetPath, resolvedPath]),
-			knownTargetPaths,
-			sectionKeys: uniqueStrings([target.fileKey, ...(target.sectionKeys ?? [])]),
-		};
-	}
-
-	const existingTargetPath = toAbsolutePath(existing.targetPath);
-	const existingResolvedPath = toAbsolutePath(existing.resolvedPath);
-	const oldPath = target.oldPath || existing.oldPath;
-	const newPath = target.newPath || existing.newPath;
-	const mergedKnownTargetPaths = absolutePathStrings([...(existing.knownTargetPaths ?? []), ...knownTargetPaths]);
-	const mergedIsNewFile = isNewUnifiedDiffFile({ oldPath, newPath });
-
-	return {
-		...existing,
-		...target,
-		fileKey: existing.fileKey || target.fileKey,
-		oldPath,
-		newPath,
-		targetPath: targetPath || existingTargetPath,
-		targetPathInput: target.targetPathInput ?? existing.targetPathInput,
-		resolvedPath: resolvedPath || existingResolvedPath || undefined,
-		candidatePaths: mergedIsNewFile
-			? absolutePathStrings([...mergedKnownTargetPaths, existingTargetPath, targetPath])
-			: absolutePathStrings([
-					...mergedKnownTargetPaths,
-					...(existing.candidatePaths ?? []),
-					...(target.candidatePaths ?? []),
-					existingTargetPath,
-					targetPath,
-					existingResolvedPath,
-					resolvedPath,
-				]),
-		knownTargetPaths: mergedKnownTargetPaths,
-		diffText: target.diffText || existing.diffText,
-		sectionKeys: uniqueStrings([
-			...(existing.sectionKeys ?? []),
-			existing.fileKey,
-			target.fileKey,
-			...(target.sectionKeys ?? []),
-		]),
-		ok: target.ok ?? existing.ok,
-		status: target.status ?? existing.status,
-		message: target.message ?? existing.message,
-		diagnostics: uniqueDiagnostics([...(existing.diagnostics ?? []), ...(target.diagnostics ?? [])]),
-		hunks: mergeNumberMax(existing.hunks, target.hunks),
-		appliedHunks: mergeNumberMax(existing.appliedHunks, target.appliedHunks),
-		alreadyAppliedHunks: mergeNumberMax(existing.alreadyAppliedHunks, target.alreadyAppliedHunks),
-		addedLines: mergeNumberMax(existing.addedLines, target.addedLines),
-		deletedLines: mergeNumberMax(existing.deletedLines, target.deletedLines),
-	};
-}
-
-function upsertEditableTargetForModal(
-	byKey: Map<string, EditableUnifiedDiffTarget>,
-	target: EditableUnifiedDiffTarget
-) {
-	const existingEntry = [...byKey.entries()].find(([, existing]) => editableTargetsMatch(existing, target));
-	const key = existingEntry?.[0] ?? getLocalTargetKey(target, byKey.size);
-	const existing = existingEntry?.[1];
-
-	byKey.set(key, mergeEditableTargetForModal(existing, target));
-}
-
-function mergeEditableTargetPreservingLocalPath(
-	base: EditableUnifiedDiffTarget,
-	local: EditableUnifiedDiffTarget
-): EditableUnifiedDiffTarget {
-	const merged = mergeEditableTargetForModal(local, base);
-	const localTargetPathInput = local.targetPathInput ?? local.targetPath;
-	const knownTargetPaths = absolutePathStrings(merged.knownTargetPaths ?? []);
-	const isNewFile = isNewUnifiedDiffFile(merged);
-
-	return {
-		...merged,
-		targetPath: toAbsolutePath(local.targetPath),
-		targetPathInput: localTargetPathInput,
-		ok: base.ok,
-		status: base.status,
-		message: base.message,
-		diagnostics: base.diagnostics ? uniqueDiagnostics(base.diagnostics) : undefined,
-		candidatePaths: isNewFile
-			? absolutePathStrings([...knownTargetPaths, local.targetPath])
-			: absolutePathStrings([local.targetPath, ...(local.candidatePaths ?? []), ...(merged.candidatePaths ?? [])]),
-	};
-}
-
-function mergeModalTargetsPreservingLocalEdits(
-	nextTargets: EditableUnifiedDiffTarget[],
-	previousTargets: EditableUnifiedDiffTarget[]
-): EditableUnifiedDiffTarget[] {
-	if (previousTargets.length === 0) {
-		return nextTargets;
-	}
-
-	const matchedPreviousIndexes = new Set<number>();
-
-	return nextTargets.map(next => {
-		const previousIndex = previousTargets.findIndex(
-			(previous, index) => !matchedPreviousIndexes.has(index) && editableTargetsMatch(previous, next)
-		);
-
-		if (previousIndex < 0) {
-			return next;
-		}
-
-		const previous = previousTargets[previousIndex];
-		if (!previous) {
-			return next;
-		}
-
-		matchedPreviousIndexes.add(previousIndex);
-		return mergeEditableTargetPreservingLocalPath(next, previous);
-	});
-}
-
-function normalizePathForDisplayScore(value: string | undefined | null): string {
-	return (value ?? '')
-		.trim()
-		.replaceAll('\\', '/')
-		.replaceAll(/\/+/g, '/')
-		.replace(/^(?:\.\/)+/, '');
-}
-
-function trimTrailingSlashesForDisplayScore(value: string): string {
-	if (value === '/') {
-		return value;
-	}
-	return value.replaceAll(/\/+$/g, '');
-}
-
-function isAbsoluteDisplayPath(value: string): boolean {
-	return isAbsolutePath(value);
-}
-
-function looksLikeDirectoryCandidate(value: string): boolean {
-	const trimmed = value.trim();
-	return trimmed.endsWith('/') || trimmed.endsWith('\\');
-}
-
-function getDisplayPathParts(value: string): string[] {
-	return trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value))
-		.replace(/^\/+/, '')
-		.split('/')
-		.filter(Boolean);
-}
-
-function getDisplayPathBasename(value: string): string {
-	const normalized = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
-	const index = normalized.lastIndexOf('/');
-	return index >= 0 ? normalized.slice(index + 1) : normalized;
-}
-
-function getDisplayPathDirname(value: string): string {
-	const normalized = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
-	const index = normalized.lastIndexOf('/');
-
-	if (index < 0) {
-		return '';
-	}
-	if (index === 0) {
-		return '/';
-	}
-	return normalized.slice(0, index);
-}
-
-function pathEndsWithDisplayPath(value: string, suffix: string): boolean {
-	const normalizedValue = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(value));
-	const normalizedSuffix = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(suffix)).replace(/^\/+/, '');
-
-	if (!normalizedValue || !normalizedSuffix) {
-		return false;
-	}
-
-	return normalizedValue === normalizedSuffix || normalizedValue.endsWith(`/${normalizedSuffix}`);
-}
-
-function getCommonSuffixPartCount(left: string, right: string): number {
-	const leftParts = getDisplayPathParts(left);
-	const rightParts = getDisplayPathParts(right);
-	let count = 0;
-
-	while (
-		count < leftParts.length &&
-		count < rightParts.length &&
-		leftParts[leftParts.length - 1 - count] === rightParts[rightParts.length - 1 - count]
-	) {
-		count += 1;
-	}
-
-	return count;
-}
-
-function getPatchPathsForDisplayTarget(target: EditableUnifiedDiffTarget): string[] {
-	return uniqueStrings([target.newPath, target.oldPath]).filter(path => path !== '/dev/null');
-}
-
-function scoreDisplayCandidatePath(
-	candidateRaw: string,
-	target: EditableUnifiedDiffTarget,
-	knownPathKeys: ReadonlySet<string>
-): number {
-	const candidate = normalizePathForDisplayScore(candidateRaw);
-	if (!candidate || candidate === '/dev/null') {
-		return Number.NEGATIVE_INFINITY;
-	}
-
-	let score = 0;
-	const isAbsolute = isAbsoluteDisplayPath(candidate);
-	const isDirectory = looksLikeDirectoryCandidate(candidateRaw);
-
-	if (isAbsolute) {
-		score += 1000;
-	}
-	if (isDirectory) {
-		score -= 250;
-	}
-
-	const targetPath = normalizePathForDisplayScore(target.targetPath);
-	const resolvedPath = normalizePathForDisplayScore(target.resolvedPath);
-
-	if (targetPath && candidate === targetPath) {
-		score = Math.max(score, 100_000);
-	}
-	if (resolvedPath && candidate === resolvedPath) {
-		score = Math.max(score, 95_000);
-	}
-
-	for (const patchPathRaw of getPatchPathsForDisplayTarget(target)) {
-		const patchPath = normalizePathForDisplayScore(patchPathRaw);
-		if (!patchPath) {
-			continue;
-		}
-
-		if (candidate === patchPath) {
-			score = Math.max(score, 90_000);
-		}
-
-		if (pathEndsWithDisplayPath(candidate, patchPath)) {
-			score = Math.max(score, 80_000 + getDisplayPathParts(patchPath).length * 100);
-		}
-
-		const commonSuffixParts = getCommonSuffixPartCount(candidate, patchPath);
-		if (commonSuffixParts > 0) {
-			score = Math.max(score, 30_000 + commonSuffixParts * 100);
-		}
-
-		const patchDir = getDisplayPathDirname(patchPath);
-		if (isDirectory && patchDir && pathEndsWithDisplayPath(candidate, patchDir)) {
-			score = Math.max(score, 20_000 + getDisplayPathParts(patchDir).length * 100);
-		}
-
-		const candidateBasename = getDisplayPathBasename(candidate);
-		const patchBasename = getDisplayPathBasename(patchPath);
-		if (candidateBasename && patchBasename && candidateBasename === patchBasename) {
-			score = Math.max(score, 10_000);
-		}
-	}
-
-	const candidateKey = trimTrailingSlashesForDisplayScore(candidate);
-	if (knownPathKeys.has(candidateKey)) {
-		score = Math.max(score, 200_000);
-	}
-
-	return score;
-}
-
-function buildDisplayCandidatePathsForTarget(
-	target: EditableUnifiedDiffTarget,
-	limit = DISPLAY_CANDIDATE_PATH_LIMIT
-): DisplayCandidatePathList {
-	const knownTargetPaths = absolutePathStrings(target.knownTargetPaths ?? []);
-	const knownPathKeys = new Set(
-		knownTargetPaths.map(path => trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(path))).filter(Boolean)
-	);
-	const isNewFile = isNewUnifiedDiffFile(target);
-	const selectedPathKey = trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(target.targetPath));
-	const allowedNewFilePathKeys = new Set([...knownPathKeys, selectedPathKey].filter(Boolean));
-	const targetCandidatePaths = absolutePathStrings(target.candidatePaths ?? []);
-	const safeTargetCandidatePaths = isNewFile
-		? targetCandidatePaths.filter(path =>
-				allowedNewFilePathKeys.has(trimTrailingSlashesForDisplayScore(normalizePathForDisplayScore(path)))
-			)
-		: targetCandidatePaths;
-	const rawCandidates = isNewFile
-		? absolutePathStrings([target.targetPath, ...knownTargetPaths, ...safeTargetCandidatePaths])
-		: absolutePathStrings([...knownTargetPaths, target.resolvedPath, target.targetPath, ...safeTargetCandidatePaths]);
-
-	const byKey = new Map<string, { path: string; score: number; firstIndex: number }>();
-
-	for (let index = 0; index < rawCandidates.length; index += 1) {
-		const path = rawCandidates[index]?.trim();
-		if (!path) {
-			continue;
-		}
-
-		const key = normalizePathForDisplayScore(path);
-		if (!key || key === '/dev/null') {
-			continue;
-		}
-
-		const score = scoreDisplayCandidatePath(path, target, knownPathKeys);
-		const existing = byKey.get(key);
-
-		if (!existing) {
-			byKey.set(key, { path, score, firstIndex: index });
-		} else if (score > existing.score) {
-			byKey.set(key, { ...existing, path, score });
-		}
-	}
-
-	const sorted = [...byKey.values()].toSorted((left, right) => {
-		if (left.score !== right.score) {
-			return right.score - left.score;
-		}
-		return left.firstIndex - right.firstIndex;
-	});
-
-	const paths =
-		limit > 0 ? sorted.slice(0, limit).map(candidate => candidate.path) : sorted.map(candidate => candidate.path);
-
-	return {
-		paths,
-		total: sorted.length,
-		isLimited: limit > 0 && sorted.length > limit,
-	};
-}
-
-function getDisplayCandidatePathsForTarget(target: EditableUnifiedDiffTarget): DisplayCandidatePathList {
-	const cached = displayCandidatePathCache.get(target);
-	if (cached) {
-		return cached;
-	}
-
-	const next = buildDisplayCandidatePathsForTarget(target);
-	displayCandidatePathCache.set(target, next);
-	return next;
-}
-
-function isTargetProblem(target: EditableUnifiedDiffTarget, missing: boolean): boolean {
-	if (isTerminalUnifiedDiffStatus(target.status)) {
-		return false;
-	}
-
-	return (
-		missing ||
-		target.ok === false ||
-		(target.status !== undefined && target.status !== ApplyUnifiedDiffStatus.Applicable.toString())
-	);
-}
-
-function isTargetApplicableForApply(
-	target: EditableUnifiedDiffTarget,
-	output: ApplyUnifiedDiffOut | undefined
-): boolean {
-	if (isTerminalUnifiedDiffStatus(target.status)) {
-		return false;
-	}
-
-	if (target.status !== undefined) {
-		return target.status === ApplyUnifiedDiffStatus.Applicable.toString() && target.ok !== false;
-	}
-
-	if (!output) {
-		return true;
-	}
-
-	if (output.files && output.files.length > 0) {
-		return false;
-	}
-
-	return output.status === ApplyUnifiedDiffStatus.Applicable && output.ok;
-}
-
-function getLocalTargetKey(target: EditableUnifiedDiffTarget, index: number): string {
-	return (
-		target.fileKey?.trim() ||
-		target.sectionKeys?.join('|') ||
-		getPathIdentity(target.resolvedPath) ||
-		getPathIdentity(target.newPath) ||
-		getPathIdentity(target.oldPath) ||
-		`target-${index}`
-	);
-}
-
-function renderStatusCountBadge(label: string, count: number, tone: HeaderButtonTone) {
-	if (count <= 0) {
+function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyFileView['fullOutcome'] }) {
+	if (!outcome) {
 		return null;
 	}
 
-	return (
-		<span className={`badge badge-outline badge-sm ${getBadgeToneClassName(tone)}`}>
-			{count} {label}
-		</span>
-	);
-}
+	const isProblem = outcome.status === 'blocked' || outcome.status === 'needs-info';
 
-function renderPathMeta(label: string, path: string) {
 	return (
-		<div className="flex min-w-0 items-center gap-2">
-			<span className="text-base-content/40 w-8 shrink-0 uppercase">{label}</span>
-			<span className="min-w-0 truncate font-mono" title={path}>
-				{path}
-			</span>
+		<div
+			className={`mt-3 rounded-lg border px-3 py-2 text-xs/5 whitespace-pre-wrap ${
+				isProblem ? 'border-error/30 bg-error/5 text-error' : 'border-base-300 bg-base-200/40 text-base-content/80'
+			}`}
+			role={isProblem ? 'alert' : 'status'}
+		>
+			<span className="font-semibold">{label}: </span>
+			{outcome.message}
 		</div>
 	);
 }
 
-function getTargetVisualState(
-	target: EditableUnifiedDiffTarget,
-	missing: boolean,
-	diagnostics: ApplyUnifiedDiffDiagnostic[] = []
-): TargetVisualState {
-	if (isTerminalUnifiedDiffStatus(target.status)) {
-		return target.status === ApplyUnifiedDiffStatus.Applied ? 'success' : 'info';
-	}
+function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
+	const { file } = view;
+	const checkedCount = Object.keys(view.hunkOutcomes).length;
+	const readyCount = file.hunks.filter(hunk => view.hunkOutcomes[hunk.id]?.status === 'ready').length;
+	const blockedCount = file.hunks.filter(hunk => {
+		const status = view.hunkOutcomes[hunk.id]?.status;
+		return status === 'blocked' || status === 'needs-info';
+	}).length;
+	const selectedCount = view.selectedHunkIDs.length;
+	const allHunksChecked = checkedCount === file.hunks.length && checkedCount > 0;
+	const canCheckHunks =
+		view.canCheck && file.canApplyPartial && file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES && !controller.busy;
 
-	if (
-		target.status === ApplyUnifiedDiffStatus.Conflict ||
-		target.status === ApplyUnifiedDiffStatus.Error ||
-		target.ok === false ||
-		diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error)
-	) {
-		return 'error';
-	}
+	return (
+		<div className="space-y-3">
+			<div className="flex flex-wrap items-center justify-between gap-2">
+				<div>
+					<div className="text-sm font-semibold">Apply selected hunks</div>
+					<div className="text-base-content/60 mt-1 text-xs">
+						Each hunk is checked without writing. The selected combined patch is dry-run again before any write.
+					</div>
+				</div>
 
-	if (
-		missing ||
-		target.status === ApplyUnifiedDiffStatus.NeedsInfo ||
-		diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Warning)
-	) {
-		return 'warning';
-	}
+				<button
+					type="button"
+					className="btn btn-xs btn-outline"
+					disabled={!canCheckHunks}
+					onClick={() => {
+						void controller.checkHunks(file.id);
+					}}
+				>
+					Check hunks
+				</button>
+			</div>
 
-	if (target.status === ApplyUnifiedDiffStatus.Applicable) {
-		return 'success';
-	}
-	if (diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info)) {
-		return 'info';
-	}
-	return 'neutral';
+			{!file.canApplyPartial ? (
+				<div className="text-base-content/60 text-xs">
+					Partial application is available only for valid, non-overlapping text modifications without file-operation
+					metadata.
+				</div>
+			) : null}
+
+			{file.hunks.length > MAX_INTERACTIVE_HUNK_PROBES ? (
+				<div className="text-warning text-xs">
+					This file has {file.hunks.length} hunks. Per-hunk checking is limited to {MAX_INTERACTIVE_HUNK_PROBES} hunks.
+				</div>
+			) : null}
+
+			{checkedCount > 0 ? (
+				<div className="text-base-content/70 text-xs">
+					{checkedCount}/{file.hunks.length} checked, {readyCount} applicable, {blockedCount} unavailable.
+				</div>
+			) : null}
+
+			<div className="space-y-2">
+				{file.hunks.map((hunk, index) => {
+					const outcome = view.hunkOutcomes[hunk.id];
+					const isReady = outcome?.status === 'ready';
+					const isProblem = outcome?.status === 'blocked' || outcome?.status === 'needs-info';
+
+					return (
+						<div
+							key={hunk.id}
+							className={`rounded-lg border p-3 ${isProblem ? 'border-error/30 bg-error/5' : 'border-base-300'}`}
+						>
+							<label className="flex items-start gap-2 text-xs">
+								<input
+									type="checkbox"
+									className="checkbox checkbox-xs mt-0.5"
+									checked={view.selectedHunkIDs.includes(hunk.id)}
+									disabled={!isReady || !!controller.busy}
+									onChange={event => {
+										controller.setHunkSelected(file.id, hunk.id, event.target.checked);
+									}}
+								/>
+								<span className="font-semibold">Hunk {index + 1}</span>
+								<span className="min-w-0">
+									<span className="text-base-content/60 ml-2">{outcome?.status ?? 'not checked'}</span>
+									<code className="mt-1 block break-all">{hunk.header}</code>
+								</span>
+							</label>
+
+							<OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />
+
+							{outcome?.diagnostics.length ? (
+								<div className="mt-2">
+									{renderDiagnosticsPanel({
+										title: `Hunk ${index + 1} diagnostics`,
+										diagnostics: outcome.diagnostics,
+									})}
+								</div>
+							) : null}
+
+							<LazyDetails
+								className="mt-2"
+								summary="View hunk source"
+								renderContent={() => (
+									<pre className="app-bg-code max-h-64 overflow-auto rounded-sm p-2 text-xs">
+										<code>{[hunk.header, ...hunk.lines].join('\n')}</code>
+									</pre>
+								)}
+							/>
+						</div>
+					);
+				})}
+			</div>
+
+			<OutcomeNotice label="Selected hunks" outcome={view.partialOutcome} />
+
+			<button
+				type="button"
+				className="btn btn-sm btn-primary"
+				disabled={!!controller.busy || !allHunksChecked || selectedCount === 0}
+				onClick={() => {
+					void controller.applySelectedHunks(file.id);
+				}}
+			>
+				Apply selected hunks ({selectedCount})
+			</button>
+		</div>
+	);
 }
 
-function getTargetMessageClassName(visualState: TargetVisualState): string {
-	switch (visualState) {
-		default:
-			return 'border border-base-300 bg-base-200/60 text-base-content/75';
-	}
+function FileCard({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
+	const { file } = view;
+	const inputID = `interactive-diff-target-${file.id}`;
+	const isActive = controller.busy?.activeFileIDs.includes(file.id) ?? false;
+	const displayPath = getInteractiveDiffTargetPath(file) || 'Target path required';
+	const candidates = view.candidates.slice(0, DISPLAY_CANDIDATE_LIMIT);
+	const fileDiagnostics = uniqueDiagnostics([
+		...file.diagnostics,
+		...(view.fullOutcome?.diagnostics ?? []),
+		...(view.partialOutcome?.diagnostics ?? []),
+	]);
+	const canUsePartialHunks = file.hunks.length > 1;
+
+	return (
+		<section className={`rounded-xl border p-4 shadow-sm ${getCardClassName(view)}`} aria-busy={isActive}>
+			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+				<div className="min-w-0 flex-1">
+					<div className="flex flex-wrap items-center gap-2">
+						<span className={`badge badge-outline badge-sm ${getStatusClassName(view.status)}`}>
+							{getStatusLabel(view.status)}
+						</span>
+						<span className="badge badge-ghost badge-sm">{file.kind}</span>
+						<span className="text-base-content/50 text-xs">{file.id}</span>
+					</div>
+
+					<div className="mt-2 font-mono text-sm font-semibold break-all">{displayPath}</div>
+
+					<div className="text-base-content/60 mt-1 text-xs">
+						{file.hunks.length} hunk{file.hunks.length === 1 ? '' : 's'}, +{file.addedLines}/-{file.deletedLines}
+					</div>
+
+					{file.oldPath && file.newPath && file.oldPath !== file.newPath ? (
+						<div className="text-base-content/60 mt-2 space-y-1 font-mono text-xs break-all">
+							<div>Old: {file.oldPath}</div>
+							<div>New: {file.newPath}</div>
+						</div>
+					) : null}
+
+					{isActive ? (
+						<output className="text-info mt-3 flex items-center gap-2 text-xs">
+							<span className="loading loading-spinner loading-xs" />
+							Checking or applying this file.
+						</output>
+					) : null}
+				</div>
+
+				<div className="flex shrink-0 flex-wrap gap-2">
+					<button
+						type="button"
+						className="btn btn-xs btn-outline"
+						disabled={!!controller.busy || !view.canCheck}
+						onClick={() => {
+							void controller.checkFile(file.id);
+						}}
+					>
+						Dry run
+					</button>
+
+					<button
+						type="button"
+						className="btn btn-xs btn-primary"
+						disabled={!!controller.busy || !view.canCheck}
+						title="Runs a fresh dry run immediately before applying this file."
+						onClick={() => {
+							void controller.applyFile(file.id);
+						}}
+					>
+						Apply file
+					</button>
+				</div>
+			</div>
+
+			<OutcomeNotice label="File" outcome={view.fullOutcome} />
+
+			<label className="mt-4 mb-1 block text-xs font-semibold" htmlFor={inputID}>
+				Absolute target file path
+			</label>
+
+			<input
+				id={inputID}
+				className={`input input-sm w-full font-mono text-xs ${
+					view.hasInvalidPathInput ? 'input-error' : !view.targetPath ? 'input-warning' : ''
+				}`}
+				value={view.pathInput}
+				disabled={!!controller.busy}
+				placeholder="Enter an absolute local target path"
+				spellCheck={false}
+				onChange={event => {
+					controller.setTargetPath(file.id, event.target.value);
+				}}
+			/>
+
+			<div className="text-base-content/60 mt-1 text-xs">
+				{view.hasInvalidPathInput
+					? 'Target paths must be absolute and cannot contain dot segments.'
+					: !view.targetPath
+						? isNewInteractiveDiffFile(file)
+							? 'A new file needs a workspace-supported or manually entered absolute target path.'
+							: 'Choose or enter an absolute target path before checking this file.'
+						: 'Changing this path invalidates prior checks for this file.'}
+			</div>
+
+			{candidates.length > 0 ? (
+				<select
+					className="select select-sm mt-2 w-full font-mono text-xs"
+					value=""
+					disabled={!!controller.busy}
+					aria-label={`Supported target paths for ${displayPath}`}
+					onChange={event => {
+						if (event.target.value) {
+							controller.setTargetPath(file.id, event.target.value);
+						}
+					}}
+				>
+					<option value="">Choose a supported target path</option>
+					{candidates.map(candidate => (
+						<option key={candidate} value={candidate}>
+							{candidate}
+						</option>
+					))}
+				</select>
+			) : null}
+
+			{fileDiagnostics.length > 0 ? (
+				<div className="mt-3">
+					{renderDiagnosticsPanel({
+						title: 'File diagnostics',
+						description: 'These diagnostics apply only to this file section.',
+						diagnostics: fileDiagnostics,
+					})}
+				</div>
+			) : null}
+
+			{canUsePartialHunks ? (
+				<LazyDetails
+					className="mt-3"
+					summary="Review individual hunks"
+					renderContent={() => <HunkPanel view={view} controller={controller} />}
+				/>
+			) : null}
+
+			<LazyDetails
+				className="mt-3"
+				summary="View file patch"
+				renderContent={() => (
+					<pre className="app-bg-code max-h-80 overflow-auto rounded-sm p-3 text-xs">
+						<code>{file.sourceText}</code>
+					</pre>
+				)}
+			/>
+		</section>
+	);
 }
 
-interface DiffApplyModalProps {
-	isOpen: boolean;
-	onClose: () => void;
-	fallbackParsed: ReturnType<typeof parseUnifiedDiffForUI>;
-	output?: ApplyUnifiedDiffOut;
-	error?: string;
-	candidatePaths: string[];
-	workspaceRoots: string[];
-	fileTargets: ApplyUnifiedDiffFileTarget[];
-	strict: boolean;
-	onStrictChange: (strict: boolean) => void;
-	onDryRun: (targets: EditableUnifiedDiffTarget[], strict: boolean, options?: DiffApplyRunOptions) => Promise<void>;
-	onApply: (targets: EditableUnifiedDiffTarget[], strict: boolean, options?: DiffApplyRunOptions) => Promise<void>;
-}
-
-function DiffApplyModalContent({
-	isOpen,
-
-	fallbackParsed,
-	output,
-	error,
-	candidatePaths,
-	workspaceRoots,
-	fileTargets,
-	strict,
-	onStrictChange,
-	onDryRun,
-	onApply,
-}: Omit<DiffApplyModalProps, 'onClose'>) {
+function DiffApplyModalContent({ controller }: { controller: DiffApplyController }) {
 	const { requestClose } = useModalDialogController();
 
-	const baseTargets = useMemo(() => {
-		if (!isOpen) {
-			return [];
-		}
+	const completedCount = controller.appliedFileCount + controller.alreadyAppliedFileCount;
 
-		const fromOutput = buildEditableTargetsFromOutput(output, fallbackParsed, candidatePaths, workspaceRoots);
-		const byKey = new Map<string, EditableUnifiedDiffTarget>();
-
-		for (const target of fromOutput) {
-			upsertEditableTargetForModal(byKey, target);
-		}
-
-		for (const target of fileTargets) {
-			upsertEditableTargetForModal(byKey, {
-				fileKey: target.fileKey,
-				oldPath: target.oldPath,
-				newPath: target.newPath,
-				targetPath: target.targetPath,
-				candidatePaths: absolutePathStrings([target.targetPath]),
-				knownTargetPaths: [],
-			});
-		}
-
-		return [...byKey.values()];
-	}, [candidatePaths, fallbackParsed, fileTargets, isOpen, output, workspaceRoots]);
-
-	// This array contains only user-edited target paths. Backend/parser state
-	// remains derived from props and cannot become stale.
-	const [localTargets, setLocalTargets] = useState<EditableUnifiedDiffTarget[]>([]);
-	const displayTargets = useMemo(
-		() => mergeModalTargetsPreservingLocalEdits(baseTargets, localTargets),
-		[baseTargets, localTargets]
-	);
-
-	const [runningAction, setRunningAction] = useState<ModalRunningAction | null>(null);
-	const isRunning = runningAction !== null;
-	const patchDiagnostics = uniqueDiagnostics([
-		...(fallbackParsed.diagnostics ?? []),
-		...collectPatchLevelDiagnostics(output),
-	]);
-
-	if (!isOpen) {
-		return null;
-	}
-
-	const fileDiagnostics = collectFileLevelDiagnostics(output);
-	const summary = summaryLabel(output, fallbackParsed);
-	const counts = buildFileStatusCounts(output, fallbackParsed);
-	const targetsForApply = displayTargets.filter(target => isTargetApplicableForApply(target, output));
-	const missingCount = targetsForApply.filter(target => !isAbsolutePath(target.targetPath)).length;
-	const hasAnyTargets = displayTargets.length > 0;
-	const canApplyFromModal = targetsForApply.length > 0 && missingCount === 0 && !isRunning;
-	const patchDiagnosticCounts = getDiagnosticSeverityCounts(patchDiagnostics);
-	const blockedFileCount = Math.max(0, counts.blocked - counts.needsInfo);
-
-	const outputIsSuccessful =
-		output?.ok === true ||
-		(output?.status === ApplyUnifiedDiffStatus.Applicable && output.ok) ||
-		isTerminalUnifiedDiffStatus(output?.status);
-
-	const updateTarget = (index: number, targetPath: string) => {
-		const currentTarget = displayTargets[index];
-		if (!currentTarget) {
-			return;
-		}
-
-		const editedTarget: EditableUnifiedDiffTarget = {
-			...currentTarget,
-			targetPath: toAbsolutePath(targetPath),
-			targetPathInput: targetPath,
-			candidatePaths: isNewUnifiedDiffFile(currentTarget)
-				? absolutePathStrings([...(currentTarget.knownTargetPaths ?? []), targetPath])
-				: absolutePathStrings([targetPath, ...(currentTarget.candidatePaths ?? [])]),
-		};
-
-		setLocalTargets(previous => {
-			const existingIndex = previous.findIndex(target => editableTargetsMatch(target, currentTarget));
-			if (existingIndex < 0) {
-				return [...previous, editedTarget];
-			}
-
-			const existing = previous[existingIndex];
-			if (
-				existing.targetPath === editedTarget.targetPath &&
-				existing.targetPathInput === editedTarget.targetPathInput
-			) {
-				return previous;
-			}
-
-			const next = [...previous];
-			next[existingIndex] = editedTarget;
-			return next;
-		});
-	};
-
-	const handleDryRun = async () => {
-		if (isRunning) {
-			return;
-		}
-		setRunningAction({ key: 'global', kind: 'dry-run' });
-		try {
-			await onDryRun(displayTargets, strict);
-		} finally {
-			setRunningAction(null);
-		}
-	};
-
-	const handleApply = async () => {
-		if (isRunning || !canApplyFromModal) {
-			return;
-		}
-
-		setRunningAction({ key: 'global', kind: 'apply' });
-		try {
-			await onApply(targetsForApply, strict);
-		} finally {
-			setRunningAction(null);
-		}
-	};
-
-	const handleTargetDryRun = async (index: number) => {
-		if (isRunning) {
-			return;
-		}
-
-		const target = displayTargets[index];
-
-		if (!target) {
-			return;
-		}
-
-		const key = getLocalTargetKey(target, index);
-		setRunningAction({ key, kind: 'dry-run' });
-
-		try {
-			await onDryRun([target], strict, {
-				mergeOutput: true,
-			});
-		} finally {
-			setRunningAction(null);
-		}
-	};
-
-	const handleTargetApply = async (index: number) => {
-		if (isRunning) {
-			return;
-		}
-
-		const target = displayTargets[index];
-		if (!target || !isTargetApplicableForApply(target, output) || !isAbsolutePath(target.targetPath)) {
-			return;
-		}
-
-		const key = getLocalTargetKey(target, index);
-		setRunningAction({ key, kind: 'apply' });
-
-		try {
-			await onApply([target], strict, {
-				mergeOutput: true,
-			});
-		} finally {
-			setRunningAction(null);
-		}
-	};
-
-	const globalDryRunning = runningAction?.key === 'global' && runningAction.kind === 'dry-run';
-	const globalApplying = runningAction?.key === 'global' && runningAction.kind === 'apply';
+	const busyLabel = controller.busy
+		? controller.busy.stopping
+			? 'Stopping after in-flight requests finish. An already-submitted write cannot be undone.'
+			: `${controller.busy.kind.replaceAll('-', ' ')}: ${controller.busy.completed}/${controller.busy.total}`
+		: '';
 
 	return (
 		<>
 			<div className="modal-box bg-base-100 flex max-h-[calc(100dvh-2rem)] w-11/12 max-w-5xl flex-col overflow-hidden rounded-2xl p-0 shadow-2xl">
-				<div className="border-base-300 bg-base-100 border-b px-4 py-3 sm:px-5">
+				<div className="border-base-300 border-b px-4 py-3 sm:px-5">
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 flex-1">
-							<h3 className="flex min-w-0 items-center gap-2 text-base font-semibold">
+							<h3 className="flex items-center gap-2 text-base font-semibold">
 								<FiGitPullRequest size={16} className="shrink-0" />
-								<span className="truncate">Apply unified diff</span>
+								<span>Apply unified diff</span>
 							</h3>
-							<div className="text-base-content/60 mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-								<span>{summary}</span>
-								{patchDiagnosticCounts.total > 0 ? (
-									<span
-										className={`badge badge-outline badge-sm ${getDiagnosticSummaryBadgeClassName(
-											patchDiagnosticCounts
-										)}`}
-										title={formatDiagnosticsTitle(patchDiagnostics)}
-									>
-										{patchDiagnosticCounts.total} patch diag
-										{patchDiagnosticCounts.total === 1 ? '' : 's'}
-									</span>
-								) : null}
-								{missingCount > 0 ? (
-									<span className="badge badge-outline badge-warning badge-sm">{missingCount} need absolute paths</span>
-								) : null}
-							</div>
-							<div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-								{renderStatusCountBadge('applicable', counts.applicable, 'success')}
-								{renderStatusCountBadge('applied', counts.applied, 'success')}
-								{renderStatusCountBadge('already applied', counts.alreadyApplied, 'info')}
-								{counts.needsInfo > 0 ? (
-									<span className="badge badge-outline badge-sm badge-warning">{counts.needsInfo} need info</span>
-								) : null}
-								{renderStatusCountBadge('blocked', blockedFileCount, 'error')}
-								{renderStatusCountBadge('pending', counts.unknown, 'neutral')}
+
+							<div className="text-base-content/60 mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs">
+								<span>{controller.files.length} file sections</span>
+								<span>{controller.readyFileCount} ready</span>
+								{controller.needsInfoFileCount > 0 ? <span>{controller.needsInfoFileCount} need paths</span> : null}
+								{controller.blockedFileCount > 0 ? <span>{controller.blockedFileCount} blocked</span> : null}
+								{completedCount > 0 ? <span>{completedCount} complete</span> : null}
 							</div>
 						</div>
 
@@ -864,247 +431,77 @@ function DiffApplyModalContent({
 							onClick={() => {
 								requestClose();
 							}}
-							aria-label="Close"
+							aria-label="Close diff details"
 						>
-							<FiX size={12} />
+							<FiX size={14} />
 						</button>
+					</div>
+
+					<label
+						className="mt-3 flex items-center gap-2 text-sm"
+						title="Strict matching disables backend fuzzy matching."
+					>
+						<input
+							type="checkbox"
+							className="checkbox checkbox-xs"
+							checked={controller.strict}
+							disabled={!!controller.busy}
+							onChange={event => {
+								controller.setStrict(event.target.checked);
+							}}
+						/>
+						Strict matching
+					</label>
+
+					<div className="text-base-content/60 mt-1 text-xs">
+						Changing matching mode invalidates previous dry-run results.
 					</div>
 				</div>
 
-				<div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:px-5">
-					{output?.message || error ? (
-						<div className="border-base-300 bg-base-100 mb-4 rounded-xl border px-3 py-2 text-sm">
-							<div className="flex items-start gap-2">
-								<span
-									className={`badge badge-outline badge-sm shrink-0 ${getBadgeToneClassName(
-										error ? 'error' : outputIsSuccessful ? 'success' : 'warning'
-									)}`}
-								>
-									{error ? 'Error' : outputIsSuccessful ? 'Ready' : 'Notice'}
-								</span>
-								<span className="min-w-0 leading-5">{error || output?.message}</span>
-							</div>
+				<div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:px-5">
+					{renderDiagnosticsPanel({
+						title: 'Patch diagnostics',
+						description: 'These are parser-level diagnostics for the entire patch.',
+						diagnostics: controller.patchDiagnostics,
+					})}
+
+					{controller.files.length === 0 ? (
+						<div className="border-base-300 rounded-xl border p-4 text-sm">
+							No interactive file sections could be extracted from this diff.
 						</div>
 					) : null}
 
-					{renderDiagnosticsPanel({
-						title: 'Patch diagnostics',
-						description: 'Applies to the whole patch, not one file section.',
-						diagnostics: patchDiagnostics,
-						className: 'mb-4',
-						footer:
-							fileDiagnostics.length > 0
-								? `${fileDiagnostics.length} file-specific diagnostic${
-										fileDiagnostics.length === 1 ? '' : 's'
-									} shown inside file sections.`
-								: undefined,
-					})}
-
-					<div className="border-base-300 bg-base-100 mb-4 flex flex-col gap-3 rounded-xl border px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-						<label
-							className="flex items-center gap-2 text-sm"
-							title="Strict disables fuzzy matching in the backend tool"
-						>
-							<input
-								type="checkbox"
-								className="checkbox checkbox-xs"
-								checked={strict}
-								onChange={event => {
-									onStrictChange(event.target.checked);
-								}}
-							/>
-							<span>Strict matching</span>
-						</label>
-
-						{missingCount > 0 ? (
-							<div className="badge badge-outline badge-warning badge-sm">
-								{missingCount} target path{missingCount === 1 ? '' : 's'} must be absolute.
-							</div>
-						) : null}
-					</div>
-
-					<div className="space-y-3">
-						{!hasAnyTargets ? (
-							<div className="bg-base-100 border-base-300 rounded-xl border p-4 text-sm">
-								No file target information could be extracted. Try a dry run, or provide a complete unified diff.
-							</div>
-						) : null}
-
-						{displayTargets.map((target, index) => {
-							const missing = !isAbsolutePath(target.targetPath);
-							const targetPathInput = target.targetPathInput ?? target.targetPath;
-							const inputId = `diff-apply-target-${target.fileKey ?? index}`;
-							const candidateDisplay = getDisplayCandidatePathsForTarget(target);
-							const candidates = candidateDisplay.paths;
-							const isNewFile = isNewUnifiedDiffFile(target);
-							const targetDiagnostics = uniqueDiagnostics(target.diagnostics ?? []);
-							const targetKey = getLocalTargetKey(target, index);
-							const isTargetDryRunning = runningAction?.key === targetKey && runningAction.kind === 'dry-run';
-							const isTargetApplying = runningAction?.key === targetKey && runningAction.kind === 'apply';
-							const isProblem = isTargetProblem(target, missing);
-							const canApplyTarget = isTargetApplicableForApply(target, output) && !missing && !isRunning;
-							const isTerminal = isTerminalUnifiedDiffStatus(target.status);
-							const targetVisualState = getTargetVisualState(target, missing, targetDiagnostics);
-							const targetCardClassName = getTargetCardClassName(targetVisualState);
-							const targetBadgeClassName = getTargetStatusBadgeClassName(targetVisualState);
-							const targetMessageClassName = getTargetMessageClassName(targetVisualState);
-							const displayPath = getTargetDisplayPath(target);
-
-							return (
-								<div key={targetKey} className={`rounded-xl border p-4 shadow-sm ${targetCardClassName}`}>
-									<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-										<div className="min-w-0 flex-1">
-											<div className="flex min-w-0 flex-wrap items-center gap-2">
-												<span className={`badge badge-outline badge-sm ${targetBadgeClassName}`}>
-													{getTargetStatusLabel(target, missing)}
-												</span>
-												<span
-													className="max-w-full min-w-0 truncate font-mono text-sm font-semibold"
-													title={displayPath}
-												>
-													{displayPath}
-												</span>
-											</div>
-
-											<div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-												{typeof target.hunks === 'number' ? (
-													<span className="badge badge-ghost badge-sm">
-														{target.hunks} hunk{target.hunks === 1 ? '' : 's'}
-													</span>
-												) : null}
-												{typeof target.addedLines === 'number' ? (
-													<span className="badge badge-ghost badge-sm">+{target.addedLines}</span>
-												) : null}
-												{typeof target.deletedLines === 'number' ? (
-													<span className="badge badge-ghost badge-sm">-{target.deletedLines}</span>
-												) : null}
-												{target.fileKey ? (
-													<span className="badge badge-ghost badge-sm font-mono">{target.fileKey}</span>
-												) : null}
-												{target.sectionKeys && target.sectionKeys.length > 1 ? (
-													<span className="badge badge-ghost badge-sm">{target.sectionKeys.length} sections</span>
-												) : null}
-												{targetDiagnostics.length > 0 ? renderDiagnosticSeveritySummary(targetDiagnostics) : null}
-											</div>
-
-											{target.oldPath || target.newPath ? (
-												<div className="text-base-content/60 mt-2 grid gap-1 text-[11px]">
-													{target.oldPath ? renderPathMeta('old', target.oldPath) : null}
-													{target.newPath ? renderPathMeta('new', target.newPath) : null}
-												</div>
-											) : null}
-
-											{target.message ? (
-												<div className={`mt-2 rounded-lg px-3 py-2 text-xs/5 ${targetMessageClassName}`}>
-													{target.message}
-												</div>
-											) : null}
-										</div>
-
-										<div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
-											<button
-												type="button"
-												className="btn btn-xs btn-outline"
-												disabled={isRunning}
-												onClick={() => {
-													void handleTargetDryRun(index);
-												}}
-											>
-												{isTargetDryRunning ? <span className="loading loading-spinner loading-xs" /> : null}
-												Dry run
-											</button>
-
-											<button
-												type="button"
-												className="btn btn-xs btn-primary"
-												disabled={!canApplyTarget || isProblem || isTerminal}
-												onClick={() => {
-													void handleTargetApply(index);
-												}}
-											>
-												{isTargetApplying ? <span className="loading loading-spinner loading-xs" /> : null}
-												Apply
-											</button>
-										</div>
-									</div>
-
-									<label className="text-base-content/70 mt-3 mb-1 block text-xs font-medium" htmlFor={inputId}>
-										Target file path
-									</label>
-
-									<input
-										id={inputId}
-										className={`input input-sm w-full font-mono text-xs ${missing ? 'input-error' : ''}`}
-										value={targetPathInput}
-										onChange={event => {
-											updateTarget(index, event.target.value);
-										}}
-										placeholder="Enter an absolute local target file path"
-										spellCheck={false}
-									/>
-
-									{missing ? (
-										<div className="text-error mt-1 text-xs">
-											{isNewFile && candidates.length === 0
-												? 'No attachment, tool path, or workspace root supports this new file location. Enter an absolute local target path.'
-												: isNewFile
-													? 'Select an evidence-backed target path or enter an absolute local target path.'
-													: targetPathInput.trim()
-														? 'Target path must be absolute before applying this file patch.'
-														: 'Target path is required before applying this file patch.'}
-										</div>
-									) : null}
-
-									{candidates.length > 0 ? (
-										<details className="group border-base-300 bg-base-100 mt-3 overflow-hidden rounded-lg border">
-											<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold">
-												<span>{isNewFile ? 'Supported target paths' : 'Evidence-backed candidate paths'}</span>
-												<span className="text-base-content/50 inline-flex items-center gap-1 font-normal">
-													<FiChevronRight size={11} className="transition group-open:rotate-90" />
-													{candidateDisplay.isLimited
-														? `${candidates.length} of ${candidateDisplay.total} options`
-														: `${candidateDisplay.total} options`}
-												</span>
-											</summary>
-											<div className="border-base-300 border-t px-3 py-2">
-												<ul className="grid gap-1.5">
-													{candidates.map(candidate => (
-														<li key={candidate} className="min-w-0">
-															<button
-																type="button"
-																className="btn btn-xs btn-ghost h-auto min-h-0 w-full justify-start rounded-md p-2 text-left font-mono text-[11px]/4 whitespace-normal"
-																title={candidate}
-																onClick={() => {
-																	updateTarget(index, candidate);
-																}}
-															>
-																<span className="min-w-0 break-all">{candidate}</span>
-															</button>
-														</li>
-													))}
-													{candidateDisplay.isLimited ? (
-														<li className="text-base-content/50 px-2 py-1 text-xs">
-															+{candidateDisplay.total - candidates.length} lower-ranked candidate paths hidden
-														</li>
-													) : null}
-												</ul>
-											</div>
-										</details>
-									) : null}
-
-									{targetDiagnostics.length > 0 ? (
-										<div className="mt-3">
-											{renderDiagnosticsPanel({
-												title: 'File diagnostics',
-												diagnostics: targetDiagnostics,
-											})}
-										</div>
-									) : null}
-								</div>
-							);
-						})}
-					</div>
+					{controller.files.map(view => (
+						<FileCard key={view.file.id} view={view} controller={controller} />
+					))}
 				</div>
+
+				{controller.busy ? (
+					<div className="border-base-300 flex items-center justify-between gap-3 border-t px-5 py-2 text-xs">
+						<div className="min-w-0">
+							<output className="flex items-center gap-2" aria-live="polite">
+								<span className="loading loading-spinner loading-xs" />
+								<span>{busyLabel}</span>
+							</output>
+							<div className="text-base-content/60 mt-1">
+								Dry runs are bounded. Writes are serialized and rechecked immediately before apply.
+							</div>
+						</div>
+
+						<button
+							type="button"
+							className="btn btn-xs"
+							disabled={controller.busy.stopping}
+							onClick={controller.cancel}
+						>
+							Stop remaining work
+						</button>
+					</div>
+				) : (
+					<div className="border-base-300 text-base-content/60 border-t px-5 py-2 text-xs">
+						Files apply independently. A failure in one file does not roll back files already applied.
+					</div>
+				)}
 
 				<ModalActions className="bg-base-100">
 					<button
@@ -1120,26 +517,24 @@ function DiffApplyModalContent({
 					<button
 						type="button"
 						className="btn btn-sm"
-						disabled={isRunning}
+						disabled={!!controller.busy || controller.patchHasErrors || controller.files.length === 0}
 						onClick={() => {
-							void handleDryRun();
+							void controller.checkAll();
 						}}
 					>
-						{globalDryRunning ? <span className="loading loading-spinner loading-xs" /> : null}
 						Dry run all
 					</button>
 
 					<button
 						type="button"
 						className="btn btn-sm btn-primary"
-						disabled={!canApplyFromModal}
-						title="Runs a dry run first, then applies only file patches reported as applicable."
+						disabled={!!controller.busy || controller.patchHasErrors || controller.readyFileCount === 0}
+						title="Only files with a current successful dry run are selected. Each is dry-run again immediately before writing."
 						onClick={() => {
-							void handleApply();
+							void controller.applyReady();
 						}}
 					>
-						{globalApplying ? <span className="loading loading-spinner loading-xs" /> : null}
-						Apply applicable ({targetsForApply.length})
+						Apply ready ({controller.readyFileCount})
 					</button>
 				</ModalActions>
 			</div>
@@ -1149,14 +544,14 @@ function DiffApplyModalContent({
 	);
 }
 
-export function DiffApplyModal(props: DiffApplyModalProps) {
-	if (!props.isOpen) {
+export function DiffApplyModal({ isOpen, onClose, controller }: DiffApplyModalProps) {
+	if (!isOpen) {
 		return null;
 	}
 
 	return (
-		<ModalDialog isOpen={props.isOpen} onClose={props.onClose} data-disable-chat-shortcuts="true">
-			<DiffApplyModalContent {...props} />
+		<ModalDialog isOpen={isOpen} onClose={onClose} data-disable-chat-shortcuts="true">
+			<DiffApplyModalContent controller={controller} />
 		</ModalDialog>
 	);
 }
