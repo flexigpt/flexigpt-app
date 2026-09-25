@@ -4,7 +4,7 @@ import { useCallback } from 'react';
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InferenceError, ModelParam, UIToolCall } from '@/spec/inference';
 import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelection } from '@/spec/tool';
 import { RoleEnum, Status } from '@/spec/inference';
 
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
@@ -35,7 +35,7 @@ import {
 	initConversationMessage,
 	shouldPersistAssistantModelParam,
 } from '@/chats/conversation/hydration_helper';
-import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
+import { requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
 
 interface UseSendMessageArgs {
 	tabsRef: RefObject<ChatTabState[]>;
@@ -132,7 +132,7 @@ export function useSendMessage({
 			const chatWithPlaceholder: Conversation = {
 				...updatedChatWithUserMessage,
 				messages: [...updatedChatWithUserMessage.messages, assistantPlaceholder],
-				modifiedAt: new Date(),
+				modifiedAt: new Date().toISOString(),
 			};
 
 			updateTab(tabId, tab => ({
@@ -198,12 +198,12 @@ export function useSendMessage({
 				: undefined;
 
 			try {
-				let toolStoreChoices: ToolStoreChoice[] | undefined;
+				let toolSelections: ToolSelection[] | undefined;
 
 				const latestUser = findLatestUserMessage(updatedChatWithUserMessage.messages);
 
-				if (latestUser?.toolStoreChoices && latestUser.toolStoreChoices.length > 0) {
-					toolStoreChoices = latestUser.toolStoreChoices;
+				if (latestUser?.toolSelections && latestUser.toolSelections.length > 0) {
+					toolSelections = latestUser.toolSelections;
 				}
 
 				const { responseMessage, rawResponse } = await HandleCompletion(
@@ -212,7 +212,7 @@ export function useSendMessage({
 					inputParams,
 					effectiveCurrentUserMsg,
 					history,
-					toolStoreChoices,
+					toolSelections,
 					effectiveCurrentUserMsg.mcpContext,
 					assistantPlaceholder,
 					skillSessionID,
@@ -306,7 +306,7 @@ export function useSendMessage({
 					let finalChat: Conversation = {
 						...chatWithPlaceholder,
 						messages: [...chatWithPlaceholder.messages.slice(0, -1), persistedAssistantMessage],
-						modifiedAt: new Date(),
+						modifiedAt: new Date().toISOString(),
 					};
 
 					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
@@ -315,7 +315,7 @@ export function useSendMessage({
 
 					if (persistedAssistantMessage.uiToolCalls && persistedAssistantMessage.uiToolCalls.length > 0) {
 						queuedRunnableToolCalls = persistedAssistantMessage.uiToolCalls.filter(call =>
-							isRunnableComposerToolCall(call)
+							requiresComposerToolResponse(call)
 						);
 					}
 				} else {
@@ -341,7 +341,7 @@ export function useSendMessage({
 					let finalChat: Conversation = {
 						...chatWithPlaceholder,
 						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
-						modifiedAt: new Date(),
+						modifiedAt: new Date().toISOString(),
 					};
 					finalChat = applyCompletionMetadata(finalChat, currentUserMsg?.id, rawResponse);
 
@@ -370,7 +370,7 @@ export function useSendMessage({
 							const messages = tab.conversation.messages.filter((_, i) => i !== idx);
 							return {
 								...tab,
-								conversation: { ...tab.conversation, messages, modifiedAt: new Date() },
+								conversation: { ...tab.conversation, messages, modifiedAt: new Date().toISOString() },
 							};
 						});
 					} else {
@@ -390,7 +390,7 @@ export function useSendMessage({
 						const finalChat: Conversation = {
 							...chatWithPlaceholder,
 							messages: [...chatWithPlaceholder.messages.slice(0, -1), partialMsg],
-							modifiedAt: new Date(),
+							modifiedAt: new Date().toISOString(),
 						};
 
 						saveUpdatedConversation(tabId, finalChat);
@@ -429,7 +429,7 @@ export function useSendMessage({
 					const finalChat: Conversation = {
 						...chatWithPlaceholder,
 						messages: [...chatWithPlaceholder.messages.slice(0, -1), fallbackMsg],
-						modifiedAt: new Date(),
+						modifiedAt: new Date().toISOString(),
 					};
 
 					saveUpdatedConversation(tabId, finalChat);
@@ -534,7 +534,7 @@ export function useSendMessage({
 					const updatedChat: Conversation = {
 						...tab.conversation,
 						messages,
-						modifiedAt: new Date(),
+						modifiedAt: new Date().toISOString(),
 					};
 
 					updateTab(tabId, current => ({ ...current, editingMessageId: null }));
@@ -549,7 +549,7 @@ export function useSendMessage({
 			const updatedChat: Conversation = {
 				...tab.conversation,
 				messages: [...tab.conversation.messages, userMsg],
-				modifiedAt: new Date(),
+				modifiedAt: new Date().toISOString(),
 			};
 
 			saveUpdatedConversation(tabId, updatedChat);
@@ -584,7 +584,8 @@ export function useSendMessage({
 			const external: EditorExternalMessage = {
 				text: message.uiContent ?? '',
 				attachments: message.attachments,
-				toolChoices: message.toolStoreChoices,
+				toolChoices: message.uiToolChoices,
+				toolSelectionIssues: message.uiToolSelectionIssues,
 				mcpContext: message.mcpContext,
 				mcpAppContextUpdates: message.mcpAppContextUpdates,
 				toolOutputs: message.uiToolOutputs,

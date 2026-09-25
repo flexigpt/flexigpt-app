@@ -6,22 +6,22 @@ export function GetTool(arg1) {
   return window['go']['main']['ToolStoreWrapper']['GetTool'](arg1);
 }
 
-export function ListToolBundles(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['ListToolBundles'](arg1);
+export function GetToolCollection(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['GetToolCollection'](arg1);
 }
 
-export function ListTools(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['ListTools'](arg1);
+export function ListCollectionTools(arg1) {
+  return window['go']['main']['ToolStoreWrapper']['ListCollectionTools'](arg1);
 }
 
-export function PatchTool(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['PatchTool'](arg1);
+export function ListToolCollections() {
+  return window['go']['main']['ToolStoreWrapper']['ListToolCollections']();
 }
 
-export function PatchToolBundle(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['PatchToolBundle'](arg1);
+export function SetToolCollectionEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['ToolStoreWrapper']['SetToolCollectionEnabled'](arg1, arg2, arg3);
 }
 
-export function ResolveMappedToolTarget(arg1) {
-  return window['go']['main']['ToolStoreWrapper']['ResolveMappedToolTarget'](arg1);
+export function SetToolEnabled(arg1, arg2, arg3) {
+  return window['go']['main']['ToolStoreWrapper']['SetToolEnabled'](arg1, arg2, arg3);
 }

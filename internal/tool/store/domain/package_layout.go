@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
@@ -25,7 +26,7 @@ func ToolCollectionPackageAddress(
 	return source.NewManagedPackageAddress(
 		ToolCollectionPackageKind,
 		name,
-		"unversioned",
+		documentTopology.UnversionedPackageVersion(),
 	)
 }
 

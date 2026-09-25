@@ -1,5 +1,5 @@
 import type { MCPProviderToolMapping, MCPToolAppRenderInfo, MCPToolSelection } from '@/spec/mcp';
-import type { ToolOutputUnion, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
 export type ProviderName = string;
@@ -500,9 +500,12 @@ export interface UIToolCall {
 	status: UIToolCallStatus;
 	/**
 	 * Optional. Some tool calls are injected at runtime (e.g. skills-*) and do not
-	 * correspond to a ToolStoreChoice in message.toolStoreChoices.
+	 * correspond to a stored ToolSelection.
 	 */
 	toolStoreChoice?: ToolStoreChoice;
+
+	/** Original selection, including when its current Tool metadata is unavailable. */
+	toolSelection?: ToolSelection;
 
 	/**
 	 * Optional MCP identity for dynamically hydrated MCP tool calls.
@@ -534,6 +537,8 @@ export interface UIToolOutput {
 	 * For regular tool-store tools we typically hydrate this.
 	 */
 	toolStoreChoice?: ToolStoreChoice;
+	/** Original selection retained independently of current metadata availability. */
+	toolSelection?: ToolSelection;
 	/**
 	 * Optional MCP identity for dynamically executed MCP tool outputs.
 	 */

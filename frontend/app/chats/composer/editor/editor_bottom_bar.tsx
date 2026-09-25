@@ -10,6 +10,8 @@ import type { ToolListItem } from '@/spec/tool';
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
+import type { ToolCatalogState } from '@/hooks/use_tool';
+
 import type { UseComposerMCPResult } from '@/chats/composer/mcp/mcp_composer_types';
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
@@ -65,7 +67,7 @@ interface EditorBottomBarProps {
 	// Web-search state comes from EditorArea (separate UX/state)
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
-	onWebSearchArgsBlockedChange?: (blocked: boolean) => void;
+	toolCatalog: ToolCatalogState;
 
 	// Skills state comes from EditorArea (conversation-level)
 	allSkills: SkillListItem[];
@@ -122,7 +124,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onOpenConversationToolDetails,
 	webSearchTemplates,
 	setWebSearchTemplates,
-	onWebSearchArgsBlockedChange,
+	toolCatalog,
 	allSkills,
 	skillsLoading = false,
 	skillsLoadError,
@@ -234,7 +236,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						onOpenConversationToolDetails={onOpenConversationToolDetails}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplates}
-						onWebSearchArgsBlockedChange={onWebSearchArgsBlockedChange}
+						toolCatalog={toolCatalog}
 						toolArgsEventTarget={toolArgsEventTarget}
 						isInputLocked={isInputLocked}
 					/>

@@ -1,15 +1,17 @@
 import type { Dispatch, MouseEvent, RefObject, SetStateAction, SyntheticEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
-import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiTool, FiX } from 'react-icons/fi';
+import { FiAlertTriangle, FiCheck, FiEdit2, FiGlobe, FiRefreshCw, FiTool, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
 import { Menu, MenuButton, MenuItem, useStoreState } from '@ariakit/react';
 
 import type { ProviderSDKType } from '@/spec/inference';
-import type { ToolListItem } from '@/spec/tool';
+import type { ToolListItem, ToolStoreChoice } from '@/spec/tool';
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
-import { useTools } from '@/hooks/use_tool';
+import type { ToolCatalogState } from '@/hooks/use_tool';
+
+import { toolArtifactKey, toolDisplayName } from '@/apis/tool_management';
 
 import {
 	actionTriggerChipClearButtonClasses,
@@ -18,7 +20,7 @@ import {
 	actionTriggerMenuItemClasses,
 	actionTriggerMenuWideClasses,
 } from '@/components/action_trigger_chip';
-import { GroupedMenuSection, GroupedMenuSubheading } from '@/components/grouped_menu_sections';
+import { GroupedMenuSection } from '@/components/grouped_menu_sections';
 import { HoverTip, HoverTipContent } from '@/components/hover_tip';
 import { SearchableMenuInput } from '@/components/searchmenu/searchable_menu';
 import {
@@ -34,33 +36,21 @@ import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_u
 import { dispatchOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolMenuRow } from '@/chats/composer/tools/tool_menu_row';
 import {
-	getEligibleWebSearchTools,
-	normalizeWebSearchChoiceTemplates,
+	getWebSearchConfiguration,
 	webSearchIdentityKey,
 	webSearchTemplateFromToolListItem,
 } from '@/chats/composer/tools/websearch_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
-interface ToolBundleGroup {
-	bundleID: string;
-	bundleSlug: string;
-	isBuiltIn: boolean;
-	attachedOptions: ToolListItem[];
-	conversationOptions: ConversationToolStateEntry[];
-	availableOptions: ToolListItem[];
-}
-
 interface ToolsBottomBarChipProps {
 	store: MenuStore;
 	buttonRef: RefObject<HTMLButtonElement | null>;
 	shortcut?: string;
 	currentProviderSDKType: ProviderSDKType;
-
 	attachedToolEntries: AttachedToolEntry[];
 	conversationToolsState: ConversationToolStateEntry[];
 	setConversationToolsState: Dispatch<SetStateAction<ConversationToolStateEntry[]>>;
-
 	onAttachTool: (item: ToolListItem, autoExecute: boolean) => void;
 	onDetachToolByKey: (key: string) => void;
 	onSetAttachedToolAutoExecute: (key: string, autoExecute: boolean) => void;
@@ -69,170 +59,64 @@ interface ToolsBottomBarChipProps {
 	onEditAttachedToolOptions: (entry: AttachedToolEntry) => void;
 	onOpenAttachedToolDetails?: (entry: AttachedToolEntry) => void;
 	onOpenConversationToolDetails?: (entry: ConversationToolStateEntry) => void;
-
 	webSearchTemplates: WebSearchChoiceTemplate[];
 	setWebSearchTemplates: Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>;
-	onWebSearchArgsBlockedChange?: (blocked: boolean) => void;
+	toolCatalog: ToolCatalogState;
 	toolArgsEventTarget?: EventTarget | null;
-
 	isInputLocked?: boolean;
 }
 
-const toolMenuCollator = new Intl.Collator(undefined, {
-	numeric: true,
-	sensitivity: 'base',
-});
-
-function stop(e: SyntheticEvent | MouseEvent) {
-	e.preventDefault();
-	e.stopPropagation();
+interface ToolCollectionGroup {
+	key: string;
+	name: string;
+	available: ToolListItem[];
+	conversation: ConversationToolStateEntry[];
 }
 
-function getToolKey(item: ToolListItem): string {
-	return toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+
+function stop(event: SyntheticEvent | MouseEvent) {
+	event.preventDefault();
+	event.stopPropagation();
 }
 
-function getAttachedToolKey(entry: AttachedToolEntry): string {
-	return toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
+function itemKey(item: ToolListItem): string {
+	return toolIdentityKey(item.target);
 }
 
-function getConversationToolKey(entry: ConversationToolStateEntry): string {
-	return toolIdentityKey(
-		entry.toolStoreChoice.bundleID,
-		entry.toolStoreChoice.bundleSlug ?? entry.toolStoreChoice.bundleID,
-		entry.toolStoreChoice.toolSlug,
-		entry.toolStoreChoice.toolVersion
-	);
+function choiceLabel(choice: Omit<ToolStoreChoice, 'choiceID'>): string {
+	return `${choice.collectionName ? `${choice.collectionName}/` : ''}${choice.target.name}${
+		choice.toolVersion ? `@${choice.toolVersion}` : ''
+	}`;
 }
 
-function compareToolListItems(a: ToolListItem, b: ToolListItem): number {
-	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) {
-		return bundleSlugCompare;
-	}
-
-	const bundleIDCompare = toolMenuCollator.compare(a.bundleID, b.bundleID);
-	if (bundleIDCompare !== 0) {
-		return bundleIDCompare;
-	}
-
-	const toolSlugCompare = toolMenuCollator.compare(a.toolSlug, b.toolSlug);
-	if (toolSlugCompare !== 0) {
-		return toolSlugCompare;
-	}
-
-	const toolVersionCompare = toolMenuCollator.compare(a.toolVersion, b.toolVersion);
-	if (toolVersionCompare !== 0) {
-		return toolVersionCompare;
-	}
-
-	return toolMenuCollator.compare(getToolKey(a), getToolKey(b));
+function itemLabel(item: ToolListItem): string {
+	return `${item.collectionName}/${item.toolDefinition.name}@${item.toolDefinition.version}`;
 }
 
-function compareToolGroups(a: ToolBundleGroup, b: ToolBundleGroup): number {
-	const bundleSlugCompare = toolMenuCollator.compare(a.bundleSlug, b.bundleSlug);
-	if (bundleSlugCompare !== 0) {
-		return bundleSlugCompare;
-	}
-	return toolMenuCollator.compare(a.bundleID, b.bundleID);
+function compareItems(left: ToolListItem, right: ToolListItem): number {
+	return collator.compare(itemLabel(left), itemLabel(right)) || collator.compare(itemKey(left), itemKey(right));
 }
 
-function getToolListItemSearchFields(item: ToolListItem) {
+function itemSearchFields(item: ToolListItem) {
 	return [
 		{ value: item.toolDefinition.displayName, weight: 7 },
-		{ value: item.toolSlug, weight: 6 },
-		{ value: item.toolVersion, weight: 4 },
-		{ value: item.bundleSlug, weight: 3 },
-		{ value: item.bundleID, weight: 2 },
+		{ value: item.toolDefinition.name, weight: 6 },
+		{ value: item.toolDefinition.version, weight: 4 },
+		{ value: item.collectionName, weight: 3 },
 		{ value: item.toolDefinition.description, weight: 2 },
 		{ value: item.toolDefinition.tags, weight: 1 },
 	];
 }
 
-function getAttachedToolSearchFields(entry: AttachedToolEntry) {
+function choiceSearchFields(choice: ToolStoreChoice) {
 	return [
-		{ value: entry.toolSnapshot?.displayName ?? entry.toolSlug, weight: 7 },
-		{ value: entry.toolSlug, weight: 6 },
-		{ value: entry.toolVersion, weight: 4 },
-		{ value: entry.bundleSlug, weight: 3 },
-		{ value: entry.bundleID, weight: 2 },
-		{ value: entry.toolSnapshot?.description, weight: 2 },
-	];
-}
-
-function getConversationToolSearchFields(entry: ConversationToolStateEntry) {
-	const choice = entry.toolStoreChoice;
-	return [
-		{ value: choice.displayName ?? choice.toolSlug, weight: 7 },
-		{ value: choice.toolSlug, weight: 6 },
+		{ value: choice.displayName, weight: 7 },
+		{ value: choice.target.name, weight: 6 },
 		{ value: choice.toolVersion, weight: 4 },
-		{ value: choice.bundleSlug, weight: 3 },
-		{ value: choice.bundleID, weight: 2 },
+		{ value: choice.collectionName, weight: 3 },
 		{ value: choice.description, weight: 2 },
 	];
-}
-
-function compareConversationToolEntries(a: ConversationToolStateEntry, b: ConversationToolStateEntry): number {
-	return toolMenuCollator.compare(getConversationToolKey(a), getConversationToolKey(b));
-}
-
-function groupTools(
-	tools: ToolListItem[],
-	attachedToolKeys: Set<string>,
-	conversationToolByKey: Map<string, ConversationToolStateEntry>
-): ToolBundleGroup[] {
-	const groupsByBundle = new Map<string, ToolBundleGroup>();
-	const remainingConversationTools = new Map(conversationToolByKey);
-
-	function ensureGroup(groupKey: string, bundleID: string, bundleSlug: string, isBuiltIn: boolean): ToolBundleGroup {
-		let group = groupsByBundle.get(groupKey);
-		if (!group) {
-			group = {
-				bundleID,
-				bundleSlug: bundleSlug || bundleID,
-				isBuiltIn,
-				attachedOptions: [],
-				conversationOptions: [],
-				availableOptions: [],
-			};
-			groupsByBundle.set(groupKey, group);
-		}
-		return group;
-	}
-
-	for (const item of [...tools].toSorted(compareToolListItems)) {
-		const groupKey = item.bundleID || item.bundleSlug;
-		const group = ensureGroup(groupKey, item.bundleID, item.bundleSlug || item.bundleID, item.isBuiltIn);
-		const itemKey = getToolKey(item);
-
-		if (attachedToolKeys.has(itemKey)) {
-			group.attachedOptions.push(item);
-			continue;
-		}
-
-		const conversationEntry = remainingConversationTools.get(itemKey);
-		if (conversationEntry) {
-			group.conversationOptions.push(conversationEntry);
-			remainingConversationTools.delete(itemKey);
-			continue;
-		}
-
-		group.availableOptions.push(item);
-	}
-
-	for (const entry of remainingConversationTools.values()) {
-		const bundleID = entry.toolStoreChoice.bundleID || entry.toolStoreChoice.bundleSlug || 'bundle';
-		const bundleSlug = entry.toolStoreChoice.bundleSlug || entry.toolStoreChoice.bundleID || bundleID;
-		const groupKey = bundleID || bundleSlug || entry.key;
-		const group = ensureGroup(groupKey, bundleID, bundleSlug, false);
-		group.conversationOptions.push(entry);
-	}
-
-	return [...groupsByBundle.values()].toSorted(compareToolGroups);
-}
-
-function getArgsBadgeClass(hasBlockingArgs: boolean) {
-	return hasBlockingArgs ? 'badge badge-warning badge-xs animate-pulse' : 'badge badge-success badge-xs bg-success/30';
 }
 
 export function ToolsBottomBarChip({
@@ -253,16 +137,24 @@ export function ToolsBottomBarChip({
 	onOpenConversationToolDetails,
 	webSearchTemplates,
 	setWebSearchTemplates,
-	onWebSearchArgsBlockedChange,
+	toolCatalog,
 	toolArgsEventTarget,
 	isInputLocked = false,
 }: ToolsBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
-	const menuContentElement = useStoreState(store, 'contentElement');
-	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
-	const { data: toolData, loading: toolsLoading } = useTools();
+	const contentElement = useStoreState(store, 'contentElement');
+	const [query, setQuery] = useSearchableMenuState(open);
+	const [autoOverrides, setAutoOverrides] = useState<Record<string, boolean>>({});
 
-	const [toolAutoExecOverrides, setToolAutoExecOverrides] = useState<Record<string, boolean>>({});
+	const {
+		data: toolData,
+		error: catalogError,
+		loading: isLoading,
+		isRefreshing,
+		hasResolved,
+		refresh: reloadOrThrow,
+		ready: catalogReady,
+	} = toolCatalog;
 
 	useEffect(() => {
 		if (isInputLocked) {
@@ -270,517 +162,238 @@ export function ToolsBottomBarChip({
 		}
 	}, [isInputLocked, store]);
 
-	const attachedToolKeys = useMemo(() => {
-		return new Set(attachedToolEntries.map(k => getAttachedToolKey(k)));
-	}, [attachedToolEntries]);
-
-	const conversationToolByKey = useMemo(() => {
-		return new Map<string, ConversationToolStateEntry>(
-			conversationToolsState.map(entry => [getConversationToolKey(entry), entry])
-		);
-	}, [conversationToolsState]);
-
-	const visibleAttachedToolEntries = useMemo(
+	const attached = useMemo(
 		() => attachedToolEntries.filter(entry => entry.toolType !== ToolStoreChoiceType.WebSearch),
 		[attachedToolEntries]
 	);
-
-	const attachedAutoExecByKey = useMemo(() => {
-		const map: Record<string, boolean> = {};
-		for (const entry of visibleAttachedToolEntries) {
-			map[getAttachedToolKey(entry)] = entry.autoExecute;
-		}
-		return map;
-	}, [visibleAttachedToolEntries]);
-
-	const getAutoExecForTool = useMemo(() => {
-		return (item: ToolListItem): boolean => {
-			const key = getToolKey(item);
-			if (typeof attachedAutoExecByKey[key] === 'boolean') {
-				return attachedAutoExecByKey[key];
-			}
-			const override = toolAutoExecOverrides[key];
-			if (typeof override === 'boolean') {
-				return override;
-			}
-			return item.toolDefinition.autoExecute ?? false;
-		};
-	}, [attachedAutoExecByKey, toolAutoExecOverrides]);
-
-	const eligibleWebSearchTools = useMemo(() => {
-		if (toolsLoading) {
-			return [];
-		}
-		return getEligibleWebSearchTools(toolData, currentProviderSDKType);
-	}, [currentProviderSDKType, toolData, toolsLoading]);
-
-	const displayedEligibleWebSearchTools = useMemo(() => {
-		if (!isSearchQueryActive(searchQuery)) {
-			return eligibleWebSearchTools;
-		}
-
-		return rankSearchableItems(eligibleWebSearchTools, {
-			query: searchQuery,
-			getKey: getToolKey,
-			getFields: getToolListItemSearchFields,
-			fallbackCompare: compareToolListItems,
-		});
-	}, [eligibleWebSearchTools, searchQuery]);
-
-	const eligibleWebSearchKeys = useMemo(() => {
-		return new Set(
-			eligibleWebSearchTools.map(tool =>
-				webSearchIdentityKey({
-					bundleID: tool.bundleID,
-					toolSlug: tool.toolSlug,
-					toolVersion: tool.toolVersion,
-				})
-			)
-		);
-	}, [eligibleWebSearchTools]);
-
-	const compatibleWebSearchTemplates = useMemo(
-		() =>
-			normalizeWebSearchChoiceTemplates(
-				webSearchTemplates.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)))
-			),
-		[eligibleWebSearchKeys, webSearchTemplates]
+	const attachedByKey = useMemo(
+		() => new Map(attached.map(entry => [toolIdentityKey(entry.target), entry])),
+		[attached]
 	);
 
-	const activeWebSearch = compatibleWebSearchTemplates[0];
-	const webSearchEnabled = Boolean(activeWebSearch);
+	const {
+		eligible: eligibleWebSearch,
+		active: activeWebSearch,
+		item: activeWebSearchItem,
+		status: webSearchStatus,
+		blocked: webSearchBlocked,
+	} = useMemo(
+		() => getWebSearchConfiguration(webSearchTemplates, toolData, catalogReady, currentProviderSDKType),
+		[webSearchTemplates, toolData, catalogReady, currentProviderSDKType]
+	);
 
-	useEffect(() => {
-		if (toolsLoading) {
-			return;
-		}
+	const available = useMemo(
+		() =>
+			catalogReady
+				? toolData.filter(item => {
+						const implementation = item.toolDefinition.implementation;
+						return (
+							implementation.kind === ToolImplType.Go ||
+							(implementation.sdkToolType !== ToolStoreChoiceType.WebSearch &&
+								implementation.sdkType === currentProviderSDKType.toString())
+						);
+					})
+				: [],
+		[toolData, currentProviderSDKType, catalogReady]
+	);
 
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
-		setWebSearchTemplates(prev => {
-			if (prev.length === 0) {
-				return prev;
-			}
-			const next = prev.filter(template => eligibleWebSearchKeys.has(webSearchIdentityKey(template)));
-			return next.length === prev.length ? prev : next;
-		});
-	}, [eligibleWebSearchKeys, setWebSearchTemplates, toolsLoading]);
+	const visibleAvailable = useMemo(
+		() =>
+			isSearchQueryActive(query)
+				? rankSearchableItems(available, {
+						query,
+						getKey: itemKey,
+						getFields: itemSearchFields,
+						fallbackCompare: compareItems,
+					})
+				: available.toSorted(compareItems),
+		[available, query]
+	);
+	const visibleWebSearch = useMemo(
+		() =>
+			isSearchQueryActive(query)
+				? rankSearchableItems(eligibleWebSearch, {
+						query,
+						getKey: itemKey,
+						getFields: itemSearchFields,
+						fallbackCompare: compareItems,
+					})
+				: eligibleWebSearch.toSorted((left, right) => {
+						const activeKey = activeWebSearch ? webSearchIdentityKey(activeWebSearch) : undefined;
+						const leftActive = itemKey(left) === activeKey;
+						const rightActive = itemKey(right) === activeKey;
+						return leftActive !== rightActive ? (leftActive ? -1 : 1) : compareItems(left, right);
+					}),
+		[eligibleWebSearch, activeWebSearch, query]
+	);
+	const visibleAttached = useMemo(
+		() =>
+			isSearchQueryActive(query)
+				? rankSearchableItems(attached, {
+						query,
+						getKey: entry => entry.selectionID,
+						getFields: choiceSearchFields,
+					})
+				: attached,
+		[attached, query]
+	);
+	const visibleConversation = useMemo(
+		() =>
+			isSearchQueryActive(query)
+				? rankSearchableItems(conversationToolsState, {
+						query,
+						getKey: entry => entry.key,
+						getFields: entry => choiceSearchFields(entry.toolStoreChoice),
+					})
+				: conversationToolsState,
+		[conversationToolsState, query]
+	);
 
-	const activeWebSearchDef = useMemo(() => {
-		if (!activeWebSearch) {
-			return undefined;
-		}
-		return eligibleWebSearchTools.find(
-			tool =>
-				tool.bundleID === activeWebSearch.bundleID &&
-				tool.toolSlug === activeWebSearch.toolSlug &&
-				tool.toolVersion === activeWebSearch.toolVersion
+	const groups = useMemo(() => {
+		const result = new Map<string, ToolCollectionGroup>();
+		const conversationKeys = new Set(
+			conversationToolsState.map(entry => toolIdentityKey(entry.toolStoreChoice.target))
 		);
-	}, [activeWebSearch, eligibleWebSearchTools]);
+		const ensure = (key: string, name: string) => {
+			let group = result.get(key);
+			if (!group) {
+				group = { key, name, available: [], conversation: [] };
+				result.set(key, group);
+			}
+			return group;
+		};
 
-	const activeWebSearchArgsStatus = useMemo(() => {
-		const schema = activeWebSearchDef?.toolDefinition.userArgSchema;
-		if (!schema || !activeWebSearch) {
-			return undefined;
+		for (const item of visibleAvailable) {
+			const key = itemKey(item);
+			if (conversationKeys.has(key) && !attachedByKey.has(key)) {
+				continue;
+			}
+			ensure(toolArtifactKey(item.collectionRef), item.collectionName).available.push(item);
 		}
-		return computeToolUserArgsStatus(schema, activeWebSearch.userArgSchemaInstance);
-	}, [activeWebSearch, activeWebSearchDef]);
-
-	const hasConfiguredWebSearch = webSearchTemplates.length > 0;
-	const webSearchSelectionPendingNormalization =
-		hasConfiguredWebSearch && compatibleWebSearchTemplates.length !== webSearchTemplates.length;
-
-	const webSearchDefinitionPending =
-		hasConfiguredWebSearch &&
-		(toolsLoading || webSearchSelectionPendingNormalization || (activeWebSearch && !activeWebSearchDef));
-	const webSearchArgsBlocked =
-		webSearchDefinitionPending ||
-		Boolean(webSearchEnabled && activeWebSearchArgsStatus?.hasSchema && !activeWebSearchArgsStatus.isSatisfied);
-
-	useEffect(() => {
-		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-pass-data-to-parent
-		onWebSearchArgsBlockedChange?.(webSearchArgsBlocked);
-	}, [onWebSearchArgsBlockedChange, webSearchArgsBlocked]);
-
-	const availableTools = useMemo<ToolListItem[]>(() => {
-		if (toolsLoading) {
-			return [];
+		for (const entry of visibleConversation) {
+			const choice = entry.toolStoreChoice;
+			if (attachedByKey.has(toolIdentityKey(choice.target))) {
+				continue;
+			}
+			const key = choice.collectionRef ? toolArtifactKey(choice.collectionRef) : `unresolved:${choice.target.provider}`;
+			ensure(key, choice.collectionName || 'Conversation tools').conversation.push(entry);
 		}
-		const providerSDKType = currentProviderSDKType.toString();
+		return [...result.values()].toSorted((left, right) => collator.compare(left.name, right.name));
+	}, [visibleAvailable, visibleConversation, conversationToolsState, attachedByKey]);
 
-		return toolData.filter(item => {
-			if (item.toolDefinition.llmToolType === ToolStoreChoiceType.WebSearch) {
+	const missingCount =
+		attached.filter(entry => {
+			if (!entry.toolSnapshot) {
+				return true;
+			}
+			const status = computeToolUserArgsStatus(entry.toolSnapshot.userArgSchema, entry.userArgSchemaInstance);
+			return status.hasSchema && !status.isSatisfied;
+		}).length +
+		conversationToolsState.filter(entry => {
+			if (!entry.enabled) {
 				return false;
 			}
-
-			if (item.toolDefinition.type === ToolImplType.SDK && item.toolDefinition.sdkImpl) {
-				const sdkType = item.toolDefinition.sdkImpl.sdkType;
-				if (!sdkType) {
-					return false;
-				}
-				return sdkType === providerSDKType;
-			}
-
-			return true;
-		});
-	}, [currentProviderSDKType, toolData, toolsLoading]);
-
-	const displayedAvailableTools = useMemo(() => {
-		if (!isSearchQueryActive(searchQuery)) {
-			return availableTools;
-		}
-
-		return rankSearchableItems(availableTools, {
-			query: searchQuery,
-			getKey: getToolKey,
-			getFields: getToolListItemSearchFields,
-			fallbackCompare: compareToolListItems,
-		});
-	}, [availableTools, searchQuery]);
-
-	const displayedConversationToolByKey = useMemo(() => {
-		if (!isSearchQueryActive(searchQuery)) {
-			return conversationToolByKey;
-		}
-
-		const rankedEntries = rankSearchableItems(conversationToolsState, {
-			query: searchQuery,
-			getKey: entry => entry.key,
-			getFields: getConversationToolSearchFields,
-			fallbackCompare: compareConversationToolEntries,
-		});
-
-		return new Map<string, ConversationToolStateEntry>(
-			rankedEntries.map(entry => [getConversationToolKey(entry), entry] as const)
-		);
-	}, [conversationToolByKey, conversationToolsState, searchQuery]);
-
-	const groupedTools = useMemo(
-		() => groupTools(displayedAvailableTools, attachedToolKeys, displayedConversationToolByKey),
-		[attachedToolKeys, displayedAvailableTools, displayedConversationToolByKey]
-	);
-
-	const displayedVisibleAttachedToolEntries = useMemo(() => {
-		if (!isSearchQueryActive(searchQuery)) {
-			return visibleAttachedToolEntries;
-		}
-		return rankSearchableItems(visibleAttachedToolEntries, {
-			query: searchQuery,
-			getKey: entry => entry.selectionID,
-			getFields: getAttachedToolSearchFields,
-		});
-	}, [searchQuery, visibleAttachedToolEntries]);
-
-	const attachedArgsMissingCount = useMemo(() => {
-		let count = 0;
-		for (const entry of visibleAttachedToolEntries) {
-			const status = computeToolUserArgsStatus(entry.toolSnapshot?.userArgSchema, entry.userArgSchemaInstance);
-			if (status.hasSchema && !status.isSatisfied) {
-				count += 1;
-			}
-		}
-		return count;
-	}, [visibleAttachedToolEntries]);
-
-	const conversationArgsMissingCount = useMemo(() => {
-		let count = 0;
-		for (const entry of conversationToolsState) {
-			if (!entry.enabled) {
-				continue;
+			if (!entry.toolDefinition || entry.toolLoadError) {
+				return true;
 			}
 			const status =
 				entry.argStatus ??
-				(entry.toolDefinition
-					? computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance)
-					: undefined);
-			if (status?.hasSchema && !status.isSatisfied) {
-				count += 1;
-			}
+				computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
+			return status.hasSchema && !status.isSatisfied;
+		}).length +
+		(webSearchBlocked ? 1 : 0);
+
+	const configuredCount = attached.length + conversationToolsState.length + webSearchTemplates.length;
+	const resultCount =
+		visibleAvailable.length + visibleWebSearch.length + visibleAttached.length + visibleConversation.length;
+
+	const autoExecuteFor = (item: ToolListItem) => {
+		if (item.toolDefinition.implementation.kind !== ToolImplType.Go) {
+			return false;
 		}
-		return count;
-	}, [conversationToolsState]);
-
-	const missingArgsCount = attachedArgsMissingCount + conversationArgsMissingCount + (webSearchArgsBlocked ? 1 : 0);
-
-	const conversationToolCount = conversationToolsState.length;
-	const configuredToolCount =
-		visibleAttachedToolEntries.length + conversationToolCount + compatibleWebSearchTemplates.length;
-
-	const hoverTipContent = useMemo(
-		() => (
-			<HoverTipContent
-				title={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
-				description="Choose tools for this message, retain conversation tools, and configure web search."
-				sections={[
-					{
-						id: 'current-state',
-						title: 'Current state',
-						items: [
-							`Tool configurations: ${configuredToolCount}`,
-							`Per-message tools: ${visibleAttachedToolEntries.length}`,
-							`Conversation tools: ${conversationToolCount}`,
-							webSearchDefinitionPending
-								? 'Web search: resolving the selected tool'
-								: webSearchEnabled
-									? 'Web search: enabled'
-									: 'Web search: not enabled',
-							missingArgsCount > 0 ? `Required options: ${missingArgsCount} missing` : 'Required options: complete',
-						],
-					},
-					...(missingArgsCount > 0
-						? [
-								{
-									id: 'before-sending',
-									title: <span className="text-warning">Before sending</span>,
-									items: [
-										`Fill ${missingArgsCount} required tool or web-search option${missingArgsCount === 1 ? '' : 's'} before sending.`,
-									],
-								},
-							]
-						: []),
-					...(configuredToolCount > 0
-						? [
-								{
-									id: 'clear-action',
-									title: 'Clear action',
-									items: ['Clear removes per-message tools, conversation tool settings, and the web-search selection.'],
-								},
-							]
-						: []),
-				]}
-			/>
-		),
-		[
-			configuredToolCount,
-			conversationToolCount,
-			missingArgsCount,
-			shortcut,
-			visibleAttachedToolEntries.length,
-			webSearchEnabled,
-			webSearchDefinitionPending,
-		]
-	);
-
-	const chipToneClasses =
-		missingArgsCount > 0
-			? 'border-warning/70 bg-warning/10 hover:bg-warning/15 animate-pulse'
-			: configuredToolCount > 0
-				? 'border-primary/50 bg-primary/10 hover:bg-primary/15'
-				: open
-					? 'border-base-300 bg-base-300/60'
-					: 'border-transparent';
-
-	const clearAllConfiguredTools = () => {
-		if (visibleAttachedToolEntries.length > 0) {
-			onRemoveAllAttachedTools(visibleAttachedToolEntries);
-		}
-		if (conversationToolsState.length > 0) {
-			setConversationToolsState([]);
-		}
-		if (webSearchTemplates.length > 0) {
-			setWebSearchTemplates([]);
-		}
-		store.hide();
+		const key = itemKey(item);
+		return attachedByKey.get(key)?.autoExecute ?? autoOverrides[key] ?? item.toolDefinition.autoExecute;
 	};
 
-	const handleAttachToolPick = (item: ToolListItem) => {
-		onAttachTool(item, getAutoExecForTool(item));
-	};
-
-	const handleConversationToolAutoExecute = (key: string, nextAutoExecute: boolean) => {
-		setConversationToolsState(prev =>
-			prev.map(entry =>
-				entry.key === key
-					? {
-							...entry,
-							toolStoreChoice: {
-								...entry.toolStoreChoice,
-								autoExecute: nextAutoExecute,
-							},
-						}
-					: entry
-			)
-		);
-	};
-
-	const handleConversationToolEnabled = (key: string, nextEnabled: boolean) => {
-		setConversationToolsState(prev =>
-			prev.map(entry =>
-				entry.key === key
-					? {
-							...entry,
-							enabled: nextEnabled,
-						}
-					: entry
-			)
-		);
-	};
-
-	const handleRemoveConversationTool = (key: string) => {
-		setConversationToolsState(prev => prev.filter(entry => entry.key !== key));
-	};
-
-	const handleWebSearchEnabled = (enabled: boolean) => {
-		if (!enabled) {
-			setWebSearchTemplates([]);
-			return;
-		}
-
-		if (compatibleWebSearchTemplates.length > 0 || eligibleWebSearchTools.length === 0) {
-			return;
-		}
-
-		const first = eligibleWebSearchTools[0];
-		setWebSearchTemplates([webSearchTemplateFromToolListItem(first)]);
-	};
-
-	const handleWebSearchToolSelected = (tool: ToolListItem) => {
-		setWebSearchTemplates(prev => {
-			const nextTemplate = webSearchTemplateFromToolListItem(tool);
-			const previousSameTool = prev.find(
-				template => webSearchIdentityKey(template) === webSearchIdentityKey(nextTemplate)
-			);
-
-			return [
-				{
-					...nextTemplate,
-					userArgSchemaInstance: previousSameTool?.userArgSchemaInstance,
-				},
-			];
+	const selectWebSearch = (item: ToolListItem) => {
+		setWebSearchTemplates(previous => {
+			const template = webSearchTemplateFromToolListItem(item);
+			const existing = previous.find(value => webSearchIdentityKey(value) === webSearchIdentityKey(template));
+			return [{ ...template, userArgSchemaInstance: existing?.userArgSchemaInstance }];
 		});
 	};
 
-	const orderedWebSearchTools = useMemo(() => {
-		if (!activeWebSearch) {
-			return displayedEligibleWebSearchTools;
-		}
-		const activeKey = webSearchIdentityKey(activeWebSearch);
-		return [...displayedEligibleWebSearchTools].toSorted((a, b) => {
-			const aActive = webSearchIdentityKey(a) === activeKey;
-			const bActive = webSearchIdentityKey(b) === activeKey;
-			if (aActive !== bActive) {
-				return aActive ? -1 : 1;
-			}
-			return compareToolListItems(a, b);
-		});
-	}, [activeWebSearch, displayedEligibleWebSearchTools]);
+	const updateConversation = (
+		key: string,
+		update: (entry: ConversationToolStateEntry) => ConversationToolStateEntry
+	) => {
+		setConversationToolsState(previous => previous.map(entry => (entry.key === key ? update(entry) : entry)));
+	};
 
-	const renderWebSearchRow = (tool: ToolListItem) => {
-		const key = webSearchIdentityKey(tool);
-		const isActive = activeWebSearch ? webSearchIdentityKey(activeWebSearch) === key : false;
-		const schema = tool.toolDefinition.userArgSchema;
-		const canEdit = isActive && Boolean(schema);
-		const status = isActive ? activeWebSearchArgsStatus : undefined;
-		const isArgsBad = Boolean(status?.hasSchema && !status.isSatisfied);
-		const display = tool.toolDefinition.displayName || tool.toolSlug || 'Web search';
-		const slug = `${tool.bundleSlug ?? tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
+	const refresh = () => {
+		void reloadOrThrow().catch((error: unknown) => {
+			console.error('Failed to refresh the Tool catalog:', error);
+		});
+	};
+
+	const renderAvailable = (item: ToolListItem) => {
+		const key = itemKey(item);
+		const isAttached = attachedByKey.has(key);
+		const toggle = () => {
+			if (isAttached) {
+				onDetachToolByKey(key);
+			} else {
+				onAttachTool(item, autoExecuteFor(item));
+			}
+		};
 
 		return (
-			<MenuItem
+			<ToolMenuRow
 				key={key}
-				data-searchable-menu-item="true"
-				hideOnClick={false}
-				className={`data-active-item:bg-base-200 mb-1 rounded-xl outline-none last:mb-0 ${isActive ? 'bg-base-200' : ''}`}
-				onClick={() => {
-					if (isInputLocked) {
-						return;
+				store={store}
+				disabled={isInputLocked}
+				display={toolDisplayName(item.toolDefinition)}
+				slug={itemLabel(item)}
+				isSelected={isAttached}
+				supportsAutoExecute={item.toolDefinition.implementation.kind === ToolImplType.Go}
+				autoExecute={autoExecuteFor(item)}
+				onAutoExecuteChange={value => {
+					if (isAttached) {
+						onSetAttachedToolAutoExecute(key, value);
+					} else {
+						setAutoOverrides(previous => ({ ...previous, [key]: value }));
 					}
-					handleWebSearchToolSelected(tool);
 				}}
-				title={`Web search tool: ${display} (${slug})`}
-			>
-				<div className="grid grid-cols-12 items-center gap-x-2 px-2 py-1">
-					<div className="col-span-8 flex min-w-0 items-center gap-1">
-						<FiGlobe size={14} />
-						<div className="min-w-0 flex-1">
-							<div className="truncate text-xs font-medium">{display}</div>
-							<div className="text-base-content/70 truncate text-xs">{slug}</div>
-						</div>
-						{isActive ? <FiCheck size={14} className="text-primary shrink-0" /> : null}
-					</div>
-
-					<div className="col-span-2 flex justify-center">
-						{isActive ? (
-							<span className="badge badge-info badge-xs">Active</span>
-						) : (
-							<span className="text-base-content/40 text-xs">Available</span>
-						)}
-					</div>
-
-					<div className="col-span-2 flex items-center justify-end gap-1">
-						{status?.hasSchema ? (
-							<span
-								className={isArgsBad ? 'badge badge-warning badge-xs animate-pulse' : 'badge badge-success badge-xs'}
-							>
-								{isArgsBad ? `Args: ${status.missingRequired.length}` : 'Args: OK'}
-							</span>
-						) : null}
-
-						{canEdit ? (
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
-								onClick={e => {
-									stop(e);
-									dispatchOpenToolArgs({ kind: 'webSearch' }, toolArgsEventTarget);
-								}}
-								title="Edit web search options"
-								aria-label="Edit web search options"
-							>
-								<FiEdit2 size={12} />
-							</button>
-						) : null}
-
-						{isActive ? (
-							<button
-								type="button"
-								className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
-								onClick={e => {
-									stop(e);
-									handleWebSearchEnabled(false);
-								}}
-								title="Disable web search"
-								aria-label="Disable web search"
-							>
-								<FiX size={12} />
-							</button>
-						) : null}
-					</div>
-				</div>
-			</MenuItem>
+				onRowClick={toggle}
+				primaryAction={{
+					kind: isAttached ? 'detach' : 'attach',
+					onClick: toggle,
+					disabled: isInputLocked,
+				}}
+			/>
 		);
 	};
 
-	const renderAttachedToolRow = (entry: AttachedToolEntry) => {
-		const rawDisplay = entry.toolSnapshot?.displayName ?? entry.toolSlug;
-		const display = rawDisplay && rawDisplay.length > 0 ? rawDisplay : 'Tool';
-		const slug = `${entry.bundleSlug ?? entry.bundleID}/${entry.toolSlug}@${entry.toolVersion}`;
-		const key = getAttachedToolKey(entry);
+	const renderAttached = (entry: AttachedToolEntry) => {
 		const status = computeToolUserArgsStatus(entry.toolSnapshot?.userArgSchema, entry.userArgSchemaInstance);
-		const supportsAutoExecute =
-			entry.toolType === ToolStoreChoiceType.Function || entry.toolType === ToolStoreChoiceType.Custom;
-		const hasArgs = status.hasSchema;
-
 		return (
 			<ToolMenuRow
 				key={entry.selectionID}
 				store={store}
-				menuItemClassName="data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0"
-				contentClassName="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
+				disabled={isInputLocked}
 				dataAttachmentChip="bottom-bar-attached-tool"
 				dataSelectionId={entry.selectionID}
-				title={`Per-message tool: ${display} (${slug})`}
-				display={display}
-				slug={slug}
-				isSelected={true}
-				supportsAutoExecute={supportsAutoExecute}
+				display={entry.displayName || entry.target.name}
+				slug={choiceLabel(entry)}
+				isSelected
+				supportsAutoExecute={entry.implementationKind === ToolImplType.Go}
 				autoExecute={entry.autoExecute}
-				onAutoExecuteChange={next => {
-					onSetAttachedToolAutoExecute(key, next);
+				onAutoExecuteChange={value => {
+					onSetAttachedToolAutoExecute(toolIdentityKey(entry.target), value);
 				}}
 				argsStatus={status}
-				editIcon={<FiEdit2 size={12} />}
 				onEditOptions={
-					hasArgs
+					status.hasSchema
 						? () => {
 								onEditAttachedToolOptions(entry);
 							}
@@ -799,55 +412,43 @@ export function ToolsBottomBarChip({
 						onRemoveAttachedTool(entry);
 					},
 					title: 'Remove per-message tool',
+					disabled: isInputLocked,
 				}}
 			/>
 		);
 	};
 
-	const renderConversationToolRow = (entry: ConversationToolStateEntry) => {
-		const { key, toolStoreChoice } = entry;
-		const display =
-			(toolStoreChoice.displayName && toolStoreChoice.displayName.length > 0
-				? toolStoreChoice.displayName
-				: toolStoreChoice.toolSlug) || 'Tool';
-		const slug = `${toolStoreChoice.bundleID ?? 'bundle'}/${toolStoreChoice.toolSlug}@${toolStoreChoice.toolVersion}`;
-
-		const supportsAutoExecute =
-			toolStoreChoice.toolType === ToolStoreChoiceType.Function ||
-			toolStoreChoice.toolType === ToolStoreChoiceType.Custom;
-
+	const renderConversation = (entry: ConversationToolStateEntry) => {
+		const choice = entry.toolStoreChoice;
 		const status =
 			entry.argStatus ??
 			(entry.toolDefinition
-				? computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance)
+				? computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, choice.userArgSchemaInstance)
 				: undefined);
-		const hasArgs = status?.hasSchema ?? false;
 
 		return (
 			<ToolMenuRow
-				key={key}
+				key={entry.key}
 				store={store}
-				menuItemClassName={`data-active-item:bg-base-200 mb-1 rounded-xl last:mb-0 ${
-					entry.enabled ? 'bg-primary/10' : ''
-				}`}
-				contentClassName="grid grid-cols-12 items-center gap-x-2 px-2 py-1"
+				disabled={isInputLocked}
 				dataAttachmentChip="bottom-bar-conversation-tool"
-				title={`Conversation tool: ${display} (${slug})`}
-				display={display}
-				slug={slug}
+				title={entry.toolLoadError || (!entry.toolDefinition ? 'Tool definition is being resolved.' : undefined)}
+				display={choice.displayName || choice.target.name}
+				slug={choiceLabel(choice)}
 				sourceBadge="Conversation"
 				isSelected={entry.enabled}
 				selectedTitle={entry.enabled ? 'Enabled for next send' : 'Disabled'}
-				selectedAriaLabel={entry.enabled ? 'Enabled' : 'Disabled'}
-				supportsAutoExecute={supportsAutoExecute}
-				autoExecute={entry.toolStoreChoice.autoExecute}
-				onAutoExecuteChange={next => {
-					handleConversationToolAutoExecute(key, next);
+				supportsAutoExecute={choice.implementationKind === ToolImplType.Go}
+				autoExecute={choice.autoExecute}
+				onAutoExecuteChange={value => {
+					updateConversation(entry.key, previous => ({
+						...previous,
+						toolStoreChoice: { ...previous.toolStoreChoice, autoExecute: value },
+					}));
 				}}
 				argsStatus={status}
-				editIcon={<FiEdit2 size={12} />}
 				onEditOptions={
-					hasArgs
+					status?.hasSchema
 						? () => {
 								dispatchOpenToolArgs({ kind: 'conversation', key: entry.key }, toolArgsEventTarget);
 							}
@@ -861,156 +462,148 @@ export function ToolsBottomBarChip({
 						: undefined
 				}
 				onRowClick={() => {
-					handleConversationToolEnabled(key, !entry.enabled);
+					updateConversation(entry.key, previous => ({ ...previous, enabled: !previous.enabled }));
 				}}
 				primaryAction={{
 					kind: 'remove',
 					onClick: () => {
-						handleRemoveConversationTool(key);
+						setConversationToolsState(previous => previous.filter(value => value.key !== entry.key));
 					},
 					title: 'Remove conversation tool',
+					disabled: isInputLocked,
 				}}
 			/>
 		);
 	};
 
-	const renderAvailableToolRow = (item: ToolListItem) => {
-		const display = item.toolDefinition.displayName || item.toolSlug || 'Tool';
-		const slug = `${item.bundleSlug ?? item.bundleID}/${item.toolSlug}@${item.toolVersion}`;
-		const key = getToolKey(item);
-		const isAttached = attachedToolKeys.has(key);
-		const supportsAutoExecute =
-			item.toolDefinition.llmToolType === ToolStoreChoiceType.Function ||
-			item.toolDefinition.llmToolType === ToolStoreChoiceType.Custom;
+	const renderWebSearch = (item: ToolListItem) => {
+		const selected = activeWebSearch && itemKey(item) === webSearchIdentityKey(activeWebSearch);
+		const hasSchema = item.toolDefinition.userArgSchema !== undefined;
 
 		return (
-			<ToolMenuRow
-				key={key}
+			<MenuItem
+				key={itemKey(item)}
 				store={store}
-				menuItemClassName={`rounded-xl px-0 py-0 text-sm outline-none transition-colors hover:bg-base-200 data-[active-item]:bg-base-300 overflow-hidden ${
-					isAttached ? 'bg-base-200' : ''
-				}`}
-				title={`Tool: ${display} (${slug})`}
-				display={display}
-				slug={slug}
-				isSelected={isAttached}
-				supportsAutoExecute={supportsAutoExecute}
-				autoExecute={getAutoExecForTool(item)}
-				onAutoExecuteChange={next => {
-					if (isAttached) {
-						onSetAttachedToolAutoExecute(key, next);
-						return;
-					}
-					setToolAutoExecOverrides(prev => ({ ...prev, [key]: next }));
+				hideOnClick={false}
+				disabled={isInputLocked}
+				data-searchable-menu-item="true"
+				className="data-active-item:bg-base-200 mb-1 rounded-xl"
+				onClick={() => {
+					selectWebSearch(item);
 				}}
-				onRowClick={
-					!isAttached
-						? () => {
-								handleAttachToolPick(item);
-							}
-						: () => {
-								onDetachToolByKey(key);
-							}
-				}
-				primaryAction={
-					isAttached
-						? {
-								kind: 'detach',
-								onClick: () => {
-									onDetachToolByKey(key);
-								},
-								title: 'Detach tool',
-							}
-						: {
-								kind: 'attach',
-								onClick: () => {
-									handleAttachToolPick(item);
-								},
-								title: 'Attach tool',
-								label: 'Attach',
-							}
-				}
-			/>
+			>
+				<div className="flex items-center gap-2 px-2 py-1">
+					<FiGlobe size={14} />
+					<div className="min-w-0 flex-1">
+						<div className="truncate text-xs font-medium">{toolDisplayName(item.toolDefinition)}</div>
+						<div className="text-base-content/70 truncate text-xs">{itemLabel(item)}</div>
+					</div>
+					{selected ? <FiCheck size={14} className="text-primary" /> : null}
+					{selected && webSearchStatus?.hasSchema ? (
+						<span className={`badge badge-xs ${webSearchStatus.isSatisfied ? 'badge-success' : 'badge-warning'}`}>
+							{webSearchStatus.isSatisfied ? 'Args: OK' : 'Args: Invalid'}
+						</span>
+					) : null}
+					{selected && hasSchema ? (
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs"
+							title="Edit web search options"
+							aria-label="Edit web search options"
+							onClick={event => {
+								stop(event);
+								dispatchOpenToolArgs({ kind: 'webSearch' }, toolArgsEventTarget);
+							}}
+						>
+							<FiEdit2 size={12} />
+						</button>
+					) : null}
+					{selected ? (
+						<button
+							type="button"
+							className="btn btn-ghost btn-xs text-error"
+							title="Disable web search"
+							aria-label="Disable web search"
+							onClick={event => {
+								stop(event);
+								setWebSearchTemplates([]);
+							}}
+						>
+							<FiX size={12} />
+						</button>
+					) : null}
+				</div>
+			</MenuItem>
 		);
 	};
 
-	const displayedToolResultCount =
-		displayedEligibleWebSearchTools.length +
-		displayedVisibleAttachedToolEntries.length +
-		displayedAvailableTools.length +
-		displayedConversationToolByKey.size;
-
-	const firstAvailableUnattachedTool =
-		displayedAvailableTools.find(item => !attachedToolKeys.has(getToolKey(item))) ?? null;
-	const firstWebSearchTool = displayedEligibleWebSearchTools[0] ?? null;
-	const firstConversationTool = [...displayedConversationToolByKey.values()][0] ?? null;
-
-	const handleFirstToolSearchResult = () => {
-		if (isInputLocked) {
-			return;
-		}
-		if (firstWebSearchTool) {
-			handleWebSearchToolSelected(firstWebSearchTool);
-			return;
-		}
-		if (firstAvailableUnattachedTool) {
-			handleAttachToolPick(firstAvailableUnattachedTool);
-			return;
-		}
-		if (firstConversationTool && !firstConversationTool.enabled) {
-			handleConversationToolEnabled(firstConversationTool.key, true);
-		}
-	};
+	const hoverContent = (
+		<HoverTipContent
+			title={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
+			description="Choose per-message tools, conversation tools, and provider web search."
+			sections={[
+				{
+					id: 'current-state',
+					title: 'Current state',
+					items: [
+						`Per-message tools: ${attached.length}`,
+						`Conversation tools: ${conversationToolsState.length}`,
+						activeWebSearch
+							? webSearchBlocked
+								? 'Web search: requires attention'
+								: 'Web search: enabled'
+							: 'Web search: disabled',
+						missingCount ? `Unresolved tools or invalid options: ${missingCount}` : 'Required options: complete',
+					],
+				},
+			]}
+		/>
+	);
 
 	return (
 		<div className="relative shrink-0" data-bottom-bar-tools>
-			<HoverTip
-				content={hoverTipContent}
-				placement="top"
-				wrapperElement="div"
-				wrapperClassName="inline-flex max-w-full"
-				tooltipClassName="max-w-sm"
-			>
+			<HoverTip content={hoverContent} placement="top" wrapperElement="div" wrapperClassName="inline-flex max-w-full">
 				<div
-					className={`${actionTriggerChipSurfaceClasses} border ${chipToneClasses} ${isInputLocked ? 'opacity-60' : ''}`}
+					className={`${actionTriggerChipSurfaceClasses} border ${
+						missingCount
+							? 'border-warning/70 bg-warning/10'
+							: configuredCount
+								? 'border-primary/50 bg-primary/10'
+								: 'border-transparent'
+					}`}
 				>
 					<MenuButton
 						ref={buttonRef}
 						store={store}
 						disabled={isInputLocked}
-						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 gap-0 border-none bg-transparent p-0 text-left font-normal shadow-none hover:bg-transparent"
+						className="btn btn-xs app-text-neutral h-auto min-h-0 flex-1 border-none bg-transparent p-0 font-normal shadow-none"
 						aria-label={shortcut ? `Attach tools (${shortcut})` : 'Attach tools'}
 					>
 						<ActionTriggerChipContent
 							icon={<FiTool size={14} />}
 							label="Tools"
-							count={
-								configuredToolCount > 0 ? (
-									<span className={getArgsBadgeClass(missingArgsCount > 0)}>{configuredToolCount}</span>
-								) : undefined
-							}
+							count={configuredCount ? <span className="badge badge-xs">{configuredCount}</span> : undefined}
 							suffix={
-								missingArgsCount > 0 ? (
-									<span className="badge badge-warning badge-xs">Args {missingArgsCount}</span>
-								) : configuredToolCount > 0 ? (
-									<FiCheck size={14} className="shrink-0" />
-								) : undefined
+								missingCount ? <span className="badge badge-warning badge-xs">Check {missingCount}</span> : undefined
 							}
 							open={open}
 						/>
 					</MenuButton>
 
-					{configuredToolCount > 0 || webSearchTemplates.length > 0 || conversationToolsState.length > 0 ? (
+					{configuredCount ? (
 						<button
 							type="button"
 							className={actionTriggerChipClearButtonClasses}
+							disabled={isInputLocked}
+							title="Clear tools"
+							aria-label="Clear tools"
 							onClick={event => {
 								stop(event);
-								clearAllConfiguredTools();
+								onRemoveAllAttachedTools(attached);
+								setConversationToolsState([]);
+								setWebSearchTemplates([]);
+								store.hide();
 							}}
-							aria-label="Clear tools"
-							title="Clear tools"
-							disabled={isInputLocked}
 						>
 							<FiX size={12} />
 						</button>
@@ -1027,160 +620,148 @@ export function ToolsBottomBarChip({
 				data-menu-kind="tools"
 				autoFocusOnShow={false}
 			>
-				{!open ? null : (
-					<SearchableMenuInput
-						open={open}
-						query={searchQuery}
-						onQueryChange={setSearchQuery}
-						placeholder="Search tools…"
-						resultCount={displayedToolResultCount}
-						totalCount={
-							eligibleWebSearchTools.length +
-							visibleAttachedToolEntries.length +
-							availableTools.length +
-							conversationToolsState.length
-						}
-						disabled={toolsLoading}
-						onFocusFirstItem={() => {
-							focusFirstSearchableMenuItem(menuContentElement);
-						}}
-						onEnterFirstResult={handleFirstToolSearchResult}
-						onEscape={() => {
-							store.hide();
-						}}
-					/>
-				)}
+				{open ? (
+					<>
+						<SearchableMenuInput
+							open={open}
+							query={query}
+							onQueryChange={setQuery}
+							placeholder="Search tools..."
+							resultCount={resultCount}
+							totalCount={available.length + eligibleWebSearch.length + attached.length + conversationToolsState.length}
+							disabled={isLoading && !hasResolved}
+							onFocusFirstItem={() => focusFirstSearchableMenuItem(contentElement)}
+							onEnterFirstResult={() => {
+								if (isInputLocked) {
+									return;
+								}
+								if (visibleWebSearch[0]) {
+									selectWebSearch(visibleWebSearch[0]);
+									return;
+								}
+								const first = visibleAvailable.find(item => !attachedByKey.has(itemKey(item)));
+								if (first) {
+									onAttachTool(first, autoExecuteFor(first));
+								} else if (visibleConversation[0]) {
+									updateConversation(visibleConversation[0].key, previous => ({ ...previous, enabled: true }));
+								}
+							}}
+							onEscape={() => {
+								store.hide();
+							}}
+						/>
 
-				{!open ? null : toolsLoading ? (
-					<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>Loading tools…</div>
-				) : (
-					<div className="space-y-2">
-						<GroupedMenuSection
-							title="Web search"
-							ariaLabel="Web search tools"
-							meta={
-								<>
-									<span className="badge badge-ghost badge-xs">{displayedEligibleWebSearchTools.length}</span>
-									{webSearchEnabled ? <span className="badge badge-info badge-xs">enabled</span> : null}
-									{webSearchArgsBlocked ? (
-										<span className="badge badge-warning badge-xs animate-pulse">args</span>
-									) : null}
-								</>
-							}
-						>
-							{displayedEligibleWebSearchTools.length === 0 ? (
-								<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-									No web-search tool is available for this model provider.
-								</div>
-							) : (
-								<>
-									<div className="flex items-center justify-between gap-2 px-2 py-1 text-xs">
-										<div className="text-base-content/70">
-											{webSearchEnabled ? 'The active web-search tool is listed first.' : 'Select a web-search tool.'}
+						<div className="flex items-center justify-between px-2 py-1 text-xs">
+							<span>{isLoading || isRefreshing ? 'Loading tools...' : 'Built-in Tool Collections'}</span>
+							<button
+								type="button"
+								className="btn btn-ghost btn-xs"
+								disabled={isLoading || isRefreshing || isInputLocked}
+								onClick={refresh}
+							>
+								<FiRefreshCw size={12} />
+								Refresh
+							</button>
+						</div>
+
+						{catalogError ? (
+							<div className="alert alert-warning rounded-xl p-2 text-xs">
+								The Tool catalog could not be loaded. Refresh to retry.
+							</div>
+						) : null}
+
+						<div className="space-y-2">
+							<GroupedMenuSection title="Web search" ariaLabel="Web search tools">
+								{activeWebSearch && !activeWebSearchItem ? (
+									<div className="alert alert-warning rounded-xl p-2 text-xs">
+										<div className="min-w-0 flex-1">
+											<div>{activeWebSearch.displayName || activeWebSearch.target.name}</div>
+											<div>
+												{catalogReady
+													? 'This selection is unavailable or incompatible with the current provider.'
+													: 'Waiting for the Tool catalog to verify this selection.'}
+											</div>
 										</div>
 										<button
 											type="button"
-											className="btn btn-ghost btn-xs rounded-lg"
-											disabled={isInputLocked || eligibleWebSearchTools.length === 0}
-											onClick={e => {
-												stop(e);
-												handleWebSearchEnabled(!webSearchEnabled);
+											className="btn btn-ghost btn-xs"
+											disabled={isInputLocked}
+											onClick={() => {
+												setWebSearchTemplates([]);
 											}}
 										>
-											{webSearchEnabled ? 'Disable' : 'Enable'}
+											Remove
 										</button>
 									</div>
+								) : null}
 
-									<div className="space-y-1">{orderedWebSearchTools.map(r => renderWebSearchRow(r))}</div>
-								</>
-							)}
-						</GroupedMenuSection>
-
-						{displayedVisibleAttachedToolEntries.length > 0 ? (
-							<GroupedMenuSection
-								title="This message"
-								ariaLabel="Per-message tools"
-								separatorBefore
-								meta={<span className="badge badge-ghost badge-xs">{displayedVisibleAttachedToolEntries.length}</span>}
-							>
-								<div className="space-y-1">
-									{displayedVisibleAttachedToolEntries.map(r => renderAttachedToolRow(r))}
-								</div>
-							</GroupedMenuSection>
-						) : null}
-
-						<GroupedMenuSection title="Available tools" ariaLabel="Available tools" separatorBefore>
-							{availableTools.length === 0 ? (
-								<div className={`${actionTriggerMenuItemClasses} text-base-content/60 cursor-default`}>
-									No tools available
-								</div>
-							) : (
-								<div className="space-y-2">
-									{groupedTools.map((group, groupIndex) => {
-										const totalCount =
-											group.attachedOptions.length + group.conversationOptions.length + group.availableOptions.length;
-										const showAttachedSubheading =
-											group.attachedOptions.length > 0 &&
-											(group.conversationOptions.length > 0 || group.availableOptions.length > 0);
-										const showAvailableSubheading =
-											group.availableOptions.length > 0 &&
-											(group.attachedOptions.length > 0 || group.conversationOptions.length > 0);
-
-										return (
-											<GroupedMenuSection
-												key={group.bundleID || group.bundleSlug}
-												title={group.bundleSlug}
-												ariaLabel={`${group.bundleSlug} tools`}
-												separatorBefore={groupIndex > 0}
-												meta={
-													<>
-														<span className="badge badge-ghost badge-xs">{totalCount}</span>
-														<span className="badge badge-ghost badge-xs">
-															{group.isBuiltIn ? 'built-in' : 'custom'}
-														</span>
-													</>
+								{visibleWebSearch.length > 0 ? (
+									<>
+										<button
+											type="button"
+											className="btn btn-ghost btn-xs"
+											disabled={isInputLocked}
+											onClick={() => {
+												if (activeWebSearch) {
+													setWebSearchTemplates([]);
+												} else if (eligibleWebSearch[0]) {
+													selectWebSearch(eligibleWebSearch[0]);
 												}
-											>
-												{group.attachedOptions.length > 0 ? (
-													<>
-														{showAttachedSubheading ? <GroupedMenuSubheading>Attached</GroupedMenuSubheading> : null}
-														{group.attachedOptions.map(renderAvailableToolRow)}
-													</>
-												) : null}
+											}}
+										>
+											{activeWebSearch ? 'Disable web search' : 'Enable web search'}
+										</button>
+										{visibleWebSearch.map(v => {
+											return renderWebSearch(v);
+										})}
+									</>
+								) : (
+									<div className={actionTriggerMenuItemClasses}>
+										No matching web-search tool is available for this provider.
+									</div>
+								)}
+							</GroupedMenuSection>
 
-												{group.conversationOptions.length > 0 ? (
-													<div className="space-y-1">{group.conversationOptions.map(renderConversationToolRow)}</div>
-												) : null}
-
-												{group.availableOptions.length > 0 ? (
-													<>
-														{showAvailableSubheading ? (
-															<GroupedMenuSubheading
-																separated={group.attachedOptions.length > 0 || group.conversationOptions.length > 0}
-															>
-																Available
-															</GroupedMenuSubheading>
-														) : null}
-														{group.availableOptions.map(renderAvailableToolRow)}
-													</>
-												) : null}
-											</GroupedMenuSection>
-										);
+							{visibleAttached.length > 0 ? (
+								<GroupedMenuSection title="This message" ariaLabel="Per-message tools" separatorBefore>
+									{visibleAttached.map(v => {
+										return renderAttached(v);
 									})}
-								</div>
-							)}
-						</GroupedMenuSection>
+								</GroupedMenuSection>
+							) : null}
 
-						{missingArgsCount > 0 ? (
-							<div className="alert alert-warning mt-2 rounded-xl p-2 text-xs">
-								<div className="flex items-center gap-2">
+							<GroupedMenuSection title="Available tools" ariaLabel="Available tools" separatorBefore>
+								{groups.length > 0 ? (
+									groups.map((group, index) => (
+										<GroupedMenuSection
+											key={group.key}
+											title={group.name}
+											ariaLabel={`${group.name} tools`}
+											separatorBefore={index > 0}
+											meta={
+												<span className="badge badge-ghost badge-xs">
+													{group.available.length + group.conversation.length}
+												</span>
+											}
+										>
+											{group.conversation.map(renderConversation)}
+											{group.available.map(renderAvailable)}
+										</GroupedMenuSection>
+									))
+								) : (
+									<div className={actionTriggerMenuItemClasses}>No matching tools are available.</div>
+								)}
+							</GroupedMenuSection>
+
+							{missingCount ? (
+								<div className="alert alert-warning mt-2 rounded-xl p-2 text-xs">
 									<FiAlertTriangle size={14} />
-									<span>Fill required tool/web-search options before sending.</span>
+									<span>Resolve unavailable tools and invalid tool options before sending.</span>
 								</div>
-							</div>
-						) : null}
-					</div>
-				)}
+							) : null}
+						</div>
+					</>
+				) : null}
 			</Menu>
 		</div>
 	);

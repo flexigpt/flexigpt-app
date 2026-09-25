@@ -161,6 +161,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 		collection.CreateRequest{
 			Name:        "workflow-collection",
 			DisplayName: "Workflow Collection",
+			Description: "Initial workflow Collection description.",
 		},
 	)
 	requireNoError(t, err)
@@ -181,26 +182,40 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 			Collection:       created.Artifact.Ref(),
 			ExpectedRevision: created.Artifact.Revision,
 			DisplayName:      "Workflow Collection Updated",
+			Description:      "Updated workflow Collection description.",
 		},
 	)
 	requireNoError(t, err)
 
-	_, err = harness.api.GetAgentCollection(
+	_, err = harness.store.Discovery.RefreshSource(
+		t.Context(),
+		documentTopology.UserRootID(),
+		updated.Artifact.Binding.SourceID,
+	)
+	requireNoError(t, err)
+
+	readCollection, err := harness.api.GetAgentCollection(
 		t.Context(),
 		updated.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	// "if readCollection.Artifact.DisplayName != "Workflow Collection Updated" {
-	// 	t.Fatalf(
-	// 		"Collection display name = %q",
-	// 		readCollection.Artifact.DisplayName,
-	// 	)
-	// }".
+	if readCollection.DisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"Collection display name = %q",
+			readCollection.DisplayName,
+		)
+	}
+	if readCollection.Description != "Updated workflow Collection description." {
+		t.Fatalf(
+			"Collection description = %q",
+			readCollection.Description,
+		)
+	}
 
 	disabledCollection, err := harness.api.SetAgentCollectionEnabled(
 		t.Context(),
-		updated.Artifact.Ref(),
-		updated.Artifact.Revision,
+		readCollection.Artifact.Ref(),
+		readCollection.Artifact.Revision,
 		false,
 	)
 	requireNoError(t, err)
@@ -236,6 +251,12 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 			enabledCollection.Artifact.Revision,
 		)
 	}
+	if destination.CollectionDisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"destination Collection display name = %q",
+			destination.CollectionDisplayName,
+		)
+	}
 
 	allDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
 		t.Context(),
@@ -248,6 +269,12 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	if managementDestination.RootDisplayName == "" {
 		t.Fatalf("management import destination has no Root display name")
+	}
+	if managementDestination.CollectionDisplayName != "Workflow Collection Updated" {
+		t.Fatalf(
+			"management destination Collection display name = %q",
+			managementDestination.CollectionDisplayName,
+		)
 	}
 
 	inputPath := filepath.Join(t.TempDir(), "workflow-agent.yaml")
@@ -474,29 +501,93 @@ members:
 		t.Fatalf("deleted Agent remains in Collection Agent list")
 	}
 
-	// "requireNoError(
-	// 	t,
-	// 	harness.api.DeleteAgentCollection(
-	// 		t.Context(),
-	// 		collectionRef,
-	// 		committed.Collection.Artifact.Revision,
-	// 	),
-	// )
-	// collections, err := harness.api.ListAgentCollections(
-	// 	t.Context(),
-	// 	documentTopology.UserRootID(),
-	// )
-	// requireNoError(t, err)
-	// if containsCollection(collections, collectionRef) {
-	// 	t.Fatalf("deleted custom Collection remains in Collection list")
-	// }
-	// remainingDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
-	// 	t.Context(),
-	// )
-	// requireNoError(t, err)
-	// if hasImportDestination(remainingDestinations, collectionRef) {
-	// 	t.Fatalf("deleted custom Collection remains an import destination")
-	// }.
+	currentCollection, err := harness.api.GetAgentCollection(
+		t.Context(),
+		collectionRef,
+	)
+	requireNoError(t, err)
+	if len(currentCollection.Members) == 0 {
+		t.Fatal(
+			"deleting the managed Agent unexpectedly detached Collection membership",
+		)
+	}
+
+	staleMemberships, err := harness.api.ListAgentCollectionMembers(
+		t.Context(),
+		collectionRef,
+	)
+	requireNoError(t, err)
+	if staleMemberships.Complete {
+		t.Fatal(
+			"Collection capability plan remained complete after deleting its Agent",
+		)
+	}
+
+	err = harness.api.DeleteAgentCollection(
+		t.Context(),
+		collectionRef,
+		currentCollection.Artifact.Revision,
+	)
+	requireErrorIs(t, err, basespec.ErrConflict)
+
+	memberIndex := requireAgentCollectionMemberIndex(
+		t,
+		currentCollection.Members,
+		basespec.LogicalName("workflow-agent"),
+	)
+	detachedCollection, err := harness.api.RemoveAgentCollectionMember(
+		t.Context(),
+		collection.RemoveMemberRequest{
+			Collection:       collectionRef,
+			ExpectedRevision: currentCollection.Artifact.Revision,
+			Index:            memberIndex,
+		},
+	)
+	requireNoError(t, err)
+	if len(detachedCollection.Members) != 0 {
+		t.Fatalf(
+			"Collection members after detach = %#v, want empty",
+			detachedCollection.Members,
+		)
+	}
+
+	currentMemberships, err := harness.api.ListAgentCollectionMembers(
+		t.Context(),
+		detachedCollection.Artifact.Ref(),
+	)
+	requireNoError(t, err)
+	if !currentMemberships.Complete {
+		t.Fatalf(
+			"empty Collection capability plan is incomplete: %#v",
+			currentMemberships.Occurrences,
+		)
+	}
+
+	requireNoError(
+		t,
+		harness.api.DeleteAgentCollection(
+			t.Context(),
+			detachedCollection.Artifact.Ref(),
+			detachedCollection.Artifact.Revision,
+		),
+	)
+
+	collections, err := harness.api.ListAgentCollections(
+		t.Context(),
+		documentTopology.UserRootID(),
+	)
+	requireNoError(t, err)
+	if containsCollection(collections, collectionRef) {
+		t.Fatalf("deleted custom Collection remains in Collection list")
+	}
+
+	remainingDestinations, err := harness.api.ListAgentImportDestinationsForManagement(
+		t.Context(),
+	)
+	requireNoError(t, err)
+	if hasImportDestination(remainingDestinations, collectionRef) {
+		t.Fatalf("deleted custom Collection remains an import destination")
+	}
 }
 
 func requireNamedAgent(
@@ -565,6 +656,28 @@ func requireAvailableCapability(
 	return artifact.ArtifactRef{}
 }
 
+func requireAgentCollectionMemberIndex(
+	t *testing.T,
+	values []collection.MemberReference,
+	name basespec.LogicalName,
+) int {
+	t.Helper()
+
+	for index, value := range values {
+		if value.Type == declaration.TypeAgent &&
+			value.Name == name {
+			return index
+		}
+	}
+
+	t.Fatalf(
+		"Agent Collection member %q was not found in %#v",
+		name,
+		values,
+	)
+	return 0
+}
+
 func containsAgent(
 	values []agentConsumerAPI.AgentView,
 	ref artifact.ArtifactRef,
@@ -577,25 +690,26 @@ func containsAgent(
 	return false
 }
 
-// "func containsCollection(
-// 	values []collection.CollectionView,
-// 	ref artifact.ArtifactRef,
-// ) bool {
-// 	for _, value := range values {
-// 		if value.Artifact.Ref() == ref {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
-// func hasImportDestination(
-// 	values []agentConsumerAPI.AgentImportDestination,
-// 	ref artifact.ArtifactRef,
-// ) bool {
-// 	for _, value := range values {
-// 		if value.Collection.Artifact.Ref() == ref {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }.
+func containsCollection(
+	values []collection.CollectionView,
+	ref artifact.ArtifactRef,
+) bool {
+	for _, value := range values {
+		if value.Artifact.Ref() == ref {
+			return true
+		}
+	}
+	return false
+}
+
+func hasImportDestination(
+	values []agentConsumerAPI.AgentImportDestination,
+	ref artifact.ArtifactRef,
+) bool {
+	for _, value := range values {
+		if value.Collection.Artifact.Ref() == ref {
+			return true
+		}
+	}
+	return false
+}

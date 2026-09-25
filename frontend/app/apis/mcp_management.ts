@@ -51,7 +51,7 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { ToolRef } from '@/spec/tool';
+import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import {
 	MCP_SCHEMA_VERSION,
@@ -75,7 +75,7 @@ import type {
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
 	IModelPresetStoreAPI,
-	IToolStoreAPI,
+	IToolTargetResolver,
 } from '@/apis/interface';
 
 const MANAGEMENT_PAGE_SIZE = 100;
@@ -610,7 +610,7 @@ export class MCPManagementAPI {
 		private readonly store: IMCPStoreAPI,
 		private readonly aggregate: IMCPAggregateAPI,
 		private readonly runtime: IMCPRuntimeAPI,
-		private readonly toolStore: IToolStoreAPI,
+		private readonly tools: IToolTargetResolver,
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
 
@@ -1161,8 +1161,8 @@ export class MCPManagementAPI {
 		return this.runtime.updateMCPGlobalSettings(expectedRevision, settings);
 	}
 
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef> {
-		return this.toolStore.resolveMappedToolTarget(target);
+	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView> {
+		return this.tools.resolveMappedTool(target);
 	}
 
 	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {

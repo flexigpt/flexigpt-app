@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+	FiAlertTriangle,
 	FiChevronRight,
 	FiCode,
 	FiFileText,
@@ -21,7 +22,7 @@ import type { Attachment } from '@/spec/attachment';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 import { AttachmentContentBlockMode, AttachmentKind } from '@/spec/attachment';
 import { MCPExecutionMode } from '@/spec/mcp';
@@ -298,8 +299,8 @@ interface MessageToolChoiceChipProps {
  * Read‑only chip for a tool choice used for this message.
  */
 function MessageToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
-	const name = tool.displayName || tool.toolSlug;
-	const slug = `${tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
+	const name = tool.displayName || tool.target.name;
+	const slug = `${tool.collectionName ? `${tool.collectionName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
 	const tooltipLines: string[] = [name, slug];
 	if (tool.description) {
 		tooltipLines.push(tool.description);
@@ -460,8 +461,8 @@ function MessageWebSearchCallChip({ call, fullWidth = false, onClick }: MessageW
 }
 
 function MessageWebSearchToolChoiceChip({ tool, fullWidth = false, onClick }: MessageToolChoiceChipProps) {
-	const name = tool.displayName || tool.toolSlug;
-	const slug = `${tool.bundleID}/${tool.toolSlug}@${tool.toolVersion}`;
+	const name = tool.displayName || tool.target.name;
+	const slug = `${tool.collectionName ? `${tool.collectionName}/` : ''}${tool.target.name}${tool.toolVersion ? `@${tool.toolVersion}` : ''}`;
 	const title = [name, slug, tool.description].filter(Boolean).join('\n');
 
 	return (
@@ -785,7 +786,7 @@ function ToolChoicesGroupChip({ tools, onToolChoiceDetails }: ToolChoicesGroupCh
 			title={['Tools', `${count} tool${count === 1 ? '' : 's'} used for this turn`].join('\n')}
 			ariaLabel="Show tools for this message"
 			dataMessageChip="tools-group"
-			itemKey={tool => tool.toolID ?? `${tool.bundleID}-${tool.toolSlug}-${tool.toolVersion}`}
+			itemKey={tool => tool.choiceID}
 			renderItem={(tool, options) => (
 				<MessageToolChoiceChip tool={tool} fullWidth={options.fullWidth} onClick={options.onClick} />
 			)}
@@ -918,7 +919,7 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 			title={['Web search configuration', `${count} web-search tool${count === 1 ? '' : 's'} in this turn`].join('\n')}
 			ariaLabel="Show web-search configuration for this turn"
 			dataMessageChip="websearch-tools-group"
-			itemKey={choice => choice.toolID ?? `${choice.bundleID}-${choice.toolSlug}-${choice.toolVersion}`}
+			itemKey={choice => choice.choiceID}
 			renderItem={(choice, options) => (
 				<MessageWebSearchToolChoiceChip tool={choice} fullWidth={options.fullWidth} onClick={options.onClick} />
 			)}
@@ -931,6 +932,8 @@ function WebSearchChoicesGroupChip({ choices, onChoiceDetails }: WebSearchChoice
 interface MessageAttachmentsBarProps {
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
+	toolSelectionIssues?: ToolSelectionIssue[];
+	onToolSelectionIssueDetails?: (issue: ToolSelectionIssue) => void;
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	enabledSkillRefs?: SkillRef[];
@@ -955,6 +958,8 @@ interface MessageAttachmentsBarProps {
 export function MessageAttachmentsBar({
 	attachments,
 	toolChoices,
+	toolSelectionIssues,
+	onToolSelectionIssueDetails,
 	mcpContext,
 	mcpAppContextUpdates,
 	enabledSkillRefs,
@@ -972,6 +977,7 @@ export function MessageAttachmentsBar({
 	const outputs = toolOutputs ?? [];
 	const enabledSkills = enabledSkillRefs ?? [];
 	const activeSkills = activeSkillRefs ?? [];
+	const unavailableSelections = toolSelectionIssues ?? [];
 
 	const normalToolChoices = choices.filter(c => c.toolType !== ToolStoreChoiceType.WebSearch);
 	const webSearchChoices = choices.filter(c => c.toolType === ToolStoreChoiceType.WebSearch);
@@ -1002,6 +1008,7 @@ export function MessageAttachmentsBar({
 
 	if (
 		!hasAttachments &&
+		unavailableSelections.length === 0 &&
 		!hasTools &&
 		!hasWorkspace &&
 		!hasMCP &&
@@ -1024,6 +1031,25 @@ export function MessageAttachmentsBar({
 			{hasWorkspace ? <MessageWorkspaceContextChip selection={workspaceSelection} usage={workspaceUsage} /> : null}
 
 			{hasAttachments && <AttachmentsGroupChip attachments={attachments ?? []} />}
+
+			{unavailableSelections.map(issue => (
+				<MessageBarChip
+					key={issue.selection.choiceID}
+					icon={<FiAlertTriangle size={14} />}
+					label={issue.selection.target.name}
+					title={`Tool selection unavailable: ${issue.message}`}
+					dataMessageChip="tool-selection-unavailable"
+					tone="secondary"
+					onClick={
+						onToolSelectionIssueDetails
+							? () => {
+									onToolSelectionIssueDetails(issue);
+								}
+							: undefined
+					}
+					trailing={<span className="badge badge-warning badge-xs">Unavailable</span>}
+				/>
+			))}
 
 			{/* Regular tools for this turn */}
 			{hasTools && <ToolChoicesGroupChip tools={normalToolChoices} onToolChoiceDetails={onToolChoiceDetails} />}

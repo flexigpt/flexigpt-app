@@ -1,71 +1,25 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { Tool, ToolStoreChoice } from '@/spec/tool';
+import type { ResolvedToolView, ToolStoreChoice } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
+import { getErrorMessage } from '@/lib/error_utils';
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
-import { toolStoreAPI } from '@/apis/baseapi';
+import { toolManagementAPI } from '@/apis/baseapi';
+import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
 
 import type { AttachedToolEntry } from '@/chats/composer/platedoc/tool_document_ops';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
 import { normalizeWebSearchChoiceTemplates, webSearchTemplateFromChoice } from '@/chats/composer/tools/websearch_utils';
 import { toolStoreChoicesToConversationTools } from '@/tools/lib/conversation_tool_utils';
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
 
 interface UseComposerToolConfigArgs {
 	getAttachedToolEntries: (uniqueByIdentity?: boolean) => AttachedToolEntry[];
-}
-
-function conversationToolHydrationKey(entry: ConversationToolStateEntry): string {
-	return `${entry.toolStoreChoice.bundleID}::${entry.toolStoreChoice.toolSlug}::${entry.toolStoreChoice.toolVersion}`;
-}
-
-function areStringArraysEqual(a: string[] | undefined, b: string[] | undefined): boolean {
-	const left = a ?? [];
-	const right = b ?? [];
-	if (left.length !== right.length) {
-		return false;
-	}
-	return left.every((item, idx) => item === right[idx]);
-}
-
-function areArgStatusesEqual(
-	a: ConversationToolStateEntry['argStatus'],
-	b: ConversationToolStateEntry['argStatus']
-): boolean {
-	if (!a && !b) {
-		return true;
-	}
-	if (!a || !b) {
-		return false;
-	}
-
-	return (
-		a.hasSchema === b.hasSchema &&
-		a.isInstancePresent === b.isInstancePresent &&
-		a.isInstanceJSONValid === b.isInstanceJSONValid &&
-		a.isSatisfied === b.isSatisfied &&
-		areStringArraysEqual(a.requiredKeys, b.requiredKeys) &&
-		areStringArraysEqual(a.missingRequired, b.missingRequired)
-	);
-}
-
-function getConversationToolArgsBlocked(entries: ConversationToolStateEntry[]): boolean {
-	for (const entry of entries) {
-		if (!entry.enabled) {
-			continue;
-		}
-
-		const status = entry.argStatus;
-		if (status?.hasSchema && !status.isSatisfied) {
-			return true;
-		}
-	}
-
-	return false;
 }
 
 export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToolConfigArgs): {
@@ -79,179 +33,145 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 	applyConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
 	applyWebSearchFromChoices: (tools: ToolStoreChoice[]) => void;
 } {
-	const isMountedRef = useRef(true);
-
+	const mountedRef = useRef(true);
 	const [conversationToolsState, setConversationToolsStateRaw] = useState<ConversationToolStateEntry[]>([]);
-	const conversationToolsStateRef = useRef<ConversationToolStateEntry[]>([]);
-
+	const conversationRef = useRef<ConversationToolStateEntry[]>([]);
 	const [webSearchTemplates, setWebSearchTemplatesRaw] = useState<WebSearchChoiceTemplate[]>([]);
-	const webSearchTemplatesRef = useRef<WebSearchChoiceTemplate[]>([]);
+	const webSearchRef = useRef<WebSearchChoiceTemplate[]>([]);
+	const [attachedBlocked, setAttachedBlocked] = useState(false);
 
-	const [attachedToolArgsBlocked, setAttachedToolArgsBlocked] = useState(false);
-
-	const conversationToolDefsCacheRef = useRef<Map<string, Tool>>(new Map());
-	const hydratingConversationToolKeysRef = useRef(new Set<string>());
+	const resolvedCacheRef = useRef(new Map<string, ResolvedToolView>());
+	const inFlightRef = useRef(new Set<string>());
 
 	useEffect(() => {
-		isMountedRef.current = true;
+		mountedRef.current = true;
 		return () => {
-			isMountedRef.current = false;
+			mountedRef.current = false;
 		};
 	}, []);
 
-	const primeConversationToolsFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
-		let changed = false;
-
-		const next = entries.map(entry => {
-			const cacheKey = conversationToolHydrationKey(entry);
-			const def = entry.toolDefinition ?? conversationToolDefsCacheRef.current.get(cacheKey);
-			if (!def) {
-				return entry;
-			}
-
-			const argStatus = computeToolUserArgsStatus(def.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
-
-			if (entry.toolDefinition === def && areArgStatusesEqual(entry.argStatus, argStatus)) {
-				return entry;
-			}
-
-			changed = true;
-			return { ...entry, toolDefinition: def, argStatus };
-		});
-
-		return changed ? next : entries;
+	const commitConversation = useCallback((entries: ConversationToolStateEntry[]) => {
+		conversationRef.current = entries;
+		setConversationToolsStateRaw(entries);
 	}, []);
 
-	const hydrateConversationToolsIfNeeded = useCallback(
+	const primeFromCache = useCallback((entries: ConversationToolStateEntry[]) => {
+		return entries.map(entry => {
+			const key = toolIdentityKey(entry.toolStoreChoice.target);
+			const resolved = resolvedCacheRef.current.get(key);
+			const definition = resolved?.tool ?? entry.toolDefinition;
+			if (!definition) {
+				return entry;
+			}
+
+			const choice = resolved ? toolStoreChoiceFromSelection(entry.toolStoreChoice, resolved) : entry.toolStoreChoice;
+
+			return {
+				...entry,
+				toolStoreChoice: choice,
+				toolDefinition: definition,
+				toolLoadError: undefined,
+				argStatus: computeToolUserArgsStatus(definition.userArgSchema, choice.userArgSchemaInstance),
+			};
+		});
+	}, []);
+
+	const hydrateMissing = useCallback(
 		(entries: ConversationToolStateEntry[]) => {
-			const inFlight = hydratingConversationToolKeysRef.current;
-			const cache = conversationToolDefsCacheRef.current;
+			for (const entry of entries) {
+				const target = entry.toolStoreChoice.target;
+				const key = toolIdentityKey(target);
+				if (entry.toolDefinition || resolvedCacheRef.current.has(key) || inFlightRef.current.has(key)) {
+					continue;
+				}
 
-			const missing = entries.filter(entry => {
-				const cacheKey = conversationToolHydrationKey(entry);
-				return !entry.toolDefinition && !cache.has(cacheKey) && !inFlight.has(cacheKey);
-			});
-
-			if (missing.length === 0) {
-				return;
-			}
-
-			const requestedKeys = new Set<string>();
-			for (const entry of missing) {
-				const cacheKey = conversationToolHydrationKey(entry);
-				inFlight.add(cacheKey);
-				requestedKeys.add(cacheKey);
-			}
-
-			void Promise.all(
-				missing.map(async entry => {
-					const cacheKey = conversationToolHydrationKey(entry);
+				inFlightRef.current.add(key);
+				void (async () => {
 					try {
-						const def = await toolStoreAPI.getTool(
-							entry.toolStoreChoice.bundleID,
-							entry.toolStoreChoice.toolSlug,
-							entry.toolStoreChoice.toolVersion
-						);
-						return def ? { cacheKey, def } : null;
-					} catch {
-						return null;
-					}
-				})
-			)
-				.then(results => {
-					if (!isMountedRef.current) {
-						return;
-					}
-
-					let loadedAny = false;
-					for (const result of results) {
-						if (!result) {
-							continue;
+						const resolved = await toolManagementAPI.resolveMappedTool(target);
+						if (!mountedRef.current) {
+							return;
 						}
-						cache.set(result.cacheKey, result.def);
-						loadedAny = true;
+						resolvedCacheRef.current.set(key, resolved);
+						commitConversation(primeFromCache(conversationRef.current));
+					} catch (error) {
+						if (!mountedRef.current) {
+							return;
+						}
+						const message = getErrorMessage(error, 'The selected Tool could not be resolved.');
+						commitConversation(
+							conversationRef.current.map(current =>
+								toolIdentityKey(current.toolStoreChoice.target) === key && !current.toolDefinition
+									? { ...current, toolLoadError: message }
+									: current
+							)
+						);
+					} finally {
+						inFlightRef.current.delete(key);
 					}
-
-					if (!loadedAny) {
-						return;
-					}
-
-					setConversationToolsStateRaw(prev => {
-						const next = primeConversationToolsFromCache(prev);
-						conversationToolsStateRef.current = next;
-						return next;
-					});
-				})
-				.finally(() => {
-					for (const key of requestedKeys) {
-						inFlight.delete(key);
-					}
-				});
+				})();
+			}
 		},
-		[primeConversationToolsFromCache]
+		[commitConversation, primeFromCache]
 	);
 
 	const setConversationToolsState = useCallback<Dispatch<SetStateAction<ConversationToolStateEntry[]>>>(
 		update => {
-			const prev = conversationToolsStateRef.current;
-			const requested = resolveStateUpdate(update, prev);
-			const next = primeConversationToolsFromCache(requested);
-
-			conversationToolsStateRef.current = next;
-			setConversationToolsStateRaw(next);
-			hydrateConversationToolsIfNeeded(next);
+			const next = primeFromCache(resolveStateUpdate(update, conversationRef.current));
+			commitConversation(next);
+			hydrateMissing(next);
 		},
-		[hydrateConversationToolsIfNeeded, primeConversationToolsFromCache]
+		[commitConversation, hydrateMissing, primeFromCache]
 	);
 
 	const setWebSearchTemplates = useCallback<Dispatch<SetStateAction<WebSearchChoiceTemplate[]>>>(update => {
-		const prev = webSearchTemplatesRef.current;
-		const requested = resolveStateUpdate(update, prev);
-		const next = normalizeWebSearchChoiceTemplates(requested);
-
+		const previous = webSearchRef.current;
+		const next = normalizeWebSearchChoiceTemplates(resolveStateUpdate(update, previous));
 		if (
-			prev.length === next.length &&
-			prev.every(
-				(item, idx) =>
-					item.bundleID === next[idx]?.bundleID &&
-					item.toolSlug === next[idx]?.toolSlug &&
-					item.toolVersion === next[idx]?.toolVersion &&
-					item.userArgSchemaInstance === next[idx]?.userArgSchemaInstance
+			previous.length === next.length &&
+			previous.every(
+				(item, index) =>
+					toolIdentityKey(item.target) === toolIdentityKey(next[index].target) &&
+					item.userArgSchemaInstance === next[index].userArgSchemaInstance
 			)
 		) {
 			return;
 		}
-
-		webSearchTemplatesRef.current = next;
+		webSearchRef.current = next;
 		setWebSearchTemplatesRaw(next);
 	}, []);
 
 	const recomputeAttachedToolArgsBlocked = useCallback(() => {
-		const toolEntries = getAttachedToolEntries(false);
-		let nextBlocked = false;
-
-		for (const entry of toolEntries) {
-			const schema = entry.toolSnapshot?.userArgSchema;
-			const status = computeToolUserArgsStatus(schema, entry.userArgSchemaInstance);
-			if (status.hasSchema && !status.isSatisfied) {
-				nextBlocked = true;
-				break;
+		const blocked = getAttachedToolEntries(false).some(entry => {
+			if (!entry.toolSnapshot) {
+				return true;
 			}
-		}
-
-		setAttachedToolArgsBlocked(prev => (prev === nextBlocked ? prev : nextBlocked));
+			const status = computeToolUserArgsStatus(entry.toolSnapshot.userArgSchema, entry.userArgSchemaInstance);
+			return status.hasSchema && !status.isSatisfied;
+		});
+		setAttachedBlocked(previous => (previous === blocked ? previous : blocked));
 	}, [getAttachedToolEntries]);
 
 	const clearAttachedToolValidation = useCallback(() => {
-		setAttachedToolArgsBlocked(false);
+		setAttachedBlocked(false);
 	}, []);
 
-	const conversationToolArgsBlocked = useMemo(
-		() => getConversationToolArgsBlocked(conversationToolsState),
+	const conversationBlocked = useMemo(
+		() =>
+			conversationToolsState.some(entry => {
+				if (!entry.enabled) {
+					return false;
+				}
+				if (!entry.toolDefinition || entry.toolLoadError) {
+					return true;
+				}
+				const status =
+					entry.argStatus ??
+					computeToolUserArgsStatus(entry.toolDefinition.userArgSchema, entry.toolStoreChoice.userArgSchemaInstance);
+				return status.hasSchema && !status.isSatisfied;
+			}),
 		[conversationToolsState]
 	);
-
-	const toolArgsBlocked = attachedToolArgsBlocked || conversationToolArgsBlocked;
 
 	const applyConversationToolsFromChoices = useCallback(
 		(tools: ToolStoreChoice[]) => {
@@ -262,12 +182,11 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 
 	const applyWebSearchFromChoices = useCallback(
 		(tools: ToolStoreChoice[]) => {
-			const next = normalizeWebSearchChoiceTemplates(
+			setWebSearchTemplates(
 				(tools ?? [])
 					.filter(tool => tool.toolType === ToolStoreChoiceType.WebSearch)
-					.map(t => webSearchTemplateFromChoice(t))
+					.map(tool => webSearchTemplateFromChoice(tool))
 			);
-			setWebSearchTemplates(next);
 		},
 		[setWebSearchTemplates]
 	);
@@ -277,7 +196,7 @@ export function useComposerToolConfig({ getAttachedToolEntries }: UseComposerToo
 		setConversationToolsState,
 		webSearchTemplates,
 		setWebSearchTemplates,
-		toolArgsBlocked,
+		toolArgsBlocked: attachedBlocked || conversationBlocked,
 		recomputeAttachedToolArgsBlocked,
 		clearAttachedToolValidation,
 		applyConversationToolsFromChoices,

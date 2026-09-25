@@ -32,7 +32,7 @@ import type {
 	SkillManagementView,
 	SkillPresenceStatus,
 } from '@/spec/skill';
-import type { ToolRef } from '@/spec/tool';
+import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactAdoptionMode as ArtifactAdoptionModeValue, ArtifactState } from '@/spec/artifact';
 import {
 	RuntimeSkillActivity,
@@ -50,7 +50,7 @@ import type {
 	ISkillAggregateAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
-	IToolStoreAPI,
+	IToolTargetResolver,
 } from '@/apis/interface';
 
 function artifactRefKey(ref: ArtifactRef): string {
@@ -213,7 +213,7 @@ export class SkillManagementAPI {
 		private readonly runtime: ISkillRuntimeAPI,
 		private readonly store: ISkillStoreAPI,
 		private readonly aggregate: ISkillAggregateAPI,
-		private readonly toolStore: IToolStoreAPI,
+		private readonly tools: IToolTargetResolver,
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
 
@@ -806,8 +806,8 @@ export class SkillManagementAPI {
 		};
 	}
 
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef> {
-		return this.toolStore.resolveMappedToolTarget(target);
+	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView> {
+		return this.tools.resolveMappedTool(target);
 	}
 
 	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {

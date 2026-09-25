@@ -781,7 +781,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 			const updatedConv: Conversation = {
 				...tab.conversation,
 				title: sanitized,
-				modifiedAt: new Date(),
+				modifiedAt: new Date().toISOString(),
 			};
 
 			saveUpdatedConversation(tabId, updatedConv, true);

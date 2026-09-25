@@ -245,7 +245,11 @@ export function applyCompletionMetadata(
 	currentUserMessageID: string | undefined,
 	rawResponse: CompletionResponseBody | undefined
 ): Conversation {
-	if (!currentUserMessageID || !rawResponse || (!rawResponse.hydratedCurrentInputs && !rawResponse.workspaceUsage)) {
+	if (
+		!currentUserMessageID ||
+		!rawResponse ||
+		(!rawResponse.hydratedCurrentInputs && !rawResponse.workspaceUsage && !rawResponse.mcpToolMappings)
+	) {
 		return conversation;
 	}
 
@@ -256,6 +260,7 @@ export function applyCompletionMetadata(
 				? {
 						...message,
 						inputs: rawResponse.hydratedCurrentInputs ?? message.inputs,
+						mcpToolMappings: rawResponse.mcpToolMappings ?? message.mcpToolMappings,
 						workspaceUsage: rawResponse.workspaceUsage,
 					}
 				: message

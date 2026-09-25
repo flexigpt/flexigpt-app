@@ -44,23 +44,3 @@ export function GroupedMenuSection({
 		</>
 	);
 }
-
-interface GroupedMenuSubheadingProps {
-	children: ReactNode;
-	tone?: 'muted' | 'warning';
-	separated?: boolean;
-}
-
-export function GroupedMenuSubheading({ children, tone = 'muted', separated = false }: GroupedMenuSubheadingProps) {
-	const toneClass = tone === 'warning' ? 'text-warning opacity-80' : 'opacity-50';
-
-	return (
-		<div
-			className={`px-1 text-[10px] font-medium tracking-wide uppercase ${toneClass} ${
-				separated ? 'border-base-300 mt-1 border-t pt-2' : ''
-			}`}
-		>
-			{children}
-		</div>
-	);
-}

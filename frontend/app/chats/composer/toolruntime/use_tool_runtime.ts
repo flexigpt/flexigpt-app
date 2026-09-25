@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import type { SkillRef } from '@/spec/skill';
 import { UIToolCallStatus } from '@/spec/inference';
-import { ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
+import { ToolImplType, ToolOutputKind, ToolStoreChoiceType } from '@/spec/tool';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 import { ensureMakeID, getUUIDv7 } from '@/lib/uuid_utils';
@@ -51,6 +51,7 @@ function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
 		arguments: toolCall.arguments,
 		webSearchToolCallItems: toolCall.webSearchToolCallItems,
 		toolStoreChoice: toolCall.toolStoreChoice,
+		toolSelection: toolCall.toolSelection,
 		mcpToolSelection: toolCall.mcpToolSelection,
 	};
 }
@@ -188,6 +189,8 @@ export function useComposerToolRuntime({
 		isMountedRef.current = true;
 		return () => {
 			isMountedRef.current = false;
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			toolCallAttemptKeyByIdRef.current.clear();
 		};
 	}, []);
 
@@ -399,6 +402,7 @@ export function useComposerToolRuntime({
 					type: output.type,
 					status: UIToolCallStatus.Pending,
 					toolStoreChoice: output.toolStoreChoice,
+					toolSelection: output.toolSelection,
 					mcpToolSelection: output.mcpToolSelection,
 				};
 
@@ -420,8 +424,8 @@ export function useComposerToolRuntime({
 					return;
 				}
 
-				const { bundleID, toolSlug, toolVersion } = output.toolStoreChoice;
-				if (!bundleID || !toolSlug || !toolVersion) {
+				const { target, implementationKind } = output.toolStoreChoice;
+				if (!target?.provider || !target.identifier || implementationKind !== ToolImplType.Go) {
 					return;
 				}
 			} else if (output.type !== ToolStoreChoiceType.Function && output.type !== ToolStoreChoiceType.Custom) {
@@ -438,6 +442,7 @@ export function useComposerToolRuntime({
 				type: output.type,
 				status: UIToolCallStatus.Pending,
 				toolStoreChoice: output.toolStoreChoice,
+				toolSelection: output.toolSelection,
 				errorMessage: undefined,
 			};
 

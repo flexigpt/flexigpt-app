@@ -13,7 +13,7 @@ import type {
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
 import { CONVERSATION_SCHEMA_VERSION } from '@/spec/conversation';
 import { ContentItemKind, InputKind, RoleEnum, Status, ToolType } from '@/spec/inference';
@@ -26,7 +26,8 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 import type { EditorSubmitPayload } from '@/chats/composer/editor/editor_types';
 import { uiAttachmentToConversation } from '@/chats/composer/attachments/attachment_editor_utils';
 import { clampActiveSkillRefsToEnabled, normalizeSkillRefs } from '@/skills/lib/skill_identity_utils';
-import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
+import { requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
+import { toolSelectionFromChoice } from '@/tools/lib/tool_choice_utils';
 import { mapToolOutputsToToolOutputItems } from '@/tools/lib/tool_output_utils';
 
 export function initConversation(title = 'New Conversation'): Conversation {
@@ -34,14 +35,14 @@ export function initConversation(title = 'New Conversation'): Conversation {
 		schemaVersion: CONVERSATION_SCHEMA_VERSION,
 		id: getUUIDv7(),
 		title: generateTitle(title).title,
-		createdAt: new Date(),
-		modifiedAt: new Date(),
+		createdAt: new Date().toISOString(),
+		modifiedAt: new Date().toISOString(),
 		messages: [],
 	};
 }
 
 export function initConversationMessage(role: RoleEnum): ConversationMessage {
-	const now = new Date();
+	const now = new Date().toISOString();
 	return {
 		id: getUUIDv7(),
 		createdAt: now,
@@ -81,7 +82,7 @@ function deriveConversationToolsFromMessages(messages: ConversationMessage[]): T
 		if (message.role !== RoleEnum.User) {
 			continue;
 		}
-		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch);
+		return (message.uiToolChoices ?? []).filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch);
 	}
 	return [];
 }
@@ -92,7 +93,16 @@ function deriveWebSearchChoiceFromMessages(messages: ConversationMessage[]): Too
 		if (message.role !== RoleEnum.User) {
 			continue;
 		}
-		return (message.toolStoreChoices ?? []).filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch);
+		return (message.uiToolChoices ?? []).filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch);
+	}
+	return [];
+}
+
+function deriveToolSelectionIssues(messages: ConversationMessage[]): ToolSelectionIssue[] {
+	for (const message of messages.toReversed()) {
+		if (message.role === RoleEnum.User) {
+			return message.uiToolSelectionIssues ?? [];
+		}
 	}
 	return [];
 }
@@ -204,6 +214,7 @@ export function deriveRestorableConversationContextFromMessages(
 		modelParam: findLastModelParam(messages),
 		toolChoices: deriveConversationToolsFromMessages(messages),
 		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
+		toolSelectionIssues: deriveToolSelectionIssues(messages),
 		mcpContext: deriveMCPContextFromMessages(messages),
 		mcpAppContextUpdates: deriveMCPAppContextUpdatesFromMessages(messages),
 		enabledSkillRefs,
@@ -217,7 +228,7 @@ export function buildUserConversationMessageFromEditor(
 	existingId?: string,
 	modelPresetRef?: ModelPresetRef
 ): ConversationMessage {
-	const now = new Date();
+	const now = new Date().toISOString();
 	const id = existingId ?? getUUIDv7();
 
 	const text = payload.text.trim();
@@ -274,7 +285,9 @@ export function buildUserConversationMessageFromEditor(
 			? dedupeAttachmentsByRef(payload.attachments.map(uiAttachmentToConversation))
 			: undefined;
 
-	const toolStoreChoices = payload.finalToolChoices.length > 0 ? payload.finalToolChoices : undefined;
+	const toolSelections = payload.finalToolChoices.map(choice => toolSelectionFromChoice(choice));
+	const uiToolChoices = payload.finalToolChoices.map(choice => ({ ...choice }));
+
 	const toolOutputs = payload.toolOutputs.length > 0 ? payload.toolOutputs : undefined;
 	const mcpContext = payload.mcpContext;
 	const mcpAppContextUpdates =
@@ -291,7 +304,9 @@ export function buildUserConversationMessageFromEditor(
 		modelPresetRef,
 		inputs,
 		attachments,
-		toolStoreChoices,
+		toolSelections,
+		uiToolChoices,
+		uiToolSelectionIssues: [],
 		mcpContext,
 		mcpAppContextUpdates,
 		enabledSkillRefs: enabledSkillRefs.length > 0 ? enabledSkillRefs : undefined,
@@ -309,7 +324,7 @@ export function deriveHydratedLastAssistantToolCalls(conversation: Conversation)
 	}
 
 	return (lastMessage.uiToolCalls ?? [])
-		.filter(call => isRunnableComposerToolCall(call))
+		.filter(call => requiresComposerToolResponse(call))
 		.map(call => Object.assign({}, call, { suppressAutoExecute: true }));
 }
 

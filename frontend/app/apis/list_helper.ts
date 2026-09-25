@@ -1,8 +1,7 @@
 import type { ProviderName } from '@/spec/inference';
 import type { ProviderPreset } from '@/spec/modelpreset';
-import type { ToolBundle, ToolListItem } from '@/spec/tool';
 
-import { modelPresetStoreAPI, toolStoreAPI } from '@/apis/baseapi';
+import { modelPresetStoreAPI } from '@/apis/baseapi';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
 export async function getAllProviderPresetsMap(
@@ -21,37 +20,8 @@ export async function getAllProviderPresetsMap(
 		if (Object.hasOwn(result, preset.name)) {
 			throw new Error(`Provider preset ${preset.name} was returned more than once.`);
 		}
-
 		result[preset.name] = preset;
 	}
 
 	return result;
-}
-
-export async function getAllTools(
-	bundleIDs?: string[],
-	tags?: string[],
-	includeDisabled?: boolean
-): Promise<ToolListItem[]> {
-	const recommendedPageSize = 25;
-
-	return collectAllPages(async pageToken => {
-		const page = await toolStoreAPI.listTools(bundleIDs, tags, includeDisabled, recommendedPageSize, pageToken);
-		return {
-			items: page.toolListItems,
-			nextPageToken: page.nextPageToken,
-		};
-	});
-}
-
-export async function getAllToolBundles(bundleIDs?: string[], includeDisabled?: boolean): Promise<ToolBundle[]> {
-	const pageSize = 25;
-
-	return collectAllPages(async pageToken => {
-		const page = await toolStoreAPI.listToolBundles(bundleIDs, includeDisabled, pageSize, pageToken);
-		return {
-			items: page.toolBundles,
-			nextPageToken: page.nextPageToken,
-		};
-	});
 }

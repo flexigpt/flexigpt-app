@@ -1,38 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useCallback } from 'react';
 
 import type { ToolListItem } from '@/spec/tool';
 
-import { getAllTools } from '@/apis/list_helper';
+import { useAsyncResource } from '@/hooks/use_async_resource';
+
+import { toolManagementAPI } from '@/apis/baseapi';
 
 export function useTools() {
-	const [data, setData] = useState<ToolListItem[]>([]);
-	const [loading, setLoading] = useState(true);
+	const load = useCallback((signal: AbortSignal) => toolManagementAPI.listSelectableTools(signal), []);
+	const resource = useAsyncResource(load, { initialData: [] as ToolListItem[] });
 
-	useEffect(() => {
-		let cancelled = false;
-
-		void (async () => {
-			try {
-				const res = await getAllTools();
-				if (cancelled) {
-					return;
-				}
-				setData(res);
-			} catch (err) {
-				if (!cancelled) {
-					console.error('Failed to load tools', err);
-				}
-			} finally {
-				if (!cancelled) {
-					setLoading(false);
-				}
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, []);
-
-	return { data, loading };
+	return {
+		data: resource.data,
+		error: resource.error,
+		loading: resource.isLoading,
+		isRefreshing: resource.isRefreshing,
+		hasResolved: resource.hasResolved,
+		ready: resource.hasResolved && !resource.isLoading && !resource.isRefreshing && !resource.error,
+		refresh: resource.reloadOrThrow,
+	};
 }
+
+export type ToolCatalogState = ReturnType<typeof useTools>;

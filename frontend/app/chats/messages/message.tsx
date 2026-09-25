@@ -3,7 +3,7 @@ import { FiUser, FiZap } from 'react-icons/fi';
 
 import type { ConversationMessage } from '@/spec/conversation';
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { RoleEnum, Status } from '@/spec/inference';
 
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
@@ -145,6 +145,9 @@ export const ChatMessage = memo(function ChatMessage({
 	const handleToolChoiceDetails = useCallback((choice: ToolStoreChoice) => {
 		setToolDetailsState({ kind: 'choice', choice });
 	}, []);
+	const handleToolSelectionIssueDetails = useCallback((issue: ToolSelectionIssue) => {
+		setToolDetailsState({ kind: 'selection', selection: issue.selection, message: issue.message });
+	}, []);
 	const handleToolCallDetails = useCallback((call: UIToolCall) => {
 		setToolDetailsState({ kind: 'call', call });
 	}, []);
@@ -179,7 +182,7 @@ export const ChatMessage = memo(function ChatMessage({
 
 	const hasAttachmentsBar =
 		(message.attachments?.length ?? 0) > 0 ||
-		(message.toolStoreChoices?.length ?? 0) > 0 ||
+		(message.toolSelections?.length ?? 0) > 0 ||
 		(message.mcpAppContextUpdates?.length ?? 0) > 0 ||
 		(message.uiToolCalls?.length ?? 0) > 0 ||
 		(message.uiToolOutputs?.length ?? 0) > 0 ||
@@ -317,7 +320,9 @@ export const ChatMessage = memo(function ChatMessage({
 						<div className="flex min-w-0 items-center justify-start overflow-x-hidden px-1 py-0">
 							<MessageAttachmentsBar
 								attachments={message.attachments}
-								toolChoices={message.toolStoreChoices}
+								toolChoices={message.uiToolChoices}
+								toolSelectionIssues={message.uiToolSelectionIssues}
+								onToolSelectionIssueDetails={handleToolSelectionIssueDetails}
 								mcpContext={message.mcpContext}
 								mcpAppContextUpdates={message.mcpAppContextUpdates}
 								enabledSkillRefs={message.enabledSkillRefs}

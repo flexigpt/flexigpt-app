@@ -17,6 +17,7 @@ import type {
 	ISkillAggregateAPI,
 	ISkillRuntimeAPI,
 	ISkillStoreAPI,
+	IToolAggregateAPI,
 	IToolRuntimeAPI,
 	IToolStoreAPI,
 	IWorkspaceRuntimeAPI,
@@ -25,6 +26,7 @@ import type {
 import { AgentManagementAPI } from '@/apis/agent_management';
 import { MCPManagementAPI } from '@/apis/mcp_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
+import { ToolManagementAPI } from '@/apis/tool_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
@@ -33,6 +35,9 @@ import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
+import { WailsToolAggregateAPI } from '@/apis/wailsapi/tool_aggregate';
+import { WailsToolRuntimeAPI } from '@/apis/wailsapi/tool_runtime';
+import { WailsToolStoreAPI } from '@/apis/wailsapi/tool_store';
 import { WailsWorkspaceRuntimeAPI } from '@/apis/wailsapi/workspace_runtime';
 import { WailsWorkspaceStoreAPI } from '@/apis/wailsapi/workspace_store';
 import { WorkspaceManagementAPI } from '@/apis/workspace_management';
@@ -47,8 +52,10 @@ export let settingstoreAPI: ISettingStoreAPI;
 
 export let modelPresetStoreAPI: IModelPresetStoreAPI;
 
-export let toolStoreAPI: IToolStoreAPI;
-export let toolRuntimeAPI: IToolRuntimeAPI;
+let toolStoreAPI: IToolStoreAPI;
+let toolAggregateAPI: IToolAggregateAPI;
+let toolRuntimeAPI: IToolRuntimeAPI;
+export let toolManagementAPI: ToolManagementAPI;
 
 let skillStoreAPI: ISkillStoreAPI;
 let skillAggregateAPI: ISkillAggregateAPI;
@@ -83,8 +90,10 @@ if (IS_WAILS_PLATFORM) {
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
 
-	toolStoreAPI = new wailsImpl.WailsToolStoreAPI();
-	toolRuntimeAPI = new wailsImpl.WailsToolRuntimeAPI();
+	toolStoreAPI = new WailsToolStoreAPI();
+	toolAggregateAPI = new WailsToolAggregateAPI();
+	toolRuntimeAPI = new WailsToolRuntimeAPI();
+	toolManagementAPI = new ToolManagementAPI(toolStoreAPI, toolAggregateAPI, toolRuntimeAPI);
 
 	skillStoreAPI = new WailsSkillStoreAPI();
 	skillAggregateAPI = new WailsSkillAggregateAPI();
@@ -93,7 +102,7 @@ if (IS_WAILS_PLATFORM) {
 		skillRuntimeAPI,
 		skillStoreAPI,
 		skillAggregateAPI,
-		toolStoreAPI,
+		toolManagementAPI,
 		modelPresetStoreAPI
 	);
 
@@ -104,13 +113,13 @@ if (IS_WAILS_PLATFORM) {
 		mcpStoreAPI,
 		mcpAggregateAPI,
 		mcpRuntimeAPI,
-		toolStoreAPI,
+		toolManagementAPI,
 		modelPresetStoreAPI
 	);
 
 	agentManagementAPI = new AgentManagementAPI(
 		agentStoreAPI,
-		toolStoreAPI,
+		toolManagementAPI,
 		modelPresetStoreAPI,
 		mcpManagementAPI,
 		skillManagementAPI
@@ -121,7 +130,7 @@ if (IS_WAILS_PLATFORM) {
 	workspaceManagementAPI = new WorkspaceManagementAPI(
 		workspaceStoreAPI,
 		workspaceRuntimeAPI,
-		toolStoreAPI,
+		toolManagementAPI,
 		modelPresetStoreAPI
 	);
 } else {

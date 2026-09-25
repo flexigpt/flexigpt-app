@@ -263,6 +263,57 @@ func (w *AgentStoreWrapper) UpdateAgentCollection(
 	)
 }
 
+func (w *AgentStoreWrapper) AddAgentCollectionMember(
+	request collection.AddMemberRequest,
+) (collection.CollectionView, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (
+			collection.CollectionView,
+			error,
+		) {
+			return api.AddAgentCollectionMember(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) AddAgentCollectionArtifactMember(
+	request collection.AddArtifactMemberRequest,
+) (collection.CollectionView, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (
+			collection.CollectionView,
+			error,
+		) {
+			return api.AddAgentCollectionArtifactMember(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
+func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
+	request collection.RemoveMemberRequest,
+) (collection.CollectionView, error) {
+	return withAgentStore(
+		w,
+		func(api *agentConsumerAPI.API) (
+			collection.CollectionView,
+			error,
+		) {
+			return api.RemoveAgentCollectionMember(
+				context.Background(),
+				request,
+			)
+		},
+	)
+}
+
 func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,

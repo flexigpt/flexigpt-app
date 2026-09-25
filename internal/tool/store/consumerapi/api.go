@@ -3,17 +3,16 @@ package consumerapi
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
-	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
@@ -22,17 +21,21 @@ type API struct {
 	sources          compositionapi.SourceAPI
 	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
+	resources        compositionapi.ResourceAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
+	collections      *collection.API
 
-	builtinRoot root.RootID
-	goTools     toolDomain.GoToolLocator
+	builtinRoot   root.RootID
+	builtinSource source.SourceID
+	goTools       toolDomain.GoToolLocator
 }
 
 func New(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
+	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	builtinRoot root.RootID,
@@ -41,6 +44,7 @@ func New(
 	if sources == nil ||
 		discovery == nil ||
 		artifacts == nil ||
+		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
 		goTools == nil {
@@ -52,156 +56,89 @@ func New(
 	if err := builtinRoot.Validate(); err != nil {
 		return nil, err
 	}
-	if !protection.IsProtectedRoot(builtinRoot) {
+	if builtinRoot != documentTopology.BuiltinRootID() ||
+		!protection.IsProtectedRoot(builtinRoot) {
 		return nil, fmt.Errorf(
-			"%w: Tool Store builtin Root %q is not protected",
+			"%w: Tool Store requires the protected built-in Root",
 			basespec.ErrInvalid,
-			builtinRoot,
 		)
+	}
+
+	builtinSource, err := documentTopology.BuiltinSource(
+		documentTopology.BuiltinSourceRolePackages,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if builtinSource.Kind != source.SourceKindManagedDirectory {
+		return nil, fmt.Errorf(
+			"%w: built-in Tool Source must be managed",
+			basespec.ErrInvalid,
+		)
+	}
+
+	// Built-in Tool Collections have direct named references and no aliases.
+	// A graph resolver is deliberately not installed here: the Tool target
+	// mapper itself calls this Store to check Collection membership.
+	collections, err := collection.NewWithResolver(
+		sources,
+		discovery,
+		artifacts,
+		managedArtifacts,
+		nil,
+		toolCollectionPolicy(),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	return &API{
 		sources:          sources,
 		discovery:        discovery,
 		artifacts:        artifacts,
+		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
+		collections:      collections,
 		builtinRoot:      builtinRoot,
+		builtinSource:    builtinSource.ID,
 		goTools:          goTools,
 	}, nil
-}
-
-func (a *API) ListToolCollections(
-	ctx context.Context,
-) ([]toolDomain.ToolCollection, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-
-	records, err := a.artifacts.ListByRoot(ctx, a.builtinRoot)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]toolDomain.ToolCollection, 0)
-	for _, record := range records {
-		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-			record.State != artifact.StateAvailable {
-			continue
-		}
-
-		definitionValue, err := a.artifacts.GetDefinition(
-			ctx,
-			record.Ref(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		collection, err := toolDomain.DecodeToolCollection(
-			record,
-			definitionValue,
-		)
-		if errors.Is(err, toolDomain.ErrNotToolCollection) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, collection)
-	}
-
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Artifact.LogicalName !=
-			output[right].Artifact.LogicalName {
-			return output[left].Artifact.LogicalName <
-				output[right].Artifact.LogicalName
-		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
-	})
-	return output, nil
-}
-
-func (a *API) GetToolCollection(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (toolDomain.ToolCollection, error) {
-	if a == nil {
-		return toolDomain.ToolCollection{}, basespec.ErrClosed
-	}
-	if err := a.requireBuiltinRef(ref); err != nil {
-		return toolDomain.ToolCollection{}, err
-	}
-
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return toolDomain.ToolCollection{}, err
-	}
-	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
-	if err != nil {
-		return toolDomain.ToolCollection{}, err
-	}
-	return toolDomain.DecodeToolCollection(record, definitionValue)
-}
-
-func (a *API) ListTools(
-	ctx context.Context,
-	collectionRef artifact.ArtifactRef,
-) ([]toolDomain.Tool, error) {
-	collection, err := a.GetToolCollection(ctx, collectionRef)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]toolDomain.Tool, 0, len(collection.ToolNames))
-	for _, name := range collection.ToolNames {
-		tool, err := a.toolByName(ctx, name)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"resolve Tool Collection member %q: %w",
-				name,
-				err,
-			)
-		}
-		output = append(output, tool)
-	}
-	return output, nil
 }
 
 func (a *API) GetTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (toolDomain.Tool, error) {
-	if a == nil {
-		return toolDomain.Tool{}, basespec.ErrClosed
-	}
-	if err := a.requireBuiltinRef(ref); err != nil {
-		return toolDomain.Tool{}, err
-	}
-
-	record, err := a.artifacts.Get(ctx, ref)
+) (ToolView, error) {
+	value, err := a.getTool(ctx, ref)
 	if err != nil {
-		return toolDomain.Tool{}, err
+		return ToolView{}, err
 	}
-	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
-	if err != nil {
-		return toolDomain.Tool{}, err
-	}
-	tool, err := toolDomain.DecodeTool(record, definitionValue)
-	if err != nil {
-		return toolDomain.Tool{}, err
-	}
-	return tool, a.validateGoTool(ctx, tool)
+	return toolView(value), nil
 }
 
-func (a *API) ResolveEnabledTool(
+func (a *API) ListTools(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (toolDomain.ResolvedTool, error) {
-	tool, err := a.GetTool(ctx, ref)
+	collectionRef artifact.ArtifactRef,
+) ([]ToolView, error) {
+	view, err := a.GetToolCollection(ctx, collectionRef)
 	if err != nil {
-		return toolDomain.ResolvedTool{}, err
+		return nil, err
 	}
-	return a.resolveEnabledTool(ctx, tool)
+
+	output := make([]ToolView, 0, len(view.Members))
+	for _, member := range view.Members {
+		value, err := a.toolByName(ctx, member.Name)
+		if err != nil {
+			return nil, fmt.Errorf(
+				"resolve Tool Collection member %q: %w",
+				member.Name,
+				err,
+			)
+		}
+		output = append(output, toolView(value))
+	}
+	return output, nil
 }
 
 func (a *API) SetToolEnabled(
@@ -209,20 +146,23 @@ func (a *API) SetToolEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (toolDomain.Tool, error) {
+) (ToolView, error) {
+	if err := a.ready(ctx); err != nil {
+		return ToolView{}, err
+	}
 	if expectedRevision == 0 {
-		return toolDomain.Tool{}, fmt.Errorf(
+		return ToolView{}, fmt.Errorf(
 			"%w: expected Tool revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 
-	tool, err := a.GetTool(ctx, ref)
+	value, err := a.GetTool(ctx, ref)
 	if err != nil {
-		return toolDomain.Tool{}, err
+		return ToolView{}, err
 	}
-	if tool.Artifact.Revision != expectedRevision {
-		return toolDomain.Tool{}, basespec.ErrConflict
+	if value.Artifact.Revision != expectedRevision {
+		return ToolView{}, basespec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -232,76 +172,77 @@ func (a *API) SetToolEnabled(
 		enabled,
 	)
 	if err != nil {
-		return toolDomain.Tool{}, err
+		return ToolView{}, err
 	}
-	tool.Artifact = updated.Clone()
-	return tool, nil
+	value.Artifact = updated.Clone()
+	return value, nil
 }
 
-func (a *API) SetToolCollectionEnabled(
+func (a *API) getTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (toolDomain.ToolCollection, error) {
-	if expectedRevision == 0 {
-		return toolDomain.ToolCollection{}, fmt.Errorf(
-			"%w: expected Tool Collection revision is required",
-			basespec.ErrInvalid,
-		)
+) (toolDomain.Tool, error) {
+	if err := a.ready(ctx); err != nil {
+		return toolDomain.Tool{}, err
+	}
+	if err := a.requireBuiltinRef(ref); err != nil {
+		return toolDomain.Tool{}, err
 	}
 
-	collection, err := a.GetToolCollection(ctx, ref)
+	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return toolDomain.ToolCollection{}, err
+		return toolDomain.Tool{}, err
 	}
-	if collection.Artifact.Revision != expectedRevision {
-		return toolDomain.ToolCollection{}, basespec.ErrConflict
+	if err := a.requireBuiltinArtifact(record); err != nil {
+		return toolDomain.Tool{}, err
 	}
 
-	updated, err := a.artifacts.SetEnabled(
-		ctx,
-		ref,
-		expectedRevision,
-		enabled,
+	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
+	if err != nil {
+		return toolDomain.Tool{}, err
+	}
+	value, err := toolDomain.DecodeTool(record, definitionValue)
+	if err != nil {
+		return toolDomain.Tool{}, err
+	}
+
+	actual, err := toolDomain.ToolPackageAddressFromLocator(
+		record.Binding.Locator,
 	)
 	if err != nil {
-		return toolDomain.ToolCollection{}, err
+		return toolDomain.Tool{}, err
 	}
-	collection.Artifact = updated.Clone()
-	return collection, nil
-}
-
-func (a *API) resolveEnabledTool(
-	ctx context.Context,
-	tool toolDomain.Tool,
-) (toolDomain.ResolvedTool, error) {
-	collection, err := a.collectionForTool(
-		ctx,
-		tool.Artifact.LogicalName,
+	expected, err := toolDomain.ToolPackageAddress(
+		record.LogicalName,
+		value.Document.Version,
 	)
 	if err != nil {
-		return toolDomain.ResolvedTool{}, err
+		return toolDomain.Tool{}, err
 	}
-
-	resolved := toolDomain.ResolvedTool{
-		Tool:       tool,
-		Collection: collection,
-	}
-	if !resolved.Enabled() {
-		return toolDomain.ResolvedTool{}, fmt.Errorf(
-			"%w: Tool %q is disabled",
+	if actual != expected {
+		return toolDomain.Tool{}, fmt.Errorf(
+			"%w: Tool package identity differs from its declaration",
 			basespec.ErrReferenceUnresolved,
-			tool.Artifact.LogicalName,
 		)
 	}
-	return resolved, nil
+
+	if err := a.validateGoTool(ctx, value); err != nil {
+		return toolDomain.Tool{}, err
+	}
+	return value, nil
 }
 
 func (a *API) toolByName(
 	ctx context.Context,
 	name basespec.LogicalName,
 ) (toolDomain.Tool, error) {
+	if err := a.ready(ctx); err != nil {
+		return toolDomain.Tool{}, err
+	}
+	if err := name.Validate(); err != nil {
+		return toolDomain.Tool{}, err
+	}
+
 	records, err := a.artifacts.FindByIdentity(
 		ctx,
 		a.builtinRoot,
@@ -312,28 +253,12 @@ func (a *API) toolByName(
 		return toolDomain.Tool{}, err
 	}
 
-	candidates := make([]toolDomain.Tool, 0, len(records))
+	candidates := make([]artifact.Artifact, 0, len(records))
 	for _, record := range records {
-		if record.State != artifact.StateAvailable {
-			continue
+		if record.State == artifact.StateAvailable {
+			candidates = append(candidates, record)
 		}
-		definitionValue, err := a.artifacts.GetDefinition(
-			ctx,
-			record.Ref(),
-		)
-		if err != nil {
-			return toolDomain.Tool{}, err
-		}
-		tool, err := toolDomain.DecodeTool(record, definitionValue)
-		if err != nil {
-			return toolDomain.Tool{}, err
-		}
-		if err := a.validateGoTool(ctx, tool); err != nil {
-			return toolDomain.Tool{}, err
-		}
-		candidates = append(candidates, tool)
 	}
-
 	switch len(candidates) {
 	case 0:
 		return toolDomain.Tool{}, fmt.Errorf(
@@ -342,7 +267,7 @@ func (a *API) toolByName(
 			name,
 		)
 	case 1:
-		return candidates[0], nil
+		return a.getTool(ctx, candidates[0].Ref())
 	default:
 		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: built-in Tool %q has %d matching Artifacts",
@@ -353,51 +278,82 @@ func (a *API) toolByName(
 	}
 }
 
-func (a *API) collectionForTool(
+func (a *API) validateGoTool(
 	ctx context.Context,
-	name basespec.LogicalName,
-) (toolDomain.ToolCollection, error) {
-	collections, err := a.ListToolCollections(ctx)
+	value toolDomain.Tool,
+) error {
+	if value.Document.Implementation.Kind != toolv1.ImplementationKindGo {
+		return nil
+	}
+
+	registered, err := a.goTools.LookupGoTool(
+		ctx,
+		value.Document.Implementation.Function,
+	)
 	if err != nil {
-		return toolDomain.ToolCollection{}, err
+		return err
 	}
-
-	matches := make([]toolDomain.ToolCollection, 0, 1)
-	for _, collection := range collections {
-		if collection.HasTool(name) {
-			matches = append(matches, collection)
-		}
-	}
-
-	switch len(matches) {
-	case 0:
-		return toolDomain.ToolCollection{}, fmt.Errorf(
-			"%w: Tool %q has no Tool Collection",
+	if registered.Name != value.Artifact.LogicalName ||
+		registered.Version != value.Document.Version ||
+		registered.Function != value.Document.Implementation.Function {
+		return fmt.Errorf(
+			"%w: Go Tool declaration does not match the registered Go Tool",
 			basespec.ErrReferenceUnresolved,
-			name,
-		)
-	case 1:
-		return matches[0], nil
-	default:
-		return toolDomain.ToolCollection{}, fmt.Errorf(
-			"%w: Tool %q belongs to %d Tool Collections",
-			basespec.ErrIdentityConflict,
-			name,
-			len(matches),
 		)
 	}
+
+	declaredSchema, err := jsonutil.Canonicalize(value.Document.InputSchema)
+	if err != nil {
+		return err
+	}
+	registeredSchema, err := jsonutil.Canonicalize(registered.InputSchema)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(declaredSchema, registeredSchema) {
+		return fmt.Errorf(
+			"%w: Go Tool input schema differs from the registered Go Tool",
+			basespec.ErrDigestMismatch,
+		)
+	}
+	return nil
 }
 
-func (a *API) requireBuiltinRef(
-	ref artifact.ArtifactRef,
-) error {
+func (a *API) ready(ctx context.Context) error {
+	if a == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Tool Store context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	return ctx.Err()
+}
+
+func (a *API) requireBuiltinRef(ref artifact.ArtifactRef) error {
 	if err := ref.Validate(); err != nil {
 		return err
 	}
 	if ref.RootID != a.builtinRoot ||
 		!a.protection.IsProtectedRoot(ref.RootID) {
 		return fmt.Errorf(
-			"%w: Tool Artifact is not in the built-in Tool Root",
+			"%w: Tool Artifact is not in the protected built-in Root",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
+	return nil
+}
+
+func (a *API) requireBuiltinArtifact(record artifact.Artifact) error {
+	if err := a.requireBuiltinRef(record.Ref()); err != nil {
+		return err
+	}
+	if record.Binding.SourceID != a.builtinSource ||
+		record.Binding.SubresourceLocator != "" {
+		return fmt.Errorf(
+			"%w: Tool catalog Artifact has an unsupported origin",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
@@ -409,60 +365,32 @@ func (a *API) requireBuiltinSource(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) error {
+	if err := a.ready(ctx); err != nil {
+		return err
+	}
+	if err := rootID.Validate(); err != nil {
+		return err
+	}
+	if err := sourceID.Validate(); err != nil {
+		return err
+	}
 	if rootID != a.builtinRoot ||
+		sourceID != a.builtinSource ||
 		!a.protection.IsProtectedRoot(rootID) {
 		return fmt.Errorf(
-			"%w: Tool package Root is not the protected built-in Root",
+			"%w: package is not in the configured built-in Tool Source",
 			basespec.ErrProtected,
 		)
 	}
-	_, err := a.sources.Get(ctx, rootID, sourceID)
-	return err
-}
 
-func (a *API) validateGoTool(
-	ctx context.Context,
-	tool toolDomain.Tool,
-) error {
-	if tool.Document.Implementation.Kind != toolv1.ImplementationKindGo {
-		return nil
-	}
-	if a.goTools == nil {
-		return basespec.ErrClosed
-	}
-
-	registered, err := a.goTools.LookupGoTool(
-		ctx,
-		tool.Document.Implementation.Function,
-	)
+	value, err := a.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
 		return err
 	}
-	if registered.Name != tool.Artifact.LogicalName ||
-		registered.Version != tool.Document.Version ||
-		registered.Function != tool.Document.Implementation.Function {
+	if value.Kind != source.SourceKindManagedDirectory {
 		return fmt.Errorf(
-			"%w: Go Tool declaration does not match registered Go Tool",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	declaredSchema, err := jsonutil.Canonicalize(
-		tool.Document.InputSchema,
-	)
-	if err != nil {
-		return err
-	}
-	registeredSchema, err := jsonutil.Canonicalize(
-		registered.InputSchema,
-	)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(declaredSchema, registeredSchema) {
-		return fmt.Errorf(
-			"%w: Go Tool input schema differs from registered Go Tool",
-			basespec.ErrDigestMismatch,
+			"%w: built-in Tool Source must be managed",
+			basespec.ErrInvalid,
 		)
 	}
 	return nil

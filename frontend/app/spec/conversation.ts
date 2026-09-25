@@ -16,7 +16,7 @@ import type {
 } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPProviderToolMapping } from '@/spec/mcp';
 import type { ModelPresetRef } from '@/spec/modelpreset';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
 /** Keep in sync with Go's ConversationSchemaVersion. */
@@ -24,8 +24,7 @@ export const CONVERSATION_SCHEMA_VERSION = 'v1.0.0';
 
 export interface StoreConversationMessage {
 	id: string;
-	// Go type: time
-	createdAt: Date;
+	createdAt: string;
 	role: RoleEnum;
 	status: Status;
 
@@ -36,7 +35,7 @@ export interface StoreConversationMessage {
 
 	toolChoices?: ToolChoice[];
 
-	toolStoreChoices?: ToolStoreChoice[];
+	toolSelections?: ToolSelection[];
 	mcpContext?: MCPConversationContext;
 	mcpToolMappings?: MCPProviderToolMapping[];
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
@@ -54,6 +53,16 @@ export interface StoreConversationMessage {
 	debugDetails?: any;
 }
 
+interface BaseConversation<TMessage> {
+	schemaVersion: string;
+	id: string;
+	title: string;
+	createdAt: string;
+	modifiedAt: string;
+	messages: TMessage[];
+	meta?: Record<string, any>;
+}
+
 interface UIConversationMessageDetails {
 	// UI-only, derived from outputs (we'll derive in helpers)
 	uiContent: string;
@@ -61,35 +70,26 @@ interface UIConversationMessageDetails {
 	uiReasoningContents?: ReasoningContent[];
 	uiToolCalls?: UIToolCall[];
 	uiToolOutputs?: UIToolOutput[];
+	uiToolChoices?: ToolStoreChoice[];
+	uiToolSelectionIssues?: ToolSelectionIssue[];
 	uiCitations?: URLCitation[];
 }
 
 export type ConversationMessage = StoreConversationMessage & UIConversationMessageDetails;
-
-interface BaseConversation<TMessage> {
-	schemaVersion: string;
-	id: string;
-	title: string;
-	createdAt: Date;
-	modifiedAt: Date;
-	messages: TMessage[];
-	meta?: Record<string, any>;
-}
-
 export type StoreConversation = BaseConversation<StoreConversationMessage>;
 export type Conversation = BaseConversation<ConversationMessage>;
 
 export interface ConversationSearchItem {
 	id: string;
 	title: string;
-	idDate: Date;
-	modifiedAt: Date;
+	modifiedAt?: string;
 }
 
 export interface RestorableConversationContext {
 	modelPresetRef?: ModelPresetRef;
 	modelParam?: ModelParam;
 	toolChoices: ToolStoreChoice[];
+	toolSelectionIssues?: ToolSelectionIssue[];
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	webSearchChoices: ToolStoreChoice[];

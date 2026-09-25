@@ -73,6 +73,14 @@ func (s *Service) Invoke(
 		)
 	}
 
+	if request.TimeoutMS < 0 ||
+		int64(request.TimeoutMS) > int64((1<<63-1)/time.Millisecond) {
+		return nil, fmt.Errorf(
+			"%w: Tool timeout is outside the supported range",
+			basespec.ErrInvalid,
+		)
+	}
+
 	var timeout time.Duration
 	if request.TimeoutMS > 0 {
 		timeout = time.Duration(request.TimeoutMS) * time.Millisecond

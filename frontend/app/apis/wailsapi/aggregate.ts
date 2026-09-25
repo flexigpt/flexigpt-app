@@ -3,7 +3,7 @@ import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/in
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelPresetID, PostProviderPresetPayload } from '@/spec/modelpreset';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelection } from '@/spec/tool';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 
 import { ensureMakeID } from '@/lib/uuid_utils';
@@ -79,7 +79,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		modelParams: ModelParam,
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
-		toolStoreChoices?: ToolStoreChoice[],
+		toolSelections?: ToolSelection[],
 		mcpContext?: MCPConversationContext,
 		skillSessionID?: string,
 		requestId?: string,
@@ -96,12 +96,11 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		let textCallbackId = '';
 		let thinkingCallbackId = '';
 		let abortHandler: (() => void) | undefined;
-
 		const body = {
 			modelParam: modelParams as wailsSpec.ModelParam,
 			current: current as wailsSpec.ConversationMessage,
-			history: history ? ([...history] as wailsSpec.ConversationMessage[]) : [],
-			toolStoreChoices: toolStoreChoices ? ([...toolStoreChoices] as wailsSpec.ToolStoreChoice[]) : [],
+			history: (history ?? []) as wailsSpec.ConversationMessage[],
+			toolSelections: (toolSelections ?? []) as wailsSpec.CompletionRequestBody['toolSelections'],
 			skillSessionID: skillSessionID ?? '',
 			...(mcpContext ? { mcpContext } : {}),
 		} as wailsSpec.CompletionRequestBody;
@@ -124,26 +123,12 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			if (onStreamTextData) {
 				textCallbackId = `text-${rid}`;
 
-				let lastText = '';
-				const textCb = (t: string) => {
-					if (t !== lastText) {
-						lastText = t;
-						onStreamTextData(t);
-					}
-				};
-				EventsOn(textCallbackId, textCb);
+				EventsOn(textCallbackId, onStreamTextData);
 			}
 
 			if (onStreamThinkingData) {
 				thinkingCallbackId = `thinking-${rid}`;
-				let lastThinking = '';
-				const thinkingCb = (t: string) => {
-					if (t !== lastThinking) {
-						lastThinking = t;
-						onStreamThinkingData(t);
-					}
-				};
-				EventsOn(thinkingCallbackId, thinkingCb);
+				EventsOn(thinkingCallbackId, onStreamThinkingData);
 			}
 
 			// oxlint-disable-next-line promise/param-names

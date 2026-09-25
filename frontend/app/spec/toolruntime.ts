@@ -1,13 +1,8 @@
 import type { ToolOutputUnion } from '@/spec/tool';
 
-export interface InvokeGoOptions {
-	timeoutMS?: number;
-}
-
 export interface InvokeToolResponse {
 	outputs?: ToolOutputUnion[];
-	meta?: Record<string, any>;
-	isBuiltIn: boolean;
-	isError?: boolean;
+	meta?: Record<string, unknown>;
+	isError: boolean;
 	errorMessage?: string;
 }

@@ -209,9 +209,10 @@ func ValidateRequiredText(label, value string, maximum int) error {
 		!utf8.ValidString(value) ||
 		strings.TrimSpace(value) != value {
 		return fmt.Errorf(
-			"%w: %s must be non-empty, valid UTF-8, and trimmed",
+			"%w: %s - value %q must be non-empty, valid UTF-8, and trimmed",
 			ErrInvalid,
 			label,
+			value,
 		)
 	}
 	if len(value) > maximum {

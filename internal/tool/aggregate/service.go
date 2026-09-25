@@ -9,9 +9,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type Service struct {
@@ -41,66 +41,69 @@ func New(
 	}, nil
 }
 
+func (s *Service) MapToolTarget(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (resolve.MappedTarget, error) {
+	if err := s.ready(ctx); err != nil {
+		return resolve.MappedTarget{}, err
+	}
+	value, err := s.tools.ResolveEnabledTool(ctx, ref)
+	if err != nil {
+		return resolve.MappedTarget{}, err
+	}
+	return NewMappedTarget(value)
+}
+
 func (s *Service) MapArtifactTarget(
 	ctx context.Context,
 	request resolve.ArtifactTargetRequest,
 ) (resolve.MappedTarget, bool, error) {
-	if s == nil || s.tools == nil {
-		return resolve.MappedTarget{}, false, basespec.ErrClosed
+	if err := s.ready(ctx); err != nil {
+		return resolve.MappedTarget{}, false, err
 	}
 	if request.Type != declaration.TypeTool {
 		return resolve.MappedTarget{}, false, nil
 	}
 
-	value, err := s.tools.ResolveEnabledTool(
-		ctx,
-		request.Artifact.Ref(),
-	)
+	value, err := s.tools.ResolveEnabledTool(ctx, request.Artifact.Ref())
 	if err != nil {
 		return resolve.MappedTarget{}, true, err
 	}
-	if request.Definition.Digest != value.Tool.Definition.Digest {
+	if request.Definition.Digest != value.Tool.DefinitionDigest {
 		return resolve.MappedTarget{}, true, fmt.Errorf(
-			"%w: Tool Artifact definition changed during target mapping",
+			"%w: Tool definition changed during target mapping",
 			basespec.ErrRefreshRequired,
 		)
 	}
 
 	target, err := NewMappedTarget(value)
-	if err != nil {
-		return resolve.MappedTarget{}, true, err
-	}
-	return target, true, nil
+	return target, true, err
 }
 
 func (s *Service) ResolveMappedTool(
 	ctx context.Context,
 	target resolve.MappedTarget,
-) (toolDomain.ResolvedTool, error) {
-	if s == nil || s.tools == nil {
-		return toolDomain.ResolvedTool{}, basespec.ErrClosed
+) (toolConsumerAPI.ResolvedToolView, error) {
+	if err := s.ready(ctx); err != nil {
+		return toolConsumerAPI.ResolvedToolView{}, err
 	}
-
 	value, err := DecodeTarget(target)
 	if err != nil {
-		return toolDomain.ResolvedTool{}, err
+		return toolConsumerAPI.ResolvedToolView{}, err
 	}
 
-	resolved, err := s.tools.ResolveEnabledTool(
-		ctx,
-		value.ToolArtifact,
-	)
+	resolved, err := s.tools.ResolveEnabledTool(ctx, value.ToolArtifact)
 	if err != nil {
-		return toolDomain.ResolvedTool{}, err
+		return toolConsumerAPI.ResolvedToolView{}, err
 	}
-
-	document := resolved.Tool.Document
-	if resolved.Tool.Definition.Digest != value.DefinitionDigest ||
-		resolved.Tool.Artifact.LogicalName != value.Name ||
-		string(document.Version) != value.Version ||
-		string(document.Implementation.Kind) != value.Implementation {
-		return toolDomain.ResolvedTool{}, fmt.Errorf(
-			"%w: mapped Tool target no longer matches its Tool Artifact",
+	tool := resolved.Tool
+	if tool.DefinitionDigest != value.DefinitionDigest ||
+		tool.Name != value.Name ||
+		tool.Version != value.Version ||
+		tool.Implementation.Kind != value.Implementation {
+		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
+			"%w: mapped Tool target no longer matches its Artifact",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
@@ -111,16 +114,14 @@ func (s *Service) Invoke(
 	ctx context.Context,
 	request InvokeRequest,
 ) (*toolRuntime.InvokeResponse, error) {
-	if s == nil || s.runtime == nil {
-		return nil, basespec.ErrClosed
+	if err := s.ready(ctx); err != nil {
+		return nil, err
 	}
-
 	resolved, err := s.ResolveMappedTool(ctx, request.Target)
 	if err != nil {
 		return nil, err
 	}
-	if resolved.Tool.Document.Implementation.Kind !=
-		toolv1.ImplementationKindGo {
+	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
 		return nil, fmt.Errorf(
 			"%w: SDK Tools execute through provider inference",
 			basespec.ErrUnsupported,
@@ -128,8 +129,21 @@ func (s *Service) Invoke(
 	}
 
 	return s.runtime.Invoke(ctx, toolRuntime.InvokeRequest{
-		Function:  resolved.Tool.Document.Implementation.Function,
+		Function:  resolved.Tool.Implementation.Function,
 		Args:      request.Args,
 		TimeoutMS: request.TimeoutMS,
 	})
+}
+
+func (s *Service) ready(ctx context.Context) error {
+	if s == nil || s.tools == nil || s.runtime == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Tool Aggregate context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	return ctx.Err()
 }

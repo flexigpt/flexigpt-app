@@ -9,10 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
 
 type ToolAggregateWrapper struct {
@@ -58,13 +59,24 @@ func withToolAggregate[T any](
 	})
 }
 
+func (w *ToolAggregateWrapper) MapToolTarget(
+	ref artifact.ArtifactRef,
+) (resolve.MappedTarget, error) {
+	return withToolAggregate(
+		w,
+		func(service *toolAggregate.Service) (resolve.MappedTarget, error) {
+			return service.MapToolTarget(context.Background(), ref)
+		},
+	)
+}
+
 func (w *ToolAggregateWrapper) ResolveMappedTool(
 	target resolve.MappedTarget,
-) (toolDomain.ResolvedTool, error) {
+) (toolConsumerAPI.ResolvedToolView, error) {
 	return withToolAggregate(
 		w,
 		func(service *toolAggregate.Service) (
-			toolDomain.ResolvedTool,
+			toolConsumerAPI.ResolvedToolView,
 			error,
 		) {
 			return service.ResolveMappedTool(
@@ -76,7 +88,7 @@ func (w *ToolAggregateWrapper) ResolveMappedTool(
 }
 
 func (w *ToolAggregateWrapper) InvokeMappedTool(
-	request toolAggregate.InvokeRequest,
+	request ToolAggregateInvokeRequest,
 ) (*toolRuntime.InvokeResponse, error) {
 	return withToolAggregate(
 		w,
@@ -84,7 +96,15 @@ func (w *ToolAggregateWrapper) InvokeMappedTool(
 			*toolRuntime.InvokeResponse,
 			error,
 		) {
-			return service.Invoke(context.Background(), request)
+			args, err := toolArgumentsFromBridge(request.Args)
+			if err != nil {
+				return nil, err
+			}
+			return service.Invoke(context.Background(), toolAggregate.InvokeRequest{
+				Target:    request.Target,
+				Args:      args,
+				TimeoutMS: request.TimeoutMS,
+			})
 		},
 	)
 }

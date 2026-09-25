@@ -1,14 +1,5 @@
 import type { KeyboardEvent as ReactKeyboardEvent, SubmitEventHandler } from 'react';
-import {
-	forwardRef,
-	useCallback,
-	useEffect,
-	useImperativeHandle,
-	useLayoutEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
 	FiAlertTriangle,
 	FiEdit2,
@@ -33,21 +24,21 @@ import type {
 	MCPToolSelection,
 } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolArgsTarget, ToolListItem, ToolStoreChoice } from '@/spec/tool';
+import type { ToolArgsTarget, ToolListItem, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
 import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
 import { SkillSessionSyncMode } from '@/spec/skill';
-import { ToolStoreChoiceType } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 import { formatShortcut } from '@/lib/keyboard_shortcuts';
 
 import { useEnterSubmit } from '@/hooks/use_enter_submit';
+import { useTools } from '@/hooks/use_tool';
 
 import { HoverTip } from '@/components/hover_tip';
 
-import type { AgentRuntimeSnapshot } from '@/chats/composer/agents/agent_runtime';
 import type {
 	AssistantTurnFinishedPayload,
 	EditorExternalMessage,
@@ -58,7 +49,6 @@ import type { AgentSystemPromptController } from '@/chats/composer/skills/use_ag
 import type { ToolDetailsState } from '@/chats/composer/tools/tool_details_modal';
 import type { WebSearchChoiceTemplate } from '@/chats/composer/tools/websearch_utils';
 import type { ConversationToolStateEntry } from '@/tools/lib/conversation_tool_utils';
-import { mapWebSearchTemplatesToChoices } from '@/chats/composer/agents/agent_runtime';
 import { useComposerAttachments } from '@/chats/composer/attachments/use_composer_attachments';
 import { EditorBottomBar } from '@/chats/composer/editor/editor_bottom_bar';
 import { EditorChipsBar } from '@/chats/composer/editor/editor_chips_bar';
@@ -84,10 +74,10 @@ import { useComposerTools } from '@/chats/composer/toolruntime/use_composer_tool
 import { dispatchOpenToolArgs, useOpenToolArgs } from '@/chats/composer/toolruntime/use_open_toolargs_event';
 import { ToolDetailsModal } from '@/chats/composer/tools/tool_details_modal';
 import { ToolArgsModalHost } from '@/chats/composer/tools/tool_user_args_host';
-import { buildWebSearchChoicesForSubmit } from '@/chats/composer/tools/websearch_utils';
+import { buildWebSearchChoicesForSubmit, getWebSearchConfiguration } from '@/chats/composer/tools/websearch_utils';
 import { useComposerWorkspace } from '@/chats/composer/workspaces/use_composer_workspace';
 import { conversationToolsToChoices, mergeConversationToolsWithNewChoices } from '@/tools/lib/conversation_tool_utils';
-import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
+import { isRunnableComposerToolCall, requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
 import { dedupeToolChoices, uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
@@ -113,6 +103,7 @@ export interface EditorAreaHandle {
 	resetEditor: () => void;
 	loadToolCalls: (toolCalls: UIToolCall[]) => void;
 	setConversationToolsFromChoices: (tools: ToolStoreChoice[]) => void;
+	setToolSelectionIssues: (issues: ToolSelectionIssue[]) => void;
 	setMCPContextFromMessage: (context?: MCPConversationContext) => void;
 	setMCPAppContextUpdatesFromMessage: (updates?: MCPAppModelContextUpdate[]) => void;
 	appendMCPAppContextUpdate: (update: MCPAppModelContextUpdate) => void;
@@ -132,7 +123,6 @@ interface EditorAreaProps {
 	shortcutConfig: ShortcutConfig;
 	onSubmit: (payload: EditorSubmitPayload) => Promise<void>;
 	onRequestStop: () => void;
-	onAgentRuntimeStateChange?: (snapshot: AgentRuntimeSnapshot) => void;
 	editingMessageId: string | null;
 	cancelEditing: () => void;
 	systemPrompt: AgentSystemPromptController;
@@ -141,6 +131,7 @@ interface EditorAreaProps {
 function isAutoExecutableToolChoice(choice: ToolStoreChoice): boolean {
 	return (
 		choice.autoExecute &&
+		choice.implementationKind === ToolImplType.Go &&
 		(choice.toolType === ToolStoreChoiceType.Function || choice.toolType === ToolStoreChoiceType.Custom)
 	);
 }
@@ -285,7 +276,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		shortcutConfig,
 		onSubmit,
 		onRequestStop,
-		onAgentRuntimeStateChange,
 		editingMessageId,
 		cancelEditing,
 		systemPrompt,
@@ -379,7 +369,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// empties attachments/toolOutputs but before loadAttachmentsFromMessage restores them.
 	const isLoadingExternalMessageRef = useRef(false);
 	const externalMessageLoadReleaseTimerRef = useRef<number | null>(null);
-	const [webSearchArgsBlocked, setWebSearchArgsBlocked] = useState(false);
+	const toolCatalog = useTools();
+	const [toolSelectionIssues, setToolSelectionIssues] = useState<ToolSelectionIssue[]>([]);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
 	const [toolArgsTarget, setToolArgsTarget] = useState<ToolArgsTarget | null>(null);
 
@@ -479,23 +470,26 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		requestMCPApproval: mcpApproval.requestMCPApproval,
 	});
 
-	const previousProviderSDKTypeRef = useRef(currentProviderSDKType);
+	const webSearchConfiguration = getWebSearchConfiguration(
+		webSearchTemplates,
+		toolCatalog.data,
+		toolCatalog.ready,
+		currentProviderSDKType
+	);
+	const incompatibleSDKSelection = [
+		...attachedToolEntries,
+		...conversationToolsToChoices(conversationToolsState),
+		...webSearchTemplates,
+	].some(
+		choice => choice.implementationKind === ToolImplType.SDK && choice.sdkType !== currentProviderSDKType.toString()
+	);
 	const hasBlockingMCPArgs = mcp.argumentsBlocked;
-	const hasBlockingToolArgs = toolArgsBlocked || webSearchArgsBlocked || hasBlockingMCPArgs;
-
-	useLayoutEffect(() => {
-		if (previousProviderSDKTypeRef.current === currentProviderSDKType) {
-			return;
-		}
-
-		previousProviderSDKTypeRef.current = currentProviderSDKType;
-
-		// Web-search tools are SDK-bound. Clear stale selections immediately
-		// when switching SDK families so incompatible choices cannot linger
-		// in UI state or slip into the next submit.
-		setWebSearchTemplates([]);
-		setToolArgsTarget(prev => (prev?.kind === 'webSearch' ? null : prev));
-	}, [currentProviderSDKType, setToolArgsTarget, setWebSearchTemplates]);
+	const hasBlockingToolArgs =
+		toolArgsBlocked ||
+		webSearchConfiguration.blocked ||
+		hasBlockingMCPArgs ||
+		incompatibleSDKSelection ||
+		toolSelectionIssues.length > 0;
 
 	const handleOpenToolOutput = useCallback((output: UIToolOutput) => {
 		setToolDetailsState({ kind: 'output', output });
@@ -510,29 +504,11 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	}, []);
 
 	const handleOpenAttachedToolDetails = useCallback((entry: AttachedToolEntry) => {
-		const choice: ToolStoreChoice = {
-			choiceID: entry.choiceID,
-			bundleID: entry.bundleID,
-			bundleSlug: entry.bundleSlug,
-			toolSlug: entry.toolSlug,
-			toolVersion: entry.toolVersion,
-			displayName: entry.overrides?.displayName ?? entry.toolSnapshot?.displayName ?? entry.toolSlug,
-			description: entry.overrides?.description ?? entry.toolSnapshot?.description ?? entry.toolSlug,
-			toolID: entry.toolSnapshot?.id,
-			toolType: entry.toolType,
-			autoExecute: entry.autoExecute,
-			userArgSchemaInstance: entry.userArgSchemaInstance,
-		};
-
-		setToolDetailsState({ kind: 'choice', choice });
+		setToolDetailsState({ kind: 'choice', choice: uiToolChoiceToToolStoreChoice(entry) });
 	}, []);
 
 	const attachedToolIdentityKeys = useMemo(() => {
-		return new Set(
-			attachedToolEntries.map(entry =>
-				toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion)
-			)
-		);
+		return new Set(attachedToolEntries.map(entry => toolIdentityKey(entry.target)));
 	}, [attachedToolEntries]);
 
 	useEffect(() => {
@@ -563,22 +539,12 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleAttachTool = useCallback(
 		(item: ToolListItem, autoExecute: boolean) => {
-			const identityKey = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
+			const identityKey = toolIdentityKey(item.target);
 			if (attachedToolIdentityKeys.has(identityKey)) {
 				return;
 			}
 
-			insertToolSelectionNode(
-				editor,
-				{
-					bundleID: item.bundleID,
-					bundleSlug: item.bundleSlug,
-					toolSlug: item.toolSlug,
-					toolVersion: item.toolVersion,
-				},
-				item.toolDefinition,
-				{ autoExecute }
-			);
+			insertToolSelectionNode(editor, item, autoExecute);
 			handleAttachedToolsChanged();
 		},
 		[attachedToolIdentityKeys, editor, handleAttachedToolsChanged]
@@ -610,7 +576,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const handleRemoveAttachedTool = useCallback(
 		(entry: AttachedToolEntry) => {
-			const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
+			const identityKey = toolIdentityKey(entry.target);
 			handleDetachAttachedToolByKey(identityKey);
 		},
 		[handleDetachAttachedToolByKey]
@@ -625,7 +591,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			const uniqueKeys = new Set<string>();
 
 			for (const entry of entries) {
-				const identityKey = toolIdentityKey(entry.bundleID, entry.bundleSlug, entry.toolSlug, entry.toolVersion);
+				const identityKey = toolIdentityKey(entry.target);
 				if (!attachedToolIdentityKeys.has(identityKey) || uniqueKeys.has(identityKey)) {
 					continue;
 				}
@@ -663,6 +629,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	// conversation-tool + web-search config. Keep a snapshot so Cancel restores it.
 	const preEditConversationToolsRef = useRef<ConversationToolStateEntry[] | null>(null);
 	const preEditWebSearchTemplatesRef = useRef<WebSearchChoiceTemplate[] | null>(null);
+	const preEditToolSelectionIssuesRef = useRef<ToolSelectionIssue[] | null>(null);
 	const preEditMCPContextRef = useRef<MCPConversationContext | undefined | null>(null);
 	const preEditEnabledSkillRefsRef = useRef<SkillRef[] | null>(null);
 	const preEditActiveSkillRefsRef = useRef<SkillRef[] | null>(null);
@@ -685,6 +652,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const clearPreEditSnapshot = useCallback(() => {
 		preEditConversationToolsRef.current = null;
 		preEditWebSearchTemplatesRef.current = null;
+		preEditToolSelectionIssuesRef.current = null;
 		preEditMCPContextRef.current = null;
 		preEditEnabledSkillRefsRef.current = null;
 		preEditActiveSkillRefsRef.current = null;
@@ -896,6 +864,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		}
 		if (prevWs) {
 			setWebSearchTemplates(prevWs);
+		}
+		if (preEditToolSelectionIssuesRef.current) {
+			setToolSelectionIssues(preEditToolSelectionIssuesRef.current);
 		}
 		if (prevMCP !== null) {
 			mcp.restoreContext(prevMCP ?? undefined);
@@ -1190,10 +1161,10 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const unfinishedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
 					toolCall =>
 						(toolCall.status === UIToolCallStatus.Pending || toolCall.status === UIToolCallStatus.Running) &&
-						isRunnableComposerToolCall(toolCall)
+						requiresComposerToolResponse(toolCall)
 				);
 				const failedRunnableToolCalls = runtimeAfterRun.toolCalls.filter(
-					toolCall => toolCall.status === UIToolCallStatus.Failed && isRunnableComposerToolCall(toolCall)
+					toolCall => toolCall.status === UIToolCallStatus.Failed && requiresComposerToolResponse(toolCall)
 				);
 
 				if (unfinishedRunnableToolCalls.length > 0) {
@@ -1504,6 +1475,9 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				if (!preEditWebSearchTemplatesRef.current) {
 					preEditWebSearchTemplatesRef.current = webSearchTemplates;
 				}
+				if (!preEditToolSelectionIssuesRef.current) {
+					preEditToolSelectionIssuesRef.current = toolSelectionIssues;
+				}
 				if (preEditMCPContextRef.current === null) {
 					preEditMCPContextRef.current = mcp.mcpContext;
 				}
@@ -1530,6 +1504,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				const incomingToolChoices = incoming.toolChoices ?? [];
 				applyConversationToolsFromChoices(incomingToolChoices);
 				applyWebSearchFromChoices(incomingToolChoices);
+				setToolSelectionIssues(incoming.toolSelectionIssues ?? []);
 				mcp.restoreContext(incoming.mcpContext);
 				setMCPAppContextUpdates(incoming.mcpAppContextUpdates ?? []);
 				// 4) Restore enabled/active skills together so invariants hold immediately.
@@ -1559,6 +1534,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			mcp,
 			replaceEditorDocument,
 			setToolOutputs,
+			toolSelectionIssues,
 			webSearchTemplates,
 			workspace,
 		]
@@ -1600,9 +1576,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			return;
 		}
 
-		if (toolCalls.length > 0) {
-			handleAttachedToolsChanged();
-		}
+		handleAttachedToolsChanged();
 		if (submitError) {
 			setSubmitError(null);
 		}
@@ -1636,7 +1610,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		onEditorChange,
 		restorePreEditContext,
 		submitError,
-		toolCalls.length,
 		toolOutputs.length,
 	]);
 
@@ -1727,6 +1700,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 			resetEditor,
 			loadToolCalls: handleLoadToolCalls,
 			setConversationToolsFromChoices: applyConversationToolsFromChoices,
+			setToolSelectionIssues,
 			setWebSearchFromChoices: applyWebSearchFromChoices,
 			setMCPContextFromMessage: context => {
 				mcp.restoreContext(context);
@@ -1851,23 +1825,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 		!hasBlockingToolArgs &&
 		!isInputLocked;
 
-	useEffect(() => {
-		onAgentRuntimeStateChange?.({
-			conversationToolChoices: conversationToolsToChoices(conversationToolsState),
-			webSearchChoices: mapWebSearchTemplatesToChoices(webSearchTemplates),
-			enabledSkillRefs: installedEnabledSkillRefs,
-			activeSkillRefs: installedActiveSkillRefs,
-			mcpContext: mcp.mcpContext,
-		});
-	}, [
-		conversationToolsState,
-		installedEnabledSkillRefs,
-		installedActiveSkillRefs,
-		mcp.mcpContext,
-		onAgentRuntimeStateChange,
-		webSearchTemplates,
-	]);
-
 	return (
 		<div className="mx-0 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
 			<form ref={formRef} onSubmit={handleSubmit} className="max-h-full">
@@ -1875,6 +1832,36 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 					<div className="alert alert-error mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
 						<FiAlertTriangle size={16} className="mt-0.5" />
 						<span>{submitError}</span>
+					</div>
+				) : null}
+				{toolSelectionIssues.length > 0 ? (
+					<div className="alert alert-warning mx-4 mt-3 mb-1 block text-sm">
+						<p>Some saved Tool selections are unavailable. Remove and reselect them before sending.</p>
+						{toolSelectionIssues.map(issue => (
+							<div key={issue.selection.choiceID} className="mt-2 flex items-start gap-2">
+								<div className="min-w-0 flex-1">
+									<div>{issue.selection.target.name}</div>
+									<div className="text-xs">{issue.message}</div>
+								</div>
+								<button
+									type="button"
+									className="btn btn-ghost btn-xs"
+									disabled={isInputLocked || isSubmitting}
+									onClick={() => {
+										setToolSelectionIssues(previous =>
+											previous.filter(value => value.selection.choiceID !== issue.selection.choiceID)
+										);
+									}}
+								>
+									Remove selection
+								</button>
+							</div>
+						))}
+					</div>
+				) : null}
+				{incompatibleSDKSelection ? (
+					<div className="alert alert-warning mx-4 mt-3 mb-1 text-sm">
+						A selected provider Tool is incompatible with the current model provider.
 					</div>
 				) : null}
 				{!submitError && erroredToolOutputsReadyToSubmit ? (
@@ -2103,9 +2090,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onSetAttachedToolAutoExecute={handleSetAttachedToolAutoExecuteByKey}
 						webSearchTemplates={webSearchTemplates}
 						setWebSearchTemplates={setWebSearchTemplates}
-						onWebSearchArgsBlockedChange={nextBlocked => {
-							setWebSearchArgsBlocked(nextBlocked);
-						}}
+						toolCatalog={toolCatalog}
 						onRemoveAttachedTool={handleRemoveAttachedTool}
 						onRemoveAllAttachedTools={handleRemoveAllAttachedTools}
 						onEditAttachedToolOptions={handleEditAttachedToolOptions}
@@ -2160,6 +2145,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				recomputeAttachedToolArgsBlocked={handleAttachedToolsChanged}
 				webSearchTemplates={webSearchTemplates}
 				setWebSearchTemplates={setWebSearchTemplates}
+				toolCatalog={toolCatalog}
 			/>
 		</div>
 	);

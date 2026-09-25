@@ -213,6 +213,21 @@ func readStaticSDKTools(
 			)
 		}
 
+		directory := string(collectionRoot) + "/" + entry.Name()
+		files, err := fs.ReadDir(packages, directory)
+		if err != nil {
+			return nil, err
+		}
+		if len(files) != 1 ||
+			files[0].IsDir() ||
+			files[0].Name() != string(toolDomain.ToolDocumentFile()) {
+			return nil, fmt.Errorf(
+				"%w: embedded SDK Tool directory %q must contain only its Tool document",
+				basespec.ErrInvalid,
+				directory,
+			)
+		}
+
 		location := string(collectionRoot) + "/" + entry.Name() +
 			"/" + string(toolDomain.ToolDocumentFile())
 		rawDocument, err := fs.ReadFile(packages, location)
@@ -277,6 +292,7 @@ func toolDocumentFromGoDescriptor(
 		Name:        string(value.Name),
 		DisplayName: value.DisplayName,
 		Description: value.Description,
+
 		Version:     value.Version,
 		Tags:        append([]string(nil), value.Tags...),
 		AutoExecute: value.AutoExecute,

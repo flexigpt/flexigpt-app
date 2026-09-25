@@ -2,13 +2,38 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
+
+type ToolRuntimeInvokeRequest struct {
+	Function  string                 `json:"function"`
+	Args      jsonutil.JSONRawString `json:"args,omitempty"`
+	TimeoutMS int                    `json:"timeoutMS,omitempty"`
+}
+
+type ToolAggregateInvokeRequest struct {
+	Target    resolve.MappedTarget   `json:"target"`
+	Args      jsonutil.JSONRawString `json:"args,omitempty"`
+	TimeoutMS int                    `json:"timeoutMS,omitempty"`
+}
+
+func toolArgumentsFromBridge(
+	value jsonutil.JSONRawString,
+) (json.RawMessage, error) {
+	if strings.TrimSpace(string(value)) == "" {
+		return json.RawMessage(`{}`), nil
+	}
+	return jsonutil.DecodeJSONStringRawInto[json.RawMessage](value)
+}
 
 type ToolRuntimeWrapper struct {
 	adapter *llmtoolsadapter.Adapter
@@ -54,7 +79,7 @@ func withToolRuntime[T any](
 // usually call ToolAggregateWrapper.InvokeMappedTool so artifact identity
 // and enablement are resolved before execution.
 func (w *ToolRuntimeWrapper) InvokeTool(
-	request *toolRuntime.InvokeRequest,
+	request *ToolRuntimeInvokeRequest,
 ) (*toolRuntime.InvokeResponse, error) {
 	return withToolRuntime(
 		w,
@@ -65,7 +90,15 @@ func (w *ToolRuntimeWrapper) InvokeTool(
 			if request == nil {
 				return nil, errors.New("tool runtime request is required")
 			}
-			return service.Invoke(context.Background(), *request)
+			args, err := toolArgumentsFromBridge(request.Args)
+			if err != nil {
+				return nil, err
+			}
+			return service.Invoke(context.Background(), toolRuntime.InvokeRequest{
+				Function:  request.Function,
+				Args:      args,
+				TimeoutMS: request.TimeoutMS,
+			})
 		},
 	)
 }

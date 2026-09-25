@@ -133,6 +133,12 @@ func (a *Adapter) LookupGoToolByName(
 	if a == nil || a.registry == nil {
 		return toolDomain.GoToolDescriptor{}, basespec.ErrClosed
 	}
+	if ctx == nil {
+		return toolDomain.GoToolDescriptor{}, fmt.Errorf(
+			"%w: Go Tool lookup context is nil",
+			basespec.ErrInvalid,
+		)
+	}
 	if err := name.Validate(); err != nil {
 		return toolDomain.GoToolDescriptor{}, err
 	}

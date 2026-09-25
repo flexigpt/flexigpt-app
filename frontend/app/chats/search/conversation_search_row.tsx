@@ -7,6 +7,7 @@ import { formatDateAsString } from '@/lib/date_utils';
 import { HoverTip } from '@/components/hover_tip';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
+import { conversationSearchDate } from '@/chats/search/conversation_search_utils';
 
 interface ConversationSearchRowMetaProps {
 	result: SearchResult;
@@ -21,11 +22,12 @@ export function ConversationSearchRowMeta({
 }: ConversationSearchRowMetaProps) {
 	const conversation = result.searchConversation;
 	const isOpenConversation = openConversationIdSet.has(conversation.id);
+	const modifiedAt = conversationSearchDate(conversation);
 
 	return (
 		<span className="inline-flex items-center gap-4">
 			{result.matchType === 'message' && <span className="max-w-48 truncate">{result.snippet}</span>}
-			<span className="whitespace-nowrap">{formatDateAsString(conversation.modifiedAt)}</span>
+			<span className="whitespace-nowrap">{formatDateAsString(modifiedAt)}</span>
 
 			{!isOpenConversation && (
 				<HoverTip content="Delete conversation" placement="right">

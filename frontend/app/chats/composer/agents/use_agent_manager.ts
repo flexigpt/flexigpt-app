@@ -148,7 +148,7 @@ export function useAgentManager(
 				for (const tool of recipe.toolSelections) {
 					if (tool.requiredSDKType && tool.requiredSDKType !== (nextModel.providerSDKType as string)) {
 						setActionError(
-							`Tool "${tool.choice.displayName || tool.choice.toolSlug}" requires provider SDK "${tool.requiredSDKType}", but the Agent Model uses "${nextModel.providerSDKType}".`
+							`Tool "${tool.choice.displayName || tool.choice.target.name}" requires provider SDK "${tool.requiredSDKType}", but the Agent Model uses "${nextModel.providerSDKType}".`
 						);
 						return false;
 					}

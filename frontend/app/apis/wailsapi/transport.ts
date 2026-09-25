@@ -1,4 +1,4 @@
-import type { JSONRawString, JSONSchema } from '@/lib/jsonschema_utils';
+import type { JSONObject, JSONRawString } from '@/lib/jsonschema_utils';
 
 const DEFAULT_MAX_PAGES = 1_000;
 
@@ -230,12 +230,14 @@ export function rawJSONToWails(value: JSONRawString, field: string): string {
 	return value;
 }
 
-export function jsonObjectFromWails(value: unknown, field: string): JSONSchema {
-	const parsed = JSON.parse(rawJSONFromWails(value, field));
+export function jsonSchemaFromWails(value: unknown, field: string): JSONObject | boolean {
+	const parsed: unknown = typeof value === 'boolean' ? value : JSON.parse(rawJSONFromWails(value, field));
 
-	if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
-		throw new Error(`${field} must be a JSON object.`);
+	if (typeof parsed === 'boolean') {
+		return parsed;
 	}
-
-	return parsed as JSONSchema;
+	if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
+		throw new Error(`${field} must be a JSON object or boolean schema.`);
+	}
+	return parsed as JSONObject;
 }

@@ -1,7 +1,7 @@
 import { FiTool } from 'react-icons/fi';
 
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
-import type { ToolOutputUnion, ToolStoreChoice } from '@/spec/tool';
+import type { ToolOutputUnion, ToolSelection, ToolStoreChoice } from '@/spec/tool';
 import { ToolOutputKind } from '@/spec/tool';
 
 import {
@@ -75,6 +75,7 @@ function buildToolOutputItemsMarkdown(items?: ToolOutputUnion[]): string | null 
 
 export type ToolDetailsState =
 	| { kind: 'choice'; choice: ToolStoreChoice }
+	| { kind: 'selection'; selection: ToolSelection; message?: string }
 	| { kind: 'call'; call: UIToolCall }
 	| { kind: 'output'; output: UIToolOutput }
 	| null;
@@ -85,8 +86,10 @@ interface ToolDetailsModalProps {
 }
 
 function getChoiceDisplayInfo(c: ToolStoreChoice) {
-	const display = (c.displayName && c.displayName.length > 0 ? c.displayName : c.toolSlug) || 'Tool';
-	const slug = `${c.bundleID}/${c.toolSlug}@${c.toolVersion}`;
+	const display = c.displayName || c.target.name || 'Tool';
+	const slug = `${c.collectionName ? `${c.collectionName}/` : ''}${c.target.name}${
+		c.toolVersion ? `@${c.toolVersion}` : ''
+	}`;
 	return { display, slug };
 }
 
@@ -96,6 +99,11 @@ function getToolCallDisplayName(call: UIToolCall): string {
 
 function buildPayload(state: Exclude<ToolDetailsState, null>): { title: string; payload: unknown } {
 	switch (state.kind) {
+		case 'selection':
+			return {
+				title: `Tool selection: ${state.selection.target.name}`,
+				payload: { selection: state.selection, resolutionError: state.message },
+			};
 		case 'choice': {
 			const c = state.choice;
 			const { display, slug } = getChoiceDisplayInfo(c);
@@ -243,9 +251,19 @@ function ToolDetailsModalContent({ state }: ToolDetailsModalProps) {
 	let baseMessageId = 'tool-details';
 
 	switch (state.kind) {
+		case 'selection': {
+			primaryContent = [
+				`### Tool: ${state.selection.target.name}`,
+				state.message ? `Resolution error: ${state.message}` : '',
+			]
+				.filter(Boolean)
+				.join('\n\n');
+			baseMessageId = `tool-selection:${state.selection.choiceID}`;
+			break;
+		}
 		case 'choice': {
 			primaryContent = buildChoicePrimaryContent(state.choice);
-			const choiceId = state.choice.toolSlug;
+			const choiceId = state.choice.choiceID;
 			baseMessageId = `tool-choice:${choiceId}`;
 			break;
 		}

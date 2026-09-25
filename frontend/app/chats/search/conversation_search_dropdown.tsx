@@ -6,6 +6,7 @@ import { GroupedDropdown } from '@/components/date_grouped_dropdown';
 
 import type { SearchResult } from '@/chats/search/conversation_search_utils';
 import { ConversationSearchFlatRow, ConversationSearchRowMeta } from '@/chats/search/conversation_search_row';
+import { conversationSearchDate } from '@/chats/search/conversation_search_utils';
 
 interface ConversationSearchDropdownProps {
 	results: SearchResult[];
@@ -129,7 +130,7 @@ export function ConversationSearchDropdown({
 						<GroupedDropdown<SearchResult>
 							items={results}
 							focused={focusedIndex}
-							getDate={result => new Date(result.searchConversation.modifiedAt)}
+							getDate={result => conversationSearchDate(result.searchConversation)}
 							getKey={result => result.searchConversation.id}
 							// oxlint-disable-next-line react/no-unstable-nested-components
 							getLabel={result => <span className="truncate">{result.searchConversation.title}</span>}

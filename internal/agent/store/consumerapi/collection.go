@@ -2,6 +2,7 @@ package consumerapi
 
 import (
 	"context"
+	"fmt"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
@@ -66,6 +67,67 @@ func (a *API) UpdateAgentCollection(
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
 	return a.collections.Update(ctx, request)
+}
+
+// AddAgentCollectionMember adds one explicit named Agent relationship. It is
+// useful for relationships such as a user Collection reference to a protected
+// built-in Agent using scope "builtin".
+func (a *API) AddAgentCollectionMember(
+	ctx context.Context,
+	request collection.AddMemberRequest,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.AddMember(ctx, request)
+}
+
+// AddAgentCollectionArtifactMember adds one currently available root Agent
+// Artifact to a Collection. Same-Root Artifacts are represented by an exact
+// source-relative locator; cross-Root Artifact references are rejected by the
+// generic Collection API.
+func (a *API) AddAgentCollectionArtifactMember(
+	ctx context.Context,
+	request collection.AddArtifactMemberRequest,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+
+	target, err := a.GetAgent(ctx, request.Artifact)
+	if err != nil {
+		return collection.CollectionView{}, err
+	}
+	if target.State != artifact.StateAvailable {
+		return collection.CollectionView{}, fmt.Errorf(
+			"%w: Agent Artifact %q is unavailable",
+			basespec.ErrReferenceUnresolved,
+			target.ID,
+		)
+	}
+	if target.Binding.SubresourceLocator != "" {
+		return collection.CollectionView{}, fmt.Errorf(
+			"%w: contained Agent Artifacts cannot be direct Collection members",
+			basespec.ErrUnsupported,
+		)
+	}
+
+	return a.collections.AddArtifactMember(ctx, request)
+}
+
+// RemoveAgentCollectionMember removes one direct member by the normalized
+// index exposed in CollectionView.Members.
+func (a *API) RemoveAgentCollectionMember(
+	ctx context.Context,
+	request collection.RemoveMemberRequest,
+) (collection.CollectionView, error) {
+	if a == nil || a.collections == nil {
+		return collection.CollectionView{}, basespec.ErrClosed
+	}
+	return a.collections.RemoveMember(
+		ctx,
+		request,
+	)
 }
 
 func (a *API) SetAgentCollectionEnabled(

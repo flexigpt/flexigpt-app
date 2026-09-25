@@ -17,7 +17,6 @@ import type { PreparedAgentStarter } from '@/apis/agent_management';
 
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
 
-import type { AgentRuntimeSnapshot } from '@/chats/composer/agents/agent_runtime';
 import type { EditorAreaHandle } from '@/chats/composer/editor/editor_area';
 import type {
 	AssistantTurnFinishedPayload,
@@ -25,7 +24,6 @@ import type {
 	EditorSubmitPayload,
 } from '@/chats/composer/editor/editor_types';
 import type { ChatWorkflowStarter } from '@/chats/conversation/starter_intent';
-import { areAgentRuntimeSnapshotsEqual, EMPTY_AGENT_RUNTIME_SNAPSHOT } from '@/chats/composer/agents/agent_runtime';
 import { useAgentManager } from '@/chats/composer/agents/use_agent_manager';
 import { ContextBar } from '@/chats/composer/contextarea/context_bar';
 import { useComposerContextState } from '@/chats/composer/contextarea/use_context_state';
@@ -80,8 +78,6 @@ export const ComposerBox = memo(
 		ref
 	) {
 		const [abortConfirmationRequested, setAbortConfirmationRequested] = useState(false);
-		const [_runtimeSnapshot, setRuntimeSnapshot] = useState<AgentRuntimeSnapshot>(EMPTY_AGENT_RUNTIME_SNAPSHOT);
-
 		const editorAreaRef = useRef<EditorAreaHandle>(null);
 		const composerContext = useComposerContextState();
 		const systemPrompt = useAgentSystemPrompt({
@@ -89,51 +85,31 @@ export const ComposerBox = memo(
 			modelOptionsLoaded: composerContext.modelOptionsLoaded,
 		});
 
-		const replaceRuntimeSnapshot = useCallback((next: AgentRuntimeSnapshot) => {
-			setRuntimeSnapshot(previous => (areAgentRuntimeSnapshotsEqual(previous, next) ? previous : next));
+		const applyAgentRuntime = useCallback((recipe: PreparedAgentStarter) => {
+			const editor = editorAreaRef.current;
+			if (!editor) {
+				return;
+			}
+			if (recipe.startingText.trim()) {
+				editor.setDraftTextIfEmpty(recipe.startingText);
+			}
+
+			const choices = recipe.toolSelections.map(selection => selection.choice);
+			if (choices.length > 0) {
+				editor.setConversationToolsFromChoices(
+					choices.filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch)
+				);
+				editor.setWebSearchFromChoices(choices.filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch));
+				editor.setToolSelectionIssues([]);
+			}
+
+			if (recipe.enabledSkillRefs.length > 0 || recipe.activeSkillRefs.length > 0) {
+				editor.setInstalledSkillStateFromAgent(recipe.enabledSkillRefs, recipe.activeSkillRefs);
+			}
+			if (recipe.mcpContext) {
+				editor.setMCPContextFromMessage(recipe.mcpContext);
+			}
 		}, []);
-
-		const updateRuntimeSnapshot = useCallback((updater: (previous: AgentRuntimeSnapshot) => AgentRuntimeSnapshot) => {
-			setRuntimeSnapshot(previous => {
-				const next = updater(previous);
-				return areAgentRuntimeSnapshotsEqual(previous, next) ? previous : next;
-			});
-		}, []);
-
-		const applyAgentRuntime = useCallback(
-			(recipe: PreparedAgentStarter) => {
-				if (recipe.startingText.trim()) {
-					editorAreaRef.current?.setDraftTextIfEmpty(recipe.startingText);
-				}
-
-				const toolChoices = recipe.toolSelections.map(selection => selection.choice);
-				const conversationTools = toolChoices.filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch);
-				const webSearchTools = toolChoices.filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch);
-
-				if (toolChoices.length > 0) {
-					editorAreaRef.current?.setConversationToolsFromChoices(conversationTools);
-					editorAreaRef.current?.setWebSearchFromChoices(webSearchTools);
-				}
-
-				if (recipe.enabledSkillRefs.length > 0 || recipe.activeSkillRefs.length > 0) {
-					editorAreaRef.current?.setInstalledSkillStateFromAgent(recipe.enabledSkillRefs, recipe.activeSkillRefs);
-				}
-
-				if (recipe.mcpContext) {
-					editorAreaRef.current?.setMCPContextFromMessage(recipe.mcpContext);
-				}
-
-				updateRuntimeSnapshot(previous => ({
-					conversationToolChoices: toolChoices.length > 0 ? conversationTools : previous.conversationToolChoices,
-					webSearchChoices: toolChoices.length > 0 ? webSearchTools : previous.webSearchChoices,
-					enabledSkillRefs:
-						recipe.enabledSkillRefs.length > 0 ? [...recipe.enabledSkillRefs] : previous.enabledSkillRefs,
-					activeSkillRefs: recipe.activeSkillRefs.length > 0 ? [...recipe.activeSkillRefs] : previous.activeSkillRefs,
-					mcpContext: recipe.mcpContext ?? previous.mcpContext,
-				}));
-			},
-			[updateRuntimeSnapshot]
-		);
 
 		const agent = useAgentManager(composerContext, { applyAgentRuntime }, systemPrompt);
 
@@ -141,21 +117,21 @@ export const ComposerBox = memo(
 			setAbortConfirmationRequested(false);
 			agent.clearAgentTracking();
 
-			editorAreaRef.current?.resetEditor();
-			editorAreaRef.current?.setConversationToolsFromChoices([]);
-			editorAreaRef.current?.setWebSearchFromChoices([]);
-			editorAreaRef.current?.clearMCPContext();
-			editorAreaRef.current?.clearWorkspace();
-			editorAreaRef.current?.setSkillStateFromMessage([], [], {
+			const editor = editorAreaRef.current;
+			editor?.resetEditor();
+			editor?.setConversationToolsFromChoices([]);
+			editor?.setWebSearchFromChoices([]);
+			editor?.setToolSelectionIssues([]);
+			editor?.clearMCPContext();
+			editor?.clearWorkspace();
+			editor?.setSkillStateFromMessage([], [], {
 				syncSession: SkillSessionSyncMode.None,
 				forceResetSession: true,
 			});
 
-			replaceRuntimeSnapshot(EMPTY_AGENT_RUNTIME_SNAPSHOT);
-
 			const model = composerContext.resetForNewConversation();
 			systemPrompt.resetForNewConversation(model.systemPrompt);
-		}, [agent, composerContext, replaceRuntimeSnapshot, systemPrompt]);
+		}, [agent, composerContext, systemPrompt]);
 
 		const resetForNewConversation = useCallback(async () => {
 			resetComposerState();
@@ -174,84 +150,31 @@ export const ComposerBox = memo(
 			ref,
 			() => ({
 				getUIChatOptions: () => composerContext.chatOptions,
-				focus: () => {
-					editorAreaRef.current?.focus();
-				},
-				resetEditor: () => {
-					editorAreaRef.current?.resetEditor();
-				},
+				focus: () => editorAreaRef.current?.focus(),
+				resetEditor: () => editorAreaRef.current?.resetEditor(),
 				resetForNewConversation,
-				openTemplateMenu: () => {
-					editorAreaRef.current?.openTemplateMenu();
-				},
-				openToolMenu: () => {
-					editorAreaRef.current?.openToolMenu();
-				},
-				openAttachmentMenu: () => {
-					editorAreaRef.current?.openAttachmentMenu();
-				},
-				openSystemPromptMenu: () => {
-					editorAreaRef.current?.openSystemPromptMenu();
-				},
-				openSkillsMenu: () => {
-					editorAreaRef.current?.openSkillsMenu();
-				},
-				openMCPMenu: () => {
-					editorAreaRef.current?.openMCPMenu();
-				},
-				openWorkspaceMenu: () => {
-					editorAreaRef.current?.openWorkspaceMenu();
-				},
-				requestStopResponse: () => {
-					editorAreaRef.current?.requestStopResponse();
-				},
+				openTemplateMenu: () => editorAreaRef.current?.openTemplateMenu(),
+				openToolMenu: () => editorAreaRef.current?.openToolMenu(),
+				openAttachmentMenu: () => editorAreaRef.current?.openAttachmentMenu(),
+				openSystemPromptMenu: () => editorAreaRef.current?.openSystemPromptMenu(),
+				openSkillsMenu: () => editorAreaRef.current?.openSkillsMenu(),
+				openMCPMenu: () => editorAreaRef.current?.openMCPMenu(),
+				openWorkspaceMenu: () => editorAreaRef.current?.openWorkspaceMenu(),
+				requestStopResponse: () => editorAreaRef.current?.requestStopResponse(),
 				loadWorkflowStarter: async starter => {
 					resetComposerState();
 					editorAreaRef.current?.setDraftText(starter.draft ?? '');
-
-					if (starter.agent) {
-						return agent.selectAgent(starter.agent);
-					}
-
-					return agent.ensureDefaultAgent();
+					return starter.agent ? agent.selectAgent(starter.agent) : agent.ensureDefaultAgent();
 				},
-				loadExternalMessage: message => {
-					editorAreaRef.current?.loadExternalMessage(message);
-				},
-				loadToolCalls: toolCalls => {
-					editorAreaRef.current?.loadToolCalls(toolCalls);
-				},
-				finishAssistantTurn: payload => {
-					editorAreaRef.current?.finishAssistantTurn(payload);
-				},
-				setConversationToolsFromChoices: tools => {
-					editorAreaRef.current?.setConversationToolsFromChoices(tools);
-					updateRuntimeSnapshot(previous => ({
-						...previous,
-						conversationToolChoices: [...tools],
-					}));
-				},
-				setWebSearchFromChoices: tools => {
-					editorAreaRef.current?.setWebSearchFromChoices(tools);
-					updateRuntimeSnapshot(previous => ({
-						...previous,
-						webSearchChoices: [...tools],
-					}));
-				},
-				appendMCPAppContextUpdate: update => {
-					editorAreaRef.current?.appendMCPAppContextUpdate(update);
-				},
-				applyAttachmentsDrop: payload => {
-					editorAreaRef.current?.applyAttachmentsDrop(payload);
-				},
-				setSkillStateFromMessage: (enabledRefs, activeRefs, options) => {
-					editorAreaRef.current?.setSkillStateFromMessage(enabledRefs, activeRefs, options);
-					updateRuntimeSnapshot(previous => ({
-						...previous,
-						enabledSkillRefs: [...enabledRefs],
-						activeSkillRefs: [...activeRefs],
-					}));
-				},
+				loadExternalMessage: message => editorAreaRef.current?.loadExternalMessage(message),
+				loadToolCalls: calls => editorAreaRef.current?.loadToolCalls(calls),
+				finishAssistantTurn: payload => editorAreaRef.current?.finishAssistantTurn(payload),
+				setConversationToolsFromChoices: tools => editorAreaRef.current?.setConversationToolsFromChoices(tools),
+				setWebSearchFromChoices: tools => editorAreaRef.current?.setWebSearchFromChoices(tools),
+				appendMCPAppContextUpdate: update => editorAreaRef.current?.appendMCPAppContextUpdate(update),
+				applyAttachmentsDrop: payload => editorAreaRef.current?.applyAttachmentsDrop(payload),
+				setSkillStateFromMessage: (enabled, active, options) =>
+					editorAreaRef.current?.setSkillStateFromMessage(enabled, active, options),
 				restoreConversationContext: context => {
 					setAbortConfirmationRequested(false);
 					agent.clearAgentTracking();
@@ -259,34 +182,20 @@ export const ComposerBox = memo(
 					const model = composerContext.restoreConversationContext(context);
 					systemPrompt.restoreConversationContext(model?.systemPrompt ?? '', context.modelParam);
 
-					editorAreaRef.current?.setConversationToolsFromChoices(context.toolChoices);
-					editorAreaRef.current?.setWebSearchFromChoices(context.webSearchChoices);
-					editorAreaRef.current?.setMCPContextFromMessage(context.mcpContext);
-					editorAreaRef.current?.setMCPAppContextUpdatesFromMessage(context.mcpAppContextUpdates);
-					editorAreaRef.current?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
+					const editor = editorAreaRef.current;
+					editor?.setConversationToolsFromChoices(context.toolChoices);
+					editor?.setWebSearchFromChoices(context.webSearchChoices);
+					editor?.setToolSelectionIssues(context.toolSelectionIssues ?? []);
+					editor?.setMCPContextFromMessage(context.mcpContext);
+					editor?.setMCPAppContextUpdatesFromMessage(context.mcpAppContextUpdates);
+					editor?.setSkillStateFromMessage(context.enabledSkillRefs, context.activeSkillRefs, {
 						syncSession: SkillSessionSyncMode.None,
 						forceResetSession: true,
 					});
-					editorAreaRef.current?.setWorkspaceSelectionFromMessage(context.workspaceSelection, false);
-
-					replaceRuntimeSnapshot({
-						conversationToolChoices: [...context.toolChoices],
-						webSearchChoices: [...context.webSearchChoices],
-						enabledSkillRefs: [...context.enabledSkillRefs],
-						activeSkillRefs: [...context.activeSkillRefs],
-						mcpContext: context.mcpContext,
-					});
+					editor?.setWorkspaceSelectionFromMessage(context.workspaceSelection, false);
 				},
 			}),
-			[
-				agent,
-				composerContext,
-				replaceRuntimeSnapshot,
-				resetForNewConversation,
-				resetComposerState,
-				systemPrompt,
-				updateRuntimeSnapshot,
-			]
+			[agent, composerContext, resetForNewConversation, resetComposerState, systemPrompt]
 		);
 
 		return (
@@ -321,7 +230,6 @@ export const ComposerBox = memo(
 							setAbortConfirmationRequested(true);
 						}
 					}}
-					onAgentRuntimeStateChange={replaceRuntimeSnapshot}
 					editingMessageId={editingMessageId}
 					cancelEditing={onCancelEditing}
 					systemPrompt={systemPrompt}

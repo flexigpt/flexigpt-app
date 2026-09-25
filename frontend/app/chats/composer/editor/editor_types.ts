@@ -2,13 +2,14 @@ import type { Attachment, UIAttachment } from '@/spec/attachment';
 import type { UIToolOutput } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
 import type { SkillRef } from '@/spec/skill';
-import type { ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
+import type { ToolSelectionIssue, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
 
 export interface EditorExternalMessage {
 	text: string;
 	attachments?: Attachment[];
 	toolChoices?: ToolStoreChoice[];
+	toolSelectionIssues?: ToolSelectionIssue[];
 	mcpContext?: MCPConversationContext;
 	mcpAppContextUpdates?: MCPAppModelContextUpdate[];
 	toolOutputs?: UIToolOutput[];

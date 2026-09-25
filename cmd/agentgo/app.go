@@ -273,6 +273,7 @@ func (a *App) initManagers() {
 		artifactComposition.Sources,
 		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
+		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		goTools,

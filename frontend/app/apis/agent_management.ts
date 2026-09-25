@@ -16,7 +16,10 @@ import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolStoreAPI } from '@/apis/interface';
+import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
+
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 type AgentStarterIssueSeverity = 'error' | 'warning';
 
@@ -254,7 +257,7 @@ export class AgentManagementAPI {
 
 	constructor(
 		private readonly agents: IAgentStoreAPI,
-		private readonly tools: IToolStoreAPI,
+		private readonly tools: IToolTargetResolver,
 		private readonly models: IModelPresetStoreAPI,
 		private readonly mcp: AgentMCPRuntimeResolver,
 		private readonly skills: AgentSkillRenderer
@@ -529,55 +532,40 @@ export class AgentManagementAPI {
 						issue(
 							issues,
 							'error',
-							'agent.recipe.tool-artifact-target-unsupported',
-							'This Agent resolved a Tool as an Artifact. The current frontend can map Tool fallback targets, but it has no ArtifactRef-to-ToolRef API.',
+							'agent.recipe.tool-mapped-target-missing',
+							'This Agent Tool occurrence is missing its aggregate-mapped target.',
 							occurrence.path
 						);
 						continue;
 					}
 
 					try {
-						const toolRef = await this.tools.resolveMappedToolTarget(occurrence.mapped);
-						const tool = await this.tools.getTool(toolRef.bundleID, toolRef.toolSlug, toolRef.toolVersion);
-
-						if (!tool) {
-							issue(
-								issues,
-								'error',
-								'agent.recipe.tool-not-found',
-								`Mapped Tool "${mappedTargetLabel(occurrence.mapped)}" could not be loaded from the Tool Store.`,
-								occurrence.path
-							);
-							continue;
-						}
-
+						const resolved = await this.tools.resolveMappedTool(occurrence.mapped);
+						const tool = resolved.tool;
+						const implementation = tool.implementation;
 						const requiredSDKType =
-							tool.type === ToolImplType.SDK ? tool.sdkImpl?.sdkType?.trim() || undefined : undefined;
+							implementation.kind === ToolImplType.SDK ? implementation.sdkType.trim() || undefined : undefined;
 
-						if (tool.type === ToolImplType.SDK && !requiredSDKType) {
+						if (implementation.kind === ToolImplType.SDK && !requiredSDKType) {
 							issue(
 								issues,
 								'error',
 								'agent.recipe.tool-sdk-metadata-missing',
-								`Tool "${tool.displayName || tool.slug}" is missing SDK compatibility metadata.`,
+								`Tool "${tool.displayName || tool.name}" is missing SDK compatibility metadata.`,
 								occurrence.path
 							);
 							continue;
 						}
 
-						const choice: ToolStoreChoice = {
-							choiceID: getUUIDv7(),
-							bundleID: toolRef.bundleID,
-							toolSlug: toolRef.toolSlug,
-							toolVersion: toolRef.toolVersion,
-							toolID: tool.id,
-							toolType: tool.llmToolType,
-							displayName: tool.displayName,
-							description: tool.description,
-							autoExecute: occurrenceAutoExecute(occurrence, tool.autoExecute),
-						};
-
-						const key = `${toolRef.bundleID}/${toolRef.toolSlug}@${toolRef.toolVersion}`;
+						const choice = toolStoreChoiceFromSelection(
+							{
+								choiceID: getUUIDv7(),
+								target: occurrence.mapped,
+								autoExecute: occurrenceAutoExecute(occurrence, tool.autoExecute),
+							},
+							resolved
+						);
+						const key = toolIdentityKey(choice.target);
 						const existing = toolSelections.get(key);
 
 						if (
@@ -588,7 +576,7 @@ export class AgentManagementAPI {
 								issues,
 								'error',
 								'agent.recipe.conflicting-tool-overrides',
-								`Tool "${tool.displayName || tool.slug}" occurs with conflicting Agent relationship behavior.`,
+								`Tool "${tool.displayName || tool.name}" occurs with conflicting Agent relationship behavior.`,
 								occurrence.path
 							);
 							continue;
@@ -604,7 +592,7 @@ export class AgentManagementAPI {
 							issues,
 							'error',
 							'agent.recipe.tool-mapping-failed',
-							`Could not map Tool target "${mappedTargetLabel(occurrence.mapped)}": ${
+							`Could not resolve Tool target "${mappedTargetLabel(occurrence.mapped)}": ${
 								error instanceof Error ? error.message : 'unknown error'
 							}`,
 							occurrence.path

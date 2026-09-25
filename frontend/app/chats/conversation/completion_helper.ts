@@ -16,17 +16,19 @@ import type {
 } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
 import type { ModelPresetID } from '@/spec/modelpreset';
-import type { ToolStoreChoice } from '@/spec/tool';
+import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
 import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
-import { ToolStoreChoiceType } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import { aggregateAPI } from '@/apis/baseapi';
 
+import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
+import { toolSelectionFromChoice } from '@/tools/lib/tool_choice_utils';
 import {
 	extractPrimaryTextFromToolOutputs,
 	formatToolOutputSummary,
@@ -39,7 +41,7 @@ export async function HandleCompletion(
 	modelParams: ModelParam,
 	currentUserMsg: ConversationMessage,
 	history: ConversationMessage[],
-	toolStoreChoices: ToolStoreChoice[] | undefined,
+	toolSelections: ToolSelection[] | undefined,
 	mcpContext: MCPConversationContext | undefined,
 	assistantPlaceholder: ConversationMessage,
 	skillSessionID?: string,
@@ -51,8 +53,9 @@ export async function HandleCompletion(
 	responseMessage: ConversationMessage | undefined;
 	rawResponse?: CompletionResponseBody;
 }> {
-	// console.log('history to completion', JSON.stringify(history, null, 2));
-	const choiceMap = new Map<string, ToolStoreChoice>((toolStoreChoices ?? []).map(choice => [choice.choiceID, choice]));
+	const choiceMap = new Map<string, ToolStoreChoice>(
+		(currentUserMsg.uiToolChoices ?? []).map(choice => [choice.choiceID, choice])
+	);
 
 	const resp = await aggregateAPI.fetchCompletion(
 		provider,
@@ -60,7 +63,7 @@ export async function HandleCompletion(
 		modelParams,
 		currentUserMsg,
 		history,
-		toolStoreChoices,
+		toolSelections,
 		mcpContext,
 		skillSessionID,
 		requestId,
@@ -426,7 +429,7 @@ function buildAssistantMessageFromResponse(
 	choiceMap: Map<string, ToolStoreChoice>,
 	mcpContext?: MCPConversationContext
 ): ConversationMessage | undefined {
-	const now = new Date();
+	const now = new Date().toISOString();
 	const id = baseId || getUUIDv7();
 
 	if (!resp.inferenceResponse) {
@@ -469,7 +472,8 @@ function buildAssistantMessageFromResponse(
 export function deriveUIFieldsFromOutputUnion(
 	outputs: OutputUnion[] | undefined,
 	choiceMap: Map<string, ToolStoreChoice>,
-	mcpToolSelectionMap?: Map<string, MCPToolSelection>
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>,
+	selectionIssues?: Map<string, ToolSelectionIssue>
 ): {
 	uiContent: string;
 	uiReasoningContents?: ReasoningContent[];
@@ -534,21 +538,36 @@ export function deriveUIFieldsFromOutputUnion(
 				break;
 
 			case OutputKind.FunctionToolCall: {
-				const uiFunctionToolCall = deriveUIToolCallFromToolCall(o.functionToolCall, choiceMap, mcpToolSelectionMap);
+				const uiFunctionToolCall = deriveUIToolCallFromToolCall(
+					o.functionToolCall,
+					choiceMap,
+					mcpToolSelectionMap,
+					selectionIssues
+				);
 				if (uiFunctionToolCall) {
 					toolCalls.push(uiFunctionToolCall);
 				}
 				break;
 			}
 			case OutputKind.CustomToolCall: {
-				const uiCustomToolCall = deriveUIToolCallFromToolCall(o.customToolCall, choiceMap, mcpToolSelectionMap);
+				const uiCustomToolCall = deriveUIToolCallFromToolCall(
+					o.customToolCall,
+					choiceMap,
+					mcpToolSelectionMap,
+					selectionIssues
+				);
 				if (uiCustomToolCall) {
 					toolCalls.push(uiCustomToolCall);
 				}
 				break;
 			}
 			case OutputKind.WebSearchToolCall: {
-				const uiWebsearchToolCall = deriveUIToolCallFromToolCall(o.webSearchToolCall, choiceMap, mcpToolSelectionMap);
+				const uiWebsearchToolCall = deriveUIToolCallFromToolCall(
+					o.webSearchToolCall,
+					choiceMap,
+					mcpToolSelectionMap,
+					selectionIssues
+				);
 				if (uiWebsearchToolCall) {
 					toolCalls.push(uiWebsearchToolCall);
 				}
@@ -563,7 +582,9 @@ export function deriveUIFieldsFromOutputUnion(
 						toolCallMap = collectToolCallsFromOutputs(outputs);
 					}
 					// Only called when a real ToolOutput exists.
-					toolOutputs.push(buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap, mcpToolSelectionMap));
+					toolOutputs.push(
+						buildUIToolOutputFromToolOutput(out, choiceMap, toolCallMap, mcpToolSelectionMap, selectionIssues)
+					);
 				}
 				break;
 			}
@@ -584,7 +605,8 @@ export function deriveUIFieldsFromOutputUnion(
 function deriveUIToolCallFromToolCall(
 	toolCall: ToolCall | undefined,
 	choiceMap: Map<string, ToolStoreChoice>,
-	mcpToolSelectionMap?: Map<string, MCPToolSelection>
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>,
+	selectionIssues?: Map<string, ToolSelectionIssue>
 ): UIToolCall | undefined {
 	if (!toolCall) {
 		return undefined;
@@ -597,13 +619,16 @@ function deriveUIToolCallFromToolCall(
 	const toolStoreChoice = toolCall.choiceID ? choiceMap.get(toolCall.choiceID) : undefined;
 
 	const type = toolCall.type as unknown as ToolStoreChoiceType;
-
-	// For provider-managed web-search, the "call" appearing in outputs
-	// means "search was (or will be) handled by the provider", not a
-	// pending client-side action. Mark it as 'succeeded' so it is never
-	// treated as a pending/runnable chip.
-	const status: UIToolCall['status'] =
-		type === ToolStoreChoiceType.WebSearch ? UIToolCallStatus.Succeeded : UIToolCallStatus.Pending;
+	const issue = selectionIssues?.get(toolCall.choiceID);
+	const providerManaged =
+		type === ToolStoreChoiceType.WebSearch || toolStoreChoice?.implementationKind === ToolImplType.SDK;
+	const unresolvedClientTool =
+		!providerManaged && !toolStoreChoice && !mcpToolSelection && !isSkillsToolName(toolCall.name);
+	const status: UIToolCall['status'] = providerManaged
+		? UIToolCallStatus.Succeeded
+		: unresolvedClientTool
+			? UIToolCallStatus.Failed
+			: UIToolCallStatus.Pending;
 
 	return {
 		id: toolCall.id || toolCall.callID || `${toolCall.name}:${choiceID}`,
@@ -617,6 +642,10 @@ function deriveUIToolCallFromToolCall(
 		// for us the call is pending here and then it will run and move to final status.
 		status: status,
 		toolStoreChoice,
+		toolSelection: toolStoreChoice ? toolSelectionFromChoice(toolStoreChoice) : issue?.selection,
+		errorMessage: unresolvedClientTool
+			? issue?.message || 'This call cannot be matched to an available selected Tool.'
+			: undefined,
 		mcpToolSelection,
 	};
 }
@@ -625,7 +654,8 @@ export function buildUIToolOutputFromToolOutput(
 	out: ToolOutput,
 	choiceMap: Map<string, ToolStoreChoice>,
 	toolCallMap?: Map<string, ToolCall>,
-	mcpToolSelectionMap?: Map<string, MCPToolSelection>
+	mcpToolSelectionMap?: Map<string, MCPToolSelection>,
+	selectionIssues?: Map<string, ToolSelectionIssue>
 ): UIToolOutput {
 	const isError = out.isError;
 	const toolStoreChoice = choiceMap.get(out.choiceID);
@@ -659,6 +689,9 @@ export function buildUIToolOutputFromToolOutput(
 		webSearchToolOutputItems: webSearchOutputs,
 
 		toolStoreChoice,
+		toolSelection: toolStoreChoice
+			? toolSelectionFromChoice(toolStoreChoice)
+			: selectionIssues?.get(out.choiceID)?.selection,
 		mcpToolSelection,
 		mcpApp,
 		isError: isError,

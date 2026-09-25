@@ -1,99 +1,71 @@
-import type { UIToolUserArgsStatus } from '@/spec/tool';
+import type { ToolJSONSchema, UIToolUserArgsStatus } from '@/spec/tool';
 
-import type { JSONSchema } from '@/lib/jsonschema_utils';
 import { getRequiredFromJSONSchema, isJSONObject } from '@/lib/jsonschema_utils';
 
-/**
- * Inspect a tool's userArgSchema and a JSON-encoded instance string and
- * compute whether all required keys are populated.
- *
- * We intentionally treat:
- *  - no schema            => satisfied (no args required)
- *  - schema with no "required" keys => satisfied
- *  - invalid / non-object instance  => all required missing
- */
 export function computeToolUserArgsStatus(
-	schema: JSONSchema | undefined,
+	schema: ToolJSONSchema | undefined,
 	rawInstance?: string | null
 ): UIToolUserArgsStatus {
 	const base: UIToolUserArgsStatus = {
-		hasSchema: false,
+		hasSchema: schema !== undefined,
 		requiredKeys: [],
 		missingRequired: [],
-		isInstancePresent: false,
+		isInstancePresent: Boolean(rawInstance?.trim()),
 		isInstanceJSONValid: false,
 		isSatisfied: true,
 	};
 
-	if (!schema || !isJSONObject(schema)) {
-		// No schema at all -> nothing to validate.
-		return base;
+	if (schema === undefined) {
+		return { ...base, hasSchema: false };
+	}
+
+	let parsed: unknown;
+	if (base.isInstancePresent) {
+		try {
+			parsed = JSON.parse(rawInstance ?? '');
+			base.isInstanceJSONValid = isJSONObject(parsed);
+		} catch {
+			base.isInstanceJSONValid = false;
+		}
+	}
+
+	if (schema === false) {
+		return { ...base, isSatisfied: false };
+	}
+	if (schema === true) {
+		return {
+			...base,
+			isSatisfied: !base.isInstancePresent || base.isInstanceJSONValid,
+		};
 	}
 
 	const required = getRequiredFromJSONSchema(schema) ?? [];
-
-	const status: UIToolUserArgsStatus = {
-		...base,
-		hasSchema: true,
-		requiredKeys: required,
-		isSatisfied: true,
-	};
-
-	if (!rawInstance || rawInstance.trim() === '') {
+	if (!base.isInstancePresent) {
 		return {
-			...status,
-			isInstancePresent: false,
-			isInstanceJSONValid: false,
+			...base,
+			requiredKeys: required,
 			missingRequired: required,
 			isSatisfied: required.length === 0,
 		};
 	}
-
-	status.isInstancePresent = true;
-
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(rawInstance);
-	} catch {
+	if (!base.isInstanceJSONValid || !isJSONObject(parsed)) {
 		return {
-			...status,
-			isInstanceJSONValid: false,
+			...base,
+			requiredKeys: required,
 			missingRequired: required,
 			isSatisfied: false,
 		};
 	}
 
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		return {
-			...status,
-			isInstanceJSONValid: false,
-			missingRequired: required,
-			isSatisfied: false,
-		};
-	}
+	const missing = required.filter(key => {
+		const value = parsed[key];
+		return value === undefined || value === null || (typeof value === 'string' && value.trim() === '');
+	});
 
-	status.isInstanceJSONValid = true;
-
-	if (required.length === 0) {
-		return status;
-	}
-
-	const obj = parsed as Record<string, unknown>;
-	const missing: string[] = [];
-
-	for (const key of required) {
-		const v = obj[key];
-		if (v === undefined || v === null) {
-			missing.push(key);
-			continue;
-		}
-		if (typeof v === 'string' && v.trim() === '') {
-			missing.push(key);
-			continue;
-		}
-	}
-
-	status.missingRequired = missing;
-	status.isSatisfied = missing.length === 0;
-	return status;
+	return {
+		...base,
+		requiredKeys: required,
+		missingRequired: missing,
+		isSatisfied: missing.length === 0,
+	};
 }

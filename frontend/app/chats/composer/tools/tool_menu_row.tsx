@@ -78,8 +78,11 @@ function getArgsBadge(status?: UIToolUserArgsStatus): { label: string; className
 	if (!status?.hasSchema) {
 		return null;
 	}
+	if (!status.isSatisfied && status.missingRequired.length === 0) {
+		return { label: 'Args: Invalid', className: 'badge badge-warning badge-xs text-xs p-0' };
+	}
 	// schema exists, but no required fields
-	if (status.requiredKeys.length === 0) {
+	if (status.requiredKeys.length === 0 && status.isSatisfied) {
 		return { label: 'Args: Optional', className: 'badge badge-ghost badge-xs text-xs p-0' };
 	}
 	if (status.isSatisfied) {
@@ -191,6 +194,7 @@ export function ToolMenuRow({
 								type="checkbox"
 								className="toggle toggle-xs"
 								tabIndex={-1}
+								disabled={disabled}
 								checked={!!autoExecute}
 								onChange={e => {
 									const next = e.currentTarget.checked;
@@ -201,7 +205,7 @@ export function ToolMenuRow({
 						</label>
 					) : (
 						<span className="text-base-content/40 text-xs" title="Auto-exec not applicable">
-							—
+							N/A
 						</span>
 					)}
 				</div>
@@ -214,6 +218,7 @@ export function ToolMenuRow({
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
+							disabled={disabled}
 							onClick={e => {
 								stop(e);
 								onEditOptions();
@@ -229,6 +234,7 @@ export function ToolMenuRow({
 						<button
 							type="button"
 							className="btn btn-ghost btn-xs text-base-content/60 shrink-0 px-1 py-0 shadow-none"
+							disabled={disabled}
 							onClick={e => {
 								stop(e);
 								onShowDetails();
@@ -245,7 +251,7 @@ export function ToolMenuRow({
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs shrink-0 px-1 py-0 shadow-none"
-								disabled={primaryAction.disabled}
+								disabled={disabled || primaryAction.disabled}
 								onClick={e => {
 									stop(e);
 									primaryAction.onClick();
@@ -259,7 +265,7 @@ export function ToolMenuRow({
 							<button
 								type="button"
 								className="btn btn-ghost btn-xs text-error shrink-0 px-1 py-0 shadow-none"
-								disabled={primaryAction.disabled}
+								disabled={disabled || primaryAction.disabled}
 								onClick={e => {
 									stop(e);
 									primaryAction.onClick();

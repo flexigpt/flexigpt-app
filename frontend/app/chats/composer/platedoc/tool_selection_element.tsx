@@ -10,8 +10,10 @@ export function ToolSelectionElement(props: PlateElementProps<any>) {
 	const { element, attributes, children } = props as any;
 	const el = element as ToolSelectionElementNode;
 
-	const display = el.overrides?.displayName ?? el.toolSnapshot?.displayName ?? el.toolSlug;
-	const slug = `${el.bundleSlug ?? el.bundleID}/${el.toolSlug}@${el.toolVersion}`;
+	const display = el.overrides?.displayName ?? el.displayName ?? el.target.name;
+	const label = `${el.collectionName ? `${el.collectionName}/` : ''}${el.target.name}${
+		el.toolVersion ? `@${el.toolVersion}` : ''
+	}`;
 
 	return (
 		<span
@@ -19,8 +21,7 @@ export function ToolSelectionElement(props: PlateElementProps<any>) {
 			contentEditable={false}
 			data-tool-chip
 			aria-hidden="true"
-			title={`Tool: ${display} • ${slug}`}
-			// Absolutely position and zero-size so it contributes no line height.
+			title={`Tool: ${display} (${label})`}
 			style={{
 				position: 'absolute',
 				width: 0,

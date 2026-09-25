@@ -1,15 +1,14 @@
 import { useCallback } from 'react';
 import { FiRefreshCw } from 'react-icons/fi';
 
-import type { Tool, ToolBundle } from '@/spec/tool';
-
-import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
-import { getErrorMessage } from '@/lib/error_utils';
+import type { CollectionView } from '@/spec/collection';
+import type { ToolView } from '@/spec/tool';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
-import { toolStoreAPI } from '@/apis/baseapi';
-import { getAllToolBundles, getAllTools } from '@/apis/list_helper';
+import type { ToolCollectionData } from '@/apis/tool_management';
+import { toolManagementAPI } from '@/apis/baseapi';
+import { toolArtifactKey, toolArtifactRef, toolCollectionRef } from '@/apis/tool_management';
 
 import { Loader } from '@/components/loader';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
@@ -17,138 +16,85 @@ import { ManagementPageHeader } from '@/components/managementui/management_page_
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
 import { PageFrame } from '@/components/page_frame';
 
-import { ToolBundleCard } from '@/tools/tool_bundle_card';
-
-interface BundleData {
-	bundle: ToolBundle;
-	tools: Tool[];
-	toolLoadError?: string;
-}
-
-async function loadBuiltInToolBundleData(signal: AbortSignal): Promise<BundleData[]> {
-	const toolBundles = await getAllToolBundles(undefined, true);
-	throwIfAborted(signal);
-
-	if (toolBundles.some(bundle => !bundle.isBuiltIn)) {
-		throw new Error('The tool catalogue returned a non-built-in bundle.');
-	}
-
-	return mapWithConcurrency(
-		toolBundles,
-		4,
-		async bundle => {
-			try {
-				const toolListItems = await getAllTools([bundle.id], undefined, true);
-				throwIfAborted(signal);
-
-				const tools = toolListItems.map(item => item.toolDefinition);
-				if (tools.some(tool => !tool.isBuiltIn)) {
-					throw new Error('The tool catalogue returned a non-built-in tool.');
-				}
-
-				return {
-					bundle,
-					tools,
-				};
-			} catch (error) {
-				throwIfAborted(signal);
-				return {
-					bundle,
-					tools: [],
-					toolLoadError: getErrorMessage(error, 'Failed to load built-in tools for this bundle.'),
-				};
-			}
-		},
-		signal
-	);
-}
+import { ToolCollectionCard } from '@/tools/tool_collection_card';
 
 // oxlint-disable-next-line no-restricted-exports
 export default function ToolsPage() {
-	const loadPageData = useCallback((signal: AbortSignal) => loadBuiltInToolBundleData(signal), []);
+	const loadPageData = useCallback((signal: AbortSignal) => toolManagementAPI.loadManagementPageData(signal), []);
 	const {
-		data: bundles,
+		data: collections,
 		error: pageLoadError,
 		isLoading,
 		isRefreshing,
 		hasResolved,
 		reloadOrThrow,
-		setData: setBundles,
-	} = useAsyncResource(loadPageData, { initialData: [] as BundleData[] });
+		setData: setCollections,
+	} = useAsyncResource(loadPageData, { initialData: [] as ToolCollectionData[] });
 
-	const refreshBundleTools = useCallback(
-		async (bundleID: string) => {
-			const toolListItems = await getAllTools([bundleID], undefined, true);
-			const freshTools = toolListItems.map(item => item.toolDefinition);
+	const refreshCollection = useCallback(
+		async (collection: CollectionView) => {
+			const ref = toolCollectionRef(collection);
+			const [freshCollection, freshTools] = await Promise.all([
+				toolManagementAPI.getToolCollection(ref),
+				toolManagementAPI.listCollectionTools(ref),
+			]);
+			const key = toolArtifactKey(ref);
 
-			if (freshTools.some(tool => !tool.isBuiltIn)) {
-				throw new Error('The tool catalogue returned a non-built-in tool.');
-			}
-
-			setBundles(previous =>
-				(previous ?? []).map(bundleData =>
-					bundleData.bundle.id === bundleID
-						? {
-								...bundleData,
-								tools: freshTools,
-								toolLoadError: undefined,
-							}
-						: bundleData
-				)
+			setCollections(previous =>
+				(previous ?? []).map(item => {
+					if (toolArtifactKey(toolCollectionRef(item.collection)) !== key) {
+						return item;
+					}
+					const oldTools = new Map(item.tools.map(tool => [toolArtifactKey(toolArtifactRef(tool)), tool]));
+					return {
+						collection:
+							item.collection.artifact.revision > freshCollection.artifact.revision ? item.collection : freshCollection,
+						tools: freshTools.map(tool => {
+							const old = oldTools.get(toolArtifactKey(toolArtifactRef(tool)));
+							return old && old.artifact.revision > tool.artifact.revision ? old : tool;
+						}),
+					};
+				})
 			);
 		},
-		[setBundles]
+		[setCollections]
 	);
 
-	const handleToggleBundleEnable = useCallback(
-		async (bundleID: string, enabled: boolean) => {
-			const bundleData = (bundles ?? []).find(item => item.bundle.id === bundleID);
-			if (!bundleData?.bundle.isBuiltIn) {
-				throw new Error('Only built-in tool bundles can be changed.');
-			}
+	const toggleCollection = useCallback(
+		async (collection: CollectionView, enabled: boolean) => {
+			const ref = toolCollectionRef(collection);
+			const updated = await toolManagementAPI.setToolCollectionEnabled(ref, collection.artifact.revision, enabled);
+			const key = toolArtifactKey(ref);
 
-			await toolStoreAPI.patchToolBundle(bundleID, enabled);
-
-			setBundles(previous =>
+			setCollections(previous =>
 				(previous ?? []).map(item =>
-					item.bundle.id === bundleID
+					toolArtifactKey(toolCollectionRef(item.collection)) === key
 						? {
 								...item,
-								bundle: {
-									...item.bundle,
-									isEnabled: enabled,
-								},
+								collection: item.collection.artifact.revision > updated.artifact.revision ? item.collection : updated,
 							}
 						: item
 				)
 			);
 		},
-		[bundles, setBundles]
+		[setCollections]
 	);
 
-	const handleToggleToolEnable = useCallback(
-		async (bundleID: string, tool: Tool, enabled: boolean) => {
-			const bundleData = (bundles ?? []).find(item => item.bundle.id === bundleID);
-			if (!bundleData?.bundle.isBuiltIn || !tool.isBuiltIn) {
-				throw new Error('Only built-in tools can be changed.');
-			}
-			if (!bundleData.tools.some(candidate => candidate.id === tool.id)) {
-				throw new Error('Tool not found.');
-			}
+	const toggleTool = useCallback(
+		async (collection: CollectionView, tool: ToolView, enabled: boolean) => {
+			const updated = await toolManagementAPI.setToolEnabled(toolArtifactRef(tool), tool.artifact.revision, enabled);
+			const collectionKey = toolArtifactKey(toolCollectionRef(collection));
+			const toolKey = toolArtifactKey(toolArtifactRef(tool));
 
-			await toolStoreAPI.patchTool(bundleID, tool.slug, tool.version, enabled);
-
-			setBundles(previous =>
+			setCollections(previous =>
 				(previous ?? []).map(item =>
-					item.bundle.id === bundleID
+					toolArtifactKey(toolCollectionRef(item.collection)) === collectionKey
 						? {
 								...item,
 								tools: item.tools.map(candidate =>
-									candidate.id === tool.id
-										? {
-												...candidate,
-												isEnabled: enabled,
-											}
+									toolArtifactKey(toolArtifactRef(candidate)) === toolKey &&
+									candidate.artifact.revision <= updated.artifact.revision
+										? updated
 										: candidate
 								),
 							}
@@ -156,14 +102,8 @@ export default function ToolsPage() {
 				)
 			);
 		},
-		[bundles, setBundles]
+		[setCollections]
 	);
-
-	const refreshPage = () => {
-		void reloadOrThrow().catch((error: unknown) => {
-			console.error('Failed to refresh built-in tools:', error);
-		});
-	};
 
 	if (isLoading && !hasResolved) {
 		return <Loader text="Loading built-in tools..." />;
@@ -174,9 +114,18 @@ export default function ToolsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Built-in Tools"
-					description="Inspect and enable built-in Go tools and provider API tools. Custom and HTTP tool authoring are not supported."
+					description="Inspect and enable built-in Go tools and provider API tools, organized into Collections."
 					actions={
-						<button type="button" className="btn btn-ghost rounded-xl" onClick={refreshPage} disabled={isRefreshing}>
+						<button
+							type="button"
+							className="btn btn-ghost rounded-xl"
+							disabled={isRefreshing}
+							onClick={() => {
+								void reloadOrThrow().catch((error: unknown) => {
+									console.error('Failed to refresh built-in tools:', error);
+								});
+							}}
+						>
 							<FiRefreshCw className={isRefreshing ? 'animate-spin' : undefined} size={18} />
 							<span>{isRefreshing ? 'Refreshing' : 'Refresh'}</span>
 						</button>
@@ -193,17 +142,19 @@ export default function ToolsPage() {
 						/>
 					) : null}
 
-					{bundles.length === 0 ? <p className="mt-8 text-center text-sm">No built-in tools are available.</p> : null}
+					{collections.length === 0 && !pageLoadError ? (
+						<p className="mt-8 text-center text-sm">No built-in tools are available.</p>
+					) : null}
 
-					{bundles.map(bundleData => (
-						<ToolBundleCard
-							key={bundleData.bundle.id}
-							bundle={bundleData.bundle}
-							tools={bundleData.tools}
-							toolLoadError={bundleData.toolLoadError}
-							onRefreshTools={() => refreshBundleTools(bundleData.bundle.id)}
-							onToggleBundleEnable={handleToggleBundleEnable}
-							onToggleToolEnable={handleToggleToolEnable}
+					{collections.map(item => (
+						<ToolCollectionCard
+							key={toolArtifactKey(toolCollectionRef(item.collection))}
+							collection={item.collection}
+							tools={item.tools}
+							toolLoadError={item.toolLoadError}
+							onRefreshTools={() => refreshCollection(item.collection)}
+							onToggleCollectionEnable={toggleCollection}
+							onToggleToolEnable={toggleTool}
 						/>
 					))}
 				</ManagementPageContent>

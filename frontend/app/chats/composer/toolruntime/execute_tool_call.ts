@@ -13,7 +13,7 @@ import { ToolOutputKind } from '@/spec/tool';
 import { withTimeout } from '@/lib/async_utils';
 import { isJSONObject } from '@/lib/jsonschema_utils';
 
-import { mcpManagementAPI, skillManagementAPI, toolRuntimeAPI } from '@/apis/baseapi';
+import { mcpManagementAPI, skillManagementAPI, toolManagementAPI } from '@/apis/baseapi';
 
 import type { RequestMCPApproval } from '@/chats/composer/mcp/use_mcp_approval';
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
@@ -111,6 +111,7 @@ function buildMCPToolOutput(args: {
 		arguments: args.toolCall.arguments,
 		webSearchToolCallItems: args.toolCall.webSearchToolCallItems,
 		toolStoreChoice: args.toolCall.toolStoreChoice,
+		toolSelection: args.toolCall.toolSelection,
 		mcpToolSelection: args.selection,
 		mcpApp: args.mcpApp,
 	};
@@ -428,6 +429,7 @@ export async function executeComposerToolCall({
 					arguments: toolCall.arguments,
 					webSearchToolCallItems: toolCall.webSearchToolCallItems,
 					toolStoreChoice: toolCall.toolStoreChoice,
+					toolSelection: toolCall.toolSelection,
 					skillRuntimeMeta: resp.meta,
 				},
 			};
@@ -443,11 +445,9 @@ export async function executeComposerToolCall({
 		return executeMCPToolCall(toolCall, toolCall.mcpToolSelection, requestMCPApproval);
 	}
 
-	const bundleID = toolCall.toolStoreChoice?.bundleID;
-	const toolSlug = toolCall.toolStoreChoice?.toolSlug;
-	const toolVersion = toolCall.toolStoreChoice?.toolVersion;
+	const target = toolCall.toolStoreChoice?.target;
 
-	if (!bundleID || !toolSlug || !toolVersion) {
+	if (!target) {
 		return {
 			ok: false,
 			errorMessage: 'Cannot resolve tool identity for this call.',
@@ -456,12 +456,12 @@ export async function executeComposerToolCall({
 
 	try {
 		const resp = await withTimeout(
-			toolRuntimeAPI.invokeTool(bundleID, toolSlug, toolVersion, args),
+			toolManagementAPI.invokeMappedTool(target, args, TOOL_CALL_TIMEOUT_MS),
 			TOOL_CALL_TIMEOUT_MS,
 			`Tool call "${toolCall.name}" timed out after ${Math.round(TOOL_CALL_TIMEOUT_MS / 1000)} seconds.`
 		);
 
-		const isError = !!resp.isError;
+		const isError = resp.isError;
 		const errorMessage =
 			resp.errorMessage || (isError ? 'Tool reported an error. Inspect the output for details.' : undefined);
 
@@ -482,6 +482,7 @@ export async function executeComposerToolCall({
 				arguments: toolCall.arguments,
 				webSearchToolCallItems: toolCall.webSearchToolCallItems,
 				toolStoreChoice: toolCall.toolStoreChoice,
+				toolSelection: toolCall.toolSelection,
 			},
 		};
 	} catch (err) {

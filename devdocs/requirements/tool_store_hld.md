@@ -1,120 +1,60 @@
 # Tool Store HLD
 
-Status: Target design. This is a breaking migration from the legacy Tool Store to an Artifact Store-backed Tool Store. It preserves the current built-in Go Tool and SDK Tool capabilities, Collection and Tool enablement, inference Tool-choice hydration, Composer selection, and Go Tool invocation behavior.
+Status: Current design and implementation direction. The Tool Store is Artifact Store-backed, uses the adapted `toolv1` contract, supports built-in Go and SDK Tools, exposes Tool capabilities as mapped targets to Artifact consumers, and preserves Composer, inference, conversation, and management behavior.
 
 Normative foundations:
 
 - [Portable Artifact Declaration Contracts HLD](./artifact_contracts_hld.md)
 - [Artifact Store, Resolution, and Ecosystem HLD](./artifacts_hld.md)
 
-This HLD defines Tool-specific catalog storage, Tool Collections, built-in Tool admission, mapped-target exposure, Go and SDK execution routing, inference and conversation integration, management behavior, and migration boundaries.
-
-It does not redefine generic Artifact Store persistence, protected topology, portable Plugin syntax, generic source behavior, or generic Artifact enablement.
-
-## Table of contents <!-- omit from toc -->
-
-- [Purpose](#purpose)
-- [Goals and scope](#goals-and-scope)
-  - [Goals](#goals)
-  - [In scope](#in-scope)
-  - [Out of scope](#out-of-scope)
-- [Requirements and invariants](#requirements-and-invariants)
-  - [Built-in-only Tool admission](#built-in-only-tool-admission)
-  - [Tool descriptor compatibility](#tool-descriptor-compatibility)
-  - [Bundle to Collection mapping](#bundle-to-collection-mapping)
-  - [Artifact Store-backed enablement](#artifact-store-backed-enablement)
-  - [Mapped-only external Tool exposure](#mapped-only-external-tool-exposure)
-  - [Tool relationship admission](#tool-relationship-admission)
-- [Target model](#target-model)
-  - [Tool Catalog records](#tool-catalog-records)
-  - [Tool Collections](#tool-collections)
-  - [Go Tool records](#go-tool-records)
-  - [SDK Tool records](#sdk-tool-records)
-  - [Tool identity](#tool-identity)
-- [Required workflows](#required-workflows)
-  - [Built-in Tool Catalog installation](#built-in-tool-catalog-installation)
-  - [Browse and manage Collections and Tools](#browse-and-manage-collections-and-tools)
-  - [Resolve a Tool for an Artifact consumer](#resolve-a-tool-for-an-artifact-consumer)
-  - [Hydrate Tool choices for inference](#hydrate-tool-choices-for-inference)
-  - [Execute a Go Tool](#execute-a-go-tool)
-  - [Execute an SDK Tool](#execute-an-sdk-tool)
-- [Architecture and ownership](#architecture-and-ownership)
-  - [Responsibility boundaries](#responsibility-boundaries)
-  - [Store, runtime, and aggregate separation](#store-runtime-and-aggregate-separation)
-  - [Tool Aggregate responsibilities](#tool-aggregate-responsibilities)
-  - [Artifact resolver integration](#artifact-resolver-integration)
-- [Management API and UI](#management-api-and-ui)
-  - [Management operations](#management-operations)
-  - [Management UI](#management-ui)
-  - [Composer Tool selection](#composer-tool-selection)
-- [Inference and conversation integration](#inference-and-conversation-integration)
-  - [Conversation Tool selection](#conversation-tool-selection)
-  - [Per-turn persistence](#per-turn-persistence)
-  - [Inference bridge](#inference-bridge)
-  - [Go Tool calls from inference](#go-tool-calls-from-inference)
-  - [SDK Tool calls from inference](#sdk-tool-calls-from-inference)
-  - [MCP and Skill Tool coexistence](#mcp-and-skill-tool-coexistence)
-- [Built-in content and Artifact Store installation](#built-in-content-and-artifact-store-installation)
-  - [Built-in Tool content](#built-in-tool-content)
-  - [Package behavior](#package-behavior)
-  - [Hydration behavior](#hydration-behavior)
-- [Breaking migration considerations](#breaking-migration-considerations)
-  - [Migration boundary](#migration-boundary)
-  - [Direct Bundle migration](#direct-bundle-migration)
-  - [API and identity migration](#api-and-identity-migration)
-- [Implementation mapping](#implementation-mapping)
-- [Current implementation status](#current-implementation-status)
-  - [Current behavior retained by the target](#current-behavior-retained-by-the-target)
-  - [Required target work](#required-target-work)
-  - [Intentionally unsupported target behavior](#intentionally-unsupported-target-behavior)
-- [Difference from the current Tool Store](#difference-from-the-current-tool-store)
+This HLD defines Tool-specific behavior. It does not redefine generic Artifact Store persistence, Source behavior, protected topology, Plugin semantics, generic Collection behavior, resolver traversal, or Artifact local enablement.
 
 ## Purpose
 
 The Tool Store manages the application-provided Tool catalog.
 
-It supports two built-in Tool implementation families:
+It supports two Tool implementation families:
 
-| Tool implementation family | Definition owner                         | Execution owner                               |
-| -------------------------- | ---------------------------------------- | --------------------------------------------- |
-| Go Tool                    | `llmtools-go` built-in registry          | Local Tool Runtime through `llmtools-go`      |
-| SDK Tool                   | Application-authored built-in descriptor | Provider inference SDK through `inference-go` |
+| Implementation family | Definition source                                                 | Execution path         |
+| --------------------- | ----------------------------------------------------------------- | ---------------------- |
+| Go Tool               | `llmtools-go` built-in registry, materialized into Tool Artifacts | Local Tool Runtime     |
+| SDK Tool              | Application-authored embedded Tool document                       | Provider inference SDK |
 
-The Tool Store does not permit user-authored Tool implementations.
-
-The target model is:
+The Tool Store is Artifact Store-backed:
 
 ```text
-Embedded Go Tool catalog input
-  -> llmtools-go built-in registry
-  -> Tool Catalog records in Artifact Store
+Built-in Tool package
+  -> Tool Artifact
 
-Embedded SDK Tool catalog input
-  -> Tool Catalog records in Artifact Store
+Built-in Tool Collection package
+  -> Plugin Artifact
 
-Embedded legacy Bundle content
-  -> Tool Collection Plugin Artifacts in Artifact Store
-
-Tool Collection or Tool selection
-  -> Tool Aggregate
+Named Tool relationship
+  -> normal Artifact resolution
+  -> Tool Artifact target mapper
   -> mapped Tool target
-  -> inference projection or Go Tool Runtime
+
+Mapped Tool target
+  -> Tool Aggregate
+  -> Go Tool Runtime or provider inference projection
 ```
 
 Legacy Tool Bundles are renamed to Tool Collections.
 
-A Tool Collection is an Artifact Store-backed Collection. A Tool is stored as an internal Tool Catalog record in Artifact Store, but is exposed to other domains only through a mapped Tool target.
-
-This preserves the existing boundary:
+The migration preserves the current product model:
 
 ```text
-Agent, Skill, Workspace, Composer, inference
-  -> mapped Tool target
-  -> Tool Store and Tool Aggregate
-  -> backing Tool Catalog record
+Legacy Bundle
+  -> Tool Collection
+
+Legacy Go Tool
+  -> generated Tool Artifact
+
+Legacy SDK Tool
+  -> embedded Tool Artifact
 ```
 
-No external consumer receives a raw Tool implementation descriptor, Go function ID, Tool Catalog Artifact reference, legacy Bundle ID, or legacy Tool reference as its executable capability.
+The Tool Store does not support user Tool authoring, user Tool Collections, arbitrary SDK Tool registration, HTTP Tools, command Tools, or runtime-loaded Go plugins.
 
 ## Goals and scope
 
@@ -122,254 +62,193 @@ No external consumer receives a raw Tool implementation descriptor, Go function 
 
 The Tool Store must:
 
-- Preserve the current built-in Go Tool catalog.
-- Preserve the current built-in SDK Tool catalog, including provider web-search Tools and their user argument schemas.
-- Rename Tool Bundles to Tool Collections.
-- Preserve one Collection for every current Bundle.
-- Preserve the current Tool membership of every Bundle through its replacement Collection.
-- Store Tool Catalog records and Tool Collections in Artifact Store-managed content.
-- Use Artifact-level enablement for both Collections and Tools.
-- Make Tools available to other Artifact consumers through mapped targets only.
-- Keep Go Tool execution separate from Tool catalog storage.
-- Route SDK Tools through inference provider execution rather than local Go invocation.
-- Preserve Composer Tool selection, Tool configuration, inference hydration, auto-execution behavior, and Tool-call attribution.
-- Avoid introducing Tool authoring, arbitrary SDK Tools, HTTP Tools, command Tools, or runtime-loaded Go plugins.
+- Preserve built-in Go Tool behavior.
+- Preserve built-in SDK Tool behavior.
+- Preserve provider SDK web-search Tool behavior.
+- Preserve Tool argument schemas and SDK user argument schemas.
+- Replace legacy Bundles with Tool Collections.
+- Preserve current Bundle membership through direct built-in Collection definitions.
+- Preserve independent Tool and Collection enablement.
+- Store Tool definitions and Collections in Artifact Store managed content.
+- Expose Tool capabilities to Artifact consumers as mapped targets.
+- Keep Tool catalog storage separate from Go Tool execution.
+- Keep SDK Tool execution in provider inference.
+- Support Composer Tool selection, Tool options, inference hydration, Tool calls, Tool outputs, retries, and auto-execution.
+- Keep MCP Tool behavior separate from Tool Store behavior.
+- Continue using `toolv1` while the feature is in development.
 
 ### In scope
 
 This HLD defines:
 
-- Built-in Go Tool Catalog records.
-- Built-in SDK Tool Catalog records.
-- Tool Collection representation and membership.
+- Built-in `toolv1` Tool Artifacts.
+- Read-only Tool Collections represented by Plugin Artifacts.
+- Go Tool generation and validation from `llmtools-go`.
+- Static SDK Tool package admission.
 - Tool and Collection enablement.
-- Tool mapped-target identity and validation.
-- Tool fallback and target-projection behavior.
-- Go Tool Runtime behavior.
-- SDK Tool inference behavior.
-- Tool management API and UI behavior.
-- Composer and conversation Tool selection behavior.
-- Breaking migration from the legacy Tool Store.
+- Tool Artifact to mapped-target projection.
+- Go Tool invocation through the Tool Aggregate.
+- Low-level runtime Tool invocation.
+- SDK Tool inference projection.
+- Composer Tool selection and option handling.
+- Conversation Tool selection persistence.
+- Tool management APIs and UI.
+- Built-in Tool package hydration.
+- Breaking replacement of the legacy Tool Store.
 
 ### Out of scope
 
 This HLD does not define:
 
 - User Tool authoring.
+- User Tool import, export, replacement, editing, or deletion.
 - User-created Tool Collections.
-- Tool or Collection import and export.
-- Tool or Collection deletion.
-- Tool membership editing.
-- Arbitrary Go function registration.
+- Tool Collection editing, deletion, or membership mutation.
+- Arbitrary Go Tool registration.
 - Runtime Go plugin loading.
 - Arbitrary SDK Tool registration.
-- HTTP Tool definitions.
-- Command Tool definitions.
-- Tool implementation fetched from a URL, Git repository, package registry, or local user path.
-- MCP server setup, MCP Tool discovery, MCP Tool execution, or MCP connection state.
+- HTTP Tool declarations.
+- Command Tool declarations.
+- MCP server setup, connection management, or capability discovery.
+- MCP policy and approval semantics.
 - Provider credential management.
-- Conversation migration from legacy persisted Tool choices.
+- Conversation migration from legacy Tool choices.
 
-Existing conversation migration is handled by the independent migration script and is not part of this HLD.
+Conversation migration is owned by the separate migration script and is not part of this HLD.
 
-## Requirements and invariants
+## Tool model
 
-### Built-in-only Tool admission
+### Tool Artifact
 
-The Tool Store admits only application-provided built-in Tools.
+A Tool is a source-backed Artifact with:
 
-A Tool Catalog record must be one of:
+```text
+type: tool
+schema: toolv1
+root: protected built-in Root
+source: built-in managed package Source
+```
 
-- A Go Tool generated from an approved `llmtools-go` built-in registry descriptor.
-- An SDK Tool declared by application-owned embedded Tool catalog content.
+A Tool Artifact contains:
 
-The Tool Store must reject:
+- Logical Tool name.
+- Tool version.
+- Display name.
+- Description.
+- Tags.
+- Auto-execution default.
+- Input schema.
+- Optional user argument schema.
+- Optional output schema.
+- Go or SDK implementation declaration.
 
-- User-created Tool definitions.
-- Tool definitions discovered from arbitrary user Sources.
-- Tool definitions with unknown implementation types.
-- Tool definitions with an unrecognized Go function ID.
-- Tool definitions with an unrecognized SDK type.
-- HTTP, command, package, URL, Git, or dynamically loaded implementations.
+The Tool Artifact is the authoritative backing record for:
 
-The supported implementation discriminator is:
+- Tool source provenance.
+- Tool definition digest.
+- Tool Artifact revision.
+- Tool enabled state.
+- Tool package identity.
+- Tool Collection membership validation.
+- Mapped-target validation.
+
+### Tool contract version
+
+The current feature uses the adapted `toolv1` contract in place. The active Tool implementation kinds are:
 
 ```text
 go
 sdk
 ```
 
-The legacy `http` implementation type is not supported by the target Tool Store.
-
-### Tool descriptor compatibility
-
-The target Tool Catalog must preserve the existing Tool descriptor behavior, including:
-
-- Tool ID.
-- Slug.
-- Version.
-- Display name.
-- Description.
-- Tags.
-- User-callable flag.
-- Model-callable flag.
-- Auto-execution recommendation.
-- LLM Tool semantic type.
-- Argument schema.
-- User argument schema.
-- Go implementation function identity.
-- SDK implementation type.
-- Built-in provenance.
-- Enabled state.
-
-The Tool Catalog must continue to support current SDK Tool semantic types, including `webSearch`.
-
-The Tool Catalog must not narrow SDK Tools to only function Tools. An SDK Tool's semantic Tool type remains part of its built-in descriptor and is used when creating the provider inference Tool choice.
-
-### Bundle to Collection mapping
-
-Every current legacy Bundle becomes exactly one Tool Collection.
-
-The migration is direct:
+The current Tool contract intentionally does not contain:
 
 ```text
-Legacy Bundle
-  -> one Tool Collection
-
-Legacy Bundle metadata
-  -> Tool Collection metadata
-
-Legacy Tool membership in Bundle
-  -> Tool membership in Tool Collection
+userCallable
+llmCallable
+http implementation
+command implementation
+locator
 ```
 
-For example, a legacy filesystem Bundle becomes one filesystem Tool Collection containing the same filesystem Tools.
+A selected Tool is advertised to inference according to its implementation and current selection context.
 
-This is not inferred dynamically at runtime. It is application-owned built-in content.
+The Composer determines whether a Tool call is locally runnable:
 
-Each Tool belongs to one routing Tool Collection in the current product, matching the current one-Tool-to-one-Bundle model.
+| Tool implementation | Local Composer execution | Provider inference execution            |
+| ------------------- | ------------------------ | --------------------------------------- |
+| Go                  | Yes                      | Advertised as a function Tool choice    |
+| SDK                 | No                       | Provider SDK executes the Tool behavior |
 
-The routing Collection is used for:
+### Go Tool declaration
 
-- Management grouping.
-- Collection-level enablement.
-- Tool list presentation.
-- Tool availability validation.
-
-It does not imply that a Collection owns the Tool implementation. The Tool implementation remains independently represented by its Tool Catalog record.
-
-### Artifact Store-backed enablement
-
-The target uses Artifact Store local enablement rather than a legacy Tool overlay database.
-
-| State              | Backing record                     | Meaning                                                       |
-| ------------------ | ---------------------------------- | ------------------------------------------------------------- |
-| Collection enabled | Tool Collection Artifact `Enabled` | Enables or disables all Tools routed through that Collection. |
-| Tool enabled       | Tool Catalog Artifact `Enabled`    | Enables or disables the exact Tool descriptor.                |
-
-A Tool is available only when:
-
-```text
-Tool Catalog Artifact is available
-  and Tool Catalog Artifact is enabled
-  and routing Tool Collection is available
-  and routing Tool Collection is enabled
-```
-
-Disabling a Collection does not change individual Tool enabled state.
-
-Disabling a Tool does not change Collection enabled state.
-
-Both disabled Collections and disabled Tools remain visible in Tool management views.
-
-### Mapped-only external Tool exposure
-
-Tool Catalog Artifacts are internal Tool Store backing records.
-
-Other domains receive Tools only as mapped targets.
-
-A mapped Tool target must contain:
-
-- `type: tool`.
-- The logical Tool name.
-- `builtin: true`.
-- A Tool Aggregate provider identity.
-- A versioned opaque identifier.
-
-The opaque identifier must bind the resolved Tool Catalog record identity and current definition revision or digest.
-
-It may internally identify the backing Tool Catalog Artifact, but that Artifact reference is not a public Tool capability and is not passed directly to consumers.
-
-Mapped targets must be revalidated before use. A mapped target is invalid when:
-
-- Its backing Tool Catalog record no longer exists.
-- Its Tool Catalog record is unavailable.
-- Its Tool Catalog record is disabled.
-- Its routing Collection is unavailable.
-- Its routing Collection is disabled.
-- Its definition digest no longer matches.
-- Its implementation identity no longer matches the admitted Go or SDK descriptor.
-- Its logical Tool name no longer matches.
-
-### Tool relationship admission
-
-The Tool Store accepts only named external Tool relationships for executable Tool usage.
-
-Supported form:
+A Go Tool declaration identifies one application-linked `llmtools-go` registration:
 
 ```yaml
-- type: tool
-  name: readfile
-  scope: builtin
+type: tool
+name: readfile
+version: v1
+displayName: Read file
+autoExecute: true
+
+inputSchema:
+  type: object
+
+implementation:
+  kind: go
+  function: github.com/flexigpt/llmtools-go/fstool/readfile.ReadFile
 ```
 
-The Tool Store does not accept these as executable Tool Store targets:
+The Tool Store validates a Go Tool against the linked `llmtools-go` registry.
 
-- Located Tool relationships.
-- Contained Tool declarations.
-- Tool selectors.
-- Artifact-backed user Tool declarations.
-- Tool definitions from a mutable user Root.
-- Raw Go function references.
-- Raw SDK implementation references.
+### SDK Tool declaration
 
-The shared Artifact resolver may still understand generic portable Tool declaration syntax. Tool Store-owned consumers must route Tool relationship resolution through the Tool Aggregate so that only approved mapped targets are accepted.
+An SDK Tool declaration identifies an application-authored provider capability:
 
-## Target model
+```yaml
+type: tool
+name: openaiwebsearch
+version: v1.0.0
+displayName: OpenAI Responses SDK Web Search
+autoExecute: false
 
-### Tool Catalog records
+inputSchema:
+  type: object
+  additionalProperties: false
 
-A Tool Catalog record is a Tool Store-owned source-backed Artifact Store record.
+userArgSchema:
+  type: object
+  properties:
+    searchContextSize:
+      type: string
 
-It represents one built-in Tool descriptor, not a caller-authorable Tool declaration.
+implementation:
+  kind: sdk
+  sdkType: providerSDKTypeOpenAIResponses
+  sdkToolType: webSearch
+```
 
-Conceptually:
+The current SDK Tool semantic types are:
 
 ```text
-Tool Catalog record
-  -> Tool identity
-  -> Tool descriptor
-  -> Go or SDK implementation discriminator
-  -> schemas and callable metadata
-  -> routing Tool Collection identity
-  -> Artifact availability and enablement
+function
+custom
+webSearch
 ```
 
-The Tool Catalog record preserves the current `Tool` model semantics while moving its persistence to Artifact Store-managed content.
+The current embedded SDK Tool catalog uses provider web-search Tools.
 
-The record is private to the Tool Store. It is not directly returned as an executable Tool target by Artifact resolver consumers.
+### Tool Collection
 
-### Tool Collections
+A Tool Collection is a read-only Tool Store view over a protected `plugin` Artifact.
 
-A Tool Collection is a Tool Store view over a protected built-in `plugin` Artifact.
-
-A conceptual Collection declaration is:
+Example:
 
 ```yaml
 type: plugin
-name: filesystem-tools
-displayName: Filesystem Tools
-description: Built-in filesystem capabilities.
+name: fs
+displayName: File-system utilities
+description: Common file-system helpers.
 
 members:
   - type: tool
@@ -381,408 +260,574 @@ members:
     scope: builtin
 ```
 
-The Collection declaration contains Tool membership only. It does not contain implementation bodies.
+A Tool Collection must:
 
-A Tool Collection is:
+- Be a concrete Plugin declaration.
+- Not be a locator alias.
+- Contain only `type: tool` members.
+- Use named external Tool members.
+- Use `scope: builtin`.
+- Not use Tool locators.
+- Not use contained Tool declarations.
+- Not use Tool selectors.
+- Not use Tool overrides.
+- Not use Tool `use` behavior.
+- Be read-only.
+- Be built-in package content.
 
-- Source-backed through protected Artifact Store managed content.
-- Read-only as declaration content.
-- Enableable and disableable through local Artifact state.
-- Visible in management UI.
-- Not a user authoring destination.
-- Not automatically activated for a Workspace, Agent, Skill, or Composer.
+Each admitted Tool belongs to exactly one Tool Collection in the current product.
 
-### Go Tool records
-
-A Go Tool record is generated or validated from the linked `llmtools-go` built-in registry.
-
-The Tool Store must verify that:
-
-- The catalog Tool ID matches the registered Tool descriptor.
-- The catalog slug and version match the registered Tool descriptor.
-- The argument schema matches the registered Tool descriptor.
-- The Go function identifier is registered in the approved registry.
-- The routing Tool Collection includes the Tool.
-- The Tool is not duplicated under another admitted name.
-
-The Go Tool record is not executable by itself. The Tool Aggregate resolves it to a runtime Tool key, and the Tool Runtime invokes the registered `llmtools-go` implementation.
-
-### SDK Tool records
-
-An SDK Tool record is application-authored built-in catalog content.
-
-It contains the current SDK Tool information, including:
-
-- SDK type.
-- LLM Tool semantic type.
-- Argument schema.
-- User argument schema.
-- User-callable and model-callable flags.
-- Display metadata.
-- Routing Tool Collection.
-- Any provider-specific built-in metadata required by inference projection.
-
-SDK Tool records include the current provider web-search Tool descriptors.
-
-SDK Tool records are not executed by the local Tool Runtime. They are projected into `inference-go` Tool choices and executed by the configured provider SDK during completion.
-
-### Tool identity
-
-The Tool Store keeps the current Tool identity concepts:
+This preserves the existing Bundle model:
 
 ```text
-Tool ID
-Tool slug
-Tool version
+One Bundle
+  -> one Tool Collection
+
+One Tool
+  -> one Tool Collection
 ```
 
-The Artifact Store Artifact ID is an internal storage identity. It does not replace the Tool's logical identity.
+The Collection groups and gates Tool availability. It does not own or execute the Tool implementation.
 
-The mapped target identity must bind:
+## Availability and enablement
+
+A Tool is available for mapped-target use only when:
 
 ```text
-Tool Catalog Artifact identity
-  + Tool descriptor digest or revision
-  + Tool ID
-  + Tool slug
-  + Tool version
-  + implementation discriminator
+Tool Artifact is available
+  and Tool Artifact is enabled
+  and Tool Collection Artifact is available
+  and Tool Collection Artifact is enabled
 ```
 
-A Tool slug must identify one admitted active Tool descriptor.
+Tool enablement uses the Tool Artifact's universal `Enabled` field.
 
-If two active built-in Tool records have the same slug, Tool resolution is ambiguous and must fail. No Collection order, package order, or version ordering may select one implicitly.
+Collection enablement uses the Tool Collection Plugin Artifact's universal `Enabled` field.
 
-## Required workflows
+Disabling a Tool Collection:
 
-### Built-in Tool Catalog installation
+- Makes all routed Tools unavailable for mapped-target resolution.
+- Does not mutate individual Tool enabled state.
+- Does not delete Tool Artifacts.
+- Does not change Tool definitions.
+- Does not prevent Tool management inspection.
 
-At startup, Tool Store initialization performs:
+Disabling a Tool:
+
+- Makes that Tool unavailable for mapped-target resolution.
+- Does not mutate its Tool Collection enabled state.
+- Does not delete the Tool Artifact.
+- Does not change its definition.
+
+Management views include disabled Tools and disabled Collections.
+
+## Mapped Tool targets
+
+### External capability form
+
+Artifact consumers receive a Tool capability as:
 
 ```text
-Load embedded Tool Collection content
-  -> load application-authored SDK Tool definitions
-  -> inspect approved llmtools-go built-in Tool registry
-  -> generate or validate Go Tool definitions
-  -> validate Tool descriptors and Collection membership
-  -> publish Tool Catalog records to protected Artifact Store content
-  -> publish Tool Collection Plugin Artifacts
-  -> reconcile current Tool and Collection enablement state
-  -> expose Tool Aggregate mapped-target resolution
+resolve.MappedTarget
 ```
 
-The Tool installer must reject a package when:
-
-- A Collection references a missing Tool Catalog record.
-- A Tool Catalog record has no routing Collection.
-- A Tool is routed through more than one current Collection.
-- A Go Tool does not match the linked `llmtools-go` registry.
-- An SDK Tool has an unsupported SDK type or unsupported semantic Tool type.
-- A Collection contains a non-Tool member.
-- A Collection contains a Tool locator, contained Tool declaration, selector, override, or use block.
-- A Tool descriptor is structurally invalid.
-- A duplicate Tool slug is admitted.
-
-The Tool installer does not execute Go Tools or SDK Tools.
-
-### Browse and manage Collections and Tools
-
-The management workflow is:
+The current Tool mapped-target provider is:
 
 ```text
-Open Tools
-  -> list all Tool Collections, including disabled Collections
-  -> expand a Collection
-  -> list its Tool Catalog records, including disabled Tools
-  -> inspect Go or SDK metadata and schemas
-  -> enable or disable a Collection
-  -> enable or disable a Tool
-  -> reload the management projection
+flexigpt.tool.aggregate.v1
 ```
 
-The reload action is a read refresh of the management projection. It does not author, republish, or mutate Tool package content.
+The mapped target payload contains:
 
-### Resolve a Tool for an Artifact consumer
+```text
+ToolArtifact
+DefinitionDigest
+Name
+Version
+Implementation
+```
 
-An Agent, Skill, Plugin, Team, Workspace, or Composer can reference a built-in Tool by name.
+The target is versioned through the mapped identifier format:
+
+```text
+v1.<base64url-canonical-json>
+```
+
+The payload is an encoded protocol identity. It is not intended to be secret or opaque for security purposes.
+
+### Why the mapped target contains Artifact identity
+
+The Tool Artifact reference and definition digest allow the Tool Aggregate to verify that the selected Tool still:
+
+- Exists.
+- Belongs to the protected built-in Tool Store.
+- Has not changed definition.
+- Has the same logical name.
+- Has the same version.
+- Has the same implementation kind.
+- Is enabled.
+- Belongs to an enabled Tool Collection.
+
+This makes a stale mapped target unavailable rather than silently invoking a changed Tool definition.
+
+### Artifact target mapper
+
+Tool mapping uses `resolve.ArtifactTargetMapper`.
+
+The flow is:
 
 ```text
 Named Tool relationship
-  -> Tool Aggregate target resolver
-  -> locate approved Tool Catalog record
-  -> validate Tool and Collection availability
-  -> emit mapped Tool target
-  -> consumer capability plan
+  -> normal Artifact lookup
+  -> terminal Tool Artifact
+  -> Tool Aggregate MapArtifactTarget
+  -> ResolveEnabledTool
+  -> mapped Tool target
 ```
 
-The Tool Aggregate is responsible for ensuring a Tool Catalog Artifact is never returned as a raw executable Artifact target.
+This differs from a fallback-only Tool design.
 
-For supported application content, a named Tool relationship resolves only to an approved built-in mapped target.
+Tool Artifacts exist in the protected built-in Root, so normal Artifact lookup succeeds. The target mapper converts that resolved Artifact into the mapped Tool target before a consumer receives it.
 
-### Hydrate Tool choices for inference
+### Target mapper requirements
 
-The inference workflow is:
+The Tool target mapper must:
+
+- Handle only `type: tool`.
+- Require a protected built-in Tool Artifact.
+- Require the configured built-in Tool Source.
+- Require an available Tool Artifact.
+- Require an enabled Tool Artifact.
+- Resolve exactly one Tool Collection for the Tool.
+- Require an available Tool Collection.
+- Require an enabled Tool Collection.
+- Verify Tool definition digest.
+- Verify Tool name.
+- Verify Tool version.
+- Verify Tool implementation kind.
+- Return a mapped Tool target when handled.
+- Return unavailable status when the Tool or Collection is disabled or unavailable.
+
+The Tool target mapper is the minimum requirement for any consumer that resolves Tool relationships.
+
+### Resolver composition rule
+
+Every consumer-facing resolver that can resolve Tool relationships must receive the Tool target mapper.
+
+This includes resolver construction used by:
+
+- Agent Store.
+- Skill Store.
+- MCP Store where Tool relationships can occur.
+- Workspace Store.
+- Any future Artifact consumer that resolves `type: tool`.
+
+Tool Collection management does not need a graph resolver because it validates direct Collection membership through the Tool Store.
+
+### Capability plan behavior
+
+For normal Tool relationships, capability plans expose:
 
 ```text
-Conversation Tool selection
-  -> mapped Tool target and selection settings
-  -> Tool Inference Bridge
-  -> resolve and validate Tool Catalog record
-  -> validate enabled and model-callable state
-  -> project inference-go ToolChoice
-  -> append Skill and MCP Tool choices as applicable
-  -> provider completion
+mapped Tool target
 ```
 
-Go Tool hydration:
+The backing Tool Artifact is storage and management identity.
+
+Management APIs may expose backing Artifact references because they need:
+
+- Tool enablement.
+- Collection enablement.
+- Revision-based updates.
+- Inspection.
+- Refresh and retry behavior.
+
+Mapped selector behavior is acceptable in the current scope. Tool Collections themselves do not allow selectors.
+
+## Built-in Tool installation
+
+### Package families
+
+The Tool installer publishes two built-in package families:
 
 ```text
-Mapped Go Tool target
-  -> Tool Catalog descriptor
-  -> function or custom Tool choice metadata
-  -> Tool argument schema
-  -> inference-go ToolChoice
+tool/<tool-name>/<tool-version>
+  -> tool declaration
+
+tool-collection/<collection-name>/unversioned
+  -> plugin declaration
 ```
 
-SDK Tool hydration:
+A Tool package contains exactly its Tool declaration document.
+
+A Tool Collection package contains exactly its Plugin declaration document.
+
+### Go Tool package preparation
+
+For every Tool Collection member not backed by a static SDK Tool document:
 
 ```text
-Mapped SDK Tool target
-  -> Tool Catalog descriptor
-  -> validate user argument instance against UserArgSchema
-  -> map SDK semantic Tool type
-  -> provider-specific inference-go ToolChoice
-  -> provider SDK execution during completion
+Tool Collection member name
+  -> llmtools-go registry lookup by name
+  -> Go Tool descriptor
+  -> generated toolv1 Tool document
+  -> Tool package
 ```
 
-The current SDK web-search behavior remains supported.
+The generated Go Tool document includes:
 
-A disabled Tool or disabled Collection must not hydrate into an inference Tool choice.
+- Name.
+- Version.
+- Display metadata.
+- Tags.
+- Auto-execution default.
+- Input schema.
+- Go function identifier.
 
-### Execute a Go Tool
+The Tool Store validates the hydrated Tool Artifact against the registry before using it.
 
-A local Go Tool invocation flow is:
+### SDK Tool package preparation
+
+SDK Tool documents are embedded under their Tool Collection directory.
+
+For every static SDK Tool:
+
+- The Tool directory must contain only its Tool document.
+- The Tool must be declared by the containing Tool Collection.
+- The Tool implementation kind must be `sdk`.
+- The Tool name must be unique across all Tool Collections.
+- The Tool must be source-backed by the protected built-in Tool Source.
+
+### Go Tool admission
+
+A generated or hydrated Go Tool must match the `llmtools-go` descriptor for:
 
 ```text
-Mapped Go Tool target
-  -> Tool Aggregate validates target and availability
-  -> Tool Catalog resolves runtime Tool key
-  -> Tool Runtime calls llmtools-go registry
-  -> Tool outputs return to caller
+name
+version
+function
+input schema
 ```
 
-The Tool Runtime only executes Go Tools.
+A Go Tool that does not match the linked registry is unavailable.
 
-The Tool Runtime must reject:
+A registry Tool not named by an embedded Tool Collection is not admitted to the application Tool catalog.
 
-- SDK Tool targets.
-- Disabled Tools.
-- Tools from disabled Collections.
-- Unrecognized runtime Tool keys.
-- Raw function IDs supplied by callers.
-- Legacy Bundle and Tool references.
+### Auto-execution policy
 
-SDK Tool execution never goes through the local Tool Runtime.
+Go Tool auto-execution policy is application-controlled.
 
-### Execute an SDK Tool
+The `llmtools-go` adapter defines the policy for registered Go functions.
 
-An SDK Tool is executed as part of provider inference.
+Current behavior is:
 
 ```text
-Mapped SDK Tool target
-  -> Tool Inference Bridge
-  -> provider-compatible inference ToolChoice
+Known mutating or dangerous functions
+  -> autoExecute: false
+
+Other admitted Go functions
+  -> autoExecute: true
+```
+
+This is intentional because the application controls both:
+
+- The embedded Tool Collection membership.
+- The `llmtools-go` registry version.
+- The non-auto-executable function list.
+
+Auto-execution remains a Tool default and a Composer selection behavior. It is not general authorization.
+
+### Hydration behavior
+
+The Tool installer participates in protected built-in package hydration.
+
+It must:
+
+- Publish missing Tool packages.
+- Publish missing Tool Collection packages.
+- Replace changed known Tool packages.
+- Replace changed known Tool Collection packages.
+- Remove stale known Tool packages.
+- Remove stale known Tool Collection packages.
+- Preserve unchanged Tool Artifact references.
+- Preserve unchanged Collection Artifact references.
+- Preserve Tool enabled state for unchanged Tool Artifacts.
+- Preserve Collection enabled state for unchanged Tool Collection Artifacts.
+- Revalidate Go Tool registry compatibility during Tool reads and mapped-target resolution.
+
+The legacy standalone Tool directory and Tool overlay store are not used by the target implementation.
+
+## Tool Store API
+
+### Management API
+
+The Tool Store management API supports:
+
+| Operation                      | Behavior                                                                                 |
+| ------------------------------ | ---------------------------------------------------------------------------------------- |
+| List Tool Collections          | Lists built-in read-only Tool Collections.                                               |
+| Get Tool Collection            | Returns Collection metadata, members, revision, and enabled state.                       |
+| List Collection Tools          | Resolves Tool members into Tool views.                                                   |
+| Get Tool                       | Returns a Tool view from a protected built-in Tool Artifact.                             |
+| Set Tool Collection enabled    | Updates Collection Artifact `Enabled` state.                                             |
+| Set Tool enabled               | Updates Tool Artifact `Enabled` state.                                                   |
+| Resolve enabled Tool           | Resolves a Tool together with its routed Collection and verifies effective availability. |
+| Install built-in Tool package  | Privileged installer operation.                                                          |
+| Remove built-in Tool package   | Privileged installer operation.                                                          |
+| Ensure built-in Source current | Privileged installer operation.                                                          |
+
+The Tool Store management API does not support:
+
+- Tool creation.
+- Tool deletion.
+- Tool editing.
+- Tool import.
+- Tool export.
+- Tool Collection creation.
+- Tool Collection deletion.
+- Tool Collection metadata editing.
+- Tool Collection membership editing.
+
+### Tool view
+
+A Tool management view contains:
+
+- Tool Artifact metadata.
+- Definition digest.
+- Name.
+- Version.
+- Display name.
+- Description.
+- Tags.
+- Auto-execution default.
+- Input schema.
+- User argument schema.
+- Output schema.
+- Implementation kind.
+- SDK type and SDK Tool type when applicable.
+
+The current Tool view may expose raw Go function identity. This is acceptable for the current application scope and developer inspection.
+
+The function identity is not the normal execution capability identity for Tool Store consumers. Mapped targets remain the Tool Store capability form.
+
+## Tool Aggregate
+
+### Responsibilities
+
+The Tool Aggregate owns the connection between:
+
+- Tool Store.
+- Tool Artifact target mapper.
+- Mapped Tool target encoding.
+- Mapped Tool target decoding.
+- Go Tool Runtime.
+- Inference Tool choice hydration.
+
+It provides:
+
+| Operation                      | Behavior                                                      |
+| ------------------------------ | ------------------------------------------------------------- |
+| Map Tool target                | Maps an enabled Tool Artifact to a mapped target.             |
+| Map Artifact target            | Implements `resolve.ArtifactTargetMapper` for Tool Artifacts. |
+| Resolve mapped Tool            | Decodes and revalidates a mapped Tool target.                 |
+| Invoke mapped Tool             | Routes a mapped Go Tool to local runtime.                     |
+| Hydrate inference Tool choice  | Converts a Tool selection into an inference Tool choice.      |
+| Hydrate inference Tool choices | Converts a selection list into inference Tool choices.        |
+
+### Mapped Tool resolution
+
+Mapped Tool resolution performs:
+
+```text
+Decode mapped target
+  -> load protected Tool Artifact
+  -> verify Tool definition digest
+  -> verify Tool name
+  -> verify Tool version
+  -> verify implementation kind
+  -> verify Tool enabled state
+  -> resolve Tool Collection
+  -> verify Collection enabled state
+  -> return resolved Tool view
+```
+
+A Tool target does not remain valid simply because its encoded identifier is syntactically valid.
+
+### Mapped Go Tool invocation
+
+Mapped Go Tool invocation performs:
+
+```text
+Mapped target
+  -> Tool Aggregate ResolveMappedTool
+  -> verify implementation kind is go
+  -> resolve internal function identifier
+  -> Tool Runtime Invoke
+```
+
+Mapped SDK Tool invocation is not routed to local Tool Runtime.
+
+SDK Tools execute through provider inference after Tool choice hydration.
+
+## Tool Runtime
+
+### Low-level runtime role
+
+The Tool Runtime is a low-level execution service.
+
+It accepts:
+
+```text
+function
+arguments
+timeout
+```
+
+It validates:
+
+- Runtime service availability.
+- Context.
+- Function text.
+- JSON argument syntax.
+- Timeout range.
+- Registry membership through the configured Go Tool caller.
+
+The Tool Runtime deliberately does not depend on:
+
+- Tool Store.
+- Tool Collection.
+- Artifact Store.
+- Tool Artifact state.
+- Mapped targets.
+- SDK Tool descriptors.
+- Composer state.
+- Conversation state.
+
+### Raw runtime invocation
+
+The raw runtime wrapper is intentionally available.
+
+It is useful for application-level direct execution of registered `llmtools-go` functions.
+
+It is not a Tool Store capability-resolution API.
+
+Consequently:
+
+```text
+Tool Aggregate invocation
+  -> respects Tool Artifact and Collection enablement
+
+Raw runtime invocation
+  -> executes an admitted registry function directly
+```
+
+The raw runtime path is intentionally separate from Tool Store enablement behavior.
+
+### MCP runtime behavior
+
+MCP Tool invocation is also a runtime concern.
+
+MCP execution may be exposed through runtime-facing application APIs, but it remains governed by MCP-specific behavior:
+
+- Server identity.
+- Connection readiness.
+- Tool discovery snapshot.
+- Tool digest.
+- Approval policy.
+- Execution mode.
+- Invocation arguments.
+- MCP response content.
+
+MCP Tools are not Tool Store Tool Artifacts and are not Tool Collection members.
+
+The Tool Runtime and MCP Runtime may remain separate internal services while sharing an application-level runtime-facing transport layer.
+
+## SDK Tool inference behavior
+
+### SDK execution boundary
+
+SDK Tools are not locally executed by Tool Runtime.
+
+They are projected into provider inference choices:
+
+```text
+ToolSelection
+  -> Tool Aggregate ResolveMappedTool
+  -> SDK Tool descriptor
+  -> inference ToolChoice
   -> provider SDK request
   -> provider Tool-call or Tool-output events
-  -> conversation outputs
 ```
 
-The Tool Store does not directly invoke SDK Tools.
+### SDK Tool choice hydration
 
-## Architecture and ownership
-
-### Responsibility boundaries
-
-| Concern                                           | Owner                                           |
-| ------------------------------------------------- | ----------------------------------------------- |
-| Go Tool implementation and registry               | `llmtools-go`                                   |
-| SDK Tool built-in descriptors                     | Application-owned embedded Tool catalog content |
-| Tool Catalog record persistence                   | Artifact Store-backed Tool Store                |
-| Tool Collection persistence                       | Artifact Store-backed Tool Store                |
-| Collection and Tool enabled state                 | Universal Artifact `Enabled` state              |
-| Tool target projection                            | Tool Aggregate                                  |
-| Mapped target fallback integration                | Tool Aggregate                                  |
-| Go Tool invocation                                | Tool Runtime                                    |
-| SDK Tool projection and provider execution        | Tool Inference Bridge and provider inference    |
-| Composer Tool selection                           | Composer and conversation UI                    |
-| Tool call attribution and auto-execution decision | Conversation and inference consumer             |
-| MCP Tool discovery and invocation                 | MCP Store and MCP Runtime                       |
-
-### Store, runtime, and aggregate separation
-
-The target dependency direction is:
+For Go Tools, inference hydration produces:
 
 ```text
-Tool Catalog domain types
-  <- Tool Store
-  <- Tool Runtime
-  <- Tool Aggregate
-  <- Tool Inference Bridge
-
-Artifact Store
-  <- Tool Store
-  <- Tool Aggregate
-
-Tool Aggregate
-  <- Artifact resolver integration
-  <- management facade
-  <- Composer and inference consumers
+type: function
+name: Tool name
+description: Tool description
+arguments: Tool input schema
 ```
 
-The Tool Runtime must not depend on:
+For SDK Tools, inference hydration uses the Tool's declared SDK semantic type.
 
-- Tool Store types.
-- Artifact Store types.
-- Tool Collection types.
-- Artifact resolver types.
-- Wails transport types.
-- Legacy `ToolStore`, `ToolBundle`, or `ToolRef` types.
+Current behavior:
 
-The Tool Store must not invoke the Tool Runtime.
+| SDK Tool type | Inference projection                                             |
+| ------------- | ---------------------------------------------------------------- |
+| `webSearch`   | `ToolTypeWebSearch` with `WebSearchToolChoiceItem` configuration |
+| `function`    | Function-style Tool choice with input schema                     |
+| `custom`      | Custom-style Tool choice with input schema                       |
 
-The Tool Aggregate is the only component allowed to combine:
+The Tool Aggregate performs the implementation-specific projection. The inference wrapper owns final provider request composition and global Tool choice uniqueness.
 
-- Tool Catalog record resolution.
-- Tool Collection resolution.
-- Artifact enabled state.
-- Mapped target encoding and decoding.
-- Go Tool runtime dispatch.
-- SDK Tool inference projection.
+### User argument configuration
 
-This replaces the current direct dependency:
+SDK Tool user argument configuration is selection-specific.
+
+The selection stores:
 
 ```text
-ToolRuntime
-  -> ToolStore
+choiceID
+target
+autoExecute
+userArgSchemaInstance
 ```
 
-with:
+Current behavior is intentionally lightweight:
+
+- Frontend validates JSON shape and required top-level fields for user experience.
+- Web-search configuration is decoded into the inference web-search configuration structure.
+- SDK `function` and `custom` configurations are accepted structurally when present.
+- The system does not add a general backend JSON Schema validation layer.
+- The system does not add a separate SDK vendor registry or validation surface.
+
+This is intentional for the current built-in-only scope.
+
+### Provider compatibility
+
+The frontend filters SDK Tools by the current provider SDK type.
+
+This is the current product behavior.
+
+The Tool Store remains provider-neutral. It stores SDK type metadata and Tool semantic type metadata, while inference and provider integration decide whether a projected Tool choice is accepted by the selected provider.
+
+## Composer and conversation integration
+
+### Tool selection identity
+
+A Tool selection uses:
 
 ```text
-ToolAggregate
-  -> ToolStore
-  -> Tool Runtime
-  -> Tool Inference Bridge
-```
-
-### Tool Aggregate responsibilities
-
-The Tool Aggregate provides four distinct capabilities:
-
-| Capability             | Responsibility                                                                |
-| ---------------------- | ----------------------------------------------------------------------------- |
-| Tool target resolver   | Converts an approved Tool Catalog record into a mapped Tool target.           |
-| Mapped target resolver | Converts a mapped Tool target back into a validated internal Tool descriptor. |
-| Tool invocation router | Routes Go Tools to the Tool Runtime and rejects SDK Tool invocation.          |
-| Tool inference bridge  | Converts Go and SDK Tool selections into `inference-go` Tool choices.         |
-
-The Tool Aggregate must validate both the Tool and its routed Collection on every mapped target use.
-
-It must not trust cached frontend metadata, legacy IDs, Tool slugs alone, or a caller-provided implementation reference.
-
-### Artifact resolver integration
-
-The existing Tool fallback provider becomes an Artifact Store-backed Tool Aggregate integration.
-
-It must resolve named Tool relationships by consulting the Tool Store's backing Tool Catalog records.
-
-It must return mapped targets, not raw Tool Catalog Artifacts.
-
-This means the Tool resolver path is:
-
-```text
-Portable named Tool relationship
-  -> Tool Aggregate
-  -> Tool Catalog Artifact
+ToolSelection
+  -> choiceID
   -> mapped target
+  -> autoExecute
+  -> userArgSchemaInstance
 ```
 
-The backing Artifact is internal storage. The mapped target is the external capability.
-
-## Management API and UI
-
-### Management operations
-
-The target Tool Store management surface supports:
-
-| Operation                      | Behavior                                                                            |
-| ------------------------------ | ----------------------------------------------------------------------------------- |
-| List Tool Collections          | Returns all built-in Tool Collections, including disabled Collections.              |
-| Get Tool Collection            | Returns Collection metadata, enabled state, and Tool membership projection.         |
-| List Collection Tools          | Returns current Tool descriptors, including disabled Tools.                         |
-| Get Tool                       | Returns a read-only Tool descriptor and effective availability.                     |
-| Set Collection enabled         | Updates the Tool Collection Artifact `Enabled` state.                               |
-| Set Tool enabled               | Updates the Tool Catalog Artifact `Enabled` state.                                  |
-| Resolve mapped Tool target     | Internal or aggregate-facing operation that validates and resolves a mapped target. |
-| Hydrate inference Tool choices | Converts current Tool selections into `inference-go` Tool choices.                  |
-| Invoke mapped Go Tool          | Validates and invokes an enabled mapped Go Tool.                                    |
-
-The management surface does not support:
-
-- Create Tool Collection.
-- Delete Tool Collection.
-- Edit Tool Collection declaration content.
-- Add or remove Collection members.
-- Create Tool.
-- Delete Tool.
-- Edit Tool implementation.
-- Import Tool.
-- Export Tool.
-- Register arbitrary SDK Tools.
-- Register arbitrary Go Tools.
-
-### Management UI
-
-The current Tools page becomes a Tool Collections page.
-
-It must preserve the current interaction model:
-
-- List all built-in Collections.
-- Expand a Collection to inspect its Tools.
-- Show Collection enabled state.
-- Show Tool enabled state.
-- Toggle Collection enabled state.
-- Toggle Tool enabled state.
-- Show display name, slug, version, description, tags, callable flags, and schemas.
-- Show implementation family as `Go` or `Provider SDK`.
-- Show whether a Tool is user-callable or model-callable.
-- Show read-only messaging for built-in definitions.
-- Surface Collection or Tool load errors without hiding unaffected Collections.
-
-The UI must not add:
-
-- Add Tool controls.
-- Delete Tool controls.
-- Add Collection controls.
-- Delete Collection controls.
-- Tool implementation editors.
-- HTTP Tool editors.
-- Arbitrary SDK Tool editors.
-- MCP Tool management inside the Tool page.
-
-### Composer Tool selection
-
-Composer Tool selection must continue to support:
-
-- Selecting enabled Tools.
-- Deselecting selected Tools.
-- Preserving a selection-specific `choiceID`.
-- Configuring `autoExecute`.
-- Rendering and validating `UserArgSchema` for SDK Tools.
-- Persisting a selection-specific user argument instance.
-- Displaying Tool availability and validation errors.
-
-The Composer must identify a selected Tool by its mapped target, not by:
+The mapped target replaces the legacy identity:
 
 ```text
 bundleID
@@ -790,339 +835,334 @@ toolSlug
 toolVersion
 ```
 
-The UI may retain display metadata as a convenience snapshot, but all execution-relevant fields are reloaded from the Tool Aggregate.
+Frontend-enriched Tool choices may additionally contain:
 
-## Inference and conversation integration
+- Tool display name.
+- Description.
+- Tool version.
+- Collection reference.
+- Collection name.
+- Implementation kind.
+- SDK type.
+- SDK Tool semantic type.
 
-### Conversation Tool selection
+That metadata is for display and Composer behavior. The mapped target remains the durable Tool selection identity.
 
-A current conversation Tool selection should conceptually contain:
+### Conversation persistence
 
-```text
-ToolSelection
-  -> choiceID
-  -> mapped Tool target
-  -> autoExecute
-  -> userArgSchemaInstance
-  -> optional display snapshot
-```
-
-The Tool semantic type, implementation type, schemas, callable flags, and SDK type are derived from the current validated Tool Catalog descriptor.
-
-They must not be trusted from frontend-provided selection metadata.
-
-### Per-turn persistence
-
-The current behavior of storing both:
-
-- The Tool Store selection used for the turn.
-- The hydrated `inference-go` Tool choice used for the request.
-
-remains valid.
-
-The new selection record replaces legacy Bundle and Tool tuple addressing with a mapped target.
-
-The hydrated inference Tool choice remains the request snapshot that was sent to the provider.
-
-### Inference bridge
-
-`ProviderSetAPI` currently depends directly on the legacy `ToolStore` through `buildToolChoices`.
-
-The target `ProviderSetAPI` depends on a Tool Inference Bridge or Tool Aggregate port instead.
-
-Conceptually:
+Conversation messages persist:
 
 ```text
-ProviderSetAPI
-  -> ToolInferenceBridge.HydrateChoices
-  -> ToolAggregate.ResolveMappedTarget
-  -> Tool Store catalog and enabled-state validation
-  -> Go or SDK inference ToolChoice projection
+ToolSelections
+ToolChoices
 ```
 
-The Tool Inference Bridge must:
+`ToolSelections` are the current Tool Store selection records.
 
-- Validate every selected mapped target.
-- Reject Tools from disabled Collections.
-- Reject disabled Tools.
-- Reject non-model-callable Tools.
-- Validate SDK user argument instances against the current Tool `UserArgSchema`.
-- Preserve current SDK web-search configuration projection.
-- Reject an SDK Tool when the selected provider or model does not support its declared SDK behavior.
-- Preserve `choiceID` so provider Tool calls can be attributed back to the selected Tool.
+`ToolChoices` are hydrated inference request snapshots.
 
-### Go Tool calls from inference
-
-When a model calls a Go Tool:
+For a new completion:
 
 ```text
-Provider Tool call
-  -> choiceID
-  -> selected mapped Tool target
-  -> Tool Aggregate
-  -> Tool Runtime
-  -> llmtools-go Tool output
-  -> inference Tool output event
+CompletionRequest.ToolSelections
+  -> Tool Aggregate hydration
+  -> current inference ToolChoices
 ```
 
-The `choiceID` maps the provider Tool call to the selected mapped target.
+The inference wrapper does not infer current Tool choices from historical `ToolChoices`.
 
-The Tool Runtime never receives a legacy Bundle ID, Tool slug, Tool version, or raw Go function ID from the inference layer.
+### Composer Tool categories
 
-### SDK Tool calls from inference
+The Composer supports:
 
-When a provider executes an SDK Tool:
+| Category                    | Behavior                                                             |
+| --------------------------- | -------------------------------------------------------------------- |
+| Per-message Go Tool         | Attached for one message and may support auto-execution.             |
+| Conversation Tool           | Remains available across subsequent turns until disabled or removed. |
+| SDK web-search Tool         | Managed as a provider-specific web-search template.                  |
+| SDK function or custom Tool | Projected according to SDK Tool type and current provider behavior.  |
+| Skill Tool                  | Managed by Skill Runtime.                                            |
+| MCP Tool                    | Managed by MCP Runtime and MCP policy.                               |
+
+### Composer Tool hydration
+
+The Composer hydrates persisted Tool selections through the Tool Aggregate.
 
 ```text
-Provider completion request
-  -> SDK ToolChoice
-  -> provider SDK executes server Tool behavior
-  -> provider response includes Tool-call or Tool-output events
-  -> conversation persists normal inference output
+Mapped target
+  -> ResolveMappedTool
+  -> Tool view
+  -> frontend-enriched Tool choice
 ```
 
-No local Tool Runtime call occurs for SDK Tools.
+If a target is unavailable:
 
-This preserves the current distinction:
+- The original selection remains inspectable.
+- The UI reports a Tool selection issue.
+- The Tool cannot be used for a new completion until it is resolvable again or removed.
+- A historical Go Tool call can still produce a submitted Tool error result when needed to complete a model Tool-call sequence.
 
-| Tool type | Local Tool Runtime | Provider inference SDK        |
-| --------- | ------------------ | ----------------------------- |
-| Go        | Yes                | Receives Tool definition only |
-| SDK       | No                 | Yes                           |
+### User argument UI
 
-### MCP and Skill Tool coexistence
+The Composer Tool options UI uses the Tool `UserArgSchema`.
 
-The Tool Inference Bridge produces only Tool Store-managed Tool choices.
+It supports:
 
-The existing completion pipeline continues to append:
+- JSON object editing.
+- Required-key display.
+- Schema display.
+- Example generation.
+- Invalid JSON feedback.
+- Required-key validation.
+- Persisted user argument instances.
+- Separate Tool option state for attached, conversation, and web-search selections.
 
-- Skill runtime Tool choices.
-- MCP Tool choices.
-- MCP Tool mappings.
-- MCP context inputs.
+### Auto-execution
 
-MCP Tools are not copied into Tool Collections and are not represented as Tool Catalog records.
+Auto-execution is a Composer behavior.
 
-## Built-in content and Artifact Store installation
+For Tool Store Tools:
 
-### Built-in Tool content
+- Go Tools may be auto-executed.
+- SDK Tools are not locally runnable by Composer.
+- Web-search SDK behavior is handled by provider inference.
+- Tool auto-execution can be overridden per selection.
+- Tool default auto-execution originates from the Tool Artifact.
 
-The target built-in Tool content contains:
+MCP and Skill auto-execution remain owned by their respective runtime domains.
 
-- Tool Collection definitions migrated from current Bundle definitions.
-- Application-authored SDK Tool definitions.
-- Go Tool catalog definitions derived from or validated against `llmtools-go`.
-- Collection routing metadata.
-- Tool schemas and user argument schemas.
-- Tool display metadata.
+### Tool choice uniqueness
 
-The legacy standalone tools directory is removed.
+The Tool Aggregate ensures Tool selection identity and Tool choice ID correctness for Tool Store choices.
 
-The Artifact Store protected managed Source becomes the persistent backing location for Tool Catalog records and Tool Collection packages.
-
-### Package behavior
-
-The Tool installer publishes two conceptual package families:
+The inference wrapper owns global provider request uniqueness after combining:
 
 ```text
-Tool Collection package
-  -> one Plugin declaration
-  -> named Tool membership
-
-Tool Catalog package
-  -> one Tool Catalog descriptor
-  -> Go or SDK implementation metadata
+Tool Store choices
+  + Skill Runtime choices
+  + MCP choices
 ```
 
-The exact physical package filenames are an implementation concern. The package boundary must preserve stable source-backed Artifact identity for unchanged Tool and Collection content.
+The inference wrapper is responsible for ensuring provider-facing Tool names and choice IDs are valid for one request.
 
-### Hydration behavior
+## Tool management UI
 
-Ordinary built-in hydration must:
+### Tool Collections page
 
-- Create missing Tool Catalog records.
-- Create missing Tool Collections.
-- Repair changed known Tool packages.
-- Repair changed known Collection packages.
-- Remove stale known Tool packages.
-- Remove stale known Collection packages.
-- Preserve unchanged Tool and Collection Artifact references.
-- Preserve enabled state for unchanged Tool and Collection Artifacts.
-- Revalidate Go Tool descriptors against the linked `llmtools-go` registry.
-- Revalidate SDK Tool descriptors against the supported built-in SDK catalog.
+The Tool management page presents built-in Tool Collections.
 
-Hydration must not:
+A user can:
 
-- Reset enabled state for unchanged Tools.
-- Reset enabled state for unchanged Collections.
-- Create user-authorable Tool content.
-- Expose Tool Catalog Artifacts directly to generic consumers.
-- Convert SDK Tools into Go Tools.
-- Convert MCP Tools into Tool Catalog records.
+- Browse Tool Collections.
+- Expand a Tool Collection.
+- Inspect Tool metadata.
+- Inspect Tool schemas.
+- Inspect Tool version.
+- Inspect Tool implementation kind.
+- Inspect SDK type when applicable.
+- Inspect effective enabled state.
+- Enable or disable a Tool Collection.
+- Enable or disable a Tool.
+- Reload the management projection.
 
-## Breaking migration considerations
+The page does not provide:
 
-### Migration boundary
+- Create Tool Collection.
+- Delete Tool Collection.
+- Edit Tool Collection.
+- Add Tool.
+- Delete Tool.
+- Edit Tool.
+- Import Tool.
+- Export Tool.
+- Register SDK Tool.
+- Register Go Tool.
+- Manage MCP Tools.
 
-This is a breaking migration because the legacy Tool Store data model and transport identities are removed.
+### Effective Tool state
 
-The following legacy storage is removed:
+A Tool row distinguishes:
+
+```text
+Enabled
+Disabled
+Collection disabled
+```
+
+The effective enabled state is:
+
+```text
+Tool Artifact enabled
+  and Tool Collection Artifact enabled
+```
+
+The UI retains the individual Tool toggle even when the Collection is disabled so the user can configure Tool state before re-enabling the Collection.
+
+### Implementation display
+
+The UI displays:
+
+| Tool kind | Implementation label | Execution label    |
+| --------- | -------------------- | ------------------ |
+| Go        | Go                   | Local runtime      |
+| SDK       | Provider API         | Provider inference |
+
+For SDK Tools, the UI displays the SDK type.
+
+For Go Tools, the UI displays the Tool auto-execution default.
+
+## Security and boundary rules
+
+The Tool Store prevents arbitrary Tool authoring by requiring:
+
+- Protected built-in Root provenance.
+- Configured built-in Tool Source provenance.
+- Managed Tool package origin.
+- Tool package identity validation.
+- Tool Collection membership validation.
+- Go Tool registry validation.
+- Tool and Collection enabled-state validation for mapped targets.
+
+The Tool Store does not attempt to validate every possible provider SDK vendor surface.
+
+The Tool Store does not attempt to apply a generic backend JSON Schema validator to SDK user configuration.
+
+The Tool Store does not own MCP approval or policy behavior.
+
+The Tool Aggregate and Tool Store protect catalog-managed Tool use. The low-level runtime wrapper intentionally remains capable of direct registered runtime invocation.
+
+## Breaking migration
+
+This is a breaking migration.
+
+The legacy Tool Store is removed:
 
 ```text
 tools_v1 directory
-legacy embedded Tool Bundle manifests
-legacy Tool JSON catalog files
-legacy Tool enablement overlay database
-legacy ToolStore-backed runtime lookup
+legacy Tool Bundle manifests
+legacy Tool JSON catalog
+legacy Tool overlay database
+legacy ToolStore lookup APIs
+legacy Bundle and Tool tuple identity
+legacy Tool Runtime Store dependency
 ```
 
-The target Artifact Store contains the new Tool Catalog records and Tool Collections.
-
-### Direct Bundle migration
-
-Each current Bundle is migrated directly into a Tool Collection package.
-
-Each current Tool is migrated into one Tool Catalog record:
-
-- Current Go Tools become Go Tool Catalog records.
-- Current SDK Tools become SDK Tool Catalog records.
-- Existing Tool schemas are preserved.
-- Existing SDK `UserArgSchema` values are preserved.
-- Existing `LLMToolType` values are preserved.
-- Existing Collection membership is preserved.
-
-No legacy Bundle-to-Collection inference is required after packaging. The built-in Collection packages are the source of truth.
-
-### API and identity migration
-
-The following legacy identity form is retired:
+The replacement is:
 
 ```text
-bundleID + toolSlug + toolVersion
+Artifact Store Tool Artifacts
+Artifact Store Tool Collection Plugin Artifacts
+Artifact Enabled state
+Tool Artifact target mapping
+mapped Tool targets
+Tool Aggregate
+Store-independent Tool Runtime
+Tool Aggregate inference hydration
 ```
 
-The new executable identity is:
+The migration is direct:
 
 ```text
-mapped Tool target
+Legacy Bundle
+  -> embedded Tool Collection package
+
+Legacy Go Tool
+  -> generated Tool Artifact package
+
+Legacy SDK Tool
+  -> embedded Tool Artifact package
 ```
 
-The following legacy APIs are replaced:
-
-| Legacy behavior                      | Target behavior                                             |
-| ------------------------------------ | ----------------------------------------------------------- |
-| List Tool Bundles                    | List Tool Collections                                       |
-| Patch Tool Bundle                    | Set Tool Collection enabled                                 |
-| List Tools by Bundle                 | List Tools by Collection                                    |
-| Patch Tool                           | Set Tool enabled                                            |
-| Get Tool by Bundle, slug, version    | Resolve Tool descriptor through Tool Store or mapped target |
-| Invoke Tool by Bundle, slug, version | Invoke mapped Go Tool through Tool Aggregate                |
-| Legacy Tool fallback target          | Artifact Store-backed mapped Tool target                    |
-| Direct inference ToolStore lookup    | Tool Inference Bridge hydration                             |
-
-Conversation migration is outside this HLD.
+No Tool v2 contract is introduced. The active Tool contract remains `toolv1`.
 
 ## Implementation mapping
 
-| Current component                 | Target responsibility                                                                            |
-| --------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `internal/tool/store`             | Artifact Store-backed Tool Store consumer API over Tool Catalog and Tool Collection Artifacts.   |
-| `internal/tool/spec.ToolBundle`   | Replaced by Tool Collection Artifact projection.                                                 |
-| `internal/tool/spec.Tool`         | Preserved semantically as a Tool Catalog descriptor, backed by Artifact Store source content.    |
-| `tools.bundles.json`              | Replaced by embedded Tool Collection package definitions.                                        |
-| Existing SDK Tool JSON files      | Migrated into embedded SDK Tool Catalog package definitions.                                     |
-| `injectLLMToolsGo`                | Produces or validates Go Tool Catalog records from `llmtools-go`.                                |
-| Legacy enablement overlay         | Replaced by Tool and Collection Artifact `Enabled` state.                                        |
-| `artifactfallback.Service`        | Replaced by Tool Aggregate mapped-target resolver backed by Artifact Store Tool Catalog records. |
-| `ToolRuntime`                     | Go-only runtime with no Tool Store dependency.                                                   |
-| `ToolStoreWrapper`                | Management-facing Tool Store facade.                                                             |
-| `ToolRuntimeWrapper`              | Aggregate-facing Go invocation facade.                                                           |
-| `ProviderSetAPI.buildToolChoices` | Tool Inference Bridge hydration from mapped Tool selections.                                     |
-| Tools management page             | Tool Collections management projection retaining current enable or disable controls.             |
-| Composer Tool identity helpers    | Mapped-target identity helpers.                                                                  |
+| Responsibility                    | Implementation mapping                                            |
+| --------------------------------- | ----------------------------------------------------------------- |
+| Tool declaration contract         | `internal/artifactcontract/declaration/toolv1`                    |
+| Tool Artifact domain              | `internal/tool/store/domain`                                      |
+| Tool Collection domain            | `internal/tool/store/consumerapi` and shared `collection` package |
+| Go Tool registry adapter          | `internal/tool/llmtoolsadapter`                                   |
+| Tool installer                    | `internal/tool/store/builtin`                                     |
+| Tool Store API                    | `internal/tool/store/consumerapi.API`                             |
+| Go Tool Runtime                   | `internal/tool/runtime.Service`                                   |
+| Tool Aggregate                    | `internal/tool/aggregate.Service`                                 |
+| Mapped Tool target                | `internal/tool/aggregate.TargetV1`                                |
+| Tool Artifact target mapper       | `resolve.ArtifactTargetMapper` implemented by Tool Aggregate      |
+| Tool management wrapper           | `ToolStoreWrapper`                                                |
+| Tool Aggregate wrapper            | `ToolAggregateWrapper`                                            |
+| Tool Runtime wrapper              | `ToolRuntimeWrapper`                                              |
+| Inference Tool hydration          | `ToolAggregate.HydrateInferenceToolChoices`                       |
+| Inference Tool choice assembly    | `ProviderSetAPI`                                                  |
+| Composer Tool selection hydration | `hydrateToolSelectionsForUI`                                      |
+| Composer Go Tool execution        | `invokeMappedTool` through Tool Aggregate                         |
+| Composer MCP Tool execution       | MCP runtime and MCP management APIs                               |
+| Tool Collections page             | `frontend/app/tools`                                              |
 
 ## Current implementation status
 
-Status terms:
+### Available
 
-- `Current` means behavior exists in the supplied implementation.
-- `Required` means target-design work is required.
-- `Retired` means the legacy behavior is removed by this migration.
-- `Not supported` means intentionally outside the target Tool Store.
+| Capability                                                    | Status    |
+| ------------------------------------------------------------- | --------- |
+| Adapted `toolv1` Go implementation kind                       | Available |
+| Adapted `toolv1` SDK implementation kind                      | Available |
+| SDK Tool semantic types `function`, `custom`, and `webSearch` | Available |
+| Built-in Tool Artifacts                                       | Available |
+| Built-in Tool Collections                                     | Available |
+| Read-only Tool Collection domain                              | Available |
+| One Tool Collection route per Tool                            | Available |
+| Tool Artifact enablement                                      | Available |
+| Tool Collection enablement                                    | Available |
+| Go Tool registry adapter                                      | Available |
+| Go Tool document generation                                   | Available |
+| Static SDK Tool documents                                     | Available |
+| Protected Tool package hydration                              | Available |
+| Tool Artifact target mapper                                   | Available |
+| Mapped Tool target encoding                                   | Available |
+| Mapped Tool target revalidation                               | Available |
+| Tool Aggregate                                                | Available |
+| Store-independent Go Tool Runtime                             | Available |
+| Raw low-level Go Tool runtime invocation                      | Available |
+| SDK web-search inference projection                           | Available |
+| Tool selections using mapped targets                          | Available |
+| Conversation ToolSelections persistence shape                 | Available |
+| Composer Tool selection hydration                             | Available |
+| Composer Tool options UI                                      | Available |
+| Tool Collection management UI                                 | Available |
+| Go and SDK effective-state display                            | Available |
+| MCP Tool execution as a separate runtime concern              | Available |
 
-### Current behavior retained by the target
+### Current scope decisions
 
-| Capability                           | Status  | Target disposition                                              |
-| ------------------------------------ | ------- | --------------------------------------------------------------- |
-| Built-in Go Tools                    | Current | Retained through `llmtools-go`-validated Tool Catalog records.  |
-| Built-in SDK Tools                   | Current | Retained through application-authored SDK Tool Catalog records. |
-| SDK web-search Tool choices          | Current | Retained through Tool Inference Bridge projection.              |
-| Tool argument schemas                | Current | Retained in Tool Catalog records.                               |
-| SDK user argument schemas            | Current | Retained in Tool Catalog records and Composer configuration.    |
-| Tool Bundle grouping                 | Current | Retained as renamed Tool Collections.                           |
-| Bundle enable or disable             | Current | Retained as Tool Collection Artifact enablement.                |
-| Tool enable or disable               | Current | Retained as Tool Catalog Artifact enablement.                   |
-| Go Tool invocation                   | Current | Retained through a Store-independent Tool Runtime.              |
-| Composer Tool selection              | Current | Retained with mapped-target identity.                           |
-| Conversation Tool choice persistence | Current | Retained with mapped-target selection records.                  |
-| MCP Tool coexistence                 | Current | Retained as a separate MCP subsystem.                           |
+| Decision                                                                                  | Status      |
+| ----------------------------------------------------------------------------------------- | ----------- |
+| No Tool v2 contract                                                                       | Intentional |
+| No `userCallable` field                                                                   | Intentional |
+| No `llmCallable` field                                                                    | Intentional |
+| No generic backend JSON Schema validation for SDK user arguments                          | Intentional |
+| No separate SDK vendor registry                                                           | Intentional |
+| No Tool output schema enforcement                                                         | Intentional |
+| No explicit legacy Tool ID field                                                          | Intentional |
+| Raw Go function identifiers may be exposed to application management and runtime surfaces | Intentional |
+| Raw runtime invocation may bypass Tool Store enablement                                   | Intentional |
+| Go auto-execution policy is controlled by the application adapter                         | Intentional |
+| Inference wrapper owns global Tool choice uniqueness                                      | Intentional |
+| Mapped targets may encode backing Artifact identity                                       | Intentional |
 
-### Required target work
+### Not supported
 
-| Capability                     | Status   | Required outcome                                                                                            |
-| ------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------- |
-| Tool Catalog Artifact schema   | Required | Define and register a Tool Store-private source-backed Tool descriptor schema.                              |
-| SDK Tool package migration     | Required | Move current SDK Tool descriptors and schemas into protected Artifact Store packages.                       |
-| Go Tool package generation     | Required | Generate or validate Go Tool Catalog records from `llmtools-go`.                                            |
-| Tool Collection packages       | Required | Convert every current Bundle into one protected Plugin-based Tool Collection.                               |
-| Tool installer                 | Required | Hydrate Tool Catalog and Tool Collection package families into Artifact Store.                              |
-| Tool Catalog validation        | Required | Enforce Go registry matching, SDK admission, unique slugs, and one Collection route per Tool.               |
-| Tool mapped-target aggregate   | Required | Resolve backing Tool Catalog records into validated mapped targets.                                         |
-| Resolver integration           | Required | Ensure Tool Store consumers receive mapped targets rather than raw Tool Catalog Artifacts.                  |
-| Store-independent Go runtime   | Required | Remove direct dependency on legacy `ToolStore`.                                                             |
-| Tool Inference Bridge          | Required | Replace direct legacy Store hydration in `ProviderSetAPI`.                                                  |
-| Composer selection migration   | Required | Use mapped targets and current Tool descriptors rather than Bundle tuple identity.                          |
-| Management UI migration        | Required | Replace Bundle terminology and legacy APIs with Tool Collection projections.                                |
-| Legacy tools directory removal | Required | Remove standalone Tool Store content and overlay persistence after Artifact Store-backed content is active. |
-
-### Intentionally unsupported target behavior
-
-| Capability                                              | Status        |
-| ------------------------------------------------------- | ------------- |
-| User-created Tool Collection                            | Not supported |
-| Tool Collection deletion                                | Not supported |
-| Tool Collection membership editing                      | Not supported |
-| User-created Go Tool                                    | Not supported |
-| User-created SDK Tool                                   | Not supported |
-| Arbitrary SDK Tool registration                         | Not supported |
-| HTTP Tool definition                                    | Not supported |
-| Command Tool definition                                 | Not supported |
-| Runtime Go plugin loading                               | Not supported |
-| Arbitrary Tool source registration                      | Not supported |
-| MCP Tool duplication into Tool Store                    | Not supported |
-| Raw Tool Catalog Artifact as external executable target | Not supported |
-
-## Difference from the current Tool Store
-
-The target intentionally preserves current product behavior:
-
-- The same built-in Go Tools remain available.
-- The same built-in SDK Tools remain available.
-- Current SDK web-search behavior remains available.
-- Current Tool argument and user argument schemas remain available.
-- Current Bundles become Collections with the same membership.
-- Collections and individual Tools can still be enabled or disabled independently.
-- Go Tools are still invoked locally.
-- SDK Tools are still executed by provider SDK inference.
-- Composer Tool selection, user argument configuration, auto-execution handling, Tool-call attribution, and conversation Tool choice persistence remain supported.
-- MCP Tools remain separate and continue to coexist with Tool Store Tool choices.
-
-The primary differences are architectural and storage-related:
-
-- Bundles are renamed to Tool Collections.
-- Tool definitions and Collections are persisted and hydrated through Artifact Store instead of the legacy `tools_v1` directory and Tool overlay store.
-- Tool and Collection enabled state uses Artifact Store `Enabled` metadata instead of a Tool-specific overlay database.
-- Tool Catalog records are internal Artifact Store backing records.
-- Other domains receive Tools only as mapped targets.
-- Go Tool Runtime no longer depends on Tool Store types.
-- SDK Tool projection is owned by the Tool Inference Bridge rather than direct legacy Tool Store lookup.
+| Capability                                    | Status        |
+| --------------------------------------------- | ------------- |
+| User-created Tool                             | Not supported |
+| User-created Tool Collection                  | Not supported |
+| Tool Collection editing                       | Not supported |
+| Tool Collection membership editing            | Not supported |
+| Arbitrary Go Tool registration                | Not supported |
+| Runtime Go plugin loading                     | Not supported |
+| Arbitrary SDK Tool registration               | Not supported |
+| HTTP Tool declaration                         | Not supported |
+| Command Tool declaration                      | Not supported |
+| Local SDK Tool execution through Tool Runtime | Not supported |
+| MCP Tool duplication into Tool Collections    | Not supported |
+| Tool import or export                         | Not supported |

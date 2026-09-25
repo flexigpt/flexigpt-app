@@ -111,7 +111,7 @@ func (a *API) ListAgentImportDestinations(
 			Collection:            value,
 			CollectionRevision:    value.Artifact.Revision,
 			CollectionName:        value.Artifact.LogicalName,
-			CollectionDisplayName: value.Artifact.DisplayName,
+			CollectionDisplayName: value.DisplayName,
 			Baseline:              value.Baseline,
 			Enabled:               value.Artifact.Enabled,
 		})
@@ -783,7 +783,7 @@ func (a *API) agentImportDestination(
 			Collection:            value,
 			CollectionRevision:    value.Artifact.Revision,
 			CollectionName:        value.Artifact.LogicalName,
-			CollectionDisplayName: value.Artifact.DisplayName,
+			CollectionDisplayName: value.DisplayName,
 			Baseline:              value.Baseline,
 			Enabled:               value.Artifact.Enabled,
 		},

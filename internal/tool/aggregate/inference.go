@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
 
 type ToolSelection struct {
@@ -46,7 +47,7 @@ func (s *Service) HydrateInferenceToolChoice(
 		return inferenceSpec.ToolChoice{}, err
 	}
 
-	document := resolved.Tool.Document
+	document := resolved.Tool
 	arguments, err := toolArguments(document.InputSchema)
 	if err != nil {
 		return inferenceSpec.ToolChoice{}, err
@@ -54,7 +55,7 @@ func (s *Service) HydrateInferenceToolChoice(
 
 	choice := inferenceSpec.ToolChoice{
 		ID:          selection.ChoiceID,
-		Name:        document.Name,
+		Name:        string(document.Name),
 		Description: document.Description,
 	}
 
@@ -85,6 +86,9 @@ func (s *Service) HydrateInferenceToolChoices(
 	ctx context.Context,
 	selections []ToolSelection,
 ) ([]inferenceSpec.ToolChoice, error) {
+	if err := s.ready(ctx); err != nil {
+		return nil, err
+	}
 	output := make([]inferenceSpec.ToolChoice, 0, len(selections))
 	seen := make(map[string]struct{}, len(selections))
 
@@ -116,7 +120,7 @@ func (s *Service) HydrateInferenceToolChoices(
 
 func hydrateSDKToolChoice(
 	choice inferenceSpec.ToolChoice,
-	document toolv1.ToolDocument,
+	document toolConsumerAPI.ToolView,
 	arguments map[string]any,
 	rawUserArgs jsonutil.JSONRawString,
 ) (inferenceSpec.ToolChoice, error) {
@@ -167,9 +171,14 @@ func toolArguments(
 	raw json.RawMessage,
 ) (map[string]any, error) {
 	raw = bytes.TrimSpace(raw)
+	if bytes.Equal(raw, []byte("false")) {
+		return nil, fmt.Errorf(
+			"%w: false Tool inputSchema cannot be advertised as inference arguments",
+			basespec.ErrUnsupported,
+		)
+	}
 	if len(raw) == 0 ||
-		bytes.Equal(raw, []byte("true")) ||
-		bytes.Equal(raw, []byte("false")) {
+		bytes.Equal(raw, []byte("true")) {
 		return map[string]any{"type": "object"}, nil
 	}
 

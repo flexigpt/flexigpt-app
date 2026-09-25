@@ -12,6 +12,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -40,6 +41,15 @@ type DomainPolicy struct {
 	DocumentUse         string
 	AllowedMemberTypes  []declaration.Type
 	AllowedMemberForms  []declaration.MemberForm
+
+	// ReadOnly prohibits declaration authoring and baseline provisioning.
+	// Local Artifact enablement remains supported.
+	ReadOnly bool
+
+	// ValidateDocument applies additional consumer-specific restrictions
+	// after generic Collection decoding and domain visibility checks.
+	// It is internal configuration, never a transport projection.
+	ValidateDocument func(pluginv1.PluginDocument) error
 }
 
 func SkillDomainPolicy() DomainPolicy {
@@ -79,31 +89,7 @@ func (p DomainPolicy) Validate() error {
 	); err != nil {
 		return err
 	}
-	if err := p.SourceStorageKey.Validate(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"Collection domain Source display name",
-		p.SourceDisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := p.BaselineName.Validate(); err != nil {
-		return err
-	}
-	if err := basespec.ValidateOptionalText(
-		"Collection baseline display name",
-		p.BaselineDisplayName,
-		basespec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := basespec.ValidateRequiredText(
-		"Collection baseline description",
-		p.BaselineDescription,
-		basespec.MaxDescriptionBytes,
-	); err != nil {
+	if err := p.validateAuthoringConfiguration(); err != nil {
 		return err
 	}
 	if err := p.managedCollectionPackageKind().Validate(); err != nil {
@@ -229,6 +215,9 @@ func (a *API) EnsureBaseline(
 			basespec.ErrUnsupported,
 		)
 	}
+	if err := a.requireDeclarationAuthoring(); err != nil {
+		return CollectionView{}, err
+	}
 	if err := rootID.Validate(); err != nil {
 		return CollectionView{}, err
 	}
@@ -328,6 +317,9 @@ func (a *API) domainManagedSource(
 ) (source.Summary, error) {
 	if a == nil || a.domain == nil {
 		return source.Summary{}, basespec.ErrClosed
+	}
+	if err := a.requireDeclarationAuthoring(); err != nil {
+		return source.Summary{}, err
 	}
 	if sourceID != "" {
 		value, err := a.sources.Get(ctx, rootID, sourceID)
@@ -513,13 +505,47 @@ func (a *API) readCollectionDocument(
 			record.ID,
 		)
 	}
+	if a.domain != nil &&
+		a.domain.ReadOnly &&
+		!a.readOnlyDomainOrigin(record) {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+			"%w: Collection does not belong to this read-only domain",
+			basespec.ErrUnsupported,
+		)
+	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
+	if err := definitionValue.Validate(); err != nil {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+	}
+	if record.ResolvedDefinition == nil ||
+		*record.ResolvedDefinition != definitionValue.Digest {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+			"%w: Collection definition changed during read",
+			basespec.ErrRefreshRequired,
+		)
+	}
 	document, err := pluginv1.DecodePluginJSON(definitionValue.Body)
 	if err != nil {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+	}
+	entry, err := declaration.NewEntry(document)
+	if err != nil {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+	}
+	expected, err := decoder.DefinitionForEntry(entry)
+	if err != nil {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+	}
+	if definitionValue.Kind != expected.Kind ||
+		definitionValue.SchemaID != expected.SchemaID ||
+		definitionValue.SchemaVersion != expected.SchemaVersion {
+		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+			"%w: Collection definition has an unsupported schema",
+			basespec.ErrUnsupported,
+		)
 	}
 	if document.Name != string(record.LogicalName) {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
@@ -546,6 +572,13 @@ func (a *API) domainCollectionVisible(
 	)
 	if err != nil {
 		return false, err
+	}
+	if a.domain.ReadOnly {
+		if sourceValue.Kind != source.SourceKindManagedDirectory ||
+			!a.readOnlyDomainOrigin(record) {
+			return false, nil
+		}
+		return true, a.validateEditableDomainDocument(document)
 	}
 	if sourceValue.StorageKey == a.domain.SourceStorageKey {
 		return true, a.validateEditableDomainDocument(document)
@@ -586,6 +619,11 @@ func (a *API) Read(
 			basespec.ErrUnsupported,
 		)
 	}
+	if a.domain != nil && a.domain.ValidateDocument != nil {
+		if err := a.domain.ValidateDocument(document); err != nil {
+			return CollectionView{}, err
+		}
+	}
 
 	editable := false
 	sourceValue, err := a.sources.Get(
@@ -597,6 +635,7 @@ func (a *API) Read(
 		return CollectionView{}, err
 	}
 	if record.Binding.SubresourceLocator == "" &&
+		(a.domain == nil || !a.domain.ReadOnly) &&
 		sourceValue.Kind == source.SourceKindManagedDirectory &&
 		(a.domain == nil ||
 			sourceValue.StorageKey == a.domain.SourceStorageKey) {
@@ -609,6 +648,9 @@ func (a *API) Read(
 	}
 
 	baseline := IsBaselineCollectionArtifactForSource(record, sourceValue)
+	if a.domain != nil && a.domain.ReadOnly {
+		baseline = false
+	}
 	return readCollectionViewOf(
 		record,
 		document,

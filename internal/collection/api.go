@@ -661,6 +661,9 @@ func (a *API) create(
 	if a == nil {
 		return CollectionView{}, basespec.ErrClosed
 	}
+	if err := a.requireDeclarationAuthoring(); err != nil {
+		return CollectionView{}, err
+	}
 	if err := request.RootID.Validate(); err != nil {
 		return CollectionView{}, err
 	}
@@ -965,6 +968,9 @@ func (a *API) loadEditableCollection(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) (editableCollection, error) {
+	if err := a.requireDeclarationAuthoring(); err != nil {
+		return editableCollection{}, err
+	}
 	if err := ref.Validate(); err != nil {
 		return editableCollection{}, err
 	}
@@ -1253,9 +1259,10 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 		Type:    m.Type,
 		Name:    string(m.Name),
 		Locator: m.Locator,
-		Insert:  m.Insert,
-		Scope:   m.Scope,
-		Server:  string(m.Server),
+
+		Insert: m.Insert,
+		Scope:  m.Scope,
+		Server: string(m.Server),
 	})
 	if err != nil {
 		return declaration.Entry{}, err

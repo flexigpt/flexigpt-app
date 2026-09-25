@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"errors"
 	"fmt"
 	"slices"
 
@@ -13,29 +12,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 )
 
-var ErrNotToolCollection = errors.New("not a Tool Collection")
-
+// Tool is internal decoded Store material. Consumer and Wails APIs expose
+// explicit views instead of serializing this value.
 type Tool struct {
 	Artifact   artifact.Artifact
 	Definition definition.Definition
 	Document   toolv1.ToolDocument
-}
-
-type ToolCollection struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
-	Document   pluginv1.PluginDocument
-	ToolNames  []basespec.LogicalName
-}
-
-type ResolvedTool struct {
-	Tool       Tool
-	Collection ToolCollection
-}
-
-func (v ResolvedTool) Enabled() bool {
-	return v.Tool.Artifact.Enabled &&
-		v.Collection.Artifact.Enabled
 }
 
 func DecodeTool(
@@ -56,13 +38,23 @@ func DecodeTool(
 			record.ID,
 		)
 	}
+	if err := value.Validate(); err != nil {
+		return Tool{}, err
+	}
 	if value.Kind != ToolArtifactKind ||
 		value.SchemaID != toolv1.ToolSchemaKey.SchemaID ||
 		value.SchemaVersion != toolv1.ToolSchemaKey.SchemaVersion {
 		return Tool{}, fmt.Errorf(
-			"%w: Tool Artifact %q has an unsupported Tool schema",
-			basespec.ErrReferenceUnresolved,
+			"%w: Tool Artifact %q has an unsupported schema",
+			basespec.ErrUnsupported,
 			record.ID,
+		)
+	}
+	if record.ResolvedDefinition == nil ||
+		*record.ResolvedDefinition != value.Digest {
+		return Tool{}, fmt.Errorf(
+			"%w: Tool definition changed during read",
+			basespec.ErrRefreshRequired,
 		)
 	}
 
@@ -72,10 +64,11 @@ func DecodeTool(
 	}
 	if record.LogicalName != basespec.LogicalName(document.Name) {
 		return Tool{}, fmt.Errorf(
-			"%w: Tool Artifact identity differs from Tool declaration",
+			"%w: tool identity differs from its declaration",
 			basespec.ErrDigestMismatch,
 		)
 	}
+
 	return Tool{
 		Artifact:   record.Clone(),
 		Definition: value.Clone(),
@@ -83,63 +76,19 @@ func DecodeTool(
 	}, nil
 }
 
-func DecodeToolCollection(
-	record artifact.Artifact,
-	value definition.Definition,
-) (ToolCollection, error) {
-	if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-		record.Binding.SubresourceLocator != "" {
-		return ToolCollection{}, fmt.Errorf(
-			"%w: Artifact %q is not a Tool Collection",
-			ErrNotToolCollection,
-			record.ID,
-		)
-	}
-	if record.State != artifact.StateAvailable {
-		return ToolCollection{}, fmt.Errorf(
-			"%w: Tool Collection Artifact %q is unavailable",
-			basespec.ErrReferenceUnresolved,
-			record.ID,
-		)
-	}
-
-	document, err := pluginv1.DecodePluginJSON(value.Body)
-	if err != nil {
-		return ToolCollection{}, err
-	}
-	if document.Locator != nil {
-		return ToolCollection{}, fmt.Errorf(
-			"%w: located Plugin aliases are not Tool Collections",
-			ErrNotToolCollection,
-		)
-	}
-	if record.LogicalName != basespec.LogicalName(document.Name) {
-		return ToolCollection{}, fmt.Errorf(
-			"%w: Tool Collection identity differs from Plugin declaration",
-			basespec.ErrDigestMismatch,
-		)
-	}
-
-	tools, err := ValidateToolCollectionDocument(document)
-	if err != nil {
-		return ToolCollection{}, err
-	}
-
-	return ToolCollection{
-		Artifact:   record.Clone(),
-		Definition: value.Clone(),
-		Document:   document,
-		ToolNames:  tools,
-	}, nil
-}
-
+// ValidateToolCollectionDocument applies the restrictions of the built-in
+// Tool catalog. Generic Collection decoding and projection remain owned by
+// the collection package.
 func ValidateToolCollectionDocument(
 	document pluginv1.PluginDocument,
 ) ([]basespec.LogicalName, error) {
+	if err := document.Validate(); err != nil {
+		return nil, err
+	}
 	if document.Locator != nil {
 		return nil, fmt.Errorf(
-			"%w: located Plugin aliases are not Tool Collections",
-			ErrNotToolCollection,
+			"%w: Tool Collections cannot be located aliases",
+			basespec.ErrUnsupported,
 		)
 	}
 
@@ -152,7 +101,7 @@ func ValidateToolCollectionDocument(
 	}
 
 	seen := make(map[basespec.LogicalName]struct{}, len(ordered))
-	tools := make([]basespec.LogicalName, 0, len(ordered))
+	names := make([]basespec.LogicalName, 0, len(ordered))
 	for index, member := range ordered {
 		form, err := member.MemberForm()
 		if err != nil {
@@ -167,8 +116,8 @@ func ValidateToolCollectionDocument(
 			header.Type != declaration.TypeTool ||
 			header.Locator != nil {
 			return nil, fmt.Errorf(
-				"%w: Tool Collection members must be named built-in Tool references",
-				ErrNotToolCollection,
+				"%w: Tool Collections require named built-in Tool references",
+				basespec.ErrUnsupported,
 			)
 		}
 
@@ -181,12 +130,15 @@ func ValidateToolCollectionDocument(
 			len(relationship.Use) != 0 {
 			return nil, fmt.Errorf(
 				"%w: Tool Collection member %q has unsupported relationship behavior",
-				ErrNotToolCollection,
+				basespec.ErrUnsupported,
 				header.Name,
 			)
 		}
 
 		name := basespec.LogicalName(header.Name)
+		if err := name.Validate(); err != nil {
+			return nil, err
+		}
 		if _, duplicate := seen[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool Collection repeats Tool %q",
@@ -195,15 +147,9 @@ func ValidateToolCollectionDocument(
 			)
 		}
 		seen[name] = struct{}{}
-		tools = append(tools, name)
+		names = append(names, name)
 	}
 
-	slices.Sort(tools)
-	return tools, nil
-}
-
-func (v ToolCollection) HasTool(
-	name basespec.LogicalName,
-) bool {
-	return slices.Contains(v.ToolNames, name)
+	slices.Sort(names)
+	return names, nil
 }

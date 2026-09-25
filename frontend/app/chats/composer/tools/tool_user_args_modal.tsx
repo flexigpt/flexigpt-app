@@ -2,7 +2,9 @@ import type { SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiRefreshCcw, FiTool } from 'react-icons/fi';
 
-import type { JSONObject, JSONSchema } from '@/lib/jsonschema_utils';
+import type { ToolJSONSchema } from '@/spec/tool';
+
+import type { JSONObject } from '@/lib/jsonschema_utils';
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import {
 	buildExampleFromDraft7Schema,
@@ -26,9 +28,11 @@ interface ToolUserArgsModalProps {
 	onClose: () => void;
 
 	toolLabel: string;
-	schema: JSONSchema | undefined;
+	schema: ToolJSONSchema | undefined;
 	existingInstance?: string;
 	modalIdentity?: string;
+	isLoading?: boolean;
+	loadError?: string;
 	onSave: (newInstance: string) => void;
 }
 
@@ -65,6 +69,8 @@ function ToolUserArgsModalContent({
 	toolLabel,
 	schema,
 	existingInstance,
+	isLoading = false,
+	loadError,
 	onSave,
 }: Omit<ToolUserArgsModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose } = useModalDialogController();
@@ -75,16 +81,20 @@ function ToolUserArgsModalContent({
 	}));
 	const [error, setError] = useState<string | null>(null);
 
-	const schemaObj = useMemo(() => getJSONObject(schema), [schema]);
-	const properties = useMemo(() => getPropertiesFromJSONSchema(schema) ?? ({} as JSONObject), [schema]);
-	const requiredKeys = useMemo(() => getRequiredFromJSONSchema(schema) ?? [], [schema]);
+	const objectSchema = typeof schema === 'boolean' ? undefined : schema;
+	const schemaObj = useMemo(() => getJSONObject(objectSchema), [objectSchema]);
+	const properties = useMemo(() => getPropertiesFromJSONSchema(objectSchema) ?? ({} as JSONObject), [objectSchema]);
+	const requiredKeys = useMemo(() => getRequiredFromJSONSchema(objectSchema) ?? [], [objectSchema]);
 
 	const allKeys = useMemo(() => Object.keys(properties), [properties]);
 	const optionalKeys = useMemo(() => allKeys.filter(k => !requiredKeys.includes(k)), [allKeys, requiredKeys]);
 
 	const exampleInstanceObj = useMemo(() => (schemaObj ? buildExampleFromDraft7Schema(schemaObj) : {}), [schemaObj]);
 
-	const schemaPretty = useMemo(() => (schemaObj ? toPrettyJSON(schemaObj) : null), [schemaObj]);
+	const schemaPretty = useMemo(
+		() => (typeof schema === 'boolean' ? String(schema) : schemaObj ? toPrettyJSON(schemaObj) : null),
+		[schema, schemaObj]
+	);
 	const examplePretty = useMemo(() => toPrettyJSON(exampleInstanceObj), [exampleInstanceObj]);
 
 	const schemaMarkdown = useMemo(() => (schemaPretty ? asJsonMarkdownBlock(schemaPretty) : null), [schemaPretty]);
@@ -130,6 +140,11 @@ function ToolUserArgsModalContent({
 		e.preventDefault();
 		e.stopPropagation();
 
+		if (isLoading || loadError) {
+			setError(loadError || 'Wait for the tool definition to load.');
+			return;
+		}
+
 		let raw = formData.rawJson.trim();
 		if (!raw) {
 			if (requiredKeys.length > 0) {
@@ -154,7 +169,11 @@ function ToolUserArgsModalContent({
 
 		const status = computeToolUserArgsStatus(schema, JSON.stringify(parsed));
 		if (status.hasSchema && !status.isSatisfied) {
-			setError(`Missing required keys: ${status.missingRequired.join(', ')}. Populate them (non-empty) before saving.`);
+			setError(
+				schema === false
+					? 'This tool declares a false user-configuration schema. No configuration is valid.'
+					: `Missing required keys: ${status.missingRequired.join(', ')}. Populate them before saving.`
+			);
 			return;
 		}
 
@@ -207,7 +226,11 @@ function ToolUserArgsModalContent({
 									)}
 								</>
 							) : (
-								<div>This tool does not define a user configuration schema.</div>
+								<div>
+									{schema === false
+										? 'This tool does not accept any user configuration.'
+										: 'There are no required configuration keys for this tool.'}
+								</div>
 							)}
 						</div>
 
@@ -259,9 +282,10 @@ function ToolUserArgsModalContent({
 							/>
 
 							<div className="min-h-6 text-xs">
-								{error && (
+								{isLoading ? <span>Loading tool definition...</span> : null}
+								{(loadError || error) && (
 									<span className="text-error flex items-center gap-1">
-										<FiAlertCircle size={12} /> {error}
+										<FiAlertCircle size={12} /> {loadError || error}
 									</span>
 								)}
 							</div>
@@ -309,7 +333,7 @@ function ToolUserArgsModalContent({
 							>
 								Cancel
 							</button>
-							<button type="submit" className="btn btn-primary rounded-xl">
+							<button type="submit" className="btn btn-primary rounded-xl" disabled={isLoading || Boolean(loadError)}>
 								Save
 							</button>
 						</ModalActions>

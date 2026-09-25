@@ -1,62 +1,45 @@
-import type { ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
+import type { ToolSelection, ToolStoreChoice, UIToolStoreChoice } from '@/spec/tool';
 
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
-// Convert the editor's attached-tool shape into the persisted ToolStoreChoice shape.
+/** Editor selection to frontend choice. */
 export function uiToolChoiceToToolStoreChoice(att: UIToolStoreChoice): ToolStoreChoice {
 	return {
 		choiceID: att.choiceID,
-		bundleID: att.bundleID,
-		toolSlug: att.toolSlug,
-		toolVersion: att.toolVersion,
-		displayName: att.displayName,
-		description: att.description,
-		toolID: att.toolID,
-		toolType: att.toolType,
+		target: att.target,
 		autoExecute: att.autoExecute,
 		userArgSchemaInstance: att.userArgSchemaInstance,
+		toolType: att.toolType,
+		implementationKind: att.implementationKind,
+		sdkType: att.sdkType,
+		displayName: att.displayName,
+		description: att.description,
+		toolVersion: att.toolVersion,
+		collectionRef: att.collectionRef,
+		collectionName: att.collectionName,
 	};
 }
 
-export function dedupeToolChoices(choices: ToolStoreChoice[]): ToolStoreChoice[] {
-	const out: ToolStoreChoice[] = [];
-	const seen = new Set<string>();
-
-	for (const t of choices ?? []) {
-		const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		out.push(t);
-	}
-
-	return out;
+/** Exact backend and persistence projection. */
+export function toolSelectionFromChoice(choice: ToolSelection): ToolSelection {
+	return {
+		choiceID: choice.choiceID,
+		target: choice.target,
+		autoExecute: choice.autoExecute,
+		userArgSchemaInstance: choice.userArgSchemaInstance,
+	};
 }
 
-export function areToolChoiceListsEqual(a: ToolStoreChoice[], b: ToolStoreChoice[]): boolean {
-	if (a === b) {
-		return true;
-	}
-	if (a.length !== b.length) {
-		return false;
-	}
+export function dedupeToolChoices<T extends ToolSelection>(choices: T[]): T[] {
+	const output: T[] = [];
+	const seen = new Set<string>();
 
-	for (let i = 0; i < a.length; i += 1) {
-		const left = a[i];
-		const right = b[i];
-
-		if (
-			left.toolType !== right.toolType ||
-			left.bundleID !== right.bundleID ||
-			left.toolSlug !== right.toolSlug ||
-			left.toolVersion !== right.toolVersion ||
-			left.autoExecute !== right.autoExecute ||
-			(left.userArgSchemaInstance ?? '') !== (right.userArgSchemaInstance ?? '')
-		) {
-			return false;
+	for (const choice of choices ?? []) {
+		const key = toolIdentityKey(choice.target);
+		if (!seen.has(key)) {
+			seen.add(key);
+			output.push(choice);
 		}
 	}
-
-	return true;
+	return output;
 }

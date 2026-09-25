@@ -3,6 +3,7 @@ import { FiAlertTriangle, FiCode, FiPlay, FiTerminal, FiTool, FiX } from 'react-
 import type { UIToolCall, UIToolOutput } from '@/spec/inference';
 import { UIToolCallStatus } from '@/spec/inference';
 import { MCPExecutionMode } from '@/spec/mcp';
+import { ToolImplType } from '@/spec/tool';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { isRunnableComposerToolCall } from '@/tools/lib/tool_call_utils';
@@ -270,7 +271,9 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 	const isError = !!output.isError;
 
 	const hasResolvableStoredTool =
-		!!output.toolStoreChoice?.bundleID && !!output.toolStoreChoice?.toolSlug && !!output.toolStoreChoice?.toolVersion;
+		output.toolStoreChoice?.implementationKind === ToolImplType.Go &&
+		!!output.toolStoreChoice.target.provider &&
+		!!output.toolStoreChoice.target.identifier;
 	const canRetry = isError && (isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
 	const titleLines = [
 		isError ? `Errored result from: ${label}` : label,

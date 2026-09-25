@@ -38,7 +38,7 @@ import type {
 	UpdateCollectionRequest,
 } from '@/spec/collection';
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
+import type { CompletionResponseBody, ModelParam, ProviderName, ToolChoice } from '@/spec/inference';
 import type {
 	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
@@ -107,8 +107,8 @@ import type {
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
 } from '@/spec/skill';
-import type { Tool, ToolBundle, ToolListItem, ToolRef, ToolStoreChoice } from '@/spec/tool';
-import type { InvokeGoOptions, InvokeToolResponse } from '@/spec/toolruntime';
+import type { ResolvedToolView, ToolSelection, ToolView } from '@/spec/tool';
+import type { InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
 	WorkspaceArtifactView,
@@ -192,33 +192,38 @@ export interface IModelPresetStoreAPI {
 	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef>;
 }
 
+export interface IToolRuntimeAPI {
+	invokeTool(functionName: string, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
+}
+
 export interface IToolStoreAPI {
-	/** List tool bundles, optionally filtered by IDs, disabled, and paginated. */
-	listToolBundles(
-		bundleIDs?: string[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ toolBundles: ToolBundle[]; nextPageToken?: string }>;
+	listToolCollections(): Promise<CollectionView[]>;
 
-	/** Patch (enable/disable) a tool bundle. */
-	patchToolBundle(bundleID: string, isEnabled: boolean): Promise<void>;
+	getToolCollection(collection: ArtifactRef): Promise<CollectionView>;
 
-	/** List tools, optionally filtered by bundleIDs, tags, etc. */
-	listTools(
-		bundleIDs?: string[],
-		tags?: string[],
-		includeDisabled?: boolean,
-		recommendedPageSize?: number,
-		pageToken?: string
-	): Promise<{ toolListItems: ToolListItem[]; nextPageToken?: string }>;
+	listCollectionTools(collection: ArtifactRef): Promise<ToolView[]>;
 
-	/** Get a tool version. */
-	getTool(bundleID: string, toolSlug: string, version: string): Promise<Tool | undefined>;
+	getTool(tool: ArtifactRef): Promise<ToolView>;
 
-	patchTool(bundleID: string, toolSlug: string, version: string, isEnabled: boolean): Promise<void>;
+	setToolEnabled(tool: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<ToolView>;
 
-	resolveMappedToolTarget(target: MappedTarget): Promise<ToolRef>;
+	setToolCollectionEnabled(
+		collection: ArtifactRef,
+		expectedRevision: number,
+		enabled: boolean
+	): Promise<CollectionView>;
+}
+
+export interface IToolTargetResolver {
+	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView>;
+}
+
+export interface IToolAggregateAPI extends IToolTargetResolver {
+	mapToolTarget(tool: ArtifactRef): Promise<MappedTarget>;
+
+	invokeMappedTool(target: MappedTarget, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse>;
+
+	hydrateInferenceToolChoice(selection: ToolSelection): Promise<ToolChoice>;
 }
 
 export interface IAgentStoreAPI {
@@ -427,17 +432,6 @@ export interface IWorkspaceManagementAPI {
 	): Promise<WorkspaceRuntimePlan>;
 }
 
-export interface IToolRuntimeAPI {
-	/** Invoke a tool version. */
-	invokeTool(
-		bundleID: string,
-		toolSlug: string,
-		version: string,
-		args?: JSONRawString,
-		goOptions?: InvokeGoOptions
-	): Promise<InvokeToolResponse>;
-}
-
 export interface IConversationStoreAPI {
 	putConversation: (conversation: StoreConversation) => Promise<void>;
 	putMessagesToConversation(id: string, title: string, messages: StoreConversationMessage[]): Promise<void>;
@@ -488,7 +482,7 @@ export interface IAggregateAPI {
 		modelParams: ModelParam,
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
-		toolStoreChoices?: ToolStoreChoice[],
+		toolSelections?: ToolSelection[],
 		mcpContext?: MCPConversationContext,
 		skillSessionID?: string,
 		requestId?: string,

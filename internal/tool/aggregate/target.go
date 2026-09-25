@@ -4,11 +4,12 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
+	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
 
 const (
@@ -17,11 +18,11 @@ const (
 )
 
 type TargetV1 struct {
-	ToolArtifact     artifact.ArtifactRef `json:"toolArtifact"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
-	Name             basespec.LogicalName `json:"name"`
-	Version          string               `json:"version"`
-	Implementation   string               `json:"implementation"`
+	ToolArtifact     artifact.ArtifactRef      `json:"toolArtifact"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	Name             basespec.LogicalName      `json:"name"`
+	Version          basespec.LogicalVersion   `json:"version"`
+	Implementation   toolv1.ImplementationKind `json:"implementation"`
 }
 
 func (t TargetV1) Validate() error {
@@ -34,15 +35,14 @@ func (t TargetV1) Validate() error {
 	if err := t.Name.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := basespec.ValidatePortableName(
 		"mapped Tool version",
-		t.Version,
-		basespec.MaxVersionBytes,
+		string(t.Version),
 	); err != nil {
 		return err
 	}
 	switch t.Implementation {
-	case "go", "sdk":
+	case toolv1.ImplementationKindGo, toolv1.ImplementationKindSDK:
 		return nil
 	default:
 		return fmt.Errorf(
@@ -54,9 +54,9 @@ func (t TargetV1) Validate() error {
 }
 
 func NewMappedTarget(
-	value toolDomain.ResolvedTool,
+	value toolConsumerAPI.ResolvedToolView,
 ) (resolve.MappedTarget, error) {
-	if !value.Enabled() {
+	if !value.Enabled() || !value.Tool.BuiltIn {
 		return resolve.MappedTarget{}, fmt.Errorf(
 			"%w: Tool %q is disabled",
 			basespec.ErrReferenceUnresolved,
@@ -64,13 +64,12 @@ func NewMappedTarget(
 		)
 	}
 
-	document := value.Tool.Document
 	targetValue := TargetV1{
 		ToolArtifact:     value.Tool.Artifact.Ref(),
-		DefinitionDigest: value.Tool.Definition.Digest,
-		Name:             value.Tool.Artifact.LogicalName,
-		Version:          string(document.Version),
-		Implementation:   string(document.Implementation.Kind),
+		DefinitionDigest: value.Tool.DefinitionDigest,
+		Name:             value.Tool.Name,
+		Version:          value.Tool.Version,
+		Implementation:   value.Tool.Implementation.Kind,
 	}
 	if err := targetValue.Validate(); err != nil {
 		return resolve.MappedTarget{}, err

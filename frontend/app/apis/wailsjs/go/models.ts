@@ -132,6 +132,42 @@ export namespace aggregate {
 	        this.nonEmpty = source["nonEmpty"];
 	    }
 	}
+	export class ToolSelection {
+	    choiceID: string;
+	    target: resolve.MappedTarget;
+	    autoExecute: boolean;
+	    userArgSchemaInstance?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolSelection(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.choiceID = source["choiceID"];
+	        this.target = this.convertValues(source["target"], resolve.MappedTarget);
+	        this.autoExecute = source["autoExecute"];
+	        this.userArgSchemaInstance = source["userArgSchemaInstance"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 
 }
 
@@ -2596,6 +2632,110 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class ToolImplementationView {
+	    kind: string;
+	    function?: string;
+	    sdkType?: string;
+	    sdkToolType?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolImplementationView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.function = source["function"];
+	        this.sdkType = source["sdkType"];
+	        this.sdkToolType = source["sdkToolType"];
+	    }
+	}
+	export class ToolView {
+	    artifact: artifact.Artifact;
+	    definitionDigest: string;
+	    name: string;
+	    version: string;
+	    displayName: string;
+	    description?: string;
+	    tags?: string[];
+	    autoExecute: boolean;
+	    builtIn: boolean;
+	    inputSchema: number[];
+	    userArgSchema?: number[];
+	    outputSchema?: number[];
+	    implementation: ToolImplementationView;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.definitionDigest = source["definitionDigest"];
+	        this.name = source["name"];
+	        this.version = source["version"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.tags = source["tags"];
+	        this.autoExecute = source["autoExecute"];
+	        this.builtIn = source["builtIn"];
+	        this.inputSchema = source["inputSchema"];
+	        this.userArgSchema = source["userArgSchema"];
+	        this.outputSchema = source["outputSchema"];
+	        this.implementation = this.convertValues(source["implementation"], ToolImplementationView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ResolvedToolView {
+	    tool: ToolView;
+	    collection: collection.CollectionView;
+	
+	    static createFrom(source: any = {}) {
+	        return new ResolvedToolView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.tool = this.convertValues(source["tool"], ToolView);
+	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	export class ServerPage {
 	    items: artifact.Artifact[];
@@ -2695,6 +2835,8 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	
+	
 	export class WorkspaceArtifactView {
 	    artifact: artifact.ArtifactRef;
 	    revision: number;
@@ -4030,6 +4172,56 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class ToolAggregateInvokeRequest {
+	    target: resolve.MappedTarget;
+	    args?: string;
+	    timeoutMS?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolAggregateInvokeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.target = this.convertValues(source["target"], resolve.MappedTarget);
+	        this.args = source["args"];
+	        this.timeoutMS = source["timeoutMS"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ToolRuntimeInvokeRequest {
+	    function: string;
+	    args?: string;
+	    timeoutMS?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolRuntimeInvokeRequest(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.function = source["function"];
+	        this.args = source["args"];
+	        this.timeoutMS = source["timeoutMS"];
+	    }
+	}
 
 }
 
@@ -4694,6 +4886,42 @@ export namespace runtime {
 		}
 	}
 	
+	export class InvokeResponse {
+	    outputs?: spec.ToolOutputUnion[];
+	    meta?: Record<string, any>;
+	    isError: boolean;
+	    errorMessage?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new InvokeResponse(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.outputs = this.convertValues(source["outputs"], spec.ToolOutputUnion);
+	        this.meta = source["meta"];
+	        this.isError = source["isError"];
+	        this.errorMessage = source["errorMessage"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class InvokeSkillToolRequestBody {
 	    sessionID: string;
 	    toolName: string;
@@ -6701,38 +6929,6 @@ export namespace spec {
 	        this.reasoningTokens = source["reasoningTokens"];
 	    }
 	}
-	export class ToolStoreChoice {
-	    choiceID: string;
-	    bundleID: string;
-	    bundleSlug?: string;
-	    toolID?: string;
-	    toolSlug: string;
-	    toolVersion: string;
-	    toolType: string;
-	    description?: string;
-	    displayName?: string;
-	    autoExecute: boolean;
-	    userArgSchemaInstance?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolStoreChoice(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.choiceID = source["choiceID"];
-	        this.bundleID = source["bundleID"];
-	        this.bundleSlug = source["bundleSlug"];
-	        this.toolID = source["toolID"];
-	        this.toolSlug = source["toolSlug"];
-	        this.toolVersion = source["toolVersion"];
-	        this.toolType = source["toolType"];
-	        this.description = source["description"];
-	        this.displayName = source["displayName"];
-	        this.autoExecute = source["autoExecute"];
-	        this.userArgSchemaInstance = source["userArgSchemaInstance"];
-	    }
-	}
 	export class WebSearchToolChoiceItemUserLocation {
 	    city: string;
 	    country: string;
@@ -7492,7 +7688,7 @@ export namespace spec {
 	    inputs?: InputUnion[];
 	    outputs?: OutputUnion[];
 	    toolChoices?: ToolChoice[];
-	    toolStoreChoices?: ToolStoreChoice[];
+	    toolSelections?: aggregate.ToolSelection[];
 	    mcpContext?: conversation.MCPConversationContext;
 	    mcpToolMappings?: conversation.MCPProviderToolMapping[];
 	    mcpAppContextUpdates?: conversation.MCPAppModelContextUpdate[];
@@ -7521,7 +7717,7 @@ export namespace spec {
 	        this.inputs = this.convertValues(source["inputs"], InputUnion);
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
-	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
+	        this.toolSelections = this.convertValues(source["toolSelections"], aggregate.ToolSelection);
 	        this.mcpContext = this.convertValues(source["mcpContext"], conversation.MCPConversationContext);
 	        this.mcpToolMappings = this.convertValues(source["mcpToolMappings"], conversation.MCPProviderToolMapping);
 	        this.mcpAppContextUpdates = this.convertValues(source["mcpAppContextUpdates"], conversation.MCPAppModelContextUpdate);
@@ -7714,7 +7910,7 @@ export namespace spec {
 	    modelParam?: ModelParam;
 	    history: ConversationMessage[];
 	    current: ConversationMessage;
-	    toolStoreChoices?: ToolStoreChoice[];
+	    toolSelections?: aggregate.ToolSelection[];
 	    mcpContext?: conversation.MCPConversationContext;
 	    skillSessionID?: string;
 	
@@ -7727,7 +7923,7 @@ export namespace spec {
 	        this.modelParam = this.convertValues(source["modelParam"], ModelParam);
 	        this.history = this.convertValues(source["history"], ConversationMessage);
 	        this.current = this.convertValues(source["current"], ConversationMessage);
-	        this.toolStoreChoices = this.convertValues(source["toolStoreChoices"], ToolStoreChoice);
+	        this.toolSelections = this.convertValues(source["toolSelections"], aggregate.ToolSelection);
 	        this.mcpContext = this.convertValues(source["mcpContext"], conversation.MCPConversationContext);
 	        this.skillSessionID = source["skillSessionID"];
 	    }
@@ -8523,381 +8719,8 @@ export namespace spec {
 		}
 	}
 	
-	export class GetToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetToolRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	    }
-	}
-	export class SDKToolImpl {
-	    sdkType: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SDKToolImpl(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sdkType = source["sdkType"];
-	    }
-	}
-	export class GoToolImpl {
-	    func: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new GoToolImpl(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.func = source["func"];
-	    }
-	}
-	export class Tool {
-	    schemaVersion: string;
-	    id: string;
-	    slug: string;
-	    version: string;
-	    displayName: string;
-	    description?: string;
-	    tags?: string[];
-	    userCallable: boolean;
-	    llmCallable: boolean;
-	    autoExecute: boolean;
-	    argSchema: number[];
-	    userArgSchema?: number[];
-	    llmToolType: string;
-	    type: string;
-	    goImpl?: GoToolImpl;
-	    sdkImpl?: SDKToolImpl;
-	    isEnabled: boolean;
-	    isBuiltIn: boolean;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Tool(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.schemaVersion = source["schemaVersion"];
-	        this.id = source["id"];
-	        this.slug = source["slug"];
-	        this.version = source["version"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.tags = source["tags"];
-	        this.userCallable = source["userCallable"];
-	        this.llmCallable = source["llmCallable"];
-	        this.autoExecute = source["autoExecute"];
-	        this.argSchema = source["argSchema"];
-	        this.userArgSchema = source["userArgSchema"];
-	        this.llmToolType = source["llmToolType"];
-	        this.type = source["type"];
-	        this.goImpl = this.convertValues(source["goImpl"], GoToolImpl);
-	        this.sdkImpl = this.convertValues(source["sdkImpl"], SDKToolImpl);
-	        this.isEnabled = source["isEnabled"];
-	        this.isBuiltIn = source["isBuiltIn"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class GetToolResponse {
-	    Body?: Tool;
-	
-	    static createFrom(source: any = {}) {
-	        return new GetToolResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], Tool);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	
-	
-	
-	export class InvokeGoOptions {
-	    timeoutMS?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeGoOptions(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.timeoutMS = source["timeoutMS"];
-	    }
-	}
-	export class InvokeToolRequestBody {
-	    args: string;
-	    goOptions?: InvokeGoOptions;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeToolRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.args = source["args"];
-	        this.goOptions = this.convertValues(source["goOptions"], InvokeGoOptions);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class InvokeToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	    Body?: InvokeToolRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeToolRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	        this.Body = this.convertValues(source["Body"], InvokeToolRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ToolOutputFile {
-	    fileName: string;
-	    fileMIME: string;
-	    fileData: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolOutputFile(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.fileName = source["fileName"];
-	        this.fileMIME = source["fileMIME"];
-	        this.fileData = source["fileData"];
-	    }
-	}
-	export class ToolOutputImage {
-	    detail: string;
-	    imageName: string;
-	    imageMIME: string;
-	    imageData: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolOutputImage(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.detail = source["detail"];
-	        this.imageName = source["imageName"];
-	        this.imageMIME = source["imageMIME"];
-	        this.imageData = source["imageData"];
-	    }
-	}
-	export class ToolOutputText {
-	    text: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolOutputText(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.text = source["text"];
-	    }
-	}
-	export class ToolOutputUnion {
-	    kind: string;
-	    textItem?: ToolOutputText;
-	    imageItem?: ToolOutputImage;
-	    fileItem?: ToolOutputFile;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolOutputUnion(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.textItem = this.convertValues(source["textItem"], ToolOutputText);
-	        this.imageItem = this.convertValues(source["imageItem"], ToolOutputImage);
-	        this.fileItem = this.convertValues(source["fileItem"], ToolOutputFile);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class InvokeToolResponseBody {
-	    outputs?: ToolOutputUnion[];
-	    meta?: Record<string, any>;
-	    isBuiltIn: boolean;
-	    isError: boolean;
-	    errorMessage: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeToolResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.outputs = this.convertValues(source["outputs"], ToolOutputUnion);
-	        this.meta = source["meta"];
-	        this.isBuiltIn = source["isBuiltIn"];
-	        this.isError = source["isError"];
-	        this.errorMessage = source["errorMessage"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class InvokeToolResponse {
-	    Body?: InvokeToolResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new InvokeToolResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], InvokeToolResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	
 	
 	export class ListConversationsRequest {
@@ -9037,258 +8860,6 @@ export namespace spec {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.Body = this.convertValues(source["Body"], ListProviderPresetsResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ListToolBundlesRequest {
-	    BundleIDs: string[];
-	    IncludeDisabled: boolean;
-	    PageSize: number;
-	    PageToken: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolBundlesRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleIDs = source["BundleIDs"];
-	        this.IncludeDisabled = source["IncludeDisabled"];
-	        this.PageSize = source["PageSize"];
-	        this.PageToken = source["PageToken"];
-	    }
-	}
-	export class ToolBundle {
-	    schemaVersion: string;
-	    id: string;
-	    slug: string;
-	    displayName?: string;
-	    description?: string;
-	    isEnabled: boolean;
-	    isBuiltIn: boolean;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolBundle(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.schemaVersion = source["schemaVersion"];
-	        this.id = source["id"];
-	        this.slug = source["slug"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.isEnabled = source["isEnabled"];
-	        this.isBuiltIn = source["isBuiltIn"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ListToolBundlesResponseBody {
-	    toolBundles: ToolBundle[];
-	    nextPageToken?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolBundlesResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.toolBundles = this.convertValues(source["toolBundles"], ToolBundle);
-	        this.nextPageToken = source["nextPageToken"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ListToolBundlesResponse {
-	    Body?: ListToolBundlesResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolBundlesResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], ListToolBundlesResponseBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class ListToolsRequest {
-	    BundleIDs: string[];
-	    Tags: string[];
-	    IncludeDisabled: boolean;
-	    RecommendedPageSize: number;
-	    PageToken: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolsRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleIDs = source["BundleIDs"];
-	        this.Tags = source["Tags"];
-	        this.IncludeDisabled = source["IncludeDisabled"];
-	        this.RecommendedPageSize = source["RecommendedPageSize"];
-	        this.PageToken = source["PageToken"];
-	    }
-	}
-	export class ToolListItem {
-	    bundleID: string;
-	    bundleSlug: string;
-	    toolSlug: string;
-	    toolVersion: string;
-	    isBuiltIn: boolean;
-	    toolDefinition: Tool;
-	
-	    static createFrom(source: any = {}) {
-	        return new ToolListItem(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.bundleID = source["bundleID"];
-	        this.bundleSlug = source["bundleSlug"];
-	        this.toolSlug = source["toolSlug"];
-	        this.toolVersion = source["toolVersion"];
-	        this.isBuiltIn = source["isBuiltIn"];
-	        this.toolDefinition = this.convertValues(source["toolDefinition"], Tool);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ListToolsResponseBody {
-	    toolListItems: ToolListItem[];
-	    nextPageToken?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolsResponseBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.toolListItems = this.convertValues(source["toolListItems"], ToolListItem);
-	        this.nextPageToken = source["nextPageToken"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ListToolsResponse {
-	    Body?: ListToolsResponseBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new ListToolsResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Body = this.convertValues(source["Body"], ListToolsResponseBody);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -9562,124 +9133,6 @@ export namespace spec {
 	
 	    static createFrom(source: any = {}) {
 	        return new PatchProviderPresetResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class PatchToolBundleRequestBody {
-	    isEnabled: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolBundleRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isEnabled = source["isEnabled"];
-	    }
-	}
-	export class PatchToolBundleRequest {
-	    BundleID: string;
-	    Body?: PatchToolBundleRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolBundleRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.Body = this.convertValues(source["Body"], PatchToolBundleRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PatchToolBundleResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolBundleResponse(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	
-	    }
-	}
-	export class PatchToolRequestBody {
-	    isEnabled: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolRequestBody(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.isEnabled = source["isEnabled"];
-	    }
-	}
-	export class PatchToolRequest {
-	    BundleID: string;
-	    ToolSlug: string;
-	    Version: string;
-	    Body?: PatchToolRequestBody;
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolRequest(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.BundleID = source["BundleID"];
-	        this.ToolSlug = source["ToolSlug"];
-	        this.Version = source["Version"];
-	        this.Body = this.convertValues(source["Body"], PatchToolRequestBody);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	export class PatchToolResponse {
-	
-	
-	    static createFrom(source: any = {}) {
-	        return new PatchToolResponse(source);
 	    }
 	
 	    constructor(source: any = {}) {
@@ -10048,7 +9501,6 @@ export namespace spec {
 	}
 	
 	
-	
 	export class SearchConversationsRequest {
 	    Query: string;
 	    PageToken: string;
@@ -10356,15 +9808,89 @@ export namespace spec {
 	
 	
 	
+	export class ToolOutputFile {
+	    fileName: string;
+	    fileMIME: string;
+	    fileData: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new ToolOutputFile(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.fileName = source["fileName"];
+	        this.fileMIME = source["fileMIME"];
+	        this.fileData = source["fileData"];
+	    }
+	}
+	export class ToolOutputImage {
+	    detail: string;
+	    imageName: string;
+	    imageMIME: string;
+	    imageData: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new ToolOutputImage(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.detail = source["detail"];
+	        this.imageName = source["imageName"];
+	        this.imageMIME = source["imageMIME"];
+	        this.imageData = source["imageData"];
+	    }
+	}
 	
+	export class ToolOutputText {
+	    text: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new ToolOutputText(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.text = source["text"];
+	    }
+	}
+	export class ToolOutputUnion {
+	    kind: string;
+	    textItem?: ToolOutputText;
+	    imageItem?: ToolOutputImage;
+	    fileItem?: ToolOutputFile;
 	
+	    static createFrom(source: any = {}) {
+	        return new ToolOutputUnion(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.textItem = this.convertValues(source["textItem"], ToolOutputText);
+	        this.imageItem = this.convertValues(source["imageItem"], ToolOutputImage);
+	        this.fileItem = this.convertValues(source["fileItem"], ToolOutputFile);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	
 	
 	

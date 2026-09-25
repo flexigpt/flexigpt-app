@@ -32,9 +32,7 @@ type Installer struct {
 	fingerprint   cryptoutil.Digest
 }
 
-func NewInstaller(
-	dependencies InstallerDependencies,
-) (*Installer, error) {
+func NewInstaller(dependencies InstallerDependencies) (*Installer, error) {
 	if dependencies.Tools == nil ||
 		dependencies.Packages == nil ||
 		dependencies.GoTools == nil {
@@ -112,13 +110,9 @@ func (i *Installer) BuiltInPackageScopes() []basespec.Locator {
 func (i *Installer) DesiredHydration(
 	ctx context.Context,
 ) (topology.Hydration, error) {
-	if i == nil {
-		return topology.Hydration{}, basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := i.ready(ctx); err != nil {
 		return topology.Hydration{}, err
 	}
-
 	value := topology.Hydration{
 		InstallerName: i.BuiltInName(),
 		RootID:        i.rootID,
@@ -134,10 +128,7 @@ func (i *Installer) DesiredHydration(
 func (i *Installer) DesiredPackageHydrations(
 	ctx context.Context,
 ) ([]topology.PackageHydration, error) {
-	if i == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := i.ready(ctx); err != nil {
 		return nil, err
 	}
 
@@ -164,32 +155,21 @@ func (i *Installer) DesiredPackageHydrations(
 	return topology.NormalizePackageHydrations(output)
 }
 
-func (i *Installer) Ensure(
-	ctx context.Context,
-) error {
-	if i == nil {
-		return basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return err
-	}
+func (i *Installer) Ensure(ctx context.Context) error {
 	if err := i.EnsureHydration(ctx, false); err != nil {
 		return err
 	}
 	return i.FinalizeHydration(ctx)
 }
 
-func (i *Installer) EnsureHydration(
-	ctx context.Context,
-	_ bool,
-) error {
-	if i == nil {
-		return basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+func (i *Installer) EnsureHydration(ctx context.Context, _ bool) error {
+	if err := i.ready(ctx); err != nil {
 		return err
 	}
 	for _, value := range i.prepared {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if err := i.installPreparedPackage(ctx, value); err != nil {
 			return err
 		}
@@ -202,22 +182,43 @@ func (i *Installer) EnsurePackageHydration(
 	_ bool,
 	stale []topology.PackageHydration,
 ) error {
-	if i == nil {
-		return basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := i.ready(ctx); err != nil {
 		return err
 	}
 
+	desired := make(map[basespec.Locator]struct{}, len(i.packageScopes))
+	for _, scope := range i.packageScopes {
+		desired[scope] = struct{}{}
+	}
+
 	for _, value := range stale {
-		address, err := source.ParseManagedPackageAddressDirectory(
-			value.Key.Scope,
-		)
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if value.Key.InstallerName != i.BuiltInName() ||
+			value.RootID != i.rootID ||
+			value.SourceID != i.sourceID {
+			return fmt.Errorf(
+				"%w: stale Tool hydration belongs to another installer or Source",
+				basespec.ErrProtected,
+			)
+		}
+
+		address, err := source.ParseManagedPackageAddressDirectory(value.Key.Scope)
 		if err != nil {
 			return err
 		}
 		if address.Kind != toolDomain.ToolPackageKind &&
 			address.Kind != toolDomain.ToolCollectionPackageKind {
+			return fmt.Errorf(
+				"%w: stale Tool hydration has an unsupported package kind",
+				basespec.ErrInvalid,
+			)
+		}
+
+		// Desired packages are replaced by Publish without a preceding
+		// removal. This preserves their normal Artifact lifecycle.
+		if _, stillDesired := desired[value.Key.Scope]; stillDesired {
 			continue
 		}
 		if err := i.tools.RemoveBuiltInPackage(
@@ -234,35 +235,40 @@ func (i *Installer) EnsurePackageHydration(
 		}
 	}
 
-	for _, value := range i.prepared {
-		if err := i.installPreparedPackage(ctx, value); err != nil {
-			return err
-		}
-	}
-	return nil
+	return i.EnsureHydration(ctx, false)
 }
 
-func (i *Installer) FinalizeHydration(
-	ctx context.Context,
-) error {
-	if i == nil {
-		return basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+func (i *Installer) FinalizeHydration(ctx context.Context) error {
+	if err := i.ready(ctx); err != nil {
 		return err
 	}
-	return i.tools.EnsureBuiltInSourceCurrent(
-		ctx,
-		i.rootID,
-		i.sourceID,
-	)
+	return i.tools.EnsureBuiltInSourceCurrent(ctx, i.rootID, i.sourceID)
+}
+
+func (i *Installer) ready(ctx context.Context) error {
+	if i == nil || i.tools == nil {
+		return basespec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: built-in Tool installer context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	return installerapi.RequirePrivileged(ctx)
 }
 
 func (i *Installer) installPreparedPackage(
 	ctx context.Context,
 	value PreparedPackage,
 ) error {
-	return i.tools.InstallBuiltInPackage(
+	if err := value.Validate(); err != nil {
+		return err
+	}
+	if err := i.tools.InstallBuiltInPackage(
 		ctx,
 		toolConsumerAPI.BuiltInPackageInstallRequest{
 			RootID:              i.rootID,
@@ -274,5 +280,12 @@ func (i *Installer) installPreparedPackage(
 			ExpectedLogicalName: value.ExpectedLogicalName,
 			ExpectedDefinition:  value.ExpectedDefinition,
 		},
-	)
+	); err != nil {
+		return fmt.Errorf(
+			"install built-in Tool package %q: %w",
+			value.Address,
+			err,
+		)
+	}
+	return nil
 }

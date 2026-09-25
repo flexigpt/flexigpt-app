@@ -1,4 +1,4 @@
-import type { Tool, ToolStoreChoice, UIToolUserArgsStatus } from '@/spec/tool';
+import type { ToolStoreChoice, ToolView, UIToolUserArgsStatus } from '@/spec/tool';
 import { ToolStoreChoiceType } from '@/spec/tool';
 
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
@@ -7,96 +7,77 @@ export interface ConversationToolStateEntry {
 	key: string;
 	toolStoreChoice: ToolStoreChoice;
 	enabled: boolean;
-	/** Optional full tool definition, used for arg schema etc. */
-	toolDefinition?: Tool;
-	/** Cached status of userArgSchemaInstance vs schema. */
+	toolDefinition?: ToolView;
+	toolLoadError?: string;
 	argStatus?: UIToolUserArgsStatus;
 }
 
 /**
- * Initialize UI state from an array of ToolStoreChoice coming from history
- * (e.g. last user message's toolChoices).
+ * Input is frontend-enriched choices. Stored ToolSelections must first be
+ * hydrated through toolManagementAPI.
  */
 export function toolStoreChoicesToConversationTools(choices: ToolStoreChoice[]): ConversationToolStateEntry[] {
-	const out: ConversationToolStateEntry[] = [];
+	const output: ConversationToolStateEntry[] = [];
 	const seen = new Set<string>();
 
-	for (const t of choices ?? []) {
-		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
-			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			out.push({ key, toolStoreChoice: t, enabled: true });
-		}
-	}
-
-	return out;
-}
-
-/**
- * Extract only the ENABLED tools, deduped by identity, for attachment to a message.
- */
-export function conversationToolsToChoices(entries: ConversationToolStateEntry[]): ToolStoreChoice[] {
-	if (!entries || entries.length === 0) {
-		return [];
-	}
-	const out: ToolStoreChoice[] = [];
-	const seen = new Set<string>();
-
-	for (const e of entries) {
-		if (!e.enabled) {
+	for (const choice of choices ?? []) {
+		if (choice.toolType === ToolStoreChoiceType.WebSearch) {
 			continue;
 		}
-		const t = e.toolStoreChoice;
-		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
-			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-			if (seen.has(key)) {
-				continue;
-			}
+		const key = toolIdentityKey(choice.target);
+		if (!seen.has(key)) {
 			seen.add(key);
-			out.push(t);
+			output.push({ key, toolStoreChoice: choice, enabled: true });
 		}
 	}
-
-	return out;
+	return output;
 }
 
-/**
- * After a send, merge any newly used tools into the UI state.
- * - Preserves existing enabled/disabled flags.
- * - Adds brand-new tools as enabled=true.
- */
-export function mergeConversationToolsWithNewChoices(
-	prev: ConversationToolStateEntry[],
-	newTools: ToolStoreChoice[]
-): ConversationToolStateEntry[] {
-	if (!newTools || newTools.length === 0) {
-		return prev;
-	}
+export function conversationToolsToChoices(entries: ConversationToolStateEntry[]): ToolStoreChoice[] {
+	const output: ToolStoreChoice[] = [];
+	const seen = new Set<string>();
 
-	const next = [...prev];
-	const indexByKey = new Map<string, number>();
-	for (let i = 0; i < next.length; i += 1) {
-		indexByKey.set(next[i].key, i);
-	}
-
-	for (const t of newTools) {
-		if (t.toolType !== ToolStoreChoiceType.WebSearch) {
-			const key = toolIdentityKey(t.bundleID, undefined, t.toolSlug, t.toolVersion);
-			const existingIdx = indexByKey.get(key);
-			if (existingIdx !== null && existingIdx !== undefined) {
-				// Refresh metadata but keep enabled flag.
-				next[existingIdx] = {
-					...next[existingIdx],
-					toolStoreChoice: { ...next[existingIdx].toolStoreChoice, ...t },
-				};
-			} else {
-				next.push({ key, toolStoreChoice: t, enabled: true });
-			}
+	for (const entry of entries ?? []) {
+		const choice = entry.toolStoreChoice;
+		if (!entry.enabled || choice.toolType === ToolStoreChoiceType.WebSearch) {
+			continue;
+		}
+		const key = toolIdentityKey(choice.target);
+		if (!seen.has(key)) {
+			seen.add(key);
+			output.push(choice);
 		}
 	}
+	return output;
+}
 
+export function mergeConversationToolsWithNewChoices(
+	previous: ConversationToolStateEntry[],
+	choices: ToolStoreChoice[]
+): ConversationToolStateEntry[] {
+	if (!choices?.length) {
+		return previous;
+	}
+
+	const next = [...previous];
+	const indexes = new Map(next.map((entry, index) => [entry.key, index]));
+
+	for (const choice of choices) {
+		if (choice.toolType === ToolStoreChoiceType.WebSearch) {
+			continue;
+		}
+		const key = toolIdentityKey(choice.target);
+		const index = indexes.get(key);
+
+		if (index !== undefined) {
+			next[index] = {
+				...next[index],
+				toolStoreChoice: choice,
+			};
+		} else {
+			indexes.set(key, next.length);
+			next.push({ key, toolStoreChoice: choice, enabled: true });
+		}
+	}
 	return next;
 }

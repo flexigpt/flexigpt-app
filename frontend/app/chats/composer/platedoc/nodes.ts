@@ -1,27 +1,24 @@
-import type { Tool, ToolStoreChoiceType } from '@/spec/tool';
+import type { TElement, TText } from 'platejs';
+
+import type { ToolView, UIToolStoreChoice } from '@/spec/tool';
 
 export const KEY_TOOL_SELECTION = 'toolSelection';
 
-// oxlint-disable-next-line typescript/consistent-type-definitions
-export type ToolSelectionElementNode = {
-	type: typeof KEY_TOOL_SELECTION;
-	choiceID: string;
-	bundleID: string;
-	bundleSlug?: string;
-	toolSlug: string;
-	toolVersion: string;
-	selectionID: string;
-	toolType: ToolStoreChoiceType;
-	autoExecute: boolean;
-	userArgSchemaInstance?: string;
+/**
+ * Plate requires inserted element nodes to structurally satisfy TElement.
+ * Extending TElement also gives the node the index signature expected by
+ * Plate's generic transform APIs.
+ */
+export type ToolSelectionElementNode = TElement &
+	UIToolStoreChoice & {
+		type: typeof KEY_TOOL_SELECTION;
+		toolSnapshot?: ToolView;
+		overrides?: {
+			displayName?: string;
+			description?: string;
+			tags?: string[];
+		};
 
-	toolSnapshot?: Tool;
-	overrides?: {
-		displayName?: string;
-		description?: string;
-		tags?: string[];
+		// Inline void elements need one text child.
+		children: [TText];
 	};
-
-	// inline+void node needs a text child
-	children: [{ text: '' }];
-};

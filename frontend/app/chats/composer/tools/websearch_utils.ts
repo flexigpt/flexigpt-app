@@ -4,7 +4,11 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-// Persisted config we keep in UI state (NO choiceID; we generate a fresh one per send).
+import { toolChoiceFromListItem } from '@/apis/tool_management';
+
+import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
+import { computeToolUserArgsStatus } from '@/tools/lib/tool_userargs_utils';
+
 export type WebSearchChoiceTemplate = Omit<ToolStoreChoice, 'choiceID'> & {
 	toolType: ToolStoreChoiceType.WebSearch;
 };
@@ -12,67 +16,68 @@ export type WebSearchChoiceTemplate = Omit<ToolStoreChoice, 'choiceID'> & {
 export function normalizeWebSearchChoiceTemplates(
 	templates: WebSearchChoiceTemplate[] | null | undefined
 ): WebSearchChoiceTemplate[] {
-	const out: WebSearchChoiceTemplate[] = [];
-	const seen = new Set<string>();
-
-	for (const template of templates ?? []) {
-		const key = `${template.bundleID}/${template.toolSlug}@${template.toolVersion}`;
-		if (seen.has(key)) {
-			continue;
-		}
-		seen.add(key);
-		out.push(template);
-		if (out.length === 1) {
-			break;
-		}
-	}
-
-	return out;
+	return templates?.length ? [templates[0]] : [];
 }
 
 export function webSearchTemplateFromChoice(choice: ToolStoreChoice): WebSearchChoiceTemplate {
-	const { choiceID: _drop, ...rest } = choice;
-	return rest as WebSearchChoiceTemplate;
-}
+	if (choice.toolType !== ToolStoreChoiceType.WebSearch || choice.implementationKind !== ToolImplType.SDK) {
+		throw new Error('The selected tool is not a provider web-search tool.');
+	}
 
-export function webSearchTemplateFromToolListItem(item: ToolListItem): WebSearchChoiceTemplate {
+	const { choiceID: _choiceID, ...template } = choice;
 	return {
-		bundleID: item.bundleID,
-		bundleSlug: item.bundleSlug,
-		toolID: item.toolDefinition.id,
-		toolSlug: item.toolSlug,
-		toolVersion: item.toolVersion,
+		...template,
 		toolType: ToolStoreChoiceType.WebSearch,
-		displayName: item.toolDefinition.displayName,
-		description: item.toolDefinition.description,
 		autoExecute: false,
-		userArgSchemaInstance: undefined,
 	};
 }
 
-function buildWebSearchChoiceForSubmit(t: WebSearchChoiceTemplate): ToolStoreChoice {
-	return { ...t, choiceID: getUUIDv7() };
+export function webSearchTemplateFromToolListItem(item: ToolListItem): WebSearchChoiceTemplate {
+	return webSearchTemplateFromChoice(toolChoiceFromListItem(item, false));
 }
 
-function isEligibleWebSearchToolForSDKType(item: ToolListItem, sdkType: ProviderSDKType): boolean {
-	if (item.toolDefinition.llmToolType !== ToolStoreChoiceType.WebSearch) {
-		return false;
-	}
-	// Provider-managed web-search tools are SDK-bound
-	if (item.toolDefinition.type !== ToolImplType.SDK) {
-		return false;
-	}
-	return item.toolDefinition.sdkImpl?.sdkType === sdkType.toString();
+function getEligibleWebSearchTools(tools: ToolListItem[], sdkType: ProviderSDKType): ToolListItem[] {
+	return tools.filter(item => {
+		const implementation = item.toolDefinition.implementation;
+		return (
+			implementation.kind === ToolImplType.SDK &&
+			implementation.sdkToolType === ToolStoreChoiceType.WebSearch &&
+			implementation.sdkType === sdkType.toString()
+		);
+	});
 }
 
-export function getEligibleWebSearchTools(tools: ToolListItem[], sdkType: ProviderSDKType): ToolListItem[] {
-	return tools.filter(t => isEligibleWebSearchToolForSDKType(t, sdkType));
+export function buildWebSearchChoicesForSubmit(templates: WebSearchChoiceTemplate[]): ToolStoreChoice[] {
+	return normalizeWebSearchChoiceTemplates(templates).map(template => ({
+		...template,
+		choiceID: getUUIDv7(),
+	}));
 }
 
-export function buildWebSearchChoicesForSubmit(ts: WebSearchChoiceTemplate[]): ToolStoreChoice[] {
-	return normalizeWebSearchChoiceTemplates(ts).map(t => buildWebSearchChoiceForSubmit(t));
+export function webSearchIdentityKey(value: Pick<ToolStoreChoice, 'target'>): string {
+	return toolIdentityKey(value.target);
 }
 
-export function webSearchIdentityKey(t: { bundleID: string; toolSlug: string; toolVersion: string }): string {
-	return `${t.bundleID}/${t.toolSlug}@${t.toolVersion}`;
+export function getWebSearchConfiguration(
+	templates: WebSearchChoiceTemplate[],
+	tools: ToolListItem[],
+	catalogReady: boolean,
+	sdkType: ProviderSDKType
+) {
+	const eligible = catalogReady ? getEligibleWebSearchTools(tools, sdkType) : [];
+	const active = templates[0];
+	const item = active
+		? eligible.find(candidate => webSearchIdentityKey(candidate) === webSearchIdentityKey(active))
+		: undefined;
+	const status = item
+		? computeToolUserArgsStatus(item.toolDefinition.userArgSchema, active?.userArgSchemaInstance)
+		: undefined;
+
+	return {
+		eligible,
+		active,
+		item,
+		status,
+		blocked: Boolean(active && (!catalogReady || !item || (status?.hasSchema && !status.isSatisfied))),
+	};
 }

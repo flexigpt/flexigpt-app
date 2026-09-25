@@ -2,134 +2,80 @@ import type { Path } from 'platejs';
 import type { PlateEditor } from 'platejs/react';
 import { ElementApi, NodeApi } from 'platejs';
 
-import type { Tool, UIToolStoreChoice } from '@/spec/tool';
-import { ToolStoreChoiceType } from '@/spec/tool';
+import type { ToolListItem, ToolView, UIToolStoreChoice } from '@/spec/tool';
+import { ToolImplType } from '@/spec/tool';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
+import { toolChoiceFromListItem } from '@/apis/tool_management';
+
 import type { ToolSelectionElementNode } from '@/chats/composer/platedoc/nodes';
 import { KEY_TOOL_SELECTION } from '@/chats/composer/platedoc/nodes';
+import { uiToolChoiceToToolStoreChoice } from '@/tools/lib/tool_choice_utils';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
-export interface AttachedToolEntry {
-	choiceID: string;
-	bundleID: string;
-	bundleSlug?: string;
-	toolSlug: string;
-	toolVersion: string;
-	selectionID: string;
-	toolType: ToolStoreChoiceType;
-	autoExecute: boolean;
-	userArgSchemaInstance?: string;
-	toolSnapshot?: Tool;
+export interface AttachedToolEntry extends UIToolStoreChoice {
+	toolSnapshot?: ToolView;
 	overrides?: ToolSelectionElementNode['overrides'];
-}
-
-function toolIdentityKeyFromNode(
-	n: Pick<ToolSelectionElementNode, 'bundleID' | 'bundleSlug' | 'toolSlug' | 'toolVersion'>
-): string {
-	return toolIdentityKey(n.bundleID, n.bundleSlug, n.toolSlug, n.toolVersion);
-}
-
-function getAttachedToolKeySet(editor: PlateEditor): Set<string> {
-	const keys = new Set<string>();
-	for (const [el] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			keys.add(toolIdentityKeyFromNode(el as unknown as ToolSelectionElementNode));
-		}
-	}
-	return keys;
 }
 
 function toAttachedToolEntry(node: ToolSelectionElementNode): AttachedToolEntry {
 	return {
-		choiceID: node.choiceID,
-		bundleID: node.bundleID,
-		bundleSlug: node.bundleSlug,
-		toolSlug: node.toolSlug,
-		toolVersion: node.toolVersion,
+		...uiToolChoiceToToolStoreChoice(node),
 		selectionID: node.selectionID,
-		toolType: node.toolType,
-		autoExecute: node.autoExecute,
-		userArgSchemaInstance: node.userArgSchemaInstance,
+		displayName: node.overrides?.displayName ?? node.displayName ?? node.toolSnapshot?.displayName ?? node.target.name,
+		description: node.overrides?.description ?? node.description ?? node.toolSnapshot?.description,
 		toolSnapshot: node.toolSnapshot,
 		overrides: node.overrides,
 	};
 }
 
-// Insert a hidden tool selection chip (inline+void) to drive bottom bar UI.
-export function insertToolSelectionNode(
-	editor: PlateEditor,
-	item: {
-		bundleID: string;
-		bundleSlug?: string;
-		toolSlug: string;
-		toolVersion: string;
-	},
-	toolSnapshot?: Tool,
-	opts?: {
-		toolType?: ToolStoreChoiceType;
-		choiceID?: string;
-		autoExecute: boolean;
-		userArgSchemaInstance?: string;
-	}
-) {
-	const identity = toolIdentityKey(item.bundleID, item.bundleSlug, item.toolSlug, item.toolVersion);
-	if (getAttachedToolKeySet(editor).has(identity)) {
+export function insertToolSelectionNode(editor: PlateEditor, item: ToolListItem, autoExecute: boolean): void {
+	const key = toolIdentityKey(item.target);
+	if (getAttachedToolEntries(editor).some(entry => toolIdentityKey(entry.target) === key)) {
 		return;
 	}
 
-	const selectionID = `tool:${item.bundleID}/${item.toolSlug}@${item.toolVersion}:${Date.now().toString(36)}${Math.random()
-		.toString(36)
-		.slice(2, 8)}`;
-
+	const choice = toolChoiceFromListItem(item, autoExecute);
 	const node: ToolSelectionElementNode = {
+		...choice,
+		target: { ...choice.target },
 		type: KEY_TOOL_SELECTION,
-		choiceID: opts?.choiceID ?? getUUIDv7(),
-
-		bundleID: item.bundleID,
-		bundleSlug: item.bundleSlug,
-		toolSlug: item.toolSlug,
-		toolVersion: item.toolVersion,
-
-		toolType: opts?.toolType ?? toolSnapshot?.llmToolType ?? ToolStoreChoiceType.Function,
-		autoExecute: opts?.autoExecute ?? toolSnapshot?.autoExecute ?? false,
-		userArgSchemaInstance: opts?.userArgSchemaInstance,
-
-		selectionID,
-		toolSnapshot,
+		selectionID: `tool:${getUUIDv7()}`,
+		toolSnapshot: structuredClone(item.toolDefinition),
 		overrides: {},
 		children: [{ text: '' }],
 	};
 
 	editor.tf.withoutNormalizing(() => {
-		// Insert the tool chip (invisible inline) and an empty text leaf after it
-		// so the caret has a cheap place to land without forcing block normalization.
 		editor.tf.insertNodes([node, { text: '' }], { select: true });
 	});
 }
 
-// By default, returns only the first occurrence for each unique tool identity.
-export function getAttachedToolEntries(editor: PlateEditor, uniqueByIdentity?: boolean): AttachedToolEntry[] {
-	const out: AttachedToolEntry[] = [];
-	const unique = uniqueByIdentity ?? true;
-	const seen = unique ? new Set<string>() : undefined;
+export function getAttachedToolEntries(editor: PlateEditor, uniqueByIdentity = true): AttachedToolEntry[] {
+	const output: AttachedToolEntry[] = [];
+	const seen = new Set<string>();
 
-	for (const [el] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			const node = el as unknown as ToolSelectionElementNode;
-			if (unique) {
-				const key = toolIdentityKeyFromNode(node);
-				if ((seen as Set<string>).has(key)) {
-					continue;
-				}
-				(seen as Set<string>).add(key);
-			}
-			out.push(toAttachedToolEntry(node));
+	for (const [element] of NodeApi.elements(editor)) {
+		if (!ElementApi.isElementType(element, KEY_TOOL_SELECTION)) {
+			continue;
 		}
+		const node = element as unknown as ToolSelectionElementNode;
+		const key = toolIdentityKey(node.target);
+		if (uniqueByIdentity && seen.has(key)) {
+			continue;
+		}
+		seen.add(key);
+		output.push(toAttachedToolEntry(node));
 	}
+	return output;
+}
 
-	return out;
+export function getAttachedTools(editor: PlateEditor): UIToolStoreChoice[] {
+	return getAttachedToolEntries(editor).map(entry => ({
+		...uiToolChoiceToToolStoreChoice(entry),
+		selectionID: entry.selectionID,
+	}));
 }
 
 export function setAttachedToolUserArgSchemaInstanceBySelectionID(
@@ -137,105 +83,56 @@ export function setAttachedToolUserArgSchemaInstanceBySelectionID(
 	selectionID: string,
 	newInstance: string
 ): boolean {
-	for (const [el, path] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			const node = el as unknown as ToolSelectionElementNode;
-			if (node.selectionID !== selectionID) {
-				continue;
-			}
-
+	for (const [element, path] of NodeApi.elements(editor)) {
+		if (!ElementApi.isElementType(element, KEY_TOOL_SELECTION)) {
+			continue;
+		}
+		const node = element as unknown as ToolSelectionElementNode;
+		if (node.selectionID === selectionID) {
 			editor.tf.setNodes<ToolSelectionElementNode>({ userArgSchemaInstance: newInstance }, { at: path });
 			return true;
 		}
 	}
-
 	return false;
 }
 
-// Remove all instances of a tool by identity key (bundle+slug+version).
-export function removeToolByKey(editor: PlateEditor, identityKey: string) {
+export function removeToolByKey(editor: PlateEditor, identityKey: string): void {
 	const paths: Path[] = [];
-	for (const [el, path] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			const n = el as unknown as ToolSelectionElementNode;
-			if (toolIdentityKeyFromNode(n) === identityKey) {
-				paths.push(path);
-			}
+	for (const [element, path] of NodeApi.elements(editor)) {
+		if (
+			ElementApi.isElementType(element, KEY_TOOL_SELECTION) &&
+			toolIdentityKey((element as unknown as ToolSelectionElementNode).target) === identityKey
+		) {
+			paths.push(path);
 		}
-	}
-	// Remove from last to first to avoid path shift issues.
-	for (const p of paths.toReversed()) {
-		try {
-			editor.tf.removeNodes({ at: p });
-		} catch {
-			// swallow
-		}
-	}
-}
-
-// Build a serializable list of attached tools for submission
-export function getAttachedTools(editor: PlateEditor): UIToolStoreChoice[] {
-	const items: UIToolStoreChoice[] = [];
-	const seen = new Set<string>();
-
-	for (const [el] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			const n = el as unknown as ToolSelectionElementNode;
-			const key = toolIdentityKeyFromNode(n);
-			if (seen.has(key)) {
-				continue;
-			}
-			seen.add(key);
-			items.push({
-				choiceID: n.choiceID,
-				selectionID: n.selectionID,
-				bundleID: n.bundleID,
-				toolSlug: n.toolSlug,
-				toolVersion: n.toolVersion,
-				displayName: n.overrides?.displayName
-					? n.overrides.displayName
-					: n.toolSnapshot?.displayName
-						? n.toolSnapshot.displayName
-						: n.toolSlug,
-				description: n.overrides?.description
-					? n.overrides.description
-					: n.toolSnapshot?.description
-						? n.toolSnapshot.description
-						: n.toolSlug,
-				toolID: n.toolSnapshot?.id,
-				toolType: n.toolType,
-				autoExecute: n.autoExecute,
-				userArgSchemaInstance: n.userArgSchemaInstance,
-			});
-		}
-	}
-	return items;
-}
-
-// Update autoExecute for all instances of a tool by identity key (bundle+slug+version).
-export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string, autoExecute: boolean) {
-	const paths: Path[] = [];
-	for (const [el, path] of NodeApi.elements(editor)) {
-		if (ElementApi.isElementType(el, KEY_TOOL_SELECTION)) {
-			const n = el as unknown as ToolSelectionElementNode;
-			if (toolIdentityKeyFromNode(n) === identityKey) {
-				paths.push(path);
-			}
-		}
-	}
-
-	if (paths.length === 0) {
-		return;
 	}
 
 	editor.tf.withoutNormalizing(() => {
-		for (const p of paths) {
-			try {
-				// Update the hidden carrier node; chips read from this.
-				editor.tf.setNodes<ToolSelectionElementNode>({ autoExecute }, { at: p });
-			} catch {
-				// swallow
-			}
+		for (const path of paths.toReversed()) {
+			editor.tf.removeNodes({ at: path });
+		}
+	});
+}
+
+export function setToolAutoExecuteByKey(editor: PlateEditor, identityKey: string, autoExecute: boolean): void {
+	const updates: Array<{ path: Path; autoExecute: boolean }> = [];
+
+	for (const [element, path] of NodeApi.elements(editor)) {
+		if (!ElementApi.isElementType(element, KEY_TOOL_SELECTION)) {
+			continue;
+		}
+		const node = element as unknown as ToolSelectionElementNode;
+		if (toolIdentityKey(node.target) === identityKey) {
+			updates.push({
+				path,
+				autoExecute: node.implementationKind === ToolImplType.Go && autoExecute,
+			});
+		}
+	}
+
+	editor.tf.withoutNormalizing(() => {
+		for (const update of updates) {
+			editor.tf.setNodes<ToolSelectionElementNode>({ autoExecute: update.autoExecute }, { at: update.path });
 		}
 	});
 }
