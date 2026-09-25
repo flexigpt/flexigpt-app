@@ -221,7 +221,7 @@ export function useDiffApplyController(
 					pathInput,
 					targetPath: explicitTargetPath,
 					effectiveTargetPath,
-					candidates: uniquePaths([...(suggestion?.candidates ?? []), reviewOutcome?.resolvedTargetPath]),
+					candidates: uniquePaths([reviewOutcome?.resolvedTargetPath, ...(suggestion?.candidates ?? [])]),
 					fingerprint,
 					reviewOutcome,
 					applyOutcome,

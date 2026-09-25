@@ -35,6 +35,11 @@ export interface DropdownProps<K extends string> {
 	 */
 	inlineMenu?: boolean;
 	maxSummaryHeight?: number | string;
+	/**
+	 * Opens the dropdown on its first render. This is primarily useful with
+	 * inlineMenu inside a modal.
+	 */
+	defaultOpen?: boolean;
 }
 
 // A single reusable dropdown that can be used by passing the appropriate config.
@@ -52,9 +57,10 @@ export function Dropdown<K extends string>(props: DropdownProps<K>) {
 		disabled = false,
 		inlineMenu = false,
 		maxSummaryHeight,
+		defaultOpen = false,
 	} = props;
 
-	const [isOpen, setIsOpen] = useState(false);
+	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const [floatingStyle, setFloatingStyle] = useState<CSSProperties | null>(null);
 	const [portalTarget, setPortalTarget] = useState<Element | null>(null);
 	const detailsRef = useRef<HTMLDetailsElement>(null);
@@ -62,9 +68,6 @@ export function Dropdown<K extends string>(props: DropdownProps<K>) {
 	const menuRef = useRef<HTMLUListElement>(null);
 
 	const closeMenu = useCallback(() => {
-		if (detailsRef.current) {
-			detailsRef.current.open = false;
-		}
 		setIsOpen(false);
 		setFloatingStyle(null);
 		setPortalTarget(null);
@@ -191,20 +194,23 @@ export function Dropdown<K extends string>(props: DropdownProps<K>) {
 			{filteredKeys.map(key => {
 				const item = dropdownItems[key];
 				const isItemDisabled = disabled || !item?.isEnabled;
+				const isSelected = key === selectedKey;
 
 				return (
 					<li key={key} className="w-full">
 						<button
 							type="button"
-							aria-current={key === selectedKey ? 'true' : undefined}
+							aria-current={isSelected ? 'true' : undefined}
 							disabled={isItemDisabled}
-							className="m-1 flex w-[calc(100%-0.5rem)] min-w-0 items-center justify-between gap-2 rounded-xl p-2 text-left disabled:cursor-not-allowed disabled:opacity-50"
+							className={`m-1 flex w-[calc(100%-0.5rem)] min-w-0 items-center justify-between gap-2 rounded-xl p-2 text-left disabled:cursor-not-allowed disabled:opacity-50 ${
+								isSelected ? 'bg-primary/15 text-primary ring-primary/30 font-medium ring-1' : 'hover:bg-base-200/70'
+							}`}
 							onClick={() => {
 								handleSelection(key);
 							}}
 						>
 							<span className="min-w-0 truncate">{getItemDisplayName(key)}</span>
-							{key === selectedKey ? <FiCheck className="shrink-0" /> : null}
+							{isSelected ? <FiCheck className="shrink-0" /> : null}
 						</button>
 					</li>
 				);
@@ -220,6 +226,7 @@ export function Dropdown<K extends string>(props: DropdownProps<K>) {
 		<details
 			ref={detailsRef}
 			className="relative w-full"
+			open={isOpen}
 			onToggle={(event: SyntheticEvent<HTMLElement>) => {
 				const details = event.currentTarget as HTMLDetailsElement;
 				if (disabled && details.open) {

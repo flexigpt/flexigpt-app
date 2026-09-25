@@ -28,12 +28,13 @@ interface LazyPanelProps {
 	summary: ReactNode;
 	className?: string;
 	renderContent: () => ReactNode;
+	defaultOpen?: boolean;
 }
 
 const DISPLAY_CANDIDATE_LIMIT = 24;
 
-function LazyPanel({ summary, className = '', renderContent }: LazyPanelProps) {
-	const [isOpen, setIsOpen] = useState(false);
+function LazyPanel({ summary, className = '', renderContent, defaultOpen = false }: LazyPanelProps) {
+	const [isOpen, setIsOpen] = useState(defaultOpen);
 	const contentID = useId();
 
 	return (
@@ -251,7 +252,15 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 	);
 }
 
-function FileCard({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
+function FileCard({
+	view,
+	controller,
+	defaultTargetPickerOpen,
+}: {
+	view: DiffApplyFileView;
+	controller: DiffApplyController;
+	defaultTargetPickerOpen: boolean;
+}) {
 	const { file } = view;
 	const inputID = useId();
 	const displayPath = getInteractiveDiffTargetPath(file) || 'Target path unresolved';
@@ -267,6 +276,12 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 		return items;
 	}, {});
 	const selectedCandidate = candidates.includes(view.pathInput) ? view.pathInput : '';
+	const hasSelectedCandidate = selectedCandidate.length > 0;
+	const manualTargetSummary = hasSelectedCandidate
+		? 'Enter a different target path'
+		: view.targetPath
+			? 'Edit target path'
+			: 'Enter a target path manually';
 
 	const showHunks = file.hunks.length > 0 && (view.canTryHunks || Object.keys(view.hunkOutcomes).length > 0);
 
@@ -338,48 +353,69 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 			<OutcomeNotice label="Review" outcome={view.reviewOutcome} />
 			<OutcomeNotice label="Apply" outcome={view.applyOutcome} />
 
-			<label className="mt-4 mb-1 block text-xs font-semibold" htmlFor={inputID}>
-				Optional target file path
-			</label>
+			<div className="mt-4 space-y-2">
+				<div className="flex items-center justify-between gap-2">
+					<span className="text-xs font-semibold">Eligible target paths</span>
+					<span className="text-base-content/50 text-[11px]">Ranked</span>
+				</div>
 
-			<input
-				id={inputID}
-				className="input input-sm w-full font-mono text-xs"
-				value={view.pathInput}
-				disabled={!!controller.busy}
-				placeholder="Leave blank to let the backend resolve the target"
-				spellCheck={false}
-				onChange={event => {
-					controller.setTargetPath(file.id, event.target.value);
-				}}
-			/>
+				<Dropdown<string>
+					dropdownItems={candidateDropdownItems}
+					selectedKey={selectedCandidate}
+					onChange={candidate => {
+						controller.setTargetPath(file.id, candidate);
+					}}
+					filterDisabled={false}
+					title={`Eligible target paths for ${displayPath}`}
+					placeholderLabel={
+						candidates.length > 0 ? 'Choose a ranked target path' : 'No eligible target paths were found'
+					}
+					orderedKeys={candidates}
+					inlineMenu
+					defaultOpen={defaultTargetPickerOpen}
+					maxMenuHeight={220}
+					disabled={!!controller.busy}
+				/>
 
-			<div className="text-base-content/60 mt-1 text-xs">
-				{!view.targetPath
-					? isNewInteractiveDiffFile(file)
-						? 'For a new file, enter a target path or let the backend request one during review.'
-						: 'The backend resolves and validates target paths from patch headers, workspace roots, or candidates.'
-					: 'Changing this target clears old review and apply results for this file.'}
+				<div className="text-base-content/60 text-xs">
+					{hasSelectedCandidate
+						? 'The selected path is sent as an explicit backend target.'
+						: view.targetPath
+							? 'A manually entered target path is sent to the backend.'
+							: candidates.length > 0
+								? 'Suggestions are ordered by file match, then directory match.'
+								: isNewInteractiveDiffFile(file)
+									? 'No destination was derived for this new file. Enter one manually or let the backend request it.'
+									: 'No target was derived. The backend can still resolve the path during review.'}
+				</div>
 			</div>
 
-			{candidates.length > 0 ? (
-				<div className="mt-2">
-					<Dropdown<string>
-						dropdownItems={candidateDropdownItems}
-						selectedKey={selectedCandidate}
-						onChange={candidate => {
-							controller.setTargetPath(file.id, candidate);
-						}}
-						filterDisabled={false}
-						title={`Suggested target paths for ${displayPath}`}
-						placeholderLabel="Choose a suggested target path"
-						orderedKeys={candidates}
-						inlineMenu
-						maxMenuHeight={220}
-						disabled={!!controller.busy}
-					/>
-				</div>
-			) : null}
+			<LazyPanel
+				className="mt-3"
+				summary={manualTargetSummary}
+				defaultOpen={!!view.pathInput && !hasSelectedCandidate}
+				renderContent={() => (
+					<div>
+						<label className="mb-1 block text-xs font-semibold" htmlFor={inputID}>
+							Target path override
+						</label>
+						<input
+							id={inputID}
+							className="input input-sm w-full font-mono text-xs"
+							value={view.pathInput}
+							disabled={!!controller.busy}
+							placeholder="Leave blank to let the backend resolve the target"
+							spellCheck={false}
+							onChange={event => {
+								controller.setTargetPath(file.id, event.target.value);
+							}}
+						/>
+						<div className="text-base-content/60 mt-1 text-xs">
+							Leave this blank to clear the explicit target and let the backend resolve it.
+						</div>
+					</div>
+				)}
+			/>
 
 			{diagnostics.length > 0 ? (
 				<div className="mt-3">
@@ -423,6 +459,12 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 			? 'Stopping after in-flight requests finish. Already submitted writes cannot be undone.'
 			: `${controller.busy.kind.replaceAll('-', ' ')}: ${controller.busy.completed}/${controller.busy.total}`
 		: '';
+	const unresolvedFiles = controller.files.filter(view => !view.targetPath);
+	const initiallyOpenTargetFileID =
+		unresolvedFiles.find(view => view.file.kind === 'add' && view.candidates.length > 0)?.file.id ??
+		unresolvedFiles.find(view => view.candidates.length > 0)?.file.id ??
+		unresolvedFiles.find(view => view.file.kind === 'add')?.file.id ??
+		unresolvedFiles[0]?.file.id;
 
 	return (
 		<>
@@ -486,7 +528,12 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					) : null}
 
 					{controller.files.map(view => (
-						<FileCard key={view.file.id} view={view} controller={controller} />
+						<FileCard
+							key={view.file.id}
+							view={view}
+							controller={controller}
+							defaultTargetPickerOpen={view.file.id === initiallyOpenTargetFileID}
+						/>
 					))}
 				</div>
 

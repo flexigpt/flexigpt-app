@@ -1037,6 +1037,132 @@ export function isNewInteractiveDiffFile(file: InteractiveDiffFile): boolean {
 	return file.kind === 'add' && file.oldPath === DEV_NULL && !!file.newPath;
 }
 
+interface AbsoluteInteractiveTargetPath {
+	root: string;
+	segments: string[];
+	caseInsensitive: boolean;
+}
+
+interface RankedInteractiveTargetPath {
+	path: string;
+	rank: number;
+	order: number;
+}
+
+interface DirectoryAnchor {
+	candidateIndex: number;
+	targetIndex: number;
+	length: number;
+}
+
+function splitAbsoluteInteractiveTargetPath(value: string): AbsoluteInteractiveTargetPath | undefined {
+	const path = normalizeInteractiveTargetPath(value);
+
+	if (!path) {
+		return undefined;
+	}
+
+	if (/^[A-Z]:\//.test(path)) {
+		return {
+			root: path.slice(0, 3),
+			segments: path.slice(3).split('/').filter(Boolean),
+			caseInsensitive: true,
+		};
+	}
+
+	if (path.startsWith('//')) {
+		const parts = path.slice(2).split('/').filter(Boolean);
+
+		if (parts.length < 2) {
+			return undefined;
+		}
+
+		return {
+			root: `//${parts[0]}/${parts[1]}`,
+			segments: parts.slice(2),
+			caseInsensitive: true,
+		};
+	}
+
+	return {
+		root: '/',
+		segments: path.slice(1).split('/').filter(Boolean),
+		caseInsensitive: false,
+	};
+}
+
+function joinInteractiveAbsolutePath(parts: AbsoluteInteractiveTargetPath, segments: string[]): string {
+	const suffix = segments.filter(Boolean).join('/');
+
+	if (parts.root === '/') {
+		return normalizeInteractiveTargetPath(suffix ? `/${suffix}` : '/');
+	}
+
+	if (parts.root.endsWith('/')) {
+		return normalizeInteractiveTargetPath(suffix ? `${parts.root}${suffix}` : parts.root);
+	}
+
+	return normalizeInteractiveTargetPath(suffix ? `${parts.root}/${suffix}` : parts.root);
+}
+
+function sameInteractivePathSegment(left: string, right: string, caseInsensitive: boolean): boolean {
+	return caseInsensitive ? left.toLowerCase() === right.toLowerCase() : left === right;
+}
+
+function findBestDirectoryAnchor(
+	candidateSegments: string[],
+	targetSegments: string[],
+	caseInsensitive: boolean
+): DirectoryAnchor | undefined {
+	const maxLength = Math.min(candidateSegments.length, targetSegments.length);
+
+	for (let length = maxLength; length > 0; length -= 1) {
+		for (let targetIndex = 0; targetIndex <= targetSegments.length - length; targetIndex += 1) {
+			for (let candidateIndex = 0; candidateIndex <= candidateSegments.length - length; candidateIndex += 1) {
+				const matches = targetSegments
+					.slice(targetIndex, targetIndex + length)
+					.every((segment, offset) =>
+						sameInteractivePathSegment(segment, candidateSegments[candidateIndex + offset] ?? '', caseInsensitive)
+					);
+
+				if (matches) {
+					return {
+						candidateIndex,
+						targetIndex,
+						length,
+					};
+				}
+			}
+		}
+	}
+
+	return undefined;
+}
+
+function addRankedInteractiveTarget(
+	targets: Map<string, RankedInteractiveTargetPath>,
+	value: string,
+	rank: number,
+	order: number
+): void {
+	const path = normalizeInteractiveTargetPath(value);
+	const key = targetPathIdentity(path);
+
+	if (!path || !key) {
+		return;
+	}
+
+	const previous = targets.get(key);
+
+	if (!previous || rank < previous.rank || (rank === previous.rank && order < previous.order)) {
+		targets.set(key, {
+			path,
+			rank,
+			order,
+		});
+	}
+}
+
 export function inferInteractiveDiffTargets(
 	files: InteractiveDiffFile[],
 	candidatePaths: string[] = [],
@@ -1044,7 +1170,7 @@ export function inferInteractiveDiffTargets(
 ): Map<string, InteractiveDiffTargetSuggestion> {
 	const externalCandidates = normalizeInteractiveTargetPaths(candidatePaths);
 	const explicitRoots = normalizeInteractiveTargetPaths(workspaceRoots);
-	const inferredRoots: string[] = [];
+	const inferredAttachmentRoots: string[] = [];
 
 	for (const file of files) {
 		const relativePath = safeRelativePatchPath(getInteractiveDiffTargetPath(file));
@@ -1057,12 +1183,12 @@ export function inferInteractiveDiffTargets(
 			const root = rootForCandidatePath(candidate, relativePath);
 
 			if (root) {
-				inferredRoots.push(root);
+				inferredAttachmentRoots.push(root);
 			}
 		}
 	}
 
-	const roots = normalizeInteractiveTargetPaths([...explicitRoots, ...inferredRoots]);
+	const attachmentRoots = normalizeInteractiveTargetPaths(inferredAttachmentRoots);
 
 	const suggestions = new Map<string, InteractiveDiffTargetSuggestion>();
 
@@ -1070,31 +1196,122 @@ export function inferInteractiveDiffTargets(
 		const patchPath = getInteractiveDiffTargetPath(file);
 		const absolutePatchPath = normalizeInteractiveTargetPath(patchPath);
 		const relativePatchPath = safeRelativePatchPath(patchPath);
+		const relativeSegments = relativePatchPath ? relativePatchPath.split('/').filter(Boolean) : [];
+		const targetFileName = relativeSegments.at(-1) ?? '';
+		const targetDirectorySegments = relativeSegments.slice(0, -1);
+		const rankedTargets = new Map<string, RankedInteractiveTargetPath>();
+		let order = 0;
 
-		const directCandidates = absolutePatchPath
-			? externalCandidates.filter(candidate => targetPathIdentity(candidate) === targetPathIdentity(absolutePatchPath))
-			: relativePatchPath
-				? externalCandidates.filter(candidate => pathEndsWithRelativePath(candidate, relativePatchPath))
-				: [];
+		const addTarget = (path: string, rank: number) => {
+			addRankedInteractiveTarget(rankedTargets, path, rank, order);
+			order += 1;
+		};
 
-		const rootedCandidates = absolutePatchPath
-			? roots.filter(root => isPathWithinRoot(absolutePatchPath, root)).map(() => absolutePatchPath)
-			: relativePatchPath
-				? roots.map(root => joinWorkspaceRoot(root, relativePatchPath)).filter(Boolean)
-				: [];
+		/*
+		 * An absolute path written in the patch is useful context, but an exact
+		 * attached-file match always ranks above it.
+		 */
+		if (absolutePatchPath) {
+			addTarget(absolutePatchPath, 1);
+		}
 
-		const allCandidates = normalizeInteractiveTargetPaths([...directCandidates, ...rootedCandidates]);
+		for (const candidate of externalCandidates) {
+			const isExactFileMatch = absolutePatchPath
+				? targetPathIdentity(candidate) === targetPathIdentity(absolutePatchPath)
+				: relativePatchPath
+					? pathEndsWithRelativePath(candidate, relativePatchPath)
+					: false;
 
-		const targetPath =
-			directCandidates.length === 1
-				? (directCandidates[0] ?? '')
-				: allCandidates.length === 1
-					? (allCandidates[0] ?? '')
-					: '';
+			if (isExactFileMatch) {
+				addTarget(candidate, 0);
+			}
+
+			/*
+			 * Candidate paths are existing files. Remove the filename, locate
+			 * the closest directory anchor from the path in the patch text, and
+			 * build a possible destination from that directory.
+			 *
+			 * This intentionally also runs for added files. New destinations
+			 * normally do not exist in candidatePaths, so directory matching is
+			 * the useful source of suggestions.
+			 */
+			if (!relativePatchPath || !targetFileName) {
+				continue;
+			}
+
+			const candidateParts = splitAbsoluteInteractiveTargetPath(candidate);
+
+			if (!candidateParts) {
+				continue;
+			}
+
+			const candidateDirectorySegments = candidateParts.segments.slice(0, -1);
+
+			if (targetDirectorySegments.length === 0) {
+				addTarget(joinInteractiveAbsolutePath(candidateParts, [...candidateDirectorySegments, targetFileName]), 50);
+				continue;
+			}
+
+			const anchor = findBestDirectoryAnchor(
+				candidateDirectorySegments,
+				targetDirectorySegments,
+				candidateParts.caseInsensitive
+			);
+
+			if (anchor) {
+				const destination = joinInteractiveAbsolutePath(candidateParts, [
+					...candidateDirectorySegments.slice(0, anchor.candidateIndex),
+					...targetDirectorySegments.slice(anchor.targetIndex),
+					targetFileName,
+				]);
+				const isExactDirectoryMatch =
+					anchor.targetIndex === 0 &&
+					anchor.length === targetDirectorySegments.length &&
+					anchor.candidateIndex + anchor.length === candidateDirectorySegments.length;
+
+				addTarget(destination, isExactDirectoryMatch ? 10 : 20 + targetDirectorySegments.length - anchor.length);
+				continue;
+			}
+
+			/*
+			 * Keep a low-ranked fallback rooted at attached files. This is less
+			 * precise than a directory anchor, but gives the user a useful path
+			 * when attachments are the only workspace information available.
+			 */
+			addTarget(joinInteractiveAbsolutePath(candidateParts, [...candidateDirectorySegments, ...relativeSegments]), 50);
+		}
+
+		for (const root of attachmentRoots) {
+			if (absolutePatchPath) {
+				if (isPathWithinRoot(absolutePatchPath, root)) {
+					addTarget(absolutePatchPath, 60);
+				}
+			} else if (relativePatchPath) {
+				addTarget(joinWorkspaceRoot(root, relativePatchPath), 60);
+			}
+		}
+
+		for (const root of explicitRoots) {
+			if (absolutePatchPath) {
+				if (isPathWithinRoot(absolutePatchPath, root)) {
+					addTarget(absolutePatchPath, 100);
+				}
+			} else if (relativePatchPath) {
+				addTarget(joinWorkspaceRoot(root, relativePatchPath), 100);
+			}
+		}
+
+		const candidates = [...rankedTargets.values()]
+			.toSorted((left, right) => left.rank - right.rank || left.order - right.order)
+			.map(target => target.path);
 
 		suggestions.set(file.id, {
-			targetPath,
-			candidates: allCandidates.slice(0, MAX_INTERACTIVE_CANDIDATES),
+			/*
+			 * Ranking is only presentation. The UI does not automatically turn
+			 * the first candidate into an explicit backend target.
+			 */
+			targetPath: candidates.length === 1 ? (candidates[0] ?? '') : '',
+			candidates: candidates.slice(0, MAX_INTERACTIVE_CANDIDATES),
 		});
 	}
 
