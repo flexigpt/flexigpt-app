@@ -10,6 +10,7 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { IToolAggregateAPI, IToolRuntimeAPI, IToolStoreAPI } from '@/apis/interface';
@@ -95,6 +96,10 @@ export class ToolManagementAPI {
 		private readonly runtime: IToolRuntimeAPI
 	) {}
 
+	private readonly composerSelectableToolsCatalog = createSharedAsyncCatalog<ToolListItem[]>(() =>
+		this.listSelectableToolsUncached()
+	);
+
 	listToolCollections(): Promise<CollectionView[]> {
 		return this.store.listToolCollections();
 	}
@@ -111,16 +116,20 @@ export class ToolManagementAPI {
 		return this.store.getTool(tool);
 	}
 
-	setToolEnabled(tool: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<ToolView> {
-		return this.store.setToolEnabled(tool, expectedRevision, enabled);
+	async setToolEnabled(tool: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<ToolView> {
+		const updated = await this.store.setToolEnabled(tool, expectedRevision, enabled);
+		this.invalidateComposerSelectableTools();
+		return updated;
 	}
 
-	setToolCollectionEnabled(
+	async setToolCollectionEnabled(
 		collection: ArtifactRef,
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<CollectionView> {
-		return this.store.setToolCollectionEnabled(collection, expectedRevision, enabled);
+		const updated = await this.store.setToolCollectionEnabled(collection, expectedRevision, enabled);
+		this.invalidateComposerSelectableTools();
+		return updated;
 	}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<ToolCollectionData[]> {
@@ -152,7 +161,19 @@ export class ToolManagementAPI {
 		);
 	}
 
-	async listSelectableTools(signal?: AbortSignal): Promise<ToolListItem[]> {
+	/**
+	 * Shared static catalog used by all mounted composer tabs.
+	 * Runtime invocation and mapped-target resolution remain uncached.
+	 */
+	listComposerSelectableTools(force = false): Promise<ToolListItem[]> {
+		return this.composerSelectableToolsCatalog.load(force);
+	}
+
+	invalidateComposerSelectableTools(): void {
+		this.composerSelectableToolsCatalog.invalidate();
+	}
+
+	private async listSelectableToolsUncached(signal?: AbortSignal): Promise<ToolListItem[]> {
 		const collections = await this.store.listToolCollections();
 		if (signal) {
 			throwIfAborted(signal);
@@ -191,6 +212,10 @@ export class ToolManagementAPI {
 			throwIfAborted(signal);
 		}
 		return items;
+	}
+
+	listSelectableTools(signal?: AbortSignal): Promise<ToolListItem[]> {
+		return this.listSelectableToolsUncached(signal);
 	}
 
 	mapToolTarget(tool: ArtifactRef): Promise<MappedTarget> {

@@ -1827,7 +1827,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	return (
 		<div className="mx-0 flex max-h-128 w-full min-w-0 flex-col overflow-hidden">
-			<form ref={formRef} onSubmit={handleSubmit} className="max-h-full">
+			<form ref={formRef} noValidate onSubmit={handleSubmit} className="max-h-full">
 				{submitError ? (
 					<div className="alert alert-error mx-4 mt-3 mb-1 flex items-start gap-2 text-sm" role="alert">
 						<FiAlertTriangle size={16} className="mt-0.5" />

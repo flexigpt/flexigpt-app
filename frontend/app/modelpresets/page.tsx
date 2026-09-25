@@ -19,7 +19,7 @@ import { redactSensitiveHTTPHeaders } from '@/lib/http_input_utils';
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { aggregateAPI, modelPresetStoreAPI, settingstoreAPI } from '@/apis/baseapi';
-import { getAllProviderPresetsMap } from '@/apis/list_helper';
+import { getAllProviderPresetsMap, invalidateComposerModelCatalog } from '@/apis/model_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
@@ -112,6 +112,8 @@ export default function ModelPresetsPage() {
 	}, []);
 
 	const refreshCanonicalData = useCallback(async () => {
+		// Management mutations affect the composer model picker.
+		invalidateComposerModelCatalog();
 		await reloadCanonicalData();
 	}, [reloadCanonicalData]);
 

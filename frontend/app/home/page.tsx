@@ -11,7 +11,7 @@ import { useTitleBarContent } from '@/hooks/use_title_bar';
 
 import type { AgentCatalogOption } from '@/apis/agent_management';
 import { agentManagementAPI, settingstoreAPI } from '@/apis/baseapi';
-import { getAllProviderPresetsMap } from '@/apis/list_helper';
+import { getAllProviderPresetsMap } from '@/apis/model_management';
 
 import { PageFrame } from '@/components/page_frame';
 

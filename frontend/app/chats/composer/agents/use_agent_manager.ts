@@ -67,12 +67,12 @@ export function useAgentManager(
 
 	const pendingDefaultRef = useRef(false);
 	const appliedInstructionSourceKeyRef = useRef<string | null>(null);
-	const refreshAgents = useCallback(async () => {
+	const loadAgentOptions = useCallback(async (force = false) => {
 		setLoading(true);
 		setError(null);
 
 		try {
-			setAgentOptions(await agentManagementAPI.listAgentCatalogOptions());
+			setAgentOptions(await agentManagementAPI.listAgentCatalogOptions(force));
 		} catch (loadError) {
 			setAgentOptions([]);
 			setError(getErrorMessage(loadError, 'Failed to load Agents.'));
@@ -81,10 +81,12 @@ export function useAgentManager(
 		}
 	}, []);
 
+	const refreshAgents = useCallback(() => loadAgentOptions(true), [loadAgentOptions]);
+
 	useEffect(() => {
 		// oxlint-disable-next-line react/set-state-in-effect
-		void refreshAgents();
-	}, [refreshAgents]);
+		void loadAgentOptions(false);
+	}, [loadAgentOptions]);
 
 	const selectedAgent = useMemo(
 		() => agentOptions.find(option => option.key === selectedAgentKey) ?? null,

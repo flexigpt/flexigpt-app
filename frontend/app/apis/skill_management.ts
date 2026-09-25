@@ -44,6 +44,7 @@ import {
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { getErrorMessage } from '@/lib/error_utils';
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type {
 	IModelPresetStoreAPI,
@@ -216,6 +217,14 @@ export class SkillManagementAPI {
 		private readonly tools: IToolTargetResolver,
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
+
+	private readonly composerSkillsCatalog = createSharedAsyncCatalog<SkillListItem[]>(() =>
+		this.listSkills(undefined, false, true)
+	);
+
+	invalidateComposerSkillsCatalog(): void {
+		this.composerSkillsCatalog.invalidate();
+	}
 
 	async createArtifactSkillSession(options: ArtifactSkillSessionOptions): Promise<ArtifactSkillSession> {
 		const allowConfigured = options.allowArtifacts !== undefined;
@@ -411,6 +420,14 @@ export class SkillManagementAPI {
 		return { skillBundles, skillListItems };
 	}
 
+	/**
+	 * Shared declaration catalog for every mounted composer.
+	 * It is not a Skill Runtime session cache.
+	 */
+	listComposerSkills(force = false): Promise<SkillListItem[]> {
+		return this.composerSkillsCatalog.load(force);
+	}
+
 	async listSkillBundles(bundleIDs?: string[], includeDisabled = true): Promise<SkillBundle[]> {
 		const collections = await this.store.listSkillCollectionsForManagement();
 
@@ -533,6 +550,7 @@ export class SkillManagementAPI {
 			created = await this.store.setSkillCollectionEnabled(collectionRef(created), created.artifact.revision, false);
 		}
 
+		this.invalidateComposerSkillsCatalog();
 		void created;
 	}
 
@@ -540,6 +558,7 @@ export class SkillManagementAPI {
 		const collection = await this.resolveBundleCollection(bundleID);
 
 		await this.store.setSkillCollectionEnabled(collectionRef(collection), collection.artifact.revision, enabled);
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async updateSkillBundleMetadata(bundleID: string, displayName: string, description?: string): Promise<void> {
@@ -554,6 +573,7 @@ export class SkillManagementAPI {
 			displayName,
 			description,
 		});
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async refreshSkillBundle(bundleID: string): Promise<void> {
@@ -577,6 +597,8 @@ export class SkillManagementAPI {
 		})) {
 			await this.store.refreshSkillSource(source.rootID, source.sourceID);
 		}
+
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async deleteSkillBundle(bundleID: string): Promise<void> {
@@ -590,6 +612,7 @@ export class SkillManagementAPI {
 			collection: collectionRef(collection),
 			expectedRevision: collection.artifact.revision,
 		});
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async putSkillArtifact(bundleID: string, _artifactID: string, input: SkillArtifactCreateInput): Promise<Skill> {
@@ -604,6 +627,7 @@ export class SkillManagementAPI {
 			enabled: input.isEnabled,
 		});
 
+		this.invalidateComposerSkillsCatalog();
 		const bundle = toSkillBundle(result.collection);
 		return this.projectSkill(bundle, result.artifact, true, undefined, true);
 	}
@@ -639,6 +663,7 @@ export class SkillManagementAPI {
 		};
 
 		await this.store.replaceManagedSkill(request);
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async getManagedSkillDocument(bundleID: string, artifactID: string): Promise<ManagedSkillDocumentView> {
@@ -682,6 +707,7 @@ export class SkillManagementAPI {
 				},
 			});
 		}
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async patchSkill(
@@ -723,6 +749,7 @@ export class SkillManagementAPI {
 				markdownBody: managed.document.markdownBody,
 				isEnabled: isEnabled ?? artifact.enabled,
 			});
+			this.invalidateComposerSkillsCatalog();
 			return;
 		}
 
@@ -741,6 +768,7 @@ export class SkillManagementAPI {
 			artifact.revision,
 			isEnabled
 		);
+		this.invalidateComposerSkillsCatalog();
 	}
 
 	async deleteSkill(bundleID: string, artifactID: string): Promise<void> {
@@ -766,6 +794,8 @@ export class SkillManagementAPI {
 			expectedRevision: membership.collectionRevision,
 			index: membership.memberIndex,
 		});
+
+		this.invalidateComposerSkillsCatalog();
 
 		let isManaged: boolean;
 		try {

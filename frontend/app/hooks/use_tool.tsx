@@ -7,8 +7,18 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 import { toolManagementAPI } from '@/apis/baseapi';
 
 export function useTools() {
-	const load = useCallback((signal: AbortSignal) => toolManagementAPI.listSelectableTools(signal), []);
-	const resource = useAsyncResource(load, { initialData: [] as ToolListItem[] });
+	const load = useCallback(async (_signal: AbortSignal): Promise<ToolListItem[]> => {
+		return toolManagementAPI.listComposerSelectableTools();
+	}, []);
+
+	const resource = useAsyncResource(load, {
+		initialData: [] as ToolListItem[],
+	});
+
+	const refresh = useCallback(() => {
+		toolManagementAPI.invalidateComposerSelectableTools();
+		return resource.reloadOrThrow();
+	}, [resource]);
 
 	return {
 		data: resource.data,
@@ -16,8 +26,8 @@ export function useTools() {
 		loading: resource.isLoading,
 		isRefreshing: resource.isRefreshing,
 		hasResolved: resource.hasResolved,
-		ready: resource.hasResolved && !resource.isLoading && !resource.isRefreshing && !resource.error,
-		refresh: resource.reloadOrThrow,
+		ready: (resource.hasResolved && !resource.isLoading && !resource.isRefreshing && !resource.error) satisfies boolean,
+		refresh,
 	};
 }
 

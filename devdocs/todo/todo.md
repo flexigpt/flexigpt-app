@@ -9,6 +9,8 @@
 - [ ] the modal has bugs when multi file things are done. mostly some files are nto shown at all. some files which are shown may or may not be dry run. the error in file is displayed at top and nto near dry run or same file. apply file similalry at top is problematic in message.
 - [ ] copy button in different tab seems to lag when there is some other streaming etc going on.
 
+- [ ] in thinking send in inference, make sure that the first message sent doesnt have encrypted thinking or any such input.
+
 - Testing
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.

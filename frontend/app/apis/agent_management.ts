@@ -14,6 +14,7 @@ import { ToolImplType } from '@/spec/tool';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolTargetResolver } from '@/apis/interface';
@@ -22,8 +23,6 @@ import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
 
 type AgentStarterIssueSeverity = 'error' | 'warning';
-
-const AGENT_CATALOG_CACHE_TTL_MS = 10 * 60 * 1000;
 
 export interface AgentCollectionData {
 	collection: CollectionView;
@@ -252,8 +251,10 @@ function availabilityIssueForOccurrence(occurrence: CapabilityOccurrence): Agent
 
 export class AgentManagementAPI {
 	private readonly collectionAgentLoads = new Map<string, Promise<AgentView[]>>();
-	private agentCatalogCache?: { agents: AgentView[]; loadedAt: number };
-	private agentCatalogLoad?: Promise<AgentView[]>;
+
+	private readonly composerAgentCatalog = createSharedAsyncCatalog<AgentView[]>(
+		async () => (await this.agents.listAgentsForManagement()) ?? []
+	);
 
 	constructor(
 		private readonly agents: IAgentStoreAPI,
@@ -264,39 +265,19 @@ export class AgentManagementAPI {
 	) {}
 
 	invalidateAgentCatalog(): void {
-		this.agentCatalogCache = undefined;
+		this.composerAgentCatalog.invalidate();
 	}
 
-	async preloadAgentCatalog(): Promise<void> {
-		await this.loadAgentCatalog();
+	async preloadAgentCatalog(force = false): Promise<void> {
+		await this.composerAgentCatalog.load(force);
 	}
 
-	private async loadAgentCatalog(): Promise<AgentView[]> {
-		const cached = this.agentCatalogCache;
-		if (cached && Date.now() - cached.loadedAt <= AGENT_CATALOG_CACHE_TTL_MS) {
-			return cached.agents;
-		}
-
-		if (!this.agentCatalogLoad) {
-			const load = this.agents.listAgentsForManagement().then(values => {
-				const agents = values ?? [];
-				this.agentCatalogCache = {
-					agents,
-					loadedAt: Date.now(),
-				};
-				return agents;
-			});
-
-			this.agentCatalogLoad = load;
-			const clear = () => {
-				if (this.agentCatalogLoad === load) {
-					this.agentCatalogLoad = undefined;
-				}
-			};
-			void load.then(clear, clear);
-		}
-
-		return this.agentCatalogLoad;
+	/**
+	 * Static Agent declaration catalog only.
+	 * Agent recipe preparation remains an uncached runtime operation.
+	 */
+	listAgentCatalogOptions(force = false): Promise<AgentCatalogOption[]> {
+		return this.composerAgentCatalog.load(force).then(agents => this.projectAgentCatalogOptions(agents));
 	}
 
 	async loadManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
@@ -396,9 +377,7 @@ export class AgentManagementAPI {
 		}
 	}
 
-	async listAgentCatalogOptions(): Promise<AgentCatalogOption[]> {
-		const agents = await this.loadAgentCatalog();
-
+	private projectAgentCatalogOptions(agents: AgentView[]): AgentCatalogOption[] {
 		return agents
 			.map(agent => {
 				const ref = agentArtifactRef(agent);

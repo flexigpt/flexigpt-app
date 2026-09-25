@@ -4,6 +4,15 @@ import { useSearchParams } from 'react-router';
 
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
+import {
+	agentManagementAPI,
+	mcpManagementAPI,
+	skillManagementAPI,
+	toolManagementAPI,
+	workspaceManagementAPI,
+} from '@/apis/baseapi';
+import { invalidateComposerModelCatalog } from '@/apis/model_management';
+
 import { PageFrame } from '@/components/page_frame';
 
 import type { ConversationAreaHandle } from '@/chats/conversation/conversation_area';
@@ -54,6 +63,17 @@ export default function ChatsPage() {
 		conversationAreaRef,
 		searchRef,
 	});
+
+	useEffect(() => {
+		return () => {
+			toolManagementAPI.invalidateComposerSelectableTools();
+			skillManagementAPI.invalidateComposerSkillsCatalog();
+			agentManagementAPI.invalidateAgentCatalog();
+			mcpManagementAPI.invalidateComposerMCPDeclarations();
+			workspaceManagementAPI.invalidateComposerWorkspaceCatalog();
+			invalidateComposerModelCatalog();
+		};
+	}, []);
 
 	useEffect(() => {
 		if (!workflowStarter) {

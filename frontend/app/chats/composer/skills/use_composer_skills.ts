@@ -95,44 +95,6 @@ function isInstructionSkillListItem(item: SkillListItem): boolean {
 	return isInstructionInsertSkill(item.skillDefinition);
 }
 
-let composerSkillsCatalogCache: SkillListItem[] | undefined;
-let composerSkillsCatalogPromise: Promise<SkillListItem[]> | undefined;
-
-async function fetchComposerSkillsCatalog(): Promise<SkillListItem[]> {
-	const items = await skillManagementAPI.listSkills(undefined, false);
-	return items.filter(item => isInstructionInsertSkill(item.skillDefinition));
-}
-
-function loadComposerSkillsCatalog(force = false): Promise<SkillListItem[]> {
-	if (composerSkillsCatalogPromise) {
-		return composerSkillsCatalogPromise;
-	}
-	if (!force && composerSkillsCatalogCache !== undefined) {
-		return Promise.resolve(composerSkillsCatalogCache);
-	}
-
-	const request = fetchComposerSkillsCatalog().then(items => {
-		composerSkillsCatalogCache = items;
-		return items;
-	});
-	composerSkillsCatalogPromise = request;
-
-	void request.then(
-		() => {
-			if (composerSkillsCatalogPromise === request) {
-				composerSkillsCatalogPromise = undefined;
-			}
-		},
-		() => {
-			if (composerSkillsCatalogPromise === request) {
-				composerSkillsCatalogPromise = undefined;
-			}
-		}
-	);
-
-	return request;
-}
-
 export function useComposerSkills(): UseComposerSkillsResult {
 	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
@@ -528,9 +490,13 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	const refreshSkills = useCallback(async () => {
 		setSkillsLoading(true);
 		setSkillsLoadError(null);
+
 		try {
-			const out = await loadComposerSkillsCatalog(true);
-			setAllSkills(out);
+			setAllSkills(
+				(await skillManagementAPI.listComposerSkills(true)).filter(s => {
+					return isInstructionSkillListItem(s);
+				})
+			);
 		} catch (error) {
 			console.error('Failed to refresh skills catalog:', error);
 			setSkillsLoadError(
@@ -549,7 +515,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 	// Fetch skills catalog (store listSkills; NOT runtime listRuntimeSkills).
 	useEffect(() => {
 		let cancelled = false;
-		const loadPromise = loadComposerSkillsCatalog();
+		const loadPromise = skillManagementAPI.listComposerSkills();
 		skillsCatalogLoadPromiseRef.current = loadPromise;
 
 		loadPromise
@@ -557,7 +523,11 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				if (cancelled) {
 					return;
 				}
-				setAllSkills(out);
+				setAllSkills(
+					out.filter(s => {
+						return isInstructionSkillListItem(s);
+					})
+				);
 				setSkillsLoadError(null);
 			})
 			.catch((error: unknown) => {

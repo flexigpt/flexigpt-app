@@ -69,6 +69,7 @@ import {
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type {
 	IMCPAggregateAPI,
@@ -82,6 +83,11 @@ const MANAGEMENT_PAGE_SIZE = 100;
 const MAX_MANAGEMENT_PAGE_HOPS = 10_000;
 const PLACEHOLDER_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const MCP_SERVER_MANAGEMENT_CONCURRENCY = 4;
+
+export interface MCPComposerDeclarations {
+	bundle: MCPBundleView;
+	servers: MCPServerView[];
+}
 
 interface MCPSecretTarget {
 	kind: MCPSecretKind;
@@ -614,6 +620,22 @@ export class MCPManagementAPI {
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
 
+	private readonly composerMCPDeclarationsCatalog = createSharedAsyncCatalog<MCPComposerDeclarations[]>(async () => {
+		const bundles = await this.listMCPBundles();
+		return mapWithConcurrency(bundles, MCP_SERVER_MANAGEMENT_CONCURRENCY, async bundle => ({
+			bundle,
+			servers: await this.listMCPServers(bundle),
+		}));
+	});
+
+	listComposerMCPDeclarations(force = false): Promise<MCPComposerDeclarations[]> {
+		return this.composerMCPDeclarationsCatalog.load(force);
+	}
+
+	invalidateComposerMCPDeclarations(): void {
+		this.composerMCPDeclarationsCatalog.invalidate();
+	}
+
 	async listMCPCollectionsForManagement(): Promise<CollectionView[]> {
 		return this.collectPages(pageToken => this.store.listMCPCollectionsPage(MANAGEMENT_PAGE_SIZE, pageToken));
 	}
@@ -666,6 +688,7 @@ export class MCPManagementAPI {
 			displayName,
 			description,
 		});
+		this.invalidateComposerMCPDeclarations();
 		return this.toBundleView(collection);
 	}
 
@@ -748,15 +771,19 @@ export class MCPManagementAPI {
 		if (!refreshed) {
 			throw new Error('MCP server was saved but could not be loaded afterward.');
 		}
+
+		this.invalidateComposerMCPDeclarations();
 		return refreshed;
 	}
 
 	async setMCPBundleEnabled(bundle: MCPBundleView, enabled: boolean): Promise<void> {
 		await this.store.setMCPCollectionEnabled(bundle.ref, bundle.collection.artifact.revision, enabled);
+		this.invalidateComposerMCPDeclarations();
 	}
 
 	async setMCPServerEnabled(server: MCPServerView, enabled: boolean): Promise<void> {
 		await this.store.setMCPServerEnabled(server.ref, server.artifact.revision, enabled);
+		this.invalidateComposerMCPDeclarations();
 	}
 
 	async deleteMCPServer(bundle: MCPBundleView, server: MCPServerView): Promise<void> {
@@ -781,6 +808,7 @@ export class MCPManagementAPI {
 		if (remaining.length === 0) {
 			await this.aggregate.purgeManagedMCP(server.ref, server.artifact.revision);
 		}
+		this.invalidateComposerMCPDeclarations();
 	}
 
 	async deleteMCPBundle(bundle: MCPBundleView): Promise<void> {
@@ -821,6 +849,7 @@ export class MCPManagementAPI {
 			collection: bundle.ref,
 			expectedRevision: current.artifact.revision,
 		});
+		this.invalidateComposerMCPDeclarations();
 	}
 
 	async applyMCPServerSetup(
@@ -914,10 +943,12 @@ export class MCPManagementAPI {
 
 		if (latest.builtIn) {
 			await this.aggregate.updateProtectedMCPServerInstallation(serverRef, latest.installationRevision, nextData);
+			this.invalidateComposerMCPDeclarations();
 			return;
 		}
 
 		await this.aggregate.updateMCPServerInstallation(serverRef, latest.artifact.revision, nextData);
+		this.invalidateComposerMCPDeclarations();
 	}
 
 	async getMCPCollectionManagementView(collection: ArtifactRef): Promise<MCPCollectionManagementView> {

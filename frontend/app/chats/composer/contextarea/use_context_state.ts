@@ -7,46 +7,13 @@ import type { IncludePreviousMessages, ModelPresetRef, UIChatOption } from '@/sp
 import { ReasoningType } from '@/spec/inference';
 import { DefaultUIChatOptions } from '@/spec/modelpreset';
 
+import { getChatInputOptions } from '@/apis/model_management';
+
 import {
 	getSupportedReasoningLevels,
 	sanitizeUIChatOptionByCapabilities,
 	supportsOutputVerbosity,
 } from '@/modelpresets/lib/capabilities_override';
-import { getChatInputOptions } from '@/modelpresets/lib/uichatoption_helper';
-
-type ChatInputOptionsResult = Awaited<ReturnType<typeof getChatInputOptions>>;
-
-let chatInputOptionsCache: ChatInputOptionsResult | undefined;
-let chatInputOptionsPromise: Promise<ChatInputOptionsResult> | undefined;
-
-function loadChatInputOptionsCached(options?: { forceRefresh?: boolean }): Promise<ChatInputOptionsResult> {
-	if (!options?.forceRefresh) {
-		if (chatInputOptionsCache) {
-			return Promise.resolve(chatInputOptionsCache);
-		}
-
-		if (chatInputOptionsPromise) {
-			return chatInputOptionsPromise;
-		}
-	} else if (chatInputOptionsPromise) {
-		return chatInputOptionsPromise;
-	}
-
-	const request = getChatInputOptions().then(result => {
-		chatInputOptionsCache = result;
-		return result;
-	});
-
-	chatInputOptionsPromise = request;
-
-	void request.finally(() => {
-		if (chatInputOptionsPromise === request) {
-			chatInputOptionsPromise = undefined;
-		}
-	});
-
-	return request;
-}
 
 function hasOwn(value: object, key: string): boolean {
 	return Object.hasOwn(value, key);
@@ -285,7 +252,7 @@ export function useComposerContextState(): ComposerContextController {
 	useEffect(() => {
 		let cancelled = false;
 
-		void loadChatInputOptionsCached({ forceRefresh: true })
+		void getChatInputOptions()
 			.then(result => {
 				if (cancelled) {
 					return;

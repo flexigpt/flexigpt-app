@@ -241,8 +241,8 @@ function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
 	return [...new Set(paths)];
 }
 
-async function collectUserMessageSkillTemplates(): Promise<SkillListItem[]> {
-	const all = await skillManagementAPI.listSkills(undefined, false);
+async function collectUserMessageSkillTemplates(force = false): Promise<SkillListItem[]> {
+	const all = await skillManagementAPI.listComposerSkills(force);
 	return all
 		.filter(item => item.skillDefinition.insert === SkillInsert.UserMessage)
 		.toSorted(compareSkillTemplateListItems);
@@ -253,11 +253,11 @@ function useUserMessageSkillTemplates(open: boolean) {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
-	const refresh = useCallback(async () => {
+	const refresh = useCallback(async (force = false) => {
 		setLoading(true);
 		setError(null);
 		try {
-			const next = await collectUserMessageSkillTemplates();
+			const next = await collectUserMessageSkillTemplates(force);
 			setItems(next);
 		} catch (loadError) {
 			console.error('Failed to load user-message skill templates:', loadError);
@@ -274,7 +274,7 @@ function useUserMessageSkillTemplates(open: boolean) {
 		}
 
 		// oxlint-disable-next-line react/set-state-in-effect
-		void refresh();
+		void refresh(false);
 	}, [open, refresh]);
 
 	return { items, loading, error, refresh };
@@ -826,7 +826,7 @@ function SkillTemplateBottomBarChipInner({
 				loadError={templateLoadError}
 				actionError={templateActionError}
 				onRetry={() => {
-					void refresh();
+					void refresh(true);
 				}}
 				onPick={item => {
 					void handlePick(item);

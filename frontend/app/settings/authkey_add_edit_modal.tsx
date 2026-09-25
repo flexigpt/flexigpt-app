@@ -12,7 +12,7 @@ import { omitManyKeys } from '@/lib/obj_utils';
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import { aggregateAPI } from '@/apis/baseapi';
-import { getAllProviderPresetsMap } from '@/apis/list_helper';
+import { getAllProviderPresetsMap } from '@/apis/model_management';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -25,7 +25,6 @@ import { ModalField } from '@/components/modal/modal_field';
 import { ModalHeader } from '@/components/modal/modal_header';
 import { ModalSection } from '@/components/modal/modal_section';
 
-/* ────────────────────────── props & helpers ────────────────────────── */
 interface AddEditAuthKeyModalProps {
 	isOpen: boolean;
 	initial: AuthKeyMeta | null; // “edit” when NOT null

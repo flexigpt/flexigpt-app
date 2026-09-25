@@ -5,11 +5,8 @@ import type { ProviderPreset } from '@/spec/modelpreset';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
-import { getAllProviderPresetsMap } from '@/apis/list_helper';
+import { getAllProviderPresetsMap } from '@/apis/model_management';
 
-/* ────────────────────────────────────────────────────────────────────────── */
-/*  Internal cache (module scope = one copy per page-load)                   */
-/* ────────────────────────────────────────────────────────────────────────── */
 let builtInAuthKeys: ReadonlySet<AuthKeyName> | null = null;
 let initPromise: Promise<void> | null = null;
 

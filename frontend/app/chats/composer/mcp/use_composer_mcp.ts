@@ -283,46 +283,40 @@ export function useComposerMCP(): UseComposerMCPResult {
 		});
 	}, []);
 
-	const refreshAll = useCallback(async () => {
+	const loadDeclarationCatalog = useCallback(async (force = false) => {
 		setLoading(true);
 		setError(undefined);
 
 		try {
-			const [bundles, pendingAuthorizations] = await Promise.all([
-				mcpManagementAPI.listMCPBundles(),
+			const [declarations, pendingAuthorizations] = await Promise.all([
+				mcpManagementAPI.listComposerMCPDeclarations(force),
 				mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => []),
 			]);
 
-			const nestedOptions = await Promise.all(
-				bundles.map(async bundle => {
-					const servers = await mcpManagementAPI.listMCPServers(bundle);
+			const values = await Promise.all(
+				declarations.flatMap(({ bundle, servers }) =>
+					servers.map(async server => {
+						const runtimeServerID = server.runtimeServerID;
+						if (!runtimeServerID) {
+							return undefined;
+						}
 
-					const values = await Promise.all(
-						servers.map(async server => {
-							const runtimeServerID = server.runtimeServerID;
-							if (!runtimeServerID) {
-								return undefined;
-							}
+						const [runtime, authHealth] = await Promise.all([
+							mcpManagementAPI.getMCPServerStatus(runtimeServerID).catch(() => undefined),
+							mcpManagementAPI.getMCPServerAuthHealth(server.ref).catch(() => undefined),
+						]);
 
-							const [runtime, authHealth] = await Promise.all([
-								mcpManagementAPI.getMCPServerStatus(runtimeServerID).catch(() => undefined),
-								mcpManagementAPI.getMCPServerAuthHealth(server.ref).catch(() => undefined),
-							]);
-
-							return optionFromServer(
-								bundle,
-								server,
-								runtime,
-								overlayPendingOAuthAuthHealth(runtimeServerID, authHealth, pendingAuthorizations)
-							);
-						})
-					);
-
-					return values.filter((option): option is MCPComposerServerOption => option !== undefined);
-				})
+						return optionFromServer(
+							bundle,
+							server,
+							runtime,
+							overlayPendingOAuthAuthHealth(runtimeServerID, authHealth, pendingAuthorizations)
+						);
+					})
+				)
 			);
 
-			const nextOptions = nestedOptions.flat();
+			const nextOptions = values.filter((option): option is MCPComposerServerOption => option !== undefined);
 
 			if (!mountedRef.current) {
 				return;
@@ -343,9 +337,11 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 	}, []);
 
+	const refreshAll = useCallback(() => loadDeclarationCatalog(true), [loadDeclarationCatalog]);
+
 	useEffect(() => {
-		void refreshAll();
-	}, [refreshAll]);
+		void loadDeclarationCatalog(false);
+	}, [loadDeclarationCatalog]);
 
 	const loadDiscoveryForServer = useCallback(
 		async (server: MCPRuntimeServerID, force = false): Promise<MCPDiscoveryLoadResult | undefined> => {

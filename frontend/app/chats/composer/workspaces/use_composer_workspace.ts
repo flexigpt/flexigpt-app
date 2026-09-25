@@ -15,6 +15,8 @@ import { ArtifactState } from '@/spec/artifact';
 import { SkillSessionSyncMode } from '@/spec/skill';
 import { WorkspaceInsertTarget } from '@/spec/workspace';
 
+import { throwIfAborted } from '@/lib/async_utils';
+
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { workspaceManagementAPI } from '@/apis/baseapi';
@@ -76,9 +78,6 @@ export interface ComposerWorkspaceController {
 	createWorkspaceDirectory: (path: string) => Promise<void>;
 	getSelectionSnapshot: () => WorkspaceConversationSelection | undefined;
 }
-
-const PAGE_SIZE = 100;
-const MAX_PAGE_HOPS = 10_000;
 
 function refKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
@@ -149,32 +148,6 @@ function selectionFromPlan(
 	};
 }
 
-async function listAllDirectories(): Promise<WorkspaceDirectoryView[]> {
-	const output: WorkspaceDirectoryView[] = [];
-	const cursors = new Set<string>();
-	let cursor: string | undefined;
-
-	for (let hop = 0; hop < MAX_PAGE_HOPS; hop += 1) {
-		const page = await workspaceManagementAPI.listWorkspaceDirectories({
-			cursor,
-			limit: PAGE_SIZE,
-		});
-		output.push(...page.items);
-
-		if (!page.nextCursor) {
-			return output;
-		}
-		if (cursors.has(page.nextCursor)) {
-			throw new Error('Workspace directory pagination returned a repeated cursor.');
-		}
-
-		cursors.add(page.nextCursor);
-		cursor = page.nextCursor;
-	}
-
-	throw new Error(`Workspace directory pagination exceeded ${MAX_PAGE_HOPS} pages.`);
-}
-
 function candidatesFor(directories: WorkspaceDirectoryView[]): ComposerWorkspaceCandidate[] {
 	return directories.flatMap(directory =>
 		directory.workspaces.map(workspace => ({
@@ -200,7 +173,12 @@ export function useComposerWorkspace({
 	applyWorkspaceSkillSelectionState,
 	getCurrentActiveSkillRefs,
 }: UseComposerWorkspaceArgs): ComposerWorkspaceController {
-	const loadDirectories = useCallback(async () => listAllDirectories(), []);
+	const loadDirectories = useCallback(async (signal: AbortSignal) => {
+		const directories = await workspaceManagementAPI.listComposerWorkspaceDirectories();
+		throwIfAborted(signal);
+		return directories;
+	}, []);
+
 	const {
 		data: directories,
 		error: directoriesError,
@@ -294,6 +272,8 @@ export function useComposerWorkspace({
 	);
 
 	const refreshWorkspaces = useCallback(async () => {
+		workspaceManagementAPI.invalidateComposerWorkspaceCatalog();
+
 		try {
 			await reloadOrThrow();
 		} catch {
@@ -338,7 +318,7 @@ export function useComposerWorkspace({
 			let candidate = candidateForRef(candidatesFor(nextDirectories), nextSelection.workspace);
 
 			if (!candidate) {
-				nextDirectories = await listAllDirectories();
+				nextDirectories = await workspaceManagementAPI.listComposerWorkspaceDirectories();
 				setDirectories(nextDirectories);
 				candidate = candidateForRef(candidatesFor(nextDirectories), nextSelection.workspace);
 			}

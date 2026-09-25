@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSearch, FiSettings, FiX } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -131,20 +131,6 @@ function WorkspaceBottomBarChipContent({
 	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
 	const [isSelectionOpen, setIsSelectionOpen] = useState(false);
 	const [actionError, setActionError] = useState<string | null>(null);
-	const refreshedForCurrentOpenRef = useRef(false);
-
-	useEffect(() => {
-		if (!open) {
-			refreshedForCurrentOpenRef.current = false;
-			return;
-		}
-		if (refreshedForCurrentOpenRef.current) {
-			return;
-		}
-
-		refreshedForCurrentOpenRef.current = true;
-		void state.refreshWorkspaces();
-	}, [open, state]);
 
 	const visibleWorkspaces = useMemo(
 		() => state.workspaces.filter(candidate => candidateMatchesSearch(candidate, search)),

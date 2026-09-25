@@ -16,6 +16,8 @@ import type {
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
 
+import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
+
 import type {
 	IModelPresetStoreAPI,
 	IToolTargetResolver,
@@ -24,6 +26,9 @@ import type {
 	IWorkspaceStoreAPI,
 } from '@/apis/interface';
 
+const COMPOSER_WORKSPACE_PAGE_SIZE = 100;
+const MAX_COMPOSER_WORKSPACE_PAGE_HOPS = 10_000;
+
 export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 	constructor(
 		public readonly store: IWorkspaceStoreAPI,
@@ -31,6 +36,51 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 		private readonly tools: IToolTargetResolver,
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
+
+	private readonly composerWorkspaceDirectoriesCatalog = createSharedAsyncCatalog<WorkspaceDirectoryView[]>(() =>
+		this.listComposerWorkspaceDirectoriesUncached()
+	);
+
+	/**
+	 * Shared directory and Workspace declaration catalog.
+	 * It intentionally excludes Workspace runtime plans.
+	 */
+	listComposerWorkspaceDirectories(force = false): Promise<WorkspaceDirectoryView[]> {
+		return this.composerWorkspaceDirectoriesCatalog.load(force);
+	}
+
+	invalidateComposerWorkspaceCatalog(): void {
+		this.composerWorkspaceDirectoriesCatalog.invalidate();
+	}
+
+	private async listComposerWorkspaceDirectoriesUncached(): Promise<WorkspaceDirectoryView[]> {
+		const output: WorkspaceDirectoryView[] = [];
+		const cursors = new Set<string>();
+		let cursor: string | undefined;
+
+		for (let hop = 0; hop < MAX_COMPOSER_WORKSPACE_PAGE_HOPS; hop += 1) {
+			const page = await this.store.listWorkspaceDirectories({
+				cursor,
+				limit: COMPOSER_WORKSPACE_PAGE_SIZE,
+			});
+			output.push(...(page.items ?? []));
+
+			if (!page.nextCursor) {
+				return output.toSorted((left, right) =>
+					left.root.displayName.localeCompare(right.root.displayName, undefined, {
+						sensitivity: 'base',
+					})
+				);
+			}
+			if (cursors.has(page.nextCursor)) {
+				throw new Error('Workspace directory pagination returned a repeated cursor.');
+			}
+			cursors.add(page.nextCursor);
+			cursor = page.nextCursor;
+		}
+
+		throw new Error(`Workspace directory pagination exceeded ${MAX_COMPOSER_WORKSPACE_PAGE_HOPS} pages.`);
+	}
 
 	getWorkspaceDefaultPolicy(): Promise<WorkspaceDefaultPolicyView> {
 		return this.store.getWorkspaceDefaultPolicy();
@@ -48,33 +98,47 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 		return this.store.listWorkspaceDirectoryArtifacts(directory);
 	}
 
-	refreshWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView> {
-		return this.store.refreshWorkspaceDirectory(directory);
+	async refreshWorkspaceDirectory(directory: WorkspaceDirectoryRef): Promise<WorkspaceDirectoryView> {
+		const refreshed = await this.store.refreshWorkspaceDirectory(directory);
+		this.invalidateComposerWorkspaceCatalog();
+		return refreshed;
 	}
 
-	registerWorkspaceDirectory(path: string): Promise<WorkspaceDirectoryView> {
-		return this.store.registerWorkspaceDirectory(path);
+	async registerWorkspaceDirectory(path: string): Promise<WorkspaceDirectoryView> {
+		const directory = await this.store.registerWorkspaceDirectory(path);
+		this.invalidateComposerWorkspaceCatalog();
+		return directory;
 	}
 
-	removeWorkspaceDirectory(directory: WorkspaceDirectoryRef, expectedRevision: number): Promise<void> {
-		return this.store.removeWorkspaceDirectory(directory, expectedRevision);
+	async removeWorkspaceDirectory(directory: WorkspaceDirectoryRef, expectedRevision: number): Promise<void> {
+		await this.store.removeWorkspaceDirectory(directory, expectedRevision);
+		this.invalidateComposerWorkspaceCatalog();
 	}
 
-	setWorkspaceDirectoryArtifactEnabled(
+	async setWorkspaceDirectoryArtifactEnabled(
 		directory: WorkspaceDirectoryRef,
 		artifact: ArtifactRef,
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<WorkspaceArtifactView> {
-		return this.store.setWorkspaceDirectoryArtifactEnabled(directory, artifact, expectedRevision, enabled);
+		const updated = await this.store.setWorkspaceDirectoryArtifactEnabled(
+			directory,
+			artifact,
+			expectedRevision,
+			enabled
+		);
+		this.invalidateComposerWorkspaceCatalog();
+		return updated;
 	}
 
-	setWorkspaceDirectoryEnabled(
+	async setWorkspaceDirectoryEnabled(
 		directory: WorkspaceDirectoryRef,
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<WorkspaceDirectoryView> {
-		return this.store.setWorkspaceDirectoryEnabled(directory, expectedRevision, enabled);
+		const updated = await this.store.setWorkspaceDirectoryEnabled(directory, expectedRevision, enabled);
+		this.invalidateComposerWorkspaceCatalog();
+		return updated;
 	}
 
 	composeWorkspacePrompt(workspace: ArtifactRef, artifacts: ArtifactRef[]): Promise<WorkspacePromptPlan> {
