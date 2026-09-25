@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
+import { createElement, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import { useHighlight } from '@/hooks/use_highlight';
@@ -7,7 +8,7 @@ import type { MermaidRenderStatus } from '@/components/markdown/mermaid_diagram_
 import { CopyButton } from '@/components/copy_button';
 import { DownloadButton } from '@/components/download_button';
 import { DiffApplyControl } from '@/components/markdown/diff_apply_control';
-import { looksLikeUnifiedDiff } from '@/components/markdown/diff_block';
+import { looksLikeInteractiveDiff } from '@/components/markdown/diff_apply_model';
 import { MermaidDiagram } from '@/components/markdown/mermaid_diagram_card';
 
 interface CodeProps {
@@ -19,6 +20,7 @@ interface CodeProps {
 	diffWorkspaceRoots?: string[];
 	defaultExpanded?: boolean;
 	disableControls?: boolean;
+	autoReviewEpoch?: number;
 }
 
 interface MermaidResultState {
@@ -33,6 +35,56 @@ interface ExpansionOverrideState {
 }
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
+
+const MAX_HIGHLIGHT_CHARACTERS = 100_000;
+const shikiAllowedTags = new Set(['code', 'pre', 'span']);
+
+function renderShikiNode(node: Node, key: string): ReactNode {
+	if (node.nodeType === Node.TEXT_NODE) {
+		return node.textContent;
+	}
+
+	if (node.nodeType !== Node.ELEMENT_NODE) {
+		return null;
+	}
+
+	const element = node as HTMLElement;
+	const children = [...element.childNodes].map((child, index) => renderShikiNode(child, `${key}-${index}`));
+	const tagName = element.tagName.toLowerCase();
+
+	if (!shikiAllowedTags.has(tagName)) {
+		return children;
+	}
+
+	return createElement(
+		tagName,
+		{
+			key,
+			className: element.className || undefined,
+			style: {
+				backgroundColor: element.style.backgroundColor || undefined,
+				color: element.style.color || undefined,
+				fontStyle: element.style.fontStyle || undefined,
+				fontWeight: element.style.fontWeight || undefined,
+			},
+		},
+		children
+	);
+}
+
+function ShikiHighlightedCode({ html }: { html: string }) {
+	const content = useMemo(() => {
+		if (typeof DOMParser === 'undefined') {
+			return null;
+		}
+
+		const document = new DOMParser().parseFromString(html, 'text/html');
+		return [...document.body.childNodes].map((node, index) => renderShikiNode(node, String(index)));
+	}, [html]);
+
+	// oxlint-disable-next-line react/jsx-no-useless-fragment
+	return <>{content}</>;
+}
 
 function useNearViewport(enabled: boolean) {
 	const elementRef = useRef<HTMLDivElement | null>(null);
@@ -85,6 +137,7 @@ export function CodeBlock({
 	diffWorkspaceRoots,
 	defaultExpanded = true,
 	disableControls = false,
+	autoReviewEpoch = 0,
 }: CodeProps) {
 	const codeBodyId = useId();
 
@@ -94,19 +147,11 @@ export function CodeBlock({
 
 	const [mermaidResult, setMermaidResult] = useState<MermaidResultState | null>(null);
 	const [expansionOverride, setExpansionOverride] = useState<ExpansionOverrideState | null>(null);
-	const lastSettledValueRef = useRef<string | null>(null);
-
-	useEffect(() => {
-		if (!isBusy) {
-			lastSettledValueRef.current = value;
-		}
-	}, [isBusy, value]);
 
 	const currentMermaidResult = isMermaid && mermaidResult?.key === codeBlockKey ? mermaidResult : null;
-	const hasPreviouslySettledValue =
-		// oxlint-disable-next-line react/refs
-		isBusy && lastSettledValueRef.current === value;
-	const diffControlsDisabled = disableControls && !hasPreviouslySettledValue;
+	// Streaming values are not stable enough for diff application controls.
+	// They become available once the code block is no longer busy.
+	const diffControlsDisabled = disableControls || isBusy;
 
 	const mermaidRenderStatus: MermaidRenderStatus =
 		!isMermaid || isBusy || !value.trim() ? 'idle' : currentMermaidResult?.status === 'error' ? 'error' : 'rendering';
@@ -125,16 +170,18 @@ export function CodeBlock({
 	// Shiki replaces the complete code subtree whenever a result arrives.
 	// Deferring does not coalesce token updates, so keep its input stable and
 	// render the current raw value until the stream has settled.
-	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded;
-	const valueForHighlight = isBusy ? '' : value;
+	const withinHighlightBudget = value.length <= MAX_HIGHLIGHT_CHARACTERS;
+	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded && withinHighlightBudget;
+	const valueForHighlight = isBusy || !withinHighlightBudget ? '' : value;
 	const html = useHighlight(valueForHighlight, language, shouldHighlight);
+
 	const isDiffLike = useMemo(
-		() => richCodeWorkActivated && !diffControlsDisabled && looksLikeUnifiedDiff(value, language),
-		[diffControlsDisabled, language, richCodeWorkActivated, value]
+		() => !diffControlsDisabled && looksLikeInteractiveDiff(value, language),
+		[diffControlsDisabled, language, value]
 	);
 
 	const highlightedHtml = html ?? '';
-	const showFallback = isBusy || !value.trim() || html === null || html === '';
+	const showFallback = !withinHighlightBudget || isBusy || !value.trim() || html === null || html === '';
 
 	const headerLabel = hasMermaidSyntaxError
 		? 'Mermaid syntax error'
@@ -193,12 +240,12 @@ export function CodeBlock({
 
 						{isDiffLike ? (
 							<DiffApplyControl
-								key={codeBlockKey}
 								language={language}
 								diffText={value}
 								isBusy={diffControlsDisabled}
 								candidatePaths={diffCandidatePaths}
 								workspaceRoots={diffWorkspaceRoots}
+								autoReviewEpoch={autoReviewEpoch}
 							/>
 						) : null}
 					</div>
@@ -240,11 +287,9 @@ export function CodeBlock({
 						{showFallback ? (
 							fallback
 						) : (
-							<div
-								className="app-shiki-container max-w-full overflow-x-auto"
-								// oxlint-disable-next-line react/no-danger
-								dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-							/>
+							<div className="app-shiki-container max-w-full overflow-x-auto">
+								<ShikiHighlightedCode html={highlightedHtml} />
+							</div>
 						)}
 					</div>
 				)}

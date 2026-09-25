@@ -80,6 +80,7 @@ export function MarkdownCodeRenderer({
 			diffWorkspaceRoots={settings.diffWorkspaceRoots}
 			defaultExpanded={settings.defaultCodeBlockExpanded}
 			disableControls={settings.isBusy}
+			autoReviewEpoch={settings.autoReviewEpoch}
 		/>
 	);
 }

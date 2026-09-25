@@ -200,12 +200,13 @@ export function reportFrontendError(error: unknown, extra: ErrorExtra = {}) {
 
 		persistPayload(payload);
 
+		const lp = formatPayloadForLog(payload);
 		// Keep browser console useful in dev and in WebView devtools.
-		console.error('Frontend error:', payload);
+		console.error('Frontend error:', lp);
 
 		if (logger) {
 			try {
-				logger.error(formatPayloadForLog(payload));
+				logger.error(lp);
 			} catch (loggerError) {
 				console.error('Failed to write frontend error to backend logger:', loggerError);
 			}

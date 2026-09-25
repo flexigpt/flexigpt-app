@@ -7,6 +7,7 @@ export interface JSONObject {
 type JSONValue = JSONPrimitive | JSONObject | JSONValue[];
 
 export type JSONRawString = string;
+
 type JSONObjectParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
 
 export function isJSONObject(value: unknown): value is JSONObject {

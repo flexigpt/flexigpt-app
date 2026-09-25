@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiUser, FiZap } from 'react-icons/fi';
 
 import type { ConversationMessage } from '@/spec/conversation';
@@ -132,20 +132,33 @@ export const ChatMessage = memo(function ChatMessage({
 }: ChatMessageProps) {
 	const isUser = message.role === RoleEnum.User;
 	const streamSnapshot = useMessageStreamSnapshot(streamSource, isBusy);
+	const isStreaming = isBusy && streamSource !== undefined;
+	const sawStreamingRef = useRef(isStreaming);
+	const [autoReviewEpoch, setAutoReviewEpoch] = useState(0);
+
+	/*
+	 * ChatMessage survives the switch from streaming markdown segments to the
+	 * final markdown tree. A historical message begins settled and therefore
+	 * never increments this value.
+	 */
+	useEffect(() => {
+		if (isStreaming) {
+			sawStreamingRef.current = true;
+			return;
+		}
+
+		if (!isBusy && sawStreamingRef.current) {
+			sawStreamingRef.current = false;
+			setAutoReviewEpoch(epoch => epoch + 1);
+		}
+	}, [isBusy, isStreaming]);
+
 	const align = !isUser ? 'items-end text-left' : 'items-start text-left';
 	const leftColSpan = !isUser ? 'col-span-1 lg:col-span-2' : 'col-span-1';
 	const rightColSpan = !isUser ? 'col-span-1' : 'col-span-1 lg:col-span-2';
 
 	const [renderMarkdown, setRenderMarkdown] = useState(!isUser);
-	const [hasMountedRichMarkdown, setHasMountedRichMarkdown] = useState(!isUser && !deferRichRendering);
 	const [toolDetailsState, setToolDetailsState] = useState<ToolDetailsState>(null);
-
-	useEffect(() => {
-		if (renderMarkdown && !deferRichRendering) {
-			// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-chain-state-updates
-			setHasMountedRichMarkdown(true);
-		}
-	}, [deferRichRendering, renderMarkdown]);
 
 	const handleDisableMarkdownChange = useCallback((checked: boolean) => {
 		setRenderMarkdown(!checked);
@@ -162,7 +175,7 @@ export const ChatMessage = memo(function ChatMessage({
 	const handleToolOutputDetails = useCallback((output: UIToolOutput) => {
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
-	const shouldRenderMarkdown = renderMarkdown && (hasMountedRichMarkdown || !deferRichRendering);
+	const shouldRenderMarkdown = renderMarkdown && !deferRichRendering;
 
 	const bubbleExtra = [isBusy ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : ''].filter(Boolean).join(' ');
 
@@ -262,6 +275,7 @@ export const ChatMessage = memo(function ChatMessage({
 								align={align}
 								renderAsMarkdown={shouldRenderMarkdown}
 								diffCandidatePaths={diffCandidatePaths}
+								autoReviewEpoch={autoReviewEpoch}
 								streamingText={isBusy ? streamSnapshot.text : undefined}
 							/>
 							{/* Fallback for error-only messages with no text content */}

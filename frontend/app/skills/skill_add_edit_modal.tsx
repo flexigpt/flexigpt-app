@@ -445,10 +445,25 @@ function AddEditSkillModalContent({
 		return next;
 	};
 
+	const hasRequiredFormValues = isRegisteringFolder
+		? Boolean(formData.displayName.trim() && formData.location.trim())
+		: Boolean(
+				formData.name.trim() &&
+				formData.slug.trim() &&
+				formData.type &&
+				(!isEditMode || formData.location.trim()) &&
+				((!isAddMode || creationMode !== 'create') && !isEditMode
+					? true
+					: formData.description.trim() && scaffoldBody.trim())
+			);
+
 	const isAllValid =
 		isViewMode ||
-		// oxlint-disable-next-line react/immutability
-		(isEditDocumentReady && !isSubmitting && Object.values(validateForm(formData)).every(error => !error));
+		(isEditDocumentReady &&
+			!isSubmitting &&
+			hasRequiredFormValues &&
+			!scaffoldArgumentError &&
+			!Object.values(errors).some(Boolean));
 
 	useEffect(() => {
 		if (!isAddMode) {
@@ -756,8 +771,7 @@ function AddEditSkillModalContent({
 			setFormData(previous => ({
 				...previous,
 				location: path,
-				// oxlint-disable-next-line unicorn/prefer-array-find
-				displayName: previous.displayName || path.replaceAll('\\', '/').split('/').filter(Boolean).at(-1) || '',
+				displayName: previous.displayName || path.replaceAll('\\', '/').split('/').findLast(Boolean) || '',
 			}));
 		} catch (error) {
 			setSubmitError(error instanceof Error ? error.message : 'Could not choose a Skill folder.');

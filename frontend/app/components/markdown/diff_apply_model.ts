@@ -3,24 +3,35 @@ import { ApplyUnifiedDiffDiagnosticLevel, ApplyUnifiedDiffStatus } from '@/spec/
 
 const DEV_NULL = '/dev/null';
 
+/*
+ * Important architecture boundary:
+ *
+ * This module intentionally does not validate unified-diff correctness.
+ *
+ * Do not add frontend enforcement for:
+ * - hunk line counts
+ * - line numbers
+ * - whitespace/context requirements
+ * - missing hunk context
+ * - malformed LLM-generated patch bodies
+ *
+ * The backend fuzzy applier and its dry-run endpoint are the sole authority
+ * for applicability. This module only isolates likely file/hunk sections and
+ * preserves source text for backend review/apply requests.
+ */
+
+export const MAX_INTERACTIVE_HUNK_PROBES = 64;
 const MAX_INTERACTIVE_DIFF_CHARACTERS = 1_500_000;
 const MAX_INTERACTIVE_DIFF_FILES = 100;
-export const MAX_INTERACTIVE_HUNK_PROBES = 24;
-const MAX_INTERACTIVE_CANDIDATES = 32;
-const MAX_INTERACTIVE_DIAGNOSTICS = 32;
+const MAX_INTERACTIVE_CANDIDATES = 100;
+const MAX_INTERACTIVE_DIAGNOSTICS = 128;
 
 type InteractiveDiffFileKind = 'modify' | 'add' | 'delete' | 'rename';
 
 export interface InteractiveDiffHunk {
 	id: string;
 	header: string;
-	suffix: string;
-	oldStart: number;
-	oldCount: number;
-	newStart: number;
-	newCount: number;
-	lines: string[];
-	valid: boolean;
+	sourceText: string;
 }
 
 export interface InteractiveDiffFile {
@@ -28,14 +39,28 @@ export interface InteractiveDiffFile {
 	oldPath?: string;
 	newPath?: string;
 	kind: InteractiveDiffFileKind;
+
+	/**
+	 * Original file section used for preview. This is intentionally preserved
+	 * even when headers/counts/body shape look malformed.
+	 */
 	sourceText: string;
+
+	/**
+	 * Text sent for a whole-file backend review/apply request.
+	 * It equals sourceText. The UI does not repair or convert patch syntax
+	 * before asking the backend to review it.
+	 */
+	requestText: string;
+
+	/**
+	 * Original file preamble before the first hunk. It is reused when sending
+	 * one selected hunk, without rebuilding or renumbering hunk coordinates.
+	 */
+	hunkPrefixText: string;
+
 	hunks: InteractiveDiffHunk[];
-	addedLines: number;
-	deletedLines: number;
 	diagnostics: ApplyUnifiedDiffDiagnostic[];
-	canApplyWhole: boolean;
-	canApplyPartial: boolean;
-	needsSyntheticHeaders: boolean;
 }
 
 export interface ParsedInteractiveDiff {
@@ -59,24 +84,25 @@ export interface DiffApplyOutcome {
 	status: DiffApplyOutcomeStatus;
 	message: string;
 	diagnostics: ApplyUnifiedDiffDiagnostic[];
+
+	/**
+	 * Backend-reported target/resolved path. This is presentation data and is
+	 * not validated or rewritten by the UI.
+	 */
+	resolvedTargetPath?: string;
 }
 
 interface WorkingDiffSection {
 	lines: string[];
+	hasGitBoundary: boolean;
+	hasHeaders: boolean;
 	oldPath?: string;
 	newPath?: string;
-	hunks: InteractiveDiffHunk[];
-	diagnostics: ApplyUnifiedDiffDiagnostic[];
-	hasHeaders: boolean;
-	hasMetadata: boolean;
-	binary: boolean;
 }
 
-interface ParsedHunk {
-	hunk?: InteractiveDiffHunk;
-	sourceLines: string[];
-	end: number;
-	diagnostic?: ApplyUnifiedDiffDiagnostic;
+interface HeaderPair {
+	oldPath: string;
+	newPath: string;
 }
 
 function createDiagnostic(
@@ -107,27 +133,29 @@ function appendDiagnostic(
 			createDiagnostic(
 				ApplyUnifiedDiffDiagnosticLevel.Warning,
 				'diagnostics_truncated',
-				'Additional diagnostics were suppressed to keep the diff UI responsive.'
+				'Additional parser notes were suppressed to keep the diff UI responsive.'
 			)
 		);
 	}
 }
 
-function hasErrorDiagnostics(diagnostics: ApplyUnifiedDiffDiagnostic[]): boolean {
-	return diagnostics.some(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error);
-}
-
 function ensureTrailingNewline(value: string): string {
+	if (!value) {
+		return '';
+	}
+
 	return value.endsWith('\n') ? value : `${value}\n`;
 }
 
-function dedupeInteractiveDiagnostics(
+function sourceFromLines(lines: string[]): string {
+	return ensureTrailingNewline(lines.join('\n'));
+}
+
+function limitInteractiveDiagnostics(
 	values: Array<ApplyUnifiedDiffDiagnostic | undefined | null>,
 	limit = MAX_INTERACTIVE_DIAGNOSTICS
 ): ApplyUnifiedDiffDiagnostic[] {
-	const output: ApplyUnifiedDiffDiagnostic[] = [];
-	const seen = new Set<string>();
-	let truncated = false;
+	const unique = new Map<string, ApplyUnifiedDiffDiagnostic>();
 
 	for (const value of values) {
 		if (!value) {
@@ -143,38 +171,52 @@ function dedupeInteractiveDiagnostics(
 		const code = value.code?.trim() ?? '';
 		const key = `${level}\u0000${code}\u0000${message}`;
 
-		if (seen.has(key)) {
-			continue;
+		if (!unique.has(key)) {
+			unique.set(key, {
+				level,
+				code: code || undefined,
+				message,
+			});
 		}
-
-		seen.add(key);
-
-		if (output.length >= limit) {
-			truncated = true;
-			continue;
-		}
-
-		output.push({
-			level,
-			code: code || undefined,
-			message,
-		});
 	}
 
-	if (truncated) {
-		output.push(
-			createDiagnostic(
-				ApplyUnifiedDiffDiagnosticLevel.Warning,
-				'diagnostics_truncated',
-				'Additional diagnostics were suppressed to keep the diff UI responsive.'
-			)
-		);
+	const all = [...unique.values()];
+	const ordered = [
+		...all.filter(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Error),
+		...all.filter(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Warning),
+		...all.filter(diagnostic => diagnostic.level === ApplyUnifiedDiffDiagnosticLevel.Info),
+	];
+
+	if (ordered.length <= limit) {
+		return ordered;
 	}
 
-	return output;
+	return [
+		...ordered.slice(0, limit),
+		createDiagnostic(
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'diagnostics_truncated',
+			'Additional diagnostics were suppressed to keep the diff UI responsive.'
+		),
+	];
 }
 
-export function normalizeInteractiveTargetPath(value: string | undefined | null): string {
+function createUnsplitInteractiveDiffFile(
+	text: string,
+	diagnostics: ApplyUnifiedDiffDiagnostic[] = []
+): InteractiveDiffFile {
+	return {
+		id: 'unsplit-section',
+		kind: 'modify',
+		sourceText: text,
+		requestText: text,
+		hunkPrefixText: '',
+		hunks: [],
+		diagnostics: limitInteractiveDiagnostics(diagnostics),
+	};
+}
+
+function normalizeInteractiveTargetPath(value: string | undefined | null): string {
 	const raw = value?.trim() ?? '';
 
 	if (!raw || raw === DEV_NULL || /[\u0000-\u001F\u007F]/.test(raw)) {
@@ -229,6 +271,7 @@ export function normalizeInteractiveTargetPaths(values: Array<string | undefined
 
 	for (const value of values) {
 		const path = normalizeInteractiveTargetPath(value);
+
 		if (!path || seen.has(path)) {
 			continue;
 		}
@@ -265,17 +308,17 @@ function normalizePatchPath(value: string | undefined | null): string {
 }
 
 function safeRelativePatchPath(value: string | undefined): string {
-	const raw = normalizePatchPath(value);
+	const normalized = normalizePatchPath(value);
 
-	if (!raw || raw === DEV_NULL || normalizeInteractiveTargetPath(raw)) {
+	if (!normalized || normalized === DEV_NULL || normalizeInteractiveTargetPath(normalized)) {
 		return '';
 	}
 
-	if (raw.startsWith('/') || /^[A-Za-z]:/.test(raw) || raw.startsWith('//')) {
+	if (normalized.startsWith('/') || normalized.startsWith('//') || /^[A-Za-z]:/.test(normalized)) {
 		return '';
 	}
 
-	const parts = raw.split('/').filter(Boolean);
+	const parts = normalized.split('/').filter(Boolean);
 
 	if (parts.length === 0 || parts.some(part => part === '.' || part === '..')) {
 		return '';
@@ -285,13 +328,7 @@ function safeRelativePatchPath(value: string | undefined): string {
 }
 
 function patchPathIdentity(value: string | undefined): string {
-	const absolute = targetPathIdentity(value);
-
-	if (absolute) {
-		return absolute;
-	}
-
-	return normalizePatchPath(value);
+	return targetPathIdentity(value) || normalizePatchPath(value);
 }
 
 function pathEndsWithRelativePath(candidate: string, relativePath: string): boolean {
@@ -313,7 +350,9 @@ function rootForCandidatePath(candidate: string, relativePath: string): string {
 	}
 
 	const root = normalizedCandidate.slice(0, normalizedCandidate.length - suffix.length);
-	return normalizeInteractiveTargetPath(root || '/');
+	const absoluteRoot = /^[A-Za-z]:$/.test(root) ? `${root}/` : root;
+
+	return normalizeInteractiveTargetPath(absoluteRoot || '/');
 }
 
 function joinWorkspaceRoot(root: string, relativePath: string): string {
@@ -363,11 +402,21 @@ function readDiffToken(input: string): { token: string; rest: string } {
 	}
 
 	let token = '';
+	const bytes: number[] = [];
+
+	const flushBytes = () => {
+		if (bytes.length > 0) {
+			token += new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes));
+			bytes.length = 0;
+		}
+	};
 
 	for (let index = 1; index < value.length; index += 1) {
 		const character = value[index];
 
 		if (character === '"') {
+			flushBytes();
+
 			return {
 				token,
 				rest: value.slice(index + 1).trimStart(),
@@ -375,6 +424,7 @@ function readDiffToken(input: string): { token: string; rest: string } {
 		}
 
 		if (character !== '\\') {
+			flushBytes();
 			token += character;
 			continue;
 		}
@@ -394,10 +444,18 @@ function readDiffToken(input: string): { token: string; rest: string } {
 				cursor += 1;
 			}
 
-			token += String.fromCodePoint(Number.parseInt(octal, 8));
+			const byte = Number.parseInt(octal, 8);
+
+			if (byte > 255) {
+				throw new Error('Invalid octal byte in quoted diff path.');
+			}
+
+			bytes.push(byte);
 			index = cursor - 1;
 			continue;
 		}
+
+		flushBytes();
 
 		const escapes: Record<string, string> = {
 			'"': '"',
@@ -407,7 +465,11 @@ function readDiffToken(input: string): { token: string; rest: string } {
 			t: '\t',
 		};
 
-		token += escapes[next] ?? next;
+		if (!(next in escapes)) {
+			throw new Error('Unsupported escape in quoted diff path.');
+		}
+
+		token += escapes[next];
 		index += 1;
 	}
 
@@ -418,42 +480,43 @@ function readHeaderPath(input: string): string {
 	const value = input.trimStart();
 
 	if (!value) {
-		throw new Error('Missing diff header path.');
-	}
-
-	if (value.startsWith('"')) {
-		return readDiffToken(value).token;
-	}
-
-	const tabIndex = value.indexOf('\t');
-	const path = tabIndex >= 0 ? value.slice(0, tabIndex) : (value.split(/\s+/, 1)[0] ?? '');
-
-	if (!path) {
-		throw new Error('Missing diff header path.');
-	}
-
-	return path;
-}
-
-function readLoosePath(input: string): string {
-	const value = input.trim();
-
-	if (!value) {
 		return '';
 	}
 
-	return value.startsWith('"') ? readDiffToken(value).token : value;
+	if (value.startsWith('"')) {
+		try {
+			return readDiffToken(value).token;
+		} catch {
+			return '';
+		}
+	}
+
+	const tabIndex = value.indexOf('\t');
+
+	if (tabIndex >= 0) {
+		return value.slice(0, tabIndex).trim();
+	}
+
+	// Standard unified diffs typically use a tab before timestamps. If an LLM
+	// omitted it, keep a likely spaced filename rather than validating/rejecting.
+	return value.replace(/\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:[\s\S]*$/, '').trim();
 }
 
-function normalizeHeaderPair(oldPath: string, newPath: string): [string, string] {
+function normalizeHeaderPair(oldPath: string, newPath: string): HeaderPair {
 	const oldHasGitPrefix = oldPath.startsWith('a/');
 	const newHasGitPrefix = newPath.startsWith('b/');
 
 	if ((oldHasGitPrefix && (newHasGitPrefix || newPath === DEV_NULL)) || (oldPath === DEV_NULL && newHasGitPrefix)) {
-		return [oldHasGitPrefix ? oldPath.slice(2) : oldPath, newHasGitPrefix ? newPath.slice(2) : newPath];
+		return {
+			oldPath: oldHasGitPrefix ? oldPath.slice(2) : oldPath,
+			newPath: newHasGitPrefix ? newPath.slice(2) : newPath,
+		};
 	}
 
-	return [oldPath, newPath];
+	return {
+		oldPath,
+		newPath,
+	};
 }
 
 function formatHeaderPath(path: string): string {
@@ -480,302 +543,134 @@ function getFileKind(oldPath: string | undefined, newPath: string | undefined): 
 	return 'modify';
 }
 
-function hunksDoNotOverlap(hunks: InteractiveDiffHunk[]): boolean {
-	let previousEnd = -1;
-	let previousInsertion: number | undefined;
-
-	for (const hunk of hunks) {
-		const start = hunk.oldCount === 0 ? hunk.oldStart : hunk.oldStart - 1;
-
-		if (start < previousEnd || (hunk.oldCount === 0 && previousInsertion === start)) {
-			return false;
-		}
-
-		previousEnd = Math.max(previousEnd, start + hunk.oldCount);
-		previousInsertion = hunk.oldCount === 0 ? start : undefined;
-	}
-
-	return true;
+function isHeaderLine(line: string, prefix: '---' | '+++'): boolean {
+	return line.startsWith(`${prefix} `) || line.startsWith(`${prefix}\t`);
 }
 
-function parseHunkAt(lines: string[], start: number, hunkID: string): ParsedHunk {
-	const header = lines[start] ?? '';
-	const match = /^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(.*)$/.exec(header);
+function readHeaderPair(lines: string[], index: number): HeaderPair | undefined {
+	const oldLine = lines[index] ?? '';
+	const newLine = lines[index + 1] ?? '';
 
-	if (!match?.[1] || !match[3]) {
-		return {
-			sourceLines: [header],
-			end: start + 1,
-			diagnostic: createDiagnostic(
-				ApplyUnifiedDiffDiagnosticLevel.Error,
-				'invalid_hunk_header',
-				`Invalid hunk header: ${header}`
-			),
-		};
-	}
-
-	const oldStart = Number(match[1]);
-	const oldCount = match[2] === undefined ? 1 : Number(match[2]);
-	const newStart = Number(match[3]);
-	const newCount = match[4] === undefined ? 1 : Number(match[4]);
-
-	if (
-		![oldStart, oldCount, newStart, newCount].every(n => {
-			return Number.isSafeInteger(n);
-		}) ||
-		oldStart < 0 ||
-		newStart < 0 ||
-		oldCount < 0 ||
-		newCount < 0 ||
-		(oldCount > 0 && oldStart === 0) ||
-		(newCount > 0 && newStart === 0) ||
-		(oldCount === 0 && newCount === 0)
-	) {
-		return {
-			sourceLines: [header],
-			end: start + 1,
-			diagnostic: createDiagnostic(
-				ApplyUnifiedDiffDiagnosticLevel.Error,
-				'invalid_hunk_range',
-				`Invalid hunk range: ${header}`
-			),
-		};
-	}
-
-	let oldRemaining = oldCount;
-	let newRemaining = newCount;
-	let cursor = start + 1;
-	let previousWasPayload = false;
-	let valid = true;
-	const body: string[] = [];
-
-	while (cursor < lines.length) {
-		const line = lines[cursor] ?? '';
-
-		if (line === '\\ No newline at end of file') {
-			if (!previousWasPayload) {
-				valid = false;
-			}
-
-			body.push(line);
-			previousWasPayload = false;
-			cursor += 1;
-			continue;
-		}
-
-		if (oldRemaining === 0 && newRemaining === 0) {
-			break;
-		}
-
-		const prefix = line[0];
-
-		if (prefix === ' ' && oldRemaining > 0 && newRemaining > 0) {
-			oldRemaining -= 1;
-			newRemaining -= 1;
-		} else if (prefix === '-' && oldRemaining > 0) {
-			oldRemaining -= 1;
-		} else if (prefix === '+' && newRemaining > 0) {
-			newRemaining -= 1;
-		} else {
-			break;
-		}
-
-		body.push(line);
-		previousWasPayload = true;
-		cursor += 1;
-	}
-
-	if (oldRemaining !== 0 || newRemaining !== 0) {
-		valid = false;
-	}
-
-	const hunk: InteractiveDiffHunk = {
-		id: hunkID,
-		header,
-		suffix: match[5] ?? '',
-		oldStart,
-		oldCount,
-		newStart,
-		newCount,
-		lines: body,
-		valid,
-	};
-
-	return {
-		hunk,
-		sourceLines: [header, ...body],
-		end: cursor,
-		diagnostic: valid
-			? undefined
-			: createDiagnostic(
-					ApplyUnifiedDiffDiagnosticLevel.Error,
-					'incomplete_hunk',
-					`Incomplete or malformed hunk: ${header}`
-				),
-	};
-}
-
-function createWorkingSection(): WorkingDiffSection {
-	return {
-		lines: [],
-		hunks: [],
-		diagnostics: [],
-		hasHeaders: false,
-		hasMetadata: false,
-		binary: false,
-	};
-}
-
-function addOutsideHunkLine(section: WorkingDiffSection, line: string): void {
-	section.lines.push(line);
-
-	if (!line.trim() || line.startsWith('index ') || /^=+$/.test(line)) {
-		return;
-	}
-
-	if (line === 'GIT binary patch' || line.startsWith('Binary files ')) {
-		section.binary = true;
-		appendDiagnostic(
-			section.diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'binary_patch',
-			'Binary patches are not supported by the interactive text diff UI.'
-		);
-		return;
-	}
-
-	if (line.startsWith('new file mode ')) {
-		section.oldPath = DEV_NULL;
-		section.hasMetadata = true;
-		return;
-	}
-
-	if (line.startsWith('deleted file mode ')) {
-		section.newPath = DEV_NULL;
-		section.hasMetadata = true;
-		return;
-	}
-
-	if (
-		line.startsWith('old mode ') ||
-		line.startsWith('new mode ') ||
-		line.startsWith('similarity index ') ||
-		line.startsWith('dissimilarity index ') ||
-		line.startsWith('copy from ') ||
-		line.startsWith('copy to ')
-	) {
-		section.hasMetadata = true;
-		return;
-	}
-
-	if (line.startsWith('rename from ')) {
-		section.hasMetadata = true;
-
-		try {
-			section.oldPath = readLoosePath(line.slice('rename from '.length));
-		} catch (error) {
-			appendDiagnostic(
-				section.diagnostics,
-				ApplyUnifiedDiffDiagnosticLevel.Error,
-				'invalid_path',
-				error instanceof Error ? error.message : 'Invalid rename source path.'
-			);
-		}
-
-		return;
-	}
-
-	if (line.startsWith('rename to ')) {
-		section.hasMetadata = true;
-
-		try {
-			section.newPath = readLoosePath(line.slice('rename to '.length));
-		} catch (error) {
-			appendDiagnostic(
-				section.diagnostics,
-				ApplyUnifiedDiffDiagnosticLevel.Error,
-				'invalid_path',
-				error instanceof Error ? error.message : 'Invalid rename target path.'
-			);
-		}
-
-		return;
-	}
-
-	appendDiagnostic(
-		section.diagnostics,
-		ApplyUnifiedDiffDiagnosticLevel.Error,
-		'unsupported_section_text',
-		`Unsupported text outside a hunk: ${line}`
-	);
-}
-
-function finishWorkingSection(section: WorkingDiffSection, sectionNumber: number): InteractiveDiffFile | undefined {
-	if (section.lines.length === 0 && section.hunks.length === 0) {
+	if (!isHeaderLine(oldLine, '---') || !isHeaderLine(newLine, '+++')) {
 		return undefined;
 	}
 
-	if (section.hunks.length === 0) {
-		appendDiagnostic(
-			section.diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'no_hunks',
-			'The file section contains no complete textual hunks.'
-		);
+	const oldPath = readHeaderPath(oldLine.slice(4));
+	const newPath = readHeaderPath(newLine.slice(4));
+
+	if (!oldPath || !newPath) {
+		return undefined;
 	}
 
-	if (!section.hasHeaders && section.hunks.length > 0) {
-		appendDiagnostic(
-			section.diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Warning,
-			'hunk_only_patch',
-			'This hunk-only patch will use the selected target path to create synthetic file headers.'
-		);
+	return normalizeHeaderPair(oldPath, newPath);
+}
+
+function likelyNewBareFileSection(pair: HeaderPair): boolean {
+	if (pair.oldPath === DEV_NULL || pair.newPath === DEV_NULL) {
+		return true;
 	}
 
-	if (section.hasHeaders && (!section.oldPath || !section.newPath)) {
-		appendDiagnostic(
-			section.diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'missing_paths',
-			'The file section is missing one of its --- or +++ paths.'
-		);
+	if (pair.oldPath === pair.newPath) {
+		return true;
 	}
 
-	if (section.oldPath === DEV_NULL && section.newPath === DEV_NULL) {
-		appendDiagnostic(
-			section.diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'invalid_paths',
-			'Both file paths cannot be /dev/null.'
-		);
+	return /[/.\\]/.test(pair.oldPath) && /[/.\\]/.test(pair.newPath);
+}
+
+function extractHunks(
+	lines: string[],
+	sectionID: string
+): {
+	hunks: InteractiveDiffHunk[];
+	hunkPrefixText: string;
+} {
+	const hunkIndexes: number[] = [];
+
+	for (let index = 0; index < lines.length; index += 1) {
+		if ((lines[index] ?? '').startsWith('@@')) {
+			hunkIndexes.push(index);
+		}
+	}
+
+	if (hunkIndexes.length === 0) {
+		return {
+			hunks: [],
+			hunkPrefixText: sourceFromLines(lines),
+		};
+	}
+
+	const firstHunkIndex = hunkIndexes[0] ?? 0;
+	const hunks = hunkIndexes.map((start, index) => {
+		const nextStart = hunkIndexes[index + 1] ?? lines.length;
+		const header = lines[start] ?? '';
+
+		return {
+			id: `${sectionID}:hunk-${index + 1}`,
+			header,
+			sourceText: sourceFromLines(lines.slice(start, nextStart)),
+		};
+	});
+
+	return {
+		hunks,
+		hunkPrefixText: sourceFromLines(lines.slice(0, firstHunkIndex)),
+	};
+}
+
+function finalizeStandardSection(section: WorkingDiffSection, sectionNumber: number): InteractiveDiffFile | undefined {
+	if (section.lines.length === 0) {
+		return undefined;
 	}
 
 	const id = `section-${sectionNumber}`;
-	const hunks = section.hunks.map((hunk, index) => ({
-		...hunk,
-		id: `${id}:hunk-${index + 1}`,
-	}));
-	const diagnostics = dedupeInteractiveDiagnostics(section.diagnostics);
-	const kind = getFileKind(section.oldPath, section.newPath);
-	const validHunks = hunks.length > 0 && hunks.every(hunk => hunk.valid);
-	const canApplyWhole = validHunks && !section.binary && !hasErrorDiagnostics(diagnostics);
+	const sourceText = sourceFromLines(section.lines);
+	const extracted = extractHunks(section.lines, id);
+	const diagnostics: ApplyUnifiedDiffDiagnostic[] = [];
+
+	if (!section.hasHeaders) {
+		appendDiagnostic(
+			diagnostics,
+			ApplyUnifiedDiffDiagnosticLevel.Info,
+			'missing_file_headers',
+			'No paired ---/+++ file headers were found. The backend will resolve this section during review.'
+		);
+	}
+
+	if (extracted.hunks.length === 0) {
+		appendDiagnostic(
+			diagnostics,
+			ApplyUnifiedDiffDiagnosticLevel.Info,
+			'no_hunk_markers',
+			'No @@ hunk markers were found. The file section is still sent unchanged to the backend.'
+		);
+	}
 
 	return {
 		id,
 		oldPath: section.oldPath,
 		newPath: section.newPath,
-		kind,
-		sourceText: ensureTrailingNewline(section.lines.join('\n')),
-		hunks,
-		addedLines: hunks.reduce((sum, hunk) => sum + hunk.lines.filter(line => line.startsWith('+')).length, 0),
-		deletedLines: hunks.reduce((sum, hunk) => sum + hunk.lines.filter(line => line.startsWith('-')).length, 0),
-		diagnostics,
-		canApplyWhole,
-		canApplyPartial:
-			canApplyWhole && kind === 'modify' && hunks.length > 1 && !section.hasMetadata && hunksDoNotOverlap(hunks),
-		needsSyntheticHeaders: !section.hasHeaders,
+		kind: getFileKind(section.oldPath, section.newPath),
+		sourceText,
+		requestText: sourceText,
+		hunkPrefixText: extracted.hunkPrefixText,
+		hunks: extracted.hunks,
+		diagnostics: limitInteractiveDiagnostics(diagnostics),
 	};
+}
+
+function parseGitBoundaryPaths(line: string): HeaderPair | undefined {
+	try {
+		const first = readDiffToken(line.slice('diff --git '.length));
+		const second = readDiffToken(first.rest);
+
+		if (!first.token || !second.token) {
+			return undefined;
+		}
+
+		return normalizeHeaderPair(first.token, second.token);
+	} catch {
+		return undefined;
+	}
 }
 
 function parseStandardDiff(text: string): {
@@ -792,7 +687,7 @@ function parseStandardDiff(text: string): {
 			return;
 		}
 
-		const file = finishWorkingSection(current, files.length + 1);
+		const file = finalizeStandardSection(current, files.length + 1);
 
 		if (file) {
 			files.push(file);
@@ -806,25 +701,18 @@ function parseStandardDiff(text: string): {
 
 		if (line.startsWith('diff --git ')) {
 			flush();
-			current = createWorkingSection();
-			current.lines.push(line);
 
-			try {
-				const first = readDiffToken(line.slice('diff --git '.length));
-				const second = readDiffToken(first.rest);
+			current = {
+				lines: [line],
+				hasGitBoundary: true,
+				hasHeaders: false,
+			};
 
-				if (!first.token || !second.token) {
-					throw new Error('diff --git must include both paths.');
-				}
+			const pair = parseGitBoundaryPaths(line);
 
-				[current.oldPath, current.newPath] = normalizeHeaderPair(first.token, second.token);
-			} catch (error) {
-				appendDiagnostic(
-					current.diagnostics,
-					ApplyUnifiedDiffDiagnosticLevel.Error,
-					'invalid_path',
-					error instanceof Error ? error.message : 'Invalid diff --git path.'
-				);
+			if (pair) {
+				current.oldPath = pair.oldPath;
+				current.newPath = pair.newPath;
 			}
 
 			index += 1;
@@ -833,96 +721,96 @@ function parseStandardDiff(text: string): {
 
 		if (line.startsWith('Index: ')) {
 			flush();
-			current = createWorkingSection();
-			current.lines.push(line);
 
-			try {
-				const path = readLoosePath(line.slice('Index: '.length));
-				current.oldPath = path;
-				current.newPath = path;
-			} catch (error) {
-				appendDiagnostic(
-					current.diagnostics,
-					ApplyUnifiedDiffDiagnosticLevel.Error,
-					'invalid_path',
-					error instanceof Error ? error.message : 'Invalid Index path.'
-				);
-			}
+			const path = line.slice('Index: '.length).trim();
+
+			current = {
+				lines: [line],
+				hasGitBoundary: true,
+				hasHeaders: false,
+				oldPath: path || undefined,
+				newPath: path || undefined,
+			};
 
 			index += 1;
 			continue;
 		}
 
-		const nextLine = lines[index + 1] ?? '';
-		const hasPairedHeaders =
-			(line.startsWith('--- ') || line.startsWith('---\t')) &&
-			(nextLine.startsWith('+++ ') || nextLine.startsWith('+++\t'));
+		const pair = readHeaderPair(lines, index);
 
-		if (hasPairedHeaders) {
-			if (current?.hasHeaders || (current?.hunks.length ?? 0) > 0) {
+		if (pair) {
+			if (!current) {
+				current = {
+					lines: [],
+					hasGitBoundary: false,
+					hasHeaders: false,
+				};
+			} else if (current.hasHeaders && !current.hasGitBoundary && likelyNewBareFileSection(pair)) {
 				flush();
+				current = {
+					lines: [],
+					hasGitBoundary: false,
+					hasHeaders: false,
+				};
 			}
 
-			current ??= createWorkingSection();
-			current.lines.push(line, nextLine);
-			current.hasHeaders = true;
-
-			try {
-				[current.oldPath, current.newPath] = normalizeHeaderPair(
-					readHeaderPath(line.slice(4)),
-					readHeaderPath(nextLine.slice(4))
-				);
-			} catch (error) {
-				appendDiagnostic(
-					current.diagnostics,
-					ApplyUnifiedDiffDiagnosticLevel.Error,
-					'invalid_path',
-					error instanceof Error ? error.message : 'Invalid unified diff header path.'
-				);
+			if (!current.hasHeaders) {
+				current.oldPath = pair.oldPath;
+				current.newPath = pair.newPath;
+				current.hasHeaders = true;
+				current.lines.push(line, lines[index + 1] ?? '');
+				index += 2;
+				continue;
 			}
 
-			index += 2;
-			continue;
-		}
-
-		if (line.startsWith('@@')) {
-			current ??= createWorkingSection();
-
-			const parsed = parseHunkAt(lines, index, `pending-hunk-${current.hunks.length + 1}`);
-
-			for (const sourceLine of parsed.sourceLines) {
-				current.lines.push(sourceLine);
-			}
-
-			if (parsed.hunk) {
-				current.hunks.push(parsed.hunk);
-			}
-
-			if (parsed.diagnostic) {
-				appendDiagnostic(
-					current.diagnostics,
-					parsed.diagnostic.level,
-					parsed.diagnostic.code ?? 'invalid_hunk',
-					parsed.diagnostic.message
-				);
-			}
-
-			index = parsed.end;
-			continue;
-		}
-
-		if (!current) {
-			// Ignore mail headers and other patch preamble text. It is not sent
-			// with a scoped file request, and should not block valid sections.
+			/*
+			 * The current section already has headers. This can be a hunk
+			 * payload such as "--- old" followed by "+++ new". Preserve it
+			 * exactly instead of treating it as another file boundary.
+			 */
+			current.lines.push(line);
 			index += 1;
 			continue;
 		}
 
-		addOutsideHunkLine(current, line);
+		if (!current && line.startsWith('@@')) {
+			current = {
+				lines: [],
+				hasGitBoundary: false,
+				hasHeaders: false,
+			};
+		}
+
+		if (current) {
+			current.lines.push(line);
+		}
+
+		// Ignore mail headers and patch preambles outside known file sections.
 		index += 1;
 	}
 
 	flush();
+
+	if (files.length === 0) {
+		appendDiagnostic(
+			diagnostics,
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'no_file_sections',
+			'No file sections could be confidently separated.'
+		);
+
+		if (text.trim()) {
+			files.push(
+				createUnsplitInteractiveDiffFile(text, [
+					createDiagnostic(
+						ApplyUnifiedDiffDiagnosticLevel.Info,
+						'unsplit_diff',
+						'The UI could not split this diff. The original text will be sent unchanged to the backend.'
+					),
+				])
+			);
+		}
+	}
 
 	return {
 		files,
@@ -934,33 +822,18 @@ function parseOpenAIPath(value: string): string {
 	const trimmed = value.trim();
 
 	if (!trimmed) {
-		throw new Error('Missing OpenAI patch path.');
+		return '';
 	}
 
-	return trimmed.startsWith('"') ? readDiffToken(trimmed).token : trimmed;
-}
+	if (!trimmed.startsWith('"')) {
+		return trimmed;
+	}
 
-function unsupportedOpenAISection(
-	id: string,
-	kind: 'add' | 'update' | 'delete',
-	path: string | undefined,
-	sourceText: string,
-	message: string
-): InteractiveDiffFile {
-	return {
-		id,
-		oldPath: kind === 'add' ? DEV_NULL : path,
-		newPath: kind === 'delete' ? DEV_NULL : path,
-		kind: kind === 'add' ? 'add' : kind === 'delete' ? 'delete' : 'modify',
-		sourceText: ensureTrailingNewline(sourceText),
-		hunks: [],
-		addedLines: 0,
-		deletedLines: 0,
-		diagnostics: [createDiagnostic(ApplyUnifiedDiffDiagnosticLevel.Error, 'unsupported_openai_section', message)],
-		canApplyWhole: false,
-		canApplyPartial: false,
-		needsSyntheticHeaders: false,
-	};
+	try {
+		return readDiffToken(trimmed).token;
+	} catch {
+		return '';
+	}
 }
 
 function parseOpenAIPatch(text: string): {
@@ -972,7 +845,7 @@ function parseOpenAIPatch(text: string): {
 	const sections: Array<{
 		index: number;
 		kind: 'add' | 'update' | 'delete';
-		pathText: string;
+		path: string;
 	}> = [];
 	const diagnostics: ApplyUnifiedDiffDiagnostic[] = [];
 	const endIndex = lines.findIndex(line => line.trim() === '*** End Patch');
@@ -985,21 +858,31 @@ function parseOpenAIPatch(text: string): {
 			continue;
 		}
 
-		const normalizedKind = match[1].toLowerCase();
+		const kind = match[1].toLowerCase();
+		const path = parseOpenAIPath(match[2]);
 
 		sections.push({
 			index,
-			kind: normalizedKind === 'add' ? 'add' : normalizedKind === 'delete' ? 'delete' : 'update',
-			pathText: match[2],
+			kind: kind === 'add' ? 'add' : kind === 'delete' ? 'delete' : 'update',
+			path,
 		});
 	}
 
 	if (hasBegin && endIndex < 0) {
 		appendDiagnostic(
 			diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'incomplete_openai_patch',
-			'The OpenAI patch is missing its End Patch marker.'
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'openai_patch_missing_end',
+			'The OpenAI patch has no End Patch marker. Sections are still preserved for backend review.'
+		);
+	}
+
+	if (endIndex >= 0 && lines.slice(endIndex + 1).some(line => line.trim())) {
+		appendDiagnostic(
+			diagnostics,
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'openai_patch_trailing_text',
+			'Unexpected text follows End Patch. It was not included in a scoped file request.'
 		);
 	}
 
@@ -1007,6 +890,7 @@ function parseOpenAIPatch(text: string): {
 
 	for (let index = 0; index < sections.length; index += 1) {
 		const section = sections[index];
+
 		if (!section) {
 			continue;
 		}
@@ -1016,99 +900,53 @@ function parseOpenAIPatch(text: string): {
 			endIndex >= section.index
 				? Math.min(nextSection?.index ?? lines.length, endIndex)
 				: (nextSection?.index ?? lines.length);
-		const body = lines.slice(section.index + 1, sectionEnd);
+		const rawLines = lines.slice(section.index, sectionEnd);
+		const rawSourceText = sourceFromLines(rawLines);
 		const id = `section-${files.length + 1}`;
-		let path: string | undefined;
+		const oldPath = section.kind === 'add' ? DEV_NULL : section.path || undefined;
+		const newPath = section.kind === 'delete' ? DEV_NULL : section.path || undefined;
+		const diagnosticsForFile: ApplyUnifiedDiffDiagnostic[] = [];
+		const extracted = extractHunks(rawLines, id);
 
-		try {
-			path = parseOpenAIPath(section.pathText);
-		} catch (error) {
-			files.push(
-				unsupportedOpenAISection(
-					id,
-					section.kind,
-					undefined,
-					lines.slice(section.index, sectionEnd).join('\n'),
-					error instanceof Error ? error.message : 'Invalid OpenAI patch path.'
-				)
-			);
-			continue;
-		}
-
-		const isSupportedAddBody =
-			section.kind === 'add' &&
-			body.length > 0 &&
-			body.every(line => line.startsWith('+') || line === '\\ No newline at end of file');
-
-		if (!isSupportedAddBody) {
-			files.push(
-				unsupportedOpenAISection(
-					id,
-					section.kind,
-					path,
-					lines.slice(section.index, sectionEnd).join('\n'),
-					section.kind === 'add'
-						? 'This Add File section has an invalid body and cannot be safely converted.'
-						: 'Only OpenAI Add File sections can be safely converted by the interactive diff UI.'
-				)
-			);
-			continue;
-		}
-
-		const addedLineCount = body.filter(line => line.startsWith('+')).length;
-
-		if (addedLineCount === 0) {
-			files.push(
-				unsupportedOpenAISection(
-					id,
-					section.kind,
-					path,
-					lines.slice(section.index, sectionEnd).join('\n'),
-					'Creating an empty OpenAI Add File section is not safely representable as a textual unified diff.'
-				)
-			);
-			continue;
-		}
-
-		const headerPath = normalizeInteractiveTargetPath(path) || path.startsWith('b/') ? path : `b/${path}`;
-		const convertedText = [
-			'--- /dev/null',
-			`+++ ${formatHeaderPath(headerPath)}`,
-			`@@ -0,0 +1,${addedLineCount} @@`,
-			...body,
-		].join('\n');
-
-		const converted = parseStandardDiff(convertedText).files[0];
-
-		if (!converted || !converted.canApplyWhole) {
-			files.push(
-				unsupportedOpenAISection(
-					id,
-					section.kind,
-					path,
-					lines.slice(section.index, sectionEnd).join('\n'),
-					'The converted Add File section could not be verified as a complete unified diff.'
-				)
-			);
-			continue;
-		}
+		appendDiagnostic(
+			diagnosticsForFile,
+			ApplyUnifiedDiffDiagnosticLevel.Info,
+			'openai_section_preserved',
+			'This OpenAI patch section is sent unchanged to the backend for fuzzy review.'
+		);
 
 		files.push({
-			...converted,
 			id,
-			hunks: converted.hunks.map((hunk, hunkIndex) => ({
-				...hunk,
-				id: `${id}:hunk-${hunkIndex + 1}`,
-			})),
-			diagnostics: dedupeInteractiveDiagnostics([
-				...converted.diagnostics,
-				createDiagnostic(
-					ApplyUnifiedDiffDiagnosticLevel.Info,
-					'converted_openai_add_file',
-					'This OpenAI Add File section is converted to standard unified diff before checking or applying.'
-				),
-			]),
+			oldPath,
+			newPath,
+			kind: section.kind === 'add' ? 'add' : section.kind === 'delete' ? 'delete' : 'modify',
+			sourceText: rawSourceText,
+			requestText: rawSourceText,
+			hunkPrefixText: extracted.hunkPrefixText,
+			hunks: extracted.hunks,
+			diagnostics: limitInteractiveDiagnostics(diagnosticsForFile),
 		});
+	}
+
+	if (files.length === 0) {
+		appendDiagnostic(
+			diagnostics,
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'no_openai_file_sections',
+			'No OpenAI file sections could be extracted.'
+		);
+
+		if (text.trim()) {
+			files.push(
+				createUnsplitInteractiveDiffFile(text, [
+					createDiagnostic(
+						ApplyUnifiedDiffDiagnosticLevel.Info,
+						'unsplit_openai_patch',
+						'The UI could not split this OpenAI patch. The original text will be sent unchanged to the backend.'
+					),
+				])
+			);
+		}
 	}
 
 	return {
@@ -1117,7 +955,7 @@ function parseOpenAIPatch(text: string): {
 	};
 }
 
-function looksLikeInteractiveDiff(value: string, language = ''): boolean {
+export function looksLikeInteractiveDiff(value: string, language = ''): boolean {
 	const normalizedLanguage = language.trim().toLowerCase();
 
 	if (normalizedLanguage === 'diff' || normalizedLanguage === 'patch' || normalizedLanguage === 'udiff') {
@@ -1128,62 +966,58 @@ function looksLikeInteractiveDiff(value: string, language = ''): boolean {
 		/^diff --git\s+/m.test(value) ||
 		/^Index:\s+/m.test(value) ||
 		(/^---[ \t]/m.test(value) && /^\+\+\+[ \t]/m.test(value)) ||
-		/^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@/m.test(value) ||
+		/^@@/m.test(value) ||
 		/^\*\*\*\s+(?:Begin Patch|(?:Add|Update|Delete)\s+File:)/m.test(value)
 	);
 }
 
 export function parseInteractiveDiff(value: string, language = ''): ParsedInteractiveDiff {
-	const text = value
-		.replaceAll('\r\n', '\n')
-		.replaceAll('\r', '\n')
-		.replace(/^\uFEFF/, '');
-	const isOpenAIPatch = /^\*\*\*\s+(?:Begin Patch|(?:Add|Update|Delete)\s+File:)/m.test(text);
+	/*
+	 * Preserve line bodies as supplied. In particular, do not normalize bare
+	 * carriage returns, whitespace, hunk counts, or line numbers. The backend
+	 * fuzzy applier owns applicability semantics.
+	 */
+	const text = value.replace(/^\uFEFF/, '');
 	const isDiffLike = looksLikeInteractiveDiff(text, language);
+	const isOpenAIPatch = /^\*\*\*\s+(?:Begin Patch|(?:Add|Update|Delete)\s+File:)/m.test(text);
 
 	if (text.length > MAX_INTERACTIVE_DIFF_CHARACTERS) {
+		const tooLargeDiagnostic = createDiagnostic(
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
+			'diff_too_large',
+			`This diff exceeds the interactive UI budget of ${MAX_INTERACTIVE_DIFF_CHARACTERS.toLocaleString()} characters. It is sent unchanged to the backend as one section.`
+		);
+
 		return {
 			isDiffLike,
 			isOpenAIPatch,
-			files: [],
-			diagnostics: [
-				createDiagnostic(
-					ApplyUnifiedDiffDiagnosticLevel.Error,
-					'diff_too_large',
-					`This diff is larger than ${MAX_INTERACTIVE_DIFF_CHARACTERS.toLocaleString()} characters and is not opened in the interactive apply UI.`
-				),
-			],
+			files: [createUnsplitInteractiveDiffFile(text, [tooLargeDiagnostic])],
+			diagnostics: [tooLargeDiagnostic],
 		};
 	}
 
 	const parsed = isOpenAIPatch ? parseOpenAIPatch(text) : parseStandardDiff(text);
-	let files = parsed.files;
-	const diagnostics = [...parsed.diagnostics];
 
-	if (files.length === 0) {
-		appendDiagnostic(
-			diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
-			'no_file_sections',
-			'No complete file sections could be extracted from this patch.'
-		);
-	}
-
-	if (files.length > MAX_INTERACTIVE_DIFF_FILES) {
-		files = files.slice(0, MAX_INTERACTIVE_DIFF_FILES);
-		appendDiagnostic(
-			diagnostics,
-			ApplyUnifiedDiffDiagnosticLevel.Error,
+	if (parsed.files.length > MAX_INTERACTIVE_DIFF_FILES) {
+		const tooManySectionsDiagnostic = createDiagnostic(
+			ApplyUnifiedDiffDiagnosticLevel.Warning,
 			'too_many_file_sections',
-			`This patch contains more than ${MAX_INTERACTIVE_DIFF_FILES} file sections and is not opened in the interactive apply UI.`
+			`This diff has more than ${MAX_INTERACTIVE_DIFF_FILES} file sections. It is sent unchanged to the backend as one section.`
 		);
+
+		return {
+			isDiffLike,
+			isOpenAIPatch,
+			files: [createUnsplitInteractiveDiffFile(text, [tooManySectionsDiagnostic])],
+			diagnostics: limitInteractiveDiagnostics([...parsed.diagnostics, tooManySectionsDiagnostic]),
+		};
 	}
 
 	return {
 		isDiffLike,
 		isOpenAIPatch,
-		files,
-		diagnostics: dedupeInteractiveDiagnostics(diagnostics),
+		files: parsed.files,
+		diagnostics: limitInteractiveDiagnostics(parsed.diagnostics),
 	};
 }
 
@@ -1196,7 +1030,7 @@ export function getInteractiveDiffTargetPath(file: InteractiveDiffFile): string 
 		return file.oldPath ?? '';
 	}
 
-	return file.oldPath ?? file.newPath ?? '';
+	return file.newPath ?? file.oldPath ?? '';
 }
 
 export function isNewInteractiveDiffFile(file: InteractiveDiffFile): boolean {
@@ -1258,233 +1092,184 @@ export function inferInteractiveDiffTargets(
 					? (allCandidates[0] ?? '')
 					: '';
 
-		const visibleCandidates = allCandidates.slice(0, MAX_INTERACTIVE_CANDIDATES);
-
-		if (targetPath && !visibleCandidates.includes(targetPath)) {
-			visibleCandidates.unshift(targetPath);
-			visibleCandidates.splice(MAX_INTERACTIVE_CANDIDATES);
-		}
-
 		suggestions.set(file.id, {
 			targetPath,
-			candidates: visibleCandidates,
+			candidates: allCandidates.slice(0, MAX_INTERACTIVE_CANDIDATES),
 		});
 	}
 
 	return suggestions;
 }
 
-function formatRange(start: number, count: number): string {
-	return count === 1 ? `${start}` : `${start},${count}`;
+function concatenatePatchParts(parts: string[]): string {
+	let output = '';
+
+	for (const part of parts) {
+		if (!part) {
+			continue;
+		}
+
+		if (output && !output.endsWith('\n')) {
+			output += '\n';
+		}
+
+		output += part;
+	}
+
+	return ensureTrailingNewline(output);
 }
 
-function renderSyntheticPatch(
-	file: InteractiveDiffFile,
-	targetPath: string,
-	hunks: InteractiveDiffHunk[],
-	adjustNewPositions: boolean
-): string {
+function syntheticHunkPrefix(file: InteractiveDiffFile, targetPath: string): string {
+	if (!targetPath) {
+		return '';
+	}
+
 	const oldPath = file.kind === 'add' ? DEV_NULL : (file.oldPath ?? targetPath);
 	const newPath = file.kind === 'delete' ? DEV_NULL : (file.newPath ?? targetPath);
-	let selectedDelta = 0;
 
-	const renderedHunks = hunks.map(hunk => {
-		let newStart = hunk.newStart;
-
-		if (adjustNewPositions) {
-			newStart = hunk.oldStart + selectedDelta;
-
-			if (hunk.oldCount === 0) {
-				newStart += 1;
-			}
-
-			if (hunk.newCount === 0) {
-				newStart -= 1;
-			}
-
-			selectedDelta += hunk.newCount - hunk.oldCount;
-		}
-
-		const header = adjustNewPositions
-			? `@@ -${formatRange(hunk.oldStart, hunk.oldCount)} +${formatRange(newStart, hunk.newCount)} @@${hunk.suffix}`
-			: hunk.header;
-
-		return [header, ...hunk.lines].join('\n');
-	});
-
-	return ensureTrailingNewline(
-		[`--- ${formatHeaderPath(oldPath)}`, `+++ ${formatHeaderPath(newPath)}`, ...renderedHunks].join('\n')
-	);
+	return sourceFromLines([`--- ${formatHeaderPath(oldPath)}`, `+++ ${formatHeaderPath(newPath)}`]);
 }
 
+/**
+ * Builds a backend request without validating or rewriting patch semantics.
+ *
+ * Whole-file requests use the original file section. Hunk requests preserve
+ * the original hunk headers and bodies exactly. Do not renumber hunk ranges,
+ * repair line counts, or reject fuzzy/LLM-shaped patch content here.
+ */
 export function buildInteractiveDiffRequest(
 	file: InteractiveDiffFile,
-	targetPath: string,
+	targetPath = '',
 	selectedHunkIDs?: string[]
 ): string {
-	const normalizedTargetPath = normalizeInteractiveTargetPath(targetPath);
-
-	if (!normalizedTargetPath) {
-		throw new Error('Choose an absolute target file path before checking or applying this section.');
+	if (selectedHunkIDs === undefined) {
+		return file.requestText || file.sourceText;
 	}
 
-	if (!file.canApplyWhole) {
-		throw new Error('This file section has structural errors and cannot be applied.');
+	const selected = new Set(selectedHunkIDs);
+	const hunks = file.hunks.filter(hunk => selected.has(hunk.id));
+
+	if (hunks.length === 0 || hunks.length !== selected.size) {
+		throw new Error('The selected hunks do not belong to this file section.');
 	}
 
-	let selectedHunks = file.hunks;
-	let shouldAdjustNewPositions = false;
+	const prefix = file.hunkPrefixText || syntheticHunkPrefix(file, targetPath);
 
-	if (selectedHunkIDs !== undefined) {
-		if (!file.canApplyPartial) {
-			throw new Error('Partial application is available only for ordinary, non-overlapping text modifications.');
-		}
-
-		const selected = new Set(selectedHunkIDs);
-		selectedHunks = file.hunks.filter(hunk => selected.has(hunk.id));
-
-		if (selectedHunks.length === 0 || selectedHunks.length !== selected.size) {
-			throw new Error('The selected hunks do not belong to this file section.');
-		}
-
-		shouldAdjustNewPositions = true;
-	}
-
-	const requestText =
-		selectedHunkIDs === undefined && !file.needsSyntheticHeaders
-			? file.sourceText
-			: renderSyntheticPatch(file, normalizedTargetPath, selectedHunks, shouldAdjustNewPositions);
-
-	const verification = parseInteractiveDiff(requestText, 'diff');
-	const verifiedFile = verification.files[0];
-	const expectedHunkCount = selectedHunks.length;
-
-	if (
-		hasErrorDiagnostics(verification.diagnostics) ||
-		verification.files.length !== 1 ||
-		!verifiedFile?.canApplyWhole ||
-		verifiedFile.hunks.length !== expectedHunkCount
-	) {
-		throw new Error('The scoped request could not be verified as exactly one complete file patch.');
-	}
-
-	return requestText;
+	return concatenatePatchParts([prefix, ...hunks.map(hunk => hunk.sourceText)]);
 }
 
 export function createDiffApplyOutcome(
 	phase: DiffApplyPhase,
 	status: DiffApplyOutcomeStatus,
 	message: string,
-	diagnostics: ApplyUnifiedDiffDiagnostic[] = []
+	diagnostics: ApplyUnifiedDiffDiagnostic[] = [],
+	resolvedTargetPath?: string
 ): DiffApplyOutcome {
 	return {
 		phase,
 		status,
 		message,
-		diagnostics: dedupeInteractiveDiagnostics(diagnostics),
+		diagnostics: limitInteractiveDiagnostics(diagnostics),
+		resolvedTargetPath: resolvedTargetPath?.trim() || undefined,
 	};
 }
 
-function terminalStatus(status: ApplyUnifiedDiffStatus | undefined): boolean {
-	return status === ApplyUnifiedDiffStatus.Applied || status === ApplyUnifiedDiffStatus.AlreadyApplied;
+function backendMessage(output: ApplyUnifiedDiffOut, fileMessage: string | undefined, fallback: string): string {
+	return fileMessage || output.message || fallback;
 }
 
-function backendMessage(
-	output: ApplyUnifiedDiffOut,
-	file: ApplyUnifiedDiffOut['files'] extends Array<infer T> | undefined ? T | undefined : never,
-	fallback: string
-): string {
-	return file?.message || output.message || fallback;
+function responseTargetPath(output: ApplyUnifiedDiffOut): string {
+	const file = output.files?.length === 1 ? output.files[0] : undefined;
+
+	return file?.targetPath?.trim() || file?.resolvedPath?.trim() || '';
 }
 
-export function interpretScopedApplyResult(
-	output: ApplyUnifiedDiffOut,
-	phase: DiffApplyPhase,
-	targetPath: string
-): DiffApplyOutcome {
+/**
+ * Maps backend results to UI states. Backend status is authoritative.
+ *
+ * Diagnostics are displayed, but do not independently override a successful
+ * fuzzy dry run or apply result.
+ */
+export function interpretScopedApplyResult(output: ApplyUnifiedDiffOut, phase: DiffApplyPhase): DiffApplyOutcome {
 	const files = output.files ?? [];
-	const file = files[0];
-	const diagnostics = dedupeInteractiveDiagnostics([...(output.diagnostics ?? []), ...(file?.diagnostics ?? [])]);
+	const file = files.length === 1 ? files[0] : undefined;
 	const status = file?.status ?? output.status;
-	const requestedDryRun = phase === 'dry-run';
-	const returnedTargetPath = normalizeInteractiveTargetPath(file?.targetPath);
+	const diagnostics = limitInteractiveDiagnostics([
+		...(output.diagnostics ?? []),
+		...(file?.diagnostics ?? []),
+		...(files.length > 1
+			? [
+					createDiagnostic(
+						ApplyUnifiedDiffDiagnosticLevel.Warning,
+						'unexpected_multiple_file_response',
+						'The backend returned multiple file results for a scoped request. The aggregate backend status is shown.'
+					),
+				]
+			: []),
+	]);
+	const targetPath = responseTargetPath(output);
+	const message = backendMessage(output, file?.message, 'The backend returned no message.');
 
-	const blocked = (message: string, needsInfo = false) =>
-		createDiffApplyOutcome(phase, needsInfo ? 'needs-info' : 'blocked', message, diagnostics);
-
-	if (files.length > 1 || (output.summary?.files ?? 0) > 1) {
-		return blocked('The backend returned multiple file results for a one-file request.');
-	}
-
-	if (typeof output.dryRun === 'boolean' && output.dryRun !== requestedDryRun) {
-		return blocked('The backend response does not match the requested dry-run/write phase.');
-	}
-
-	if (returnedTargetPath && targetPathIdentity(returnedTargetPath) !== targetPathIdentity(targetPath)) {
-		return blocked('The backend reported a different target path. No subsequent write was submitted.');
-	}
-
-	if (hasErrorDiagnostics(diagnostics)) {
-		return blocked(backendMessage(output, file, 'The backend reported an error for this file section.'));
-	}
-
-	if (!file?.ok) {
-		return blocked(backendMessage(output, file, 'The backend rejected this file section.'));
-	}
-
-	if (output.status === ApplyUnifiedDiffStatus.Error || output.status === ApplyUnifiedDiffStatus.Conflict) {
-		return blocked(backendMessage(output, file, 'The backend reported a blocked file section.'));
-	}
-
-	if (output.status === ApplyUnifiedDiffStatus.NeedsInfo || status === ApplyUnifiedDiffStatus.NeedsInfo) {
-		return blocked(backendMessage(output, file, 'The backend needs more information for this file section.'), true);
-	}
-
-	if (!output.ok && !terminalStatus(status)) {
-		return blocked(backendMessage(output, file, 'The backend did not report a successful result.'));
-	}
-
-	if (requestedDryRun) {
-		if (status === ApplyUnifiedDiffStatus.Applicable) {
-			return createDiffApplyOutcome(
-				phase,
-				'ready',
-				backendMessage(output, file, 'Dry run succeeded for this target.'),
-				diagnostics
-			);
-		}
-
-		if (status === ApplyUnifiedDiffStatus.AlreadyApplied) {
-			return createDiffApplyOutcome(
-				phase,
-				'already-applied',
-				backendMessage(output, file, 'These changes are already present.'),
-				diagnostics
-			);
-		}
-
-		return blocked(backendMessage(output, file, 'The file section is not currently applicable.'));
-	}
-
-	if (status === ApplyUnifiedDiffStatus.Applied) {
+	if (typeof output.dryRun === 'boolean' && output.dryRun !== (phase === 'dry-run')) {
 		return createDiffApplyOutcome(
 			phase,
-			'applied',
-			backendMessage(output, file, 'The file section was applied.'),
-			diagnostics
+			'blocked',
+			'The backend response phase did not match the requested review/apply operation.',
+			diagnostics,
+			targetPath
 		);
+	}
+
+	if (status === ApplyUnifiedDiffStatus.NeedsInfo) {
+		return createDiffApplyOutcome(phase, 'needs-info', message, diagnostics, targetPath);
+	}
+
+	if (status === ApplyUnifiedDiffStatus.Error || status === ApplyUnifiedDiffStatus.Conflict) {
+		return createDiffApplyOutcome(phase, 'blocked', message, diagnostics, targetPath);
+	}
+
+	/*
+	 * Terminal backend statuses remain terminal even when an older backend
+	 * implementation uses ok:false for AlreadyApplied. The status is the
+	 * backend's semantic authority.
+	 */
+	if (status === ApplyUnifiedDiffStatus.Applied) {
+		return createDiffApplyOutcome(phase, 'applied', message, diagnostics, targetPath);
 	}
 
 	if (status === ApplyUnifiedDiffStatus.AlreadyApplied) {
+		return createDiffApplyOutcome(phase, 'already-applied', message, diagnostics, targetPath);
+	}
+
+	// Backend dry-run status is authoritative. A normal successful response
+	// is { ok: true, status: Applicable }; do not invert this condition.
+	// A normal backend review response is:
+	// { ok: true, status: Applicable }.
+	//
+	// The backend owns fuzzy applicability. Do not invert this check or make
+	// a successful backend review look blocked in the UI.
+	if (status === ApplyUnifiedDiffStatus.Applicable && output.ok && file?.ok !== false) {
+		if (phase === 'dry-run') {
+			return createDiffApplyOutcome(phase, 'ready', message, diagnostics, targetPath);
+		}
 		return createDiffApplyOutcome(
 			phase,
-			'already-applied',
-			backendMessage(output, file, 'These changes are already present.'),
-			diagnostics
+			'blocked',
+			'The backend reported applicability instead of an applied write result.',
+			diagnostics,
+			targetPath
 		);
 	}
 
-	return blocked(
-		backendMessage(output, file, 'The backend did not report a successful write. Recheck the file before retrying.')
+	if (!output.ok || file?.ok === false) {
+		return createDiffApplyOutcome(phase, 'blocked', message, diagnostics, targetPath);
+	}
+
+	return createDiffApplyOutcome(
+		phase,
+		'blocked',
+		message || 'The backend did not report an applicable or applied result.',
+		diagnostics,
+		targetPath
 	);
 }

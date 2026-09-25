@@ -1,10 +1,11 @@
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
 import type { DiffApplyController, DiffApplyFileView } from '@/components/markdown/diff_apply_controller';
+import type { DiffApplyOutcome } from '@/components/markdown/diff_apply_model';
 import {
 	getInteractiveDiffTargetPath,
 	isNewInteractiveDiffFile,
@@ -21,7 +22,7 @@ interface DiffApplyModalProps {
 	controller: DiffApplyController;
 }
 
-interface LazyDetailsProps {
+interface LazyPanelProps {
 	summary: ReactNode;
 	className?: string;
 	renderContent: () => ReactNode;
@@ -29,32 +30,43 @@ interface LazyDetailsProps {
 
 const DISPLAY_CANDIDATE_LIMIT = 24;
 
-function LazyDetails({ summary, className = '', renderContent }: LazyDetailsProps) {
+function LazyPanel({ summary, className = '', renderContent }: LazyPanelProps) {
 	const [isOpen, setIsOpen] = useState(false);
+	const contentID = useId();
 
 	return (
-		<details
-			className={`group border-base-300 bg-base-100 overflow-hidden rounded-lg border ${className}`}
-			onToggle={event => {
-				setIsOpen(event.currentTarget.open);
-			}}
-		>
-			<summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold">
+		<div className={`border-base-300 bg-base-100 overflow-hidden rounded-lg border ${className}`}>
+			<button
+				type="button"
+				className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold"
+				aria-expanded={isOpen}
+				aria-controls={contentID}
+				onClick={() => {
+					setIsOpen(previous => !previous);
+				}}
+			>
 				<span>{summary}</span>
-				<FiChevronRight size={12} className="text-base-content/50 transition-transform group-open:rotate-90" />
-			</summary>
+				<FiChevronRight
+					size={12}
+					className={`text-base-content/50 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+				/>
+			</button>
 
-			{isOpen ? <div className="border-base-300 border-t px-3 py-2">{renderContent()}</div> : null}
-		</details>
+			{isOpen ? (
+				<div id={contentID} className="border-base-300 border-t px-3 py-2">
+					{renderContent()}
+				</div>
+			) : null}
+		</div>
 	);
 }
 
-function getStatusLabel(status: DiffApplyFileView['status']): string {
+function statusLabel(status: DiffApplyFileView['status']): string {
 	switch (status) {
 		case 'ready':
 			return 'ready';
 		case 'needs-info':
-			return 'needs path';
+			return 'needs info';
 		case 'blocked':
 			return 'blocked';
 		case 'applied':
@@ -64,11 +76,11 @@ function getStatusLabel(status: DiffApplyFileView['status']): string {
 		case 'partial':
 			return 'partially applied';
 		default:
-			return 'not checked';
+			return 'not reviewed';
 	}
 }
 
-function getStatusClassName(status: DiffApplyFileView['status']): string {
+function statusClassName(status: DiffApplyFileView['status']): string {
 	switch (status) {
 		case 'ready':
 		case 'applied':
@@ -85,7 +97,7 @@ function getStatusClassName(status: DiffApplyFileView['status']): string {
 	}
 }
 
-function getCardClassName(view: DiffApplyFileView): string {
+function cardClassName(view: DiffApplyFileView): string {
 	if (view.status === 'blocked') {
 		return 'border-error/40 bg-error/5';
 	}
@@ -97,7 +109,7 @@ function getCardClassName(view: DiffApplyFileView): string {
 	return 'border-base-300 bg-base-100';
 }
 
-function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyFileView['fullOutcome'] }) {
+function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyOutcome }) {
 	if (!outcome) {
 		return null;
 	}
@@ -121,115 +133,115 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 	const { file } = view;
 	const checkedCount = Object.keys(view.hunkOutcomes).length;
 	const readyCount = file.hunks.filter(hunk => view.hunkOutcomes[hunk.id]?.status === 'ready').length;
-	const blockedCount = file.hunks.filter(hunk => {
+	const unavailableCount = file.hunks.filter(hunk => {
 		const status = view.hunkOutcomes[hunk.id]?.status;
 		return status === 'blocked' || status === 'needs-info';
 	}).length;
 	const selectedCount = view.selectedHunkIDs.length;
-	const allHunksChecked = checkedCount === file.hunks.length && checkedCount > 0;
-	const canCheckHunks =
-		view.canCheck && file.canApplyPartial && file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES && !controller.busy;
+	const allHunksReviewed = checkedCount === file.hunks.length && checkedCount > 0;
+	const canReviewHunks = view.canTryHunks && file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES && !controller.busy;
 
 	return (
 		<div className="space-y-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<div>
-					<div className="text-sm font-semibold">Apply selected hunks</div>
+					<div className="text-sm font-semibold">Try individual hunks</div>
 					<div className="text-base-content/60 mt-1 text-xs">
-						Each hunk is checked without writing. The selected combined patch is dry-run again before any write.
+						File-level review did not pass. Each hunk can now be sent to the backend fuzzy dry-run independently.
 					</div>
 				</div>
 
 				<button
 					type="button"
 					className="btn btn-xs btn-outline"
-					disabled={!canCheckHunks}
+					disabled={!canReviewHunks}
 					onClick={() => {
-						void controller.checkHunks(file.id);
+						void controller.reviewHunks(file.id);
 					}}
 				>
-					Check hunks
+					Review hunks
 				</button>
 			</div>
 
-			{!file.canApplyPartial ? (
-				<div className="text-base-content/60 text-xs">
-					Partial application is available only for valid, non-overlapping text modifications without file-operation
-					metadata.
-				</div>
-			) : null}
-
 			{file.hunks.length > MAX_INTERACTIVE_HUNK_PROBES ? (
 				<div className="text-warning text-xs">
-					This file has {file.hunks.length} hunks. Per-hunk checking is limited to {MAX_INTERACTIVE_HUNK_PROBES} hunks.
+					This file has {file.hunks.length} hunks. Individual hunk review is limited to {MAX_INTERACTIVE_HUNK_PROBES}.
 				</div>
 			) : null}
 
 			{checkedCount > 0 ? (
 				<div className="text-base-content/70 text-xs">
-					{checkedCount}/{file.hunks.length} checked, {readyCount} applicable, {blockedCount} unavailable.
+					{checkedCount}/{file.hunks.length} reviewed, {readyCount} applicable, {unavailableCount} unavailable.
 				</div>
 			) : null}
 
-			<div className="space-y-2">
-				{file.hunks.map((hunk, index) => {
-					const outcome = view.hunkOutcomes[hunk.id];
-					const isReady = outcome?.status === 'ready';
-					const isProblem = outcome?.status === 'blocked' || outcome?.status === 'needs-info';
+			{checkedCount > 0 ? (
+				<div className="space-y-2">
+					{file.hunks.slice(0, MAX_INTERACTIVE_HUNK_PROBES).map((hunk, index) => {
+						const outcome = view.hunkOutcomes[hunk.id];
+						const isReady = outcome?.status === 'ready';
+						const isProblem = outcome?.status === 'blocked' || outcome?.status === 'needs-info';
 
-					return (
-						<div
-							key={hunk.id}
-							className={`rounded-lg border p-3 ${isProblem ? 'border-error/30 bg-error/5' : 'border-base-300'}`}
-						>
-							<label className="flex items-start gap-2 text-xs">
-								<input
-									type="checkbox"
-									className="checkbox checkbox-xs mt-0.5"
-									checked={view.selectedHunkIDs.includes(hunk.id)}
-									disabled={!isReady || !!controller.busy}
-									onChange={event => {
-										controller.setHunkSelected(file.id, hunk.id, event.target.checked);
-									}}
+						return (
+							<div
+								key={hunk.id}
+								className={`rounded-lg border p-3 ${isProblem ? 'border-error/30 bg-error/5' : 'border-base-300'}`}
+							>
+								{/* oxlint-disable-next-line jsx-a11y/label-has-associated-control */}
+								<label className="flex items-start gap-2 text-xs">
+									<input
+										type="checkbox"
+										className="checkbox checkbox-xs mt-0.5"
+										checked={view.selectedHunkIDs.includes(hunk.id)}
+										disabled={!isReady || !!controller.busy}
+										onChange={event => {
+											controller.setHunkSelected(file.id, hunk.id, event.target.checked);
+										}}
+									/>
+
+									<span className="min-w-0">
+										<span className="font-semibold">Hunk {index + 1}</span>
+										<span className="text-base-content/60 ml-2">{outcome?.status ?? 'not reviewed'}</span>
+										<code className="mt-1 block break-all">{hunk.header}</code>
+									</span>
+								</label>
+
+								<OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />
+
+								{outcome?.diagnostics.length ? (
+									<div className="mt-2">
+										{renderDiagnosticsPanel({
+											title: `Hunk ${index + 1} diagnostics`,
+											diagnostics: outcome.diagnostics,
+										})}
+									</div>
+								) : null}
+
+								<LazyPanel
+									className="mt-2"
+									summary="View hunk source"
+									renderContent={() => (
+										<pre
+											aria-label={`Hunk ${index + 1} source`}
+											className="app-bg-code app-text-code max-h-64 overflow-auto rounded-sm p-2 text-xs whitespace-pre"
+										>
+											<code>{hunk.sourceText}</code>
+										</pre>
+									)}
 								/>
-								<span className="font-semibold">Hunk {index + 1}</span>
-								<span className="min-w-0">
-									<span className="text-base-content/60 ml-2">{outcome?.status ?? 'not checked'}</span>
-									<code className="mt-1 block break-all">{hunk.header}</code>
-								</span>
-							</label>
+							</div>
+						);
+					})}
+				</div>
+			) : null}
 
-							<OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />
-
-							{outcome?.diagnostics.length ? (
-								<div className="mt-2">
-									{renderDiagnosticsPanel({
-										title: `Hunk ${index + 1} diagnostics`,
-										diagnostics: outcome.diagnostics,
-									})}
-								</div>
-							) : null}
-
-							<LazyDetails
-								className="mt-2"
-								summary="View hunk source"
-								renderContent={() => (
-									<pre className="app-bg-code max-h-64 overflow-auto rounded-sm p-2 text-xs">
-										<code>{[hunk.header, ...hunk.lines].join('\n')}</code>
-									</pre>
-								)}
-							/>
-						</div>
-					);
-				})}
-			</div>
-
-			<OutcomeNotice label="Selected hunks" outcome={view.partialOutcome} />
+			<OutcomeNotice label="Selected hunks" outcome={view.applyOutcome} />
 
 			<button
 				type="button"
 				className="btn btn-sm btn-primary"
-				disabled={!!controller.busy || !allHunksChecked || selectedCount === 0}
+				disabled={!!controller.busy || !allHunksReviewed || selectedCount === 0}
+				title="Apply only backend-reviewed ready hunks. This does not submit the other hunks."
 				onClick={() => {
 					void controller.applySelectedHunks(file.id);
 				}}
@@ -242,24 +254,25 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 
 function FileCard({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
 	const { file } = view;
-	const inputID = `interactive-diff-target-${file.id}`;
+	const inputID = useId();
+	const displayPath = getInteractiveDiffTargetPath(file) || 'Target path unresolved';
 	const isActive = controller.busy?.activeFileIDs.includes(file.id) ?? false;
-	const displayPath = getInteractiveDiffTargetPath(file) || 'Target path required';
 	const candidates = view.candidates.slice(0, DISPLAY_CANDIDATE_LIMIT);
-	const fileDiagnostics = uniqueDiagnostics([
+	const diagnostics = uniqueDiagnostics([
 		...file.diagnostics,
-		...(view.fullOutcome?.diagnostics ?? []),
-		...(view.partialOutcome?.diagnostics ?? []),
+		...(view.reviewOutcome?.diagnostics ?? []),
+		...(view.applyOutcome?.diagnostics ?? []),
 	]);
-	const canUsePartialHunks = file.hunks.length > 1;
+
+	const showHunks = file.hunks.length > 0 && (view.canTryHunks || Object.keys(view.hunkOutcomes).length > 0);
 
 	return (
-		<section className={`rounded-xl border p-4 shadow-sm ${getCardClassName(view)}`} aria-busy={isActive}>
+		<section className={`rounded-xl border p-4 shadow-sm ${cardClassName(view)}`} aria-busy={isActive}>
 			<div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
 				<div className="min-w-0 flex-1">
 					<div className="flex flex-wrap items-center gap-2">
-						<span className={`badge badge-outline badge-sm ${getStatusClassName(view.status)}`}>
-							{getStatusLabel(view.status)}
+						<span className={`badge badge-outline badge-sm ${statusClassName(view.status)}`}>
+							{statusLabel(view.status)}
 						</span>
 						<span className="badge badge-ghost badge-sm">{file.kind}</span>
 						<span className="text-base-content/50 text-xs">{file.id}</span>
@@ -268,7 +281,7 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 					<div className="mt-2 font-mono text-sm font-semibold break-all">{displayPath}</div>
 
 					<div className="text-base-content/60 mt-1 text-xs">
-						{file.hunks.length} hunk{file.hunks.length === 1 ? '' : 's'}, +{file.addedLines}/-{file.deletedLines}
+						{file.hunks.length} detected hunk{file.hunks.length === 1 ? '' : 's'}
 					</div>
 
 					{file.oldPath && file.newPath && file.oldPath !== file.newPath ? (
@@ -278,10 +291,16 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 						</div>
 					) : null}
 
+					{view.reviewOutcome?.resolvedTargetPath ? (
+						<div className="text-base-content/60 mt-2 font-mono text-xs break-all">
+							Backend target: {view.reviewOutcome.resolvedTargetPath}
+						</div>
+					) : null}
+
 					{isActive ? (
 						<output className="text-info mt-3 flex items-center gap-2 text-xs">
 							<span className="loading loading-spinner loading-xs" />
-							Checking or applying this file.
+							Reviewing or applying this file.
 						</output>
 					) : null}
 				</div>
@@ -290,19 +309,19 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 					<button
 						type="button"
 						className="btn btn-xs btn-outline"
-						disabled={!!controller.busy || !view.canCheck}
+						disabled={!!controller.busy}
 						onClick={() => {
-							void controller.checkFile(file.id);
+							void controller.reviewFile(file.id);
 						}}
 					>
-						Dry run
+						Review file
 					</button>
 
 					<button
 						type="button"
 						className="btn btn-xs btn-primary"
-						disabled={!!controller.busy || !view.canCheck}
-						title="Runs a fresh dry run immediately before applying this file."
+						disabled={!!controller.busy || !view.canApply}
+						title="Apply after a successful file-level backend review."
 						onClick={() => {
 							void controller.applyFile(file.id);
 						}}
@@ -312,20 +331,19 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 				</div>
 			</div>
 
-			<OutcomeNotice label="File" outcome={view.fullOutcome} />
+			<OutcomeNotice label="Review" outcome={view.reviewOutcome} />
+			<OutcomeNotice label="Apply" outcome={view.applyOutcome} />
 
 			<label className="mt-4 mb-1 block text-xs font-semibold" htmlFor={inputID}>
-				Absolute target file path
+				Optional target file path
 			</label>
 
 			<input
 				id={inputID}
-				className={`input input-sm w-full font-mono text-xs ${
-					view.hasInvalidPathInput ? 'input-error' : !view.targetPath ? 'input-warning' : ''
-				}`}
+				className="input input-sm w-full font-mono text-xs"
 				value={view.pathInput}
 				disabled={!!controller.busy}
-				placeholder="Enter an absolute local target path"
+				placeholder="Leave blank to let the backend resolve the target"
 				spellCheck={false}
 				onChange={event => {
 					controller.setTargetPath(file.id, event.target.value);
@@ -333,13 +351,11 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 			/>
 
 			<div className="text-base-content/60 mt-1 text-xs">
-				{view.hasInvalidPathInput
-					? 'Target paths must be absolute and cannot contain dot segments.'
-					: !view.targetPath
-						? isNewInteractiveDiffFile(file)
-							? 'A new file needs a workspace-supported or manually entered absolute target path.'
-							: 'Choose or enter an absolute target path before checking this file.'
-						: 'Changing this path invalidates prior checks for this file.'}
+				{!view.targetPath
+					? isNewInteractiveDiffFile(file)
+						? 'For a new file, enter a target path or let the backend request one during review.'
+						: 'The backend resolves and validates target paths from patch headers, workspace roots, or candidates.'
+					: 'Changing this target clears old review and apply results for this file.'}
 			</div>
 
 			{candidates.length > 0 ? (
@@ -347,14 +363,14 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 					className="select select-sm mt-2 w-full font-mono text-xs"
 					value=""
 					disabled={!!controller.busy}
-					aria-label={`Supported target paths for ${displayPath}`}
+					aria-label={`Suggested target paths for ${displayPath}`}
 					onChange={event => {
 						if (event.target.value) {
 							controller.setTargetPath(file.id, event.target.value);
 						}
 					}}
 				>
-					<option value="">Choose a supported target path</option>
+					<option value="">Choose a suggested target path</option>
 					{candidates.map(candidate => (
 						<option key={candidate} value={candidate}>
 							{candidate}
@@ -363,30 +379,33 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 				</select>
 			) : null}
 
-			{fileDiagnostics.length > 0 ? (
+			{diagnostics.length > 0 ? (
 				<div className="mt-3">
 					{renderDiagnosticsPanel({
-						title: 'File diagnostics',
-						description: 'These diagnostics apply only to this file section.',
-						diagnostics: fileDiagnostics,
+						title: 'File details',
+						description: 'Parser notes and backend diagnostics for this file section.',
+						diagnostics,
 					})}
 				</div>
 			) : null}
 
-			{canUsePartialHunks ? (
-				<LazyDetails
+			{showHunks ? (
+				<LazyPanel
 					className="mt-3"
-					summary="Review individual hunks"
+					summary="Try individual hunks"
 					renderContent={() => <HunkPanel view={view} controller={controller} />}
 				/>
 			) : null}
 
-			<LazyDetails
+			<LazyPanel
 				className="mt-3"
 				summary="View file patch"
 				renderContent={() => (
-					<pre className="app-bg-code max-h-80 overflow-auto rounded-sm p-3 text-xs">
-						<code>{file.sourceText}</code>
+					<pre
+						aria-label="File patch source"
+						className="app-bg-code app-text-code max-h-80 overflow-auto rounded-sm p-3 text-xs whitespace-pre"
+					>
+						<code>{file.sourceText || 'No source text is available for this file section.'}</code>
 					</pre>
 				)}
 			/>
@@ -401,7 +420,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 
 	const busyLabel = controller.busy
 		? controller.busy.stopping
-			? 'Stopping after in-flight requests finish. An already-submitted write cannot be undone.'
+			? 'Stopping after in-flight requests finish. Already submitted writes cannot be undone.'
 			: `${controller.busy.kind.replaceAll('-', ' ')}: ${controller.busy.completed}/${controller.busy.total}`
 		: '';
 
@@ -413,13 +432,13 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 						<div className="min-w-0 flex-1">
 							<h3 className="flex items-center gap-2 text-base font-semibold">
 								<FiGitPullRequest size={16} className="shrink-0" />
-								<span>Apply unified diff</span>
+								<span>Diff details</span>
 							</h3>
 
 							<div className="text-base-content/60 mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs">
 								<span>{controller.files.length} file sections</span>
 								<span>{controller.readyFileCount} ready</span>
-								{controller.needsInfoFileCount > 0 ? <span>{controller.needsInfoFileCount} need paths</span> : null}
+								{controller.needsInfoFileCount > 0 ? <span>{controller.needsInfoFileCount} need info</span> : null}
 								{controller.blockedFileCount > 0 ? <span>{controller.blockedFileCount} blocked</span> : null}
 								{completedCount > 0 ? <span>{completedCount} complete</span> : null}
 							</div>
@@ -437,10 +456,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 						</button>
 					</div>
 
-					<label
-						className="mt-3 flex items-center gap-2 text-sm"
-						title="Strict matching disables backend fuzzy matching."
-					>
+					<label className="mt-3 flex items-center gap-2 text-sm" title="Passed directly to the backend fuzzy applier.">
 						<input
 							type="checkbox"
 							className="checkbox checkbox-xs"
@@ -450,24 +466,24 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 								controller.setStrict(event.target.checked);
 							}}
 						/>
-						Strict matching
+						Strict backend matching
 					</label>
 
 					<div className="text-base-content/60 mt-1 text-xs">
-						Changing matching mode invalidates previous dry-run results.
+						Changing this option clears old review results. The UI does not validate patch structure.
 					</div>
 				</div>
 
 				<div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-4 sm:px-5">
 					{renderDiagnosticsPanel({
-						title: 'Patch diagnostics',
-						description: 'These are parser-level diagnostics for the entire patch.',
+						title: 'Patch notes',
+						description: 'These are non-blocking UI parser notes. Backend review remains authoritative.',
 						diagnostics: controller.patchDiagnostics,
 					})}
 
 					{controller.files.length === 0 ? (
 						<div className="border-base-300 rounded-xl border p-4 text-sm">
-							No interactive file sections could be extracted from this diff.
+							No file sections could be separated within the interactive UI budget.
 						</div>
 					) : null}
 
@@ -484,7 +500,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 								<span>{busyLabel}</span>
 							</output>
 							<div className="text-base-content/60 mt-1">
-								Dry runs are bounded. Writes are serialized and rechecked immediately before apply.
+								Review requests are bounded. Write requests are serialized.
 							</div>
 						</div>
 
@@ -499,7 +515,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					</div>
 				) : (
 					<div className="border-base-300 text-base-content/60 border-t px-5 py-2 text-xs">
-						Files apply independently. A failure in one file does not roll back files already applied.
+						Review uses backend dry runs. Apply sends only sections that backend review marked applicable.
 					</div>
 				)}
 
@@ -517,19 +533,19 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					<button
 						type="button"
 						className="btn btn-sm"
-						disabled={!!controller.busy || controller.patchHasErrors || controller.files.length === 0}
+						disabled={!!controller.busy || controller.files.length === 0}
 						onClick={() => {
-							void controller.checkAll();
+							void controller.reviewAll();
 						}}
 					>
-						Dry run all
+						Review all
 					</button>
 
 					<button
 						type="button"
 						className="btn btn-sm btn-primary"
-						disabled={!!controller.busy || controller.patchHasErrors || controller.readyFileCount === 0}
-						title="Only files with a current successful dry run are selected. Each is dry-run again immediately before writing."
+						disabled={!!controller.busy || controller.readyFileCount === 0}
+						title="Apply only file sections whose latest backend review returned Applicable."
 						onClick={() => {
 							void controller.applyReady();
 						}}

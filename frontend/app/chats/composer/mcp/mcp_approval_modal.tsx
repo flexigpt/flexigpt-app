@@ -19,16 +19,27 @@ interface MCPApprovalModalProps {
 }
 
 function formatArguments(summary?: MCPApprovalSummary): string {
-	const raw = summary?.arguments?.trim() ?? '';
-	if (!raw) {
+	const raw = summary?.arguments;
+
+	if (raw === null || raw === undefined || raw === '') {
 		return '-';
 	}
 
+	if (typeof raw === 'string') {
+		try {
+			const parsed = JSON.parse(raw) as unknown;
+			return JSON.stringify(parsed, null, 2);
+		} catch {
+			console.log('Error formatting approval args', summary);
+			return raw;
+		}
+	}
+
 	try {
-		const parsed = JSON.parse(raw) as unknown;
-		return JSON.stringify(parsed, null, 2);
+		return JSON.stringify(raw, null, 2) ?? '-';
 	} catch {
-		return raw;
+		console.log('Error formatting approval args', summary);
+		return '[Unable to format approval arguments]';
 	}
 }
 

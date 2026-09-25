@@ -984,28 +984,14 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 		for (const selection of Object.values(currentSelections)) {
 			const key = mcpServerKey(selection.server);
-			let option = optionsRef.current.find(item => optionKey(item) === key);
-
-			if (!option) {
-				throw new Error(`Selected MCP server ${selection.server} is no longer available.`);
-			}
-			if (!option.bundle.enabled || !option.server.artifact.enabled || !isServerOperational(option.server)) {
-				throw new Error(`Selected MCP server ${option.server.displayName} is disabled or unavailable.`);
-			}
-			if (option.runtime?.status !== MCPServerStatus.Ready) {
-				await connectServer(selection.server);
-				option = optionsRef.current.find(item => optionKey(item) === key);
-			}
-			if (!option || option.runtime?.status !== MCPServerStatus.Ready) {
-				throw new Error(`MCP server ${option?.server.displayName ?? selection.server} is not ready.`);
-			}
+			const option = optionsRef.current.find(item => optionKey(item) === key);
 
 			let selectedTools = selection.selectedTools;
 
 			if (selection.toolExposure === MCPToolExposure.All) {
 				const discovery = await loadDiscoveryForServer(selection.server).catch(() => undefined);
 				if (!discovery) {
-					throw new Error(`Could not load tools from MCP server ${option.server.displayName}.`);
+					throw new Error(`Could not load tools from MCP server ${option?.server.displayName}.`);
 				}
 				const tools = discovery?.tools ?? option?.tools ?? [];
 				selectedTools = modelSelectableTools(tools).map(t => {
@@ -1033,7 +1019,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 
 		return mcpSelectionToContext(nextSelections);
-	}, [commitSelectedByServerKey, connectServer, loadDiscoveryForServer]);
+	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
 
 	const shouldPollOAuthAuthorizations = useMemo(
 		() => options.some(option => isOAuthServerOption(option) || hasPendingOAuthHealth(option)),
