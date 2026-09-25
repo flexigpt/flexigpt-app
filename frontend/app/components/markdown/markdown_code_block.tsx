@@ -20,7 +20,6 @@ interface CodeProps {
 	diffWorkspaceRoots?: string[];
 	defaultExpanded?: boolean;
 	disableControls?: boolean;
-	autoReviewEpoch?: number;
 }
 
 interface MermaidResultState {
@@ -137,7 +136,6 @@ export function CodeBlock({
 	diffWorkspaceRoots,
 	defaultExpanded = true,
 	disableControls = false,
-	autoReviewEpoch = 0,
 }: CodeProps) {
 	const codeBodyId = useId();
 
@@ -245,7 +243,6 @@ export function CodeBlock({
 								isBusy={diffControlsDisabled}
 								candidatePaths={diffCandidatePaths}
 								workspaceRoots={diffWorkspaceRoots}
-								autoReviewEpoch={autoReviewEpoch}
 							/>
 						) : null}
 					</div>

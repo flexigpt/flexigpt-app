@@ -72,7 +72,6 @@ interface EnhancedMarkdownProps {
 	diffCandidatePaths?: string[];
 	diffWorkspaceRoots?: string[];
 	defaultCodeBlockExpanded?: boolean;
-	autoReviewEpoch?: number;
 	onLinkClick?: (href: string, event: ReactMouseEvent<HTMLAnchorElement>) => boolean;
 }
 
@@ -87,7 +86,6 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	diffCandidatePaths,
 	diffWorkspaceRoots,
 	defaultCodeBlockExpanded = true,
-	autoReviewEpoch = 0,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
 	const processedText = useMemo(() => {
@@ -104,9 +102,8 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 			diffCandidatePaths,
 			diffWorkspaceRoots,
 			defaultCodeBlockExpanded,
-			autoReviewEpoch,
 		}),
-		[autoReviewEpoch, defaultCodeBlockExpanded, diffCandidatePaths, diffWorkspaceRoots, hideMermaidCode, isBusy]
+		[defaultCodeBlockExpanded, diffCandidatePaths, diffWorkspaceRoots, hideMermaidCode, isBusy]
 	);
 
 	const components = useMemo(() => {

@@ -4,8 +4,10 @@ import { FiChevronRight, FiGitPullRequest, FiX } from 'react-icons/fi';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
+import type { DropdownItem } from '@/components/dropdown';
 import type { DiffApplyController, DiffApplyFileView } from '@/components/markdown/diff_apply_controller';
 import type { DiffApplyOutcome } from '@/components/markdown/diff_apply_model';
+import { Dropdown } from '@/components/dropdown';
 import {
 	getInteractiveDiffTargetPath,
 	isNewInteractiveDiffFile,
@@ -144,12 +146,9 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 	return (
 		<div className="space-y-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
-				<div>
-					<div className="text-sm font-semibold">Try individual hunks</div>
-					<div className="text-base-content/60 mt-1 text-xs">
-						File-level review did not pass. Each hunk can now be sent to the backend fuzzy dry-run independently.
-					</div>
-				</div>
+				<p className="text-base-content/60 min-w-0 flex-1 text-xs">
+					File-level review did not pass. Each hunk can be sent to the backend independently.
+				</p>
 
 				<button
 					type="button"
@@ -263,6 +262,11 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 		...(view.reviewOutcome?.diagnostics ?? []),
 		...(view.applyOutcome?.diagnostics ?? []),
 	]);
+	const candidateDropdownItems = candidates.reduce<Record<string, DropdownItem>>((items, candidate) => {
+		items[candidate] = { isEnabled: true };
+		return items;
+	}, {});
+	const selectedCandidate = candidates.includes(view.pathInput) ? view.pathInput : '';
 
 	const showHunks = file.hunks.length > 0 && (view.canTryHunks || Object.keys(view.hunkOutcomes).length > 0);
 
@@ -359,24 +363,22 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 			</div>
 
 			{candidates.length > 0 ? (
-				<select
-					className="select select-sm mt-2 w-full font-mono text-xs"
-					value=""
-					disabled={!!controller.busy}
-					aria-label={`Suggested target paths for ${displayPath}`}
-					onChange={event => {
-						if (event.target.value) {
-							controller.setTargetPath(file.id, event.target.value);
-						}
-					}}
-				>
-					<option value="">Choose a suggested target path</option>
-					{candidates.map(candidate => (
-						<option key={candidate} value={candidate}>
-							{candidate}
-						</option>
-					))}
-				</select>
+				<div className="mt-2">
+					<Dropdown<string>
+						dropdownItems={candidateDropdownItems}
+						selectedKey={selectedCandidate}
+						onChange={candidate => {
+							controller.setTargetPath(file.id, candidate);
+						}}
+						filterDisabled={false}
+						title={`Suggested target paths for ${displayPath}`}
+						placeholderLabel="Choose a suggested target path"
+						orderedKeys={candidates}
+						inlineMenu
+						maxMenuHeight={220}
+						disabled={!!controller.busy}
+					/>
+				</div>
 			) : null}
 
 			{diagnostics.length > 0 ? (
@@ -416,8 +418,6 @@ function FileCard({ view, controller }: { view: DiffApplyFileView; controller: D
 function DiffApplyModalContent({ controller }: { controller: DiffApplyController }) {
 	const { requestClose } = useModalDialogController();
 
-	const completedCount = controller.appliedFileCount + controller.alreadyAppliedFileCount;
-
 	const busyLabel = controller.busy
 		? controller.busy.stopping
 			? 'Stopping after in-flight requests finish. Already submitted writes cannot be undone.'
@@ -432,15 +432,13 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 						<div className="min-w-0 flex-1">
 							<h3 className="flex items-center gap-2 text-base font-semibold">
 								<FiGitPullRequest size={16} className="shrink-0" />
-								<span>Diff details</span>
+								<span>Patch details</span>
 							</h3>
 
 							<div className="text-base-content/60 mt-1 flex flex-wrap gap-x-2 gap-y-1 text-xs">
-								<span>{controller.files.length} file sections</span>
-								<span>{controller.readyFileCount} ready</span>
-								{controller.needsInfoFileCount > 0 ? <span>{controller.needsInfoFileCount} need info</span> : null}
-								{controller.blockedFileCount > 0 ? <span>{controller.blockedFileCount} blocked</span> : null}
-								{completedCount > 0 ? <span>{completedCount} complete</span> : null}
+								<span>
+									{controller.files.length} file section{controller.files.length === 1 ? '' : 's'}
+								</span>
 							</div>
 						</div>
 
@@ -470,7 +468,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					</label>
 
 					<div className="text-base-content/60 mt-1 text-xs">
-						Changing this option clears old review results. The UI does not validate patch structure.
+						Changing this option clears previous backend review results.
 					</div>
 				</div>
 
@@ -515,7 +513,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 					</div>
 				) : (
 					<div className="border-base-300 text-base-content/60 border-t px-5 py-2 text-xs">
-						Review uses backend dry runs. Apply sends only sections that backend review marked applicable.
+						Backend responses determine review and apply outcomes.
 					</div>
 				)}
 
@@ -538,7 +536,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 							void controller.reviewAll();
 						}}
 					>
-						Review all
+						{controller.hasReviewResult ? 'Review again' : 'Review all'}
 					</button>
 
 					<button

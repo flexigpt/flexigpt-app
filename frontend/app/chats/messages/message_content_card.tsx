@@ -56,7 +56,6 @@ interface MessageContentCardProps {
 	diffCandidatePaths?: string[];
 	streamingText?: string;
 	defaultCodeBlockExpanded?: boolean;
-	autoReviewEpoch?: number;
 }
 
 function stringArraysEqual(left?: string[], right?: string[]): boolean {
@@ -130,7 +129,6 @@ function StreamingMarkdownContent(props: {
 	align: string;
 	diffCandidatePaths?: string[];
 	defaultCodeBlockExpanded: boolean;
-	autoReviewEpoch: number;
 }) {
 	const { segments, tail, tailKey } = useMemo(() => splitStreamingMarkdown(props.text), [props.text]);
 
@@ -149,7 +147,6 @@ function StreamingMarkdownContent(props: {
 					align={props.align}
 					isBusy={true}
 					diffCandidatePaths={props.diffCandidatePaths}
-					autoReviewEpoch={props.autoReviewEpoch}
 					defaultCodeBlockExpanded={props.defaultCodeBlockExpanded}
 				/>
 			))}
@@ -160,7 +157,6 @@ function StreamingMarkdownContent(props: {
 					align={props.align}
 					isBusy={true}
 					diffCandidatePaths={props.diffCandidatePaths}
-					autoReviewEpoch={props.autoReviewEpoch}
 					defaultCodeBlockExpanded={props.defaultCodeBlockExpanded}
 				/>
 			) : null}
@@ -177,8 +173,7 @@ function areEqual(prev: MessageContentCardProps, next: MessageContentCardProps) 
 		prev.renderAsMarkdown === next.renderAsMarkdown &&
 		stringArraysEqual(prev.diffCandidatePaths, next.diffCandidatePaths) &&
 		prev.streamingText === next.streamingText &&
-		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded &&
-		prev.autoReviewEpoch === next.autoReviewEpoch
+		prev.defaultCodeBlockExpanded === next.defaultCodeBlockExpanded
 	);
 }
 
@@ -191,7 +186,6 @@ export const MessageContentCard = memo(function MessageContentCard({
 	diffCandidatePaths,
 	streamingText,
 	defaultCodeBlockExpanded = true,
-	autoReviewEpoch = 0,
 }: MessageContentCardProps) {
 	const textToRender = content;
 	const renderBusy = isBusy;
@@ -206,7 +200,6 @@ export const MessageContentCard = memo(function MessageContentCard({
 				align={align}
 				diffCandidatePaths={diffCandidatePaths}
 				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
-				autoReviewEpoch={autoReviewEpoch}
 			/>
 		);
 	}
@@ -239,7 +232,6 @@ export const MessageContentCard = memo(function MessageContentCard({
 				isBusy={renderBusy}
 				diffCandidatePaths={diffCandidatePaths}
 				defaultCodeBlockExpanded={defaultCodeBlockExpanded}
-				autoReviewEpoch={autoReviewEpoch}
 			/>
 		</div>
 	);
