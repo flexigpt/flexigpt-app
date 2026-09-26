@@ -50,7 +50,8 @@ export function AgentDropdown({ manager }: AgentDropdownProps) {
 					autoFocusOnShow
 				>
 					<div className="mb-2 px-1 text-xs opacity-70">
-						Agents apply a starter Model, Tools, Skills, MCP selection, and supported instruction Skills. After
+						Agents apply a starter Model, Tools, session Skills, MCP selection, system instruction Skills, and, when
+						supplied, an Agent request template. Request templates should only prefill an empty Composer draft. After
 						application, the Composer remains user-editable.
 					</div>
 

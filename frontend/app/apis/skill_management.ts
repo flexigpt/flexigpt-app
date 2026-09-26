@@ -218,9 +218,21 @@ export class SkillManagementAPI {
 		private readonly modelPresetStore: IModelPresetStoreAPI
 	) {}
 
-	private readonly composerSkillsCatalog = createSharedAsyncCatalog<SkillListItem[]>(() =>
-		this.listSkills(undefined, false, true)
-	);
+	private readonly composerSkillsCatalog = createSharedAsyncCatalog<SkillListItem[]>(async () => {
+		const skills = await this.listSkills(undefined, false, true);
+
+		// projectSkill intentionally has an instructions fallback for generic
+		// management views. Composer routing must not use that fallback:
+		// otherwise a user-message template whose runtime metadata is
+		// temporarily unavailable would incorrectly appear in Skills.
+		return skills.filter(item => {
+			const skill = item.skillDefinition;
+
+			return (
+				!skill.runtimeError && (skill.insert === SkillInsert.Instructions || skill.insert === SkillInsert.UserMessage)
+			);
+		});
+	});
 
 	invalidateComposerSkillsCatalog(): void {
 		this.composerSkillsCatalog.invalidate();

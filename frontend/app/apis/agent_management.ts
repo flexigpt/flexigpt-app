@@ -107,6 +107,14 @@ interface AgentPreparedToolSelection {
 	occurrencePath: string;
 }
 
+export interface AgentPreparedInstructionSource {
+	kind: 'skill' | 'text';
+	artifact: ArtifactRef;
+	displayName: string;
+	text: string;
+	sourceTags?: string[];
+}
+
 export interface PreparedAgentStarter {
 	agent: AgentView;
 	resolution: AgentResolution;
@@ -118,6 +126,7 @@ export interface PreparedAgentStarter {
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
 	instructionSkillRefs: SkillRef[];
+	instructionSources: AgentPreparedInstructionSource[];
 	instructionText: string;
 	startingText: string;
 
@@ -436,7 +445,7 @@ export class AgentManagementAPI {
 		const textArtifacts = new Map<string, ArtifactRef>();
 		const mcpServerIDs = new Set<MCPRuntimeServerID>();
 		const startingTextParts: string[] = [];
-		const instructionParts: string[] = [];
+		const instructionSources = new Map<string, AgentPreparedInstructionSource>();
 
 		let modelPresetRef: ModelPresetRef | undefined;
 		let includeModelSystemPrompt: boolean | undefined;
@@ -597,6 +606,10 @@ export class AgentManagementAPI {
 					const mode = occurrenceUseMode(occurrence);
 
 					if (mode === 'instructions') {
+						if (instructionSkillRefs.has(key)) {
+							continue;
+						}
+
 						instructionSkillRefs.set(key, skillRef);
 
 						try {
@@ -614,7 +627,13 @@ export class AgentManagementAPI {
 							}
 
 							if (rendered.text.trim()) {
-								instructionParts.push(rendered.text.trim());
+								instructionSources.set(`skill:${key}`, {
+									kind: 'skill',
+									artifact: skillRef,
+									displayName: rendered.displayName || rendered.name || occurrence.name || skillRef.artifactID,
+									text: rendered.text.trim(),
+									sourceTags: rendered.tags,
+								});
 							}
 						} catch (error) {
 							issue(
@@ -677,13 +696,23 @@ export class AgentManagementAPI {
 						continue;
 					}
 
+					const textKey = artifactRefKey(occurrence.artifact);
+					if (textArtifacts.has(textKey)) {
+						continue;
+					}
+
 					try {
 						const text = await this.agents.materializeAgentText(occurrence.artifact);
-						textArtifacts.set(artifactRefKey(text.artifact), text.artifact);
+						textArtifacts.set(textKey, text.artifact);
 
 						if (text.insert === AgentTextInsert.Instructions) {
 							if (text.content.trim()) {
-								instructionParts.push(text.content.trim());
+								instructionSources.set(`text:${textKey}`, {
+									kind: 'text',
+									artifact: text.artifact,
+									displayName: occurrence.name || occurrence.path || 'Agent instructions',
+									text: text.content.trim(),
+								});
 							}
 							continue;
 						}
@@ -730,6 +759,8 @@ export class AgentManagementAPI {
 						})),
 					};
 
+		const preparedInstructionSources = [...instructionSources.values()];
+
 		return {
 			agent: resolution.agent,
 			resolution,
@@ -739,7 +770,11 @@ export class AgentManagementAPI {
 			enabledSkillRefs: [...enabledSkillRefs.values()],
 			activeSkillRefs: [...activeSkillRefs.values()],
 			instructionSkillRefs: [...instructionSkillRefs.values()],
-			instructionText: instructionParts.join('\n\n').trim(),
+			instructionSources: preparedInstructionSources,
+			instructionText: preparedInstructionSources
+				.map(source => source.text)
+				.join('\n\n')
+				.trim(),
 			startingText: startingTextParts.join('\n\n').trim(),
 			mcpContext,
 			textArtifacts: [...textArtifacts.values()],

@@ -381,6 +381,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const {
 		allSkills,
 		skillsLoading,
+		templateSkills,
 		skillsLoadError,
 		activeSkillRefs,
 		installedEnabledSkillRefs,
@@ -2098,6 +2099,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 						onOpenConversationToolDetails={handleOpenConversationToolDetails}
 						allSkills={allSkills}
 						skillsLoading={skillsLoading}
+						templateSkills={templateSkills}
 						enabledSkillRefs={installedEnabledSkillRefs}
 						activeSkillRefs={installedActiveSkillRefs}
 						setEnabledSkillRefs={setEnabledSkillRefs}

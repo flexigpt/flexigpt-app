@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { SkillListItem, SkillRef } from '@/spec/skill';
 import type { WorkspaceRef } from '@/spec/workspace';
-import { RuntimeSkillActivity, SkillSessionSyncMode } from '@/spec/skill';
+import { RuntimeSkillActivity, SkillInsert, SkillSessionSyncMode } from '@/spec/skill';
 
 import { resolveStateUpdate } from '@/lib/hook_utils';
 
@@ -28,6 +28,7 @@ interface ApplySkillSelectionStateOptions {
 
 interface UseComposerSkillsResult {
 	allSkills: SkillListItem[];
+	templateSkills: SkillListItem[];
 	skillsLoading: boolean;
 	skillsLoadError: string | null;
 	enabledSkillRefs: SkillRef[];
@@ -95,14 +96,36 @@ function isInstructionSkillListItem(item: SkillListItem): boolean {
 	return isInstructionInsertSkill(item.skillDefinition);
 }
 
+function isUserMessageSkillListItem(item: SkillListItem): boolean {
+	return item.skillDefinition.insert === SkillInsert.UserMessage;
+}
+
 export function useComposerSkills(): UseComposerSkillsResult {
-	const [allSkills, setAllSkills] = useState<SkillListItem[]>([]);
+	const [composerSkills, setComposerSkills] = useState<SkillListItem[]>([]);
 	const [enabledSkillRefs, setEnabledSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [activeSkillRefs, setActiveSkillRefsRaw] = useState<SkillRef[]>([]);
 	const [skillSessionID, setSkillSessionID] = useState<string | null>(null);
 	const [skillsLoading, setSkillsLoading] = useState(true);
 	const [skillsLoadError, setSkillsLoadError] = useState<string | null>(null);
 	const [workspaceSkillRefKeys, setWorkspaceSkillRefKeys] = useState<ReadonlySet<string>>(() => new Set());
+
+	// Keep the historical allSkills surface instruction-only for callers that
+	// manage sessions. Templates are exposed separately and never enter the
+	// Skills dropdown or the session-selection path.
+	const allSkills = useMemo(
+		() =>
+			composerSkills.filter(s => {
+				return isInstructionSkillListItem(s);
+			}),
+		[composerSkills]
+	);
+	const templateSkills = useMemo(
+		() =>
+			composerSkills.filter(s => {
+				return isUserMessageSkillListItem(s);
+			}),
+		[composerSkills]
+	);
 
 	const sessionStateKeyRef = useRef('');
 	const skillSessionSyncVersionRef = useRef(0);
@@ -492,11 +515,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 		setSkillsLoadError(null);
 
 		try {
-			setAllSkills(
-				(await skillManagementAPI.listComposerSkills(true)).filter(s => {
-					return isInstructionSkillListItem(s);
-				})
-			);
+			setComposerSkills(await skillManagementAPI.listComposerSkills(true));
 		} catch (error) {
 			console.error('Failed to refresh skills catalog:', error);
 			setSkillsLoadError(
@@ -523,11 +542,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 				if (cancelled) {
 					return;
 				}
-				setAllSkills(
-					out.filter(s => {
-						return isInstructionSkillListItem(s);
-					})
-				);
+				setComposerSkills(out);
 				setSkillsLoadError(null);
 			})
 			.catch((error: unknown) => {
@@ -689,6 +704,7 @@ export function useComposerSkills(): UseComposerSkillsResult {
 
 	return {
 		allSkills,
+		templateSkills,
 		skillsLoading,
 		skillsLoadError,
 		enabledSkillRefs,

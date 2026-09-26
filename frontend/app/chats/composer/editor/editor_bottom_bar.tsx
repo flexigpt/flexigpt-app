@@ -72,6 +72,7 @@ interface EditorBottomBarProps {
 	// Skills state comes from EditorArea (conversation-level)
 	allSkills: SkillListItem[];
 	skillsLoading?: boolean;
+	templateSkills: SkillListItem[];
 	skillsLoadError?: string | null;
 	enabledSkillRefs: SkillRef[];
 	activeSkillRefs: SkillRef[];
@@ -127,6 +128,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	toolCatalog,
 	allSkills,
 	skillsLoading = false,
+	templateSkills,
 	skillsLoadError,
 	enabledSkillRefs,
 	activeSkillRefs,
@@ -204,6 +206,10 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						store={templateMenuState}
 						buttonRef={templateButtonRef}
 						shortcut={shortcutLabels.templates}
+						items={templateSkills}
+						loading={skillsLoading}
+						loadError={skillsLoadError}
+						onRefresh={onRefreshSkills}
 						onInsertTemplateText={onInsertTemplateText}
 						onAttachResourcePaths={onAttachTemplateResourcePaths}
 						isInputLocked={isInputLocked}

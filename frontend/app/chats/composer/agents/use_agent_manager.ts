@@ -5,7 +5,7 @@ import type { UIChatOption } from '@/spec/modelpreset';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import type { AgentCatalogOption, PreparedAgentStarter } from '@/apis/agent_management';
+import type { AgentCatalogOption, AgentPreparedInstructionSource, PreparedAgentStarter } from '@/apis/agent_management';
 import { agentManagementAPI } from '@/apis/baseapi';
 
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
@@ -42,6 +42,10 @@ function agentKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
 }
 
+function agentInstructionSourceKey(agent: ArtifactRef, source: AgentPreparedInstructionSource): string {
+	return `agent:${agentKey(agent)}:${source.kind}:${agentKey(source.artifact)}`;
+}
+
 function getRecipeError(recipe: PreparedAgentStarter): string | undefined {
 	const blocking = recipe.issues.filter(issue => issue.severity === 'error');
 
@@ -66,7 +70,7 @@ export function useAgentManager(
 	const [preparedStarter, setPreparedStarter] = useState<PreparedAgentStarter | null>(null);
 
 	const pendingDefaultRef = useRef(false);
-	const appliedInstructionSourceKeyRef = useRef<string | null>(null);
+	const appliedInstructionSourceKeysRef = useRef<Set<string>>(new Set());
 	const loadAgentOptions = useCallback(async (force = false) => {
 		setLoading(true);
 		setError(null);
@@ -164,30 +168,52 @@ export function useAgentManager(
 					systemPrompt.setIncludeModelDefault(recipe.includeModelSystemPrompt);
 				}
 
-				const nextInstructionSourceKey = `agent:${option.ref.rootID}:${option.ref.artifactID}:instructions`;
-				const previousInstructionSourceKey = appliedInstructionSourceKeyRef.current;
+				const instructionSources: AgentPreparedInstructionSource[] =
+					recipe.instructionSources.length > 0
+						? recipe.instructionSources
+						: recipe.instructionText.trim()
+							? [
+									{
+										kind: 'text',
+										artifact: option.ref,
+										displayName: `${option.displayName} instructions`,
+										text: recipe.instructionText,
+									},
+								]
+							: [];
 
-				if (previousInstructionSourceKey && previousInstructionSourceKey !== nextInstructionSourceKey) {
-					systemPrompt.removeInstructionSource(previousInstructionSourceKey);
+				const visibleInstructionSources = instructionSources.filter(source => source.text.trim());
+				const nextInstructionSourceKeys = new Set(
+					visibleInstructionSources.map(source => agentInstructionSourceKey(option.ref, source))
+				);
+
+				for (const previousKey of appliedInstructionSourceKeysRef.current) {
+					if (nextInstructionSourceKeys.has(previousKey)) {
+						continue;
+					}
+					systemPrompt.removeInstructionSource(previousKey);
 				}
 
-				if (recipe.instructionText.trim()) {
+				for (const source of visibleInstructionSources) {
+					const identityKey = agentInstructionSourceKey(option.ref, source);
+
 					systemPrompt.upsertAndSelectInstructionSource({
-						identityKey: nextInstructionSourceKey,
+						identityKey,
 						sourceKind: 'agent',
-						bundleID: option.ref.rootID,
-						bundleDisplayName: 'Agent',
-						bundleSlug: option.agent.builtIn ? 'built-in' : 'managed',
-						displayName: `${option.displayName} instructions`,
-						sourceSlug: option.agent.name,
-						text: recipe.instructionText,
+						bundleID: agentKey(option.ref),
+						bundleDisplayName: option.displayName,
+						bundleSlug: option.agent.name,
+						displayName: source.displayName,
+						sourceSlug: source.artifact.artifactID,
+						text: source.text,
+						sourceTags: source.sourceTags,
 						isBuiltIn: option.agent.builtIn,
+						skillRef: source.kind === 'skill' ? source.artifact : undefined,
 					});
-					appliedInstructionSourceKeyRef.current = nextInstructionSourceKey;
-				} else if (previousInstructionSourceKey) {
-					systemPrompt.removeInstructionSource(previousInstructionSourceKey);
-					appliedInstructionSourceKeyRef.current = null;
 				}
+
+				appliedInstructionSourceKeysRef.current = nextInstructionSourceKeys;
+
 				runtimeCompiler.applyAgentRuntime(recipe);
 				setPreparedStarter(recipe);
 				setSelectedAgentKey(option.key);
@@ -233,8 +259,9 @@ export function useAgentManager(
 		setSelectedAgentKey(null);
 		setPreparedStarter(null);
 		setActionError(null);
-		// Deliberately retain applied Composer state and instruction sources.
-		// Agent selection is a starter recipe, not a live runtime binding.
+		// Deliberately retain applied Composer state and instruction sources,
+		// including their keys. A later Agent selection can then remove only
+		// stale Agent-owned instruction sources.
 	}, []);
 
 	return {

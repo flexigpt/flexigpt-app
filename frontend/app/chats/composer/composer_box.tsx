@@ -90,24 +90,29 @@ export const ComposerBox = memo(
 			if (!editor) {
 				return;
 			}
-			if (recipe.startingText.trim()) {
-				editor.setDraftTextIfEmpty(recipe.startingText);
-			}
 
+			// An Agent is a complete starter recipe. Apply empty selections too,
+			// otherwise switching to an Agent with fewer capabilities leaves
+			// Tools, active Skills, or MCP state from the previous Agent.
 			const choices = recipe.toolSelections.map(selection => selection.choice);
-			if (choices.length > 0) {
-				editor.setConversationToolsFromChoices(
-					choices.filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch)
-				);
-				editor.setWebSearchFromChoices(choices.filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch));
-				editor.setToolSelectionIssues([]);
-			}
+			editor.setConversationToolsFromChoices(
+				choices.filter(choice => choice.toolType !== ToolStoreChoiceType.WebSearch)
+			);
+			editor.setWebSearchFromChoices(choices.filter(choice => choice.toolType === ToolStoreChoiceType.WebSearch));
+			editor.setToolSelectionIssues([]);
 
-			if (recipe.enabledSkillRefs.length > 0 || recipe.activeSkillRefs.length > 0) {
-				editor.setInstalledSkillStateFromAgent(recipe.enabledSkillRefs, recipe.activeSkillRefs);
-			}
+			editor.setInstalledSkillStateFromAgent(recipe.enabledSkillRefs, recipe.activeSkillRefs);
+
 			if (recipe.mcpContext) {
 				editor.setMCPContextFromMessage(recipe.mcpContext);
+			} else {
+				editor.clearMCPContext();
+			}
+
+			// Agent request templates are starter text, not an overwrite of user
+			// input or a workflow draft.
+			if (recipe.startingText.trim()) {
+				editor.setDraftTextIfEmpty(recipe.startingText);
 			}
 		}, []);
 

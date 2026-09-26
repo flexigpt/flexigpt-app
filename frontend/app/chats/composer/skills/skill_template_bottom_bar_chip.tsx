@@ -1,5 +1,5 @@
 import type { RefObject, SubmitEventHandler } from 'react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiFile, FiFilePlus, FiPaperclip } from 'react-icons/fi';
 
 import type { MenuStore } from '@ariakit/react';
@@ -76,6 +76,10 @@ export interface SkillTemplateBottomBarChipProps {
 	store: MenuStore;
 	buttonRef: RefObject<HTMLButtonElement | null>;
 	shortcut?: string;
+	items: SkillListItem[];
+	loading: boolean;
+	loadError?: string | null;
+	onRefresh?: () => Promise<void> | void;
 	onInsertTemplateText: (text: string) => Promise<void> | void;
 	onAttachResourcePaths?: (paths: string[]) => Promise<void> | void;
 	isInputLocked?: boolean;
@@ -239,45 +243,6 @@ function getSkillAttachmentPaths(item: SkillListItem | null): string[] {
 		.filter(path => path.length > 0 && !isSkillMarkdownPath(path));
 
 	return [...new Set(paths)];
-}
-
-async function collectUserMessageSkillTemplates(force = false): Promise<SkillListItem[]> {
-	const all = await skillManagementAPI.listComposerSkills(force);
-	return all
-		.filter(item => item.skillDefinition.insert === SkillInsert.UserMessage)
-		.toSorted(compareSkillTemplateListItems);
-}
-
-function useUserMessageSkillTemplates(open: boolean) {
-	const [items, setItems] = useState<SkillListItem[]>([]);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
-
-	const refresh = useCallback(async (force = false) => {
-		setLoading(true);
-		setError(null);
-		try {
-			const next = await collectUserMessageSkillTemplates(force);
-			setItems(next);
-		} catch (loadError) {
-			console.error('Failed to load user-message skill templates:', loadError);
-			setItems([]);
-			setError(loadError instanceof Error ? loadError.message : 'Failed to load user-message skill templates.');
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	useEffect(() => {
-		if (!open) {
-			return;
-		}
-
-		// oxlint-disable-next-line react/set-state-in-effect
-		void refresh(false);
-	}, [open, refresh]);
-
-	return { items, loading, error, refresh };
 }
 
 function renderSkillTemplateMenuItem(item: SkillListItem, onPick: (item: SkillListItem) => void) {
@@ -699,6 +664,10 @@ function SkillTemplateBottomBarChipInner({
 	store,
 	buttonRef,
 	shortcut,
+	items,
+	loading,
+	loadError,
+	onRefresh,
 	onInsertTemplateText,
 	onAttachResourcePaths,
 	isInputLocked = false,
@@ -726,9 +695,32 @@ function SkillTemplateBottomBarChipInner({
 			]}
 		/>
 	);
-	const { items: templates, loading, error: templateLoadError, refresh } = useUserMessageSkillTemplates(open);
+	const templates = useMemo(
+		() =>
+			items
+				.filter(item => item.skillDefinition.insert === SkillInsert.UserMessage)
+				.toSorted(compareSkillTemplateListItems),
+		[items]
+	);
+	const templateCatalogRefreshAttemptedRef = useRef(false);
 	const [modalItem, setModalItem] = useState<SkillListItem | null>(null);
 	const [templateActionError, setTemplateActionError] = useState<string | null>(null);
+
+	useEffect(() => {
+		const refresh = onRefresh;
+		if (!open || loading || templateCatalogRefreshAttemptedRef.current || !refresh) {
+			return;
+		}
+
+		templateCatalogRefreshAttemptedRef.current = true;
+		void (async () => {
+			try {
+				await refresh();
+			} catch (error) {
+				console.error('Failed to refresh Composer template catalog:', error);
+			}
+		})();
+	}, [loading, onRefresh, open]);
 
 	useEffect(() => {
 		if (!isInputLocked) {
@@ -823,11 +815,15 @@ function SkillTemplateBottomBarChipInner({
 				open={open}
 				loading={loading}
 				items={templates}
-				loadError={templateLoadError}
+				loadError={loadError}
 				actionError={templateActionError}
-				onRetry={() => {
-					void refresh(true);
-				}}
+				onRetry={
+					onRefresh
+						? () => {
+								void onRefresh();
+							}
+						: undefined
+				}
 				onPick={item => {
 					void handlePick(item);
 				}}
