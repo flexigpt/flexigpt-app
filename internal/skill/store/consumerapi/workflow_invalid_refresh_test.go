@@ -83,7 +83,9 @@ func TestSkillStoreWorkflowRefreshMarksExternalSkillInvalidAndRecovers(
 
 	listedSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	listedInvalid, found := findSkillByName(listedSkills, skillName)

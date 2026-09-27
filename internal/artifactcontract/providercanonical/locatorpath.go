@@ -11,6 +11,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 )
 
@@ -197,7 +198,7 @@ func (r *boundResolver) selectArtifact(
 		selectedLocators[locator] = struct{}{}
 	}
 
-	candidates := make([]artifact.Artifact, 0)
+	candidates := make([]catalog.Entry, 0)
 	for _, record := range records {
 		if record.Kind != request.ExpectedKind ||
 			record.State != artifact.StateAvailable {

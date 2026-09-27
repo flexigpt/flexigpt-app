@@ -25,6 +25,7 @@ import (
 type resolutionState struct {
 	nodes                int
 	active               map[artifact.ArtifactRef]struct{}
+	directRoot           *artifact.ArtifactRef
 	compositionRootID    root.RootID
 	compositionSourceID  source.SourceID
 	hasCompositionSource bool
@@ -268,6 +269,19 @@ func (r *Resolver) resolveArtifact(
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	// Direct Collection membership resolution must resolve the Collection
+	// relationships, but must not recursively expand the selected member.
+	// The selected Artifact is still loaded and type-checked above.
+	if state.directRoot != nil && ref != *state.directRoot {
+		return &ResolvedEntry{
+			Type:              loaded.declarationType,
+			scopeRootID:       loaded.record.RootID,
+			DeclarationOrigin: pointerArtifact(loaded.record),
+			Artifact:          pointerArtifact(loaded.record),
+			Definition:        pointerDefinition(loaded.definition),
+		}, nil
 	}
 
 	if mapper := r.targetMappers[loaded.declarationType]; mapper != nil {

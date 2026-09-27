@@ -5,11 +5,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
-	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -201,6 +201,46 @@ func (r *ArtifactRepository) ListBySource(
 	)
 }
 
+func (r *ArtifactRepository) ListCatalogByRoot(
+	ctx context.Context,
+	rootID root.RootID,
+) ([]catalog.Entry, error) {
+	return r.store.listArtifactCatalogByRoot(ctx, rootID)
+}
+
+func (r *ArtifactRepository) ListCatalogBySource(
+	ctx context.Context,
+	rootID root.RootID,
+	sourceID source.SourceID,
+) ([]catalog.Entry, error) {
+	return r.store.listArtifactCatalogBySource(
+		ctx,
+		rootID,
+		sourceID,
+	)
+}
+
+func (r *ArtifactRepository) FindCatalogByIdentity(
+	ctx context.Context,
+	rootID root.RootID,
+	kind artifact.ArtifactKind,
+	logicalName basespec.LogicalName,
+) ([]catalog.Entry, error) {
+	return r.store.findArtifactCatalogByIdentity(
+		ctx,
+		rootID,
+		kind,
+		logicalName,
+	)
+}
+
+func (r *ArtifactRepository) GetMany(
+	ctx context.Context,
+	refs []artifact.ArtifactRef,
+) ([]artifact.Artifact, error) {
+	return r.store.getArtifactsByReferences(ctx, refs)
+}
+
 func (r *ArtifactRepository) FindByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
@@ -275,6 +315,13 @@ func (r *DefinitionRepository) GetDefinition(
 	return r.store.getDefinition(ctx, rootID, digest)
 }
 
+func (r *DefinitionRepository) GetDefinitions(
+	ctx context.Context,
+	keys []definition.Key,
+) ([]definition.Definition, error) {
+	return r.store.getDefinitions(ctx, keys)
+}
+
 func (r *RefreshStateRepository) GetRefreshState(
 	ctx context.Context,
 	rootID root.RootID,
@@ -282,9 +329,3 @@ func (r *RefreshStateRepository) GetRefreshState(
 ) (source.RefreshState, error) {
 	return r.store.getRefreshState(ctx, rootID, sourceID)
 }
-
-var (
-	_ artifactimpl.Repository        = (*ArtifactRepository)(nil)
-	_ artifactimpl.DefinitionReader  = (*DefinitionRepository)(nil)
-	_ refreshimpl.RefreshStateReader = (*RefreshStateRepository)(nil)
-)

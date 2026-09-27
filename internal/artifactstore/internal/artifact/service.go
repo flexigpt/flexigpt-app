@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -53,53 +52,6 @@ func (s *Service) Get(
 		return artifact.Artifact{}, err
 	}
 	return s.repository.Get(ctx, ref)
-}
-
-func (s *Service) ListByRoot(
-	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	return s.repository.ListByRoot(ctx, rootID)
-}
-
-func (s *Service) ListBySource(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return nil, err
-	}
-	return s.repository.ListBySource(ctx, rootID, sourceID)
-}
-
-func (s *Service) FindByIdentity(
-	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
-) ([]artifact.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := kind.Validate(); err != nil {
-		return nil, err
-	}
-	if err := logicalName.Validate(); err != nil {
-		return nil, err
-	}
-	return s.repository.FindByIdentity(
-		ctx,
-		rootID,
-		kind,
-		logicalName,
-	)
 }
 
 func (s *Service) FindByOrigin(

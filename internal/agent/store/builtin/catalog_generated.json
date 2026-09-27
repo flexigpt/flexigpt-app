@@ -1,0 +1,4180 @@
+{
+  "hydration": {
+    "fingerprint": "sha256:add43012de8bf06b2c816b9198641e55cd2f5819b67ad20acd90fed82e7e5b88",
+    "installerName": "agent.agent",
+    "rootID": "0192c4c0-0000-7000-8000-000000000001",
+    "sourceID": "0192c4c0-0001-7000-8000-000000000001"
+  },
+  "name": "agents",
+  "packages": [
+    {
+      "address": {
+        "kind": "agent-collection",
+        "name": "core-agents",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in default Agent with plain Markdown response formatting.",
+                  "displayName": "Base Agent",
+                  "labels": {
+                    "category": "core"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    }
+                  ],
+                  "name": "base",
+                  "type": "agent"
+                },
+                "description": "Built-in default Agent with plain Markdown response formatting.",
+                "digest": "sha256:c99b68f81c4cb8a30518648d9a670d130d0ad4158c170c6c2c6a8bc7af4a1eff",
+                "displayName": "Base Agent",
+                "kind": "agent",
+                "labels": {
+                  "category": "core"
+                },
+                "logicalName": "base",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:598ee23f252701dc728c9f7e75c25dfff77712dd79ade7443889ce90aebbcff4",
+          "locator": "base/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Local development workspace with file read, write, unified diff, and shell command access.",
+                  "displayName": "Local Dev Workspace",
+                  "labels": {
+                    "category": "core"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "local-dev-workspace-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`\u003e\n\nInspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "applyunifieddiff",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "local-dev-workspace",
+                  "type": "agent"
+                },
+                "description": "Local development workspace with file read, write, unified diff, and shell command access.",
+                "digest": "sha256:356f4ca7345fee9c10beb68fbad3fb0346b1d33aa0115f301ddf21549a59ad8f",
+                "displayName": "Local Dev Workspace",
+                "kind": "agent",
+                "labels": {
+                  "category": "core"
+                },
+                "logicalName": "local-dev-workspace",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the repo/project path and the task. Example: `/absolute/path/to/repo`\u003e\n\nInspect relevant files first, prefer unified diffs for edits, use whole-file writes for create/replace cases, and verify with focused shell commands when useful. Keep write and shell actions scoped.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "local-dev-workspace-request",
+                  "type": "text"
+                },
+                "digest": "sha256:4af139046ef9dee7b237e65e2567961e00194e699f4dbc5164a6ee75a009b07c",
+                "displayName": "local-dev-workspace-request",
+                "kind": "text",
+                "logicalName": "local-dev-workspace-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/local-dev-workspace-request"
+            }
+          ],
+          "digest": "sha256:3659ad7773d4de3262affeb5cc4d2a2515241cc681065ca2b2b4f2263bc38939",
+          "locator": "local-dev-workspace/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Read-only Agent for local files, folders, repositories, documentation, and notes.",
+                  "displayName": "Local Reader",
+                  "labels": {
+                    "category": "core"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "local-reader-request",
+                      "parameters": {
+                        "content": "\u003cAttach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`\u003e\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "local-reader",
+                  "type": "agent"
+                },
+                "description": "Read-only Agent for local files, folders, repositories, documentation, and notes.",
+                "digest": "sha256:ad054dbf4312eaa038d203fb4a4479c80ddbf53aec24fd52ed8d921be4c49029",
+                "displayName": "Local Reader",
+                "kind": "agent",
+                "labels": {
+                  "category": "core"
+                },
+                "logicalName": "local-reader",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach files or replace this line with the local path(s) to read or search, for example `/absolute/path/to/file-or-folder`\u003e\n\nAnalyze this material. Summarize what it is, the important structure, notable details, risks or gaps, and what to read next.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "local-reader-request",
+                  "type": "text"
+                },
+                "digest": "sha256:9e19479dfd57ae3b828902e52af7dc8863b5e974cb8cccb85b872e1ae6d66a2b",
+                "displayName": "local-reader-request",
+                "kind": "text",
+                "logicalName": "local-reader-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/local-reader-request"
+            }
+          ],
+          "digest": "sha256:6740ef5aa14341d5d0af947384fe4cd3d2f50f719905998186c9c9d383a8c5b5",
+          "locator": "local-reader/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Local editing workspace with unified diff, direct text edit tools, and shell command access.",
+                  "displayName": "Local Targeted Text Editor",
+                  "labels": {
+                    "category": "core"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "local-targeted-text-editor-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the local path(s) and the exact edit you want. Example: `/absolute/path/to/repo-or-docs`\u003e\n\nInspect relevant files first, prefer unified diffs for normal edits, use direct text insert/replace/delete only when they are the safest precise operation, and verify with focused shell commands when useful. Keep changes scoped.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "applyunifieddiff",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "local-targeted-text-editor",
+                  "type": "agent"
+                },
+                "description": "Local editing workspace with unified diff, direct text edit tools, and shell command access.",
+                "digest": "sha256:ee0cc34cb32ce358e2cd186f5c0ad56eb0b3b683dba673f1205e21764b622975",
+                "displayName": "Local Targeted Text Editor",
+                "kind": "agent",
+                "labels": {
+                  "category": "core"
+                },
+                "logicalName": "local-targeted-text-editor",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the local path(s) and the exact edit you want. Example: `/absolute/path/to/repo-or-docs`\u003e\n\nInspect relevant files first, prefer unified diffs for normal edits, use direct text insert/replace/delete only when they are the safest precise operation, and verify with focused shell commands when useful. Keep changes scoped.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "local-targeted-text-editor-request",
+                  "type": "text"
+                },
+                "digest": "sha256:7832b3205cc66ce93ae99ccb1930d5c0ca87d2acbea9c694ae360bd979f96d20",
+                "displayName": "local-targeted-text-editor-request",
+                "kind": "text",
+                "logicalName": "local-targeted-text-editor-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/local-targeted-text-editor-request"
+            }
+          ],
+          "digest": "sha256:1dde117ce3980282a3ff5b55ddb5c815ae0017eb8abf11a32fdeb1247a502863",
+          "locator": "local-targeted-text-editor/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in general-purpose Agents for local development, local reading, and focused text editing.",
+                  "displayName": "Core Agents",
+                  "labels": {
+                    "category": "core"
+                  },
+                  "members": [
+                    {
+                      "locator": "./base/agent.yaml",
+                      "name": "base",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./local-dev-workspace/agent.yaml",
+                      "name": "local-dev-workspace",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./local-reader/agent.yaml",
+                      "name": "local-reader",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./local-targeted-text-editor/agent.yaml",
+                      "name": "local-targeted-text-editor",
+                      "type": "agent"
+                    }
+                  ],
+                  "name": "core-agents",
+                  "type": "plugin"
+                },
+                "description": "Built-in general-purpose Agents for local development, local reading, and focused text editing.",
+                "digest": "sha256:4e1dfcd990a45add33ef63f3fe54a8bc147680ef80a1db2735161026139fc6bf",
+                "displayName": "Core Agents",
+                "kind": "plugin",
+                "labels": {
+                  "category": "core"
+                },
+                "logicalName": "core-agents",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:aa93d36af7b7e0e10c66a943d716e3d0850b08a88a2829be9e33b7dae33b76b8",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "core-agents",
+      "files": [
+        {
+          "digest": "sha256:598ee23f252701dc728c9f7e75c25dfff77712dd79ade7443889ce90aebbcff4",
+          "locator": "base/agent.yaml",
+          "size": 254
+        },
+        {
+          "digest": "sha256:3659ad7773d4de3262affeb5cc4d2a2515241cc681065ca2b2b4f2263bc38939",
+          "locator": "local-dev-workspace/agent.yaml",
+          "size": 1549
+        },
+        {
+          "digest": "sha256:6740ef5aa14341d5d0af947384fe4cd3d2f50f719905998186c9c9d383a8c5b5",
+          "locator": "local-reader/agent.yaml",
+          "size": 1180
+        },
+        {
+          "digest": "sha256:1dde117ce3980282a3ff5b55ddb5c815ae0017eb8abf11a32fdeb1247a502863",
+          "locator": "local-targeted-text-editor/agent.yaml",
+          "size": 1910
+        },
+        {
+          "digest": "sha256:aa93d36af7b7e0e10c66a943d716e3d0850b08a88a2829be9e33b7dae33b76b8",
+          "locator": "plugin.yaml",
+          "size": 541
+        }
+      ],
+      "fingerprint": "sha256:3b79db1ffd7be670504eb7262f3c3876c8a8b7ce84bc8965d60c4567d1f2d460"
+    },
+    {
+      "address": {
+        "kind": "agent-collection",
+        "name": "product-leadership-agents",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Write a decision record from context, options, constraints, evidence, and trade-offs.",
+                  "displayName": "Decision Record Writer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "decision-record-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "decision-record-writer-request",
+                      "parameters": {
+                        "content": "\u003cDescribe the decision to make, options considered, constraints, evidence, stakeholders, and any deadline. Attach supporting notes if available.\u003e\n\nWrite a decision record with a clear recommendation, rationale, trade-offs accepted, risks, next steps, and concrete revisit triggers.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "decision-record-writer",
+                  "type": "agent"
+                },
+                "description": "Write a decision record from context, options, constraints, evidence, and trade-offs.",
+                "digest": "sha256:69d3982e3736210e518459ac348c1439cd9b2096b73d3769fc5982ace5d4864e",
+                "displayName": "Decision Record Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "decision-record-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cDescribe the decision to make, options considered, constraints, evidence, stakeholders, and any deadline. Attach supporting notes if available.\u003e\n\nWrite a decision record with a clear recommendation, rationale, trade-offs accepted, risks, next steps, and concrete revisit triggers.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "decision-record-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:73596c2c389684c026703b20c9a8bd343d477d7bb2c3f2f095bde8a1459aeb48",
+                "displayName": "decision-record-writer-request",
+                "kind": "text",
+                "logicalName": "decision-record-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/decision-record-writer-request"
+            }
+          ],
+          "digest": "sha256:92829fd73f7244a2d8a5c0cb64f5f0d4d98aa8a940948761d1b39326f8cce50c",
+          "locator": "decision-record-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Review plans, specifications, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear ownership, and mitigations.",
+                  "displayName": "Delivery Risk Reviewer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "delivery-risk-review",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "delivery-risk-reviewer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste the plan, milestone list, issue summary, status notes, or delivery commitment to review.\u003e\n\nReview delivery risk using the supplied source material.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "delivery-risk-reviewer",
+                  "type": "agent"
+                },
+                "description": "Review plans, specifications, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear ownership, and mitigations.",
+                "digest": "sha256:54f6a7c18b193bd2c266d9f9f78017eda5c199592df4092560a02fc5691a5b73",
+                "displayName": "Delivery Risk Reviewer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "delivery-risk-reviewer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste the plan, milestone list, issue summary, status notes, or delivery commitment to review.\u003e\n\nReview delivery risk using the supplied source material.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "delivery-risk-reviewer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:d7fb513f33b324632c466168aad1061ef9f541e139bb1e71eb81df3ec3e87da6",
+                "displayName": "delivery-risk-reviewer-request",
+                "kind": "text",
+                "logicalName": "delivery-risk-reviewer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/delivery-risk-reviewer-request"
+            }
+          ],
+          "digest": "sha256:da5e56c3a155f5f0324b114788370b83e6e883e4ed944d9a39a22152a2ef23d8",
+          "locator": "delivery-risk-reviewer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in Agents for requirements, decisions, feedback analysis, prioritization, delivery risk, and status communication.",
+                  "displayName": "Product and Leadership Agents",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "locator": "./decision-record-writer/agent.yaml",
+                      "name": "decision-record-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./delivery-risk-reviewer/agent.yaml",
+                      "name": "delivery-risk-reviewer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./prd-mrd-writer/agent.yaml",
+                      "name": "prd-mrd-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./roadmap-prioritizer/agent.yaml",
+                      "name": "roadmap-prioritizer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./status-update-writer/agent.yaml",
+                      "name": "status-update-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./user-feedback-analyzer/agent.yaml",
+                      "name": "user-feedback-analyzer",
+                      "type": "agent"
+                    }
+                  ],
+                  "name": "product-leadership-agents",
+                  "type": "plugin"
+                },
+                "description": "Built-in Agents for requirements, decisions, feedback analysis, prioritization, delivery risk, and status communication.",
+                "digest": "sha256:31c9085c3baa8c3d2b1fc3c36fd9c425b2279e61560af654c8455810eb4d2c0f",
+                "displayName": "Product and Leadership Agents",
+                "kind": "plugin",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "product-leadership-agents",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:15f6565a818d3a5b14748d0ec7ea01464f2bc59029ae6f50ae9363902f392c09",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria.",
+                  "displayName": "PRD/MRD Writer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "prd-mrd-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "prd-mrd-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach research/notes or describe the product goal, target users, constraints, and desired document type: PRD, MRD, or product requirements brief.\u003e\n\nCreate a source-grounded requirements artifact with problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "prd-mrd-writer",
+                  "type": "agent"
+                },
+                "description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria.",
+                "digest": "sha256:9e1977c619b2f26f40543ad65ffe79eb5006e0bb4c535474219da5003c0e06c7",
+                "displayName": "PRD/MRD Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "prd-mrd-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach research/notes or describe the product goal, target users, constraints, and desired document type: PRD, MRD, or product requirements brief.\u003e\n\nCreate a source-grounded requirements artifact with problem, users, goals, non-goals, testable requirements, acceptance criteria, risks, open questions, and handoff notes.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "prd-mrd-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:68c3f0250354ec25fe6c0be78a241feb00d27369befff4657aa82d232742d4f0",
+                "displayName": "prd-mrd-writer-request",
+                "kind": "text",
+                "logicalName": "prd-mrd-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/prd-mrd-writer-request"
+            }
+          ],
+          "digest": "sha256:916f32e73a2401fc24ada2cec14e64104de1aef21ff5fe7b532be77b6102bb5f",
+          "locator": "prd-mrd-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies.",
+                  "displayName": "Roadmap Prioritizer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "roadmap-prioritization",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "roadmap-prioritizer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste the backlog/opportunity list plus goals, constraints, time horizon, known effort/impact data, and dependencies.\u003e\n\nPrioritize these items against the stated goals. Use evidence-aware impact/effort/risk ranking, respect dependencies, call out missing inputs, and recommend an order.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "roadmap-prioritizer",
+                  "type": "agent"
+                },
+                "description": "Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies.",
+                "digest": "sha256:6ea37740f436be886d790bf5d0bf841e46f8f2bc5e44778ee4dd4d69ca638515",
+                "displayName": "Roadmap Prioritizer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "roadmap-prioritizer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste the backlog/opportunity list plus goals, constraints, time horizon, known effort/impact data, and dependencies.\u003e\n\nPrioritize these items against the stated goals. Use evidence-aware impact/effort/risk ranking, respect dependencies, call out missing inputs, and recommend an order.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "roadmap-prioritizer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:948b547ce7bc4934f4067a168c1028f5879e3f05ab3126504e7a8585cdaf1d52",
+                "displayName": "roadmap-prioritizer-request",
+                "kind": "text",
+                "logicalName": "roadmap-prioritizer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/roadmap-prioritizer-request"
+            }
+          ],
+          "digest": "sha256:4cdf22b425b05c994e07c26918c007db3dff16d7dc6bf68cfba2a45f1376adf1",
+          "locator": "roadmap-prioritizer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready updates.",
+                  "displayName": "Status Update Writer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "status-update-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "status-update-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.\u003e\n\nTurn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "status-update-writer",
+                  "type": "agent"
+                },
+                "description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready updates.",
+                "digest": "sha256:12fdc6b4fdd29869c14f340af59a6e5ab03c31ba58d99b0e995addc9048d20d6",
+                "displayName": "Status Update Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "status-update-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste project notes, changelog, meeting notes, issue summaries, or raw status bullets. Include the audience and time period.\u003e\n\nTurn this into a stakeholder-ready status update with summary status, progress, changes shipped, risks, blockers, decisions needed, and next steps.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "status-update-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:705ff67b277845389b057e17cc4eba4cf7ee41edfc6aaf9d0dcfd5e1261a0c48",
+                "displayName": "status-update-writer-request",
+                "kind": "text",
+                "logicalName": "status-update-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/status-update-writer-request"
+            }
+          ],
+          "digest": "sha256:a1c99f053a51ac3cc4d2d80d2005d918104de3e3979e7d44e537e1f5577df79d",
+          "locator": "status-update-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Analyze interviews, support notes, surveys, NPS comments, and customer notes into themes, needs, pain points, and product opportunities.",
+                  "displayName": "User Feedback Analyzer",
+                  "labels": {
+                    "category": "product-leadership"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "user-feedback-analysis",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "user-feedback-analyzer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste interview notes, support tickets, survey/NPS comments, or customer notes. Include source labels/dates if available.\u003e\n\nAnalyze this feedback into traceable themes, pain points, user needs, product opportunities, signal strength, biases/gaps, and follow-up questions.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "user-feedback-analyzer",
+                  "type": "agent"
+                },
+                "description": "Analyze interviews, support notes, surveys, NPS comments, and customer notes into themes, needs, pain points, and product opportunities.",
+                "digest": "sha256:17b41de877ccb60ff6dc125f11076410878822a36a3cca0b403bbf2e1ab321c3",
+                "displayName": "User Feedback Analyzer",
+                "kind": "agent",
+                "labels": {
+                  "category": "product-leadership"
+                },
+                "logicalName": "user-feedback-analyzer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste interview notes, support tickets, survey/NPS comments, or customer notes. Include source labels/dates if available.\u003e\n\nAnalyze this feedback into traceable themes, pain points, user needs, product opportunities, signal strength, biases/gaps, and follow-up questions.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "user-feedback-analyzer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:4608c3e166935454dc31bcfcd15d96e3b823360d79b951d13bfd7b889a90f48c",
+                "displayName": "user-feedback-analyzer-request",
+                "kind": "text",
+                "logicalName": "user-feedback-analyzer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/user-feedback-analyzer-request"
+            }
+          ],
+          "digest": "sha256:426ff3c46170467b07ac273fdeb2ac23125f44428d84dc58b615612848e6230d",
+          "locator": "user-feedback-analyzer/agent.yaml"
+        }
+      ],
+      "embeddedRoot": "product-leadership-agents",
+      "files": [
+        {
+          "digest": "sha256:92829fd73f7244a2d8a5c0cb64f5f0d4d98aa8a940948761d1b39326f8cce50c",
+          "locator": "decision-record-writer/agent.yaml",
+          "size": 2027
+        },
+        {
+          "digest": "sha256:da5e56c3a155f5f0324b114788370b83e6e883e4ed944d9a39a22152a2ef23d8",
+          "locator": "delivery-risk-reviewer/agent.yaml",
+          "size": 1974
+        },
+        {
+          "digest": "sha256:15f6565a818d3a5b14748d0ec7ea01464f2bc59029ae6f50ae9363902f392c09",
+          "locator": "plugin.yaml",
+          "size": 838
+        },
+        {
+          "digest": "sha256:916f32e73a2401fc24ada2cec14e64104de1aef21ff5fe7b532be77b6102bb5f",
+          "locator": "prd-mrd-writer/agent.yaml",
+          "size": 2123
+        },
+        {
+          "digest": "sha256:4cdf22b425b05c994e07c26918c007db3dff16d7dc6bf68cfba2a45f1376adf1",
+          "locator": "roadmap-prioritizer/agent.yaml",
+          "size": 2057
+        },
+        {
+          "digest": "sha256:a1c99f053a51ac3cc4d2d80d2005d918104de3e3979e7d44e537e1f5577df79d",
+          "locator": "status-update-writer/agent.yaml",
+          "size": 2038
+        },
+        {
+          "digest": "sha256:426ff3c46170467b07ac273fdeb2ac23125f44428d84dc58b615612848e6230d",
+          "locator": "user-feedback-analyzer/agent.yaml",
+          "size": 2076
+        }
+      ],
+      "fingerprint": "sha256:8d3f85bdaa90fcea714c328d904b66e917b1cae06e4041441b15a7d311b7a478"
+    },
+    {
+      "address": {
+        "kind": "agent-collection",
+        "name": "research-analysis-agents",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in Agents for evidence-based research and analysis over attached or local source material.",
+                  "displayName": "Research and Analysis Agents",
+                  "labels": {
+                    "category": "research-analysis"
+                  },
+                  "members": [
+                    {
+                      "locator": "./research-brief-writer/agent.yaml",
+                      "name": "research-brief-writer",
+                      "type": "agent"
+                    }
+                  ],
+                  "name": "research-analysis-agents",
+                  "type": "plugin"
+                },
+                "description": "Built-in Agents for evidence-based research and analysis over attached or local source material.",
+                "digest": "sha256:8cfc1d59877449b52dadec77292c5cfea89aea72f1d67f0229718e46a8ebc9b3",
+                "displayName": "Research and Analysis Agents",
+                "kind": "plugin",
+                "labels": {
+                  "category": "research-analysis"
+                },
+                "logicalName": "research-analysis-agents",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7b0d59dfb8b9376ee4ecb1d27e2ce77383a39f1dbd3aa9f8371b242c49a458c1",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Local and attached sources only.",
+                  "displayName": "Research Brief Writer",
+                  "labels": {
+                    "category": "research-analysis"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "research-brief-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "research-brief-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach source material or replace this line with local paths to notes/articles/transcripts/docs. State the research question or decision the brief should support.\u003e\n\nCreate a research brief using only the provided/local sources. Include source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "research-brief-writer",
+                  "type": "agent"
+                },
+                "description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Local and attached sources only.",
+                "digest": "sha256:3f469825080a7daa88d3cb65519504d50120f8f55b7b2cd38ec78ce42a0a0154",
+                "displayName": "Research Brief Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "research-analysis"
+                },
+                "logicalName": "research-brief-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach source material or replace this line with local paths to notes/articles/transcripts/docs. State the research question or decision the brief should support.\u003e\n\nCreate a research brief using only the provided/local sources. Include source table, key findings with evidence, disagreements, uncertainty, recommendations, and next questions.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "research-brief-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:9bc4086beccfc4cfabe77519c7b7e42cbb78e9aa34bd9391149da1d669255da9",
+                "displayName": "research-brief-writer-request",
+                "kind": "text",
+                "logicalName": "research-brief-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/research-brief-writer-request"
+            }
+          ],
+          "digest": "sha256:a6ec5dbc6d69d5b4fce942177b7e8b9f7652243c0ab56252f684bbfee32c4d90",
+          "locator": "research-brief-writer/agent.yaml"
+        }
+      ],
+      "embeddedRoot": "research-analysis-agents",
+      "files": [
+        {
+          "digest": "sha256:7b0d59dfb8b9376ee4ecb1d27e2ce77383a39f1dbd3aa9f8371b242c49a458c1",
+          "locator": "plugin.yaml",
+          "size": 340
+        },
+        {
+          "digest": "sha256:a6ec5dbc6d69d5b4fce942177b7e8b9f7652243c0ab56252f684bbfee32c4d90",
+          "locator": "research-brief-writer/agent.yaml",
+          "size": 2167
+        }
+      ],
+      "fingerprint": "sha256:e87b5fc446ae670c2d1b7ac5a138797320fca62ec874bd0f2550f69e42f40cf5"
+    },
+    {
+      "address": {
+        "kind": "agent-collection",
+        "name": "software-development-agents",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Diagnose root cause, identify missing evidence, the smallest safe fix direction, and verification steps from logs, errors, stack traces, failing outputs, code, and configuration.",
+                  "displayName": "Bug Investigator",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "bug-investigation",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "bug-investigator-request",
+                      "parameters": {
+                        "content": "\u003cPaste the error, stack trace, failing test output, bug report, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`.\u003e\n\nInvestigate this bug using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "bug-investigator",
+                  "type": "agent"
+                },
+                "description": "Diagnose root cause, identify missing evidence, the smallest safe fix direction, and verification steps from logs, errors, stack traces, failing outputs, code, and configuration.",
+                "digest": "sha256:c00262676a995484fd420fd1939cbe56c4185b0cf794352f4c951a2f3d7cdb20",
+                "displayName": "Bug Investigator",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "bug-investigator",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cPaste the error, stack trace, failing test output, bug report, or replace this line with the relevant repo/file path: `/absolute/path/to/repo-or-file`.\u003e\n\nInvestigate this bug using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "bug-investigator-request",
+                  "type": "text"
+                },
+                "digest": "sha256:7a5cb79306a61913b3e78ad75c60abad43971d9626a9f46dfd074ed13fc64f2b",
+                "displayName": "bug-investigator-request",
+                "kind": "text",
+                "logicalName": "bug-investigator-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/bug-investigator-request"
+            }
+          ],
+          "digest": "sha256:166e5046254887053c3f440fecab20da3321815c3f9ce78ef4a968c609c6a844",
+          "locator": "bug-investigator/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Understand an unfamiliar repository or module by mapping entry points, modules, flows, configuration, tests, dependencies, risks, and recommended next inspection.",
+                  "displayName": "Codebase Explorer",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "codebase-exploration",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "codebase-explorer-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the repo/module path and what you want to understand. Example: `/absolute/path/to/repo/internal/search`\u003e\n\nExplore this codebase area using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "codebase-explorer",
+                  "type": "agent"
+                },
+                "description": "Understand an unfamiliar repository or module by mapping entry points, modules, flows, configuration, tests, dependencies, risks, and recommended next inspection.",
+                "digest": "sha256:11f3112b675d8db852873583f5e90cea4dd97494389cc3234e5799da689294ce",
+                "displayName": "Codebase Explorer",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "codebase-explorer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the repo/module path and what you want to understand. Example: `/absolute/path/to/repo/internal/search`\u003e\n\nExplore this codebase area using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "codebase-explorer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:424c139cd6fd0553ea401b8a6632fb9826098ef9bb54fb843f493fcf62ea15c4",
+                "displayName": "codebase-explorer-request",
+                "kind": "text",
+                "logicalName": "codebase-explorer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/codebase-explorer-request"
+            }
+          ],
+          "digest": "sha256:999710b4feeb3037b5c0e5cd88895ac17f798acd15e95248d1cd9ae09ed07796",
+          "locator": "codebase-explorer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Design software architecture using boundary mapping, trade-off analysis, and event-pattern evaluation.",
+                  "displayName": "Designing System Architecture",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "designing-system-architecture",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "designing-system-architecture-request",
+                      "parameters": {
+                        "content": "\u003cDescribe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.\u003e\n\nRecommend the simplest viable architecture using the available source material.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "designing-system-architecture",
+                  "type": "agent"
+                },
+                "description": "Design software architecture using boundary mapping, trade-off analysis, and event-pattern evaluation.",
+                "digest": "sha256:a851956f6b6b2be91ce05c6c68d1c95687be17dbf5061bfc9f458f7e43b5c561",
+                "displayName": "Designing System Architecture",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "designing-system-architecture",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cDescribe the system/change and attach docs or provide repo paths. Include constraints such as scale, team ownership, consistency, compliance, or deadline.\u003e\n\nRecommend the simplest viable architecture using the available source material.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "designing-system-architecture-request",
+                  "type": "text"
+                },
+                "digest": "sha256:626ddcea510ea57439d5741817a498a4b012048fc8facb8b12f9636b398aa94a",
+                "displayName": "designing-system-architecture-request",
+                "kind": "text",
+                "logicalName": "designing-system-architecture-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/designing-system-architecture-request"
+            }
+          ],
+          "digest": "sha256:a48ee7a6c8f71e515e2799f707691f51c667b2555d4ccd5e4316963ebaa6fe7a",
+          "locator": "designing-system-architecture/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in Agents for repository investigation, architecture, implementation, review, refactoring, and test work.",
+                  "displayName": "Software Development Agents",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "locator": "./bug-investigator/agent.yaml",
+                      "name": "bug-investigator",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./codebase-explorer/agent.yaml",
+                      "name": "codebase-explorer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./designing-system-architecture/agent.yaml",
+                      "name": "designing-system-architecture",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./refactoring-code/agent.yaml",
+                      "name": "refactoring-code",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./reviewing-code/agent.yaml",
+                      "name": "reviewing-code",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./spec-driven-dev/agent.yaml",
+                      "name": "spec-driven-dev",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./test-case-designer/agent.yaml",
+                      "name": "test-case-designer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./test-implementer/agent.yaml",
+                      "name": "test-implementer",
+                      "type": "agent"
+                    }
+                  ],
+                  "name": "software-development-agents",
+                  "type": "plugin"
+                },
+                "description": "Built-in Agents for repository investigation, architecture, implementation, review, refactoring, and test work.",
+                "digest": "sha256:6cae98586b823d5401dded6efa91969fea5709ef8c7aa21bd4800b30980e95f6",
+                "displayName": "Software Development Agents",
+                "kind": "plugin",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "software-development-agents",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:4dcace6300ba0d1efbcf0a2688c6ccf730c75630e98dea4ee1d715b61404c60e",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Perform bounded, behavior-preserving refactors with file, text, and shell tooling.",
+                  "displayName": "Refactoring Code",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "refactoring-code",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "refactoring-code-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the repo/file path and the refactoring goal. Example: `/absolute/path/to/repo/pkg/foo`\u003e\n\nPlan a bounded, behavior-preserving refactor using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "refactoring-code",
+                  "type": "agent"
+                },
+                "description": "Perform bounded, behavior-preserving refactors with file, text, and shell tooling.",
+                "digest": "sha256:81116894d893085d6439618f15f9102950cbd04992c335d0088ed959e74c5c5d",
+                "displayName": "Refactoring Code",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "refactoring-code",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the repo/file path and the refactoring goal. Example: `/absolute/path/to/repo/pkg/foo`\u003e\n\nPlan a bounded, behavior-preserving refactor using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "refactoring-code-request",
+                  "type": "text"
+                },
+                "digest": "sha256:1a5657e9ccc84f027ede29ef0dc8b5b60ba2625035ac65458ccdd0a3678dc6eb",
+                "displayName": "refactoring-code-request",
+                "kind": "text",
+                "logicalName": "refactoring-code-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/refactoring-code-request"
+            }
+          ],
+          "digest": "sha256:0380e647c67eb86004938f126b12d1655e19604e34e9fccb884bb35377c91b17",
+          "locator": "refactoring-code/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Perform evidence-based code review using read-oriented workspace tools.",
+                  "displayName": "Reviewing Code",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "reviewing-code",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "reviewing-code-request",
+                      "parameters": {
+                        "content": "\u003cAttach changed files, paste a diff, or replace this line with repo path plus commit/branch/PR context: `/absolute/path/to/repo`.\u003e\n\nReview the code or diff using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "reviewing-code",
+                  "type": "agent"
+                },
+                "description": "Perform evidence-based code review using read-oriented workspace tools.",
+                "digest": "sha256:d9c5e46256add067039e4b652602ddda0be8b5c57800a1f661b6fdd2d0fec3be",
+                "displayName": "Reviewing Code",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "reviewing-code",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach changed files, paste a diff, or replace this line with repo path plus commit/branch/PR context: `/absolute/path/to/repo`.\u003e\n\nReview the code or diff using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "reviewing-code-request",
+                  "type": "text"
+                },
+                "digest": "sha256:b0d20e74feedb12ce96183bd0a909b7611ac69a61c3d365b23a3ad33ecc406f2",
+                "displayName": "reviewing-code-request",
+                "kind": "text",
+                "logicalName": "reviewing-code-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/reviewing-code-request"
+            }
+          ],
+          "digest": "sha256:e6618bdb1e9363a64932c0b4b3bd4fafa723d37ff8f93c5d1ca19e6daa8c86cf",
+          "locator": "reviewing-code/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Perform disciplined discovery, scoped implementation, and verification with file, text, and shell tooling.",
+                  "displayName": "Spec Driven Development",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "spec-driven-dev",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "spec-driven-dev-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the repo path and feature/change request. Example: `/absolute/path/to/repo`\u003e\n\nDevelop this change end to end using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "spec-driven-dev",
+                  "type": "agent"
+                },
+                "description": "Perform disciplined discovery, scoped implementation, and verification with file, text, and shell tooling.",
+                "digest": "sha256:3d5b6b16cf85a02336bd5a1693641c6dd5e479368cee59575de21d4e6a94316e",
+                "displayName": "Spec Driven Development",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "spec-driven-dev",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the repo path and feature/change request. Example: `/absolute/path/to/repo`\u003e\n\nDevelop this change end to end using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "spec-driven-dev-request",
+                  "type": "text"
+                },
+                "digest": "sha256:d8c22f60f448f87d54d0b325a56fb9b7aa0cdd78c3aa0563d87f816ee0b669ab",
+                "displayName": "spec-driven-dev-request",
+                "kind": "text",
+                "logicalName": "spec-driven-dev-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/spec-driven-dev-request"
+            }
+          ],
+          "digest": "sha256:a64a512698e522391f675522b4c8007332bbb1d9ee91979463b06ca406478fed",
+          "locator": "spec-driven-dev/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Design test scenarios from specifications, requirements, bug reports, or code paths and produce a test plan rather than test code.",
+                  "displayName": "Test Case Designer",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "test-case-design",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "test-case-designer-request",
+                      "parameters": {
+                        "content": "\u003cAttach a spec/bug report/code path or replace this line with the relevant repo/file path and behavior to test.\u003e\n\nDesign a traceable test plan using the available repository evidence.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "test-case-designer",
+                  "type": "agent"
+                },
+                "description": "Design test scenarios from specifications, requirements, bug reports, or code paths and produce a test plan rather than test code.",
+                "digest": "sha256:3c9f56639701edb823a76191dff1d1f0fed65cb3f517f5f0c1f850596562a0c0",
+                "displayName": "Test Case Designer",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "test-case-designer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach a spec/bug report/code path or replace this line with the relevant repo/file path and behavior to test.\u003e\n\nDesign a traceable test plan using the available repository evidence.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "test-case-designer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:247abd27743e249fcef68b5d91dc5ec144e1e3909a381407fe5550721e403a9d",
+                "displayName": "test-case-designer-request",
+                "kind": "text",
+                "logicalName": "test-case-designer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/test-case-designer-request"
+            }
+          ],
+          "digest": "sha256:d35449bc24f5e746f4bb23f65c8de7bf4082c150c3fab5b814367187a8b6ba99",
+          "locator": "test-case-designer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Write or update unit, integration, or regression tests and verify them with focused shell commands while matching existing test style.",
+                  "displayName": "Test Implementer",
+                  "labels": {
+                    "category": "software-development"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "test-implementation",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "test-implementer-request",
+                      "parameters": {
+                        "content": "\u003cReplace this line with the repo path and behavior/bug/requirement to cover with tests. Example: `/absolute/path/to/repo`\u003e\n\nInspect existing tests to match style, plan the focused cases, write or update tests only, and verify them with focused shell commands.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "test-implementer",
+                  "type": "agent"
+                },
+                "description": "Write or update unit, integration, or regression tests and verify them with focused shell commands while matching existing test style.",
+                "digest": "sha256:9145150090562589760f123374431817ee3922e6a24b89cdd616c98ad3ff1012",
+                "displayName": "Test Implementer",
+                "kind": "agent",
+                "labels": {
+                  "category": "software-development"
+                },
+                "logicalName": "test-implementer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cReplace this line with the repo path and behavior/bug/requirement to cover with tests. Example: `/absolute/path/to/repo`\u003e\n\nInspect existing tests to match style, plan the focused cases, write or update tests only, and verify them with focused shell commands.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "test-implementer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:721ea9e746f66fe333243f9512f98d0646ab2e4a82260ba0f177c0b57eb24a7c",
+                "displayName": "test-implementer-request",
+                "kind": "text",
+                "logicalName": "test-implementer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/test-implementer-request"
+            }
+          ],
+          "digest": "sha256:0a2227a9e03174d0170bccc555b93c42691808b542b46c6791ec2431d685f064",
+          "locator": "test-implementer/agent.yaml"
+        }
+      ],
+      "embeddedRoot": "software-development-agents",
+      "files": [
+        {
+          "digest": "sha256:166e5046254887053c3f440fecab20da3321815c3f9ce78ef4a968c609c6a844",
+          "locator": "bug-investigator/agent.yaml",
+          "size": 1647
+        },
+        {
+          "digest": "sha256:999710b4feeb3037b5c0e5cd88895ac17f798acd15e95248d1cd9ae09ed07796",
+          "locator": "codebase-explorer/agent.yaml",
+          "size": 1618
+        },
+        {
+          "digest": "sha256:a48ee7a6c8f71e515e2799f707691f51c667b2555d4ccd5e4316963ebaa6fe7a",
+          "locator": "designing-system-architecture/agent.yaml",
+          "size": 1643
+        },
+        {
+          "digest": "sha256:4dcace6300ba0d1efbcf0a2688c6ccf730c75630e98dea4ee1d715b61404c60e",
+          "locator": "plugin.yaml",
+          "size": 985
+        },
+        {
+          "digest": "sha256:0380e647c67eb86004938f126b12d1655e19604e34e9fccb884bb35377c91b17",
+          "locator": "refactoring-code/agent.yaml",
+          "size": 2014
+        },
+        {
+          "digest": "sha256:e6618bdb1e9363a64932c0b4b3bd4fafa723d37ff8f93c5d1ca19e6daa8c86cf",
+          "locator": "reviewing-code/agent.yaml",
+          "size": 1511
+        },
+        {
+          "digest": "sha256:a64a512698e522391f675522b4c8007332bbb1d9ee91979463b06ca406478fed",
+          "locator": "spec-driven-dev/agent.yaml",
+          "size": 2017
+        },
+        {
+          "digest": "sha256:d35449bc24f5e746f4bb23f65c8de7bf4082c150c3fab5b814367187a8b6ba99",
+          "locator": "test-case-designer/agent.yaml",
+          "size": 1571
+        },
+        {
+          "digest": "sha256:0a2227a9e03174d0170bccc555b93c42691808b542b46c6791ec2431d685f064",
+          "locator": "test-implementer/agent.yaml",
+          "size": 2130
+        }
+      ],
+      "fingerprint": "sha256:e266a7dabecf131da722a00d612c6024ad2152e38b7113106245585330d5b7ee"
+    },
+    {
+      "address": {
+        "kind": "agent-collection",
+        "name": "technical-content-writing-agents",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Generate or update API and SDK reference material and examples from code, schemas, OpenAPI, proto files, or existing documentation.",
+                  "displayName": "API Reference Writer",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "api-reference-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "api-reference-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach code/schema/OpenAPI/proto/existing docs or replace this line with absolute paths to the API/SDK surface, for example `/absolute/path/to/repo/api/docs`. Include the target audience or doc location if known.\u003e\n\nGenerate or update accurate API reference content with endpoints/functions, parameters, defaults, constraints, responses/returns, errors, examples, edge cases, and versioning notes.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "api-reference-writer",
+                  "type": "agent"
+                },
+                "description": "Generate or update API and SDK reference material and examples from code, schemas, OpenAPI, proto files, or existing documentation.",
+                "digest": "sha256:c44990ea2ff1cf055e81a512ce3d7e9787de464854fd2b99a1aae2d538a0578b",
+                "displayName": "API Reference Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "api-reference-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach code/schema/OpenAPI/proto/existing docs or replace this line with absolute paths to the API/SDK surface, for example `/absolute/path/to/repo/api/docs`. Include the target audience or doc location if known.\u003e\n\nGenerate or update accurate API reference content with endpoints/functions, parameters, defaults, constraints, responses/returns, errors, examples, edge cases, and versioning notes.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "api-reference-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:fb59d8cbf6b3730f5dfa4e4ea9e2f82fadf2f5918d257ca869166e13d4df83e6",
+                "displayName": "api-reference-writer-request",
+                "kind": "text",
+                "logicalName": "api-reference-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/api-reference-writer-request"
+            }
+          ],
+          "digest": "sha256:304fe8629d0bc8143918f7a2086bc969d9288b6b1a4a8c4e680b1a43e925740c",
+          "locator": "api-reference-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Perform a read-only audit of documentation or README files for structural gaps, stale claims, duplication, missing content, and navigation issues.",
+                  "displayName": "Docs Auditor",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "docs-audit",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "docs-auditor-request",
+                      "parameters": {
+                        "content": "\u003cAttach docs or replace this line with docs/README paths to audit, for example `/absolute/path/to/repo/docs`. Include intended audience if known.\u003e\n\nAudit these docs read-only for audience fit, structure, missing content, stale or unsupported claims, duplication, navigation issues, severity, and a recommended rewrite plan. Do not rewrite files.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "docs-auditor",
+                  "type": "agent"
+                },
+                "description": "Perform a read-only audit of documentation or README files for structural gaps, stale claims, duplication, missing content, and navigation issues.",
+                "digest": "sha256:401be5c898da225c9aa576e0bcf522d488ef9e035512ce9b8a09161d1273cd4a",
+                "displayName": "Docs Auditor",
+                "kind": "agent",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "docs-auditor",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach docs or replace this line with docs/README paths to audit, for example `/absolute/path/to/repo/docs`. Include intended audience if known.\u003e\n\nAudit these docs read-only for audience fit, structure, missing content, stale or unsupported claims, duplication, navigation issues, severity, and a recommended rewrite plan. Do not rewrite files.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "docs-auditor-request",
+                  "type": "text"
+                },
+                "digest": "sha256:cf0910c813e35a67828ef2b9f3969c9803a8dbcee9932e733cfff019c7a22564",
+                "displayName": "docs-auditor-request",
+                "kind": "text",
+                "logicalName": "docs-auditor-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/docs-auditor-request"
+            }
+          ],
+          "digest": "sha256:c8d346622c3095756d21928e2f6af486e674ab843f60e5756e9b7bd1133877f3",
+          "locator": "docs-auditor/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Create or update READMEs, guides, how-tos, tutorials, conceptual documentation, and internal documentation from source context.",
+                  "displayName": "Docs Writer",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "docs-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "docs-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach source material or replace this line with repo/docs paths plus the doc you want created or updated, for example `/absolute/path/to/repo/docs`. Include audience and desired doc type.\u003e\n\nCreate or update documentation grounded in the provided source. Include a clear outline, steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "docs-writer",
+                  "type": "agent"
+                },
+                "description": "Create or update READMEs, guides, how-tos, tutorials, conceptual documentation, and internal documentation from source context.",
+                "digest": "sha256:405512c2fcf2936ed4a369aecdfd9f8b8bea1f17d484935194602ce7bc270d00",
+                "displayName": "Docs Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "docs-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach source material or replace this line with repo/docs paths plus the doc you want created or updated, for example `/absolute/path/to/repo/docs`. Include audience and desired doc type.\u003e\n\nCreate or update documentation grounded in the provided source. Include a clear outline, steps or sections, concrete examples, limitations, and source-grounded troubleshooting notes.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "docs-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:81e800491586d436b47bb502bc9f920ab0128eb04b46e491b322a29e86ef6b1d",
+                "displayName": "docs-writer-request",
+                "kind": "text",
+                "logicalName": "docs-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/docs-writer-request"
+            }
+          ],
+          "digest": "sha256:5d78221a8860ee9a25fe9cac74f35b42b51fb20e1a8ae9a871fb5b93fa7d7d66",
+          "locator": "docs-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in Agents for documentation, API reference, release notes, and troubleshooting content.",
+                  "displayName": "Technical Content Writing Agents",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "locator": "./api-reference-writer/agent.yaml",
+                      "name": "api-reference-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./docs-auditor/agent.yaml",
+                      "name": "docs-auditor",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./docs-writer/agent.yaml",
+                      "name": "docs-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./release-notes-writer/agent.yaml",
+                      "name": "release-notes-writer",
+                      "type": "agent"
+                    },
+                    {
+                      "locator": "./troubleshooting-guide-writer/agent.yaml",
+                      "name": "troubleshooting-guide-writer",
+                      "type": "agent"
+                    }
+                  ],
+                  "name": "technical-content-writing-agents",
+                  "type": "plugin"
+                },
+                "description": "Built-in Agents for documentation, API reference, release notes, and troubleshooting content.",
+                "digest": "sha256:5b1cb1b8ab4e257cb24d8bb2e8e58fa27037999de1b36cd8f3f9b3c9c920bda6",
+                "displayName": "Technical Content Writing Agents",
+                "kind": "plugin",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "technical-content-writing-agents",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:fde7b0ee79d3410839a54a622c3c58806dde51909e29bd9d7691de2454133c0f",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Create release notes and changelogs from diffs, commit notes, pull request descriptions, issue summaries, or version notes.",
+                  "displayName": "Release Notes Writer",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "release-notes-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "release-notes-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste diffs, PR summaries, commit notes, issue lists, or version notes for the release. Include the version if known.\u003e\n\nCreate release notes from this source material. Separate added, changed, fixed, breaking changes, migration notes, known issues, and internal-only changes. Mark gaps as draft.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "release-notes-writer",
+                  "type": "agent"
+                },
+                "description": "Create release notes and changelogs from diffs, commit notes, pull request descriptions, issue summaries, or version notes.",
+                "digest": "sha256:fa9574375d4465eb0b4ce9b931289935ab9b65e5d90bced5b6f11de582a0a8bb",
+                "displayName": "Release Notes Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "release-notes-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste diffs, PR summaries, commit notes, issue lists, or version notes for the release. Include the version if known.\u003e\n\nCreate release notes from this source material. Separate added, changed, fixed, breaking changes, migration notes, known issues, and internal-only changes. Mark gaps as draft.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "release-notes-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:95f635a0c0f7c81f671de1d180301b5c2186cd82fd27604c3af8a5383e195855",
+                "displayName": "release-notes-writer-request",
+                "kind": "text",
+                "logicalName": "release-notes-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/release-notes-writer-request"
+            }
+          ],
+          "digest": "sha256:99292d58566c3bc3edfd07cb4b9c65487abdd1287e9642c891cd630455f6ea7d",
+          "locator": "release-notes-writer/agent.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles.",
+                  "displayName": "Troubleshooting Guide Writer",
+                  "labels": {
+                    "category": "technical-content-writing"
+                  },
+                  "members": [
+                    {
+                      "name": "markdown-output",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "use-explicit-tools-batched",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "grounded-local-work",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "instructions"
+                      }
+                    },
+                    {
+                      "name": "troubleshooting-guide-authoring",
+                      "scope": "builtin",
+                      "type": "skill",
+                      "use": {
+                        "mode": "active"
+                      }
+                    },
+                    {
+                      "insert": "user-message",
+                      "name": "troubleshooting-guide-writer-request",
+                      "parameters": {
+                        "content": "\u003cAttach or paste errors, logs, bug reports, support notes, or confirmed fixes. Include the intended audience and product/version if known.\u003e\n\nWrite a troubleshooting/KB article with symptom, confirmed vs possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.",
+                        "mediaType": "text/markdown"
+                      },
+                      "type": "text"
+                    },
+                    {
+                      "name": "statpath",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "overrides": {
+                        "autoExecute": true
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "overrides": {
+                        "autoExecute": false
+                      },
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "troubleshooting-guide-writer",
+                  "type": "agent"
+                },
+                "description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles.",
+                "digest": "sha256:db6e77598ac29a9f724b99140877e5faff2fa6682a3dc1a0849976512396718d",
+                "displayName": "Troubleshooting Guide Writer",
+                "kind": "agent",
+                "labels": {
+                  "category": "technical-content-writing"
+                },
+                "logicalName": "troubleshooting-guide-writer",
+                "schemaID": "artifact.agent.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "content": "\u003cAttach or paste errors, logs, bug reports, support notes, or confirmed fixes. Include the intended audience and product/version if known.\u003e\n\nWrite a troubleshooting/KB article with symptom, confirmed vs possible causes, safe diagnostic steps, fixes or workarounds, verification, prevention, and escalation notes.",
+                  "insert": "user-message",
+                  "mediaType": "text/markdown",
+                  "name": "troubleshooting-guide-writer-request",
+                  "type": "text"
+                },
+                "digest": "sha256:709d355fa830bef356f5abc06851be94643ac01be45cc3d483af018e539f411f",
+                "displayName": "troubleshooting-guide-writer-request",
+                "kind": "text",
+                "logicalName": "troubleshooting-guide-writer-request",
+                "logicalVersion": "user-message",
+                "schemaID": "artifact.text.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/text/user-message/troubleshooting-guide-writer-request"
+            }
+          ],
+          "digest": "sha256:57a052a963277927ee7b9461dc7d7b91a7f0c209f4fbf0294e0ebf1f59d10964",
+          "locator": "troubleshooting-guide-writer/agent.yaml"
+        }
+      ],
+      "embeddedRoot": "technical-content-writing-agents",
+      "files": [
+        {
+          "digest": "sha256:304fe8629d0bc8143918f7a2086bc969d9288b6b1a4a8c4e680b1a43e925740c",
+          "locator": "api-reference-writer/agent.yaml",
+          "size": 2188
+        },
+        {
+          "digest": "sha256:c8d346622c3095756d21928e2f6af486e674ab843f60e5756e9b7bd1133877f3",
+          "locator": "docs-auditor/agent.yaml",
+          "size": 1730
+        },
+        {
+          "digest": "sha256:5d78221a8860ee9a25fe9cac74f35b42b51fb20e1a8ae9a871fb5b93fa7d7d66",
+          "locator": "docs-writer/agent.yaml",
+          "size": 2125
+        },
+        {
+          "digest": "sha256:fde7b0ee79d3410839a54a622c3c58806dde51909e29bd9d7691de2454133c0f",
+          "locator": "plugin.yaml",
+          "size": 717
+        },
+        {
+          "digest": "sha256:99292d58566c3bc3edfd07cb4b9c65487abdd1287e9642c891cd630455f6ea7d",
+          "locator": "release-notes-writer/agent.yaml",
+          "size": 2089
+        },
+        {
+          "digest": "sha256:57a052a963277927ee7b9461dc7d7b91a7f0c209f4fbf0294e0ebf1f59d10964",
+          "locator": "troubleshooting-guide-writer/agent.yaml",
+          "size": 2109
+        }
+      ],
+      "fingerprint": "sha256:56a92c65f0626b4522140c6e16dc0033fb1464bb616fc3fb65efa9f1420913b2"
+    }
+  ]
+}

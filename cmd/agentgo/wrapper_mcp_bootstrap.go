@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -40,6 +41,7 @@ func InitMCPWrappers(
 	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
+	hydrator topology.CompiledHydrationCoordinator,
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
@@ -57,6 +59,7 @@ func InitMCPWrappers(
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
+		hydrator == nil ||
 		settingsStore == nil {
 		return nil, errors.New("MCP wrapper dependencies are incomplete")
 	}
@@ -97,7 +100,7 @@ func InitMCPWrappers(
 	if err != nil {
 		return nil, err
 	}
-	builtinStore, err := mcpConsumerAPI.NewBuiltinStore(storeAPI)
+	builtinCleanup, err := mcpConsumerAPI.NewBuiltinPackageCleanup(storeAPI)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +206,7 @@ func InitMCPWrappers(
 		return cleanup(err)
 	}
 
-	builtIns, err := NewMCPBuiltInInstaller(builtinStore, overlays)
+	builtIns, err := NewMCPBuiltInInstaller(hydrator, builtinCleanup, overlays)
 	if err != nil {
 		return cleanup(err)
 	}
@@ -225,11 +228,12 @@ func InitMCPWrappers(
 }
 
 func NewMCPBuiltInInstaller(
-	store mcpConsumerAPI.BuiltinStore,
+	hydrator topology.CompiledHydrationCoordinator,
+	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
 	overlays mcpOverlay.RootPurger,
 ) (builtin.HydrationInstaller, error) {
-	if store == nil {
-		return nil, errors.New("MCP built-in Store is required")
+	if hydrator == nil || cleanup == nil || overlays == nil {
+		return nil, errors.New("MCP generated built-in installer dependencies are incomplete")
 	}
 	packages, err := builtin.EmbeddedMCPPackages()
 	if err != nil {
@@ -237,8 +241,9 @@ func NewMCPBuiltInInstaller(
 	}
 	return mcpBuiltin.NewInstaller(
 		mcpBuiltin.InstallerDependencies{
-			MCP:      store,
+			Hydrator: hydrator,
 			Packages: packages,
+			Cleanup:  cleanup,
 			Overlays: overlays,
 		},
 	)

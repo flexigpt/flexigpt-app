@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"path"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -662,46 +661,9 @@ func (a *API) Read(
 
 func (a *API) ListDomain(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]CollectionView, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-
-	records, err := a.artifacts.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]CollectionView, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
-	for _, record := range records {
-		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-			record.State != artifact.StateAvailable {
-			continue
-		}
-		view, err := a.Read(ctx, record.Ref())
-		if errors.Is(err, basespec.ErrUnsupported) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		if _, duplicate := seen[view.Artifact.Ref()]; duplicate {
-			continue
-		}
-		seen[view.Artifact.Ref()] = struct{}{}
-		output = append(output, view)
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Name != output[right].Name {
-			return output[left].Name < output[right].Name
-		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
-	})
-	return output, nil
+	request ListRequest,
+) ([]ListItem, error) {
+	return a.listCollections(ctx, request, true)
 }
 
 func readCollectionViewOf(

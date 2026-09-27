@@ -3,10 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"sort"
-	"sync"
-	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -17,6 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -28,18 +26,12 @@ import (
 type SkillStoreWrapper struct {
 	api   *skillConsumerAPI.API
 	roots compositionapi.RootAPI
-
-	catalogWarmupMu     sync.Mutex
-	catalogWarmupCancel context.CancelFunc
-	catalogWarmupDone   chan struct{}
 }
 
-const skillCatalogWarmupStopTimeout = 10 * time.Second
-
 func NewSkillBuiltInInstaller(
-	skills skillConsumerAPI.BuiltinStore,
+	hydrator topology.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
-	if skills == nil {
+	if hydrator == nil {
 		return nil, errors.New("skill built-in installer dependencies are incomplete")
 	}
 
@@ -49,7 +41,7 @@ func NewSkillBuiltInInstaller(
 	}
 	return skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
-			Skills:   skills,
+			Hydrator: hydrator,
 			Packages: packages,
 		},
 	)
@@ -151,17 +143,19 @@ func (w *SkillStoreWrapper) RefreshSkillSource(
 
 func (w *SkillStoreWrapper) ListSkills(
 	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]artifact.Artifact, error) {
-		return api.ListSkills(context.Background(), rootID)
+) ([]skillConsumerAPI.SkillListItem, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]skillConsumerAPI.SkillListItem, error) {
+		return api.ListSkills(context.Background(), skillConsumerAPI.ListSkillsRequest{
+			RootID: rootID,
+		})
 	})
 }
 
 func (w *SkillStoreWrapper) ListSkillsForManagement() (
-	[]artifact.Artifact,
+	[]skillConsumerAPI.SkillListItem,
 	error,
 ) {
-	return middleware.WithRecoveryResp(func() ([]artifact.Artifact, error) {
+	return middleware.WithRecoveryResp(func() ([]skillConsumerAPI.SkillListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
 			return nil, basespec.ErrClosed
 		}
@@ -170,11 +164,13 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 			return nil, err
 		}
 
-		output := make([]artifact.Artifact, 0)
+		output := make([]skillConsumerAPI.SkillListItem, 0)
 		for _, rootValue := range roots {
 			values, err := w.api.ListSkills(
 				context.Background(),
-				rootValue.ID,
+				skillConsumerAPI.ListSkillsRequest{
+					RootID: rootValue.ID,
+				},
 			)
 			if err != nil {
 				return nil, err
@@ -182,14 +178,15 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 			output = append(output, values...)
 		}
 		sort.Slice(output, func(left, right int) bool {
-			if output[left].RootID != output[right].RootID {
-				return output[left].RootID < output[right].RootID
+			if output[left].Ref.RootID != output[right].Ref.RootID {
+				return output[left].Ref.RootID < output[right].Ref.RootID
 			}
-			if output[left].LogicalName != output[right].LogicalName {
-				return output[left].LogicalName <
-					output[right].LogicalName
+			if output[left].Name != output[right].Name {
+				return output[left].Name < output[right].Name
 			}
-			return output[left].ID < output[right].ID
+
+			return output[left].Ref.ArtifactID <
+				output[right].Ref.ArtifactID
 		})
 		return output, nil
 	})
@@ -200,10 +197,10 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 // callers receive CollectionView values and decide presentation from
 // Editable, Deletable, and Baseline.
 func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
-	[]collection.CollectionView,
+	[]collection.ListItem,
 	error,
 ) {
-	return middleware.WithRecoveryResp(func() ([]collection.CollectionView, error) {
+	return middleware.WithRecoveryResp(func() ([]collection.ListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
 			return nil, basespec.ErrClosed
 		}
@@ -213,7 +210,7 @@ func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
 			return nil, err
 		}
 
-		output := make([]collection.CollectionView, 0)
+		output := make([]collection.ListItem, 0)
 		for _, rootValue := range roots {
 			values, err := w.api.ListSkillCollections(
 				context.Background(),
@@ -226,13 +223,14 @@ func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
 		}
 
 		sort.Slice(output, func(left, right int) bool {
-			if output[left].Artifact.RootID != output[right].Artifact.RootID {
-				return output[left].Artifact.RootID < output[right].Artifact.RootID
+			if output[left].Ref.RootID != output[right].Ref.RootID {
+				return output[left].Ref.RootID < output[right].Ref.RootID
 			}
 			if output[left].Name != output[right].Name {
 				return output[left].Name < output[right].Name
 			}
-			return output[left].Artifact.ID < output[right].Artifact.ID
+			return output[left].Ref.ArtifactID <
+				output[right].Ref.ArtifactID
 		})
 		return output, nil
 	})
@@ -372,8 +370,8 @@ func (w *SkillStoreWrapper) SetSkillCollectionEnabled(
 
 func (w *SkillStoreWrapper) ListSkillCollections(
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
-	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
+	return withSkillStore(w, func(api *skillConsumerAPI.API) ([]collection.ListItem, error) {
 		return api.ListSkillCollections(context.Background(), rootID)
 	})
 }
@@ -435,84 +433,11 @@ func (w *SkillStoreWrapper) DeleteSkillCollection(
 	})
 }
 
-// startBuiltinCatalogWarmup starts runtime catalog preparation for the global
-// built-in and retained user management Roots. Protected topology hydration
-// remains synchronous and must complete before this method
-// is called.
-func (w *SkillStoreWrapper) startBuiltinCatalogWarmup(
-	syncRoot func(context.Context, root.RootID) error,
-) {
-	if w == nil || syncRoot == nil {
-		return
-	}
-
-	w.catalogWarmupMu.Lock()
-	if w.catalogWarmupCancel != nil {
-		w.catalogWarmupMu.Unlock()
-		return
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	w.catalogWarmupCancel = cancel
-	w.catalogWarmupDone = done
-	w.catalogWarmupMu.Unlock()
-
-	go func() {
-		defer close(done)
-
-		for _, rootID := range documentTopology.ManagementRootIDs() {
-			if err := ctx.Err(); err != nil {
-				return
-			}
-
-			err := syncRoot(ctx, rootID)
-			if err == nil || ctx.Err() != nil {
-				continue
-			}
-			slog.Warn(
-				"warm Skill runtime catalog",
-				"rootID",
-				rootID,
-				"error",
-				err,
-			)
-		}
-	}()
-}
-
-func (w *SkillStoreWrapper) stopBuiltinCatalogWarmup() {
-	if w == nil {
-		return
-	}
-
-	w.catalogWarmupMu.Lock()
-	cancel := w.catalogWarmupCancel
-	done := w.catalogWarmupDone
-	w.catalogWarmupCancel = nil
-	w.catalogWarmupDone = nil
-	w.catalogWarmupMu.Unlock()
-
-	if cancel == nil {
-		return
-	}
-	cancel()
-	if done == nil {
-		return
-	}
-
-	select {
-	case <-done:
-	case <-time.After(skillCatalogWarmupStopTimeout):
-		slog.Warn("skill runtime catalog warmup did not stop before shutdown")
-	}
-}
-
 func (w *SkillStoreWrapper) close() {
 	if w == nil {
 		return
 	}
-	w.stopBuiltinCatalogWarmup()
+
 	w.api = nil
 	w.roots = nil
 }

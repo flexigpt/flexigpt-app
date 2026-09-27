@@ -22,13 +22,13 @@ const (
 )
 
 type CollectionPage struct {
-	Items         []collection.CollectionView `json:"items"`
-	NextPageToken string                      `json:"nextPageToken,omitempty"`
+	Items         []collection.ListItem `json:"items"`
+	NextPageToken string                `json:"nextPageToken,omitempty"`
 }
 
 type ServerPage struct {
-	Items         []artifact.Artifact `json:"items"`
-	NextPageToken string              `json:"nextPageToken,omitempty"`
+	Items         []ServerListItem `json:"items"`
+	NextPageToken string           `json:"nextPageToken,omitempty"`
 }
 
 type RootStore interface {
@@ -39,12 +39,12 @@ type Store interface {
 	ListMCPCollections(
 		ctx context.Context,
 		rootID root.RootID,
-	) ([]collection.CollectionView, error)
+	) ([]collection.ListItem, error)
 
 	ListServers(
 		ctx context.Context,
 		rootID root.RootID,
-	) ([]artifact.Artifact, error)
+	) ([]ServerListItem, error)
 }
 
 type MCPListService struct {
@@ -104,14 +104,14 @@ func (s *MCPListService) ListCollectionsPage(
 		ctx,
 		roots,
 		cursor,
-		func(ctx context.Context, rootID root.RootID) ([]collection.CollectionView, error) {
+		func(ctx context.Context, rootID root.RootID) ([]collection.ListItem, error) {
 			return s.store.ListMCPCollections(ctx, rootID)
 		},
-		func(value collection.CollectionView) pageKey {
+		func(value collection.ListItem) pageKey {
 			return pageKey{
-				rootID: value.Artifact.RootID,
+				rootID: value.Ref.RootID,
 				name:   value.Name,
-				id:     value.Artifact.ID,
+				id:     value.Ref.ArtifactID,
 			}
 		},
 	)
@@ -119,7 +119,7 @@ func (s *MCPListService) ListCollectionsPage(
 		return CollectionPage{}, err
 	}
 	if items == nil {
-		items = []collection.CollectionView{}
+		items = []collection.ListItem{}
 	}
 	return CollectionPage{
 		Items:         items,
@@ -149,14 +149,14 @@ func (s *MCPListService) ListServersPage(
 		ctx,
 		roots,
 		cursor,
-		func(ctx context.Context, rootID root.RootID) ([]artifact.Artifact, error) {
+		func(ctx context.Context, rootID root.RootID) ([]ServerListItem, error) {
 			return s.store.ListServers(ctx, rootID)
 		},
-		func(value artifact.Artifact) pageKey {
+		func(value ServerListItem) pageKey {
 			return pageKey{
-				rootID: value.RootID,
-				name:   value.LogicalName,
-				id:     value.ID,
+				rootID: value.Ref.RootID,
+				name:   value.Name,
+				id:     value.Ref.ArtifactID,
 			}
 		},
 	)
@@ -164,7 +164,7 @@ func (s *MCPListService) ListServersPage(
 		return ServerPage{}, err
 	}
 	if items == nil {
-		items = []artifact.Artifact{}
+		items = []ServerListItem{}
 	}
 	return ServerPage{
 		Items:         items,

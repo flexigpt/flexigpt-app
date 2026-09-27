@@ -3,15 +3,59 @@ package consumerapi
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
+
+type ListServersRequest struct {
+	RootID          root.RootID `json:"rootID"`
+	Enabled         *bool       `json:"enabled,omitempty"`
+	IncludeDocument bool        `json:"includeDocument,omitempty"`
+}
+
+type ServerListItem struct {
+	Ref artifact.ArtifactRef `json:"ref"`
+
+	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+
+	State            artifact.State    `json:"state"`
+	Enabled          bool              `json:"enabled"`
+	Revision         uint64            `json:"revision"`
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
+	BuiltIn          bool              `json:"builtIn"`
+
+	Document *mcpDomainServer.ServerDocument `json:"document,omitempty"`
+}
+
+type ListPoliciesRequest struct {
+	RootID          root.RootID `json:"rootID"`
+	Enabled         *bool       `json:"enabled,omitempty"`
+	IncludeDocument bool        `json:"includeDocument,omitempty"`
+}
+
+type PolicyListItem struct {
+	Ref artifact.ArtifactRef `json:"ref"`
+
+	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+
+	State            artifact.State    `json:"state"`
+	Enabled          bool              `json:"enabled"`
+	Revision         uint64            `json:"revision"`
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
+	BuiltIn          bool              `json:"builtIn"`
+
+	Document *mcppolicyv1.MCPPolicyDocument `json:"document,omitempty"`
+}
 
 type ServerInstallationView struct {
 	Artifact     artifact.Artifact              `json:"artifact"`
@@ -94,15 +138,6 @@ type BuiltInArtifactExpectation struct {
 	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
 }
 
-type BuiltInPackageInstallRequest struct {
-	RootID         root.RootID                  `json:"rootID"`
-	SourceID       source.SourceID              `json:"sourceID"`
-	PackageAddress source.ManagedPackageAddress `json:"packageAddress"`
-	DocumentFile   basespec.Locator             `json:"documentFile"`
-	PackageFiles   []source.ManagedPackageFile  `json:"packageFiles"`
-	Expectations   []BuiltInArtifactExpectation `json:"expectations"`
-}
-
 type ServerStore interface {
 	ResolveMCPServer(
 		ctx context.Context,
@@ -152,24 +187,4 @@ type ManagementStore interface {
 		request ManagedMCPPolicyUpsertRequest,
 	) (ManagedMCPPolicyUpsertResult, error)
 	PurgeManagedMCPPolicy(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
-}
-
-type BuiltinStore interface {
-	InstallBuiltInPackage(
-		ctx context.Context,
-		request BuiltInPackageInstallRequest,
-	) ([]artifact.Artifact, error)
-
-	RemoveBuiltInPackage(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		address source.ManagedPackageAddress,
-	) error
-
-	EnsureBuiltInSourceCurrent(
-		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) error
 }

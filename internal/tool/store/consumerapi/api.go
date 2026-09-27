@@ -120,25 +120,13 @@ func (a *API) GetTool(
 func (a *API) ListTools(
 	ctx context.Context,
 	collectionRef artifact.ArtifactRef,
-) ([]ToolView, error) {
+) ([]ToolListItem, error) {
 	view, err := a.GetToolCollection(ctx, collectionRef)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]ToolView, 0, len(view.Members))
-	for _, member := range view.Members {
-		value, err := a.toolByName(ctx, member.Name)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"resolve Tool Collection member %q: %w",
-				member.Name,
-				err,
-			)
-		}
-		output = append(output, toolView(value))
-	}
-	return output, nil
+	return a.listCollectionTools(ctx, view)
 }
 
 func (a *API) SetToolEnabled(
@@ -232,52 +220,6 @@ func (a *API) getTool(
 	return value, nil
 }
 
-func (a *API) toolByName(
-	ctx context.Context,
-	name basespec.LogicalName,
-) (toolDomain.Tool, error) {
-	if err := a.ready(ctx); err != nil {
-		return toolDomain.Tool{}, err
-	}
-	if err := name.Validate(); err != nil {
-		return toolDomain.Tool{}, err
-	}
-
-	records, err := a.artifacts.FindByIdentity(
-		ctx,
-		a.builtinRoot,
-		toolDomain.ToolArtifactKind,
-		name,
-	)
-	if err != nil {
-		return toolDomain.Tool{}, err
-	}
-
-	candidates := make([]artifact.Artifact, 0, len(records))
-	for _, record := range records {
-		if record.State == artifact.StateAvailable {
-			candidates = append(candidates, record)
-		}
-	}
-	switch len(candidates) {
-	case 0:
-		return toolDomain.Tool{}, fmt.Errorf(
-			"%w: built-in Tool %q is unavailable",
-			basespec.ErrReferenceUnresolved,
-			name,
-		)
-	case 1:
-		return a.getTool(ctx, candidates[0].Ref())
-	default:
-		return toolDomain.Tool{}, fmt.Errorf(
-			"%w: built-in Tool %q has %d matching Artifacts",
-			basespec.ErrIdentityConflict,
-			name,
-			len(candidates),
-		)
-	}
-}
-
 func (a *API) validateGoTool(
 	ctx context.Context,
 	value toolDomain.Tool,
@@ -355,42 +297,6 @@ func (a *API) requireBuiltinArtifact(record artifact.Artifact) error {
 		return fmt.Errorf(
 			"%w: Tool catalog Artifact has an unsupported origin",
 			basespec.ErrReferenceUnresolved,
-		)
-	}
-	return nil
-}
-
-func (a *API) requireBuiltinSource(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) error {
-	if err := a.ready(ctx); err != nil {
-		return err
-	}
-	if err := rootID.Validate(); err != nil {
-		return err
-	}
-	if err := sourceID.Validate(); err != nil {
-		return err
-	}
-	if rootID != a.builtinRoot ||
-		sourceID != a.builtinSource ||
-		!a.protection.IsProtectedRoot(rootID) {
-		return fmt.Errorf(
-			"%w: package is not in the configured built-in Tool Source",
-			basespec.ErrProtected,
-		)
-	}
-
-	value, err := a.sources.Get(ctx, rootID, sourceID)
-	if err != nil {
-		return err
-	}
-	if value.Kind != source.SourceKindManagedDirectory {
-		return fmt.Errorf(
-			"%w: built-in Tool Source must be managed",
-			basespec.ErrInvalid,
 		)
 	}
 	return nil

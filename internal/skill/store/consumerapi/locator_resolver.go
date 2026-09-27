@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
@@ -75,9 +75,9 @@ func (r skillLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
+) ([]catalog.Entry, error) {
 	if r.artifacts == nil {
 		return nil, basespec.ErrClosed
 	}
-	return r.artifacts.ListBySource(ctx, rootID, sourceID)
+	return r.artifacts.ListBySource(ctx, rootID, sourceID, catalog.ListOptions{})
 }

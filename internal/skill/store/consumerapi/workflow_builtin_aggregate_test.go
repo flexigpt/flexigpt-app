@@ -6,6 +6,7 @@ import (
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
 func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
@@ -18,7 +19,9 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 
 	builtinSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.BuiltinRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.BuiltinRootID(),
+		},
 	)
 	requireNoError(t, err)
 
@@ -30,10 +33,16 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 		t.Fatal("markdown-output built-in Skill was not installed")
 	}
 
+	markdownOutputRecord, err := fixture.api.GetSkill(
+		ctx,
+		markdownOutput.Ref,
+	)
+	requireNoError(t, err)
+
 	sourceBefore, err := fixture.store.Sources.Get(
 		ctx,
-		markdownOutput.RootID,
-		markdownOutput.Binding.SourceID,
+		markdownOutputRecord.RootID,
+		markdownOutputRecord.Binding.SourceID,
 	)
 	requireNoError(t, err)
 
@@ -41,7 +50,7 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 
 	initial, err := aggregateService.ResolveArtifactSkill(
 		ctx,
-		markdownOutput.Ref(),
+		markdownOutput.Ref,
 	)
 	requireNoError(t, err)
 	if !initial.Enabled {
@@ -50,7 +59,7 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 
 	disabled, err := fixture.api.SetSkillEnabled(
 		ctx,
-		markdownOutput.Ref(),
+		markdownOutput.Ref,
 		markdownOutput.Revision,
 		false,
 	)
@@ -61,8 +70,8 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 
 	sourceAfterDisable, err := fixture.store.Sources.Get(
 		ctx,
-		markdownOutput.RootID,
-		markdownOutput.Binding.SourceID,
+		markdownOutputRecord.RootID,
+		markdownOutputRecord.Binding.SourceID,
 	)
 	requireNoError(t, err)
 	if sourceAfterDisable.Revision != sourceBefore.Revision {
@@ -100,18 +109,18 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 	if !restored.Enabled {
 		t.Fatal("aggregate resolved re-enabled built-in Skill as disabled")
 	}
-	if restored.Artifact != markdownOutput.Ref() {
+	if restored.Artifact != markdownOutput.Ref {
 		t.Fatalf(
 			"restored built-in Artifact ref=%+v, want %+v",
 			restored.Artifact,
-			markdownOutput.Ref(),
+			markdownOutput.Ref,
 		)
 	}
 
 	sourceAfterEnable, err := fixture.store.Sources.Get(
 		ctx,
-		markdownOutput.RootID,
-		markdownOutput.Binding.SourceID,
+		markdownOutputRecord.RootID,
+		markdownOutputRecord.Binding.SourceID,
 	)
 	requireNoError(t, err)
 	if sourceAfterEnable.Revision != sourceBefore.Revision {

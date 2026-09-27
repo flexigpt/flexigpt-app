@@ -231,8 +231,8 @@ func TestWorkflow_ManagedAgentImportRequiresDeclaredConfirmation(
 		harness.api.DeleteManagedAgent(
 			t.Context(),
 			agentConsumerAPI.ManagedAgentDeleteRequest{
-				Agent:            committed.Agent.Artifact.Ref(),
-				ExpectedRevision: committed.Agent.Artifact.Revision,
+				Agent:            committed.Agent.Ref,
+				ExpectedRevision: committed.Agent.Revision,
 			},
 		),
 	)
@@ -272,8 +272,8 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 
 	disabled, err := harness.api.SetAgentEnabled(
 		t.Context(),
-		agent.Artifact.Ref(),
-		agent.Artifact.Revision,
+		agent.Ref,
+		agent.Revision,
 		false,
 	)
 	requireNoError(t, err)
@@ -434,17 +434,17 @@ func requireImportIssue(
 
 func assertAgentNamedAbsent(
 	t *testing.T,
-	values []agentConsumerAPI.AgentView,
+	values []agentConsumerAPI.AgentListItem,
 	name string,
 ) {
 	t.Helper()
 
 	for _, value := range values {
-		if string(value.Artifact.LogicalName) == name {
+		if string(value.Name) == name {
 			t.Fatalf(
 				"unexpected Agent %q remains at %q",
 				name,
-				value.Artifact.Ref(),
+				value.Ref,
 			)
 		}
 	}

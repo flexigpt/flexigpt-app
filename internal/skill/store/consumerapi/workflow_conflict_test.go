@@ -211,7 +211,9 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 
 	userSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if _, found := findSkillByName(

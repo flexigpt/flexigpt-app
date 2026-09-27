@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 
-	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -18,7 +17,6 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -34,24 +32,18 @@ type PreparedPackage struct {
 
 	PackageFiles []source.ManagedPackageFile
 
-	Expectations []agentConsumerAPI.BuiltInAgentArtifactExpectation
+	Expectations []ArtifactExpectation
 }
 
-func (p PreparedPackage) installRequest(
-	rootID root.RootID,
-	sourceID source.SourceID,
-) agentConsumerAPI.BuiltInAgentPackageInstallRequest {
-	return agentConsumerAPI.BuiltInAgentPackageInstallRequest{
-		RootID:             rootID,
-		SourceID:           sourceID,
-		PackageAddress:     p.PackageAddress,
-		PluginDocumentFile: p.PluginDocumentFile,
-		PackageFiles:       clonePackageFiles(p.PackageFiles),
-		Expectations: append(
-			[]agentConsumerAPI.BuiltInAgentArtifactExpectation(nil),
-			p.Expectations...,
-		),
-	}
+// ArtifactExpectation is build-time package admission data. Runtime Agent
+// consumers do not own embedded package validation.
+type ArtifactExpectation struct {
+	Locator          basespec.Locator
+	Subresource      basespec.SubresourceLocator
+	Kind             artifact.ArtifactKind
+	LogicalName      basespec.LogicalName
+	LogicalVersion   basespec.LogicalVersion
+	DefinitionDigest cryptoutil.Digest
 }
 
 // PreparePackages reads direct embedded Agent Collection package directories.
@@ -167,7 +159,7 @@ func canonicalCollectionPackage(
 	files []source.ManagedPackageFile,
 ) (
 	pluginv1.PluginDocument,
-	[]agentConsumerAPI.BuiltInAgentArtifactExpectation,
+	[]ArtifactExpectation,
 	error,
 ) {
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -400,14 +392,14 @@ func canonicalAgentDocument(
 func expectationsForDocument(
 	locator basespec.Locator,
 	entry declaration.Entry,
-) ([]agentConsumerAPI.BuiltInAgentArtifactExpectation, error) {
+) ([]ArtifactExpectation, error) {
 	namedEntries, err := declaration.WalkNamedEntries(entry)
 	if err != nil {
 		return nil, err
 	}
 
 	output := make(
-		[]agentConsumerAPI.BuiltInAgentArtifactExpectation,
+		[]ArtifactExpectation,
 		0,
 		len(namedEntries),
 	)
@@ -416,7 +408,7 @@ func expectationsForDocument(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, agentConsumerAPI.BuiltInAgentArtifactExpectation{
+		output = append(output, ArtifactExpectation{
 			Locator:          locator,
 			Subresource:      named.SubresourceLocator,
 			Kind:             value.Kind,
@@ -527,7 +519,7 @@ func PackageFingerprint(
 	}
 
 	expectations := append(
-		[]agentConsumerAPI.BuiltInAgentArtifactExpectation(nil),
+		[]ArtifactExpectation(nil),
 		value.Expectations...,
 	)
 	sortExpectations(expectations)
@@ -542,7 +534,7 @@ func PackageFingerprint(
 }
 
 func sortExpectations(
-	values []agentConsumerAPI.BuiltInAgentArtifactExpectation,
+	values []ArtifactExpectation,
 ) {
 	sort.Slice(values, func(left, right int) bool {
 		if values[left].Locator != values[right].Locator {
@@ -559,17 +551,4 @@ func sortExpectations(
 		}
 		return values[left].LogicalVersion < values[right].LogicalVersion
 	})
-}
-
-func clonePackageFiles(
-	values []source.ManagedPackageFile,
-) []source.ManagedPackageFile {
-	output := make([]source.ManagedPackageFile, len(values))
-	for index, value := range values {
-		output[index] = source.ManagedPackageFile{
-			Locator: value.Locator,
-			Content: append([]byte(nil), value.Content...),
-		}
-	}
-	return output
 }

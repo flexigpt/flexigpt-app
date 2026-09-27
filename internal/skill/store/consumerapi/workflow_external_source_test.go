@@ -86,7 +86,9 @@ func TestSkillStoreWorkflowReusesFilesystemSourceForSameSkillPath(
 
 	skills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(skills) != 1 {
@@ -100,10 +102,10 @@ func TestSkillStoreWorkflowReusesFilesystemSourceForSameSkillPath(
 	if !found {
 		t.Fatalf("reused filesystem Skill %q is absent from listing", skillName)
 	}
-	if reused.Ref() != first.Artifact.Ref() {
+	if reused.Ref != first.Artifact.Ref() {
 		t.Fatalf(
 			"listed reused Skill ref=%+v, want %+v",
-			reused.Ref(),
+			reused.Ref,
 			first.Artifact.Ref(),
 		)
 	}

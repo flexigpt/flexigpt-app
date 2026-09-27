@@ -11,6 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
@@ -201,29 +202,34 @@ func (a *StoreAPI) defaultWorkspaceRecord(
 	ctx context.Context,
 	values workspaceSourceSet,
 ) (artifact.Artifact, bool, error) {
-	records, err := a.artifacts.ListBySource(
+	entries, err := a.artifacts.ListBySource(
 		ctx,
 		values.Policy.RootID,
 		values.Policy.ID,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return artifact.Artifact{}, false, err
 	}
 
-	candidates := make([]artifact.Artifact, 0, 1)
-	for _, record := range records {
-		if record.Binding.Locator == basespec.Locator(defaultpolicy.PolicyLocator) &&
-			record.Binding.SubresourceLocator == "" &&
-			record.Kind == workspaceDomain.WorkspaceArtifactKind &&
-			string(record.LogicalName) == defaultpolicy.PolicyID {
-			candidates = append(candidates, record)
+	refs := make([]artifact.ArtifactRef, 0, 1)
+	for _, entry := range entries {
+		if entry.Binding.Locator == basespec.Locator(defaultpolicy.PolicyLocator) &&
+			entry.Binding.SubresourceLocator == "" &&
+			entry.Kind == workspaceDomain.WorkspaceArtifactKind &&
+			string(entry.LogicalName) == defaultpolicy.PolicyID {
+			refs = append(refs, entry.Ref())
 		}
 	}
-	switch len(candidates) {
+	switch len(refs) {
 	case 0:
 		return artifact.Artifact{}, false, nil
 	case 1:
-		return candidates[0], true, nil
+		values, err := a.artifacts.GetMany(ctx, refs)
+		if err != nil {
+			return artifact.Artifact{}, false, err
+		}
+		return values[0], true, nil
 	default:
 		return artifact.Artifact{}, false, fmt.Errorf(
 			"%w: policy Source produced multiple default Workspace Artifacts",

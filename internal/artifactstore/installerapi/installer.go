@@ -10,4 +10,5 @@ type API interface {
 	topology.Ensurer
 	topology.HydrationCoordinator
 	topology.PackageHydrationCoordinator
+	topology.CompiledHydrationCoordinator
 }

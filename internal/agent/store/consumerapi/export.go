@@ -29,18 +29,18 @@ func (a *API) ExportAgent(
 		return AgentExportResult{}, basespec.ErrClosed
 	}
 
-	current, err := a.GetAgentView(ctx, request.Agent)
+	record, err := a.getAgentRecord(ctx, request.Agent)
 	if err != nil {
 		return AgentExportResult{}, err
 	}
-	if current.Artifact.State != artifact.StateAvailable {
+	if record.State != artifact.StateAvailable {
 		return AgentExportResult{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
 			basespec.ErrReferenceUnresolved,
-			current.Artifact.ID,
+			record.ID,
 		)
 	}
-	if current.Artifact.LogicalVersion != "" {
+	if record.LogicalVersion != "" {
 		return AgentExportResult{}, fmt.Errorf(
 			"%w: Agent Artifact has an unexpected logical version",
 			basespec.ErrDigestMismatch,
@@ -66,7 +66,7 @@ func (a *API) ExportAgent(
 	if err != nil {
 		return AgentExportResult{}, err
 	}
-	if document.Name != string(current.Artifact.LogicalName) {
+	if document.Name != string(record.LogicalName) {
 		return AgentExportResult{}, fmt.Errorf(
 			"%w: Agent declaration name differs from Artifact identity",
 			basespec.ErrDigestMismatch,
@@ -98,17 +98,22 @@ func (a *API) ExportAgent(
 
 	setup := a.exportMCPSetupDescriptors(ctx, resolution)
 
+	view, err := a.agentView(ctx, record)
+	if err != nil {
+		return AgentExportResult{}, err
+	}
+
 	return AgentExportResult{
 		Type:              declaration.TypeAgent,
-		Name:              current.Artifact.LogicalName,
+		Name:              record.LogicalName,
 		MediaType:         "application/yaml",
-		SuggestedFileName: string(current.Artifact.LogicalName) + ".agent.yaml",
+		SuggestedFileName: string(record.LogicalName) + ".agent.yaml",
 		Content:           string(content),
 		ContentDigest:     cryptoutil.DigestBytes(content),
 		DefinitionDigest:  definitionValue.Digest,
-		ArtifactRevision:  current.Artifact.Revision,
-		BuiltIn:           current.BuiltIn,
-		Managed:           current.Managed,
+		ArtifactRevision:  record.Revision,
+		BuiltIn:           view.BuiltIn,
+		Managed:           view.Managed,
 
 		Resolution:          resolution,
 		ResolutionIssue:     resolutionIssue,

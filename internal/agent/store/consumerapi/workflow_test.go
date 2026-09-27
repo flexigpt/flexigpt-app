@@ -12,7 +12,6 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -27,7 +26,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 		t.Fatalf("initial management Agent list = %#v, want empty", initial)
 	}
 
-	installer := harness.installBundledAgents(t)
+	harness.installBundledAgents(t)
 
 	builtinAgents, err := harness.api.ListAgents(
 		t.Context(),
@@ -51,7 +50,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 
 	resolution, err := harness.api.ResolveAgent(
 		t.Context(),
-		known.Artifact.Ref(),
+		known.Ref,
 	)
 	requireNoError(t, err)
 	if !resolution.Capabilities.Complete {
@@ -64,7 +63,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	exported, err := harness.api.ExportAgent(
 		t.Context(),
 		agentConsumerAPI.AgentExportRequest{
-			Agent: known.Artifact.Ref(),
+			Agent: known.Ref,
 		},
 	)
 	requireNoError(t, err)
@@ -104,14 +103,9 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 		basespec.LogicalName("local-dev-workspace"),
 	)
 
-	before := append(
-		[]agentConsumerAPI.AgentView(nil),
-		builtinAgents...,
-	)
-	requireNoError(
-		t,
-		installer.Ensure(installerapi.WithPrivilege(t.Context())),
-	)
+	before := append([]agentConsumerAPI.AgentListItem(nil), builtinAgents...)
+
+	harness.ensureBundledAgents(t)
 
 	after, err := harness.api.ListAgents(
 		t.Context(),
@@ -346,7 +340,7 @@ members:
 
 	current, err := harness.api.GetAgentView(
 		t.Context(),
-		committed.Agent.Artifact.Ref(),
+		committed.Agent.Ref,
 	)
 	requireNoError(t, err)
 	if current.Name != basespec.LogicalName("workflow-agent") {
@@ -360,7 +354,7 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if !containsAgent(allUserAgents, committed.Agent.Artifact.Ref()) {
+	if !containsAgent(allUserAgents, committed.Agent.Ref) {
 		t.Fatalf("managed Agent is missing from the Root Agent list")
 	}
 
@@ -373,13 +367,13 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if !containsAgent(collectionAgents, committed.Agent.Artifact.Ref()) {
+	if !containsAgent(collectionAgents, committed.Agent.Ref) {
 		t.Fatalf("managed Agent is missing from its Collection")
 	}
 
 	resolution, err := harness.api.ResolveAgent(
 		t.Context(),
-		committed.Agent.Artifact.Ref(),
+		committed.Agent.Ref,
 	)
 	requireNoError(t, err)
 	if !resolution.Capabilities.Complete {
@@ -407,7 +401,7 @@ members:
 	exported, err := harness.api.ExportAgent(
 		t.Context(),
 		agentConsumerAPI.AgentExportRequest{
-			Agent: committed.Agent.Artifact.Ref(),
+			Agent: committed.Agent.Ref,
 		},
 	)
 	requireNoError(t, err)
@@ -420,8 +414,8 @@ members:
 
 	disabledAgent, err := harness.api.SetAgentEnabled(
 		t.Context(),
-		committed.Agent.Artifact.Ref(),
-		committed.Agent.Artifact.Revision,
+		committed.Agent.Ref,
+		committed.Agent.Revision,
 		false,
 	)
 	requireNoError(t, err)
@@ -438,14 +432,14 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if !containsAgent(disabledAgents, committed.Agent.Artifact.Ref()) {
+	if !containsAgent(disabledAgents, committed.Agent.Ref) {
 		t.Fatalf("disabled Agent is missing from disabled Agent filter")
 	}
 
 	_, err = harness.api.SetAgentEnabled(
 		t.Context(),
-		committed.Agent.Artifact.Ref(),
-		committed.Agent.Artifact.Revision,
+		committed.Agent.Ref,
+		committed.Agent.Revision,
 		true,
 	)
 	requireErrorIs(t, err, basespec.ErrConflict)
@@ -592,18 +586,18 @@ members:
 
 func requireNamedAgent(
 	t *testing.T,
-	values []agentConsumerAPI.AgentView,
+	values []agentConsumerAPI.AgentListItem,
 	name basespec.LogicalName,
-) agentConsumerAPI.AgentView {
+) agentConsumerAPI.AgentListItem {
 	t.Helper()
 
 	for _, value := range values {
-		if value.Artifact.LogicalName == name {
+		if value.Name == name {
 			return value
 		}
 	}
 	t.Fatalf("Agent %q was not found", name)
-	return agentConsumerAPI.AgentView{}
+	return agentConsumerAPI.AgentListItem{}
 }
 
 func requireImportDestination(
@@ -614,7 +608,7 @@ func requireImportDestination(
 	t.Helper()
 
 	for _, value := range values {
-		if value.Collection.Artifact.Ref() == ref {
+		if value.Collection == ref {
 			return value
 		}
 	}
@@ -679,11 +673,11 @@ func requireAgentCollectionMemberIndex(
 }
 
 func containsAgent(
-	values []agentConsumerAPI.AgentView,
+	values []agentConsumerAPI.AgentListItem,
 	ref artifact.ArtifactRef,
 ) bool {
 	for _, value := range values {
-		if value.Artifact.Ref() == ref {
+		if value.Ref == ref {
 			return true
 		}
 	}
@@ -691,11 +685,11 @@ func containsAgent(
 }
 
 func containsCollection(
-	values []collection.CollectionView,
+	values []collection.ListItem,
 	ref artifact.ArtifactRef,
 ) bool {
 	for _, value := range values {
-		if value.Artifact.Ref() == ref {
+		if value.Ref == ref {
 			return true
 		}
 	}
@@ -707,7 +701,7 @@ func hasImportDestination(
 	ref artifact.ArtifactRef,
 ) bool {
 	for _, value := range values {
-		if value.Collection.Artifact.Ref() == ref {
+		if value.Collection == ref {
 			return true
 		}
 	}

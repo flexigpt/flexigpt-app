@@ -10,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 )
@@ -308,11 +309,12 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 		rootID,
 		artifact.ArtifactKind(declarationType),
 		name,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
-	compositionRecords := make([]artifact.Artifact, 0)
+	compositionRecords := make([]catalog.Entry, 0)
 	for _, record := range records {
 		if record.Binding.SourceID != state.compositionSourceID {
 			continue
@@ -396,6 +398,7 @@ func (r *Resolver) resolveInRoot(
 		rootID,
 		artifact.ArtifactKind(declarationType),
 		name,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return nil, false, err
@@ -649,12 +652,13 @@ func (r *Resolver) resolveContainedMember(
 		rootID,
 		artifact.ArtifactKind(header.Type),
 		basespec.LogicalName(header.Name),
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := make([]artifact.Artifact, 0, 1)
+	matches := make([]artifact.ArtifactRef, 0, 1)
 	for _, record := range records {
 		if record.State != artifact.StateAvailable ||
 			record.Binding.SourceID != from.Binding.SourceID ||
@@ -671,7 +675,7 @@ func (r *Resolver) resolveContainedMember(
 			return nil, err
 		}
 		if bytes.Equal(definitionValue.Body, targetRaw) {
-			matches = append(matches, record)
+			matches = append(matches, record.Ref())
 		}
 	}
 
@@ -687,7 +691,7 @@ func (r *Resolver) resolveContainedMember(
 		return r.resolveArtifact(
 			ctx,
 			state,
-			matches[0].Ref(),
+			matches[0],
 			header.Type,
 			expectedVersion,
 			depth+1,

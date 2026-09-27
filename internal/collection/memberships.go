@@ -61,13 +61,18 @@ func (a *API) ListMembershipsForArtifact(
 		targetTerminal = terminal
 	}
 
-	plugins, err := a.ListDomain(ctx, ref.RootID)
+	plugins, err := a.ListDomain(ctx, ListRequest{
+		RootID: ref.RootID,
+	})
 	if err != nil {
 		return nil, err
 	}
 	output := make([]ArtifactMembershipView, 0)
 	for _, collectionValue := range plugins {
-		plugin, err := a.resolver.ResolvePlugin(ctx, collectionValue.Artifact.Ref())
+		plugin, err := a.resolver.ResolvePluginMembers(
+			ctx,
+			collectionValue.Ref,
+		)
 		if err != nil {
 			return nil, err
 		}
@@ -75,7 +80,7 @@ func (a *API) ListMembershipsForArtifact(
 			return nil, fmt.Errorf(
 				"%w: Plugin %q did not resolve as a Plugin",
 				basespec.ErrReferenceUnresolved,
-				collectionValue.Artifact.ID,
+				collectionValue.Ref.ArtifactID,
 			)
 		}
 
@@ -100,9 +105,9 @@ func (a *API) ListMembershipsForArtifact(
 			}
 
 			view := ArtifactMembershipView{
-				Collection:         collectionValue.Artifact.Ref(),
+				Collection:         collectionValue.Ref,
 				CollectionName:     collectionValue.Name,
-				CollectionRevision: collectionValue.Artifact.Revision,
+				CollectionRevision: collectionValue.Revision,
 				MemberIndex:        index,
 				Member:             member,
 				Status:             relationship.Status,

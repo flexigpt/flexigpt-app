@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
@@ -79,6 +80,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 		ctx,
 		current.RootID,
 		current.Binding.SourceID,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -87,7 +89,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 		)
 	}
 
-	packageRecords := make([]artifact.Artifact, 0)
+	packageRecords := make([]catalog.Entry, 0)
 	rootFound := false
 	for _, record := range records {
 		if record.Binding.Locator != current.Binding.Locator {
@@ -151,7 +153,7 @@ func (a *API) loadManagedAgent(
 		return editableManagedAgent{}, err
 	}
 
-	record, err := a.GetAgent(ctx, ref)
+	record, err := a.getAgentRecord(ctx, ref)
 	if err != nil {
 		return editableManagedAgent{}, err
 	}

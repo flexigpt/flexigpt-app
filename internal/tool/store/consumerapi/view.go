@@ -18,6 +18,22 @@ type ToolImplementationView struct {
 	SDKToolType toolv1.SDKToolType        `json:"sdkToolType,omitempty"`
 }
 
+type ToolListItem struct {
+	Ref artifact.ArtifactRef `json:"ref"`
+
+	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+
+	State            artifact.State    `json:"state"`
+	Enabled          bool              `json:"enabled"`
+	Revision         uint64            `json:"revision"`
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
+	BuiltIn          bool              `json:"builtIn"`
+
+	Document *toolv1.ToolDocument `json:"document,omitempty"`
+}
+
 type ToolView struct {
 	Artifact         artifact.Artifact       `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`

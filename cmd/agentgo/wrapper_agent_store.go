@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
@@ -23,9 +24,9 @@ type AgentStoreWrapper struct {
 }
 
 func NewAgentBuiltInInstaller(
-	agents agentConsumerAPI.BuiltinStore,
+	hydrator topology.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
-	if agents == nil {
+	if hydrator == nil {
 		return nil, errors.New(
 			"agent built-in installer dependencies are incomplete",
 		)
@@ -37,7 +38,7 @@ func NewAgentBuiltInInstaller(
 	}
 	return agentBuiltin.NewInstaller(
 		agentBuiltin.InstallerDependencies{
-			Agents:   agents,
+			Hydrator: hydrator,
 			Packages: packages,
 		},
 	)
@@ -102,22 +103,22 @@ func withAgentStore[T any](
 
 func (w *AgentStoreWrapper) ListAgents(
 	request agentConsumerAPI.ListAgentsRequest,
-) ([]agentConsumerAPI.AgentView, error) {
+) ([]agentConsumerAPI.AgentListItem, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentView, error) {
+		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentListItem, error) {
 			return api.ListAgents(context.Background(), request)
 		},
 	)
 }
 
 func (w *AgentStoreWrapper) ListAgentsForManagement() (
-	[]agentConsumerAPI.AgentView,
+	[]agentConsumerAPI.AgentListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentView, error) {
+		func(api *agentConsumerAPI.API) ([]agentConsumerAPI.AgentListItem, error) {
 			return api.ListAgentsForManagement(context.Background())
 		},
 	)
@@ -127,12 +128,12 @@ func (w *AgentStoreWrapper) ListAgentsForManagement() (
 // every Root. This avoids frontend root discovery through an unrelated global
 // Agent list and ensures empty Collections remain visible.
 func (w *AgentStoreWrapper) ListAgentCollectionsForManagement() (
-	[]collection.CollectionView,
+	[]collection.ListItem,
 	error,
 ) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) ([]collection.ListItem, error) {
 			return api.ListAgentCollectionsForManagement(
 				context.Background(),
 			)
@@ -145,8 +146,11 @@ func (w *AgentStoreWrapper) GetAgent(
 ) (agentConsumerAPI.AgentView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentView, error) {
-			return api.GetAgentView(context.Background(), ref)
+		func(api *agentConsumerAPI.API) (
+			agentConsumerAPI.AgentView,
+			error,
+		) {
+			return api.GetAgent(context.Background(), ref)
 		},
 	)
 }
@@ -229,10 +233,10 @@ func (w *AgentStoreWrapper) GetAgentCollection(
 
 func (w *AgentStoreWrapper) ListAgentCollections(
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) ([]collection.CollectionView, error) {
+		func(api *agentConsumerAPI.API) ([]collection.ListItem, error) {
 			return api.ListAgentCollections(context.Background(), rootID)
 		},
 	)

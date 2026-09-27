@@ -1,6 +1,7 @@
 package consumerapi
 
 import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -27,6 +28,35 @@ type SkillPathRegistrationResult struct {
 	Artifact artifact.Artifact `json:"artifact"`
 }
 
+type ListSkillsRequest struct {
+	RootID root.RootID `json:"rootID"`
+
+	Enabled *bool `json:"enabled,omitempty"`
+
+	IncludeDocument bool `json:"includeDocument,omitempty"`
+}
+
+// SkillListItem is declaration metadata. Runtime registration, source files,
+// arguments, resources, and execution state are intentionally not listing
+// fields.
+type SkillListItem struct {
+	Ref artifact.ArtifactRef `json:"ref"`
+
+	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+
+	State            artifact.State    `json:"state"`
+	Enabled          bool              `json:"enabled"`
+	Revision         uint64            `json:"revision"`
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
+
+	BuiltIn bool `json:"builtIn"`
+	Managed bool `json:"managed"`
+
+	Document *skillv1.SkillDocument `json:"document,omitempty"`
+}
+
 type ManagedSkillCreateRequest struct {
 	Collection                 artifact.ArtifactRef `json:"collection"`
 	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
@@ -45,23 +75,6 @@ type ManagedSkillCreateResult struct {
 	Address           artifact.ArtifactAddress  `json:"address"`
 	Collection        collection.CollectionView `json:"collection"`
 	MembershipCreated bool                      `json:"membershipCreated"`
-}
-
-type BuiltInSkillArtifactExpectation struct {
-	Locator          basespec.Locator            `json:"locator"`
-	Subresource      basespec.SubresourceLocator `json:"subresource"`
-	Kind             artifact.ArtifactKind       `json:"kind"`
-	LogicalName      basespec.LogicalName        `json:"logicalName"`
-	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
-}
-
-type BuiltInSkillPackageInstallRequest struct {
-	RootID         root.RootID                       `json:"rootID"`
-	SourceID       source.SourceID                   `json:"sourceID"`
-	PackageAddress source.ManagedPackageAddress      `json:"packageAddress"`
-	DocumentFile   basespec.Locator                  `json:"documentFile"`
-	PackageFiles   []source.ManagedPackageFile       `json:"packageFiles"`
-	Expectations   []BuiltInSkillArtifactExpectation `json:"expectations"`
 }
 
 type ManagedSkillReplaceRequest struct {

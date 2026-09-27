@@ -52,11 +52,11 @@ func (a *API) GetAgentCollection(
 func (a *API) ListAgentCollections(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
 		return nil, basespec.ErrClosed
 	}
-	return a.collections.ListDomain(ctx, rootID)
+	return a.collections.ListDomain(ctx, collection.ListRequest{RootID: rootID})
 }
 
 func (a *API) UpdateAgentCollection(
@@ -94,7 +94,7 @@ func (a *API) AddAgentCollectionArtifactMember(
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
 
-	target, err := a.GetAgent(ctx, request.Artifact)
+	target, err := a.getAgentRecord(ctx, request.Artifact)
 	if err != nil {
 		return collection.CollectionView{}, err
 	}

@@ -67,15 +67,12 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	)
 	requireNoError(t, err)
 
-	builtinStore, err := skillConsumerAPI.NewBuiltinStore(api)
-	requireNoError(t, err)
-
 	packages, err := builtin.EmbeddedSkillPackages()
 	requireNoError(t, err)
 
 	installer, err := skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
-			Skills:   builtinStore,
+			Hydrator: store.Topology,
 			Packages: packages,
 		},
 	)
@@ -181,35 +178,35 @@ func workflowSkillMarkdown(
 }
 
 func findSkillByName(
-	values []artifact.Artifact,
+	values []skillConsumerAPI.SkillListItem,
 	name string,
-) (artifact.Artifact, bool) {
-	for _, value := range values {
-		if string(value.LogicalName) == name {
-			return value, true
-		}
-	}
-	return artifact.Artifact{}, false
-}
-
-func findCollectionByName(
-	values []collection.CollectionView,
-	name string,
-) (collection.CollectionView, bool) {
+) (skillConsumerAPI.SkillListItem, bool) {
 	for _, value := range values {
 		if string(value.Name) == name {
 			return value, true
 		}
 	}
-	return collection.CollectionView{}, false
+	return skillConsumerAPI.SkillListItem{}, false
+}
+
+func findCollectionByName(
+	values []collection.ListItem,
+	name string,
+) (collection.ListItem, bool) {
+	for _, value := range values {
+		if string(value.Name) == name {
+			return value, true
+		}
+	}
+	return collection.ListItem{}, false
 }
 
 func skillRevisionSnapshot(
-	values []artifact.Artifact,
+	values []skillConsumerAPI.SkillListItem,
 ) map[artifact.ArtifactRef]uint64 {
 	output := make(map[artifact.ArtifactRef]uint64, len(values))
 	for _, value := range values {
-		output[value.Ref()] = value.Revision
+		output[value.Ref] = value.Revision
 	}
 	return output
 }

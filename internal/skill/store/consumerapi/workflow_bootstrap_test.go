@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
+	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
 func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
@@ -47,7 +48,9 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 
 	initialUserSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(initialUserSkills) != 0 {
@@ -78,7 +81,9 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 
 	builtinSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.BuiltinRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.BuiltinRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(builtinSkills) == 0 {
@@ -162,10 +167,10 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	if !found {
 		t.Fatal("user Skill baseline is absent from Collection listing")
 	}
-	if listedBaseline.Artifact.Ref() != baseline.Artifact.Ref() {
+	if listedBaseline.Ref != baseline.Artifact.Ref() {
 		t.Fatalf(
 			"listed baseline ref=%+v, want %+v",
-			listedBaseline.Artifact.Ref(),
+			listedBaseline.Ref,
 			baseline.Artifact.Ref(),
 		)
 	}
@@ -190,7 +195,9 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 
 	afterRehydrate, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.BuiltinRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.BuiltinRootID(),
+		},
 	)
 	requireNoError(t, err)
 	afterSnapshot := skillRevisionSnapshot(afterRehydrate)

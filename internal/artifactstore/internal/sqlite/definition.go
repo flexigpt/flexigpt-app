@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
@@ -27,33 +26,17 @@ func (s *Store) getDefinition(
 	rootID root.RootID,
 	digest cryptoutil.Digest,
 ) (definition.Definition, error) {
-	if err := rootID.Validate(); err != nil {
-		return definition.Definition{}, err
-	}
-	if err := cryptoutil.ValidateDigest(digest); err != nil {
-		return definition.Definition{}, err
-	}
-	if err := s.requireActiveRoot(ctx, rootID); err != nil {
-		return definition.Definition{}, err
-	}
-	value, err := getDefinitionTx(
+	values, err := s.getDefinitions(
 		ctx,
-		s.db,
-		rootID,
-		digest,
+		[]definition.Key{{
+			RootID: rootID,
+			Digest: digest,
+		}},
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return definition.Definition{}, fmt.Errorf(
-			"%w: Definition %q in Root %q",
-			basespec.ErrDefinitionNotFound,
-			digest,
-			rootID,
-		)
-	}
 	if err != nil {
 		return definition.Definition{}, err
 	}
-	return value.Clone(), nil
+	return values[0], nil
 }
 
 func putDefinitionTx(

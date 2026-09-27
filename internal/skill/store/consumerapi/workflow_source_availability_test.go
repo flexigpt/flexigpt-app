@@ -105,7 +105,9 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 
 	listedSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	listedMissing, found := findSkillByName(listedSkills, skillName)

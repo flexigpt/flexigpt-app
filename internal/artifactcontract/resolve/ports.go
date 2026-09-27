@@ -6,6 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -23,7 +24,8 @@ type ArtifactReader interface {
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
 		logicalName basespec.LogicalName,
-	) ([]artifact.Artifact, error)
+		options catalog.ListOptions,
+	) ([]catalog.Entry, error)
 
 	GetDefinition(
 		ctx context.Context,
@@ -41,7 +43,8 @@ type SourceArtifactReader interface {
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-	) ([]artifact.Artifact, error)
+		options catalog.ListOptions,
+	) ([]catalog.Entry, error)
 }
 
 // SourceEntryInspector confirms physical Source entry metadata without

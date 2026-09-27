@@ -13,6 +13,7 @@ import (
 	"path"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
@@ -38,6 +39,9 @@ type API struct {
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	domain           *DomainPolicy
 	resolver         *resolve.Resolver
+
+	// Immutable Plugin projections keyed by Definition digest.
+	catalogProjections sync.Map
 }
 
 func NewWithResolver(
@@ -264,45 +268,9 @@ func (a *API) SetEnabled(
 
 func (a *API) List(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]CollectionView, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-
-	records, err := a.artifacts.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]CollectionView, 0)
-	for _, record := range records {
-		if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-			record.State != artifact.StateAvailable ||
-			record.Binding.SubresourceLocator != "" {
-			continue
-		}
-
-		view, err := a.Get(ctx, record.Ref())
-		if errors.Is(err, basespec.ErrUnsupported) {
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, view)
-	}
-
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Name != output[right].Name {
-			return output[left].Name < output[right].Name
-		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
-	})
-	return output, nil
+	request ListRequest,
+) ([]ListItem, error) {
+	return a.listCollections(ctx, request, false)
 }
 
 func (a *API) Update(

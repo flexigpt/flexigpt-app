@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -32,6 +31,8 @@ type API struct {
 	collections      *collection.API
 
 	declarationResolver *resolve.Resolver
+
+	listDocuments sync.Map
 }
 
 func New(
@@ -190,34 +191,6 @@ func (a *API) RefreshSkillSource(
 	}
 	_, err := a.discovery.RefreshSource(ctx, rootID, sourceID)
 	return err
-}
-
-func (a *API) ListSkills(
-	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	values, err := a.artifacts.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]artifact.Artifact, 0, len(values))
-	for _, value := range values {
-		if !skillDomain.IsSkillKind(value.Kind) {
-			continue
-		}
-		output = append(output, value.Clone())
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].LogicalName != output[right].LogicalName {
-			return output[left].LogicalName <
-				output[right].LogicalName
-		}
-		return output[left].ID < output[right].ID
-	})
-	return output, nil
 }
 
 func (a *API) GetSkill(
@@ -841,26 +814,6 @@ func (a *API) ensureSkillBaselineCollection(
 		return collection.CollectionView{}, basespec.ErrClosed
 	}
 	return a.collections.EnsureBaseline(ctx, rootID)
-}
-
-func (a *API) ensureBuiltInSkillSourceCurrent(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) error {
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return err
-	}
-	if err := a.requireMutable(ctx, rootID, true); err != nil {
-		return err
-	}
-
-	return compositionapi.EnsureSourceCurrent(
-		ctx,
-		a.discovery,
-		rootID,
-		sourceID,
-	)
 }
 
 func (a *API) requireMutable(

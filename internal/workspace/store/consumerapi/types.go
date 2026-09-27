@@ -48,14 +48,33 @@ type WorkspaceDirectoryView struct {
 	Diagnostics     []diagnostic.Diagnostic       `json:"diagnostics,omitempty"`
 }
 
+// WorkspaceDirectoryListItem is the lightweight directory-management list
+// projection. It intentionally does not resolve Workspace manifests or build
+// runtime composition plans.
+type WorkspaceDirectoryListItem struct {
+	Ref WorkspaceDirectoryRef `json:"ref"`
+
+	RootID          root.RootID `json:"rootID"`
+	RootDisplayName string      `json:"rootDisplayName"`
+
+	Enabled bool `json:"enabled"`
+
+	DirectorySourceID       source.SourceID `json:"directorySourceID"`
+	DirectorySourceRevision uint64          `json:"directorySourceRevision"`
+
+	PolicyID      string            `json:"policyID"`
+	PolicyVersion string            `json:"policyVersion"`
+	PolicyDigest  cryptoutil.Digest `json:"policyDigest"`
+}
+
 type WorkspacePageRequest struct {
 	Cursor string `json:"cursor,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
 }
 
 type WorkspacePage struct {
-	Items      []WorkspaceDirectoryView `json:"items"`
-	NextCursor string                   `json:"nextCursor,omitempty"`
+	Items      []WorkspaceDirectoryListItem `json:"items"`
+	NextCursor string                       `json:"nextCursor,omitempty"`
 }
 
 type WorkspaceDefaultPolicyView struct {

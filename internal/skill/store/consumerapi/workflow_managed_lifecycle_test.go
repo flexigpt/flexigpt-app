@@ -184,17 +184,19 @@ func TestSkillStoreWorkflowManagedCollectionAndSkillLifecycle(
 
 	listedSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	listedSkill, found := findSkillByName(listedSkills, skillName)
 	if !found {
 		t.Fatalf("created Skill %q is absent from ListSkills", skillName)
 	}
-	if listedSkill.Ref() != created.Artifact.Ref() {
+	if listedSkill.Ref != created.Artifact.Ref() {
 		t.Fatalf(
 			"listed Skill ref=%+v, want %+v",
-			listedSkill.Ref(),
+			listedSkill.Ref,
 			created.Artifact.Ref(),
 		)
 	}
@@ -485,7 +487,9 @@ func TestSkillStoreWorkflowManagedCollectionAndSkillLifecycle(
 
 	remainingSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if _, found := findSkillByName(remainingSkills, skillName); found {
@@ -537,10 +541,10 @@ func TestSkillStoreWorkflowManagedCollectionAndSkillLifecycle(
 	if !found {
 		t.Fatal("baseline Collection disappeared during managed Skill cleanup")
 	}
-	if remainingBaseline.Artifact.Ref() != baseline.Artifact.Ref() {
+	if remainingBaseline.Ref != baseline.Artifact.Ref() {
 		t.Fatalf(
 			"remaining baseline ref=%+v, want %+v",
-			remainingBaseline.Artifact.Ref(),
+			remainingBaseline.Ref,
 			baseline.Artifact.Ref(),
 		)
 	}

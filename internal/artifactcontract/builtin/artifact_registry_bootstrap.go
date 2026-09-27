@@ -338,7 +338,22 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	); err != nil {
 		return fmt.Errorf("ensure built-in topology: %w", err)
 	}
+
+	compiled, err := r.prepareCompiledHydration(
+		ctx,
+		entries,
+		prepared,
+	)
+	if err != nil {
+		return err
+	}
+
+	physicalWork := false
 	for _, entry := range entries {
+		if compiled.handles(entry.name) {
+			continue
+		}
+
 		hydrated, supported := entry.installer.(HydrationInstaller)
 		if packageInstaller, packageSupported := entry.installer.(PackageHydrationInstaller); packageSupported &&
 			packageAware {
@@ -349,6 +364,10 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 					break
 				}
 			}
+			if !packageHydrationNeedsMutation(preparedValue) {
+				continue
+			}
+			physicalWork = true
 			if err := packageInstaller.EnsurePackageHydration(
 				ctx,
 				preparedValue.current,
@@ -366,6 +385,10 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 					break
 				}
 			}
+			if current {
+				continue
+			}
+			physicalWork = true
 			if err := hydrated.EnsureHydration(ctx, current); err != nil {
 				return fmt.Errorf(
 					"ensure built-in installer %q: %w",
@@ -375,6 +398,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			}
 			continue
 		}
+		physicalWork = true
 		if err := entry.installer.Ensure(ctx); err != nil {
 			return fmt.Errorf(
 				"ensure built-in installer %q: %w",
@@ -383,6 +407,13 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			)
 		}
 	}
+	if err := compiled.apply(ctx); err != nil {
+		return fmt.Errorf("hydrate compiled built-in packages: %w", err)
+	}
+	if compiled.hasPhysicalWork() {
+		physicalWork = true
+	}
+
 	// Installers can share a protected managed Source. A later installer can
 	// advance the shared Source revision after an earlier installer publishes
 	// content. Every hydration-aware installer therefore finalizes only after
@@ -396,25 +427,29 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		desiredByInstaller[value.installer] = value.desired
 	}
 
-	for _, entry := range entries {
-		hydrated, supported := entry.installer.(HydrationInstaller)
-		if !supported {
-			continue
-		}
-		if _, found := desiredByInstaller[entry.name]; !found {
-			return fmt.Errorf(
-				"%w: hydration installer %q has no desired Source",
-				basespec.ErrInvalid,
-				entry.name,
-			)
-		}
+	// No physical package work means there is nothing to refresh or validate.
+	// Hydration markers are still committed below when their fingerprints changed.
+	if physicalWork {
+		for _, entry := range entries {
+			hydrated, supported := entry.installer.(HydrationInstaller)
+			if !supported {
+				continue
+			}
+			if _, found := desiredByInstaller[entry.name]; !found {
+				return fmt.Errorf(
+					"%w: hydration installer %q has no desired Source",
+					basespec.ErrInvalid,
+					entry.name,
+				)
+			}
 
-		if err := hydrated.FinalizeHydration(ctx); err != nil {
-			return fmt.Errorf(
-				"finalize built-in installer %q: %w",
-				entry.name,
-				err,
-			)
+			if err := hydrated.FinalizeHydration(ctx); err != nil {
+				return fmt.Errorf(
+					"finalize built-in installer %q: %w",
+					entry.name,
+					err,
+				)
+			}
 		}
 	}
 

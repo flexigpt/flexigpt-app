@@ -2,23 +2,35 @@ package consumerapi
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type AgentView struct {
-	Artifact artifact.Artifact `json:"artifact"`
+	Ref artifact.ArtifactRef `json:"ref"`
 
 	Name        basespec.LogicalName `json:"name"`
 	DisplayName string               `json:"displayName"`
 	Description string               `json:"description,omitempty"`
 
-	BuiltIn bool `json:"builtIn"`
-	Managed bool `json:"managed"`
+	State            artifact.State    `json:"state"`
+	Enabled          bool              `json:"enabled"`
+	Revision         uint64            `json:"revision"`
+	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
+	BuiltIn          bool              `json:"builtIn"`
+	Managed          bool              `json:"managed"`
+}
+
+// AgentListItem is the lightweight Agent list response. Document is omitted
+// unless ListAgentsRequest.IncludeDocument is true.
+type AgentListItem struct {
+	AgentView
+
+	Document *agentv1.AgentDocument `json:"document,omitempty"`
 }
 
 type AgentResolution struct {
@@ -53,32 +65,11 @@ type ListAgentsRequest struct {
 
 	// Enabled filters universal Artifact.Enabled metadata when non-nil.
 	Enabled *bool `json:"enabled,omitempty"`
+
+	IncludeDocument bool `json:"includeDocument,omitempty"`
 }
 
 type ManagedAgentDeleteRequest struct {
 	Agent            artifact.ArtifactRef `json:"agent"`
 	ExpectedRevision uint64               `json:"expectedRevision"`
-}
-
-type BuiltInAgentArtifactExpectation struct {
-	Locator          basespec.Locator            `json:"locator"`
-	Subresource      basespec.SubresourceLocator `json:"subresource,omitempty"`
-	Kind             artifact.ArtifactKind       `json:"kind"`
-	LogicalName      basespec.LogicalName        `json:"logicalName"`
-	LogicalVersion   basespec.LogicalVersion     `json:"logicalVersion,omitempty"`
-	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
-}
-
-type BuiltInAgentPackageInstallRequest struct {
-	RootID root.RootID `json:"rootID"`
-
-	SourceID source.SourceID `json:"sourceID"`
-
-	PackageAddress source.ManagedPackageAddress `json:"packageAddress"`
-
-	PluginDocumentFile basespec.Locator `json:"pluginDocumentFile"`
-
-	PackageFiles []source.ManagedPackageFile `json:"packageFiles"`
-
-	Expectations []BuiltInAgentArtifactExpectation `json:"expectations"`
 }

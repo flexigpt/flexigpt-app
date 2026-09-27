@@ -1,0 +1,364 @@
+package collection
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+)
+
+// ListRequest is the public Collection listing request.
+//
+// It contains only domain-owned listing choices. Generic Artifact Store query
+// details remain inside the Collection API.
+type ListRequest struct {
+	RootID          root.RootID `json:"rootID"`
+	IncludeDocument bool        `json:"includeDocument,omitempty"`
+}
+
+// ListItem is a lightweight Collection projection.
+//
+// Members are not returned in ordinary listings. The member count is enough
+// for management pages to determine whether deletion can be offered. Read
+// returns CollectionView when a caller explicitly selects one Collection.
+type ListItem struct {
+	Ref      artifact.ArtifactRef `json:"ref"`
+	SourceID source.SourceID      `json:"sourceID"`
+
+	Name        basespec.LogicalName `json:"name"`
+	DisplayName string               `json:"displayName"`
+	Description string               `json:"description,omitempty"`
+
+	State    artifact.State `json:"state"`
+	Enabled  bool           `json:"enabled"`
+	Revision uint64         `json:"revision"`
+
+	MemberCount int  `json:"memberCount"`
+	BuiltIn     bool `json:"builtIn"`
+	Editable    bool `json:"editable"`
+	Deletable   bool `json:"deletable"`
+	Baseline    bool `json:"baseline"`
+
+	Document *pluginv1.PluginDocument `json:"document,omitempty"`
+}
+
+type collectionMemberShape struct {
+	Type declaration.Type
+	Form declaration.MemberForm
+}
+
+type collectionProjection struct {
+	document pluginv1.PluginDocument
+	members  []collectionMemberShape
+}
+
+func (a *API) listCollections(
+	ctx context.Context,
+	request ListRequest,
+	domainOnly bool,
+) ([]ListItem, error) {
+	if a == nil || a.artifacts == nil {
+		return nil, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: Collection list context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if err := request.RootID.Validate(); err != nil {
+		return nil, err
+	}
+
+	entries, err := a.artifacts.ListByRoot(
+		ctx,
+		request.RootID,
+		catalog.ListOptions{
+			IncludeDocument: request.IncludeDocument,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	needDocuments := request.IncludeDocument
+	if !needDocuments {
+		for _, entry := range entries {
+			if entry.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
+				entry.State != artifact.StateAvailable ||
+				entry.Binding.SubresourceLocator != "" ||
+				entry.Definition == nil {
+				continue
+			}
+			if _, found := a.catalogProjections.Load(
+				entry.Definition.Digest,
+			); !found {
+				needDocuments = true
+				break
+			}
+		}
+	}
+
+	// A Collection list needs a small direct-member projection for domain
+	// visibility, baseline classification, and editability. On a cold process
+	// this performs one bulk document attachment. Later ordinary list calls use
+	// only catalog metadata plus immutable Definition-digest cache entries.
+	if needDocuments && !request.IncludeDocument {
+		entries, err = a.artifacts.ListByRoot(
+			ctx,
+			request.RootID,
+			catalog.ListOptions{IncludeDocument: true},
+		)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	output := make([]ListItem, 0)
+	for _, entry := range entries {
+		if entry.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
+			entry.State != artifact.StateAvailable ||
+			entry.Binding.SubresourceLocator != "" ||
+			entry.Definition == nil {
+			continue
+		}
+
+		projection, err := a.collectionProjectionFor(entry)
+		if err != nil {
+			return nil, err
+		}
+		if domainOnly {
+			visible, err := a.collectionVisibleInList(
+				entry,
+				projection,
+			)
+			if err != nil {
+				return nil, err
+			}
+			if !visible {
+				continue
+			}
+		}
+
+		if a.domain != nil && a.domain.ValidateDocument != nil {
+			if err := a.domain.ValidateDocument(
+				projection.document,
+			); err != nil {
+				return nil, err
+			}
+		}
+
+		editable, baseline := a.collectionListEditability(
+			entry,
+			projection,
+		)
+
+		displayName := projection.document.DisplayName
+		if displayName == "" {
+			displayName = entry.DisplayName
+		}
+
+		item := ListItem{
+			Ref:         entry.Ref(),
+			SourceID:    entry.Source.ID,
+			Name:        entry.LogicalName,
+			DisplayName: displayName,
+			Description: projection.document.Description,
+			State:       entry.State,
+			Enabled:     entry.Enabled,
+			Revision:    entry.Revision,
+			MemberCount: len(projection.members),
+			BuiltIn:     entry.Ref().RootID == documentTopology.BuiltinRootID(),
+			Editable:    editable,
+			Deletable:   editable && !baseline && len(projection.members) == 0,
+			Baseline:    baseline,
+		}
+		if request.IncludeDocument {
+			document, err := projection.document.Clone()
+			if err != nil {
+				return nil, err
+			}
+			item.Document = &document
+		}
+		output = append(output, item)
+	}
+
+	sort.Slice(output, func(left, right int) bool {
+		if output[left].Name != output[right].Name {
+			return output[left].Name < output[right].Name
+		}
+		return output[left].Ref.ArtifactID <
+			output[right].Ref.ArtifactID
+	})
+	return output, nil
+}
+
+func (a *API) collectionProjectionFor(
+	entry catalog.Entry,
+) (collectionProjection, error) {
+	if entry.Definition == nil {
+		return collectionProjection{}, fmt.Errorf(
+			"%w: Collection Definition is unavailable",
+			basespec.ErrDefinitionNotFound,
+		)
+	}
+
+	if cached, found := a.catalogProjections.Load(
+		entry.Definition.Digest,
+	); found {
+		v, ok := cached.(collectionProjection)
+		if !ok {
+			return collectionProjection{}, errors.New("collection projection not found")
+		}
+		return v, nil
+	}
+	if entry.Document == nil {
+		return collectionProjection{}, fmt.Errorf(
+			"%w: Collection listing requires an admitted Definition document",
+			basespec.ErrDefinitionNotFound,
+		)
+	}
+
+	document, err := pluginv1.DecodePluginJSON(entry.Document.Body)
+	if err != nil {
+		return collectionProjection{}, err
+	}
+	if document.Name != string(entry.LogicalName) {
+		return collectionProjection{}, fmt.Errorf(
+			"%w: Collection Definition identity differs from catalog identity",
+			basespec.ErrDigestMismatch,
+		)
+	}
+
+	projection := collectionProjection{
+		document: document,
+		members:  make([]collectionMemberShape, 0, len(document.Members)),
+	}
+	for _, member := range document.Members {
+		form, err := member.MemberForm()
+		if err != nil {
+			return collectionProjection{}, err
+		}
+		projection.members = append(
+			projection.members,
+			collectionMemberShape{
+				Type: member.Header().Type,
+				Form: form,
+			},
+		)
+	}
+
+	actual, loaded := a.catalogProjections.LoadOrStore(
+		entry.Definition.Digest,
+		projection,
+	)
+	if loaded {
+		v, ok := actual.(collectionProjection)
+		if !ok {
+			return collectionProjection{}, errors.New("collection projection not found")
+		}
+		return v, nil
+	}
+	return projection, nil
+}
+
+func (a *API) collectionVisibleInList(
+	entry catalog.Entry,
+	projection collectionProjection,
+) (bool, error) {
+	if a.domain == nil {
+		return true, nil
+	}
+
+	if a.domain.ReadOnly {
+		if entry.Source.Kind != source.SourceKindManagedDirectory ||
+			entry.Binding.SubresourceLocator != "" {
+			return false, nil
+		}
+		address, err := a.managedCollectionAddressFromLocator(
+			entry.Binding.Locator,
+		)
+		if err != nil || address.Name != entry.LogicalName {
+			//nolint:nilerr // Ok.
+			return false, nil
+		}
+		return true, a.validateEditableProjection(projection)
+	}
+
+	if entry.Source.StorageKey == a.domain.SourceStorageKey {
+		return true, a.validateEditableProjection(projection)
+	}
+	if len(projection.members) == 0 {
+		return false, nil
+	}
+	for _, member := range projection.members {
+		if !a.domain.allows(member.Type) {
+			return false, nil
+		}
+	}
+	return true, nil
+}
+
+func (a *API) collectionListEditability(
+	entry catalog.Entry,
+	projection collectionProjection,
+) (editable, baseline bool) {
+	if entry.Ref().RootID == documentTopology.BuiltinRootID() ||
+		entry.Source.Kind != source.SourceKindManagedDirectory ||
+		!entry.Source.Enabled ||
+		entry.Binding.SubresourceLocator != "" ||
+		(a.domain != nil &&
+			(a.domain.ReadOnly ||
+				entry.Source.StorageKey != a.domain.SourceStorageKey)) {
+		return false, false
+	}
+
+	address, err := a.managedCollectionAddressFromLocator(
+		entry.Binding.Locator,
+	)
+	if err != nil || address.Name != entry.LogicalName ||
+		a.validateEditableProjection(projection) != nil {
+		return false, false
+	}
+
+	if a.domain == nil {
+		return true, false
+	}
+	return true,
+		entry.LogicalName == a.domain.BaselineName &&
+			address.Name == a.domain.BaselineName
+}
+
+func (a *API) validateEditableProjection(
+	projection collectionProjection,
+) error {
+	for _, member := range projection.members {
+		if member.Form != declaration.MemberNamed {
+			return fmt.Errorf(
+				"%w: editable Collection has a non-named member",
+				basespec.ErrUnsupported,
+			)
+		}
+		if a.domain != nil &&
+			(!a.domain.allows(member.Type) ||
+				!a.domain.allowsMemberForm(member.Form)) {
+			return fmt.Errorf(
+				"%w: Collection member is outside the domain policy",
+				basespec.ErrUnsupported,
+			)
+		}
+	}
+	return nil
+}

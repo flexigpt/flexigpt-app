@@ -7,14 +7,20 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 
 	_ "github.com/glebarez/go-sqlite"
 )
 
 type Store struct {
 	db *sql.DB
+
+	definitionMu    sync.RWMutex
+	definitionCache map[definition.Key]definition.Definition
+	definitionBytes int
 }
 
 const (

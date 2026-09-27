@@ -340,7 +340,9 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 
 	remainingSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(remainingSkills) != 0 {

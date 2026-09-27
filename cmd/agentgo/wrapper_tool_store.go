@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
@@ -52,29 +53,20 @@ func InitToolStoreWrapper(
 }
 
 func NewToolBuiltInInstaller(
-	storeWrapper *ToolStoreWrapper,
-	goTools toolDomain.GoToolLocator,
+	hydrator topology.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
-	if storeWrapper == nil || storeWrapper.api == nil {
-		return nil, basespec.ErrClosed
-	}
-	if goTools == nil {
-		return nil, errors.New("tool built-in installer Go Tool locator is required")
+	if hydrator == nil {
+		return nil, errors.New("tool generated catalog installer hydrator is required")
 	}
 
-	tools, err := toolConsumerAPI.NewBuiltinStore(storeWrapper.api)
-	if err != nil {
-		return nil, err
-	}
 	packages, err := builtin.EmbeddedToolPackages()
 	if err != nil {
 		return nil, err
 	}
 
 	return toolBuiltin.NewInstaller(toolBuiltin.InstallerDependencies{
-		Tools:    tools,
+		Hydrator: hydrator,
 		Packages: packages,
-		GoTools:  goTools,
 	})
 }
 
@@ -116,10 +108,10 @@ func (w *ToolStoreWrapper) GetToolCollection(
 
 func (w *ToolStoreWrapper) ListCollectionTools(
 	ref artifact.ArtifactRef,
-) ([]toolConsumerAPI.ToolView, error) {
+) ([]toolConsumerAPI.ToolListItem, error) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) ([]toolConsumerAPI.ToolView, error) {
+		func(api *toolConsumerAPI.API) ([]toolConsumerAPI.ToolListItem, error) {
 			return api.ListTools(context.Background(), ref)
 		},
 	)

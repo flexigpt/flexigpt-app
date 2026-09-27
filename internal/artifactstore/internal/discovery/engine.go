@@ -114,6 +114,7 @@ func (r Result) Validate() error {
 
 type Engine struct {
 	decoders *DecoderRegistry
+	compiled compiledDocumentRegistry
 }
 
 func NewEngine(
@@ -304,6 +305,64 @@ func (e *Engine) Discover(
 				"",
 				diagnostics,
 			)
+			continue
+		}
+
+		if compiled, found := e.compiledDocument(
+			value.RootID,
+			value.ID,
+			entry.Locator,
+		); found {
+			if compiled.Digest != sourceDigest {
+				diagnostics := []diagnostic.Diagnostic{{
+					Severity: diagnostic.SeverityError,
+					Code:     DiagnosticCodeContentDigestMismatch,
+					Message:  "compiled declaration bytes differ from the binary catalog",
+					Location: &diagnostic.Location{
+						Locator: entry.Locator,
+					},
+				}}
+				result.Diagnostics = diagnostic.Append(
+					result.Diagnostics,
+					diagnostics...,
+				)
+				appendInvalid(
+					&result,
+					value,
+					entry.Locator,
+					&sourceDigest,
+					compiledDecoderID,
+					diagnostics,
+				)
+				continue
+			}
+
+			// The generated catalog already completed canonicalization, schema
+			// validation, declaration-tree validation, and Definition creation.
+			// Runtime checks source bytes against the generated digest, then
+			// publishes the immutable generated Definitions directly.
+			for _, item := range compiled.Artifacts {
+				definitionValue := item.Definition.Clone()
+				result.Observations = append(
+					result.Observations,
+					Observation{
+						RootID: value.RootID,
+						Binding: artifact.SourceBinding{
+							SourceID:           value.ID,
+							Locator:            entry.Locator,
+							SubresourceLocator: item.Subresource,
+						},
+						Kind:                definitionValue.Kind,
+						LogicalName:         definitionValue.LogicalName,
+						LogicalVersion:      definitionValue.LogicalVersion,
+						Definition:          &definitionValue,
+						SourceContentDigest: cryptoutil.CloneDigest(&sourceDigest),
+						DecoderID:           compiledDecoderID,
+						State:               ObservationValid,
+						Diagnostics:         diagnostic.Clone(item.Diagnostics),
+					},
+				)
+			}
 			continue
 		}
 

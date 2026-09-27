@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -43,8 +44,36 @@ type Reader interface {
 	) (artifact.Artifact, error)
 }
 
+// CatalogReader returns committed lightweight catalog rows. It deliberately
+// does not return Artifact.Data, diagnostics, or Definition.Body.
+type CatalogReader interface {
+	ListCatalogByRoot(
+		ctx context.Context,
+		rootID root.RootID,
+	) ([]catalog.Entry, error)
+
+	ListCatalogBySource(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) ([]catalog.Entry, error)
+
+	FindCatalogByIdentity(
+		ctx context.Context,
+		rootID root.RootID,
+		kind artifact.ArtifactKind,
+		logicalName basespec.LogicalName,
+	) ([]catalog.Entry, error)
+
+	GetMany(
+		ctx context.Context,
+		refs []artifact.ArtifactRef,
+	) ([]artifact.Artifact, error)
+}
+
 type Repository interface {
 	Reader
+	CatalogReader
 
 	Create(
 		ctx context.Context,
@@ -70,6 +99,11 @@ type Repository interface {
 }
 
 type DefinitionReader interface {
+	GetDefinitions(
+		ctx context.Context,
+		keys []definition.Key,
+	) ([]definition.Definition, error)
+
 	GetDefinition(
 		ctx context.Context,
 		rootID root.RootID,

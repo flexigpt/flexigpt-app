@@ -18,7 +18,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -35,7 +34,16 @@ type PreparedPackage struct {
 	PackageAddress      source.ManagedPackageAddress
 	DocumentFile        basespec.Locator
 	PackageFiles        []source.ManagedPackageFile
-	Expectations        []mcpConsumerAPI.BuiltInArtifactExpectation
+	Expectations        []ArtifactExpectation
+}
+
+type ArtifactExpectation struct {
+	Locator          basespec.Locator
+	Subresource      basespec.SubresourceLocator
+	Kind             artifact.ArtifactKind
+	LogicalName      basespec.LogicalName
+	LogicalVersion   basespec.LogicalVersion
+	DefinitionDigest cryptoutil.Digest
 }
 
 // PreparePackages discovers every direct embedded MCP package directory and
@@ -154,7 +162,7 @@ func preparePackage(
 func canonicalCollectionExpectations(
 	documentFile basespec.Locator,
 	document []byte,
-) ([]mcpConsumerAPI.BuiltInArtifactExpectation, error) {
+) ([]ArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
 		basespec.MaxDefinitionBytes,
@@ -196,7 +204,7 @@ func canonicalCollectionExpectations(
 		return nil, err
 	}
 
-	output := make([]mcpConsumerAPI.BuiltInArtifactExpectation, 0, len(named))
+	output := make([]ArtifactExpectation, 0, len(named))
 	for _, value := range named {
 		var definitionValue definition.Definition
 		if value.SubresourceLocator == "" {
@@ -229,7 +237,7 @@ func canonicalCollectionExpectations(
 		}
 		output = append(
 			output,
-			mcpConsumerAPI.BuiltInArtifactExpectation{
+			ArtifactExpectation{
 				Locator:          documentFile,
 				Subresource:      value.SubresourceLocator,
 				Kind:             definitionValue.Kind,
@@ -303,7 +311,7 @@ func PackageFingerprint(
 	}
 
 	expectations := append(
-		[]mcpConsumerAPI.BuiltInArtifactExpectation(nil),
+		[]ArtifactExpectation(nil),
 		value.Expectations...,
 	)
 	sortMCPExpectations(expectations)
@@ -318,7 +326,7 @@ func PackageFingerprint(
 }
 
 func sortMCPExpectations(
-	values []mcpConsumerAPI.BuiltInArtifactExpectation,
+	values []ArtifactExpectation,
 ) {
 	sort.Slice(values, func(left, right int) bool {
 		if values[left].Locator != values[right].Locator {

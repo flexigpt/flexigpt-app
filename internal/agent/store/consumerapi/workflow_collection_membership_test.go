@@ -59,7 +59,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		collection.AddArtifactMemberRequest{
 			Collection:       secondary.Artifact.Ref(),
 			ExpectedRevision: secondary.Artifact.Revision,
-			Artifact:         first.Agent.Artifact.Ref(),
+			Artifact:         first.Agent.Ref,
 		},
 	)
 	requireNoError(t, err)
@@ -75,7 +75,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		collection.AddArtifactMemberRequest{
 			Collection:       secondaryWithMember.Artifact.Ref(),
 			ExpectedRevision: secondaryWithMember.Artifact.Revision,
-			Artifact:         first.Agent.Artifact.Ref(),
+			Artifact:         first.Agent.Ref,
 		},
 	)
 	requireErrorIs(t, err, basespec.ErrIdentityConflict)
@@ -85,13 +85,13 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		t,
 		harness,
 		primaryRef,
-		first.Agent.Artifact.Ref(),
+		first.Agent.Ref,
 	)
 	requireCollectionContainsAgent(
 		t,
 		harness,
 		secondaryRef,
-		first.Agent.Artifact.Ref(),
+		first.Agent.Ref,
 	)
 
 	requireNoError(
@@ -99,8 +99,8 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		harness.api.DeleteManagedAgent(
 			t.Context(),
 			agentConsumerAPI.ManagedAgentDeleteRequest{
-				Agent:            first.Agent.Artifact.Ref(),
-				ExpectedRevision: first.Agent.Artifact.Revision,
+				Agent:            first.Agent.Ref,
+				ExpectedRevision: first.Agent.Revision,
 			},
 		),
 	)
@@ -125,13 +125,13 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		t,
 		harness,
 		primaryRef,
-		first.Agent.Artifact.Ref(),
+		first.Agent.Ref,
 	)
 	assertCollectionDoesNotContainAgent(
 		t,
 		harness,
 		secondaryRef,
-		first.Agent.Artifact.Ref(),
+		first.Agent.Ref,
 	)
 	requireCollectionPlanComplete(t, harness, primaryRef, false)
 	requireCollectionPlanComplete(t, harness, secondaryRef, false)
@@ -184,13 +184,13 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 		t,
 		harness,
 		primaryRef,
-		restored.Agent.Artifact.Ref(),
+		restored.Agent.Ref,
 	)
 	requireCollectionContainsAgent(
 		t,
 		harness,
 		secondaryRef,
-		restored.Agent.Artifact.Ref(),
+		restored.Agent.Ref,
 	)
 	requireCollectionPlanComplete(t, harness, primaryRef, true)
 	requireCollectionPlanComplete(t, harness, secondaryRef, true)
@@ -232,11 +232,13 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 	)
 	requireNoError(t, err)
 
-	requireCollectionContainsAgent(
+	// Collection-filtered ListAgents is root-local. The member refers to a
+	// protected built-in in another Root, so assert it through resolution.
+	requireCollectionCapabilityContainsAgent(
 		t,
 		harness,
 		added.Artifact.Ref(),
-		builtinAgent.Artifact.Ref(),
+		builtinAgent.Ref,
 	)
 
 	memberIndex := requireAgentCollectionMemberIndex(
@@ -294,6 +296,37 @@ func requireCollectionContainsAgent(
 			agentRef,
 		)
 	}
+}
+
+func requireCollectionCapabilityContainsAgent(
+	t *testing.T,
+	harness *workflowHarness,
+	collectionRef artifact.ArtifactRef,
+	agentRef artifact.ArtifactRef,
+) {
+	t.Helper()
+
+	plan, err := harness.api.ListAgentCollectionMembers(
+		t.Context(),
+		collectionRef,
+	)
+	requireNoError(t, err)
+
+	for _, occurrence := range plan.Occurrences {
+		if occurrence.Type != declaration.TypeAgent ||
+			occurrence.Artifact == nil ||
+			*occurrence.Artifact != agentRef {
+			continue
+		}
+		return
+	}
+
+	t.Fatalf(
+		"Collection %q capability plan does not resolve Agent %q: %#v",
+		collectionRef,
+		agentRef,
+		plan.Occurrences,
+	)
 }
 
 func assertCollectionDoesNotContainAgent(

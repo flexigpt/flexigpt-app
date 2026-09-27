@@ -57,7 +57,9 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 
 	skills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(skills) != 2 {
@@ -75,17 +77,23 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 	if !found {
 		t.Fatalf("directory Skill %q is absent from ListSkills", betaName)
 	}
-	if alpha.Binding.SourceID != registered.ID {
+
+	alphaRecord, err := fixture.api.GetSkill(ctx, alpha.Ref)
+	requireNoError(t, err)
+	betaRecord, err := fixture.api.GetSkill(ctx, beta.Ref)
+	requireNoError(t, err)
+
+	if alphaRecord.Binding.SourceID != registered.ID {
 		t.Fatalf(
 			"alpha Source ID=%q, want registered Source %q",
-			alpha.Binding.SourceID,
+			alphaRecord.Binding.SourceID,
 			registered.ID,
 		)
 	}
-	if beta.Binding.SourceID != registered.ID {
+	if betaRecord.Binding.SourceID != registered.ID {
 		t.Fatalf(
 			"beta Source ID=%q, want registered Source %q",
-			beta.Binding.SourceID,
+			betaRecord.Binding.SourceID,
 			registered.ID,
 		)
 	}
@@ -123,7 +131,7 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 
 	disabledAlpha, err := fixture.api.SetSkillEnabled(
 		ctx,
-		alpha.Ref(),
+		alpha.Ref,
 		alpha.Revision,
 		false,
 	)
@@ -152,7 +160,7 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 		),
 	)
 
-	refreshedAlpha, err := fixture.api.GetSkill(ctx, alpha.Ref())
+	refreshedAlpha, err := fixture.api.GetSkill(ctx, alpha.Ref)
 	requireNoError(t, err)
 	if refreshedAlpha.State != artifact.StateAvailable {
 		t.Fatalf(
@@ -172,13 +180,13 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 		)
 	}
 
-	refreshedBeta, err := fixture.api.GetSkill(ctx, beta.Ref())
+	refreshedBeta, err := fixture.api.GetSkill(ctx, beta.Ref)
 	requireNoError(t, err)
-	if refreshedBeta.Ref() != beta.Ref() {
+	if refreshedBeta.Ref() != beta.Ref {
 		t.Fatalf(
 			"refreshed beta ref=%+v, want %+v",
 			refreshedBeta.Ref(),
-			beta.Ref(),
+			beta.Ref,
 		)
 	}
 	if refreshedBeta.Revision != beta.Revision {
@@ -191,7 +199,9 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 
 	finalSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	if len(finalSkills) != 2 {

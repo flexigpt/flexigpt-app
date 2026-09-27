@@ -30,10 +30,10 @@ type AgentImportIssue struct {
 }
 
 type AgentImportDestination struct {
-	RootID          root.RootID               `json:"rootID"`
-	RootDisplayName string                    `json:"rootDisplayName,omitempty"`
-	SourceID        source.SourceID           `json:"sourceID"`
-	Collection      collection.CollectionView `json:"collection"`
+	RootID          root.RootID          `json:"rootID"`
+	RootDisplayName string               `json:"rootDisplayName,omitempty"`
+	SourceID        source.SourceID      `json:"sourceID"`
+	Collection      artifact.ArtifactRef `json:"collection"`
 
 	CollectionRevision    uint64               `json:"collectionRevision"`
 	CollectionName        basespec.LogicalName `json:"collectionName"`

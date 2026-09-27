@@ -13,13 +13,13 @@ import (
 
 func (a *API) ListAgentsForManagement(
 	ctx context.Context,
-) ([]AgentView, error) {
+) ([]AgentListItem, error) {
 	roots, err := a.managementRoots(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]AgentView, 0)
+	output := make([]AgentListItem, 0)
 	for _, rootValue := range roots {
 		values, err := a.ListAgents(ctx, ListAgentsRequest{
 			RootID: rootValue.ID,
@@ -31,27 +31,28 @@ func (a *API) ListAgentsForManagement(
 	}
 
 	sort.Slice(output, func(left, right int) bool {
-		if output[left].Artifact.RootID != output[right].Artifact.RootID {
-			return output[left].Artifact.RootID <
-				output[right].Artifact.RootID
+		if output[left].Ref.RootID != output[right].Ref.RootID {
+			return output[left].Ref.RootID <
+				output[right].Ref.RootID
 		}
 		if output[left].Name != output[right].Name {
 			return output[left].Name < output[right].Name
 		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
+		return output[left].Ref.ArtifactID <
+			output[right].Ref.ArtifactID
 	})
 	return output, nil
 }
 
 func (a *API) ListAgentCollectionsForManagement(
 	ctx context.Context,
-) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
 	roots, err := a.managementRoots(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]collection.CollectionView, 0)
+	output := make([]collection.ListItem, 0)
 	for _, rootValue := range roots {
 		values, err := a.ListAgentCollections(ctx, rootValue.ID)
 		if err != nil {
@@ -61,16 +62,14 @@ func (a *API) ListAgentCollectionsForManagement(
 	}
 
 	sort.Slice(output, func(left, right int) bool {
-		if output[left].Artifact.RootID != output[right].Artifact.RootID {
-			return output[left].Artifact.RootID <
-				output[right].Artifact.RootID
+		if output[left].Ref.RootID != output[right].Ref.RootID {
+			return output[left].Ref.RootID <
+				output[right].Ref.RootID
 		}
-		if output[left].Artifact.LogicalName !=
-			output[right].Artifact.LogicalName {
-			return output[left].Artifact.LogicalName <
-				output[right].Artifact.LogicalName
+		if output[left].Name != output[right].Name {
+			return output[left].Name < output[right].Name
 		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
+		return output[left].Ref.ArtifactID < output[right].Ref.ArtifactID
 	})
 	return output, nil
 }
@@ -103,8 +102,8 @@ func (a *API) ListAgentImportDestinationsForManagement(
 			return output[left].CollectionName <
 				output[right].CollectionName
 		}
-		return output[left].Collection.Artifact.ID <
-			output[right].Collection.Artifact.ID
+		return output[left].Collection.ArtifactID <
+			output[right].Collection.ArtifactID
 	})
 	return output, nil
 }

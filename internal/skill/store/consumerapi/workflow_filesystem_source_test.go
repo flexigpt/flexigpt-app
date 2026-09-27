@@ -73,17 +73,19 @@ func TestSkillStoreWorkflowAddsAndRefreshesFilesystemSkill(
 
 	listedSkills, err := fixture.api.ListSkills(
 		ctx,
-		documentTopology.UserRootID(),
+		skillConsumerAPI.ListSkillsRequest{
+			RootID: documentTopology.UserRootID(),
+		},
 	)
 	requireNoError(t, err)
 	listedSkill, found := findSkillByName(listedSkills, skillName)
 	if !found {
 		t.Fatalf("filesystem Skill %q is absent from ListSkills", skillName)
 	}
-	if listedSkill.Ref() != registered.Artifact.Ref() {
+	if listedSkill.Ref != registered.Artifact.Ref() {
 		t.Fatalf(
 			"listed filesystem Skill ref=%+v, want %+v",
-			listedSkill.Ref(),
+			listedSkill.Ref,
 			registered.Artifact.Ref(),
 		)
 	}

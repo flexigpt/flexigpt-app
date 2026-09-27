@@ -69,11 +69,13 @@ func (a *API) ResolveMCPCollection(
 func (a *API) ListMCPCollections(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
 		return nil, basespec.ErrClosed
 	}
-	return a.collections.ListDomain(ctx, rootID)
+	return a.collections.ListDomain(ctx, collection.ListRequest{
+		RootID: rootID,
+	})
 }
 
 func (a *API) ListMCPCollectionMemberships(

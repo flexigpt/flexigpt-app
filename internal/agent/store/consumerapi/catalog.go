@@ -3,7 +3,6 @@ package consumerapi
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
@@ -24,7 +23,7 @@ type agentSourceCacheKey struct {
 	sourceID source.SourceID
 }
 
-func (a *API) GetAgent(
+func (a *API) getAgentRecord(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
@@ -53,130 +52,7 @@ func (a *API) GetAgentView(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (AgentView, error) {
-	value, err := a.GetAgent(ctx, ref)
-	if err != nil {
-		return AgentView{}, err
-	}
-	return a.agentView(ctx, value)
-}
-
-func (a *API) ListAgents(
-	ctx context.Context,
-	request ListAgentsRequest,
-) ([]AgentView, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, basespec.ErrClosed
-	}
-	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: Agent list context is nil",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-
-	names := make(
-		map[basespec.LogicalName]struct{},
-		len(request.LogicalNames),
-	)
-	for index, name := range request.LogicalNames {
-		if err := name.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"agent list logicalNames[%d]: %w",
-				index,
-				err,
-			)
-		}
-		names[name] = struct{}{}
-	}
-
-	var records []artifact.Artifact
-	if request.Collection != nil {
-		if err := request.Collection.Validate(); err != nil {
-			return nil, err
-		}
-		if request.Collection.RootID != request.RootID {
-			return nil, fmt.Errorf(
-				"%w: Agent Collection belongs to another Root",
-				basespec.ErrInvalid,
-			)
-		}
-		if request.IncludeBuiltin {
-			return nil, fmt.Errorf(
-				"%w: collection-filtered Agent lists cannot include another Root",
-				basespec.ErrInvalid,
-			)
-		}
-
-		values, err := a.listCollectionAgents(ctx, *request.Collection)
-		if err != nil {
-			return nil, err
-		}
-		records = values
-	} else {
-		rootIDs := []root.RootID{request.RootID}
-		if request.IncludeBuiltin && request.RootID != agentBuiltinRootID() {
-			rootIDs = append(rootIDs, agentBuiltinRootID())
-		}
-
-		for _, rootID := range rootIDs {
-			values, err := a.artifacts.ListByRoot(ctx, rootID)
-			if err != nil {
-				return nil, err
-			}
-			records = append(records, values...)
-		}
-	}
-
-	seen := make(map[artifact.ArtifactRef]struct{}, len(records))
-	sourceCache := make(
-		map[agentSourceCacheKey]source.Summary,
-	)
-	output := make([]AgentView, 0, len(records))
-	for _, record := range records {
-		if !agentDomain.IsAgentKind(record.Kind) {
-			continue
-		}
-		if len(names) != 0 {
-			if _, found := names[record.LogicalName]; !found {
-				continue
-			}
-		}
-		if request.Enabled != nil && record.Enabled != *request.Enabled {
-			continue
-		}
-		if _, duplicate := seen[record.Ref()]; duplicate {
-			continue
-		}
-		seen[record.Ref()] = struct{}{}
-
-		view, err := a.agentViewWithSourceCache(
-			ctx,
-			record,
-			sourceCache,
-		)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, view)
-	}
-
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Name != output[right].Name {
-			return output[left].Name < output[right].Name
-		}
-		if output[left].Artifact.RootID != output[right].Artifact.RootID {
-			return output[left].Artifact.RootID <
-				output[right].Artifact.RootID
-		}
-		return output[left].Artifact.ID < output[right].Artifact.ID
-	})
-	return output, nil
+	return a.GetAgent(ctx, ref)
 }
 
 func (a *API) SetAgentEnabled(
@@ -191,7 +67,7 @@ func (a *API) SetAgentEnabled(
 			basespec.ErrInvalid,
 		)
 	}
-	if _, err := a.GetAgent(ctx, ref); err != nil {
+	if _, err := a.getAgentRecord(ctx, ref); err != nil {
 		return artifact.Artifact{}, err
 	}
 	return a.artifacts.SetEnabled(
@@ -219,7 +95,7 @@ func (a *API) ResolveAgent(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-	agent, err := a.GetAgentView(ctx, *plan.RootArtifact)
+	agent, err := a.GetAgent(ctx, *plan.RootArtifact)
 	if err != nil {
 		return AgentResolution{}, err
 	}
@@ -239,10 +115,10 @@ func (a *API) ResolveAgentCapabilities(
 	return a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
 }
 
-func (a *API) listCollectionAgents(
+func (a *API) listCollectionAgentRefs(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
+) ([]artifact.ArtifactRef, error) {
 	if a == nil || a.collections == nil || a.declarationResolver == nil {
 		return nil, basespec.ErrClosed
 	}
@@ -250,7 +126,7 @@ func (a *API) listCollectionAgents(
 		return nil, err
 	}
 
-	plugin, err := a.declarationResolver.ResolvePlugin(ctx, ref)
+	plugin, err := a.declarationResolver.ResolvePluginMembers(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
@@ -278,13 +154,9 @@ func (a *API) listCollectionAgents(
 		}
 	}
 
-	output := make([]artifact.Artifact, 0, len(refs))
+	output := make([]artifact.ArtifactRef, 0, len(refs))
 	for target := range refs {
-		record, err := a.GetAgent(ctx, target)
-		if err != nil {
-			return nil, err
-		}
-		output = append(output, record)
+		output = append(output, target)
 	}
 	return output, nil
 }
@@ -310,10 +182,16 @@ func (a *API) agentViewWithSourceCache(
 	}
 
 	view := AgentView{
-		Artifact:    record.Clone(),
+		Ref:         record.Ref(),
 		Name:        record.LogicalName,
 		DisplayName: record.DisplayName,
+		State:       record.State,
+		Enabled:     record.Enabled,
+		Revision:    record.Revision,
 		BuiltIn:     record.RootID == agentBuiltinRootID(),
+	}
+	if record.ResolvedDefinition != nil {
+		view.DefinitionDigest = *record.ResolvedDefinition
 	}
 
 	if record.State != artifact.StateAvailable {
@@ -330,19 +208,15 @@ func (a *API) agentViewWithSourceCache(
 			basespec.ErrDigestMismatch,
 		)
 	}
-
-	document, err := agentv1.DecodeAgentJSON(definitionValue.Body)
-	if err != nil {
-		return AgentView{}, err
-	}
-	if document.Name != string(record.LogicalName) {
+	if definitionValue.LogicalName != record.LogicalName ||
+		definitionValue.LogicalVersion != record.LogicalVersion {
 		return AgentView{}, fmt.Errorf(
 			"%w: Agent declaration name differs from Artifact identity",
 			basespec.ErrDigestMismatch,
 		)
 	}
 
-	view.Description = document.Description
+	view.Description = definitionValue.Description
 	key := agentSourceCacheKey{
 		rootID:   record.RootID,
 		sourceID: record.Binding.SourceID,

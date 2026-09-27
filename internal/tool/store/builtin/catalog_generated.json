@@ -1,0 +1,4371 @@
+{
+  "hydration": {
+    "fingerprint": "sha256:c823d5b315724a05a4165a01131a24afae4fd60afa5fd15fa670ddd5b51bef8a",
+    "installerName": "tool",
+    "rootID": "0192c4c0-0000-7000-8000-000000000001",
+    "sourceID": "0192c4c0-0001-7000-8000-000000000001"
+  },
+  "name": "tools",
+  "packages": [
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "anthropicmessages",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in server Tools for Anthropic Messages.",
+                  "displayName": "Anthropic Messages Tools",
+                  "members": [
+                    {
+                      "name": "anthropicwebsearch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "anthropicmessages",
+                  "type": "plugin"
+                },
+                "description": "Built-in server Tools for Anthropic Messages.",
+                "digest": "sha256:0f497e08df27622fb4d64d9804284606bdadf68df8e74ac4a939e67784530c0b",
+                "displayName": "Anthropic Messages Tools",
+                "kind": "plugin",
+                "logicalName": "anthropicmessages",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:0d3cdde241c79eb3803ae9df7acce531546b4c50a5e5b6287b2d4e34635d7d6a",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "anthropicmessages",
+      "files": [
+        {
+          "digest": "sha256:0d3cdde241c79eb3803ae9df7acce531546b4c50a5e5b6287b2d4e34635d7d6a",
+          "locator": "plugin.yaml",
+          "size": 221
+        }
+      ],
+      "fingerprint": "sha256:dbb9e7ce5ea20c0405858347b2ec1cbe6256795306fb4f7858cd36f48ffba792"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "exec",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in command and script execution helpers.",
+                  "displayName": "Command and script execution utilities",
+                  "members": [
+                    {
+                      "name": "runscript",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "shellcommand",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "exec",
+                  "type": "plugin"
+                },
+                "description": "Built-in command and script execution helpers.",
+                "digest": "sha256:cd1da46d9a1e86fafba299ec80c345ed50da1d0682400787b87857c3dd324bca",
+                "displayName": "Command and script execution utilities",
+                "kind": "plugin",
+                "logicalName": "exec",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:5208ed400b285706e29c96c905de50676b16cbacc280c895cd61a536f1a07ab1",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "exec",
+      "files": [
+        {
+          "digest": "sha256:5208ed400b285706e29c96c905de50676b16cbacc280c895cd61a536f1a07ab1",
+          "locator": "plugin.yaml",
+          "size": 270
+        }
+      ],
+      "fingerprint": "sha256:40ed3d1c42726cc5612449084b6e4f65c4c3f104b979775e95cda3a9ee39e4b7"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "fs",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Common file-system helpers.",
+                  "displayName": "File-system utilities",
+                  "members": [
+                    {
+                      "name": "deletefile",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "listdirectory",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "mimeforextension",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "mimeforpath",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readfile",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "searchfiles",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "statpath",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "writefile",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "fs",
+                  "type": "plugin"
+                },
+                "description": "Common file-system helpers.",
+                "digest": "sha256:ad900e146219a84e2455da4f7c78800c00f35fa78237419863d4db31a1fec73d",
+                "displayName": "File-system utilities",
+                "kind": "plugin",
+                "logicalName": "fs",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7505684bc520797b0fc56426421dd355b4beda1fbbe9c904719534270a957a35",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:7505684bc520797b0fc56426421dd355b4beda1fbbe9c904719534270a957a35",
+          "locator": "plugin.yaml",
+          "size": 561
+        }
+      ],
+      "fingerprint": "sha256:7c24a8e7ea11b38ecf9b32187e31359f9d26ef56981bd2e3528f54993856508a"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "git",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Common local Git helpers.",
+                  "displayName": "Git utilities",
+                  "members": [
+                    {
+                      "name": "gitadd",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitblame",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitbranch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitchangedfiles",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitcheckout",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitcommit",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitcreatebranch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitcreatetag",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitdeletetag",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitdiff",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitfilehistory",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitfindrepos",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitgrep",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitinit",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitlisttree",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitlog",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitreadblob",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitrepoinfo",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitreset",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gitshow",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "gittag",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "git",
+                  "type": "plugin"
+                },
+                "description": "Common local Git helpers.",
+                "digest": "sha256:ce3ee1e48aeb1d4acd7a0d845c0a6ac0dd6de30107049783f273a0b5682bf6ee",
+                "displayName": "Git utilities",
+                "kind": "plugin",
+                "logicalName": "git",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:dc683b8214dfdbc592947c81f00c12da1a60d40149ac7e52a97232e63e0a8d1c",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:dc683b8214dfdbc592947c81f00c12da1a60d40149ac7e52a97232e63e0a8d1c",
+          "locator": "plugin.yaml",
+          "size": 1242
+        }
+      ],
+      "fingerprint": "sha256:57087fbb5feb6e1457c7e4949391b8a36ea1cf7ab310352cf74dd679cecff314"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "googlegeneratecontent",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in server Tools for Google GenAI.",
+                  "displayName": "Google GenAI Tools",
+                  "members": [
+                    {
+                      "name": "googlewebsearch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "googlegeneratecontent",
+                  "type": "plugin"
+                },
+                "description": "Built-in server Tools for Google GenAI.",
+                "digest": "sha256:a75d01dbdaacc791fabd458ca90cb8b9f092f7fefb353bec87c599b62cc0b79d",
+                "displayName": "Google GenAI Tools",
+                "kind": "plugin",
+                "logicalName": "googlegeneratecontent",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:cedae0ceda8a4685ad1a81142d0aa3742bd255475112c664d5df0ed9aefc30fd",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "googlegeneratecontent",
+      "files": [
+        {
+          "digest": "sha256:cedae0ceda8a4685ad1a81142d0aa3742bd255475112c664d5df0ed9aefc30fd",
+          "locator": "plugin.yaml",
+          "size": 210
+        }
+      ],
+      "fingerprint": "sha256:a04c7b257c4351b63672c36a53ecb290a67a4d28b3e965058ebc111e5a6905db"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "image",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Common image helpers.",
+                  "displayName": "Image utilities",
+                  "members": [
+                    {
+                      "name": "readimage",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "image",
+                  "type": "plugin"
+                },
+                "description": "Common image helpers.",
+                "digest": "sha256:64fe1869997142cd45ea885fb0e5ae85773476f9a28d4cdd4cc3f5646998dbc3",
+                "displayName": "Image utilities",
+                "kind": "plugin",
+                "logicalName": "image",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:89164d689418f1038d5b50817fcffdf95ed1459fe2a210ea86a5e4e8f3cc4c9d",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "image",
+      "files": [
+        {
+          "digest": "sha256:89164d689418f1038d5b50817fcffdf95ed1459fe2a210ea86a5e4e8f3cc4c9d",
+          "locator": "plugin.yaml",
+          "size": 167
+        }
+      ],
+      "fingerprint": "sha256:643179ecdf9cdd9ff62c069a368a3c77491bd6d29a80de22a764613a4565d6f6"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "openaichat",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in server Tools for OpenAI Chat Completions.",
+                  "displayName": "OpenAI Chat Completion Tools",
+                  "members": [
+                    {
+                      "name": "openaichatwebsearch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "openaichat",
+                  "type": "plugin"
+                },
+                "description": "Built-in server Tools for OpenAI Chat Completions.",
+                "digest": "sha256:fea06c6164b5f8eb634fb65d2b0687f90a489482b495486a2cbd874166bfa3f6",
+                "displayName": "OpenAI Chat Completion Tools",
+                "kind": "plugin",
+                "logicalName": "openaichat",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:b6ee7217a2af9c704ac0ddc72dca55fadf7b4dd6eea6fc6b16615eec86ba5baa",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "openaichat",
+      "files": [
+        {
+          "digest": "sha256:b6ee7217a2af9c704ac0ddc72dca55fadf7b4dd6eea6fc6b16615eec86ba5baa",
+          "locator": "plugin.yaml",
+          "size": 224
+        }
+      ],
+      "fingerprint": "sha256:287026b79baea0e2a354475a4f910dd18bf1103d6a47c9c69d60a7ee82d368dc"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "openairesponses",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in server Tools for OpenAI Responses.",
+                  "displayName": "OpenAI Responses Tools",
+                  "members": [
+                    {
+                      "name": "openaiwebsearch",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "openairesponses",
+                  "type": "plugin"
+                },
+                "description": "Built-in server Tools for OpenAI Responses.",
+                "digest": "sha256:c5145987da001071e2ae05694efc4b2f6a59e858adb5f989d35f2d27a20de38a",
+                "displayName": "OpenAI Responses Tools",
+                "kind": "plugin",
+                "logicalName": "openairesponses",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:4287fea274f69fafabb8ce6f0ec2b8345e94efa0f322de5f550d27121e475c11",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "openairesponses",
+      "files": [
+        {
+          "digest": "sha256:4287fea274f69fafabb8ce6f0ec2b8345e94efa0f322de5f550d27121e475c11",
+          "locator": "plugin.yaml",
+          "size": 212
+        }
+      ],
+      "fingerprint": "sha256:e7bbba2ae090a3615aa50cbb25044ec723888ce309548d599fa6d915775d06f4"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "text",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Common text processing helpers.",
+                  "displayName": "Text utilities",
+                  "members": [
+                    {
+                      "name": "applyunifieddiff",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "deletetext",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "findtext",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "inserttext",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "readtextrange",
+                      "scope": "builtin",
+                      "type": "tool"
+                    },
+                    {
+                      "name": "replacetext",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "text",
+                  "type": "plugin"
+                },
+                "description": "Common text processing helpers.",
+                "digest": "sha256:6d1d7d319ee39c42497bf8e707161191c2060c58352c2be4f394d6e9395ec400",
+                "displayName": "Text utilities",
+                "kind": "plugin",
+                "logicalName": "text",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f169eed2cb447a7c545add8ec70688b45c09d38bd9deb1fd9f5b92ff5bc3fa84",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:f169eed2cb447a7c545add8ec70688b45c09d38bd9deb1fd9f5b92ff5bc3fa84",
+          "locator": "plugin.yaml",
+          "size": 454
+        }
+      ],
+      "fingerprint": "sha256:8e423cba22802a4753f7e1d64edbe249739ea810383053f6ae81f9c867758c26"
+    },
+    {
+      "address": {
+        "kind": "tool-collection",
+        "name": "web",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Common web helpers to fetch and process pages.",
+                  "displayName": "Web utilities",
+                  "members": [
+                    {
+                      "name": "fetchurl",
+                      "scope": "builtin",
+                      "type": "tool"
+                    }
+                  ],
+                  "name": "web",
+                  "type": "plugin"
+                },
+                "description": "Common web helpers to fetch and process pages.",
+                "digest": "sha256:4b24a463978383358962d7facb841641d5d0070fb721938840e7e080be8231b7",
+                "displayName": "Web utilities",
+                "kind": "plugin",
+                "logicalName": "web",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:5d40682e23c8077339f14df640d4fb5761b37e7b3c12127de7d5365c097c3dfd",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "web",
+      "files": [
+        {
+          "digest": "sha256:5d40682e23c8077339f14df640d4fb5761b37e7b3c12127de7d5365c097c3dfd",
+          "locator": "plugin.yaml",
+          "size": 187
+        }
+      ],
+      "fingerprint": "sha256:36dcef311e9903e90054d8700df387766b549547ca3a804b223073ea7bf8f47d"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "anthropicwebsearch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Search the web for relevant content and use it in model output.",
+                  "displayName": "Anthropic Messages SDK Web Search",
+                  "implementation": {
+                    "kind": "sdk",
+                    "sdkToolType": "webSearch",
+                    "sdkType": "providerSDKTypeAnthropicMessages"
+                  },
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "object"
+                  },
+                  "name": "anthropicwebsearch",
+                  "tags": [
+                    "sdk",
+                    "search"
+                  ],
+                  "type": "tool",
+                  "userArgSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowedDomains": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "blockedDomains": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "maxUses": {
+                        "type": "integer"
+                      },
+                      "userLocation": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "version": "v1.0.0"
+                },
+                "description": "Search the web for relevant content and use it in model output.",
+                "digest": "sha256:7aced5d3f98fa9db631dd8e13ad84d48668aa3d53c5a9d2c040105a8410fdca0",
+                "displayName": "Anthropic Messages SDK Web Search",
+                "kind": "tool",
+                "logicalName": "anthropicwebsearch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:74c3f7fa9468c43c174534fbcb0a93081d1bfdd0e5a3dad42a9f5dd4e6052493",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "anthropicmessages",
+      "files": [
+        {
+          "digest": "sha256:74c3f7fa9468c43c174534fbcb0a93081d1bfdd0e5a3dad42a9f5dd4e6052493",
+          "locator": "tool.yaml",
+          "size": 829
+        }
+      ],
+      "fingerprint": "sha256:59365998fe33543e2bebc6ca33fbe7f8c5adc9d2276065e507091a4165c1904f"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "applyunifieddiff",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Apply or dry-run a unified diff against local UTF-8 text files. Supports Git-style unified diffs, multi-file patches, path overrides, candidate local paths, already-applied detection, no-newline-at-EOF markers, and safe fuzzy hunk matching. The parser is intentionally tolerant of common malformed/LLM diffs. Set dryRun=true to check without writing. Set strict=true to disable fuzzy matching.",
+                  "displayName": "Apply unified diff",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/applyunifieddiff.ApplyUnifiedDiff",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "candidatePaths": {
+                        "description": "Optional local paths to consider if paths parsed from the diff do not resolve. The tool matches by exact path, suffix, and unique basename.",
+                        "items": {
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "diffText": {
+                        "description": "Unified diff text to apply or dry-run. May contain one or more file patches and hunks.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "dryRun": {
+                        "default": false,
+                        "description": "If true, check applicability and return resolved fileTargets without writing files.",
+                        "type": "boolean"
+                      },
+                      "fileTargets": {
+                        "description": "Optional explicit target path mappings for file patches. Use when diff paths are missing, wrong, relative to a different base, or ambiguous.",
+                        "items": {
+                          "additionalProperties": false,
+                          "properties": {
+                            "fileKey": {
+                              "description": "Parsed file key such as file-1, file-2, etc.",
+                              "type": "string"
+                            },
+                            "newPath": {
+                              "description": "New path from the diff, if known.",
+                              "type": "string"
+                            },
+                            "oldPath": {
+                              "description": "Old path from the diff, if known.",
+                              "type": "string"
+                            },
+                            "targetPath": {
+                              "description": "Actual local file path to use for this file patch.",
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "targetPath"
+                          ],
+                          "type": "object"
+                        },
+                        "type": "array"
+                      },
+                      "strict": {
+                        "default": false,
+                        "description": "If true, use strict exact hunk matching only. Default false enables safe fuzzy matching.",
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "diffText"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "applyunifieddiff",
+                  "tags": [
+                    "fs",
+                    "text",
+                    "diff",
+                    "patch",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Apply or dry-run a unified diff against local UTF-8 text files. Supports Git-style unified diffs, multi-file patches, path overrides, candidate local paths, already-applied detection, no-newline-at-EOF markers, and safe fuzzy hunk matching. The parser is intentionally tolerant of common malformed/LLM diffs. Set dryRun=true to check without writing. Set strict=true to disable fuzzy matching.",
+                "digest": "sha256:bfca249b6ae2b2b41689dfaa95e51b78b95cb20608e82f226802f2bad48cde95",
+                "displayName": "Apply unified diff",
+                "kind": "tool",
+                "logicalName": "applyunifieddiff",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:9c5bdc350fba4cddd912d4ce241ba519444e2bc96a037fb40a46c76f4496fe50",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:9c5bdc350fba4cddd912d4ce241ba519444e2bc96a037fb40a46c76f4496fe50",
+          "locator": "tool.yaml",
+          "size": 2150
+        }
+      ],
+      "fingerprint": "sha256:86a0a07c45659660dfff7debb5e8c4fe0b6162231b2687b75570406ba24aa04b"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "deletefile",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Safely delete a file by moving it to a trash directory. trashDir=auto will try to use the system trash when possible; otherwise falls back to a local .trash directory.",
+                  "displayName": "Delete file",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/deletefile.DeleteFile",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "description": "Path of the file to delete.",
+                        "type": "string"
+                      },
+                      "trashDir": {
+                        "default": "auto",
+                        "description": "Trash destination. Use \"auto\" to attempt system trash detection; If auto detection fails, a default .trash directory is used. Non-existent directory will be created.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "deletefile",
+                  "tags": [
+                    "fs"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Safely delete a file by moving it to a trash directory. trashDir=auto will try to use the system trash when possible; otherwise falls back to a local .trash directory.",
+                "digest": "sha256:6b1ced7d2fea1e59ef667e483ecd473c28ea969185d6c6176c178ed8585007c0",
+                "displayName": "Delete file",
+                "kind": "tool",
+                "logicalName": "deletefile",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f94593feeef32d1e1cab291348fb956975496091a9d13a83dc665ccd7dd8f0f6",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:f94593feeef32d1e1cab291348fb956975496091a9d13a83dc665ccd7dd8f0f6",
+          "locator": "tool.yaml",
+          "size": 852
+        }
+      ],
+      "fingerprint": "sha256:b599394f2adf7bc485fa82410cc2202819b8cfc0c06d5ac600eb9cc2bc197b99"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "deletetext",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Delete a text block from a UTF-8 text file. Matching compares TrimSpace(line). Use textAbove and/or textBelow only to locate the intended occurrence. Use lineHint only when expectedCount is 1. The tool fails unless the number of matches equals expectedCount.",
+                  "displayName": "Delete text",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/deletetext.DeleteText",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "expectedCount": {
+                        "default": 1,
+                        "description": "Fail unless exactly this many matches are found. Defaults to 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "lineHint": {
+                        "description": "Optional 1-based hint for the start line of oldText. Use only when expectedCount is 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "oldText": {
+                        "description": "Text block to delete.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "Path of the file.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "textAbove": {
+                        "description": "Optional text above oldText used only to locate the occurrence.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "textBelow": {
+                        "description": "Optional copied text below oldText used only to locate the occurrence.",
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "oldText"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "deletetext",
+                  "tags": [
+                    "text"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Delete a text block from a UTF-8 text file. Matching compares TrimSpace(line). Use textAbove and/or textBelow only to locate the intended occurrence. Use lineHint only when expectedCount is 1. The tool fails unless the number of matches equals expectedCount.",
+                "digest": "sha256:d80160795e350e33a70e75737cc93f66c54531a0de9b4db6fabdeaa1c4b3c2e0",
+                "displayName": "Delete text",
+                "kind": "tool",
+                "logicalName": "deletetext",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:3a79f49225876c51e8d743ad014614770c0ce4067dd35c666668d96f83fc21cf",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:3a79f49225876c51e8d743ad014614770c0ce4067dd35c666668d96f83fc21cf",
+          "locator": "tool.yaml",
+          "size": 1350
+        }
+      ],
+      "fingerprint": "sha256:6d5ca0d62d7232ef8a80ac1083ea7c373bc035f1de550ba3c6f3dbaf83019967"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "fetchurl",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Fetch an HTTP/HTTPS URL. Default auto mode returns compact text for HTML/text/PDF and image/file outputs for binary URLs. Use startIndex to continue truncated text.",
+                  "displayName": "Fetch URL",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/webtool/fetchurl.FetchURL",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "encoding": {
+                        "default": "auto",
+                        "description": "Return mode. auto returns text for HTML/text/PDF and image/file outputs for binary URLs. text forces readable text. binary returns base64 image/file output.",
+                        "enum": [
+                          "auto",
+                          "text",
+                          "binary"
+                        ],
+                        "type": "string"
+                      },
+                      "maxLength": {
+                        "default": 5000,
+                        "description": "Maximum number of text characters to return. Applies only to text output.",
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "raw": {
+                        "default": false,
+                        "description": "For HTML/text responses, return raw decoded text instead of readable Markdown extraction.",
+                        "type": "boolean"
+                      },
+                      "startIndex": {
+                        "default": 0,
+                        "description": "Start text output at this character index. Use the next startIndex from a truncated result to continue.",
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "url": {
+                        "description": "Absolute http or https URL to fetch.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "url"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "fetchurl",
+                  "tags": [
+                    "web",
+                    "fetch"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Fetch an HTTP/HTTPS URL. Default auto mode returns compact text for HTML/text/PDF and image/file outputs for binary URLs. Use startIndex to continue truncated text.",
+                "digest": "sha256:60f438c1b10e922e11a9b626a2ab73693db679a3db7cfc166fd61b8146c9ac61",
+                "displayName": "Fetch URL",
+                "kind": "tool",
+                "logicalName": "fetchurl",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:1dab8763d46ab72675d1c82b64b668e935982ffe5bb8bbb0a90db8d558eb4cde",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "web",
+      "files": [
+        {
+          "digest": "sha256:1dab8763d46ab72675d1c82b64b668e935982ffe5bb8bbb0a90db8d558eb4cde",
+          "locator": "tool.yaml",
+          "size": 1366
+        }
+      ],
+      "fingerprint": "sha256:12db67bd847501d3c6d7ccdfa103e9553ac990c483d105b7039e05210663057c"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "findtext",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Find substring or regex matches in a text file and return exact line/column ranges with surrounding context. Multi-line search works by including newlines in query",
+                  "displayName": "Find text matches",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/findtext.FindText",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "contextLines": {
+                        "default": 1,
+                        "description": "Number of lines to include before and after each match. Returned context always includes the matched lines themselves.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxMatches": {
+                        "default": 10,
+                        "description": "Maximum number of non-overlapping matches to return.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Path of the file",
+                        "type": "string"
+                      },
+                      "query": {
+                        "description": "Text or regex to find. May include newline characters for multi-line search. For substring search, TrimSpace is used",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "queryType": {
+                        "default": "substring",
+                        "enum": [
+                          "substring",
+                          "regex"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "query"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "findtext",
+                  "tags": [
+                    "text"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Find substring or regex matches in a text file and return exact line/column ranges with surrounding context. Multi-line search works by including newlines in query",
+                "digest": "sha256:5a073d8b702b6c9563e46926a16d1036faffd0f28a2b2b34df29e3f84cdd77fa",
+                "displayName": "Find text matches",
+                "kind": "tool",
+                "logicalName": "findtext",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:743a4c5dbfd7734f56b393cbecc037cce5a763c00b84aeefd6eeed129d1c5874",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:743a4c5dbfd7734f56b393cbecc037cce5a763c00b84aeefd6eeed129d1c5874",
+          "locator": "tool.yaml",
+          "size": 1191
+        }
+      ],
+      "fingerprint": "sha256:41b79e1fc32f4eb8ede4858131d224dd76e7d3e785f8e8b9393ba2388c926322"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitadd",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Add repository-relative paths to the index, or add all changes, in a local Git repository.",
+                  "displayName": "Git add",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/add.Add",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "all": {
+                        "default": false,
+                        "description": "If true, add all changes from the worktree root.",
+                        "type": "boolean"
+                      },
+                      "paths": {
+                        "description": "Repository-relative paths to add. Required unless all=true.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitadd",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Add repository-relative paths to the index, or add all changes, in a local Git repository.",
+                "digest": "sha256:4a7fd4cae0cc4d7cd028af9609fb7f93d78fa415de60f0f8d5dfe52f7c21e9b7",
+                "displayName": "Git add",
+                "kind": "tool",
+                "logicalName": "gitadd",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:2d79d374f4e78c79c8775915c4ba651edfc68e0784ba0816a732d1ce2a88c050",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:2d79d374f4e78c79c8775915c4ba651edfc68e0784ba0816a732d1ce2a88c050",
+          "locator": "tool.yaml",
+          "size": 788
+        }
+      ],
+      "fingerprint": "sha256:e76e3461a99ecb266be759f469cd4274e4df22c883f9015a5bb75cca9e00fb41"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitblame",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return a bounded best-effort first-parent blame for a repository-relative file path.",
+                  "displayName": "Git blame",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/blame.Blame",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "endLine": {
+                        "description": "1-based end line. Defaults to the end of file.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxCommits": {
+                        "default": 200,
+                        "description": "Maximum first-parent commits to walk.",
+                        "maximum": 1000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Repository-relative file path.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to blame.",
+                        "type": "string"
+                      },
+                      "startLine": {
+                        "default": 1,
+                        "description": "1-based start line. Defaults to 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitblame",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return a bounded best-effort first-parent blame for a repository-relative file path.",
+                "digest": "sha256:bfd6d1d89cc04fdd2d4850d5e502ec8c4fbc351afc0817e2dafc316454e14804",
+                "displayName": "Git blame",
+                "kind": "tool",
+                "logicalName": "gitblame",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:a8445eb1dc34c798f0cd2e361d16f279d79a7da351a8e908f16600a1a2b99a03",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:a8445eb1dc34c798f0cd2e361d16f279d79a7da351a8e908f16600a1a2b99a03",
+          "locator": "tool.yaml",
+          "size": 1052
+        }
+      ],
+      "fingerprint": "sha256:eb5cf3830bc52b5f611f5de8377d628f17720769388d97c1a65fbd20d24956ff"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitbranch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "List local, remote, or all branches in a local Git repository.",
+                  "displayName": "Git branch",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/branches.Branches",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "kind": {
+                        "default": "local",
+                        "description": "Branch kind to list.",
+                        "enum": [
+                          "local",
+                          "remote",
+                          "all"
+                        ],
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitbranch",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "List local, remote, or all branches in a local Git repository.",
+                "digest": "sha256:13f62be948b4863c150f18465ea308a72394b9eb26b2a338eca16512b3fb313f",
+                "displayName": "Git branch",
+                "kind": "tool",
+                "logicalName": "gitbranch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:202aff940cec74c93f131b80f89d8db129217308f3535434d706397160acacde",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:202aff940cec74c93f131b80f89d8db129217308f3535434d706397160acacde",
+          "locator": "tool.yaml",
+          "size": 653
+        }
+      ],
+      "fingerprint": "sha256:5c74835798a32cc6ad7bbf8672c90c64e28216aba78add7a09c7dd035be85c10"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitchangedfiles",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return a bounded list of changed files without producing a full diff.",
+                  "displayName": "Git changed files",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/changedfiles.ChangedFiles",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "base": {
+                        "description": "Base revision for kind=refs.",
+                        "type": "string"
+                      },
+                      "kind": {
+                        "default": "working",
+                        "description": "Change kind. working=unstaged worktree changes, staged=index changes, refs=changes from base to target.",
+                        "enum": [
+                          "working",
+                          "staged",
+                          "refs"
+                        ],
+                        "type": "string"
+                      },
+                      "maxCount": {
+                        "default": 500,
+                        "description": "Maximum changed files to return.",
+                        "maximum": 5000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "paths": {
+                        "description": "Optional repository-relative paths to include.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "target": {
+                        "default": "HEAD",
+                        "description": "Target revision for kind=refs.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitchangedfiles",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return a bounded list of changed files without producing a full diff.",
+                "digest": "sha256:e23fe9beb385bf38b23ead80f00db3e87363a1307389560bdd2b1b5856f525f0",
+                "displayName": "Git changed files",
+                "kind": "tool",
+                "logicalName": "gitchangedfiles",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:93d4da699ec0dae6c40ee5dcea563fe489306659a3204d7e9f9501475cb28cfa",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:93d4da699ec0dae6c40ee5dcea563fe489306659a3204d7e9f9501475cb28cfa",
+          "locator": "tool.yaml",
+          "size": 1164
+        }
+      ],
+      "fingerprint": "sha256:deca75ed4afb2ec7de03d9bd29cee47a1c8845161e095edc1cc43d5242e2f545"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitcheckout",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Checkout a local branch, optionally creating it from a startPoint.",
+                  "displayName": "Git checkout",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/checkout.Checkout",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "create": {
+                        "default": false,
+                        "description": "If true, create the branch before checkout.",
+                        "type": "boolean"
+                      },
+                      "force": {
+                        "default": false,
+                        "description": "If true, force checkout. Defaults to false because it can discard local changes.",
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "description": "Local branch name to checkout.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "startPoint": {
+                        "default": "HEAD",
+                        "description": "Revision used when create=true.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitcheckout",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Checkout a local branch, optionally creating it from a startPoint.",
+                "digest": "sha256:2b68ba9bb59f98424c03cecf49b475601eec701713da019bdea9650128e85532",
+                "displayName": "Git checkout",
+                "kind": "tool",
+                "logicalName": "gitcheckout",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:3982ccd864ebcc2680fd8c453ad13acd63942c31207b03e25f3232f14b124ce7",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:3982ccd864ebcc2680fd8c453ad13acd63942c31207b03e25f3232f14b124ce7",
+          "locator": "tool.yaml",
+          "size": 970
+        }
+      ],
+      "fingerprint": "sha256:766b63eb9f7782e77d1e6bf428f21629b52c49a8535471dba1629b45683aea37"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitcommit",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Create a local Git commit from staged changes, optionally staging modified tracked files with all=true.",
+                  "displayName": "Git commit",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/commit.Commit",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "all": {
+                        "default": false,
+                        "description": "If true, automatically stage modified and deleted tracked files before committing.",
+                        "type": "boolean"
+                      },
+                      "authorEmail": {
+                        "description": "Optional author email. Defaults to repo config, then GitTool default author.",
+                        "type": "string"
+                      },
+                      "authorName": {
+                        "description": "Optional author name. Defaults to repo config, then GitTool default author.",
+                        "type": "string"
+                      },
+                      "message": {
+                        "description": "Commit message.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "message"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitcommit",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Create a local Git commit from staged changes, optionally staging modified tracked files with all=true.",
+                "digest": "sha256:073c0b779a780349aef0bed67f654c7f1501eff7b2ea6050e276378c088705df",
+                "displayName": "Git commit",
+                "kind": "tool",
+                "logicalName": "gitcommit",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:006f81e42556803f75ddd84418862fe35244d90f3b9e65395793352c019077b8",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:006f81e42556803f75ddd84418862fe35244d90f3b9e65395793352c019077b8",
+          "locator": "tool.yaml",
+          "size": 1038
+        }
+      ],
+      "fingerprint": "sha256:b5e500714efec48adb19d59669a84994b6aecec8504eedfa7ecf016480526734"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitcreatebranch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Create a local Git branch from a revision, optionally checking it out.",
+                  "displayName": "Git create branch",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/createbranch.CreateBranch",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "checkout": {
+                        "default": false,
+                        "description": "If true, checkout the branch after creating it.",
+                        "type": "boolean"
+                      },
+                      "name": {
+                        "description": "New local branch name.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "startPoint": {
+                        "default": "HEAD",
+                        "description": "Revision to create the branch from.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitcreatebranch",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Create a local Git branch from a revision, optionally checking it out.",
+                "digest": "sha256:969fdab00081058f5b26537a1da5797e3c8c1619a37b1627a71227af8bb23bf0",
+                "displayName": "Git create branch",
+                "kind": "tool",
+                "logicalName": "gitcreatebranch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:2572f641b4ce8c9c6c2bfb73bfd1107f38067eb48647deacc9d5bb7dc33985f3",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:2572f641b4ce8c9c6c2bfb73bfd1107f38067eb48647deacc9d5bb7dc33985f3",
+          "locator": "tool.yaml",
+          "size": 853
+        }
+      ],
+      "fingerprint": "sha256:be3da103b36d271135df640605480cd62582f2b1a2760601be3b2d29970e821b"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitcreatetag",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Create a local lightweight or annotated Git tag. If message is non-empty, an annotated tag is created; otherwise a lightweight tag is created.",
+                  "displayName": "Git create tag",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/createtag.CreateTag",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "message": {
+                        "description": "Optional tag message. If non-empty, creates an annotated tag. If omitted or empty, creates a lightweight tag.",
+                        "type": "string"
+                      },
+                      "name": {
+                        "description": "Tag name to create. Pass a plain tag name, not refs/tags/name.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "taggerEmail": {
+                        "description": "Optional tagger email for annotated tags. Defaults to repo config, then GitTool default author.",
+                        "type": "string"
+                      },
+                      "taggerName": {
+                        "description": "Optional tagger name for annotated tags. Defaults to repo config, then GitTool default author.",
+                        "type": "string"
+                      },
+                      "target": {
+                        "default": "HEAD",
+                        "description": "Revision to tag.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitcreatetag",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Create a local lightweight or annotated Git tag. If message is non-empty, an annotated tag is created; otherwise a lightweight tag is created.",
+                "digest": "sha256:ad9696c45c8c808e81a823b78d100d35cff836355c866bdb9c8995e268662fe2",
+                "displayName": "Git create tag",
+                "kind": "tool",
+                "logicalName": "gitcreatetag",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:3ba28148aaa1b8938a4a790b7134dfdcc88f59a00996414c4472d28f1f66243d",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:3ba28148aaa1b8938a4a790b7134dfdcc88f59a00996414c4472d28f1f66243d",
+          "locator": "tool.yaml",
+          "size": 1260
+        }
+      ],
+      "fingerprint": "sha256:621f496740a7df364bd80ea6739ed517fae6fcedd9c11dea76073ebc6d7f78d1"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitdeletetag",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Delete a local Git tag ref. This does not contact remotes.",
+                  "displayName": "Git delete tag",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/deletetag.DeleteTag",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "name": {
+                        "description": "Tag name to delete. Pass a plain tag name, not refs/tags/name.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "name"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitdeletetag",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Delete a local Git tag ref. This does not contact remotes.",
+                "digest": "sha256:bce4f6e7ab5b34127afa506508f19cc25b3e79f08ee9d4c717bbb2fc4e280aae",
+                "displayName": "Git delete tag",
+                "kind": "tool",
+                "logicalName": "gitdeletetag",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:cc071e8e1723f2d1249624bcd97d6c486deed7fa1946eec1a7a331d146b3c0d6",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:cc071e8e1723f2d1249624bcd97d6c486deed7fa1946eec1a7a331d146b3c0d6",
+          "locator": "tool.yaml",
+          "size": 659
+        }
+      ],
+      "fingerprint": "sha256:63635c378251238e260c7da5b0b6ac7153724bb6c4a91672c85bdb29d78d89ea"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitdiff",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return a bounded unified diff for working changes, staged changes, or two revisions in a local Git repository.",
+                  "displayName": "Git diff",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/diff.Diff",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "base": {
+                        "description": "Base revision for kind=refs.",
+                        "type": "string"
+                      },
+                      "contextLines": {
+                        "default": 3,
+                        "description": "Unified diff context lines.",
+                        "maximum": 20,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "kind": {
+                        "default": "working",
+                        "description": "Diff kind. working=unstaged worktree changes, staged=index changes, refs=diff base..target.",
+                        "enum": [
+                          "working",
+                          "staged",
+                          "refs"
+                        ],
+                        "type": "string"
+                      },
+                      "maxBytes": {
+                        "default": 1048576,
+                        "description": "Maximum diff bytes returned. Hard capped by the implementation.",
+                        "maximum": 2097152,
+                        "minimum": 34,
+                        "type": "integer"
+                      },
+                      "paths": {
+                        "description": "Optional repository-relative paths to include.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "target": {
+                        "default": "HEAD",
+                        "description": "Target revision for kind=refs.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitdiff",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return a bounded unified diff for working changes, staged changes, or two revisions in a local Git repository.",
+                "digest": "sha256:c43e35543b2cc9061060a64bf402d73c3a76a31e926fe2503bc5cffefb5335ab",
+                "displayName": "Git diff",
+                "kind": "tool",
+                "logicalName": "gitdiff",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:be7c8aa834a8e41a165ce2d54888dc4c218d94e3e63de27f8cb6ec993665e4ec",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:be7c8aa834a8e41a165ce2d54888dc4c218d94e3e63de27f8cb6ec993665e4ec",
+          "locator": "tool.yaml",
+          "size": 1314
+        }
+      ],
+      "fingerprint": "sha256:09f6938fd37a10be97194b16e9142ddf5120c0e3ffb7ff99850ac1b90fc9d374"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitfilehistory",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "List bounded commit history touching one repository-relative path.",
+                  "displayName": "Git file history",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/filehistory.FileHistory",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "firstParent": {
+                        "default": true,
+                        "description": "If true, follow only the first-parent chain. Defaults to true.",
+                        "type": "boolean"
+                      },
+                      "maxCommits": {
+                        "default": 50,
+                        "description": "Maximum matching commits to return.",
+                        "maximum": 500,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxWalk": {
+                        "default": 2000,
+                        "description": "Maximum commits to inspect while looking for matching commits.",
+                        "maximum": 20000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Repository-relative file path.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to start from.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitfilehistory",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "List bounded commit history touching one repository-relative path.",
+                "digest": "sha256:ea4c0d8369266cc904a923e03aa5735565390ce6bf1bc22a377024569886df86",
+                "displayName": "Git file history",
+                "kind": "tool",
+                "logicalName": "gitfilehistory",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:9afffb9cd1bb6791fa3f7877d2f17082d51cef251371c842468656ece173da3f",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:9afffb9cd1bb6791fa3f7877d2f17082d51cef251371c842468656ece173da3f",
+          "locator": "tool.yaml",
+          "size": 1128
+        }
+      ],
+      "fingerprint": "sha256:2169a958f08703c570c7b406f8311d8eb9ebd627d098635ea27591cc4bfa7218"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitfindrepos",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Discover local Git repositories below a directory using hard depth, visit, and result bounds.",
+                  "displayName": "Git find repositories",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/findrepos.FindRepos",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "includeBare": {
+                        "default": true,
+                        "description": "If true, include bare repositories.",
+                        "type": "boolean"
+                      },
+                      "maxDepth": {
+                        "default": 5,
+                        "description": "Maximum directory depth below rootPath.",
+                        "maximum": 12,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "maxRepos": {
+                        "default": 100,
+                        "description": "Maximum repositories to return.",
+                        "maximum": 1000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxVisitedDirs": {
+                        "default": 20000,
+                        "description": "Maximum directories to visit before truncating.",
+                        "maximum": 100000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "rootPath": {
+                        "description": "Directory under which repositories should be discovered.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "rootPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitfindrepos",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Discover local Git repositories below a directory using hard depth, visit, and result bounds.",
+                "digest": "sha256:abe36acf02a3bf53ad36ef12fd6ef24b28c11898a12ad3e64a10cde0b74bae2f",
+                "displayName": "Git find repositories",
+                "kind": "tool",
+                "logicalName": "gitfindrepos",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:9b2b0321648dc51876d3e6866d6b2a14c559cef25865b5d179cf722b2abe722c",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:9b2b0321648dc51876d3e6866d6b2a14c559cef25865b5d179cf722b2abe722c",
+          "locator": "tool.yaml",
+          "size": 1090
+        }
+      ],
+      "fingerprint": "sha256:dd9f367aef64c231c7bcfa74ffc054aadfc086a58a6217587a57731b4041516a"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitgrep",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Search UTF-8 tracked file contents at HEAD or another revision using Go regular expressions.",
+                  "displayName": "Git grep",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/grep.Grep",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "contextLines": {
+                        "default": 0,
+                        "description": "Number of surrounding lines to include with each match.",
+                        "maximum": 5,
+                        "minimum": 0,
+                        "type": "integer"
+                      },
+                      "ignoreCase": {
+                        "default": false,
+                        "description": "If true, perform case-insensitive matching.",
+                        "type": "boolean"
+                      },
+                      "literal": {
+                        "default": false,
+                        "description": "If true, pattern is treated as a literal string.",
+                        "type": "boolean"
+                      },
+                      "maxBytes": {
+                        "default": 1048576,
+                        "description": "Maximum bytes to read per file.",
+                        "maximum": 4194304,
+                        "minimum": 1024,
+                        "type": "integer"
+                      },
+                      "maxFiles": {
+                        "default": 10000,
+                        "description": "Maximum files to inspect.",
+                        "maximum": 50000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "maxMatches": {
+                        "default": 100,
+                        "description": "Maximum matches to return.",
+                        "maximum": 1000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "paths": {
+                        "description": "Optional repository-relative paths to include.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "pattern": {
+                        "description": "Search pattern. Interpreted as RE2 regexp unless literal=true.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to search.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "pattern"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitgrep",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Search UTF-8 tracked file contents at HEAD or another revision using Go regular expressions.",
+                "digest": "sha256:5f988b90e67c73c34d753fa6ea160927ed6e1110fdd2c9f6bde481721a6c2df2",
+                "displayName": "Git grep",
+                "kind": "tool",
+                "logicalName": "gitgrep",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:0f1f0c38a6303a01d19e946d1b9d9331782eb8f6c1c7aa6de01754cd5e2c0464",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:0f1f0c38a6303a01d19e946d1b9d9331782eb8f6c1c7aa6de01754cd5e2c0464",
+          "locator": "tool.yaml",
+          "size": 1593
+        }
+      ],
+      "fingerprint": "sha256:39e476cd2f3d4c704494ef82dada8e5ca9cf2e08adab0c444c07ac2d56d0972f"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitinit",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Initialize a local Git repository at repoPath using pure Go Git operations.",
+                  "displayName": "Git init",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/init.Init",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "bare": {
+                        "default": false,
+                        "description": "If true, initialize a bare repository.",
+                        "type": "boolean"
+                      },
+                      "createParents": {
+                        "default": false,
+                        "description": "If true, create missing parent directories.",
+                        "type": "boolean"
+                      },
+                      "repoPath": {
+                        "description": "Directory path where the repository should be initialized.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitinit",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Initialize a local Git repository at repoPath using pure Go Git operations.",
+                "digest": "sha256:d0ea39b1a08b319a2c932f0e88b87abb5aadebfc7c5fd6882e2e2526d3014a73",
+                "displayName": "Git init",
+                "kind": "tool",
+                "logicalName": "gitinit",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:3d39047027794628fd588f299828bdbcfd46ccbbe01000a87a4251d718e6a714",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:3d39047027794628fd588f299828bdbcfd46ccbbe01000a87a4251d718e6a714",
+          "locator": "tool.yaml",
+          "size": 769
+        }
+      ],
+      "fingerprint": "sha256:650cb703cc079df8517333c2726cf7296a7038def25862b34b69473d485c7ab2"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitlisttree",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "List files and optionally directories at HEAD or another revision without checking it out.",
+                  "displayName": "Git list tree",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/listtree.ListTree",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "includeDirs": {
+                        "default": false,
+                        "description": "If true, include tree/directory entries.",
+                        "type": "boolean"
+                      },
+                      "maxEntries": {
+                        "default": 1000,
+                        "description": "Maximum entries to return.",
+                        "maximum": 10000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "default": ".",
+                        "description": "Repository-relative path to list.",
+                        "type": "string"
+                      },
+                      "recursive": {
+                        "default": true,
+                        "description": "If true, recursively list files below path.",
+                        "type": "boolean"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to inspect.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitlisttree",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "List files and optionally directories at HEAD or another revision without checking it out.",
+                "digest": "sha256:aeccfac0e5db7a449b4e4cba45864a14d827b7f50263a9f8659ac1fa6a8e1b76",
+                "displayName": "Git list tree",
+                "kind": "tool",
+                "logicalName": "gitlisttree",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:2521b82a7bd7ab04d749172d101299f6ce27494f38ed6b6cdae9f3e02800eefa",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:2521b82a7bd7ab04d749172d101299f6ce27494f38ed6b6cdae9f3e02800eefa",
+          "locator": "tool.yaml",
+          "size": 1076
+        }
+      ],
+      "fingerprint": "sha256:1641f630b60689158876a2dbcc16764150ced95e3ba2e2a35b5bcc4ef393724c"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitlog",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return bounded structured commit history for a local Git repository.",
+                  "displayName": "Git log",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/log.Log",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "maxCount": {
+                        "default": 10,
+                        "description": "Maximum commits to return.",
+                        "maximum": 100,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to start from.",
+                        "type": "string"
+                      },
+                      "since": {
+                        "description": "Optional lower date bound. Accepts RFC3339, YYYY-MM-DDTHH:MM:SS, or YYYY-MM-DD.",
+                        "type": "string"
+                      },
+                      "until": {
+                        "description": "Optional upper date bound. Accepts RFC3339, YYYY-MM-DDTHH:MM:SS, or YYYY-MM-DD.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitlog",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return bounded structured commit history for a local Git repository.",
+                "digest": "sha256:60e6be68785d90fcd049dc76ed67813e3f40c46b2480cd3b3ed897f33f69e578",
+                "displayName": "Git log",
+                "kind": "tool",
+                "logicalName": "gitlog",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:6149e6487d3b9b6c6146b2ba0d402a4dec53f748c0854e6ba28e5ef1fda16f29",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:6149e6487d3b9b6c6146b2ba0d402a4dec53f748c0854e6ba28e5ef1fda16f29",
+          "locator": "tool.yaml",
+          "size": 973
+        }
+      ],
+      "fingerprint": "sha256:61be62b886401bfd65b793f7daf763018056b96a0e5927a5cfa59107a92b0775"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitreadblob",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Read a repository-relative file at HEAD or another revision without checkout.",
+                  "displayName": "Git read blob",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/readblob.ReadBlob",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "encoding": {
+                        "default": "auto",
+                        "description": "Output encoding. auto emits text for UTF-8 text and omits binary content.",
+                        "enum": [
+                          "auto",
+                          "text",
+                          "base64"
+                        ],
+                        "type": "string"
+                      },
+                      "maxBytes": {
+                        "default": 1048576,
+                        "description": "Maximum blob bytes to read.",
+                        "maximum": 4194304,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Repository-relative file path.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to inspect.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath",
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitreadblob",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Read a repository-relative file at HEAD or another revision without checkout.",
+                "digest": "sha256:753a912e695c2230d74cf7a57562ad910edd3970ec083b140235bfe4adf2e301",
+                "displayName": "Git read blob",
+                "kind": "tool",
+                "logicalName": "gitreadblob",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:8d92b3f202fa48abfb1eacdef9fb30f83b36f0a6aa1c1ceaefe06a0967ed08fd",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:8d92b3f202fa48abfb1eacdef9fb30f83b36f0a6aa1c1ceaefe06a0967ed08fd",
+          "locator": "tool.yaml",
+          "size": 1013
+        }
+      ],
+      "fingerprint": "sha256:0f952b2a1f23e5f0a04c1a0998de4e682cbc8a3f600ed446b6640bf86358628c"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitrepoinfo",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return compact local Git repository metadata, including bare/unborn/detached state, refs, remotes, and author config.",
+                  "displayName": "Git repository info",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/repoinfo.RepoInfo",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitrepoinfo",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return compact local Git repository metadata, including bare/unborn/detached state, refs, remotes, and author config.",
+                "digest": "sha256:b5e5c450754ad26cd7bda7f84cf8714893533f02ec14940089c61e7202e1330c",
+                "displayName": "Git repository info",
+                "kind": "tool",
+                "logicalName": "gitrepoinfo",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:40431e517898283344f95357218c14fc220c8cc91bbe11f70cb8686b8d855af7",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:40431e517898283344f95357218c14fc220c8cc91bbe11f70cb8686b8d855af7",
+          "locator": "tool.yaml",
+          "size": 607
+        }
+      ],
+      "fingerprint": "sha256:7ddb4bc3481e29f6169c431d0c9b90b22f39f9cfeb92e13c527a7862993e7453"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitreset",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Run a safe mixed reset to unstage all staged changes while preserving the working tree.",
+                  "displayName": "Git reset",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/reset.Reset",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "confirmDiscard": {
+                        "default": false,
+                        "description": "Required for mode=hard because it discards worktree changes.",
+                        "type": "boolean"
+                      },
+                      "mode": {
+                        "default": "mixed",
+                        "description": "Reset mode. mixed resets the index and preserves the worktree. hard resets index and worktree and requires confirmDiscard=true.",
+                        "enum": [
+                          "mixed",
+                          "hard"
+                        ],
+                        "type": "string"
+                      },
+                      "paths": {
+                        "description": "Optional repository-relative paths for a path-limited mixed reset.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Revision to reset to.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitreset",
+                  "tags": [
+                    "git",
+                    "write"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Run a safe mixed reset to unstage all staged changes while preserving the working tree.",
+                "digest": "sha256:583b3f544f6d59f84704bc3e04b6a8713fdc92cd49d61a9bdefcec28571b2c8f",
+                "displayName": "Git reset",
+                "kind": "tool",
+                "logicalName": "gitreset",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:977ce6322094876948ceb9f730ec14bcb646120ce89e59b8cadfdd3d5b84707a",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:977ce6322094876948ceb9f730ec14bcb646120ce89e59b8cadfdd3d5b84707a",
+          "locator": "tool.yaml",
+          "size": 1118
+        }
+      ],
+      "fingerprint": "sha256:8aaa891cdfb980af6f75036c69ee5eda360d0abe6553c2c47f081e72857c2fc0"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gitshow",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Show a local Git commit with metadata and an optional bounded patch.",
+                  "displayName": "Git show",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/show.Show",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "includePatch": {
+                        "default": true,
+                        "description": "If true, include the commit patch when available.",
+                        "type": "boolean"
+                      },
+                      "maxBytes": {
+                        "default": 1048576,
+                        "description": "Maximum patch bytes returned. Hard capped by the implementation.",
+                        "maximum": 2097152,
+                        "minimum": 64,
+                        "type": "integer"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      },
+                      "revision": {
+                        "default": "HEAD",
+                        "description": "Commit revision to show.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gitshow",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Show a local Git commit with metadata and an optional bounded patch.",
+                "digest": "sha256:fad5441328a37431667aa7df330e7544e052f0681ce90e96658795016107ef3d",
+                "displayName": "Git show",
+                "kind": "tool",
+                "logicalName": "gitshow",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:84ac1b257c10478cae092df12b1392e1a0dc85a45c705e145f3e639d720965ff",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:84ac1b257c10478cae092df12b1392e1a0dc85a45c705e145f3e639d720965ff",
+          "locator": "tool.yaml",
+          "size": 897
+        }
+      ],
+      "fingerprint": "sha256:3f4ff002f43e8e8afc4a57ec6a4f27998c0d33cd70dbad8d240080bf399b0a39"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "gittag",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "List tags in a local Git repository, optionally filtered by a glob pattern.",
+                  "displayName": "Git tag",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/gittool/tags.Tags",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "pattern": {
+                        "description": "Optional glob pattern for tag names, for example v*.",
+                        "type": "string"
+                      },
+                      "repoPath": {
+                        "description": "Path to an existing local Git repository.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "repoPath"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "gittag",
+                  "tags": [
+                    "git",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "List tags in a local Git repository, optionally filtered by a glob pattern.",
+                "digest": "sha256:28fdf8d39e306910eeb142653eede8a6758a9d7b826d38dcf4d589177e4764ff",
+                "displayName": "Git tag",
+                "kind": "tool",
+                "logicalName": "gittag",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7ca56361f7f55f1255b89163aa0df2d0edff26c886430729f35945cbdb2b1aa4",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "git",
+      "files": [
+        {
+          "digest": "sha256:7ca56361f7f55f1255b89163aa0df2d0edff26c886430729f35945cbdb2b1aa4",
+          "locator": "tool.yaml",
+          "size": 637
+        }
+      ],
+      "fingerprint": "sha256:4828bd2a1892110dfc207d63c9f5eb23b5b55d34f5b42c188cf15fbdb0bab9e1"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "googlewebsearch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Search the web for relevant content and use it in model output.",
+                  "displayName": "Google GenAI SDK Web Search",
+                  "implementation": {
+                    "kind": "sdk",
+                    "sdkToolType": "webSearch",
+                    "sdkType": "providerSDKTypeGoogleGenerateContent"
+                  },
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "object"
+                  },
+                  "name": "googlewebsearch",
+                  "tags": [
+                    "sdk",
+                    "search"
+                  ],
+                  "type": "tool",
+                  "userArgSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowedDomains": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "blockedDomains": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "maxUses": {
+                        "type": "integer"
+                      },
+                      "searchContextSize": {
+                        "type": "string"
+                      },
+                      "userLocation": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "version": "v1.0.0"
+                },
+                "description": "Search the web for relevant content and use it in model output.",
+                "digest": "sha256:cf0980ca76853af7c9dcfb28419c8f89bc35d067bfc63b3cce6089574e6ed531",
+                "displayName": "Google GenAI SDK Web Search",
+                "kind": "tool",
+                "logicalName": "googlewebsearch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:ce25bb89344307408cd98c6dbaf271c0dca9a45b05d7fe8f9d86a68e4e411e7b",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "googlegeneratecontent",
+      "files": [
+        {
+          "digest": "sha256:ce25bb89344307408cd98c6dbaf271c0dca9a45b05d7fe8f9d86a68e4e411e7b",
+          "locator": "tool.yaml",
+          "size": 862
+        }
+      ],
+      "fingerprint": "sha256:a7448380270eb2df7b4ef69573980ba8f8c69e0c1fd3e096bc6574a1e1848b4e"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "inserttext",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Insert a text block into a UTF-8 text file at the start, end, or between copied surrounding text. Between mode requires textAbove or textBelow. When both are provided, only blank or whitespace-only lines may lie between them and insertion happens at the start of that blank gap",
+                  "displayName": "Insert text",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/inserttext.InsertText",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "lineHint": {
+                        "description": "Optional 1-based hint for the line where inserted text should begin, taken from read/find output. If several locations still match, the tool only succeeds when one nearby location is uniquely preferred within a small built-in tolerance",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Path of the file.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "position": {
+                        "description": "Where to insert the text block",
+                        "enum": [
+                          "start",
+                          "end",
+                          "between"
+                        ],
+                        "type": "string"
+                      },
+                      "text": {
+                        "description": "Text block to insert. Newline characters are treated as line breaks.",
+                        "type": "string"
+                      },
+                      "textAbove": {
+                        "description": "Text above the insertion point",
+                        "type": "string"
+                      },
+                      "textBelow": {
+                        "description": "Text below the insertion point",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "text",
+                      "position"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "inserttext",
+                  "tags": [
+                    "text"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Insert a text block into a UTF-8 text file at the start, end, or between copied surrounding text. Between mode requires textAbove or textBelow. When both are provided, only blank or whitespace-only lines may lie between them and insertion happens at the start of that blank gap",
+                "digest": "sha256:e04c6b36942a7a102537dfee2b72105fa084fff19d909f86dd513e8938c1ad8c",
+                "displayName": "Insert text",
+                "kind": "tool",
+                "logicalName": "inserttext",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:e876b5c789be9bace70b16d25c43b2c172c0b67fc12c8139b4e8e21f29a006bd",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:e876b5c789be9bace70b16d25c43b2c172c0b67fc12c8139b4e8e21f29a006bd",
+          "locator": "tool.yaml",
+          "size": 1425
+        }
+      ],
+      "fingerprint": "sha256:d731999cc770cebabb88bc46e9cb3b279e2dae36107dfc03e87fa854b2e1e251"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "listdirectory",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "List immediate entries in a directory. Dot-prefixed files and directories are excluded by default. You can optionally filter by basename glob and entry kind.",
+                  "displayName": "List directory",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/listdirectory.ListDirectory",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "includeDotEntries": {
+                        "default": false,
+                        "description": "Include entries whose names start with '.'.",
+                        "type": "boolean"
+                      },
+                      "kind": {
+                        "default": "all",
+                        "description": "Optional entry-kind filter.",
+                        "enum": [
+                          "all",
+                          "file",
+                          "directory",
+                          "other"
+                        ],
+                        "type": "string"
+                      },
+                      "maxEntries": {
+                        "default": 200,
+                        "description": "Maximum entries to return after filtering.",
+                        "maximum": 5000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "nameGlob": {
+                        "description": "Optional glob applied to immediate entry names, like \"*.txt\".",
+                        "type": "string"
+                      },
+                      "path": {
+                        "default": ".",
+                        "description": "Directory to list.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [],
+                    "type": "object"
+                  },
+                  "name": "listdirectory",
+                  "tags": [
+                    "fs",
+                    "list"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "List immediate entries in a directory. Dot-prefixed files and directories are excluded by default. You can optionally filter by basename glob and entry kind.",
+                "digest": "sha256:1949796344a336f35245ced2fa24cbbea813f9fe3bdea5a671d2f95725d62290",
+                "displayName": "List directory",
+                "kind": "tool",
+                "logicalName": "listdirectory",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:2dcc34247bdaa03a143c49fc327f9c1635af55177f9ceee3188592f95d4e9ed0",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:2dcc34247bdaa03a143c49fc327f9c1635af55177f9ceee3188592f95d4e9ed0",
+          "locator": "tool.yaml",
+          "size": 1112
+        }
+      ],
+      "fingerprint": "sha256:0c76a8cf18b65ac75133a67e0000dc75b8831fb411e0edec87bb8869d0223241"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "mimeforextension",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return the best-known MIME type for an extension (accepts both 'png' and '.png'). Falls back to application/octet-stream when unknown.",
+                  "displayName": "Detect MIME for extension",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/mimeforextension.MIMEForExtension",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "extension": {
+                        "description": "File extension (e.g. 'png' or '.png').",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "extension"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "mimeforextension",
+                  "tags": [
+                    "mime"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return the best-known MIME type for an extension (accepts both 'png' and '.png'). Falls back to application/octet-stream when unknown.",
+                "digest": "sha256:c788f78d69709aaa82e123d0abe3991bdfd46f80fdae430f226cac89eb3007f0",
+                "displayName": "Detect MIME for extension",
+                "kind": "tool",
+                "logicalName": "mimeforextension",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:6b3fb14b3c1a221957a62d6dc8839f35d12654406cd55fd8189f9fe0affcc427",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:6b3fb14b3c1a221957a62d6dc8839f35d12654406cd55fd8189f9fe0affcc427",
+          "locator": "tool.yaml",
+          "size": 643
+        }
+      ],
+      "fingerprint": "sha256:e098381071f4fdd8f0f4f5d0a1a165f0470c8d736d542a472d31d0a9c7536f64"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "mimeforpath",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Best-effort MIME type detection for a filesystem path. Uses the extension if reliable; otherwise sniffs the file bytes.",
+                  "displayName": "Detect MIME for path",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/mimeforpath.MIMEForPath",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "description": "Path of the file to check.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "mimeforpath",
+                  "tags": [
+                    "fs",
+                    "mime"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Best-effort MIME type detection for a filesystem path. Uses the extension if reliable; otherwise sniffs the file bytes.",
+                "digest": "sha256:535e835e57e03c8f08d2a2f5967a65fe23d49f632ef8dc57ddc6a85e288153d5",
+                "displayName": "Detect MIME for path",
+                "kind": "tool",
+                "logicalName": "mimeforpath",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:349042caafc19a16680e33e6c203205f7de7301f32fe36d7da531a37aa16d0ba",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:349042caafc19a16680e33e6c203205f7de7301f32fe36d7da531a37aa16d0ba",
+          "locator": "tool.yaml",
+          "size": 591
+        }
+      ],
+      "fingerprint": "sha256:804cbaaf18adf6f89e5a41fadea9fdcf40f6f3de44dd814d43a4ad0d5e7356df"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "openaichatwebsearch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Search the web for relevant content and use it in model output.",
+                  "displayName": "OpenAI Chat Completions SDK Web Search",
+                  "implementation": {
+                    "kind": "sdk",
+                    "sdkToolType": "webSearch",
+                    "sdkType": "providerSDKTypeOpenAIChatCompletions"
+                  },
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "object"
+                  },
+                  "name": "openaichatwebsearch",
+                  "tags": [
+                    "sdk",
+                    "search"
+                  ],
+                  "type": "tool",
+                  "userArgSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "searchContextSize": {
+                        "type": "string"
+                      },
+                      "userLocation": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "version": "v1.0.0"
+                },
+                "description": "Search the web for relevant content and use it in model output.",
+                "digest": "sha256:240cdace6fbe4c6fb7cadb33d6a2027cbc1f652a1ae4cb62a663e77723519963",
+                "displayName": "OpenAI Chat Completions SDK Web Search",
+                "kind": "tool",
+                "logicalName": "openaichatwebsearch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:de908b5bd1e4827313a19bf913d2a3dd09e61ae59e85151f2245c4a404fa8a71",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "openaichat",
+      "files": [
+        {
+          "digest": "sha256:de908b5bd1e4827313a19bf913d2a3dd09e61ae59e85151f2245c4a404fa8a71",
+          "locator": "tool.yaml",
+          "size": 728
+        }
+      ],
+      "fingerprint": "sha256:7125e9877efb67a314f29100ee51c2f3d8d6199f47f894ba200566986e5ea8f5"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "openaiwebsearch",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Search the web for relevant content and use it in model output.",
+                  "displayName": "OpenAI Responses SDK Web Search",
+                  "implementation": {
+                    "kind": "sdk",
+                    "sdkToolType": "webSearch",
+                    "sdkType": "providerSDKTypeOpenAIResponses"
+                  },
+                  "inputSchema": {
+                    "additionalProperties": false,
+                    "properties": {},
+                    "type": "object"
+                  },
+                  "name": "openaiwebsearch",
+                  "tags": [
+                    "sdk",
+                    "search"
+                  ],
+                  "type": "tool",
+                  "userArgSchema": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "allowedDomains": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "searchContextSize": {
+                        "type": "string"
+                      },
+                      "userLocation": {
+                        "additionalProperties": false,
+                        "properties": {
+                          "city": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "region": {
+                            "type": "string"
+                          },
+                          "timezone": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "version": "v1.0.0"
+                },
+                "description": "Search the web for relevant content and use it in model output.",
+                "digest": "sha256:a75daf160d34586201719572413547152285267ca4c87ff65d8a9af8087c0b67",
+                "displayName": "OpenAI Responses SDK Web Search",
+                "kind": "tool",
+                "logicalName": "openaiwebsearch",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f87860bdb7a83bb944a5931a770bd418ba240a1e963deaf1a438ad1d87b6a386",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "openairesponses",
+      "files": [
+        {
+          "digest": "sha256:f87860bdb7a83bb944a5931a770bd418ba240a1e963deaf1a438ad1d87b6a386",
+          "locator": "tool.yaml",
+          "size": 771
+        }
+      ],
+      "fingerprint": "sha256:c75b592d1be1f4ae967d31bfe6c34b5a68261464141695f6a61da484bb3a8535"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "readfile",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Read a local file. Text mode is for UTF-8 text-like files and PDFs (extracted content). Binary mode returns file or image output with base64 data instead of plain text.",
+                  "displayName": "Read file",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/readfile.ReadFile",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "encoding": {
+                        "default": "text",
+                        "description": "Return mode. Use \"text\" for UTF-8 text-like files and PDFs (extracted text is returned). Use \"binary\" for non-text files; binary mode returns file/image output with base64 data, not plain text.",
+                        "enum": [
+                          "text",
+                          "binary"
+                        ],
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "Path of the file to read.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "readfile",
+                  "tags": [
+                    "fs",
+                    "read"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Read a local file. Text mode is for UTF-8 text-like files and PDFs (extracted content). Binary mode returns file or image output with base64 data instead of plain text.",
+                "digest": "sha256:93eb9a30fdb9c6d2102b1b1fb34c7cabaed4d18c3289f39248d7af4905400caf",
+                "displayName": "Read file",
+                "kind": "tool",
+                "logicalName": "readfile",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:6f828d2eace80b9d0156ca4ca4badd15fba57d8bd8267691b99aa8c049665a5c",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:6f828d2eace80b9d0156ca4ca4badd15fba57d8bd8267691b99aa8c049665a5c",
+          "locator": "tool.yaml",
+          "size": 904
+        }
+      ],
+      "fingerprint": "sha256:93c6ebc3ff7f9adfe04e8ff8b54dae62944c3279ed7673f78fa9ea2a31c77f82"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "readimage",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Read intrinsic metadata for a local image file, optionally including base64-encoded contents.",
+                  "displayName": "Read image",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/imagetool/readimage.ReadImage",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "includeBase64Data": {
+                        "default": false,
+                        "description": "If true, include the base64-encoded file contents in the output.",
+                        "type": "boolean"
+                      },
+                      "path": {
+                        "description": "Path of the image to read.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "readimage",
+                  "tags": [
+                    "image",
+                    "file"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Read intrinsic metadata for a local image file, optionally including base64-encoded contents.",
+                "digest": "sha256:cf980461f203879533710424d4d43def334583cbf45d1cbadf8a1bf7d605ebca",
+                "displayName": "Read image",
+                "kind": "tool",
+                "logicalName": "readimage",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:621ca692ede7951444376c754539c53d0b27dd7059342cd28fbc96e86e068372",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "image",
+      "files": [
+        {
+          "digest": "sha256:621ca692ede7951444376c754539c53d0b27dd7059342cd28fbc96e86e068372",
+          "locator": "tool.yaml",
+          "size": 691
+        }
+      ],
+      "fingerprint": "sha256:380d562fa3fcb832ee411703664e7984ed3a4fc8740526030fcefdff185b7f92"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "readtextrange",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Read a contiguous range of lines from a UTF-8 text file and return them with line numbers.",
+                  "displayName": "Read text range",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/readtextrange.ReadTextRange",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "lineCount": {
+                        "default": 1000,
+                        "description": "Optional number of lines to return. Defaults to 1000. Maximum 16000. If the file ends sooner, fewer lines are returned and eofReached will be true.",
+                        "maximum": 16000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "path": {
+                        "description": "Path of the UTF-8 text file.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "startLine": {
+                        "default": 1,
+                        "description": "Optional 1-based line number to start reading from. Defaults to 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "readtextrange",
+                  "tags": [
+                    "text"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Read a contiguous range of lines from a UTF-8 text file and return them with line numbers.",
+                "digest": "sha256:5ef2c4b068b1ae898f932d46603a7d7b192089db69aa98c7ee3a9bd2438b4af4",
+                "displayName": "Read text range",
+                "kind": "tool",
+                "logicalName": "readtextrange",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:04ee8680ca38035cb2f9114afa4e172878103627d0f4e0b7c335d290835977de",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:04ee8680ca38035cb2f9114afa4e172878103627d0f4e0b7c335d290835977de",
+          "locator": "tool.yaml",
+          "size": 952
+        }
+      ],
+      "fingerprint": "sha256:ad3090a00734282fbcc455c05e24752a6a32418a3319f154f75e3f7ed90e1923"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "replacetext",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Replace a text block in a UTF-8 text file with new text. Matching compares TrimSpace(line). Use textAbove and/or textBelow only to locate the intended occurrence. Use lineHint only when expectedCount is 1. The tool fails unless the number of matches equals expectedCount.",
+                  "displayName": "Replace text",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/texttool/replacetext.ReplaceText",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "expectedCount": {
+                        "default": 1,
+                        "description": "Fail unless exactly this many matches are found. Defaults to 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "lineHint": {
+                        "description": "Optional 1-based hint for the start line of oldText. Use only when expectedCount is 1.",
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "newText": {
+                        "description": "Replacement text block.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "oldText": {
+                        "description": "Exact text block to replace.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "path": {
+                        "description": "Path of file.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "textAbove": {
+                        "description": "Optional text above oldText used only to locate the occurrence.",
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "textBelow": {
+                        "description": "Optional text below oldText used only to locate the occurrence.",
+                        "minLength": 1,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "oldText",
+                      "newText"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "replacetext",
+                  "tags": [
+                    "text"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Replace a text block in a UTF-8 text file with new text. Matching compares TrimSpace(line). Use textAbove and/or textBelow only to locate the intended occurrence. Use lineHint only when expectedCount is 1. The tool fails unless the number of matches equals expectedCount.",
+                "digest": "sha256:bf332bf5ae2b578308064c292d7e4128abe5edb0403ca4a452b2dcf038e31955",
+                "displayName": "Replace text",
+                "kind": "tool",
+                "logicalName": "replacetext",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:60313326e4e02d7c890334f062afa82418ab8d0e130ba28f283cf79bd42bac78",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "text",
+      "files": [
+        {
+          "digest": "sha256:60313326e4e02d7c890334f062afa82418ab8d0e130ba28f283cf79bd42bac78",
+          "locator": "tool.yaml",
+          "size": 1455
+        }
+      ],
+      "fingerprint": "sha256:a962433adf8b6ced537e38c51167fc94728df0b13090e4d998b7741642ff1624"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "runscript",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Run an existing script from disk.",
+                  "displayName": "Run Script",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/exectool/runscript.RunScript",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "args": {
+                        "description": "Arguments passed to the script.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "env": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "Environment variable overrides (merged into the process env + tool base env).",
+                        "type": "object"
+                      },
+                      "path": {
+                        "description": "Path to the script. Can be absolute or relative. If relative and workdir is provided, resolves against workdir; otherwise resolves against the tool workBaseDir.",
+                        "type": "string"
+                      },
+                      "workDir": {
+                        "description": "Working directory. Can be absolute or relative to workBaseDir.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "runscript",
+                  "tags": [
+                    "exec"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Run an existing script from disk.",
+                "digest": "sha256:ad9039361f9c9ba1b13157cb565534f9a168ca9b4fe7bc6315d2f907359fd8d1",
+                "displayName": "Run Script",
+                "kind": "tool",
+                "logicalName": "runscript",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:04dcbf7567a48ac43eeefa58036082ee47c048c1f84b49c1406e84ba6747459a",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "exec",
+      "files": [
+        {
+          "digest": "sha256:04dcbf7567a48ac43eeefa58036082ee47c048c1f84b49c1406e84ba6747459a",
+          "locator": "tool.yaml",
+          "size": 985
+        }
+      ],
+      "fingerprint": "sha256:bbb2f5e77235eeabd5cea239cf0ffbbb1364b59f8369785146b19db8978c1613"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "searchfiles",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Recursively search files by path, file content, or both. Dot-prefixed files and directories are excluded by default. Content search only checks small (\u003c 1MB) UTF-8 text-like files.",
+                  "displayName": "Search files (content or path)",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/searchfiles.SearchFiles",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "caseSensitive": {
+                        "default": true,
+                        "description": "Whether matching is case-sensitive.",
+                        "type": "boolean"
+                      },
+                      "includeDotEntries": {
+                        "default": false,
+                        "description": "Include files and directories whose names start with '.'",
+                        "type": "boolean"
+                      },
+                      "maxResults": {
+                        "default": 100,
+                        "description": "Maximum matches to return.",
+                        "maximum": 1000,
+                        "minimum": 1,
+                        "type": "integer"
+                      },
+                      "nameGlob": {
+                        "description": "Optional basename glob to limit which files are searched, like \"*.go\".",
+                        "type": "string"
+                      },
+                      "query": {
+                        "description": "Search text to match against file paths and/or file content.",
+                        "type": "string"
+                      },
+                      "regexp": {
+                        "default": false,
+                        "description": "If true, interpret query as an RE2 regular expression. If false, match literal text.",
+                        "type": "boolean"
+                      },
+                      "root": {
+                        "default": ".",
+                        "description": "Directory to start searching from.",
+                        "type": "string"
+                      },
+                      "searchIn": {
+                        "default": "pathOrContent",
+                        "description": "Where to search for matches.",
+                        "enum": [
+                          "path",
+                          "content",
+                          "pathOrContent"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "query"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "searchfiles",
+                  "tags": [
+                    "fs",
+                    "search"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Recursively search files by path, file content, or both. Dot-prefixed files and directories are excluded by default. Content search only checks small (\u003c 1MB) UTF-8 text-like files.",
+                "digest": "sha256:1f57c82aea73b7d287ab1b010500dbc1e839c9a87e3750dde6a80bfa79762a2b",
+                "displayName": "Search files (content or path)",
+                "kind": "tool",
+                "logicalName": "searchfiles",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:8faa2bb5284ddcd060d81a98fa880848ac1323dc32da1f8836b29b8b968f0c75",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:8faa2bb5284ddcd060d81a98fa880848ac1323dc32da1f8836b29b8b968f0c75",
+          "locator": "tool.yaml",
+          "size": 1546
+        }
+      ],
+      "fingerprint": "sha256:278d3b6ed8946e7e2eb3e80f19cccf83f95769086bd4d4491fc98d41d3327156"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "shellcommand",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Execute local shell commands (cross-platform). Supports session-like persistence for workdir/env.",
+                  "displayName": "Shell Command",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/exectool/shellcommand.ShellCommand",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "commands": {
+                        "description": "List of commands to execute sequentially. Prefer setting workdir rather than using 'cd'.",
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      },
+                      "env": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "description": "Environment variable overrides (merged into the process env + tool base env + session env).",
+                        "type": "object"
+                      },
+                      "executeParallel": {
+                        "default": false,
+                        "description": "If true, treat commands as independent (do not stop on error).",
+                        "type": "boolean"
+                      },
+                      "sessionID": {
+                        "default": "",
+                        "description": "Optional session identifier. If omitted/empty, a new session is created and returned. Sessions persist workdir and env across calls (not a persistent shell process).",
+                        "type": "string"
+                      },
+                      "shell": {
+                        "default": "auto",
+                        "description": "Which shell to run. Prefer 'auto' which a safe default per OS unless explicit per shell behavior is needed.",
+                        "enum": [
+                          "auto",
+                          "bash",
+                          "zsh",
+                          "sh",
+                          "dash",
+                          "ksh",
+                          "fish",
+                          "pwsh",
+                          "powershell",
+                          "cmd"
+                        ],
+                        "type": "string"
+                      },
+                      "workDir": {
+                        "description": "Working directory to execute in. If omitted and sessionID is used, uses the session workdir; otherwise uses tools workBaseDir.",
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "name": "shellcommand",
+                  "tags": [
+                    "exec"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Execute local shell commands (cross-platform). Supports session-like persistence for workdir/env.",
+                "digest": "sha256:8a7338eead80c6fba54e50ca572a6ec205496c43f16afc6da185ef49e3d5d504",
+                "displayName": "Shell Command",
+                "kind": "tool",
+                "logicalName": "shellcommand",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:3c5c91c3e80a0171216ea2b5f7e897f95d89a842ac6eea41f7c8c0944a0b3e27",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "exec",
+      "files": [
+        {
+          "digest": "sha256:3c5c91c3e80a0171216ea2b5f7e897f95d89a842ac6eea41f7c8c0944a0b3e27",
+          "locator": "tool.yaml",
+          "size": 1582
+        }
+      ],
+      "fingerprint": "sha256:78aff67d9255b68579fed12479636b7af6eb3b3c40d64702dd688c3c0fbfc478"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "statpath",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": true,
+                  "description": "Return size, timestamps, and basic metadata for a file-system path without modifying it.",
+                  "displayName": "Inspect path",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/statpath.StatPath",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "path": {
+                        "description": "Path to inspect.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "statpath",
+                  "tags": [
+                    "fs",
+                    "stat"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Return size, timestamps, and basic metadata for a file-system path without modifying it.",
+                "digest": "sha256:b47cf5d27f4edbff6cea6b6aa6805e8bb54a65f6df80044ea55a0cc2209ed779",
+                "displayName": "Inspect path",
+                "kind": "tool",
+                "logicalName": "statpath",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:9e9fb542007b55763e87215380804a8d341582573fd0c67ef3d2b9f61ccaf16a",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:9e9fb542007b55763e87215380804a8d341582573fd0c67ef3d2b9f61ccaf16a",
+          "locator": "tool.yaml",
+          "size": 533
+        }
+      ],
+      "fingerprint": "sha256:2ab104969616c5b7bf55a8187c988effc89ffe667745224761757f6d35377169"
+    },
+    {
+      "address": {
+        "kind": "tool",
+        "name": "writefile",
+        "version": "v1.0.0"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "autoExecute": false,
+                  "description": "Write a file to disk. Set createParents=true if folders dont exist. Set overwrite=true to replace the file. Text mode writes UTF-8 text. Binary mode expects base64 input and writes raw bytes.",
+                  "displayName": "Write file",
+                  "implementation": {
+                    "function": "github.com/flexigpt/llmtools-go/fstool/writefile.WriteFile",
+                    "kind": "go"
+                  },
+                  "inputSchema": {
+                    "$schema": "http://json-schema.org/draft-07/schema#",
+                    "additionalProperties": false,
+                    "properties": {
+                      "content": {
+                        "description": "If encoding=text, UTF-8 content. If encoding=binary, base64-encoded bytes.",
+                        "type": "string"
+                      },
+                      "createParents": {
+                        "default": false,
+                        "description": "If true, create missing parent directories. Max new directories created is 8.",
+                        "type": "boolean"
+                      },
+                      "encoding": {
+                        "default": "text",
+                        "description": "Write mode.",
+                        "enum": [
+                          "text",
+                          "binary"
+                        ],
+                        "type": "string"
+                      },
+                      "overwrite": {
+                        "default": false,
+                        "description": "If false and the file exists, return an error. If true, create the file if needed or replace the existing file.",
+                        "type": "boolean"
+                      },
+                      "path": {
+                        "description": "Path of the file to write.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "content"
+                    ],
+                    "type": "object"
+                  },
+                  "name": "writefile",
+                  "tags": [
+                    "fs"
+                  ],
+                  "type": "tool",
+                  "version": "v1.0.0"
+                },
+                "description": "Write a file to disk. Set createParents=true if folders dont exist. Set overwrite=true to replace the file. Text mode writes UTF-8 text. Binary mode expects base64 input and writes raw bytes.",
+                "digest": "sha256:e863a2e27b133bd9f9b07cebb1463eb917e8e8eafe467ea67f59501a3c17f434",
+                "displayName": "Write file",
+                "kind": "tool",
+                "logicalName": "writefile",
+                "schemaID": "artifact.tool.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:c1c52593b4be29268c3d9dd3f0cc9fc6e62a5f8e48c66b976291be32698e9413",
+          "locator": "tool.yaml"
+        }
+      ],
+      "embeddedRoot": "fs",
+      "files": [
+        {
+          "digest": "sha256:c1c52593b4be29268c3d9dd3f0cc9fc6e62a5f8e48c66b976291be32698e9413",
+          "locator": "tool.yaml",
+          "size": 1189
+        }
+      ],
+      "fingerprint": "sha256:2d5c3e5e381ace456e7a25b2347e59a7bf48959924315a64140ba9818dc082da"
+    }
+  ]
+}

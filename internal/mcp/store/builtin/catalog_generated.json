@@ -1,0 +1,3421 @@
+{
+  "hydration": {
+    "fingerprint": "sha256:d2a016d588176f6154c0b4caec7d05076a99e5d517433d10b12c8f50cfa49e7f",
+    "installerName": "mcp",
+    "rootID": "0192c4c0-0000-7000-8000-000000000001",
+    "sourceID": "0192c4c0-0001-7000-8000-000000000001"
+  },
+  "name": "mcps",
+  "packages": [
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "cloudflare",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Cloudflare fully managed remote MCP servers.",
+                  "members": [
+                    {
+                      "name": "agents-docs",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Agents SDK Docs",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://agents.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "ai-gateway",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare AI Gateway",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://ai-gateway.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "api",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare API",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "auditlogs",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Audit Logs",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://auditlogs.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "autorag",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare AI Search / AutoRAG",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://autorag.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "browser-run",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Browser Run",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://browser.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builds",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Builds",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://builds.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "casb",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare One CASB",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://casb.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "container",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Container",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://containers.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "dex",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Digital Experience Monitoring",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://dex.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "dns-analytics",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare DNS Analytics",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://dns-analytics.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "cloudflare-docs",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Docs",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://docs.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "graphql",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare GraphQL",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://graphql.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "logs",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Logs",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://logs.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "observability",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Observability",
+                        "policy": {
+                          "name": "builtin-manual-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://observability.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "radar",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Radar",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://radar.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "workers",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Cloudflare Workers and Bindings",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://bindings.mcp.cloudflare.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-auto-read",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-read",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-cloudflare",
+                  "type": "plugin"
+                },
+                "description": "Cloudflare fully managed remote MCP servers.",
+                "digest": "sha256:f464234a4a3fbda04d3ef9102d7e3f2ab6d896d1f1eaac1bb2a5e3efe3a9fd5c",
+                "displayName": "mcp-cloudflare",
+                "kind": "plugin",
+                "logicalName": "mcp-cloudflare",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Agents SDK Docs",
+                  "name": "agents-docs",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agents.cloudflare.com/mcp"
+                },
+                "digest": "sha256:81f43b7d691d673de47653d8863c1dfb8256becb56f39172c04bf64771327cc2",
+                "displayName": "Cloudflare Agents SDK Docs",
+                "kind": "mcp",
+                "logicalName": "agents-docs",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/agents-docs"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare AI Gateway",
+                  "name": "ai-gateway",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://ai-gateway.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:93ac03474b9fbd0369987fbf7e04d59b918cbd30f6df1d4d5a8e4248bc7fdd4a",
+                "displayName": "Cloudflare AI Gateway",
+                "kind": "mcp",
+                "logicalName": "ai-gateway",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/ai-gateway"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare API",
+                  "name": "api",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:e78ff295311dd030adefd6d3c1761bed2f884f9651e9c932f7fed96fddd266ea",
+                "displayName": "Cloudflare API",
+                "kind": "mcp",
+                "logicalName": "api",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/api"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Audit Logs",
+                  "name": "auditlogs",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://auditlogs.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:3e9289cf335d2c58c2c1ab34964ca2a5e2fd0d0ee7908a236bd61ef502f2993c",
+                "displayName": "Cloudflare Audit Logs",
+                "kind": "mcp",
+                "logicalName": "auditlogs",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/auditlogs"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare AI Search / AutoRAG",
+                  "name": "autorag",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://autorag.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:eba41d2494b1d43204fab2bde0ab17d52cb27e59be08074ef92564b17066b6cb",
+                "displayName": "Cloudflare AI Search / AutoRAG",
+                "kind": "mcp",
+                "logicalName": "autorag",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/autorag"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Browser Run",
+                  "name": "browser-run",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://browser.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:f7885494e4381976de6f6cc3c0f5256ca2e77e357258e13f91311850549caef1",
+                "displayName": "Cloudflare Browser Run",
+                "kind": "mcp",
+                "logicalName": "browser-run",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/browser-run"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Builds",
+                  "name": "builds",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://builds.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:d8399242fc4b05d3d967efa5769899f7588ad23c2d546506cc7a058db333a826",
+                "displayName": "Cloudflare Builds",
+                "kind": "mcp",
+                "logicalName": "builds",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/builds"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare One CASB",
+                  "name": "casb",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://casb.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:c1e66751d47faea2c73359acf503e6263573d45f1fcf2279224b1b956792bd0f",
+                "displayName": "Cloudflare One CASB",
+                "kind": "mcp",
+                "logicalName": "casb",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/casb"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Docs",
+                  "name": "cloudflare-docs",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://docs.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:5000216566f82ae15106580764a85e7b51415b4ac4293c5f59ab7b7bf7008dce",
+                "displayName": "Cloudflare Docs",
+                "kind": "mcp",
+                "logicalName": "cloudflare-docs",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/cloudflare-docs"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Container",
+                  "name": "container",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://containers.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:50eabaefb46032efbf0a261ad977fd50b28b66ad2e57e5f939473293c51c8d10",
+                "displayName": "Cloudflare Container",
+                "kind": "mcp",
+                "logicalName": "container",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/container"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Digital Experience Monitoring",
+                  "name": "dex",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://dex.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:feb8785f501c58e2355899985a1c189a1f73b629d2793dafea616e7bff60ab05",
+                "displayName": "Cloudflare Digital Experience Monitoring",
+                "kind": "mcp",
+                "logicalName": "dex",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/dex"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare DNS Analytics",
+                  "name": "dns-analytics",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://dns-analytics.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:5bbc8df6d108192d95128b7ead90673d127f151b00988b8e797ef4b42b67400f",
+                "displayName": "Cloudflare DNS Analytics",
+                "kind": "mcp",
+                "logicalName": "dns-analytics",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/dns-analytics"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare GraphQL",
+                  "name": "graphql",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://graphql.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:6d840204a6104ec6bfe23d581214de785fde3e3f35861cc6413ad891b91bf778",
+                "displayName": "Cloudflare GraphQL",
+                "kind": "mcp",
+                "logicalName": "graphql",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/graphql"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Logs",
+                  "name": "logs",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://logs.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:21f36c9101f2d8f239d1ec8e9ab51039eeac8ab10437eb0fc94b85ca7bf8cb7b",
+                "displayName": "Cloudflare Logs",
+                "kind": "mcp",
+                "logicalName": "logs",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/logs"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Observability",
+                  "name": "observability",
+                  "policy": {
+                    "name": "builtin-manual-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://observability.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:1b85d716b93ceca42bf08903cb33dfca0658cdeea8eaffd9b37b8783aefd28f9",
+                "displayName": "Cloudflare Observability",
+                "kind": "mcp",
+                "logicalName": "observability",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/observability"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Radar",
+                  "name": "radar",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://radar.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:a556208f361a197edaa129d32badfbe3328f3a45acd0545bde86ffe0cce0e4dc",
+                "displayName": "Cloudflare Radar",
+                "kind": "mcp",
+                "logicalName": "radar",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/radar"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Cloudflare Workers and Bindings",
+                  "name": "workers",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://bindings.mcp.cloudflare.com/mcp"
+                },
+                "digest": "sha256:432fd15201a4e88e4e6e3c0b08a919d7fff8930d895daf2da1b42502db9fc213",
+                "displayName": "Cloudflare Workers and Bindings",
+                "kind": "mcp",
+                "logicalName": "workers",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/workers"
+            }
+          ],
+          "digest": "sha256:beff391901ab8ebe713dff85b316223e22ed3ca5ee21c6fc55b9f4ef66dd4615",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "cloudflare",
+      "files": [
+        {
+          "digest": "sha256:beff391901ab8ebe713dff85b316223e22ed3ca5ee21c6fc55b9f4ef66dd4615",
+          "locator": "plugin.yaml",
+          "size": 4917
+        }
+      ],
+      "fingerprint": "sha256:7e80816e359e6f0834cecbf6066198c504b16314993d73f25a2e61d96aae106d"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "design",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in MCP server definitions for design tools.",
+                  "members": [
+                    {
+                      "name": "canva",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Canva",
+                        "install": {
+                          "note": "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.canva.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "figma-remote",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Figma (Remote)",
+                        "install": {
+                          "note": "Official Figma remote MCP server. Figma canvas mutations remain manually approved."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write-no-destructive",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.figma.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write-no-destructive",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-design",
+                  "type": "plugin"
+                },
+                "description": "Built-in MCP server definitions for design tools.",
+                "digest": "sha256:3bd77155514d31c8c0c68fcae543d886f7c761a8744186ebbf4d5b95436a36c7",
+                "displayName": "mcp-design",
+                "kind": "plugin",
+                "logicalName": "mcp-design",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Canva",
+                  "install": {
+                    "note": "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+                  },
+                  "name": "canva",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.canva.com/mcp"
+                },
+                "digest": "sha256:eb7069bac53e46e971003a63e2a71b96c1a0edfdceec77cc813a421f3670a536",
+                "displayName": "Canva",
+                "kind": "mcp",
+                "logicalName": "canva",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/canva"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Figma (Remote)",
+                  "install": {
+                    "note": "Official Figma remote MCP server. Figma canvas mutations remain manually approved."
+                  },
+                  "name": "figma-remote",
+                  "policy": {
+                    "name": "builtin-manual-write-no-destructive",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.figma.com/mcp"
+                },
+                "digest": "sha256:f920c8504a4862d5b26c2c230e5fe288e1b5f075c3dd0d5f179acae14b7107da",
+                "displayName": "Figma (Remote)",
+                "kind": "mcp",
+                "logicalName": "figma-remote",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/figma-remote"
+            }
+          ],
+          "digest": "sha256:81ffb1e83d6b7be5253f1cde3ad9ea9dec375375ac9829b86dd698c07d38d576",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "design",
+      "files": [
+        {
+          "digest": "sha256:81ffb1e83d6b7be5253f1cde3ad9ea9dec375375ac9829b86dd698c07d38d576",
+          "locator": "plugin.yaml",
+          "size": 1043
+        }
+      ],
+      "fingerprint": "sha256:0ab4df72ce902e66f99d55044362264d21ed67da64b72e0ad0fc0d0716a89c2c"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "general-services",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in MCP server definitions for Box, BGPT, and Indeed.",
+                  "members": [
+                    {
+                      "name": "bgpt",
+                      "parameters": {
+                        "auth": {
+                          "mode": "none"
+                        },
+                        "displayName": "BGPT (Scientific Papers)",
+                        "headers": {
+                          "Authorization": "Bearer ${BGPT_API_KEY}"
+                        },
+                        "install": {
+                          "inputs": {
+                            "BGPT_API_KEY": {
+                              "description": "Optional paid BGPT subscription token.",
+                              "kind": "secret",
+                              "label": "BGPT API Key",
+                              "required": false
+                            }
+                          },
+                          "note": "The free BGPT tier does not require a key. A configured key is sent as a bearer token."
+                        },
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://bgpt.pro/mcp/stream"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "box",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "BOX_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Box",
+                        "install": {
+                          "inputs": {
+                            "BOX_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from Box Integration Credentials.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Box OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Box requires Integration Credentials and a registered OAuth redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.box.com"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "indeed",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Indeed",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.indeed.com/claude/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-auto-read",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-general-services",
+                  "type": "plugin"
+                },
+                "description": "Built-in MCP server definitions for Box, BGPT, and Indeed.",
+                "digest": "sha256:b6126290b015b11d1a32d2da3109fab905080ef013a9c5f4a4d22a85a727bb69",
+                "displayName": "mcp-general-services",
+                "kind": "plugin",
+                "logicalName": "mcp-general-services",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "none"
+                  },
+                  "displayName": "BGPT (Scientific Papers)",
+                  "headers": {
+                    "Authorization": "Bearer ${BGPT_API_KEY}"
+                  },
+                  "install": {
+                    "inputs": {
+                      "BGPT_API_KEY": {
+                        "description": "Optional paid BGPT subscription token.",
+                        "kind": "secret",
+                        "label": "BGPT API Key",
+                        "required": false
+                      }
+                    },
+                    "note": "The free BGPT tier does not require a key. A configured key is sent as a bearer token."
+                  },
+                  "name": "bgpt",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://bgpt.pro/mcp/stream"
+                },
+                "digest": "sha256:b061cd4cbfe4bf30b37bd883488e9a2db86ca648670edca80ff3f544f0f8e27a",
+                "displayName": "BGPT (Scientific Papers)",
+                "kind": "mcp",
+                "logicalName": "bgpt",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/bgpt"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "BOX_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Box",
+                  "install": {
+                    "inputs": {
+                      "BOX_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from Box Integration Credentials.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Box OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Box requires Integration Credentials and a registered OAuth redirect URI."
+                  },
+                  "name": "box",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.box.com"
+                },
+                "digest": "sha256:ef234845720649953233d0a451de6edad8c462baa385ba439e4fa08cbcbbcd31",
+                "displayName": "Box",
+                "kind": "mcp",
+                "logicalName": "box",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/box"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Indeed",
+                  "name": "indeed",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.indeed.com/claude/mcp"
+                },
+                "digest": "sha256:57bdaf8830bb72e1bea8e6c3eee1dcfe2bcb25d061574231023386c8dee54df4",
+                "displayName": "Indeed",
+                "kind": "mcp",
+                "logicalName": "indeed",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/indeed"
+            }
+          ],
+          "digest": "sha256:59a03adb875f1f8a6eb76e24f9d737f63cda08f70eccc6bf8a36d36237f0da9a",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "general-services",
+      "files": [
+        {
+          "digest": "sha256:59a03adb875f1f8a6eb76e24f9d737f63cda08f70eccc6bf8a36d36237f0da9a",
+          "locator": "plugin.yaml",
+          "size": 1762
+        }
+      ],
+      "fingerprint": "sha256:86a6b196df9e9f9e3c7029bdc456852d6a016ce7bcc78e567ea1f6f9ddc66c14"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "google",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Google managed remote MCP servers.",
+                  "members": [
+                    {
+                      "name": "bigquery",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google BigQuery",
+                        "install": {
+                          "inputs": {
+                            "GOOGLE_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "OAuth client ID and client secret from Google Auth Platform.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Google OAuth Client",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://bigquery.googleapis.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "calendar",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google Calendar",
+                        "install": {
+                          "inputs": {
+                            "GOOGLE_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "OAuth client ID and client secret from Google Auth Platform.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Google OAuth Client",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://calendarmcp.googleapis.com/mcp/v1"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "compute",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google Compute Engine",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://compute.googleapis.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "gke",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google Kubernetes Engine",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://container.googleapis.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "gmail",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google Gmail",
+                        "install": {
+                          "inputs": {
+                            "GOOGLE_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "OAuth client ID and client secret from Google Auth Platform.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Google OAuth Client",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://gmailmcp.googleapis.com/mcp/v1"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "maps",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Google Maps",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mapstools.googleapis.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-read",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-google",
+                  "type": "plugin"
+                },
+                "description": "Google managed remote MCP servers.",
+                "digest": "sha256:1a5a3db7831fa227b294010b8d2d598455d8cc282b72defe160666b47c8446d8",
+                "displayName": "mcp-google",
+                "kind": "plugin",
+                "logicalName": "mcp-google",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google BigQuery",
+                  "install": {
+                    "inputs": {
+                      "GOOGLE_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "OAuth client ID and client secret from Google Auth Platform.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Google OAuth Client",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "bigquery",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://bigquery.googleapis.com/mcp"
+                },
+                "digest": "sha256:22853c651141dafccf656ce4be31c65e6432e1f67f801236ec8e1e9c7e01c29e",
+                "displayName": "Google BigQuery",
+                "kind": "mcp",
+                "logicalName": "bigquery",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/bigquery"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google Calendar",
+                  "install": {
+                    "inputs": {
+                      "GOOGLE_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "OAuth client ID and client secret from Google Auth Platform.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Google OAuth Client",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "calendar",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://calendarmcp.googleapis.com/mcp/v1"
+                },
+                "digest": "sha256:fa7b0c79df02866025615117998cd45c4f2489e14ab1ec5e3408f62a1265d53b",
+                "displayName": "Google Calendar",
+                "kind": "mcp",
+                "logicalName": "calendar",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/calendar"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google Compute Engine",
+                  "name": "compute",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://compute.googleapis.com/mcp"
+                },
+                "digest": "sha256:f558401fa5c3a2158e5e5fbf1ea2b2250ecf8139bcf60390ffc681a2152f0b1e",
+                "displayName": "Google Compute Engine",
+                "kind": "mcp",
+                "logicalName": "compute",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/compute"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google Kubernetes Engine",
+                  "name": "gke",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://container.googleapis.com/mcp"
+                },
+                "digest": "sha256:1a5091f1f016b79b30c68976fc850f6b0029343f398d90d2afd751cff7ad5f9c",
+                "displayName": "Google Kubernetes Engine",
+                "kind": "mcp",
+                "logicalName": "gke",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/gke"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "GOOGLE_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google Gmail",
+                  "install": {
+                    "inputs": {
+                      "GOOGLE_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "OAuth client ID and client secret from Google Auth Platform.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Google OAuth Client",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "gmail",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://gmailmcp.googleapis.com/mcp/v1"
+                },
+                "digest": "sha256:02622e1e12819920b837769751262d299c44d03c448f292dc1f48c3e06b7ec5c",
+                "displayName": "Google Gmail",
+                "kind": "mcp",
+                "logicalName": "gmail",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/gmail"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Google Maps",
+                  "name": "maps",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mapstools.googleapis.com/mcp"
+                },
+                "digest": "sha256:809c1683e88c7d90284b0557fe3ac25e0bea46573821e8edb06cdbc2bd9ad087",
+                "displayName": "Google Maps",
+                "kind": "mcp",
+                "logicalName": "maps",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/maps"
+            }
+          ],
+          "digest": "sha256:1ac84c89ee8b13c77745bfe17e079510f21baad3cf5d0fc222ab68f844779633",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "google",
+      "files": [
+        {
+          "digest": "sha256:1ac84c89ee8b13c77745bfe17e079510f21baad3cf5d0fc222ab68f844779633",
+          "locator": "plugin.yaml",
+          "size": 2945
+        }
+      ],
+      "fingerprint": "sha256:e3d7e0abb5eb025be3e95de7c83ed1cd7ec8b44ce3af1424057906fc70d5e2a9"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "microsoft",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Microsoft-hosted remote MCP servers.",
+                  "members": [
+                    {
+                      "name": "m365-copilot",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Microsoft 365 Copilot",
+                        "install": {
+                          "inputs": {
+                            "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "description": "Client ID and optional client secret for a public PKCE or confidential Entra application.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Microsoft Entra OAuth Client",
+                              "required": true
+                            },
+                            "MICROSOFT_TENANT_ID": {
+                              "kind": "text",
+                              "label": "Microsoft Entra Tenant ID",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-read",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "onedrive",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Microsoft OneDrive",
+                        "install": {
+                          "inputs": {
+                            "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "kind": "oauthClientCredentials",
+                              "label": "Microsoft Entra OAuth Client",
+                              "required": true
+                            },
+                            "MICROSOFT_TENANT_ID": {
+                              "kind": "text",
+                              "label": "Microsoft Entra Tenant ID",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "sharepoint",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Microsoft SharePoint",
+                        "install": {
+                          "inputs": {
+                            "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "kind": "oauthClientCredentials",
+                              "label": "Microsoft Entra OAuth Client",
+                              "required": true
+                            },
+                            "MICROSOFT_TENANT_ID": {
+                              "kind": "text",
+                              "label": "Microsoft Entra Tenant ID",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "timeoutMS": 60000,
+                        "transport": "streamableHTTP",
+                        "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "teams",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Microsoft Teams",
+                        "install": {
+                          "inputs": {
+                            "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "kind": "oauthClientCredentials",
+                              "label": "Microsoft Entra OAuth Client",
+                              "required": true
+                            },
+                            "MICROSOFT_TENANT_ID": {
+                              "kind": "text",
+                              "label": "Microsoft Entra Tenant ID",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "user",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Microsoft User Profile",
+                        "install": {
+                          "inputs": {
+                            "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "kind": "oauthClientCredentials",
+                              "label": "Microsoft Entra OAuth Client",
+                              "required": true
+                            },
+                            "MICROSOFT_TENANT_ID": {
+                              "kind": "text",
+                              "label": "Microsoft Entra Tenant ID",
+                              "required": true
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-read",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-read",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-microsoft",
+                  "type": "plugin"
+                },
+                "description": "Microsoft-hosted remote MCP servers.",
+                "digest": "sha256:af4ba9514371f87822b80a1c003d8d3ea9ecfeee0ff3f3902168347d9a87ecac",
+                "displayName": "mcp-microsoft",
+                "kind": "plugin",
+                "logicalName": "mcp-microsoft",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Microsoft 365 Copilot",
+                  "install": {
+                    "inputs": {
+                      "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "description": "Client ID and optional client secret for a public PKCE or confidential Entra application.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Microsoft Entra OAuth Client",
+                        "required": true
+                      },
+                      "MICROSOFT_TENANT_ID": {
+                        "kind": "text",
+                        "label": "Microsoft Entra Tenant ID",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "m365-copilot",
+                  "policy": {
+                    "name": "builtin-manual-read",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot"
+                },
+                "digest": "sha256:a7477403e8fe70fd376615fbc793c5170efad45490135d431a5824eeb2fefd5f",
+                "displayName": "Microsoft 365 Copilot",
+                "kind": "mcp",
+                "logicalName": "m365-copilot",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/m365-copilot"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Microsoft OneDrive",
+                  "install": {
+                    "inputs": {
+                      "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "kind": "oauthClientCredentials",
+                        "label": "Microsoft Entra OAuth Client",
+                        "required": true
+                      },
+                      "MICROSOFT_TENANT_ID": {
+                        "kind": "text",
+                        "label": "Microsoft Entra Tenant ID",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "onedrive",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer"
+                },
+                "digest": "sha256:e17603a548cf125af37c54f9d6bfcd599890ee90f2fb8c1d3f26d47b530701b0",
+                "displayName": "Microsoft OneDrive",
+                "kind": "mcp",
+                "logicalName": "onedrive",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/onedrive"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Microsoft SharePoint",
+                  "install": {
+                    "inputs": {
+                      "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "kind": "oauthClientCredentials",
+                        "label": "Microsoft Entra OAuth Client",
+                        "required": true
+                      },
+                      "MICROSOFT_TENANT_ID": {
+                        "kind": "text",
+                        "label": "Microsoft Entra Tenant ID",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "sharepoint",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "timeoutMS": 60000,
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer"
+                },
+                "digest": "sha256:10e3651fb955d97848d326907385e80b6e46e64625318ab79e38328c4f93b3dd",
+                "displayName": "Microsoft SharePoint",
+                "kind": "mcp",
+                "logicalName": "sharepoint",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/sharepoint"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Microsoft Teams",
+                  "install": {
+                    "inputs": {
+                      "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "kind": "oauthClientCredentials",
+                        "label": "Microsoft Entra OAuth Client",
+                        "required": true
+                      },
+                      "MICROSOFT_TENANT_ID": {
+                        "kind": "text",
+                        "label": "Microsoft Entra Tenant ID",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "teams",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer"
+                },
+                "digest": "sha256:66a8ccfa168ef255405ee0f35a33e2240be140e7fec36a37c3e41b34f0ec8ba1",
+                "displayName": "Microsoft Teams",
+                "kind": "mcp",
+                "logicalName": "teams",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/teams"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Microsoft User Profile",
+                  "install": {
+                    "inputs": {
+                      "MICROSOFT_ENTRA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "kind": "oauthClientCredentials",
+                        "label": "Microsoft Entra OAuth Client",
+                        "required": true
+                      },
+                      "MICROSOFT_TENANT_ID": {
+                        "kind": "text",
+                        "label": "Microsoft Entra Tenant ID",
+                        "required": true
+                      }
+                    }
+                  },
+                  "name": "user",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer"
+                },
+                "digest": "sha256:586df861eb57a208ff2adf3fda832075ded94a469ed74f9f245b43641dca7c87",
+                "displayName": "Microsoft User Profile",
+                "kind": "mcp",
+                "logicalName": "user",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/user"
+            }
+          ],
+          "digest": "sha256:969c08ae8d0a033e796db1fa4d30ad9bcde78d9fdee5a3012c72e36447034061",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "microsoft",
+      "files": [
+        {
+          "digest": "sha256:969c08ae8d0a033e796db1fa4d30ad9bcde78d9fdee5a3012c72e36447034061",
+          "locator": "plugin.yaml",
+          "size": 4181
+        }
+      ],
+      "fingerprint": "sha256:a482d8de91c97d83e6dc9018a5b176c5ef72f2a8d09589a9f502330e232f95a8"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "policies",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Shared policies for application-provided MCP servers.",
+                  "members": [
+                    {
+                      "name": "builtin-auto-read",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "auto",
+                          "requireApprovalForDestructive": false,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": false
+                        },
+                        "description": "Trusted automatic read policy.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-read",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "manual",
+                          "requireApprovalForDestructive": false,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": false
+                        },
+                        "description": "Trusted read policy that requires manual execution.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "manual",
+                          "requireApprovalForDestructive": true,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": true
+                        },
+                        "description": "Trusted write policy that requires manual execution.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write-no-destructive",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "manual",
+                          "requireApprovalForDestructive": false,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": true
+                        },
+                        "description": "Manual write policy without destructive-risk approval.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-write",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "auto",
+                          "requireApprovalForDestructive": true,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": true
+                        },
+                        "description": "Trusted automatic write policy.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-write-apps",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": true,
+                          "enabled": true,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "auto",
+                          "requireApprovalForDestructive": true,
+                          "requireApprovalForUnknownRisk": true,
+                          "requireApprovalForWrite": true
+                        },
+                        "description": "Trusted automatic write policy with MCP Apps support.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-context7-default",
+                      "parameters": {
+                        "appsPolicy": {
+                          "allowAppInitiatedToolCalls": false,
+                          "enabled": false,
+                          "requireApprovalForContextUpdates": true,
+                          "requireApprovalForOpenLink": true
+                        },
+                        "defaultPolicy": {
+                          "defaultApprovalRule": "allow",
+                          "defaultExecutionMode": "auto",
+                          "requireApprovalForDestructive": true,
+                          "requireApprovalForUnknownRisk": false,
+                          "requireApprovalForWrite": true
+                        },
+                        "description": "Context7 default policy.",
+                        "trustLevel": "trusted"
+                      },
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-builtin-policies",
+                  "type": "plugin"
+                },
+                "description": "Shared policies for application-provided MCP servers.",
+                "digest": "sha256:2cdddf6a6d2da04aca16e7069b5b59b398104ba25c696f2a2e88791d353782d2",
+                "displayName": "mcp-builtin-policies",
+                "kind": "plugin",
+                "logicalName": "mcp-builtin-policies",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "auto",
+                    "requireApprovalForDestructive": false,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": false
+                  },
+                  "description": "Trusted automatic read policy.",
+                  "name": "builtin-auto-read",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Trusted automatic read policy.",
+                "digest": "sha256:ebeb25fbef9d3bdcbb65ba513230788a076ccf392a7ab2b28e1767d4d76f8be4",
+                "displayName": "builtin-auto-read",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-auto-read",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-auto-read"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "auto",
+                    "requireApprovalForDestructive": true,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": true
+                  },
+                  "description": "Trusted automatic write policy.",
+                  "name": "builtin-auto-write",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Trusted automatic write policy.",
+                "digest": "sha256:3cc4082a087b8eaf518dd2e8447dbb6945899583de95675240321847288f7b5d",
+                "displayName": "builtin-auto-write",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-auto-write",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-auto-write"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": true,
+                    "enabled": true,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "auto",
+                    "requireApprovalForDestructive": true,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": true
+                  },
+                  "description": "Trusted automatic write policy with MCP Apps support.",
+                  "name": "builtin-auto-write-apps",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Trusted automatic write policy with MCP Apps support.",
+                "digest": "sha256:94fac10d0131b8133a550eb649423bbc016218cfc0ab4555e7989d3d441996b6",
+                "displayName": "builtin-auto-write-apps",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-auto-write-apps",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-auto-write-apps"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "auto",
+                    "requireApprovalForDestructive": true,
+                    "requireApprovalForUnknownRisk": false,
+                    "requireApprovalForWrite": true
+                  },
+                  "description": "Context7 default policy.",
+                  "name": "builtin-context7-default",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Context7 default policy.",
+                "digest": "sha256:7308a8023700f8b230e973850f6adf170470a301c0fa787d67a9feca8e82aa07",
+                "displayName": "builtin-context7-default",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-context7-default",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-context7-default"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "manual",
+                    "requireApprovalForDestructive": false,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": false
+                  },
+                  "description": "Trusted read policy that requires manual execution.",
+                  "name": "builtin-manual-read",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Trusted read policy that requires manual execution.",
+                "digest": "sha256:b7547300c7a4ac28da820580dd03273643e74839c52c59e600e6ee0cb90f6f7c",
+                "displayName": "builtin-manual-read",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-manual-read",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-manual-read"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "manual",
+                    "requireApprovalForDestructive": true,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": true
+                  },
+                  "description": "Trusted write policy that requires manual execution.",
+                  "name": "builtin-manual-write",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Trusted write policy that requires manual execution.",
+                "digest": "sha256:65b8ef62a472bfebdf20b075ae0daa1ab1ee9f6a25108eebada9e9f23833084b",
+                "displayName": "builtin-manual-write",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-manual-write",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-manual-write"
+            },
+            {
+              "definition": {
+                "body": {
+                  "appsPolicy": {
+                    "allowAppInitiatedToolCalls": false,
+                    "enabled": false,
+                    "requireApprovalForContextUpdates": true,
+                    "requireApprovalForOpenLink": true
+                  },
+                  "defaultPolicy": {
+                    "defaultApprovalRule": "allow",
+                    "defaultExecutionMode": "manual",
+                    "requireApprovalForDestructive": false,
+                    "requireApprovalForUnknownRisk": true,
+                    "requireApprovalForWrite": true
+                  },
+                  "description": "Manual write policy without destructive-risk approval.",
+                  "name": "builtin-manual-write-no-destructive",
+                  "trustLevel": "trusted",
+                  "type": "mcp.policy"
+                },
+                "description": "Manual write policy without destructive-risk approval.",
+                "digest": "sha256:8f29f0f96cf00e490cbff3f312f8fead337c54cb90c91fe6c5a45de47a99be00",
+                "displayName": "builtin-manual-write-no-destructive",
+                "kind": "mcp.policy",
+                "logicalName": "builtin-manual-write-no-destructive",
+                "schemaID": "artifact.mcp-policy.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp.policy/builtin-manual-write-no-destructive"
+            }
+          ],
+          "digest": "sha256:7a077b11b679b527065421b2c0b0a240aa0609d11fb2118f59c5e5b5b095b329",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "policies",
+      "files": [
+        {
+          "digest": "sha256:7a077b11b679b527065421b2c0b0a240aa0609d11fb2118f59c5e5b5b095b329",
+          "locator": "plugin.yaml",
+          "size": 3957
+        }
+      ],
+      "fingerprint": "sha256:0cc5299a6a0fa1b70160a5d7d9090d2644807ad6f6c5fea3572818567236ef9c"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "search",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in MCP servers for web and documentation search.",
+                  "members": [
+                    {
+                      "name": "context7",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "description": "Context7 documentation MCP server.",
+                        "displayName": "Context7",
+                        "policy": {
+                          "name": "builtin-context7-default",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.context7.com/mcp/oauth"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "exa",
+                      "parameters": {
+                        "auth": {
+                          "mode": "none"
+                        },
+                        "description": "Exa web and research search MCP server.",
+                        "displayName": "Exa Search",
+                        "headers": {
+                          "x-api-key": "${EXA_API_KEY}"
+                        },
+                        "install": {
+                          "inputs": {
+                            "EXA_API_KEY": {
+                              "description": "Optional Exa API key for higher limits and Agent tools.",
+                              "kind": "secret",
+                              "label": "Exa API Key",
+                              "required": false
+                            }
+                          }
+                        },
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.exa.ai/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "stack-overflow",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "description": "Stack Overflow MCP server.",
+                        "displayName": "Stack Overflow",
+                        "policy": {
+                          "name": "builtin-auto-read",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.stackoverflow.com"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-context7-default",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-read",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-search",
+                  "type": "plugin"
+                },
+                "description": "Built-in MCP servers for web and documentation search.",
+                "digest": "sha256:49cb10fa24a14fe255cfb90368efb92102494ffe3cd89a39002854f2e1f2ccc1",
+                "displayName": "mcp-search",
+                "kind": "plugin",
+                "logicalName": "mcp-search",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "description": "Context7 documentation MCP server.",
+                  "displayName": "Context7",
+                  "name": "context7",
+                  "policy": {
+                    "name": "builtin-context7-default",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.context7.com/mcp/oauth"
+                },
+                "description": "Context7 documentation MCP server.",
+                "digest": "sha256:bc542156c4ddb2a49bc963801a37c678b3739b3d35a7e071bd5a157fd7148100",
+                "displayName": "Context7",
+                "kind": "mcp",
+                "logicalName": "context7",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/context7"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "none"
+                  },
+                  "description": "Exa web and research search MCP server.",
+                  "displayName": "Exa Search",
+                  "headers": {
+                    "x-api-key": "${EXA_API_KEY}"
+                  },
+                  "install": {
+                    "inputs": {
+                      "EXA_API_KEY": {
+                        "description": "Optional Exa API key for higher limits and Agent tools.",
+                        "kind": "secret",
+                        "label": "Exa API Key",
+                        "required": false
+                      }
+                    }
+                  },
+                  "name": "exa",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.exa.ai/mcp"
+                },
+                "description": "Exa web and research search MCP server.",
+                "digest": "sha256:d5f669490ef8961dc96365a5906bffd752d02ddce3df70704498fefe0b52e3c7",
+                "displayName": "Exa Search",
+                "kind": "mcp",
+                "logicalName": "exa",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/exa"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "description": "Stack Overflow MCP server.",
+                  "displayName": "Stack Overflow",
+                  "name": "stack-overflow",
+                  "policy": {
+                    "name": "builtin-auto-read",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.stackoverflow.com"
+                },
+                "description": "Stack Overflow MCP server.",
+                "digest": "sha256:9a5dd9a3f1aae403f21ccc410ad0f657a3b986746d8e8128fee9959cca6be4f2",
+                "displayName": "Stack Overflow",
+                "kind": "mcp",
+                "logicalName": "stack-overflow",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/stack-overflow"
+            }
+          ],
+          "digest": "sha256:d27ecfd2a2f0ccf8f6f3303ff178c4f99043f3421efd4d6ee78f6982ba4c4908",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "search",
+      "files": [
+        {
+          "digest": "sha256:d27ecfd2a2f0ccf8f6f3303ff178c4f99043f3421efd4d6ee78f6982ba4c4908",
+          "locator": "plugin.yaml",
+          "size": 1405
+        }
+      ],
+      "fingerprint": "sha256:ec15e4798a307c84de51f93193558ff98781b49bd856518710c4f51283f1f229"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "software-dev-hosting",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in MCP servers for GitHub, Vercel, Netlify, and Hugging Face.",
+                  "members": [
+                    {
+                      "name": "github-oauth",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "GitHub",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://api.githubcopilot.com/mcp/"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "github-pat",
+                      "parameters": {
+                        "auth": {
+                          "mode": "apiKey"
+                        },
+                        "displayName": "GitHub (PAT)",
+                        "headers": {
+                          "Authorization": "Bearer ${GITHUB_PAT}",
+                          "X-MCP-Insiders": "true"
+                        },
+                        "install": {
+                          "inputs": {
+                            "GITHUB_PAT": {
+                              "description": "Sent as an Authorization bearer token.",
+                              "kind": "secret",
+                              "label": "GitHub Personal Access Token",
+                              "placeholder": "github_pat_... or ghp_...",
+                              "required": true
+                            }
+                          },
+                          "note": "Use a minimally scoped GitHub personal access token. OAuth remains preferred when available."
+                        },
+                        "policy": {
+                          "name": "builtin-auto-write-apps",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://api.githubcopilot.com/mcp/"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "huggingface",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Hugging Face",
+                        "policy": {
+                          "name": "builtin-manual-write-no-destructive",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://huggingface.co/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "netlify",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Netlify",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://netlify-mcp.netlify.app/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "vercel",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Vercel",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.vercel.com"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-manual-write-no-destructive",
+                      "type": "mcp.policy"
+                    },
+                    {
+                      "name": "builtin-auto-write-apps",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-software-dev-hosting",
+                  "type": "plugin"
+                },
+                "description": "Built-in MCP servers for GitHub, Vercel, Netlify, and Hugging Face.",
+                "digest": "sha256:e30cc9a1323e83669d55989057e048dae302252c90580d236467cf1a7f9cf07d",
+                "displayName": "mcp-software-dev-hosting",
+                "kind": "plugin",
+                "logicalName": "mcp-software-dev-hosting",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "GitHub",
+                  "name": "github-oauth",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://api.githubcopilot.com/mcp/"
+                },
+                "digest": "sha256:52386c13999a435aff19dd2046fe0edc6605280f2e6b67e879e9ec4e2f118a46",
+                "displayName": "GitHub",
+                "kind": "mcp",
+                "logicalName": "github-oauth",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/github-oauth"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "apiKey"
+                  },
+                  "displayName": "GitHub (PAT)",
+                  "headers": {
+                    "Authorization": "Bearer ${GITHUB_PAT}",
+                    "X-MCP-Insiders": "true"
+                  },
+                  "install": {
+                    "inputs": {
+                      "GITHUB_PAT": {
+                        "description": "Sent as an Authorization bearer token.",
+                        "kind": "secret",
+                        "label": "GitHub Personal Access Token",
+                        "placeholder": "github_pat_... or ghp_...",
+                        "required": true
+                      }
+                    },
+                    "note": "Use a minimally scoped GitHub personal access token. OAuth remains preferred when available."
+                  },
+                  "name": "github-pat",
+                  "policy": {
+                    "name": "builtin-auto-write-apps",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://api.githubcopilot.com/mcp/"
+                },
+                "digest": "sha256:8d7231d353b1041091d2b8a71efbd967d701f461c9c822592497b63eee46d91e",
+                "displayName": "GitHub (PAT)",
+                "kind": "mcp",
+                "logicalName": "github-pat",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/github-pat"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Hugging Face",
+                  "name": "huggingface",
+                  "policy": {
+                    "name": "builtin-manual-write-no-destructive",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://huggingface.co/mcp"
+                },
+                "digest": "sha256:f4994963d8963b8ddeb5366ecbb1e68f46932350dc2a6f5bcc285c1211801448",
+                "displayName": "Hugging Face",
+                "kind": "mcp",
+                "logicalName": "huggingface",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/huggingface"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Netlify",
+                  "name": "netlify",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://netlify-mcp.netlify.app/mcp"
+                },
+                "digest": "sha256:5070588aaa3de9a2e78a3b354430ad2a1882d464c52a6ac72c24bbadadb6cb60",
+                "displayName": "Netlify",
+                "kind": "mcp",
+                "logicalName": "netlify",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/netlify"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Vercel",
+                  "name": "vercel",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.vercel.com"
+                },
+                "digest": "sha256:bf5f27251957910ae339a6da88a0a4da8d5a4607b83bfeecfd0f948d874da24e",
+                "displayName": "Vercel",
+                "kind": "mcp",
+                "logicalName": "vercel",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/vercel"
+            }
+          ],
+          "digest": "sha256:f965c9723dac3125d80aaaf78f641510573468f3b0b201d1b21e836ea129dda9",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "software-dev-hosting",
+      "files": [
+        {
+          "digest": "sha256:f965c9723dac3125d80aaaf78f641510573468f3b0b201d1b21e836ea129dda9",
+          "locator": "plugin.yaml",
+          "size": 2077
+        }
+      ],
+      "fingerprint": "sha256:f6f53828ed8473c0b57facf9b32cb5444e2c283a0bf173b2c1b9ad497987b896"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "task-management",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Built-in MCP servers for task management and communication.",
+                  "members": [
+                    {
+                      "name": "atlassian",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Atlassian Rovo (Jira + Confluence)",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.atlassian.com/v1/mcp/authv2"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "notion",
+                      "parameters": {
+                        "auth": {
+                          "mode": "oauth"
+                        },
+                        "displayName": "Notion",
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.notion.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "slack",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "SLACK_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Slack",
+                        "install": {
+                          "inputs": {
+                            "SLACK_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret for the Slack app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Slack OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Slack MCP requires a registered confidential OAuth client."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.slack.com/mcp"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-task-management",
+                  "type": "plugin"
+                },
+                "description": "Built-in MCP servers for task management and communication.",
+                "digest": "sha256:d134819d85abb6fffa0d6b78b24c009b0c1dae2f7ca35e04de88f2b87bd21d76",
+                "displayName": "mcp-task-management",
+                "kind": "plugin",
+                "logicalName": "mcp-task-management",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Atlassian Rovo (Jira + Confluence)",
+                  "name": "atlassian",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.atlassian.com/v1/mcp/authv2"
+                },
+                "digest": "sha256:81129b7253586d506e4da7a16b75664c01f59131216e85679d4da4124d9d9764",
+                "displayName": "Atlassian Rovo (Jira + Confluence)",
+                "kind": "mcp",
+                "logicalName": "atlassian",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/atlassian"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "mode": "oauth"
+                  },
+                  "displayName": "Notion",
+                  "name": "notion",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.notion.com/mcp"
+                },
+                "digest": "sha256:ce6825b62ec212670b4f7e2bccd1d22a6dda9522d7c14e6e41bf9f0524e959f9",
+                "displayName": "Notion",
+                "kind": "mcp",
+                "logicalName": "notion",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/notion"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "SLACK_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Slack",
+                  "install": {
+                    "inputs": {
+                      "SLACK_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret for the Slack app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Slack OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Slack MCP requires a registered confidential OAuth client."
+                  },
+                  "name": "slack",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.slack.com/mcp"
+                },
+                "digest": "sha256:469bba4444b45365343cef906a189df6de94dba170c9638fc34590050526da22",
+                "displayName": "Slack",
+                "kind": "mcp",
+                "logicalName": "slack",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/slack"
+            }
+          ],
+          "digest": "sha256:6bc214595811b8e0a4e936f6d84370ef4a75231274dba899106f503d7a4db4e3",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "task-management",
+      "files": [
+        {
+          "digest": "sha256:6bc214595811b8e0a4e936f6d84370ef4a75231274dba899106f503d7a4db4e3",
+          "locator": "plugin.yaml",
+          "size": 1357
+        }
+      ],
+      "fingerprint": "sha256:b765b5f4033a0ad1467cf2e21a92429721e49cef8433af106aedb51b0294c78d"
+    },
+    {
+      "address": {
+        "kind": "mcp-collection",
+        "name": "zoom",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Official Zoom-hosted remote MCP servers.",
+                  "members": [
+                    {
+                      "name": "zoom-docs",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Zoom Docs",
+                        "install": {
+                          "inputs": {
+                            "ZOOM_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Zoom OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.zoom.us/mcp/docs/streamable"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "meetings",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Zoom Meetings",
+                        "install": {
+                          "inputs": {
+                            "ZOOM_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Zoom OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Zoom requires a Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://zoom.us/mcp/meeting/streamable"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "team-chat",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Zoom Team Chat",
+                        "install": {
+                          "inputs": {
+                            "ZOOM_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Zoom OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.zoom.us/mcp/team_chat/streamable"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "whiteboard",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Zoom Whiteboard",
+                        "install": {
+                          "inputs": {
+                            "ZOOM_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Zoom OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.zoom.us/mcp/whiteboard/streamable"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "workspace",
+                      "parameters": {
+                        "auth": {
+                          "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                          "mode": "oauth"
+                        },
+                        "displayName": "Zoom Workspace",
+                        "install": {
+                          "inputs": {
+                            "ZOOM_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Zoom OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                        },
+                        "policy": {
+                          "name": "builtin-manual-write",
+                          "required": true
+                        },
+                        "transport": "streamableHTTP",
+                        "url": "https://mcp.zoom.us/mcp/zoom/streamable"
+                      },
+                      "type": "mcp"
+                    },
+                    {
+                      "name": "builtin-manual-write",
+                      "type": "mcp.policy"
+                    }
+                  ],
+                  "name": "mcp-zoom",
+                  "type": "plugin"
+                },
+                "description": "Official Zoom-hosted remote MCP servers.",
+                "digest": "sha256:ae390ed498652b8bc3702bfc76f79db2b94cc3086215358f99e95548c7deec4a",
+                "displayName": "mcp-zoom",
+                "kind": "plugin",
+                "logicalName": "mcp-zoom",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Zoom Meetings",
+                  "install": {
+                    "inputs": {
+                      "ZOOM_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Zoom OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Zoom requires a Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                  },
+                  "name": "meetings",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://zoom.us/mcp/meeting/streamable"
+                },
+                "digest": "sha256:ac6579ade064df6ab08f7220bb37e0ac271e24fea4cc9f47de466512481db89b",
+                "displayName": "Zoom Meetings",
+                "kind": "mcp",
+                "logicalName": "meetings",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/meetings"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Zoom Team Chat",
+                  "install": {
+                    "inputs": {
+                      "ZOOM_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Zoom OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                  },
+                  "name": "team-chat",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.zoom.us/mcp/team_chat/streamable"
+                },
+                "digest": "sha256:f9f3749caf73efe38881e42efda72173ed39157d9efce4e5ae08dc26f33eb191",
+                "displayName": "Zoom Team Chat",
+                "kind": "mcp",
+                "logicalName": "team-chat",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/team-chat"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Zoom Whiteboard",
+                  "install": {
+                    "inputs": {
+                      "ZOOM_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Zoom OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                  },
+                  "name": "whiteboard",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.zoom.us/mcp/whiteboard/streamable"
+                },
+                "digest": "sha256:86579379f3448472bec266c2f5ea9cd232c7ca5ed2ff9d5609642f58bbb65173",
+                "displayName": "Zoom Whiteboard",
+                "kind": "mcp",
+                "logicalName": "whiteboard",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/whiteboard"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Zoom Workspace",
+                  "install": {
+                    "inputs": {
+                      "ZOOM_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Zoom OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                  },
+                  "name": "workspace",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.zoom.us/mcp/zoom/streamable"
+                },
+                "digest": "sha256:df51f793093b9d8bb5d07c536462cde8b1f8f65eb2814a116886c7d7b7937d52",
+                "displayName": "Zoom Workspace",
+                "kind": "mcp",
+                "logicalName": "workspace",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/workspace"
+            },
+            {
+              "definition": {
+                "body": {
+                  "auth": {
+                    "clientCredentialsInput": "ZOOM_OAUTH_CLIENT",
+                    "mode": "oauth"
+                  },
+                  "displayName": "Zoom Docs",
+                  "install": {
+                    "inputs": {
+                      "ZOOM_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and Client Secret from a Zoom Marketplace app.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Zoom OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Zoom requires a manually registered Zoom Marketplace OAuth client and a registered FlexiGPT redirect URI."
+                  },
+                  "name": "zoom-docs",
+                  "policy": {
+                    "name": "builtin-manual-write",
+                    "required": true
+                  },
+                  "transport": "streamableHTTP",
+                  "type": "mcp",
+                  "url": "https://mcp.zoom.us/mcp/docs/streamable"
+                },
+                "digest": "sha256:8038421094a1fdc4ce7cbc18b7efa0aa3b8226026d9eca39f95c1bf5174ed567",
+                "displayName": "Zoom Docs",
+                "kind": "mcp",
+                "logicalName": "zoom-docs",
+                "schemaID": "artifact.mcp.v1",
+                "schemaVersion": "v1"
+              },
+              "subresource": "members/mcp/zoom-docs"
+            }
+          ],
+          "digest": "sha256:63b7796c99f2d302dc9e0adebbf4d097165f1118305f7341670ef221827aac5d",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "zoom",
+      "files": [
+        {
+          "digest": "sha256:63b7796c99f2d302dc9e0adebbf4d097165f1118305f7341670ef221827aac5d",
+          "locator": "plugin.yaml",
+          "size": 3838
+        }
+      ],
+      "fingerprint": "sha256:d2693f329b8a13097a3d9e1e175efce01528dd1b47ce79118895ad626c53c3ba"
+    }
+  ]
+}

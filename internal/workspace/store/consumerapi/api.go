@@ -12,6 +12,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -148,26 +149,46 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	if err != nil {
 		return nil, err
 	}
-	records, err := a.artifacts.ListBySource(
+	directoryEntries, err := a.artifacts.ListBySource(
 		ctx,
 		directory.RootID,
 		values.Directory.ID,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
-	defaultRecord, found, err := a.defaultWorkspaceRecord(ctx, values)
+
+	policyEntries, err := a.artifacts.ListBySource(
+		ctx,
+		directory.RootID,
+		values.Policy.ID,
+		catalog.ListOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
-	if found {
-		records = append(records, defaultRecord)
+
+	output := make(
+		[]WorkspaceArtifactView,
+		0,
+		len(directoryEntries)+1,
+	)
+	for _, entry := range directoryEntries {
+		output = append(output, workspaceArtifactCatalogViewOf(entry))
+	}
+	for _, entry := range policyEntries {
+		if entry.Binding.Locator !=
+			basespec.Locator(defaultpolicy.PolicyLocator) ||
+			entry.Binding.SubresourceLocator != "" ||
+			entry.Kind != workspaceDomain.WorkspaceArtifactKind ||
+			string(entry.LogicalName) != defaultpolicy.PolicyID {
+			continue
+		}
+		output = append(output, workspaceArtifactCatalogViewOf(entry))
+		break
 	}
 
-	output := make([]WorkspaceArtifactView, 0, len(records))
-	for _, record := range records {
-		output = append(output, workspaceArtifactViewOf(record))
-	}
 	sort.Slice(output, func(left, right int) bool {
 		leftKey := string(output[left].Kind) + "\x00" +
 			string(output[left].LogicalName) + "\x00" +
@@ -401,7 +422,11 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 		}
 	}
 
-	records, err := a.artifacts.ListByRoot(ctx, ref.RootID)
+	records, err := a.artifacts.ListByRoot(
+		ctx,
+		ref.RootID,
+		catalog.ListOptions{},
+	)
 	if err != nil {
 		return err
 	}
@@ -451,14 +476,14 @@ func (a *StoreAPI) ListWorkspaceDirectories(ctx context.Context, request Workspa
 	end := min(start+limit, len(rootIDs))
 
 	output := WorkspacePage{
-		Items: make([]WorkspaceDirectoryView, 0, end-start),
+		Items: make([]WorkspaceDirectoryListItem, 0, end-start),
 	}
 	for _, rootID := range rootIDs[start:end] {
-		view, err := a.buildDirectoryView(ctx, rootID)
+		item, err := a.workspaceDirectoryListItem(ctx, rootID)
 		if err != nil {
 			return WorkspacePage{}, err
 		}
-		output.Items = append(output.Items, view)
+		output.Items = append(output.Items, item)
 	}
 	if end < len(rootIDs) {
 		output.NextCursor = string(rootIDs[end-1])
@@ -473,6 +498,31 @@ func (a *StoreAPI) WorkspaceDefaultPolicy() WorkspaceDefaultPolicyView {
 		Digest:  a.policy.Digest,
 		YAML:    string(a.policy.RawYAML),
 	}
+}
+
+func (a *StoreAPI) workspaceDirectoryListItem(
+	ctx context.Context,
+	rootID root.RootID,
+) (WorkspaceDirectoryListItem, error) {
+	rootValue, err := a.roots.Get(ctx, rootID)
+	if err != nil {
+		return WorkspaceDirectoryListItem{}, err
+	}
+	values, err := a.workspaceSources.required(ctx, rootID)
+	if err != nil {
+		return WorkspaceDirectoryListItem{}, err
+	}
+	return WorkspaceDirectoryListItem{
+		Ref:                     WorkspaceDirectoryRef{RootID: rootID},
+		RootID:                  rootID,
+		RootDisplayName:         rootValue.DisplayName,
+		Enabled:                 values.Directory.Enabled && values.Policy.Enabled,
+		DirectorySourceID:       values.Directory.ID,
+		DirectorySourceRevision: values.Directory.Revision,
+		PolicyID:                a.policy.ID,
+		PolicyVersion:           a.policy.Version,
+		PolicyDigest:            a.policy.Digest,
+	}, nil
 }
 
 func (a *StoreAPI) ensureWorkspaceSources(
@@ -601,23 +651,32 @@ func (a *StoreAPI) listPhysicalWorkspaces(
 	rootID root.RootID,
 	directoryID source.SourceID,
 ) ([]artifact.Artifact, error) {
-	records, err := a.artifacts.ListBySource(ctx, rootID, directoryID)
+	entries, err := a.artifacts.ListBySource(
+		ctx,
+		rootID,
+		directoryID,
+		catalog.ListOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
-	output := make([]artifact.Artifact, 0)
-	for _, record := range records {
-		if record.Kind != workspaceDomain.WorkspaceArtifactKind {
+	refs := make([]artifact.ArtifactRef, 0)
+	for _, entry := range entries {
+		if entry.Kind != workspaceDomain.WorkspaceArtifactKind {
 			continue
 		}
-		if record.Binding.SubresourceLocator != "" ||
-			!documentTopology.IsWorkspaceManifestLocator(record.Binding.Locator) {
+		if entry.Binding.SubresourceLocator != "" ||
+			!documentTopology.IsWorkspaceManifestLocator(entry.Binding.Locator) {
 			continue
 		}
-		if record.State != artifact.StateAvailable {
+		if entry.State != artifact.StateAvailable {
 			continue
 		}
-		output = append(output, record.Clone())
+		refs = append(refs, entry.Ref())
+	}
+	output, err := a.artifacts.GetMany(ctx, refs)
+	if err != nil {
+		return nil, err
 	}
 	sort.Slice(output, func(i, j int) bool {
 		if output[i].LogicalName != output[j].LogicalName {
@@ -791,6 +850,24 @@ func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (
 
 func workspaceArtifactViewOf(
 	value artifact.Artifact,
+) WorkspaceArtifactView {
+	return WorkspaceArtifactView{
+		Artifact:           value.Ref(),
+		Revision:           value.Revision,
+		DisplayName:        value.DisplayName,
+		Kind:               value.Kind,
+		LogicalName:        value.LogicalName,
+		LogicalVersion:     value.LogicalVersion,
+		Enabled:            value.Enabled,
+		State:              value.State,
+		SourceID:           value.Binding.SourceID,
+		Locator:            value.Binding.Locator,
+		SubresourceLocator: value.Binding.SubresourceLocator,
+	}
+}
+
+func workspaceArtifactCatalogViewOf(
+	value catalog.Entry,
 ) WorkspaceArtifactView {
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),

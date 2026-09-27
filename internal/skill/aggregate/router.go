@@ -10,6 +10,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -81,23 +82,23 @@ func (r *ArtifactRouter) ResolveArtifactSkills(
 	ctx context.Context,
 	refs []artifact.ArtifactRef,
 ) ([]ResolvedArtifactSkill, error) {
-	records := make([]artifact.Artifact, 0, len(refs))
 	for _, ref := range refs {
 		if err := ref.Validate(); err != nil {
 			return nil, err
 		}
-		record, err := r.artifacts.Get(ctx, ref)
-		if err != nil {
-			return nil, err
-		}
+	}
+	records, err := r.artifacts.GetMany(ctx, refs)
+	if err != nil {
+		return nil, err
+	}
+	for _, record := range records {
 		if !skillDomain.IsSkillKind(record.Kind) {
 			return nil, fmt.Errorf(
 				"%w: Artifact %q is not a Skill",
 				basespec.ErrReferenceUnresolved,
-				ref.ArtifactID,
+				record.ID,
 			)
 		}
-		records = append(records, record)
 	}
 	return r.resolveRecords(ctx, records)
 }
@@ -109,19 +110,27 @@ func (r *ArtifactRouter) ListRootSkills(
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-	records, err := r.artifacts.ListByRoot(ctx, rootID)
+	entries, err := r.artifacts.ListByRoot(
+		ctx,
+		rootID,
+		catalog.ListOptions{},
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	candidates := make([]artifact.Artifact, 0, len(records))
-	for _, record := range records {
-		if !skillDomain.IsSkillKind(record.Kind) ||
-			record.State != artifact.StateAvailable ||
-			!record.Enabled {
+	refs := make([]artifact.ArtifactRef, 0, len(entries))
+	for _, entry := range entries {
+		if !skillDomain.IsSkillKind(entry.Kind) ||
+			entry.State != artifact.StateAvailable ||
+			!entry.Enabled {
 			continue
 		}
-		candidates = append(candidates, record)
+		refs = append(refs, entry.Ref())
+	}
+	candidates, err := r.artifacts.GetMany(ctx, refs)
+	if err != nil {
+		return nil, err
 	}
 
 	output, err := r.resolveRecords(ctx, candidates)

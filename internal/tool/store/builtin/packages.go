@@ -21,13 +21,14 @@ import (
 )
 
 type PreparedPackage struct {
-	EmbeddedPackageRoot basespec.Locator
-	Address             source.ManagedPackageAddress
-	DocumentFile        basespec.Locator
-	PackageFiles        []source.ManagedPackageFile
-	ExpectedKind        artifact.ArtifactKind
-	ExpectedLogicalName basespec.LogicalName
-	ExpectedDefinition  cryptoutil.Digest
+	EmbeddedPackageRoot    basespec.Locator
+	Address                source.ManagedPackageAddress
+	DocumentFile           basespec.Locator
+	PackageFiles           []source.ManagedPackageFile
+	ExpectedKind           artifact.ArtifactKind
+	ExpectedLogicalName    basespec.LogicalName
+	ExpectedLogicalVersion basespec.LogicalVersion
+	ExpectedDefinition     cryptoutil.Digest
 }
 
 func PreparePackages(
@@ -341,8 +342,9 @@ func prepareCollectionPackage(
 		ExpectedKind: artifact.ArtifactKind(
 			pluginv1.PluginType,
 		),
-		ExpectedLogicalName: basespec.LogicalName(document.Name),
-		ExpectedDefinition:  definitionValue.Digest,
+		ExpectedLogicalName:    basespec.LogicalName(document.Name),
+		ExpectedLogicalVersion: definitionValue.LogicalVersion,
+		ExpectedDefinition:     definitionValue.Digest,
 	}, nil
 }
 
@@ -381,9 +383,10 @@ func prepareToolPackage(
 			Locator: toolDomain.ToolDocumentFile(),
 			Content: raw,
 		}},
-		ExpectedKind:        toolDomain.ToolArtifactKind,
-		ExpectedLogicalName: basespec.LogicalName(document.Name),
-		ExpectedDefinition:  definitionValue.Digest,
+		ExpectedKind:           toolDomain.ToolArtifactKind,
+		ExpectedLogicalName:    basespec.LogicalName(document.Name),
+		ExpectedLogicalVersion: definitionValue.LogicalVersion,
+		ExpectedDefinition:     definitionValue.Digest,
 	}, nil
 }
 
@@ -437,6 +440,9 @@ func (p PreparedPackage) Validate() error {
 	if err := p.ExpectedLogicalName.Validate(); err != nil {
 		return err
 	}
+	if err := p.ExpectedLogicalVersion.Validate(true); err != nil {
+		return err
+	}
 	return cryptoutil.ValidateDigest(p.ExpectedDefinition)
 }
 
@@ -452,12 +458,14 @@ func (p PreparedPackage) Fingerprint() (
 		p.Address,
 		p.DocumentFile,
 		struct {
-			Kind       artifact.ArtifactKind `json:"kind"`
-			Name       basespec.LogicalName  `json:"name"`
-			Definition cryptoutil.Digest     `json:"definition"`
+			Kind       artifact.ArtifactKind   `json:"kind"`
+			Name       basespec.LogicalName    `json:"name"`
+			Version    basespec.LogicalVersion `json:"version"`
+			Definition cryptoutil.Digest       `json:"definition"`
 		}{
 			Kind:       p.ExpectedKind,
 			Name:       p.ExpectedLogicalName,
+			Version:    p.ExpectedLogicalVersion,
 			Definition: p.ExpectedDefinition,
 		},
 		p.PackageFiles,

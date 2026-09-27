@@ -107,7 +107,7 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 	exported, err := harness.api.ExportAgent(
 		t.Context(),
 		agentConsumerAPI.AgentExportRequest{
-			Agent: committed.Agent.Artifact.Ref(),
+			Agent: committed.Agent.Ref,
 		},
 	)
 	requireNoError(t, err)
@@ -130,8 +130,8 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 		harness.api.DeleteManagedAgent(
 			t.Context(),
 			agentConsumerAPI.ManagedAgentDeleteRequest{
-				Agent:            committed.Agent.Artifact.Ref(),
-				ExpectedRevision: committed.Agent.Artifact.Revision,
+				Agent:            committed.Agent.Ref,
+				ExpectedRevision: committed.Agent.Revision,
 			},
 		),
 	)

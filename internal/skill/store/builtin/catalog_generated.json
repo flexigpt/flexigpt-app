@@ -1,0 +1,1261 @@
+{
+  "hydration": {
+    "fingerprint": "sha256:5fa87027a97c4a2777de730251704bac0a69d057ac7d7a2bfdabc8836a5d48de",
+    "installerName": "agent.skill",
+    "rootID": "0192c4c0-0000-7000-8000-000000000001",
+    "sourceID": "0192c4c0-0001-7000-8000-000000000001"
+  },
+  "name": "skills",
+  "packages": [
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "core-instructions",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Use attached and local context first, separate observed facts from inferred conclusions, and cite source paths.",
+                  "displayName": "Grounded local work",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "grounded-local-work",
+                  "type": "skill"
+                },
+                "description": "Use attached and local context first, separate observed facts from inferred conclusions, and cite source paths.",
+                "digest": "sha256:ee6acb316dd61125a3570d11e29390ece99a23f1625752b85d1b67cb85e459c2",
+                "displayName": "Grounded local work",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "grounded-local-work",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:74f8ece93682ef506cd1908923aaf04c6ece2d8e10aff298a511c9534caaa2aa",
+          "locator": "grounded-local-work/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Format responses in plain Markdown using simple headings, bullets, and fenced code blocks.",
+                  "displayName": "Markdown Output",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "markdown-output",
+                  "type": "skill"
+                },
+                "description": "Format responses in plain Markdown using simple headings, bullets, and fenced code blocks.",
+                "digest": "sha256:d08fc4db9fc75d3c5548d1907e309e0e39f0fb65ab5a5c07d41414f864ce7df3",
+                "displayName": "Markdown Output",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "markdown-output",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7dbf533eae47179fb0664f8e1ba3a342770888466d9d5479e6f79cb04653cf63",
+          "locator": "markdown-output/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Builtin instruction-only skills.",
+                  "members": [
+                    {
+                      "locator": "./markdown-output",
+                      "name": "markdown-output",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./use-explicit-tools-batched",
+                      "name": "use-explicit-tools-batched",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./grounded-local-work",
+                      "name": "grounded-local-work",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "core-instructions",
+                  "type": "plugin"
+                },
+                "description": "Builtin instruction-only skills.",
+                "digest": "sha256:41c8d9d8c7b65dea653b0aa0212179198ef641c942b6f51203e1856da5e1100c",
+                "displayName": "core-instructions",
+                "kind": "plugin",
+                "logicalName": "core-instructions",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:21d22126521147bf8213f25e00ed4fc3e1b16e6f6363b10565bba0ff2d02c93d",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Prefer purpose-built filesystem and text tools over shell, batch independent calls, and use safe edit locators.",
+                  "displayName": "Use explicit tools, batched",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "use-explicit-tools-batched",
+                  "type": "skill"
+                },
+                "description": "Prefer purpose-built filesystem and text tools over shell, batch independent calls, and use safe edit locators.",
+                "digest": "sha256:4e86f51a7d0a716c2eb8a05adab6500dc5c7979e864f7f971db01cb6316f97ec",
+                "displayName": "Use explicit tools, batched",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "use-explicit-tools-batched",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:789e3d2ea8d81ef2f79b19429c3c52bb7cff307327e88ad01f6fe26cc30fc189",
+          "locator": "use-explicit-tools-batched/SKILL.md"
+        }
+      ],
+      "embeddedRoot": "core-instructions",
+      "files": [
+        {
+          "digest": "sha256:74f8ece93682ef506cd1908923aaf04c6ece2d8e10aff298a511c9534caaa2aa",
+          "locator": "grounded-local-work/SKILL.md",
+          "size": 780
+        },
+        {
+          "digest": "sha256:7dbf533eae47179fb0664f8e1ba3a342770888466d9d5479e6f79cb04653cf63",
+          "locator": "markdown-output/SKILL.md",
+          "size": 967
+        },
+        {
+          "digest": "sha256:21d22126521147bf8213f25e00ed4fc3e1b16e6f6363b10565bba0ff2d02c93d",
+          "locator": "plugin.yaml",
+          "size": 343
+        },
+        {
+          "digest": "sha256:789e3d2ea8d81ef2f79b19429c3c52bb7cff307327e88ad01f6fe26cc30fc189",
+          "locator": "use-explicit-tools-batched/SKILL.md",
+          "size": 1267
+        }
+      ],
+      "fingerprint": "sha256:aa9cb74e8c7a340d7702cb86941323e79e816a5bb74dd0aae2e1210b8f557757"
+    },
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "product-leadership",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Write a decision record from context, options, evidence, and trade-offs. Produces a clear recommendation with explicit revisit triggers, not a generic pros-and-cons list.",
+                  "displayName": "Decision Record Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "decision-record-authoring",
+                  "type": "skill"
+                },
+                "description": "Write a decision record from context, options, evidence, and trade-offs. Produces a clear recommendation with explicit revisit triggers, not a generic pros-and-cons list.",
+                "digest": "sha256:e39f5f1101056a9273ea2adf8d5f6f3fa31cb1d926e02476e7892469cea6e0f2",
+                "displayName": "Decision Record Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "decision-record-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:0c097f4239d9f5d2aab5feda2fb758483a21739267723e7c7154dfd3726609a7",
+          "locator": "decision-record-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Review plans, specs, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear owners, and mitigations. Actionable, not theoretical.",
+                  "displayName": "Delivery Risk Review",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "delivery-risk-review",
+                  "type": "skill"
+                },
+                "description": "Review plans, specs, milestones, issue lists, or status notes for delivery risks, dependency risks, blockers, unclear owners, and mitigations. Actionable, not theoretical.",
+                "digest": "sha256:b9e7a58a9476646f6119f835ba2f24482238754aa13aa6f02fa77a93d31da1a4",
+                "displayName": "Delivery Risk Review",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "delivery-risk-review",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:99600682b2fde90957507e1c91f49a698b769b0a9ebdc9eff3eb20534e7d90ad",
+          "locator": "delivery-risk-review/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Skills for PRDs, MRDs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
+                  "members": [
+                    {
+                      "locator": "./prd-mrd-authoring",
+                      "name": "prd-mrd-authoring",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./decision-record-authoring",
+                      "name": "decision-record-authoring",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./user-feedback-analysis",
+                      "name": "user-feedback-analysis",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./roadmap-prioritization",
+                      "name": "roadmap-prioritization",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./delivery-risk-review",
+                      "name": "delivery-risk-review",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./status-update-authoring",
+                      "name": "status-update-authoring",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "product-leadership",
+                  "type": "plugin"
+                },
+                "description": "Skills for PRDs, MRDs, decision records, feedback analysis, roadmap prioritization, delivery risk review, and status updates.",
+                "digest": "sha256:42e542f9c5f33976a1d2a26a7f9db59fa113b711d9e707580d67033e6d95941b",
+                "displayName": "product-leadership",
+                "kind": "plugin",
+                "logicalName": "product-leadership",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:4142a2820a22565be9cbae9858888533bec1dd10377899e8a7fb0f5c7e9c93ee",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.",
+                  "displayName": "PRD/MRD Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "prd-mrd-authoring",
+                  "type": "skill"
+                },
+                "description": "Turn goals, market or user research, constraints, and stakeholder input into a PRD, MRD, or product requirements artifact with testable requirements and acceptance criteria. Source-grounded; flags assumptions and missing inputs explicitly.",
+                "digest": "sha256:4039e2c63bce44b562c2a80c6a68b1a86802c54dc9c05cea2c8a2a051ef33055",
+                "displayName": "PRD/MRD Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "prd-mrd-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:47cd9cb631b60f06840e7b631f3c2aa5e06c394be4960b770f22d70c2cd44a92",
+          "locator": "prd-mrd-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies. Honest about missing inputs and uses relative ranking when evidence is qualitative.",
+                  "displayName": "Roadmap Prioritization",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "roadmap-prioritization",
+                  "type": "skill"
+                },
+                "description": "Prioritize ideas, requests, bugs, and opportunities against goals using impact, effort, risk, and dependencies. Honest about missing inputs and uses relative ranking when evidence is qualitative.",
+                "digest": "sha256:9c0ddc020b99bfea3c5f15a091691c98c544b2bc5ac4611bfa2eaff9618ebd9f",
+                "displayName": "Roadmap Prioritization",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "roadmap-prioritization",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:2cb6a10992f773d1edf31f92920ad4879c5e7c2656fddd109f1761e1e76b6380",
+          "locator": "roadmap-prioritization/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready status updates. Avoids internal detail unless it affects status, risk, or decisions.",
+                  "displayName": "Status Update Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "status-update-authoring",
+                  "type": "skill"
+                },
+                "description": "Convert project notes, changelogs, meeting notes, or issue summaries into stakeholder-ready status updates. Avoids internal detail unless it affects status, risk, or decisions.",
+                "digest": "sha256:2a0291ec65aa25d4c0960a7a4c875fc17b5fd47e304cf12dfb35b7204220cbb4",
+                "displayName": "Status Update Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "status-update-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f30ae6e45baaa2cfac3b25f094cb586d18625e33718d397459e05a74aa500cfe",
+          "locator": "status-update-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Analyze interviews, support notes, surveys, NPS comments, and customer notes into themes, needs, pain points, and product opportunities. Maintains traceability from theme to source.",
+                  "displayName": "User Feedback Analysis",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "user-feedback-analysis",
+                  "type": "skill"
+                },
+                "description": "Analyze interviews, support notes, surveys, NPS comments, and customer notes into themes, needs, pain points, and product opportunities. Maintains traceability from theme to source.",
+                "digest": "sha256:02829eb3b7ed2a93f53f23bf3d95c6c9b2b5c9dd73ed0a763579ff4fe512f94f",
+                "displayName": "User Feedback Analysis",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "user-feedback-analysis",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:adff691b15380e8a3689e62f941027581f6a89859bc21be03a3dc1d7dc8872dc",
+          "locator": "user-feedback-analysis/SKILL.md"
+        }
+      ],
+      "embeddedRoot": "product-leadership",
+      "files": [
+        {
+          "digest": "sha256:0c097f4239d9f5d2aab5feda2fb758483a21739267723e7c7154dfd3726609a7",
+          "locator": "decision-record-authoring/SKILL.md",
+          "size": 2822
+        },
+        {
+          "digest": "sha256:99600682b2fde90957507e1c91f49a698b769b0a9ebdc9eff3eb20534e7d90ad",
+          "locator": "delivery-risk-review/SKILL.md",
+          "size": 2827
+        },
+        {
+          "digest": "sha256:4142a2820a22565be9cbae9858888533bec1dd10377899e8a7fb0f5c7e9c93ee",
+          "locator": "plugin.yaml",
+          "size": 704
+        },
+        {
+          "digest": "sha256:47cd9cb631b60f06840e7b631f3c2aa5e06c394be4960b770f22d70c2cd44a92",
+          "locator": "prd-mrd-authoring/SKILL.md",
+          "size": 3517
+        },
+        {
+          "digest": "sha256:2cb6a10992f773d1edf31f92920ad4879c5e7c2656fddd109f1761e1e76b6380",
+          "locator": "roadmap-prioritization/SKILL.md",
+          "size": 2884
+        },
+        {
+          "digest": "sha256:f30ae6e45baaa2cfac3b25f094cb586d18625e33718d397459e05a74aa500cfe",
+          "locator": "status-update-authoring/SKILL.md",
+          "size": 2511
+        },
+        {
+          "digest": "sha256:adff691b15380e8a3689e62f941027581f6a89859bc21be03a3dc1d7dc8872dc",
+          "locator": "user-feedback-analysis/SKILL.md",
+          "size": 3019
+        }
+      ],
+      "fingerprint": "sha256:de92979bac3e8505d36d394d9ff3ae61643bb5e4b11e7c99c71bf9e009353498"
+    },
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "research-analysis",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Skills for research briefs based on local or attached source material.",
+                  "members": [
+                    {
+                      "locator": "./research-brief-authoring",
+                      "name": "research-brief-authoring",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "research-analysis",
+                  "type": "plugin"
+                },
+                "description": "Skills for research briefs based on local or attached source material.",
+                "digest": "sha256:413aa21dad7831f0e95cf43f74b05c7beab20959ce1402e8cc7207bd22412159",
+                "displayName": "research-analysis",
+                "kind": "plugin",
+                "logicalName": "research-analysis",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:e3662b283ba2ca13bc41669a4ae7d8f98be081e35b2a1a9deca47ddf881481fb",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Uses local or attached sources only; does not assume live web search.",
+                  "displayName": "Research Brief Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "research-brief-authoring",
+                  "type": "skill"
+                },
+                "description": "Turn attached or local source material into a research brief with findings, evidence, uncertainty, recommendations, and next questions. Uses local or attached sources only; does not assume live web search.",
+                "digest": "sha256:87539cc8bb231441dc2d57a5d9d5f6671daffffc64e1d3d7cf06e28405e35c07",
+                "displayName": "Research Brief Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "research-brief-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:ea7c3691b14f2b5416618ba7284fc608cc6ce0da9e43e08f2248ffb30588df02",
+          "locator": "research-brief-authoring/SKILL.md"
+        }
+      ],
+      "embeddedRoot": "research-analysis",
+      "files": [
+        {
+          "digest": "sha256:e3662b283ba2ca13bc41669a4ae7d8f98be081e35b2a1a9deca47ddf881481fb",
+          "locator": "plugin.yaml",
+          "size": 223
+        },
+        {
+          "digest": "sha256:ea7c3691b14f2b5416618ba7284fc608cc6ce0da9e43e08f2248ffb30588df02",
+          "locator": "research-brief-authoring/SKILL.md",
+          "size": 3001
+        }
+      ],
+      "fingerprint": "sha256:2355bd7eec68de54d68fd9c48a087fd144a9a62f0713cab536451e9e2bbf2c87"
+    },
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "software-dev-templates",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Generate one Mermaid diagram plus concise commentary.",
+                  "displayName": "diagrams-stage",
+                  "insert": "user-message",
+                  "locator": "./SKILL.md",
+                  "name": "diagrams-stage",
+                  "type": "skill"
+                },
+                "description": "Generate one Mermaid diagram plus concise commentary.",
+                "digest": "sha256:a9c2f43e2b607ba7d322fa6f08d5d9ba63a4602b972dad645dc8edd87a748393",
+                "displayName": "diagrams-stage",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "user-message"
+                },
+                "logicalName": "diagrams-stage",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:6da054e6c6eb34ba5bbab7f726dbb7151da11a94db24fc53dd0f292c1fe15266",
+          "locator": "diagrams-stage/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Implementation plan and snippets for the specified React stack.",
+                  "displayName": "fe-stack-react-vite",
+                  "insert": "user-message",
+                  "locator": "./SKILL.md",
+                  "name": "fe-stack-react-vite",
+                  "type": "skill"
+                },
+                "description": "Implementation plan and snippets for the specified React stack.",
+                "digest": "sha256:9e2f98b45157d3b912564afb2fa5dc3b0282fef639712663074d41cb8eec79e2",
+                "displayName": "fe-stack-react-vite",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "user-message"
+                },
+                "logicalName": "fe-stack-react-vite",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:e14567705a5d0f350b44067fa36df866963bb0c4cc442ece1b13b89e1e55bf21",
+          "locator": "fe-stack-react-vite/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Scaffold idiomatic table-driven tests for a given function.",
+                  "displayName": "go-table-tests",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "go-table-tests",
+                  "type": "skill"
+                },
+                "description": "Scaffold idiomatic table-driven tests for a given function.",
+                "digest": "sha256:75d29fb2d47cb3f791b6922847d089b5f6111636cf89e2e1a546eaa99fb846d7",
+                "displayName": "go-table-tests",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "go-table-tests",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:cd200c61bb2583db296ceccfae1c7c503759e00d63eca7a1ab4708ce200fc8fc",
+          "locator": "go-table-tests/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Builtin software development template skills.",
+                  "members": [
+                    {
+                      "locator": "./diagrams-stage",
+                      "name": "diagrams-stage",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./fe-stack-react-vite",
+                      "name": "fe-stack-react-vite",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./go-table-tests",
+                      "name": "go-table-tests",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "software-dev-templates",
+                  "type": "plugin"
+                },
+                "description": "Builtin software development template skills.",
+                "digest": "sha256:36e34d5cc8286a69a0fd8d3456c0cad68d704294877d0f066dafa1bab5669c8a",
+                "displayName": "software-dev-templates",
+                "kind": "plugin",
+                "logicalName": "software-dev-templates",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:41d7053299ccd999497fb6b3ca99e5fe3d8a70d1cf7fed1d52d73e9717597f01",
+          "locator": "plugin.yaml"
+        }
+      ],
+      "embeddedRoot": "software-dev-templates",
+      "files": [
+        {
+          "digest": "sha256:6da054e6c6eb34ba5bbab7f726dbb7151da11a94db24fc53dd0f292c1fe15266",
+          "locator": "diagrams-stage/SKILL.md",
+          "size": 723
+        },
+        {
+          "digest": "sha256:e14567705a5d0f350b44067fa36df866963bb0c4cc442ece1b13b89e1e55bf21",
+          "locator": "fe-stack-react-vite/SKILL.md",
+          "size": 599
+        },
+        {
+          "digest": "sha256:cd200c61bb2583db296ceccfae1c7c503759e00d63eca7a1ab4708ce200fc8fc",
+          "locator": "go-table-tests/SKILL.md",
+          "size": 319
+        },
+        {
+          "digest": "sha256:41d7053299ccd999497fb6b3ca99e5fe3d8a70d1cf7fed1d52d73e9717597f01",
+          "locator": "plugin.yaml",
+          "size": 335
+        }
+      ],
+      "fingerprint": "sha256:bb48e4492ab58f4db204107defe68dfeb8aa88ac4460bce580bc2c7877530f2b"
+    },
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "software-dev",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Diagnose root cause from logs, errors, stack traces, failing outputs, code, and config. Diagnosis only; no fixing by default. Use when the user wants a root cause hypothesis, an evidence assessment of a proposed fix, or a verification plan.",
+                  "displayName": "Bug Investigation",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "bug-investigation",
+                  "type": "skill"
+                },
+                "description": "Diagnose root cause from logs, errors, stack traces, failing outputs, code, and config. Diagnosis only; no fixing by default. Use when the user wants a root cause hypothesis, an evidence assessment of a proposed fix, or a verification plan.",
+                "digest": "sha256:7a788649d107398d52d11b7332c4b4d172a28eafdd5366df69f870b5ec480341",
+                "displayName": "Bug Investigation",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "bug-investigation",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:20b97f7e6545025c3efb225b65ab3fe0f7eea586c17fc201e23fbfc3ae8c95ad",
+          "locator": "bug-investigation/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Map an unfamiliar repo or module by identifying entry points, modules, flows, configs, tests, dependencies, and risks. Use when the user wants a map of code before deciding what to do next. Discovery-first; no architecture decisions, edits, or reviews.",
+                  "displayName": "Codebase Exploration",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "codebase-exploration",
+                  "type": "skill"
+                },
+                "description": "Map an unfamiliar repo or module by identifying entry points, modules, flows, configs, tests, dependencies, and risks. Use when the user wants a map of code before deciding what to do next. Discovery-first; no architecture decisions, edits, or reviews.",
+                "digest": "sha256:d09cf7d1a0b467a9fe28a27307d6a121010dcd2564bf08a8e8e9e7273bf49a30",
+                "displayName": "Codebase Exploration",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "codebase-exploration",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:ba83bf7875e1cd8a86aba74ce7ac168b0d3027f134084404ad86f7c0e9f4b19b",
+          "locator": "codebase-exploration/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Guides system architecture decisions, domain boundary mapping, and event-driven pattern evaluation. Use when the user needs to choose or evaluate structure, clarify bounded contexts and integration ownership, or assess whether CQRS, event sourcing, or sagas are justified. Compares options simplest to most complex and outputs ADR-ready decisions.",
+                  "displayName": "Designing System Architecture",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "designing-system-architecture",
+                  "type": "skill"
+                },
+                "description": "Guides system architecture decisions, domain boundary mapping, and event-driven pattern evaluation. Use when the user needs to choose or evaluate structure, clarify bounded contexts and integration ownership, or assess whether CQRS, event sourcing, or sagas are justified. Compares options simplest to most complex and outputs ADR-ready decisions.",
+                "digest": "sha256:1b98edc9e24efb1bcfabe80ce1a3a262dfd8adc459d799cf75909806b7b7bd04",
+                "displayName": "Designing System Architecture",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "designing-system-architecture",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7bd7822da4d1fccf00283bb611a9308994162f88a08346aee6b94325e6c3aa38",
+          "locator": "designing-system-architecture/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Software Development Lifecycle Skills",
+                  "members": [
+                    {
+                      "locator": "./designing-system-architecture",
+                      "name": "designing-system-architecture",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./refactoring-code",
+                      "name": "refactoring-code",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./reviewing-code",
+                      "name": "reviewing-code",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./spec-driven-dev",
+                      "name": "spec-driven-dev",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./codebase-exploration",
+                      "name": "codebase-exploration",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./test-case-design",
+                      "name": "test-case-design",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./bug-investigation",
+                      "name": "bug-investigation",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./test-implementation",
+                      "name": "test-implementation",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "software-dev",
+                  "type": "plugin"
+                },
+                "description": "Software Development Lifecycle Skills",
+                "digest": "sha256:d2c428ee3d5496007d727bf3a3bc3cd85dbab285eabd312ea45ac0e481ecb6b5",
+                "displayName": "software-dev",
+                "kind": "plugin",
+                "logicalName": "software-dev",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:a3863aa8b6dfe80d8298e1aaa52b19ee51daa55b77101adf34a53846e01e2ef2",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Selects and performs bounded, behavior-preserving refactors that reduce complexity, duplication, coupling, and change risk without turning into a rewrite. Use when the user asks to refactor code, clean up a risky module, modernize a legacy area safely, or decide what technical debt slice to tackle next from workspace access, attached files, or pasted code.",
+                  "displayName": "Refactoring Code",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "refactoring-code",
+                  "type": "skill"
+                },
+                "description": "Selects and performs bounded, behavior-preserving refactors that reduce complexity, duplication, coupling, and change risk without turning into a rewrite. Use when the user asks to refactor code, clean up a risky module, modernize a legacy area safely, or decide what technical debt slice to tackle next from workspace access, attached files, or pasted code.",
+                "digest": "sha256:1f83afc3c15a55ca6aaa8ef7f6d17fd218af8c7c9ca94e0885fbab9529ac3834",
+                "displayName": "Refactoring Code",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "refactoring-code",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:a5b36794d414cff8092a5f91f5d23be40b2d5e69f442d1a125b218cdc430fac0",
+          "locator": "refactoring-code/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Reviews code, diffs, pull requests, modules, and API/config surfaces for bugs, security flaws, reliability issues, performance/scalability risks, maintainability hazards, and misuse-enabling designs. Use when the user asks to review code, find bugs, audit merge safety, verify a fix, or assess whether an interface is safe to use.",
+                  "displayName": "Reviewing Code",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "reviewing-code",
+                  "type": "skill"
+                },
+                "description": "Reviews code, diffs, pull requests, modules, and API/config surfaces for bugs, security flaws, reliability issues, performance/scalability risks, maintainability hazards, and misuse-enabling designs. Use when the user asks to review code, find bugs, audit merge safety, verify a fix, or assess whether an interface is safe to use.",
+                "digest": "sha256:eaa776a63502f3db8b16ff0ff9cf2bfcb6094bdff81070455f4c395526273b3e",
+                "displayName": "Reviewing Code",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "reviewing-code",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:c32454a30291fd64b6b3f5b864b192ba05b87313d219e208dc023c201ad666a8",
+          "locator": "reviewing-code/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Plans, scopes, implements, and verifies bounded software changes from workspace files, attached files, pasted code, diffs, or logs. Use for features, bug fixes, refactors, enhancements, or investigations that benefit from explicit requirements, tracked implementation, and evidence-based verification.",
+                  "displayName": "Spec-Driven Development",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "spec-driven-dev",
+                  "type": "skill"
+                },
+                "description": "Plans, scopes, implements, and verifies bounded software changes from workspace files, attached files, pasted code, diffs, or logs. Use for features, bug fixes, refactors, enhancements, or investigations that benefit from explicit requirements, tracked implementation, and evidence-based verification.",
+                "digest": "sha256:5c0c2a2aa739055f9c926f06f58afa6df8875d2f866df0957ad64dccf7098160",
+                "displayName": "Spec-Driven Development",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "spec-driven-dev",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f66441321e4ca83d273cb33353750a2c2bc401f60e474b6399d01022e552b841",
+          "locator": "spec-driven-dev/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Design test scenarios from specs, requirements, bug reports, or code paths. Produces a traceable test plan and case list, not test code. Use when the user wants to plan tests before implementation, map coverage gaps, or design regression cases for a confirmed bug.",
+                  "displayName": "Test Case Design",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "test-case-design",
+                  "type": "skill"
+                },
+                "description": "Design test scenarios from specs, requirements, bug reports, or code paths. Produces a traceable test plan and case list, not test code. Use when the user wants to plan tests before implementation, map coverage gaps, or design regression cases for a confirmed bug.",
+                "digest": "sha256:33ef950579747d89d658d55e04e30d3463242d7a2f04b71d396beca64aaee883",
+                "displayName": "Test Case Design",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "test-case-design",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:d522437e14b67abbd00ad202fc1650e681ba8aa5250fe0c9d1a5da6faac59527",
+          "locator": "test-case-design/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Write or update unit, integration, or regression tests, then verify with focused shell commands. Use when the user wants new tests written, a bug fix confirmed by tests, or backfilled coverage. Matches the existing test style.",
+                  "displayName": "Test Implementation",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "test-implementation",
+                  "type": "skill"
+                },
+                "description": "Write or update unit, integration, or regression tests, then verify with focused shell commands. Use when the user wants new tests written, a bug fix confirmed by tests, or backfilled coverage. Matches the existing test style.",
+                "digest": "sha256:e2bb0808be51a51767e2b5c5a06d2237e2d3f8de0f903c0cb957ba6633285e8e",
+                "displayName": "Test Implementation",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "test-implementation",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:577963d4626ee704469e33672042d0f23abfd9b0594edd27eada44b5c11ee36a",
+          "locator": "test-implementation/SKILL.md"
+        }
+      ],
+      "embeddedRoot": "software-dev",
+      "files": [
+        {
+          "digest": "sha256:20b97f7e6545025c3efb225b65ab3fe0f7eea586c17fc201e23fbfc3ae8c95ad",
+          "locator": "bug-investigation/SKILL.md",
+          "size": 3715
+        },
+        {
+          "digest": "sha256:ba83bf7875e1cd8a86aba74ce7ac168b0d3027f134084404ad86f7c0e9f4b19b",
+          "locator": "codebase-exploration/SKILL.md",
+          "size": 3659
+        },
+        {
+          "digest": "sha256:7bd7822da4d1fccf00283bb611a9308994162f88a08346aee6b94325e6c3aa38",
+          "locator": "designing-system-architecture/SKILL.md",
+          "size": 12868
+        },
+        {
+          "digest": "sha256:defc5d92d9ce601a8f99db5e8de9c9a276835278874cb3108514ed01c467d8b7",
+          "locator": "designing-system-architecture/references/adr-template.md",
+          "size": 712
+        },
+        {
+          "digest": "sha256:a13a72e0c805ee72d1c6b44fa3464b7a714c4710d0737e77199b775164237562",
+          "locator": "designing-system-architecture/references/context-mapping-template.md",
+          "size": 1284
+        },
+        {
+          "digest": "sha256:a3863aa8b6dfe80d8298e1aaa52b19ee51daa55b77101adf34a53846e01e2ef2",
+          "locator": "plugin.yaml",
+          "size": 730
+        },
+        {
+          "digest": "sha256:a5b36794d414cff8092a5f91f5d23be40b2d5e69f442d1a125b218cdc430fac0",
+          "locator": "refactoring-code/SKILL.md",
+          "size": 10994
+        },
+        {
+          "digest": "sha256:c32454a30291fd64b6b3f5b864b192ba05b87313d219e208dc023c201ad666a8",
+          "locator": "reviewing-code/SKILL.md",
+          "size": 12696
+        },
+        {
+          "digest": "sha256:f66441321e4ca83d273cb33353750a2c2bc401f60e474b6399d01022e552b841",
+          "locator": "spec-driven-dev/SKILL.md",
+          "size": 9301
+        },
+        {
+          "digest": "sha256:d522437e14b67abbd00ad202fc1650e681ba8aa5250fe0c9d1a5da6faac59527",
+          "locator": "test-case-design/SKILL.md",
+          "size": 3435
+        },
+        {
+          "digest": "sha256:577963d4626ee704469e33672042d0f23abfd9b0594edd27eada44b5c11ee36a",
+          "locator": "test-implementation/SKILL.md",
+          "size": 3497
+        }
+      ],
+      "fingerprint": "sha256:fded346d5a1e7d27022a1ba66d50732e3e2a111a47b89e3142f29ffb2af1c289"
+    },
+    {
+      "address": {
+        "kind": "skill-collection",
+        "name": "technical-content-writing",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Generate or update API and SDK reference docs and examples from code, schemas, OpenAPI, proto files, or existing docs. Prefers accurate reference over marketing language.",
+                  "displayName": "API Reference Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "api-reference-authoring",
+                  "type": "skill"
+                },
+                "description": "Generate or update API and SDK reference docs and examples from code, schemas, OpenAPI, proto files, or existing docs. Prefers accurate reference over marketing language.",
+                "digest": "sha256:f819bd6018d94da9b0f93b788fdbf293c9b49ade573864b7a2ccd45136ef705b",
+                "displayName": "API Reference Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "api-reference-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7666fa2f6512e1deaab00a5411b70d5a08a877d7ea9a73ab6717af7458a83562",
+          "locator": "api-reference-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Read-only audit of docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.",
+                  "displayName": "Docs Audit",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "docs-audit",
+                  "type": "skill"
+                },
+                "description": "Read-only audit of docs or README files for structural gaps, stale claims, duplication, missing content, and navigation issues. Produces an audit and rewrite plan; does not rewrite docs.",
+                "digest": "sha256:03f92389188e07f2b1d428958de3460a2c611ef94ee3742a813c1bc050b5e9c3",
+                "displayName": "Docs Audit",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "docs-audit",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:6ef1d187400867e8eec2596daf6dce46fac303d88039ae87214fe76ae155778e",
+          "locator": "docs-audit/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Create or update READMEs, guides, how-tos, tutorials, conceptual docs, and internal docs from source context. Audience-aware and source-grounded. Includes diagrams only when they clarify the content.",
+                  "displayName": "Docs Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "docs-authoring",
+                  "type": "skill"
+                },
+                "description": "Create or update READMEs, guides, how-tos, tutorials, conceptual docs, and internal docs from source context. Audience-aware and source-grounded. Includes diagrams only when they clarify the content.",
+                "digest": "sha256:0ac20534b02f69cd827d53b6d47cbc48474f500e6f1f2bacfc3fd4f04a76f8a3",
+                "displayName": "Docs Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "docs-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:80b5613cafaf20d0248f60199825aafcac44e5e9e8a764b13d55bc347f8270f0",
+          "locator": "docs-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Skills for software and product documentation, API references, release notes, and troubleshooting guides.",
+                  "members": [
+                    {
+                      "locator": "./docs-audit",
+                      "name": "docs-audit",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./docs-authoring",
+                      "name": "docs-authoring",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./api-reference-authoring",
+                      "name": "api-reference-authoring",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./release-notes-authoring",
+                      "name": "release-notes-authoring",
+                      "type": "skill"
+                    },
+                    {
+                      "locator": "./troubleshooting-guide-authoring",
+                      "name": "troubleshooting-guide-authoring",
+                      "type": "skill"
+                    }
+                  ],
+                  "name": "technical-content-writing",
+                  "type": "plugin"
+                },
+                "description": "Skills for software and product documentation, API references, release notes, and troubleshooting guides.",
+                "digest": "sha256:b4707f40cc942ff56125963e8c89d9fac7c274a93ca2a4cab3894272bac27018",
+                "displayName": "technical-content-writing",
+                "kind": "plugin",
+                "logicalName": "technical-content-writing",
+                "schemaID": "artifact.plugin.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:7673c891a65f46838caf98fd3681f2cb7a920641a754a92b19ad1d85c8498834",
+          "locator": "plugin.yaml"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Create release notes and changelogs from diffs, commit notes, PR descriptions, issue summaries, or version notes. Distinguishes user-facing changes from internal changes; never invents changes.",
+                  "displayName": "Release Notes Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "release-notes-authoring",
+                  "type": "skill"
+                },
+                "description": "Create release notes and changelogs from diffs, commit notes, PR descriptions, issue summaries, or version notes. Distinguishes user-facing changes from internal changes; never invents changes.",
+                "digest": "sha256:ceb64ecf578adf3797b695ea9539c3c49db87da0bb6e0810cd1d57b2925ad411",
+                "displayName": "Release Notes Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "release-notes-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:04a7c6061e5fbc3822b45d0a920fb84525405669bfba1a05432a3c8018241744",
+          "locator": "release-notes-authoring/SKILL.md"
+        },
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles. Distinguishes confirmed causes from possible causes and prefers safe diagnostic steps.",
+                  "displayName": "Troubleshooting Guide Authoring",
+                  "insert": "instructions",
+                  "locator": "./SKILL.md",
+                  "name": "troubleshooting-guide-authoring",
+                  "type": "skill"
+                },
+                "description": "Turn errors, logs, bug reports, support notes, and fixes into troubleshooting or knowledge-base articles. Distinguishes confirmed causes from possible causes and prefers safe diagnostic steps.",
+                "digest": "sha256:98bbba2044c58f713b4b3ee7574921faba402c417110edf69b1775dc2a3b6831",
+                "displayName": "Troubleshooting Guide Authoring",
+                "kind": "skill",
+                "labels": {
+                  "skill.insert": "instructions"
+                },
+                "logicalName": "troubleshooting-guide-authoring",
+                "schemaID": "artifact.skill.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:f9be2cb408202db11c26b0ef63a342897a3b601066cd2f7722337c35bf57e877",
+          "locator": "troubleshooting-guide-authoring/SKILL.md"
+        }
+      ],
+      "embeddedRoot": "technical-content-writing",
+      "files": [
+        {
+          "digest": "sha256:7666fa2f6512e1deaab00a5411b70d5a08a877d7ea9a73ab6717af7458a83562",
+          "locator": "api-reference-authoring/SKILL.md",
+          "size": 3272
+        },
+        {
+          "digest": "sha256:6ef1d187400867e8eec2596daf6dce46fac303d88039ae87214fe76ae155778e",
+          "locator": "docs-audit/SKILL.md",
+          "size": 2891
+        },
+        {
+          "digest": "sha256:80b5613cafaf20d0248f60199825aafcac44e5e9e8a764b13d55bc347f8270f0",
+          "locator": "docs-authoring/SKILL.md",
+          "size": 3201
+        },
+        {
+          "digest": "sha256:7673c891a65f46838caf98fd3681f2cb7a920641a754a92b19ad1d85c8498834",
+          "locator": "plugin.yaml",
+          "size": 592
+        },
+        {
+          "digest": "sha256:04a7c6061e5fbc3822b45d0a920fb84525405669bfba1a05432a3c8018241744",
+          "locator": "release-notes-authoring/SKILL.md",
+          "size": 2679
+        },
+        {
+          "digest": "sha256:f9be2cb408202db11c26b0ef63a342897a3b601066cd2f7722337c35bf57e877",
+          "locator": "troubleshooting-guide-authoring/SKILL.md",
+          "size": 2955
+        }
+      ],
+      "fingerprint": "sha256:2bdaa0d30ce3d654ae16d8072e50aa98e137e5b4311187dfc527b1b297f5cc4c"
+    }
+  ]
+}

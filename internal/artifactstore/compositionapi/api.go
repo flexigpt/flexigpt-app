@@ -6,6 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
@@ -126,23 +127,36 @@ type ArtifactAPI interface {
 		ref artifact.ArtifactRef,
 	) (artifact.Artifact, error)
 
+	// GetMany loads complete Artifact entities for callers that genuinely need
+	// source state, diagnostics, local data, or resource materialization.
+	//
+	// Ordinary listings must use ListByRoot, ListBySource, or
+	// FindByIdentity instead.
+	GetMany(
+		ctx context.Context,
+		refs []artifact.ArtifactRef,
+	) ([]artifact.Artifact, error)
+
 	ListByRoot(
 		ctx context.Context,
 		rootID root.RootID,
-	) ([]artifact.Artifact, error)
+		options catalog.ListOptions,
+	) ([]catalog.Entry, error)
 
 	ListBySource(
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-	) ([]artifact.Artifact, error)
+		options catalog.ListOptions,
+	) ([]catalog.Entry, error)
 
 	FindByIdentity(
 		ctx context.Context,
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
 		logicalName basespec.LogicalName,
-	) ([]artifact.Artifact, error)
+		options catalog.ListOptions,
+	) ([]catalog.Entry, error)
 
 	FindByOrigin(
 		ctx context.Context,
@@ -155,6 +169,14 @@ type ArtifactAPI interface {
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (definition.Definition, error)
+
+	// GetDefinitions loads immutable admitted Definitions in bulk. It is used
+	// by ListOptions.IncludeDocument and by consumers that already selected
+	// immutable Definition keys from catalog metadata.
+	GetDefinitions(
+		ctx context.Context,
+		keys []definition.Key,
+	) ([]definition.Definition, error)
 
 	// SetEnabled changes universal local Artifact metadata. Unlike other local
 	// Artifact mutations, it is valid for Artifacts in protected Roots and does

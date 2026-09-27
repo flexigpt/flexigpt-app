@@ -39,14 +39,23 @@ func (a *API) ListToolCollections(
 		return nil, err
 	}
 
-	values, err := a.collections.ListDomain(ctx, a.builtinRoot)
+	items, err := a.collections.ListDomain(ctx, collection.ListRequest{
+		RootID: a.builtinRoot,
+	})
 	if err != nil {
 		return nil, err
 	}
-	for _, value := range values {
+
+	values := make([]collection.CollectionView, 0, len(items))
+	for _, item := range items {
+		value, err := a.GetToolCollection(ctx, item.Ref)
+		if err != nil {
+			return nil, err
+		}
 		if err := a.requireBuiltinArtifact(value.Artifact); err != nil {
 			return nil, err
 		}
+		values = append(values, value)
 	}
 	return values, nil
 }

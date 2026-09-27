@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 )
 
@@ -116,6 +117,7 @@ func (r *Resolver) expandSelector(
 		ctx,
 		rootID,
 		effectiveSourceID,
+		catalog.ListOptions{},
 	)
 	if err != nil {
 		return ResolvedSelector{}, err

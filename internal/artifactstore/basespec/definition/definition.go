@@ -7,9 +7,25 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
+
+// Key identifies one immutable Definition in one Root.
+//
+// It is a storage identity, not a consumer request or transport projection.
+type Key struct {
+	RootID root.RootID
+	Digest cryptoutil.Digest
+}
+
+func (k Key) Validate() error {
+	if err := k.RootID.Validate(); err != nil {
+		return err
+	}
+	return cryptoutil.ValidateDigest(k.Digest)
+}
 
 // Definition is a canonical source-decoded Artifact definition.
 //

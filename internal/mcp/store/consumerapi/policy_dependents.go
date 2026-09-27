@@ -71,7 +71,9 @@ func (a *API) listMCPServersReferencingPolicy(
 	rootID root.RootID,
 	policyName basespec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
-	servers, err := a.ListServers(ctx, rootID)
+	servers, err := a.ListServers(ctx, ListServersRequest{
+		RootID: rootID,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -84,20 +86,20 @@ func (a *API) listMCPServersReferencingPolicy(
 			continue
 		}
 
-		material, err := a.resolveServerMaterial(ctx, record.Ref())
+		material, err := a.resolveServerMaterial(ctx, record.Ref)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"inspect MCP server %q for policy dependency: %w",
-				record.ID,
+				record.Ref.ArtifactID,
 				err,
 			)
 		}
 
 		direct := material.Document.Configuration.Policy
 		if direct != nil && direct.Name == policyName {
-			if _, found := seen[record.Ref()]; !found {
-				seen[record.Ref()] = struct{}{}
-				output = append(output, record.Ref())
+			if _, found := seen[record.Ref]; !found {
+				seen[record.Ref] = struct{}{}
+				output = append(output, record.Ref)
 			}
 			continue
 		}
@@ -114,9 +116,9 @@ func (a *API) listMCPServersReferencingPolicy(
 		if !referenced {
 			continue
 		}
-		if _, found := seen[record.Ref()]; !found {
-			seen[record.Ref()] = struct{}{}
-			output = append(output, record.Ref())
+		if _, found := seen[record.Ref]; !found {
+			seen[record.Ref] = struct{}{}
+			output = append(output, record.Ref)
 		}
 	}
 

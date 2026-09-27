@@ -49,17 +49,21 @@ func withMCPStoreManagement[T any](
 
 func (w *MCPStoreWrapper) ListMCPServers(
 	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]artifact.Artifact, error) {
-		return api.ListServers(context.Background(), rootID)
+) ([]mcpConsumerAPI.ServerListItem, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.ServerListItem, error) {
+		return api.ListServers(context.Background(), mcpConsumerAPI.ListServersRequest{
+			RootID: rootID,
+		})
 	})
 }
 
 func (w *MCPStoreWrapper) ListMCPPolicies(
 	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]artifact.Artifact, error) {
-		return api.ListPolicies(context.Background(), rootID)
+) ([]mcpConsumerAPI.PolicyListItem, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.PolicyListItem, error) {
+		return api.ListPolicies(context.Background(), mcpConsumerAPI.ListPoliciesRequest{
+			RootID: rootID,
+		})
 	})
 }
 
@@ -230,8 +234,8 @@ func (w *MCPStoreWrapper) ResolveMCPCollection(
 
 func (w *MCPStoreWrapper) ListMCPCollections(
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.ListItem, error) {
 		return api.ListMCPCollections(context.Background(), rootID)
 	})
 }

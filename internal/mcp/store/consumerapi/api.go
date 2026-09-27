@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -11,11 +12,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -38,6 +36,9 @@ type API struct {
 	baselinePolicy      mcpPolicy.MCPPolicy
 	declarationResolver *resolve.Resolver
 	collections         *collection.API
+
+	serverListDocuments sync.Map
+	policyListDocuments sync.Map
 }
 
 func New(
@@ -124,16 +125,16 @@ func New(
 
 func (a *API) ListServers(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	return a.listArtifacts(ctx, rootID, mcpDomain.MCPArtifactKind)
+	request ListServersRequest,
+) ([]ServerListItem, error) {
+	return a.listServers(ctx, request)
 }
 
 func (a *API) ListPolicies(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
-	return a.listArtifacts(ctx, rootID, mcpDomain.MCPPolicyArtifactKind)
+	request ListPoliciesRequest,
+) ([]PolicyListItem, error) {
+	return a.listPolicies(ctx, request)
 }
 
 // SetServerEnabled changes only generic Artifact metadata. It is valid for
@@ -506,313 +507,6 @@ func (a *API) listMCPCollectionServers(
 			return leftArtifact.LogicalName < rightArtifact.LogicalName
 		}
 		return leftArtifact.ID < rightArtifact.ID
-	})
-	return output, nil
-}
-
-func (a *API) ensureBuiltInSourceCurrent(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) error {
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return err
-	}
-	return compositionapi.EnsureSourceCurrent(
-		ctx,
-		a.discovery,
-		rootID,
-		sourceID,
-	)
-}
-
-func (a *API) installBuiltInPackage(
-	ctx context.Context,
-	request BuiltInPackageInstallRequest,
-) ([]artifact.Artifact, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
-		return nil, err
-	}
-	if err := request.RootID.Validate(); err != nil {
-		return nil, err
-	}
-	if err := request.SourceID.Validate(); err != nil {
-		return nil, err
-	}
-	if !documentTopology.IsBuiltinPackageSource(
-		request.RootID,
-		request.SourceID,
-	) {
-		return nil, fmt.Errorf(
-			"%w: MCP package does not target the declared built-in package Source",
-			basespec.ErrInvalid,
-		)
-	}
-	if err := request.PackageAddress.Validate(); err != nil {
-		return nil, err
-	}
-	if request.PackageAddress.Kind != mcpDomain.MCPCollectionPackageKind {
-		return nil, fmt.Errorf(
-			"%w: built-in MCP package kind must be %q",
-			basespec.ErrInvalid,
-			mcpDomain.MCPCollectionPackageKind,
-		)
-	}
-	if err := request.DocumentFile.ValidatePortable(false); err != nil {
-		return nil, err
-	}
-	if !documentTopology.IsCollectionDocumentFile(
-		request.DocumentFile,
-	) {
-		return nil, fmt.Errorf(
-			"%w: built-in MCP Collection document is not declared in topology",
-			basespec.ErrInvalid,
-		)
-	}
-	if !a.protection.IsProtectedRoot(request.RootID) {
-		return nil, fmt.Errorf(
-			"%w: MCP built-in Root is not protected",
-			basespec.ErrProtected,
-		)
-	}
-
-	sourceValue, err := a.sources.Get(
-		ctx,
-		request.RootID,
-		request.SourceID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
-		return nil, fmt.Errorf(
-			"%w: MCP built-in Source must be managed",
-			basespec.ErrInvalid,
-		)
-	}
-	documentLocator, err := request.PackageAddress.FileLocator(
-		request.DocumentFile,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	expectations, rootExpectation, err := normalizeBuiltInMCPExpectations(
-		request.DocumentFile,
-		request.Expectations...,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	previousServers, err := a.builtInPackageServers(
-		ctx,
-		request.RootID,
-		request.SourceID,
-		request.PackageAddress,
-	)
-	if err != nil {
-		return nil, err
-	}
-	_, err = a.managedArtifacts.Publish(
-		ctx,
-		artifact.PublishArtifactRequest{
-			RootID: request.RootID,
-			Binding: artifact.SourceBinding{
-				SourceID:           request.SourceID,
-				Locator:            documentLocator,
-				SubresourceLocator: rootExpectation.Subresource,
-			},
-			ExpectedKind:        rootExpectation.Kind,
-			ExpectedLogicalName: rootExpectation.LogicalName,
-			ExpectedDefinition:  rootExpectation.DefinitionDigest,
-			Package: source.ManagedPackagePublication{
-				Address: request.PackageAddress,
-				Files:   request.PackageFiles,
-			},
-			AllowPackageReplacement: true,
-			AllowProtected:          true,
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	output := make([]artifact.Artifact, 0, len(expectations))
-	for _, expected := range expectations {
-		originLocator, err := request.PackageAddress.FileLocator(
-			expected.Locator,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		value, err := a.artifacts.FindByOrigin(
-			ctx,
-			request.RootID,
-			artifact.SourceBinding{
-				SourceID:           request.SourceID,
-				Locator:            originLocator,
-				SubresourceLocator: expected.Subresource,
-			},
-			expected.Kind,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if value.State != artifact.StateAvailable ||
-			value.LogicalName != expected.LogicalName ||
-			value.ResolvedDefinition == nil ||
-			*value.ResolvedDefinition != expected.DefinitionDigest {
-			return nil, fmt.Errorf(
-				"%w: built-in MCP Artifact %q does not match package expectation",
-				basespec.ErrReferenceUnresolved,
-				value.ID,
-			)
-		}
-		output = append(output, value)
-	}
-	if err := a.cleanupRemovedBuiltInPackageServers(
-		ctx,
-		previousServers,
-		output,
-	); err != nil {
-		return nil, err
-	}
-	return output, nil
-}
-
-func normalizeBuiltInMCPExpectations(
-	documentFile basespec.Locator,
-	values ...BuiltInArtifactExpectation,
-) (
-	expectations []BuiltInArtifactExpectation,
-	rootExpectation BuiltInArtifactExpectation,
-	err error,
-) {
-	if len(values) == 0 ||
-		len(values) > basespec.MaxDiscoveryEntries {
-		return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-			"%w: built-in MCP package has invalid expectation count",
-			basespec.ErrInvalid,
-		)
-	}
-
-	type origin struct {
-		locator     basespec.Locator
-		subresource basespec.SubresourceLocator
-		kind        artifact.ArtifactKind
-	}
-
-	output := append([]BuiltInArtifactExpectation(nil), values...)
-	seen := make(map[origin]struct{}, len(output))
-	var rootValue BuiltInArtifactExpectation
-	rootFound := false
-
-	for index, expected := range output {
-		if err := expected.Locator.ValidatePortable(false); err != nil {
-			return nil, BuiltInArtifactExpectation{}, err
-		}
-		if err := expected.Subresource.Validate(); err != nil {
-			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-				"built-in MCP expectations[%d]: %w",
-				index,
-				err,
-			)
-		}
-		if err := expected.Kind.Validate(); err != nil {
-			return nil, BuiltInArtifactExpectation{}, err
-		}
-		if err := expected.LogicalName.Validate(); err != nil {
-			return nil, BuiltInArtifactExpectation{}, err
-		}
-		if err := cryptoutil.ValidateDigest(
-			expected.DefinitionDigest,
-		); err != nil {
-			return nil, BuiltInArtifactExpectation{}, err
-		}
-
-		key := origin{
-			locator:     expected.Locator,
-			subresource: expected.Subresource,
-			kind:        expected.Kind,
-		}
-		if _, duplicate := seen[key]; duplicate {
-			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-				"%w: built-in MCP package repeats Artifact origin %q/%q",
-				basespec.ErrInvalid,
-				expected.Locator,
-				expected.Subresource,
-			)
-		}
-		seen[key] = struct{}{}
-
-		if expected.Locator != documentFile ||
-			expected.Subresource != "" {
-			continue
-		}
-		if rootFound ||
-			expected.Kind != artifact.ArtifactKind(
-				declaration.TypePlugin,
-			) {
-			return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-				"%w: built-in MCP package requires exactly one root Collection",
-				basespec.ErrInvalid,
-			)
-		}
-		rootValue = expected
-		rootFound = true
-	}
-	if !rootFound {
-		return nil, BuiltInArtifactExpectation{}, fmt.Errorf(
-			"%w: built-in MCP package has no root Collection",
-			basespec.ErrInvalid,
-		)
-	}
-
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].Locator != output[right].Locator {
-			return output[left].Locator < output[right].Locator
-		}
-		if output[left].Kind != output[right].Kind {
-			return output[left].Kind < output[right].Kind
-		}
-		return output[left].LogicalName <
-			output[right].LogicalName
-	})
-	return output, rootValue, nil
-}
-
-func (a *API) listArtifacts(
-	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
-) ([]artifact.Artifact, error) {
-	if a == nil {
-		return nil, basespec.ErrClosed
-	}
-	if err := rootID.Validate(); err != nil {
-		return nil, err
-	}
-	values, err := a.artifacts.ListByRoot(ctx, rootID)
-	if err != nil {
-		return nil, err
-	}
-	output := make([]artifact.Artifact, 0, len(values))
-	for _, value := range values {
-		if value.Kind == kind {
-			output = append(output, value.Clone())
-		}
-	}
-	sort.Slice(output, func(left, right int) bool {
-		if output[left].LogicalName != output[right].LogicalName {
-			return output[left].LogicalName <
-				output[right].LogicalName
-		}
-		return output[left].ID < output[right].ID
 	})
 	return output, nil
 }

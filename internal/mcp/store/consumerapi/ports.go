@@ -7,7 +7,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -40,57 +39,6 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 		return mcpDomainServer.Resolved{}, basespec.ErrClosed
 	}
 	return r.api.resolveMCPServer(ctx, ref)
-}
-
-type builtinStore struct {
-	api *API
-}
-
-func NewBuiltinStore(api *API) (BuiltinStore, error) {
-	if api == nil {
-		return nil, fmt.Errorf(
-			"%w: MCP built-in Store requires an API",
-			basespec.ErrInvalid,
-		)
-	}
-	return &builtinStore{api: api}, nil
-}
-
-func (s *builtinStore) InstallBuiltInPackage(
-	ctx context.Context,
-	request BuiltInPackageInstallRequest,
-) ([]artifact.Artifact, error) {
-	if s == nil || s.api == nil {
-		return nil, basespec.ErrClosed
-	}
-	return s.api.installBuiltInPackage(ctx, request)
-}
-
-func (s *builtinStore) RemoveBuiltInPackage(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	address source.ManagedPackageAddress,
-) error {
-	if s == nil || s.api == nil {
-		return basespec.ErrClosed
-	}
-	return s.api.removeBuiltInPackage(
-		ctx, rootID, sourceID, address,
-	)
-}
-
-func (s *builtinStore) EnsureBuiltInSourceCurrent(
-	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) error {
-	if s == nil || s.api == nil {
-		return basespec.ErrClosed
-	}
-	return s.api.ensureBuiltInSourceCurrent(
-		ctx, rootID, sourceID,
-	)
 }
 
 type BaselineEnsurer interface {
@@ -237,7 +185,7 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 func (s *CatalogStore) ListMCPCollections(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]collection.CollectionView, error) {
+) ([]collection.ListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, basespec.ErrClosed
 	}
@@ -247,9 +195,9 @@ func (s *CatalogStore) ListMCPCollections(
 func (s *CatalogStore) ListServers(
 	ctx context.Context,
 	rootID root.RootID,
-) ([]artifact.Artifact, error) {
+) ([]ServerListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, basespec.ErrClosed
 	}
-	return s.api.ListServers(ctx, rootID)
+	return s.api.ListServers(ctx, ListServersRequest{RootID: rootID})
 }

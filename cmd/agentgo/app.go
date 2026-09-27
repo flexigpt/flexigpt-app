@@ -308,8 +308,7 @@ func (a *App) initManagers() {
 	}
 
 	a.toolBuiltInInstaller, err = NewToolBuiltInInstaller(
-		a.toolStoreAPI,
-		goTools,
+		artifactComposition.Topology,
 	)
 	if err != nil {
 		slog.Error(
@@ -374,12 +373,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill store consumer API initialized")
 
-	skillBuiltinStore, err := skillConsumerAPI.NewBuiltinStore(
-		a.skillStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize Skill built-in port: " + err.Error())
-	}
 	skillBaselineEnsurer, err := skillConsumerAPI.NewBaselineEnsurer(
 		a.skillStoreAPI.api,
 	)
@@ -388,7 +381,7 @@ func (a *App) initManagers() {
 	}
 
 	a.skillBuiltInInstaller, err = NewSkillBuiltInInstaller(
-		skillBuiltinStore,
+		artifactComposition.Topology,
 	)
 	if err != nil {
 		slog.Error(
@@ -422,12 +415,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("agent store consumer API initialized")
 
-	agentBuiltinStore, err := agentConsumerAPI.NewBuiltinStore(
-		a.agentStoreAPI.api,
-	)
-	if err != nil {
-		panic("failed to initialize Agent built-in port: " + err.Error())
-	}
 	agentBaselineEnsurer, err := agentConsumerAPI.NewBaselineEnsurer(
 		a.agentStoreAPI.api,
 	)
@@ -436,7 +423,7 @@ func (a *App) initManagers() {
 	}
 
 	a.agentBuiltInInstaller, err = NewAgentBuiltInInstaller(
-		agentBuiltinStore,
+		artifactComposition.Topology,
 	)
 	if err != nil {
 		slog.Error(
@@ -492,6 +479,7 @@ func (a *App) initManagers() {
 		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
+		artifactComposition.Topology,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
 		targetMappers,
@@ -621,14 +609,6 @@ func (a *App) initManagers() {
 	}
 
 	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
-
-	if a.skillStoreAPI != nil &&
-		a.skillAggregateAPI != nil &&
-		a.skillAggregateAPI.service != nil {
-		a.skillStoreAPI.startBuiltinCatalogWarmup(
-			a.skillAggregateAPI.service.SyncRootCatalog,
-		)
-	}
 }
 
 // startup is called at application startup.
@@ -655,9 +635,6 @@ func (a *App) beforeClose(ctx context.Context) (prevent bool) { //nolint:all
 
 // shutdown is called at application termination.
 func (a *App) shutdown(ctx context.Context) { //nolint:all
-	if a.skillStoreAPI != nil {
-		a.skillStoreAPI.stopBuiltinCatalogWarmup()
-	}
 	// Perform any teardown here.
 	// Stop background goroutines + flushes for stores that need it.
 	if a.mcpAggregateAPI != nil {

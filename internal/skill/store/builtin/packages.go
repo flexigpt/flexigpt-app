@@ -17,7 +17,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -29,7 +28,17 @@ type PreparedPackage struct {
 	PackageAddress      source.ManagedPackageAddress
 	DocumentFile        basespec.Locator
 	PackageFiles        []source.ManagedPackageFile
-	Expectations        []skillConsumerAPI.BuiltInSkillArtifactExpectation
+	Expectations        []ArtifactExpectation
+}
+
+// ArtifactExpectation is build-time package admission data. It belongs to the
+// package compiler, not to the runtime Skill consumer API.
+type ArtifactExpectation struct {
+	Locator          basespec.Locator
+	Subresource      basespec.SubresourceLocator
+	Kind             artifact.ArtifactKind
+	LogicalName      basespec.LogicalName
+	DefinitionDigest cryptoutil.Digest
 }
 
 // PreparePackages discovers direct embedded Skill Plugin package
@@ -164,7 +173,7 @@ func canonicalCollectionPackage(
 	files []source.ManagedPackageFile,
 ) (
 	pluginv1.PluginDocument,
-	[]skillConsumerAPI.BuiltInSkillArtifactExpectation,
+	[]ArtifactExpectation,
 	error,
 ) {
 	raw, err := yamlutil.CanonicalObjectJSON(
@@ -203,13 +212,13 @@ func canonicalCollectionPackage(
 		len(files),
 	)
 	expectations := make(
-		[]skillConsumerAPI.BuiltInSkillArtifactExpectation,
+		[]ArtifactExpectation,
 		0,
 		1+len(collection.Members),
 	)
 	expectations = append(
 		expectations,
-		skillConsumerAPI.BuiltInSkillArtifactExpectation{
+		ArtifactExpectation{
 			Locator:          documentFile,
 			Kind:             rootDefinition.Kind,
 			LogicalName:      rootDefinition.LogicalName,
@@ -302,7 +311,7 @@ func canonicalCollectionPackage(
 		seenDocuments[documentLocator] = struct{}{}
 		expectations = append(
 			expectations,
-			skillConsumerAPI.BuiltInSkillArtifactExpectation{
+			ArtifactExpectation{
 				Locator:          documentLocator,
 				Kind:             definitionValue.Kind,
 				LogicalName:      definitionValue.LogicalName,
@@ -396,7 +405,7 @@ func PackageFingerprint(
 		)
 	}
 	expectations := append(
-		[]skillConsumerAPI.BuiltInSkillArtifactExpectation(nil),
+		[]ArtifactExpectation(nil),
 		value.Expectations...,
 	)
 	sortSkillExpectations(expectations)
@@ -411,7 +420,7 @@ func PackageFingerprint(
 }
 
 func sortSkillExpectations(
-	values []skillConsumerAPI.BuiltInSkillArtifactExpectation,
+	values []ArtifactExpectation,
 ) {
 	sort.Slice(values, func(left, right int) bool {
 		if values[left].Locator != values[right].Locator {

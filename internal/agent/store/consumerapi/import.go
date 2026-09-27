@@ -18,6 +18,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
@@ -31,6 +32,7 @@ const managedAgentPreparedTTL = 10 * time.Minute
 
 type agentImportDestinationState struct {
 	value            AgentImportDestination
+	collection       collection.CollectionView
 	sourceGeneration string
 }
 
@@ -87,33 +89,18 @@ func (a *API) ListAgentImportDestinations(
 
 	output := make([]AgentImportDestination, 0, len(values))
 	for _, value := range values {
-		if !a.IsManagedAgentCollection(value) {
+		if !value.Editable || value.BuiltIn || !value.Enabled {
 			continue
 		}
-
-		sourceValue, err := a.sources.Get(
-			ctx,
-			rootID,
-			value.Artifact.Binding.SourceID,
-		)
-		if err != nil {
-			return nil, err
-		}
-		if sourceValue.Kind != source.SourceKindManagedDirectory ||
-			sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
-			!sourceValue.Enabled {
-			continue
-		}
-
 		output = append(output, AgentImportDestination{
 			RootID:                rootID,
-			SourceID:              value.Artifact.Binding.SourceID,
-			Collection:            value,
-			CollectionRevision:    value.Artifact.Revision,
-			CollectionName:        value.Artifact.LogicalName,
+			SourceID:              value.SourceID,
+			Collection:            value.Ref,
+			CollectionRevision:    value.Revision,
+			CollectionName:        value.Name,
 			CollectionDisplayName: value.DisplayName,
 			Baseline:              value.Baseline,
-			Enabled:               value.Artifact.Enabled,
+			Enabled:               value.Enabled,
 		})
 	}
 
@@ -392,7 +379,7 @@ func (a *API) PreviewAgentImport(
 
 	restored, membershipConflicts, err := a.analyzeAgentImportMembership(
 		ctx,
-		destination.value.Collection,
+		destination.collection,
 		rootDefinition.LogicalName,
 		agentLocator,
 	)
@@ -780,13 +767,14 @@ func (a *API) agentImportDestination(
 		value: AgentImportDestination{
 			RootID:                value.Artifact.RootID,
 			SourceID:              value.Artifact.Binding.SourceID,
-			Collection:            value,
+			Collection:            value.Artifact.Ref(),
 			CollectionRevision:    value.Artifact.Revision,
 			CollectionName:        value.Artifact.LogicalName,
 			CollectionDisplayName: value.DisplayName,
 			Baseline:              value.Baseline,
 			Enabled:               value.Artifact.Enabled,
 		},
+		collection:       value,
 		sourceGeneration: inspection.State.SourceGeneration,
 	}, nil
 }
@@ -837,6 +825,7 @@ func (a *API) agentImportIdentityConflicts(
 			rootID,
 			artifact.ArtifactKind(identity.Type),
 			identity.Name,
+			catalog.ListOptions{},
 		)
 		if err != nil {
 			return nil, err
@@ -868,6 +857,7 @@ func (a *API) agentImportIdentityConflicts(
 			agentBuiltinRootID(),
 			artifact.ArtifactKind(identity.Type),
 			identity.Name,
+			catalog.ListOptions{},
 		)
 		if err != nil {
 			return nil, err
@@ -990,10 +980,16 @@ func (a *API) analyzeAgentImportMembership(
 	if err != nil {
 		return nil, nil, err
 	}
-	for _, value := range collections {
-		if value.Artifact.Ref() == selected.Artifact.Ref() {
+	for _, item := range collections {
+		if item.Ref == selected.Artifact.Ref() {
 			continue
 		}
+
+		value, err := a.GetAgentCollection(ctx, item.Ref)
+		if err != nil {
+			return nil, nil, err
+		}
+
 		for _, member := range value.Members {
 			if member.Type != declaration.TypeAgent ||
 				member.Name != name ||

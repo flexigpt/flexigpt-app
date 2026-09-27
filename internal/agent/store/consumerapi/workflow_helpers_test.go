@@ -42,6 +42,9 @@ type workflowHarness struct {
 	dependencySourceCreated bool
 	dependencyFiles         map[workflowDependency]basespec.Locator
 	nextDependencyFile      int
+
+	agentBootstrap *builtin.BootstrapRegistry
+	agentInstaller *agentBuiltin.Installer
 }
 
 type workflowDependency struct {
@@ -176,32 +179,47 @@ func (h *workflowHarness) installBundledAgents(
 ) *agentBuiltin.Installer {
 	t.Helper()
 
+	if h.agentBootstrap == nil {
+		packages, err := builtin.EmbeddedAgentPackages()
+		requireNoError(t, err)
+
+		installer, err := agentBuiltin.NewInstaller(
+			agentBuiltin.InstallerDependencies{
+				Hydrator: h.store.Topology,
+				Packages: packages,
+			},
+		)
+		requireNoError(t, err)
+
+		bootstrap, err := builtin.NewDefaultBootstrapRegistry(
+			h.store.Topology,
+			h.store.Topology,
+		)
+		requireNoError(t, err)
+		requireNoError(t, bootstrap.Register(installer))
+
+		h.agentBootstrap = bootstrap
+		h.agentInstaller = installer
+	}
 	ctx := installerapi.WithPrivilege(t.Context())
-	_, err := h.store.EnsureProtectedTopology(
-		ctx,
-		documentTopology.BuiltinTopologyDeclaration(),
-	)
-	requireNoError(t, err)
 
-	packages, err := builtin.EmbeddedAgentPackages()
-	requireNoError(t, err)
-
-	builtinStore, err := agentConsumerAPI.NewBuiltinStore(h.api)
-	requireNoError(t, err)
-
-	installer, err := agentBuiltin.NewInstaller(
-		agentBuiltin.InstallerDependencies{
-			Agents:   builtinStore,
-			Packages: packages,
-		},
-	)
-	requireNoError(t, err)
-
-	requireNoError(t, installer.EnsureBuiltInArtifacts(ctx))
+	requireNoError(t, h.agentBootstrap.Ensure(ctx))
 	h.addMissingBuiltinDependencies(t, ctx)
-	requireNoError(t, installer.FinalizeHydration(ctx))
+	return h.agentInstaller
+}
 
-	return installer
+func (h *workflowHarness) ensureBundledAgents(
+	t *testing.T,
+) {
+	t.Helper()
+
+	if h.agentBootstrap == nil {
+		h.installBundledAgents(t)
+		return
+	}
+
+	requireNoError(t, h.agentBootstrap.Ensure(t.Context()))
+	h.addMissingBuiltinDependencies(t, t.Context())
 }
 
 // addMissingBuiltinDependencies keeps this package-level workflow test focused
@@ -252,12 +270,12 @@ func (h *workflowHarness) unresolvedBuiltinDependencies(
 	for _, agent := range agents {
 		plan, err := h.api.ResolveAgentCapabilities(
 			ctx,
-			agent.Artifact.Ref(),
+			agent.Ref,
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"resolve bundled Agent %q: %w",
-				agent.Artifact.LogicalName,
+				agent.Name,
 				err,
 			)
 		}
@@ -270,7 +288,7 @@ func (h *workflowHarness) unresolvedBuiltinDependencies(
 			if occurrence.Name == "" {
 				return nil, fmt.Errorf(
 					"bundled Agent %q has unresolved unnamed %s capability at %q",
-					agent.Artifact.LogicalName,
+					agent.Name,
 					occurrence.Type,
 					occurrence.Path,
 				)
@@ -544,8 +562,8 @@ func requireErrorIs(
 
 func requireSameAgentRevisions(
 	t *testing.T,
-	before []agentConsumerAPI.AgentView,
-	after []agentConsumerAPI.AgentView,
+	before []agentConsumerAPI.AgentListItem,
+	after []agentConsumerAPI.AgentListItem,
 ) {
 	t.Helper()
 
@@ -559,22 +577,22 @@ func requireSameAgentRevisions(
 
 	revisions := make(map[artifact.ArtifactRef]uint64, len(before))
 	for _, value := range before {
-		revisions[value.Artifact.Ref()] = value.Artifact.Revision
+		revisions[value.Ref] = value.Revision
 	}
 
 	for _, value := range after {
-		revision, found := revisions[value.Artifact.Ref()]
+		revision, found := revisions[value.Ref]
 		if !found {
 			t.Fatalf(
 				"unexpected Agent %q after idempotent ensure",
-				value.Artifact.Ref(),
+				value.Ref,
 			)
 		}
-		if value.Artifact.Revision != revision {
+		if value.Revision != revision {
 			t.Fatalf(
 				"Agent %q revision changed after idempotent ensure: got %d want %d",
-				value.Artifact.Ref(),
-				value.Artifact.Revision,
+				value.Ref,
+				value.Revision,
 				revision,
 			)
 		}
