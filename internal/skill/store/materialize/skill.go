@@ -143,9 +143,6 @@ func Resolve(
 	if err != nil {
 		return ResolvedSkill{}, err
 	}
-	if err := resolved.Validate(); err != nil {
-		return ResolvedSkill{}, err
-	}
 	if resolved.Artifact.Ref() != record.Ref() ||
 		resolved.Artifact.Revision != record.Revision ||
 		resolved.Artifact.Binding != record.Binding ||

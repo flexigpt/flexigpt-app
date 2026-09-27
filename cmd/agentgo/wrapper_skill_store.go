@@ -35,14 +35,9 @@ func NewSkillBuiltInInstaller(
 		return nil, errors.New("skill built-in installer dependencies are incomplete")
 	}
 
-	packages, err := builtin.EmbeddedSkillPackages()
-	if err != nil {
-		return nil, err
-	}
 	return skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
 			Hydrator: hydrator,
-			Packages: packages,
 		},
 	)
 }

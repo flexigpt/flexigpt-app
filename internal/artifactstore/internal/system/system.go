@@ -165,7 +165,10 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
-	decoderRegistry, err := discovery.NewDecoderRegistry(registeredDecoders...)
+	decoderRegistry, err := discovery.NewDecoderRegistry(
+		registeredSchemas,
+		registeredDecoders...,
+	)
 	if err != nil {
 
 		_ = metadata.Close()

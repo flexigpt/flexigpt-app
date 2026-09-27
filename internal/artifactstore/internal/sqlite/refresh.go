@@ -147,40 +147,11 @@ func (p *Publisher) Publish(
 			return source.RefreshState{}, err
 		}
 	}
+	// Publication validation checks Artifact state. SQLite foreign keys
+	// enforce Definition existence and the insert trigger checks Source
+	// liveness. Neither requires decoding the same entities once per row.
 	for _, value := range publication.ArtifactCreates {
-		if value.ResolvedDefinition == nil {
-			return source.RefreshState{}, fmt.Errorf(
-				"%w: source-created Artifact has no Definition",
-				basespec.ErrInvalid,
-			)
-		}
-		if _, err := getDefinitionTx(ctx, tx, publication.RootID, *value.ResolvedDefinition); err != nil {
-			return source.RefreshState{}, err
-		}
-	}
-	for _, value := range publication.ArtifactCreates {
-		if err := requireActiveSourceTx(
-			ctx,
-			tx,
-			publication.RootID,
-			value.Binding.SourceID,
-		); err != nil {
-			return source.RefreshState{}, err
-		}
 		if err := insertArtifactTx(ctx, tx, value); err != nil {
-			return source.RefreshState{}, err
-		}
-	}
-	for _, update := range publication.ArtifactUpdates {
-		if update.ResolvedDefinition == nil {
-			continue
-		}
-		if _, err := getDefinitionTx(
-			ctx,
-			tx,
-			publication.RootID,
-			*update.ResolvedDefinition,
-		); err != nil {
 			return source.RefreshState{}, err
 		}
 	}

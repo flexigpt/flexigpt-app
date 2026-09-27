@@ -48,36 +48,9 @@ func (r *Resolver) ResolveCapabilities(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (CapabilityPlan, error) {
-	if r == nil || r.artifacts == nil {
-		return CapabilityPlan{}, basespec.ErrClosed
-	}
-	if err := validateResolutionContext(ctx); err != nil {
-		return CapabilityPlan{}, err
-	}
-	if err := ref.Validate(); err != nil {
-		return CapabilityPlan{}, err
-	}
-
-	terminal, err := r.ResolveTerminalArtifact(ctx, ref)
-	if err != nil {
-		return CapabilityPlan{}, err
-	}
-	record, err := r.artifacts.Get(ctx, terminal)
-	if err != nil {
-		return CapabilityPlan{}, err
-	}
-
-	declarationType := declaration.Type(record.Kind)
-	if err := declarationType.Validate(); err != nil {
-		return CapabilityPlan{}, fmt.Errorf(
-			"%w: Artifact %q has unsupported declaration type %q",
-			basespec.ErrUnsupported,
-			record.ID,
-			record.Kind,
-		)
-	}
-
-	resolved, err := r.resolveTyped(ctx, terminal, declarationType)
+	// Empty expected type means infer it from the admitted Artifact.
+	// ResolveTyped owns context, reference, alias, and type checks.
+	resolved, err := r.resolveTyped(ctx, ref, "")
 	if err != nil {
 		return CapabilityPlan{}, err
 	}

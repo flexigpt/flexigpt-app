@@ -62,9 +62,6 @@ func (a *Adapter) Resolve(
 	if err != nil {
 		return Document{}, err
 	}
-	if err := resolved.Validate(); err != nil {
-		return Document{}, err
-	}
 	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {
 		return Document{}, fmt.Errorf(
 			"%w: Artifact %q is not Text",
@@ -127,9 +124,6 @@ func (a *Adapter) ResolveWithContentSource(
 
 	resolved, err := a.resources.ResolveArtifact(ctx, ref, resource.ResolveOptions{})
 	if err != nil {
-		return Document{}, err
-	}
-	if err := resolved.Validate(); err != nil {
 		return Document{}, err
 	}
 	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {

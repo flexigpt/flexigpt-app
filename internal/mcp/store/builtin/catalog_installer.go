@@ -3,7 +3,6 @@ package builtin
 import (
 	"context"
 	"fmt"
-	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -16,7 +15,6 @@ import (
 
 type InstallerDependencies struct {
 	Hydrator topology.CompiledHydrationCoordinator
-	Packages fs.FS
 	Cleanup  mcpConsumerAPI.BuiltinPackageCleanup
 	Overlays mcpOverlay.RootPurger
 }
@@ -39,7 +37,6 @@ func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Hydrator == nil ||
-		dependencies.Packages == nil ||
 		dependencies.Cleanup == nil ||
 		dependencies.Overlays == nil {
 		return nil, fmt.Errorf(
@@ -55,7 +52,6 @@ func NewInstaller(
 
 	value, err := builtin.NewCatalogInstallerForSet(
 		set,
-		dependencies.Packages,
 		dependencies.Hydrator,
 		lifecycle{
 			cleanup:  dependencies.Cleanup,

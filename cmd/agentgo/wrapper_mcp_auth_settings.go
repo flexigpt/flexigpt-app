@@ -230,12 +230,15 @@ func (s *mcpSettingsAdapter) DeleteMCPInstallationPrefix(
 			continue
 		}
 		if found {
-			output = errors.Join(
-				output,
-				s.deleteOverlaySecretsLocked(ctx, key, raw),
-			)
+			if err := s.deleteOverlaySecretsLocked(ctx, key, raw); err != nil {
+				output = errors.Join(output, err)
+				continue
+			}
 		}
-		output = errors.Join(output, s.deleteRawLocked(ctx, key))
+		if err := s.deleteRawLocked(ctx, key); err != nil {
+			output = errors.Join(output, err)
+			continue
+		}
 		delete(index.Keys, key)
 	}
 	output = errors.Join(output, s.writeIndexLocked(ctx, index))

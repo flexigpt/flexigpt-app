@@ -2,6 +2,7 @@ package consumerapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 
@@ -123,10 +124,12 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 
 	for _, ref := range refs {
 		record, err := c.api.artifacts.Get(ctx, ref)
-		if err != nil {
+		if err != nil &&
+			!errors.Is(err, basespec.ErrArtifactNotFound) &&
+			!errors.Is(err, basespec.ErrRootNotFound) {
 			return err
 		}
-		if record.State == artifact.StateAvailable {
+		if err == nil && record.State == artifact.StateAvailable {
 			continue
 		}
 		if err := c.api.purgeBuiltInServerInstallation(ctx, ref); err != nil {

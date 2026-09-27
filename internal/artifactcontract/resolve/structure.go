@@ -8,14 +8,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -46,20 +42,16 @@ func (r *Resolver) resolveStructure(
 	from := node.Artifact
 
 	switch node.Type {
-	case declaration.TypeText:
-		_, err := textv1.DecodeTextEntry(entry)
-		return err
-
-	case declaration.TypeModel:
-		_, err := modelv1.DecodeModelEntry(entry)
-		return err
-
-	case declaration.TypeTool:
-		_, err := toolv1.DecodeToolEntry(entry)
-		return err
+	case declaration.TypeText,
+		declaration.TypeModel,
+		declaration.TypeTool,
+		declaration.TypeMCPPolicy:
+		// Leaf declarations have no composition to expand. Their schema and
+		// semantics were admitted before the Definition became visible.
+		return nil
 
 	case declaration.TypeSkill:
-		value, err := skillv1.DecodeSkillEntry(entry)
+		value, err := decodeStoredStructure[skillv1.SkillDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -75,7 +67,7 @@ func (r *Resolver) resolveStructure(
 		return err
 
 	case declaration.TypeMCP:
-		value, err := mcpv1.DecodeMCPEntry(entry)
+		value, err := decodeStoredStructure[mcpv1.MCPDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -113,12 +105,8 @@ func (r *Resolver) resolveStructure(
 		}
 		return nil
 
-	case declaration.TypeMCPPolicy:
-		_, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
-		return err
-
 	case declaration.TypePlugin:
-		value, err := pluginv1.DecodePluginEntry(entry)
+		value, err := decodeStoredStructure[pluginv1.PluginDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -134,7 +122,7 @@ func (r *Resolver) resolveStructure(
 		return err
 
 	case declaration.TypeAgent:
-		value, err := agentv1.DecodeAgentEntry(entry)
+		value, err := decodeStoredStructure[agentv1.AgentDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -185,7 +173,7 @@ func (r *Resolver) resolveStructure(
 		return nil
 
 	case declaration.TypeTeam:
-		value, err := teamv1.DecodeTeamEntry(entry)
+		value, err := decodeStoredStructure[teamv1.TeamDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -236,7 +224,7 @@ func (r *Resolver) resolveStructure(
 		return nil
 
 	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopEntry(entry)
+		value, err := decodeStoredStructure[loopv1.LoopDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -265,7 +253,7 @@ func (r *Resolver) resolveStructure(
 		return nil
 
 	case declaration.TypeWorkflow:
-		value, err := workflowv1.DecodeWorkflowEntry(entry)
+		value, err := decodeStoredStructure[workflowv1.WorkflowDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -323,7 +311,7 @@ func (r *Resolver) resolveStructure(
 		return nil
 
 	case declaration.TypeWorkspace:
-		value, err := workspacev1.DecodeWorkspaceEntry(entry)
+		value, err := decodeStoredStructure[workspacev1.WorkspaceDocument](entry)
 		if err != nil {
 			return err
 		}
@@ -352,6 +340,14 @@ func (r *Resolver) resolveStructure(
 			node.Type,
 		)
 	}
+}
+
+func decodeStoredStructure[T any](entry declaration.Entry) (T, error) {
+	var value T
+	if err := entry.DecodeInto(&value); err != nil {
+		return value, fmt.Errorf("%w: decode stored declaration: %w", basespec.ErrInvalid, err)
+	}
+	return value, nil
 }
 
 func (r *Resolver) resolveSingleMember(

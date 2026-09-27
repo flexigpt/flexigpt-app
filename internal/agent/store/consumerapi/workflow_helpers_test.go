@@ -180,13 +180,9 @@ func (h *workflowHarness) installBundledAgents(
 	t.Helper()
 
 	if h.agentBootstrap == nil {
-		packages, err := builtin.EmbeddedAgentPackages()
-		requireNoError(t, err)
-
 		installer, err := agentBuiltin.NewInstaller(
 			agentBuiltin.InstallerDependencies{
 				Hydrator: h.store.Topology,
-				Packages: packages,
 			},
 		)
 		requireNoError(t, err)

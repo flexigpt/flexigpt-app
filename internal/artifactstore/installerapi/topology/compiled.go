@@ -2,7 +2,6 @@ package topology
 
 import (
 	"context"
-	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
@@ -10,6 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
+
+const CompiledPackageSetFormat = "artifact-compiled-package-set/v1"
 
 // CompiledCatalog is binary-owned generated built-in metadata.
 //
@@ -31,6 +32,7 @@ func (c CompiledCatalog) Clone() CompiledCatalog {
 }
 
 type CompiledPackageSet struct {
+	Format    string            `json:"format"`
 	Name      string            `json:"name"`
 	Hydration Hydration         `json:"hydration"`
 	Packages  []CompiledPackage `json:"packages"`
@@ -56,7 +58,11 @@ type CompiledPackage struct {
 
 func (p CompiledPackage) Clone() CompiledPackage {
 	output := p
-	output.Files = append([]CompiledFile(nil), p.Files...)
+	output.Files = make([]CompiledFile, len(p.Files))
+	for index, file := range p.Files {
+		output.Files[index] = file
+		output.Files[index].Content = append([]byte(nil), file.Content...)
+	}
 	output.Documents = make([]CompiledDocument, len(p.Documents))
 	for index, value := range p.Documents {
 		output.Documents[index] = value.Clone()
@@ -68,6 +74,7 @@ type CompiledFile struct {
 	Locator basespec.Locator  `json:"locator"`
 	Size    int64             `json:"size"`
 	Digest  cryptoutil.Digest `json:"digest"`
+	Content []byte            `json:"content"`
 }
 
 type CompiledDocument struct {
@@ -122,11 +129,10 @@ type CompiledPackageLifecycle interface {
 	) error
 }
 
-// CompiledRegistration binds one generated catalog set to its embedded bytes.
+// CompiledRegistration supplies a self-contained generated installation payload.
 // The registration can only originate from application composition.
 type CompiledRegistration struct {
 	Set       CompiledPackageSet
-	Files     fs.FS
 	Lifecycle CompiledPackageLifecycle
 }
 

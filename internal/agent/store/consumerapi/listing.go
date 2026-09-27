@@ -2,7 +2,6 @@ package consumerapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -101,6 +101,9 @@ func (a *API) ListAgents(
 			rootID,
 			catalog.ListOptions{
 				IncludeDocument: request.IncludeDocument,
+				Kind:            agentDomain.AgentArtifactKind,
+				Enabled:         request.Enabled,
+				LogicalNames:    request.LogicalNames,
 			},
 		)
 		if err != nil {
@@ -167,34 +170,15 @@ func (a *API) agentListDocument(
 		return nil, nil
 	}
 
-	if cached, found := a.listDocuments.Load(
-		entry.Definition.Digest,
-	); found {
-		v, ok := cached.(agentv1.AgentDocument)
-		if !ok {
-			return nil, errors.New("agent document not found")
-		}
-		value, err := v.Clone()
-		if err != nil {
-			return nil, err
-		}
-		return &value, nil
-	}
-
-	document, err := agentv1.DecodeAgentJSON(entry.Document.Body)
+	document, err := a.listDocuments.GetOrLoad(
+		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
+		len(entry.Document.Body),
+		func() (agentv1.AgentDocument, error) {
+			return agentv1.DecodeAgentJSON(entry.Document.Body)
+		},
+	)
 	if err != nil {
 		return nil, err
-	}
-	actual, loaded := a.listDocuments.LoadOrStore(
-		entry.Definition.Digest,
-		document,
-	)
-	if loaded {
-		d, ok := actual.(agentv1.AgentDocument)
-		if !ok {
-			return nil, errors.New("agent document not found")
-		}
-		document = d
 	}
 
 	value, err := document.Clone()

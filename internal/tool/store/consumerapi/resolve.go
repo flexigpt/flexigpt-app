@@ -98,9 +98,6 @@ func (a *API) verifyCurrentArtifact(
 	if err != nil {
 		return err
 	}
-	if err := resolved.Validate(); err != nil {
-		return err
-	}
 	if resolved.Artifact.Ref() != record.Ref() ||
 		resolved.Artifact.Revision != record.Revision ||
 		resolved.Artifact.Binding != record.Binding ||

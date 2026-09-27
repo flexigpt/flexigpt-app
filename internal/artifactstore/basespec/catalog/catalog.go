@@ -26,6 +26,9 @@ import (
 // Source state, local enablement, or list filtering semantics.
 type ListOptions struct {
 	IncludeDocument bool
+	Kind            artifact.ArtifactKind
+	Enabled         *bool
+	LogicalNames    []basespec.LogicalName
 }
 
 // DefinitionMetadata is the small Definition projection needed by ordinary

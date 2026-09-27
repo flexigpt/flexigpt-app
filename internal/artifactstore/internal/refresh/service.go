@@ -349,15 +349,31 @@ func (s *Service) InspectSource(
 		return source.RefreshInspection{}, err
 	}
 
-	state, err := s.states.GetRefreshState(
-		ctx,
-		rootID,
-		sourceID,
-	)
+	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
 		return source.RefreshInspection{}, err
 	}
-	value, err := s.sources.Get(ctx, rootID, sourceID)
+	result, err := s.InspectSourceMetadata(ctx, value)
+	if err != nil {
+		return source.RefreshInspection{}, err
+	}
+	return s.inspectSourceGeneration(ctx, value, result)
+}
+
+func (s *Service) InspectSourceMetadata(
+	ctx context.Context,
+	value source.Source,
+) (source.RefreshInspection, error) {
+	if s == nil {
+		return source.RefreshInspection{}, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return source.RefreshInspection{}, basespec.ErrInvalid
+	}
+	if err := ctx.Err(); err != nil {
+		return source.RefreshInspection{}, err
+	}
+	state, err := s.states.GetRefreshState(ctx, value.RootID, value.ID)
 	if err != nil {
 		return source.RefreshInspection{}, err
 	}
@@ -370,6 +386,19 @@ func (s *Service) InspectSource(
 		return source.RefreshInspection{}, err
 	}
 
+	return source.RefreshInspection{
+		State:                 state,
+		SourceRevisionChanged: state.SourceRevision != value.Revision,
+		DiscoveryChanged:      state.DiscoveryFingerprint != discoveryFingerprint,
+		DecoderChanged:        state.DecoderFingerprint != decoderFingerprint,
+	}, nil
+}
+
+func (s *Service) inspectSourceGeneration(
+	ctx context.Context,
+	value source.Source,
+	result source.RefreshInspection,
+) (source.RefreshInspection, error) {
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
 		return source.RefreshInspection{}, err
@@ -381,16 +410,7 @@ func (s *Service) InspectSource(
 		return source.RefreshInspection{}, err
 	}
 
-	result := source.RefreshInspection{
-		State:                   state,
-		SourceRevisionChanged:   state.SourceRevision != value.Revision,
-		DiscoveryChanged:        state.DiscoveryFingerprint != discoveryFingerprint,
-		DecoderChanged:          state.DecoderFingerprint != decoderFingerprint,
-		SourceGenerationChanged: state.SourceGeneration != generation,
-	}
-	if err := result.Validate(); err != nil {
-		return source.RefreshInspection{}, err
-	}
+	result.SourceGenerationChanged = result.State.SourceGeneration != generation
 	return result.Clone(), nil
 }
 

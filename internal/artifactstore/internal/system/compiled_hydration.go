@@ -2,11 +2,7 @@ package system
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
-	"io/fs"
-	"path"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -30,12 +26,6 @@ func (c *Components) RegisterCompiledPackages(
 	}
 
 	for _, value := range values {
-		if value.Files == nil {
-			return fmt.Errorf(
-				"%w: compiled built-in registration has no embedded file system",
-				basespec.ErrInvalid,
-			)
-		}
 		if !c.isProtectedRoot(value.Set.Hydration.RootID) {
 			return fmt.Errorf(
 				"%w: compiled built-in registration targets an unprotected Root",
@@ -141,7 +131,6 @@ func (c *Components) HydrateCompiledPackages(
 
 			files, err := readCompiledPackageFiles(
 				ctx,
-				plan.Registration.Files,
 				packageValue,
 			)
 			if err != nil {
@@ -304,13 +293,19 @@ func (c *Components) verifyCompiledPackage(
 
 func readCompiledPackageFiles(
 	ctx context.Context,
-	filesystem fs.FS,
 	value topology.CompiledPackage,
 ) ([]source.ManagedPackageFile, error) {
-	if filesystem == nil {
-		return nil, basespec.ErrInvalid
+	if ctx == nil {
+		return nil, fmt.Errorf("%w: compiled package context is nil", basespec.ErrInvalid)
+	}
+	if len(value.Files) == 0 || len(value.Files) > basespec.MaxDiscoveryEntries {
+		return nil, fmt.Errorf(
+			"%w: compiled package has an invalid file count",
+			basespec.ErrInvalid,
+		)
 	}
 
+	var total int64
 	output := make([]source.ManagedPackageFile, 0, len(value.Files))
 	for _, file := range value.Files {
 		if err := ctx.Err(); err != nil {
@@ -320,33 +315,30 @@ func readCompiledPackageFiles(
 			return nil, err
 		}
 
-		location := path.Join(
-			string(value.EmbeddedRoot),
-			string(file.Locator),
-		)
-		reader, err := filesystem.Open(location)
-		if err != nil {
-			return nil, err
-		}
-		content, readErr := io.ReadAll(
-			io.LimitReader(reader, file.Size+1),
-		)
-		closeErr := reader.Close()
-		if err := errors.Join(readErr, closeErr); err != nil {
-			return nil, err
-		}
-		if int64(len(content)) != file.Size ||
-			cryptoutil.DigestBytes(content) != file.Digest {
+		if file.Size < 0 || file.Size > basespec.MaxScanBytes-total {
 			return nil, fmt.Errorf(
-				"%w: embedded file %q differs from generated catalog",
-				basespec.ErrDigestMismatch,
-				location,
+				"%w: compiled package exceeds the byte limit",
+				basespec.ErrInvalid,
 			)
 		}
+		actual := cryptoutil.DigestBytes(file.Content)
+		if int64(len(file.Content)) != file.Size || actual != file.Digest {
+			return nil, fmt.Errorf(
+				"%w: compiled package %q file %q: size %d/%d, digest %q/%q",
+				basespec.ErrDigestMismatch,
+				value.Address,
+				file.Locator,
+				len(file.Content),
+				file.Size,
+				actual,
+				file.Digest,
+			)
+		}
+		total += file.Size
 
 		output = append(output, source.ManagedPackageFile{
 			Locator: file.Locator,
-			Content: content,
+			Content: append([]byte(nil), file.Content...),
 		})
 	}
 	return output, nil

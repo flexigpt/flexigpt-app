@@ -185,10 +185,13 @@ func (s *snapshot) Open(
 		return nil, errors.Join(statErr, file.Close())
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf(
-			"%w: source locator %q is not a regular file",
-			basespec.ErrInvalid,
-			locator,
+		return nil, errors.Join(
+			fmt.Errorf(
+				"%w: source locator %q is not a regular file",
+				basespec.ErrInvalid,
+				locator,
+			),
+			file.Close(),
 		)
 	}
 	return file, nil

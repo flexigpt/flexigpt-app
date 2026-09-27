@@ -192,7 +192,7 @@ func (s *verificationSession) sourceLocked(
 		return current, nil
 	}
 
-	inspection, err := s.service.refresh.InspectSource(
+	value, err := s.service.sources.Get(
 		ctx,
 		key.rootID,
 		key.sourceID,
@@ -200,18 +200,9 @@ func (s *verificationSession) sourceLocked(
 	if err != nil {
 		return nil, err
 	}
-	if !inspection.IsCurrent() {
-		return nil, fmt.Errorf(
-			"%w: Artifact Source %q requires refresh",
-			basespec.ErrRefreshRequired,
-			key.sourceID,
-		)
-	}
-
-	value, err := s.service.sources.Get(
+	inspection, err := s.service.refresh.InspectSourceMetadata(
 		ctx,
-		key.rootID,
-		key.sourceID,
+		value,
 	)
 	if err != nil {
 		return nil, err
@@ -223,7 +214,7 @@ func (s *verificationSession) sourceLocked(
 			value.ID,
 		)
 	}
-	if value.Revision != inspection.State.SourceRevision {
+	if !inspection.IsCurrent() {
 		return nil, fmt.Errorf(
 			"%w: Artifact Source %q changed during batch setup",
 			basespec.ErrRefreshRequired,
@@ -393,13 +384,13 @@ func (s *Service) readSourceEntryInSession(
 				Content:          content,
 				Digest:           cryptoutil.DigestBytes(content),
 			}
-			return output.Validate()
+			return nil
 		},
 	)
 	if err != nil {
 		return resource.VerifiedEntry{}, err
 	}
-	return output.Clone(), nil
+	return output, nil
 }
 
 func (s *Service) resolveVerifiedLocalPathInSession(

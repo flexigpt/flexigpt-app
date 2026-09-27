@@ -80,7 +80,10 @@ func decodeSkill(
 }
 
 func (v SkillDocument) Clone() (SkillDocument, error) {
-	return jsonutil.CloneJSON(v)
+	output := v
+	output.Header = v.Header.Clone()
+	output.AllowedTools = declaration.CloneEntries(v.AllowedTools)
+	return output, nil
 }
 
 func (v SkillDocument) Canonicalize() (SkillDocument, error) {

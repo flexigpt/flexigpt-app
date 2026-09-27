@@ -77,14 +77,14 @@ func (o Observation) Validate() error {
 				basespec.ErrInvalid,
 			)
 		}
-		canonical, err := definition.Canonicalize(*o.Definition)
-		if err != nil {
+		// Definition admission belongs to the decoder/generated boundary and
+		// the persistence writer. Staging validation checks linkage only.
+		if err := cryptoutil.ValidateDigest(o.Definition.Digest); err != nil {
 			return err
 		}
-		if canonical.Digest != o.Definition.Digest ||
-			canonical.Kind != o.Kind ||
-			canonical.LogicalName != o.LogicalName ||
-			canonical.LogicalVersion != o.LogicalVersion {
+		if o.Definition.Kind != o.Kind ||
+			o.Definition.LogicalName != o.LogicalName ||
+			o.Definition.LogicalVersion != o.LogicalVersion {
 			return fmt.Errorf(
 				"%w: valid Source observation Definition does not match observation identity",
 				basespec.ErrInvalid,

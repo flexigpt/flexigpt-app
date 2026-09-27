@@ -59,14 +59,8 @@ func NewToolBuiltInInstaller(
 		return nil, errors.New("tool generated catalog installer hydrator is required")
 	}
 
-	packages, err := builtin.EmbeddedToolPackages()
-	if err != nil {
-		return nil, err
-	}
-
 	return toolBuiltin.NewInstaller(toolBuiltin.InstallerDependencies{
 		Hydrator: hydrator,
-		Packages: packages,
 	})
 }
 

@@ -90,12 +90,12 @@ func decodeJSON(raw []byte, target any) error {
 	if len(raw) > basespec.MaxDefinitionBytes {
 		return fmt.Errorf("%w: persisted JSON exceeds size limit", basespec.ErrInvalid)
 	}
-	canonical, err := jsonutil.Canonicalize(raw)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(canonical, target); err != nil {
-		return err
+	if err := json.Unmarshal(raw, target); err != nil {
+		return fmt.Errorf(
+			"%w: decode persisted JSON: %w",
+			basespec.ErrInvalid,
+			err,
+		)
 	}
 	return nil
 }

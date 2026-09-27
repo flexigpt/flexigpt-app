@@ -32,14 +32,9 @@ func NewAgentBuiltInInstaller(
 		)
 	}
 
-	packages, err := builtin.EmbeddedAgentPackages()
-	if err != nil {
-		return nil, err
-	}
 	return agentBuiltin.NewInstaller(
 		agentBuiltin.InstallerDependencies{
 			Hydrator: hydrator,
-			Packages: packages,
 		},
 	)
 }

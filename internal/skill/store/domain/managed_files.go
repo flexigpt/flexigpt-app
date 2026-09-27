@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // NormalizeManagedSkillFiles returns a complete portable Skill package and
@@ -128,5 +129,25 @@ func PackageDigest(
 	if err != nil {
 		return "", err
 	}
-	return cryptoutil.CanonicalDigest(normalized)
+	type fileManifest struct {
+		Locator basespec.Locator  `json:"locator"`
+		Size    int64             `json:"size"`
+		Digest  cryptoutil.Digest `json:"digest"`
+	}
+	manifest := make([]fileManifest, 0, len(normalized))
+	for _, file := range normalized {
+		manifest = append(manifest, fileManifest{
+			Locator: file.Locator,
+			Size:    int64(len(file.Content)),
+			Digest:  cryptoutil.DigestBytes(file.Content),
+		})
+	}
+	raw, err := jsonutil.MarshalCanonicalObject(map[string]any{
+		"format": "skill-package-content/v1",
+		"files":  manifest,
+	}, basespec.MaxDefinitionBytes)
+	if err != nil {
+		return "", err
+	}
+	return cryptoutil.DigestBytes(raw), nil
 }

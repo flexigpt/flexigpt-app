@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"sort"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -37,8 +37,8 @@ type API struct {
 	declarationResolver *resolve.Resolver
 	collections         *collection.API
 
-	serverListDocuments sync.Map
-	policyListDocuments sync.Map
+	serverListDocuments consumerutil.DocumentCache[mcpDomainServer.ServerDocument]
+	policyListDocuments consumerutil.DocumentCache[mcppolicyv1.MCPPolicyDocument]
 }
 
 func New(

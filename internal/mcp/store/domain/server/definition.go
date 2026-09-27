@@ -260,16 +260,19 @@ func installToDeclaration(
 		AllowEnvironment: append([]string(nil), input.AllowEnvironment...),
 	}
 	for name, value := range input.Inputs {
-		output.Inputs[name] = mcpv1.InstallInput{
-			Kind:                 string(value.Kind),
-			Label:                value.Label,
-			Description:          value.Description,
-			Note:                 value.Note,
-			Placeholder:          value.Placeholder,
-			Required:             pointerBool(value.Required),
-			Default:              stringDefaultToJSON(value.Default),
-			ClientSecretRequired: pointerBool(value.ClientSecretRequired),
+		declared := mcpv1.InstallInput{
+			Kind:        string(value.Kind),
+			Label:       value.Label,
+			Description: value.Description,
+			Note:        value.Note,
+			Placeholder: value.Placeholder,
+			Required:    pointerBool(value.Required),
+			Default:     stringDefaultToJSON(value.Default),
 		}
+		if value.Kind == InputOAuthClientCredentials {
+			declared.ClientSecretRequired = pointerBool(value.ClientSecretRequired)
+		}
+		output.Inputs[name] = declared
 	}
 	return output
 }

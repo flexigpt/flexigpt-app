@@ -65,7 +65,7 @@ func putDefinitionTx(
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(
+	result, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO artifact_definitions (
 			root_id, digest, kind, schema_id, schema_version,
@@ -89,6 +89,15 @@ func putDefinitionTx(
 	)
 	if err != nil {
 		return sqliteError(err)
+	}
+
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if inserted == 1 {
+		// The exact admitted payload was inserted by this transaction.
+		return nil
 	}
 
 	existing, err := getDefinitionTx(

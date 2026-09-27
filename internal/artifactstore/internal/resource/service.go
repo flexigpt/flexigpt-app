@@ -19,10 +19,9 @@ import (
 )
 
 type sourceRefreshInspector interface {
-	InspectSource(
+	InspectSourceMetadata(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
+		value source.Source,
 	) (source.RefreshInspection, error)
 }
 
@@ -94,67 +93,20 @@ func (s *Service) ResolveArtifact(
 		return s.resolveArtifactInSession(ctx, session, record)
 	}
 
-	inspection, err := s.refresh.InspectSource(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
-	)
+	sessionCtx, lease, err := s.BeginVerificationSession(ctx)
 	if err != nil {
 		return resource.ResolvedArtifact{}, err
 	}
-	if !inspection.IsCurrent() {
-		return resource.ResolvedArtifact{}, fmt.Errorf(
-			"%w: Artifact Source %q requires refresh",
-			basespec.ErrRefreshRequired,
-			record.Binding.SourceID,
-		)
-	}
-
-	value, err := s.sources.Get(
-		ctx,
-		record.RootID,
-		record.Binding.SourceID,
+	output, resolveErr := s.resolveArtifactInSession(
+		sessionCtx,
+		verificationSessionFromContext(sessionCtx),
+		record,
 	)
-	if err != nil {
+	closeErr := lease.Close(context.WithoutCancel(sessionCtx))
+	if err := errors.Join(resolveErr, closeErr); err != nil {
 		return resource.ResolvedArtifact{}, err
 	}
-	if !value.Enabled {
-		return resource.ResolvedArtifact{}, fmt.Errorf(
-			"%w: Artifact Source %q is disabled",
-			basespec.ErrSourceUnavailable,
-			value.ID,
-		)
-	}
-
-	definitionValue, err := s.definitions.GetDefinition(
-		ctx,
-		record.RootID,
-		*record.ResolvedDefinition,
-	)
-	if err != nil {
-		return resource.ResolvedArtifact{}, err
-	}
-	output := resource.ResolvedArtifact{
-		Artifact:     record.Clone(),
-		Definition:   definitionValue.Clone(),
-		Source:       value.Summary(),
-		RefreshState: inspection.State.Clone(),
-	}
-	if err := output.Validate(); err != nil {
-		return resource.ResolvedArtifact{}, err
-	}
-	if err := sourceimpl.VerifySnapshotContentDigest(
-		ctx,
-		s.sources,
-		value,
-		record.Binding.Locator,
-		inspection.State.SourceGeneration,
-		*record.SourceContentDigest,
-		basespec.MaxCandidateBytes,
-	); err != nil {
-		return resource.ResolvedArtifact{}, err
-	}
-	return output.Clone(), nil
+	return output, nil
 }
 
 func (s *Service) ResolveVerifiedLocalPath(
@@ -313,10 +265,7 @@ func (s *Service) ReadSourceEntry(
 		Content:          content,
 		Digest:           cryptoutil.DigestBytes(content),
 	}
-	if err := output.Validate(); err != nil {
-		return resource.VerifiedEntry{}, err
-	}
-	return output.Clone(), nil
+	return output, nil
 }
 
 // StatSourceEntry confirms one Source snapshot and returns only physical Entry
@@ -635,12 +584,6 @@ func (s *Service) ReadSourceTree(
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
 		return nil, err
-	}
-	for index := range output {
-		if err := output[index].Validate(); err != nil {
-			return nil, err
-		}
-		output[index] = output[index].Clone()
 	}
 	return output, nil
 }

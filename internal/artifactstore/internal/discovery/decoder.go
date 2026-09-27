@@ -1,21 +1,24 @@
 package discovery
 
 import (
-	"encoding/json"
 	"fmt"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DecoderRegistry struct {
-	decoders []providerapi.Decoder
-	byID     map[basespec.DecoderID]providerapi.Decoder
+	decoders    []providerapi.Decoder
+	byID        map[basespec.DecoderID]providerapi.Decoder
+	fingerprint cryptoutil.Digest
 }
 
 func NewDecoderRegistry(
+	codecs []providerapi.SchemaCodec,
 	decoders ...providerapi.Decoder,
 ) (*DecoderRegistry, error) {
 	byID := make(map[basespec.DecoderID]providerapi.Decoder, len(decoders))
@@ -48,9 +51,14 @@ func NewDecoderRegistry(
 	sort.Slice(ordered, func(left, right int) bool {
 		return ordered[left].ID() < ordered[right].ID()
 	})
+	fingerprint, err := registryFingerprint(codecs, ordered)
+	if err != nil {
+		return nil, err
+	}
 	return &DecoderRegistry{
-		decoders: ordered,
-		byID:     byID,
+		decoders:    ordered,
+		byID:        byID,
+		fingerprint: fingerprint,
 	}, nil
 }
 
@@ -61,18 +69,60 @@ func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 			basespec.ErrInvalid,
 		)
 	}
+	return r.fingerprint, nil
+}
+
+func registryFingerprint(
+	codecs []providerapi.SchemaCodec,
+	decoders []providerapi.Decoder,
+) (cryptoutil.Digest, error) {
 	type descriptor struct {
 		ID       basespec.DecoderID `json:"id"`
 		Revision string             `json:"revision"`
 	}
-	values := make([]descriptor, 0, len(r.decoders))
-	for _, decoder := range r.decoders {
+	values := make([]descriptor, 0, len(decoders))
+	for _, decoder := range decoders {
 		values = append(values, descriptor{
 			ID:       decoder.ID(),
 			Revision: decoder.Revision(),
 		})
 	}
-	raw, err := json.Marshal(values)
+	type schemaDescriptor struct {
+		Key    schema.Key        `json:"key"`
+		Digest cryptoutil.Digest `json:"digest"`
+	}
+	schemas := make([]schemaDescriptor, 0, len(codecs))
+	for _, codec := range codecs {
+		if codec == nil {
+			return "", fmt.Errorf("%w: nil schema codec", basespec.ErrInvalid)
+		}
+		raw, err := jsonutil.Canonicalize(codec.JSONSchema())
+		if err != nil {
+			return "", err
+		}
+		schemas = append(schemas, schemaDescriptor{
+			Key:    codec.Key(),
+			Digest: cryptoutil.DigestBytes(raw),
+		})
+	}
+	sort.Slice(schemas, func(i, j int) bool {
+		left, right := schemas[i].Key, schemas[j].Key
+		if left.Entity != right.Entity {
+			return left.Entity < right.Entity
+		}
+		if left.Kind != right.Kind {
+			return left.Kind < right.Kind
+		}
+		if left.SchemaID != right.SchemaID {
+			return left.SchemaID < right.SchemaID
+		}
+		return left.SchemaVersion < right.SchemaVersion
+	})
+	raw, err := jsonutil.MarshalCanonicalObject(map[string]any{
+		"format":   "artifact-decoder-registry/v1",
+		"decoders": values,
+		"schemas":  schemas,
+	}, basespec.MaxDefinitionBytes)
 	if err != nil {
 		return "", err
 	}

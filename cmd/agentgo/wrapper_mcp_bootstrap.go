@@ -235,14 +235,9 @@ func NewMCPBuiltInInstaller(
 	if hydrator == nil || cleanup == nil || overlays == nil {
 		return nil, errors.New("MCP generated built-in installer dependencies are incomplete")
 	}
-	packages, err := builtin.EmbeddedMCPPackages()
-	if err != nil {
-		return nil, err
-	}
 	return mcpBuiltin.NewInstaller(
 		mcpBuiltin.InstallerDependencies{
 			Hydrator: hydrator,
-			Packages: packages,
 			Cleanup:  cleanup,
 			Overlays: overlays,
 		},

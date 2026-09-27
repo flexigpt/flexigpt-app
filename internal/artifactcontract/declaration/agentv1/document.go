@@ -81,7 +81,18 @@ func decodeAgent(
 }
 
 func (v AgentDocument) Clone() (AgentDocument, error) {
-	return jsonutil.CloneJSON(v)
+	output := v
+	output.Header = v.Header.Clone()
+	output.Members = declaration.CloneEntries(v.Members)
+	if v.Loop != nil {
+		value := v.Loop.Clone()
+		output.Loop = &value
+	}
+	if v.Workflow != nil {
+		value := v.Workflow.Clone()
+		output.Workflow = &value
+	}
+	return output, nil
 }
 
 func (v AgentDocument) Canonicalize() (AgentDocument, error) {

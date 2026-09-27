@@ -3,7 +3,6 @@ package builtin
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -19,11 +18,10 @@ type CatalogInstaller struct {
 
 func NewCatalogInstallerForSet(
 	set topology.CompiledPackageSet,
-	filesystem fs.FS,
 	hydrator topology.CompiledHydrationCoordinator,
 	lifecycle topology.CompiledPackageLifecycle,
 ) (*CatalogInstaller, error) {
-	if filesystem == nil || hydrator == nil {
+	if hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: generated catalog installer dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -43,7 +41,6 @@ func NewCatalogInstallerForSet(
 	return &CatalogInstaller{
 		registration: topology.CompiledRegistration{
 			Set:       set.Clone(),
-			Files:     filesystem,
 			Lifecycle: lifecycle,
 		},
 		hydrator: hydrator,
@@ -122,7 +119,6 @@ func (i *CatalogInstaller) CompiledRegistration(
 	}
 	return topology.CompiledRegistration{
 		Set:       i.registration.Set.Clone(),
-		Files:     i.registration.Files,
 		Lifecycle: i.registration.Lifecycle,
 	}, nil
 }

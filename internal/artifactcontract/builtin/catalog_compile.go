@@ -138,14 +138,14 @@ func Compile(
 		config.SchemaVersion,
 		config.SetName,
 		declaration,
-		validation,
 	)
 	if err != nil {
 		return topology.CompiledPackageSet{}, err
 	}
 
 	output := topology.CompiledPackageSet{
-		Name: config.SetName,
+		Format: topology.CompiledPackageSetFormat,
+		Name:   config.SetName,
 		Hydration: topology.Hydration{
 			InstallerName: config.InstallerName,
 			RootID:        declaration.Root.ID,
@@ -296,6 +296,7 @@ func compilePackage(
 			Locator: file.Locator,
 			Size:    int64(len(file.Content)),
 			Digest:  digest,
+			Content: append([]byte(nil), file.Content...),
 		})
 	}
 
@@ -445,18 +446,17 @@ func generatedHydrationFingerprint(
 	schemaVersion string,
 	setName string,
 	declaration topology.Declaration,
-	validation cryptoutil.Digest,
 ) (cryptoutil.Digest, error) {
+	// Schema/decoder changes belong to package admission fingerprints.
+	// They must not destroy the shared Root and its local Artifact state.
 	return cryptoutil.CanonicalDigest(struct {
 		SchemaVersion string               `json:"schemaVersion"`
 		SetName       string               `json:"setName"`
 		Topology      topology.Declaration `json:"topology"`
-		Validation    cryptoutil.Digest    `json:"validation"`
 	}{
 		SchemaVersion: schemaVersion,
 		SetName:       setName,
 		Topology:      declaration,
-		Validation:    validation,
 	})
 }
 

@@ -47,7 +47,7 @@ func (w compiledHydrationWork) apply(
 func packageHydrationNeedsMutation(
 	value preparedHydration,
 ) bool {
-	if len(value.stale) != 0 {
+	if !value.current || len(value.stale) != 0 {
 		return true
 	}
 	for _, current := range value.packageCurrent {

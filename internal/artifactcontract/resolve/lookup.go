@@ -778,6 +778,13 @@ func resolutionFailure(
 	}
 
 	switch {
+	case errors.Is(err, context.Canceled),
+		errors.Is(err, context.DeadlineExceeded),
+		errors.Is(err, basespec.ErrClosed):
+		return "", ResolutionIssue{}, false
+	case errors.Is(err, basespec.ErrDigestMismatch),
+		errors.Is(err, basespec.ErrInvalid):
+		return ResolutionUnavailable, issue("artifact.reference-invalid"), true
 	case errors.Is(err, basespec.ErrIdentityConflict):
 		return ResolutionAmbiguous, issue("artifact.identity-conflict"), true
 	case errors.Is(err, basespec.ErrLocatorLimitExceeded):
@@ -792,6 +799,7 @@ func resolutionFailure(
 		return ResolutionUnavailable, issue("artifact.selector-unavailable"), true
 	case errors.Is(err, basespec.ErrReferenceUnresolved),
 		errors.Is(err, basespec.ErrArtifactNotFound),
+		errors.Is(err, basespec.ErrRootNotFound),
 		errors.Is(err, basespec.ErrDefinitionNotFound),
 		errors.Is(err, basespec.ErrSourceNotFound),
 		errors.Is(err, basespec.ErrNotFound):

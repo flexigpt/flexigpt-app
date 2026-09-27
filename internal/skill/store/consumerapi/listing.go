@@ -2,7 +2,6 @@ package consumerapi
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -42,6 +42,8 @@ func (a *API) ListSkills(
 		request.RootID,
 		catalog.ListOptions{
 			IncludeDocument: request.IncludeDocument,
+			Kind:            skillDomain.SkillArtifactKind,
+			Enabled:         request.Enabled,
 		},
 	)
 	if err != nil {
@@ -86,35 +88,15 @@ func (a *API) skillListDocument(
 		return nil, nil
 	}
 
-	if cached, found := a.listDocuments.Load(
-		entry.Definition.Digest,
-	); found {
-		d, ok := cached.(skillv1.SkillDocument)
-		if !ok {
-			return nil, errors.New("skill document not found")
-		}
-		value, err := d.Clone()
-		if err != nil {
-			return nil, err
-		}
-		return &value, nil
-	}
-
-	document, err := skillv1.DecodeSkillJSON(entry.Document.Body)
+	document, err := a.listDocuments.GetOrLoad(
+		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
+		len(entry.Document.Body),
+		func() (skillv1.SkillDocument, error) {
+			return skillv1.DecodeSkillJSON(entry.Document.Body)
+		},
+	)
 	if err != nil {
 		return nil, err
-	}
-	actual, loaded := a.listDocuments.LoadOrStore(
-		entry.Definition.Digest,
-		document,
-	)
-	if loaded {
-		d, ok := actual.(skillv1.SkillDocument)
-		if !ok {
-			return nil, errors.New("skill document not found")
-		}
-		document = d
-
 	}
 
 	value, err := document.Clone()

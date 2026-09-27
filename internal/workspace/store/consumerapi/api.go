@@ -122,6 +122,7 @@ func NewStoreAPI(
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.FallbackProviders,
+			TargetMappers:        config.TargetMappers,
 			ProtectedBuiltinRoot: documentTopology.BuiltinRootID(),
 			Refresh:              refreshCoordinator,
 			Limits:               config.ResolverLimits,

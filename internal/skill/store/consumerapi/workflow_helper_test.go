@@ -67,13 +67,11 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	)
 	requireNoError(t, err)
 
-	packages, err := builtin.EmbeddedSkillPackages()
 	requireNoError(t, err)
 
 	installer, err := skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
 			Hydrator: store.Topology,
-			Packages: packages,
 		},
 	)
 	requireNoError(t, err)
@@ -162,7 +160,7 @@ func workflowSkillMarkdown(
 	description string,
 	body string,
 ) []byte {
-	return []byte(fmt.Sprintf(
+	return fmt.Appendf(nil,
 		"---\n"+
 			"name: %s\n"+
 			"description: %s\n"+
@@ -174,7 +172,7 @@ func workflowSkillMarkdown(
 		description,
 		name,
 		body,
-	))
+	)
 }
 
 func findSkillByName(

@@ -209,11 +209,7 @@ func NormalizeCoreServer(value CoreServer) CoreServer {
 func NormalizeServerConfiguration(
 	value ServerConfiguration,
 ) ServerConfiguration {
-	value.Install.Inputs = maps.Clone(value.Install.Inputs)
-	value.Install.AllowEnvironment = slices.Clone(
-		value.Install.AllowEnvironment,
-	)
-	value.ConnectionProfiles = maps.Clone(value.ConnectionProfiles)
+	value = cloneConfiguration(value)
 	value.Auth = normalizeAuthentication(value.Auth)
 	return value
 }
@@ -998,7 +994,5 @@ func validateEnvironmentName(name string) error {
 }
 
 func placeholderInputNameValid(value string) bool {
-	return regexp.MustCompile(
-		`^[A-Za-z_][A-Za-z0-9_]*$`,
-	).MatchString(value)
+	return installationInputNamePattern.MatchString(value)
 }

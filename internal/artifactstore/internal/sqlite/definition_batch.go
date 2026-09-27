@@ -135,7 +135,9 @@ func (s *Store) cachedDefinition(
 	if !found {
 		return definition.Definition{}, false
 	}
-	return value.Clone(), true
+	// Private immutable view. GetDefinitions clones each outgoing result.
+	// No caller of this helper may mutate the borrowed value.
+	return value, true
 }
 
 func (s *Store) rememberDefinition(

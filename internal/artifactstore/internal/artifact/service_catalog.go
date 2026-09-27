@@ -172,9 +172,33 @@ func (s *Service) attachDocuments(
 	values []catalog.Entry,
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
-	output := make([]catalog.Entry, len(values))
-	for index, value := range values {
-		output[index] = value.Clone()
+	if options.Kind != "" {
+		if err := options.Kind.Validate(); err != nil {
+			return nil, err
+		}
+	}
+	names := make(map[basespec.LogicalName]struct{}, len(options.LogicalNames))
+	for _, name := range options.LogicalNames {
+		if err := name.Validate(); err != nil {
+			return nil, err
+		}
+		names[name] = struct{}{}
+	}
+
+	output := make([]catalog.Entry, 0, len(values))
+	for _, value := range values {
+		if options.Kind != "" && value.Kind != options.Kind {
+			continue
+		}
+		if options.Enabled != nil && value.Enabled != *options.Enabled {
+			continue
+		}
+		if len(names) != 0 {
+			if _, found := names[value.LogicalName]; !found {
+				continue
+			}
+		}
+		output = append(output, value.Clone())
 	}
 	if !options.IncludeDocument {
 		return output, nil

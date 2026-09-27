@@ -88,16 +88,23 @@ func EnsureUserArtifactBaselineCollectionsForRoot(
 	if skills == nil || mcp == nil || agents == nil {
 		return errors.New("user Artifact baseline dependencies are incomplete")
 	}
+	var result error
 	if _, err := skills.EnsureSkillBaselineCollection(ctx, rootID); err != nil {
-		return fmt.Errorf("ensure Skill baseline Collection: %w", err)
+		result = errors.Join(result, fmt.Errorf("ensure Skill baseline Collection: %w", err))
+	}
+	if ctx.Err() != nil {
+		return errors.Join(result, ctx.Err())
 	}
 	if _, err := mcp.EnsureMCPBaselineCollection(ctx, rootID); err != nil {
-		return fmt.Errorf("ensure MCP baseline Collection: %w", err)
+		result = errors.Join(result, fmt.Errorf("ensure MCP baseline Collection: %w", err))
+	}
+	if ctx.Err() != nil {
+		return errors.Join(result, ctx.Err())
 	}
 	if _, err := agents.EnsureAgentBaselineCollection(ctx, rootID); err != nil {
-		return fmt.Errorf("ensure Agent baseline Collection: %w", err)
+		result = errors.Join(result, fmt.Errorf("ensure Agent baseline Collection: %w", err))
 	}
-	return nil
+	return result
 }
 
 func EnsureUserArtifactBaselineCollections(
@@ -118,6 +125,7 @@ func EnsureUserArtifactBaselineCollections(
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].ID < values[right].ID
 	})
+	var result error
 	for _, value := range values {
 		if protection.IsProtectedRoot(value.ID) {
 			continue
@@ -129,14 +137,20 @@ func EnsureUserArtifactBaselineCollections(
 			mcp,
 			agents,
 		); err != nil {
-			return fmt.Errorf(
-				"ensure user Artifact baselines for Root %q: %w",
-				value.ID,
-				err,
+			if ctx.Err() != nil {
+				return errors.Join(result, ctx.Err())
+			}
+			result = errors.Join(
+				result,
+				fmt.Errorf(
+					"ensure user Artifact baselines for Root %q: %w",
+					value.ID,
+					err,
+				),
 			)
 		}
 	}
-	return nil
+	return result
 }
 
 // artifactFallbackProviders returns the fallback registrations that must be

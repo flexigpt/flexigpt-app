@@ -6,20 +6,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 )
 
 type resolutionState struct {
@@ -215,8 +208,14 @@ func (r *Resolver) resolveTyped(
 		return nil, err
 	}
 
-	state := newResolutionState()
-	return r.resolveArtifact(ctx, &state, ref, expected, "", 0)
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		r.sourceEntries,
+		func(sessionCtx context.Context) (*ResolvedEntry, error) {
+			state := newResolutionState()
+			return r.resolveArtifact(sessionCtx, &state, ref, expected, "", 0)
+		},
+	)
 }
 
 func (r *Resolver) resolveArtifact(
@@ -231,7 +230,7 @@ func (r *Resolver) resolveArtifact(
 		return nil, err
 	}
 
-	terminal, err := r.resolveTerminalArtifact(
+	loaded, err := r.resolveTerminalDeclaration(
 		ctx,
 		ref,
 		expectedType,
@@ -240,16 +239,7 @@ func (r *Resolver) resolveArtifact(
 	if err != nil {
 		return nil, err
 	}
-	if terminal != ref {
-		return r.resolveArtifact(
-			ctx,
-			state,
-			terminal,
-			expectedType,
-			expectedVersion,
-			depth+1,
-		)
-	}
+	ref = loaded.record.Ref()
 
 	if _, active := state.active[ref]; active {
 		return nil, fmt.Errorf(
@@ -260,16 +250,6 @@ func (r *Resolver) resolveArtifact(
 	}
 	state.active[ref] = struct{}{}
 	defer delete(state.active, ref)
-
-	loaded, err := r.loadAvailableDeclarationArtifact(
-		ctx,
-		ref,
-		expectedType,
-		expectedVersion,
-	)
-	if err != nil {
-		return nil, err
-	}
 
 	// Direct Collection membership resolution must resolve the Collection
 	// relationships, but must not recursively expand the selected member.
@@ -391,6 +371,14 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if err != nil {
 		return loadedDeclarationArtifact{}, err
 	}
+	if record.ResolvedDefinition == nil ||
+		definitionValue.Digest != *record.ResolvedDefinition {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact Definition changed during resolution",
+			basespec.ErrRefreshRequired,
+		)
+	}
+
 	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
 		return loadedDeclarationArtifact{}, err
 	}
@@ -446,20 +434,33 @@ func (r *Resolver) resolveTerminalArtifact(
 	expectedType declaration.Type,
 	expectedVersion basespec.LogicalVersion,
 ) (artifact.ArtifactRef, error) {
+	loaded, err := r.resolveTerminalDeclaration(ctx, ref, expectedType, expectedVersion)
+	if err != nil {
+		return artifact.ArtifactRef{}, err
+	}
+	return loaded.record.Ref(), nil
+}
+
+func (r *Resolver) resolveTerminalDeclaration(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedType declaration.Type,
+	expectedVersion basespec.LogicalVersion,
+) (loadedDeclarationArtifact, error) {
 	current := ref
 	expectedName := basespec.LogicalName("")
 	seen := make(map[artifact.ArtifactRef]struct{})
 
 	for depth := 0; depth <= r.limits.MaxDepth; depth++ {
 		if _, duplicate := seen[current]; duplicate {
-			return artifact.ArtifactRef{}, fmt.Errorf(
+			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration alias cycle at Artifact %q",
 				basespec.ErrReferenceUnresolved,
 				current.ArtifactID,
 			)
 		}
 		if len(seen) >= r.limits.MaxNodes {
-			return artifact.ArtifactRef{}, fmt.Errorf(
+			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration alias limit exceeded",
 				basespec.ErrLocatorLimitExceeded,
 			)
@@ -473,11 +474,11 @@ func (r *Resolver) resolveTerminalArtifact(
 			expectedVersion,
 		)
 		if err != nil {
-			return artifact.ArtifactRef{}, err
+			return loadedDeclarationArtifact{}, err
 		}
 		if expectedName != "" &&
 			loaded.record.LogicalName != expectedName {
-			return artifact.ArtifactRef{}, fmt.Errorf(
+			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration resolved to another name",
 				basespec.ErrReferenceUnresolved,
 			)
@@ -485,13 +486,13 @@ func (r *Resolver) resolveTerminalArtifact(
 
 		alias, err := sourceSelectedAlias(loaded.entry)
 		if err != nil {
-			return artifact.ArtifactRef{}, err
+			return loadedDeclarationArtifact{}, err
 		}
 		if !alias {
-			return current, nil
+			return loaded, nil
 		}
 		if r.locators == nil {
-			return artifact.ArtifactRef{}, fmt.Errorf(
+			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration requires a locator resolver",
 				basespec.ErrLocatorUnresolved,
 			)
@@ -510,13 +511,13 @@ func (r *Resolver) resolveTerminalArtifact(
 			},
 		)
 		if err != nil {
-			return artifact.ArtifactRef{}, err
+			return loadedDeclarationArtifact{}, err
 		}
 		if err := next.Validate(); err != nil {
-			return artifact.ArtifactRef{}, err
+			return loadedDeclarationArtifact{}, err
 		}
 		if next.RootID != loaded.record.RootID {
-			return artifact.ArtifactRef{}, fmt.Errorf(
+			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: locator resolver returned an Artifact from another Root",
 				basespec.ErrInvalid,
 			)
@@ -526,7 +527,7 @@ func (r *Resolver) resolveTerminalArtifact(
 		current = next
 	}
 
-	return artifact.ArtifactRef{}, fmt.Errorf(
+	return loadedDeclarationArtifact{}, fmt.Errorf(
 		"%w: source-selected declaration alias depth exceeded",
 		basespec.ErrLocatorLimitExceeded,
 	)
@@ -538,60 +539,15 @@ func sourceSelectedAlias(entry declaration.Entry) (bool, error) {
 		return false, nil
 	}
 	switch header.Type {
-	case declaration.TypePlugin:
-		value, err := pluginv1.DecodePluginEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeAgent:
-		value, err := agentv1.DecodeAgentEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeTeam:
-		value, err := teamv1.DecodeTeamEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeLoop:
-		value, err := loopv1.DecodeLoopEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeWorkflow:
-		value, err := workflowv1.DecodeWorkflowEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeWorkspace:
-		value, err := workspacev1.DecodeWorkspaceEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-
-	case declaration.TypeMCP:
-		value, err := mcpv1.DecodeMCPEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
-	case declaration.TypeMCPPolicy:
-		value, err := mcppolicyv1.DecodeMCPPolicyEntry(entry)
-		if err != nil {
-			return false, err
-		}
-		return value.Locator != nil, nil
+	case declaration.TypePlugin,
+		declaration.TypeAgent,
+		declaration.TypeTeam,
+		declaration.TypeLoop,
+		declaration.TypeWorkflow,
+		declaration.TypeWorkspace,
+		declaration.TypeMCP,
+		declaration.TypeMCPPolicy:
+		return true, nil
 	default:
 		return false, nil
 	}

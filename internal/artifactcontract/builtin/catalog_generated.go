@@ -3,13 +3,12 @@ package builtin
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 // DecodeGeneratedPackageSet reads embedded generated JSON through the same
@@ -129,6 +128,14 @@ func decodeCanonicalGeneratedPackageSet(
 		)
 	}
 
+	if value.Format != topology.CompiledPackageSetFormat {
+		return topology.CompiledPackageSet{}, "", fmt.Errorf(
+			"%w: generated package format %q; regenerate built-in catalogs",
+			basespec.ErrUnsupported,
+			value.Format,
+		)
+	}
+
 	if value.Name == "" ||
 		value.Hydration.InstallerName == "" ||
 		value.Hydration.Fingerprint == "" {
@@ -138,33 +145,13 @@ func decodeCanonicalGeneratedPackageSet(
 		)
 	}
 
-	return value.Clone(), cryptoutil.DigestBytes(canonical), nil
+	return value, cryptoutil.DigestBytes(canonical), nil
 }
 
-// canonicalJSON converts every JSON object, including nested Definition.Body
-// JSON, through map[string]any. "encoding/json" emits string-keyed map keys in
-// lexicographic order.
-//
-// UseNumber prevents generic decoding from converting catalog numeric values
-// such as file sizes to float64.
+// Use the same JSON canonicalization policy as Definition admission.
+// This is performed once when loading the embedded generated catalog.
 func canonicalJSON(
 	raw []byte,
 ) ([]byte, error) {
-	decoder := json.NewDecoder(bytes.NewReader(raw))
-	decoder.UseNumber()
-
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return nil, err
-	}
-
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return nil, errors.New("generated JSON contains more than one value")
-		}
-		return nil, fmt.Errorf("decode trailing generated JSON: %w", err)
-	}
-
-	return json.Marshal(value)
+	return jsonutil.Canonicalize(raw)
 }

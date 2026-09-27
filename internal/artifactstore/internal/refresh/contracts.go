@@ -92,16 +92,10 @@ func (p Publication) Validate() error {
 		len(p.Definitions),
 	)
 	for index, value := range p.Definitions {
-		canonical, err := definition.Canonicalize(value)
-		if err != nil {
+		// PutDefinitionTx owns final immutable Definition admission.
+		// Do not canonicalize and hash the same payload again here.
+		if err := cryptoutil.ValidateDigest(value.Digest); err != nil {
 			return fmt.Errorf("definition %d: %w", index, err)
-		}
-		if canonical.Digest != value.Digest {
-			return fmt.Errorf(
-				"%w: publication Definition %d is not canonical",
-				basespec.ErrInvalid,
-				index,
-			)
 		}
 		if _, duplicate := seenDefinitions[value.Digest]; duplicate {
 			return fmt.Errorf(

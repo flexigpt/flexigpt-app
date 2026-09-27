@@ -92,12 +92,12 @@ func CanonicalDocumentJSON(
 func DocumentDigest(
 	value any,
 ) (cryptoutil.Digest, error) {
-	digest, err := cryptoutil.CanonicalDigest(value)
+	raw, err := CanonicalDocumentJSON(value)
 	if err != nil {
 		return "", fmt.Errorf(
 			"calculate canonical declaration digest: %w",
 			err,
 		)
 	}
-	return digest, nil
+	return cryptoutil.DigestBytes(raw), nil
 }

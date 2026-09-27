@@ -199,6 +199,10 @@ func (e *Engine) Discover(
 		return Result{}, err
 	}
 
+	result := Result{
+		Observations: make([]Observation, 0),
+		Diagnostics:  make([]diagnostic.Diagnostic, 0),
+	}
 	foundCandidates := make(
 		map[basespec.Locator]struct{},
 		len(entries),
@@ -208,18 +212,18 @@ func (e *Engine) Discover(
 	}
 	for locator := range spec.ExpectedContentDigests {
 		if _, found := foundCandidates[locator]; !found {
-			return Result{}, fmt.Errorf(
-				"%w: expected Source content %q was not found",
-				basespec.ErrReferenceUnresolved,
-				locator,
+			result.Diagnostics = diagnostic.Append(
+				result.Diagnostics,
+				diagnostic.Diagnostic{
+					Severity: diagnostic.SeverityError,
+					Code:     "artifact.discovery.expected-content-missing",
+					Message:  "expected Source content was not found",
+					Location: &diagnostic.Location{Locator: locator},
+				},
 			)
 		}
 	}
 
-	result := Result{
-		Observations: make([]Observation, 0),
-		Diagnostics:  make([]diagnostic.Diagnostic, 0),
-	}
 	seenLocators := make(map[basespec.Locator]struct{}, len(entries))
 	validOrigins := make(map[typedOrigin]Observation)
 	invalidBindings := make(map[artifact.SourceBinding]struct{})

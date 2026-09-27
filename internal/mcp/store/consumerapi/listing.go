@@ -2,12 +2,12 @@ package consumerapi
 
 import (
 	"context"
-	"errors"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
@@ -28,6 +28,8 @@ func (a *API) listServers(
 		request.RootID,
 		catalog.ListOptions{
 			IncludeDocument: request.IncludeDocument,
+			Kind:            mcpDomain.MCPArtifactKind,
+			Enabled:         request.Enabled,
 		},
 	)
 	if err != nil {
@@ -92,6 +94,8 @@ func (a *API) listPolicies(
 		request.RootID,
 		catalog.ListOptions{
 			IncludeDocument: request.IncludeDocument,
+			Kind:            mcpDomain.MCPPolicyArtifactKind,
+			Enabled:         request.Enabled,
 		},
 	)
 	if err != nil {
@@ -148,34 +152,18 @@ func (a *API) serverListDocument(
 		return nil, nil
 	}
 
-	if cached, found := a.serverListDocuments.Load(
-		entry.Definition.Digest,
-	); found {
-		value, ok := cached.(mcpDomainServer.ServerDocument)
-		if !ok {
-			return nil, errors.New("mcp document not found")
-		}
-		return &value, nil
-	}
-
-	value, err := mcpDomainServer.ServerDocumentFromDefinition(
-		*entry.Document,
+	value, err := a.serverListDocuments.GetOrLoad(
+		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
+		len(entry.Document.Body),
+		func() (mcpDomainServer.ServerDocument, error) {
+			return mcpDomainServer.ServerDocumentFromDefinition(*entry.Document)
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	actual, loaded := a.serverListDocuments.LoadOrStore(
-		entry.Definition.Digest,
-		value,
-	)
-	if loaded {
-		v, ok := actual.(mcpDomainServer.ServerDocument)
-		if !ok {
-			return nil, errors.New("mcp document not found")
-		}
-		value = v
-	}
-	return &value, nil
+	owned := value.Clone()
+	return &owned, nil
 }
 
 func (a *API) policyListDocument(
@@ -186,32 +174,19 @@ func (a *API) policyListDocument(
 		return nil, nil
 	}
 
-	if cached, found := a.policyListDocuments.Load(
-		entry.Definition.Digest,
-	); found {
-		value, ok := cached.(mcppolicyv1.MCPPolicyDocument)
-		if !ok {
-			return nil, errors.New("mcp doc not found")
-		}
-		return &value, nil
-	}
-
-	value, err := mcppolicyv1.DecodeMCPPolicyJSON(
-		entry.Document.Body,
+	value, err := a.policyListDocuments.GetOrLoad(
+		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
+		len(entry.Document.Body),
+		func() (mcppolicyv1.MCPPolicyDocument, error) {
+			return mcppolicyv1.DecodeMCPPolicyJSON(entry.Document.Body)
+		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	actual, loaded := a.policyListDocuments.LoadOrStore(
-		entry.Definition.Digest,
-		value,
-	)
-	if loaded {
-		v, ok := actual.(mcppolicyv1.MCPPolicyDocument)
-		if !ok {
-			return nil, errors.New("mcp document not found")
-		}
-		value = v
+	owned, err := value.Clone()
+	if err != nil {
+		return nil, err
 	}
-	return &value, nil
+	return &owned, nil
 }

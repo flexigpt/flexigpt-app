@@ -93,5 +93,7 @@ func (e *Engine) compiledDocument(
 	if !found {
 		return topology.CompiledDocument{}, false
 	}
-	return value.Clone(), true
+	// Private immutable view. Discovery clones emitted Definitions before
+	// handing them to the rest of the refresh pipeline.
+	return value, true
 }

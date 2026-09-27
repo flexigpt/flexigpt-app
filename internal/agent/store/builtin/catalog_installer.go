@@ -2,7 +2,6 @@ package builtin
 
 import (
 	"errors"
-	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -10,7 +9,6 @@ import (
 
 type InstallerDependencies struct {
 	Hydrator topology.CompiledHydrationCoordinator
-	Packages fs.FS
 }
 
 type Installer struct {
@@ -20,7 +18,7 @@ type Installer struct {
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
-	if dependencies.Hydrator == nil || dependencies.Packages == nil {
+	if dependencies.Hydrator == nil {
 		return nil, errors.New("agent generated catalog installer dependencies are incomplete")
 	}
 
@@ -31,7 +29,6 @@ func NewInstaller(
 
 	value, err := builtin.NewCatalogInstallerForSet(
 		set,
-		dependencies.Packages,
 		dependencies.Hydrator,
 		nil,
 	)

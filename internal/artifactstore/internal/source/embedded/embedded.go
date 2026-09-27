@@ -2,6 +2,7 @@ package embedded
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -150,6 +151,17 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 
 func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 	hash := cryptoutil.NewDigestWriter()
+	_, _ = io.WriteString(hash, "artifact-embedded-tree/v1\x00")
+	writeHeader := func(kind byte, name string, size uint64) {
+		var encoded [8]byte
+		_, _ = hash.Write([]byte{kind})
+		binary.BigEndian.PutUint64(encoded[:], uint64(len(name)))
+		_, _ = hash.Write(encoded[:])
+		_, _ = io.WriteString(hash, name)
+		binary.BigEndian.PutUint64(encoded[:], size)
+		_, _ = hash.Write(encoded[:])
+	}
+
 	entries := 0
 	var totalBytes int64
 
@@ -183,7 +195,7 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return err
 		}
 		if info.IsDir() {
-			_, _ = io.WriteString(hash, "d\x00"+name+"\x00")
+			writeHeader('d', name, 0)
 			return nil
 		}
 		if !info.Mode().IsRegular() {
@@ -201,7 +213,8 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if err != nil {
 			return err
 		}
-		_, _ = io.WriteString(hash, "f\x00"+name+"\x00")
+		//nolint:gosec // Ok.
+		writeHeader('f', name, uint64(info.Size()))
 		written, copyErr := io.Copy(hash, io.LimitReader(file, info.Size()+1))
 		closeErr := file.Close()
 		if copyErr != nil {
@@ -217,7 +230,6 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 				name,
 			)
 		}
-		_, _ = hash.Write([]byte{0})
 		return nil
 	})
 	if err != nil {

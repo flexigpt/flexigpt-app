@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -56,6 +57,8 @@ type App struct {
 	conversationsDirPath string
 	modelPresetsDirPath  string
 	artifactStoreDirPath string
+
+	artifactInitializationError error
 }
 
 func NewApp() *App {
@@ -186,6 +189,13 @@ func (a *App) Ping() string {
 
 func (a *App) GetAppVersion() string {
 	return Version
+}
+
+func (a *App) GetArtifactInitializationError() string {
+	if a == nil || a.artifactInitializationError == nil {
+		return ""
+	}
+	return a.artifactInitializationError.Error()
 }
 
 func ensureAppPrivateDirectory(location string) error {
@@ -553,12 +563,13 @@ func (a *App) initManagers() {
 			"error",
 			err,
 		)
-		panic(
-			"failed to initialize managers: built-in topology initialization failed\n" +
-				err.Error(),
+		a.artifactInitializationError = errors.Join(
+			a.artifactInitializationError,
+			err,
 		)
+	} else {
+		slog.Info("shared built-in artifact topology initialized")
 	}
-	slog.Info("shared built-in artifact topology initialized")
 
 	err = EnsureUserArtifactBaselineCollections(
 		context.Background(),
@@ -574,12 +585,13 @@ func (a *App) initManagers() {
 			"error",
 			err,
 		)
-		panic(
-			"failed to initialize managers: user Artifact baseline provisioning failed\n" +
-				err.Error(),
+		a.artifactInitializationError = errors.Join(
+			a.artifactInitializationError,
+			err,
 		)
+	} else {
+		slog.Info("user Artifact baseline Collections initialized")
 	}
-	slog.Info("user Artifact baseline Collections initialized")
 
 	workspaceConversationSource, err := workspaceConsumerAPI.NewConversationSource(
 		a.workspaceStoreAPI.api,
