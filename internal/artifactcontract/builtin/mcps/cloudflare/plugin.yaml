@@ -133,7 +133,7 @@ members:
         mode: oauth
       policy:
         required: true
-        name: builtin-auto-read
+        name: builtin-auto-write
   - type: mcp
     name: graphql
     parameters:
@@ -183,7 +183,7 @@ members:
     parameters:
       transport: streamableHTTP
       url: https://bindings.mcp.cloudflare.com/mcp
-      displayName: Cloudflare Workers and Bindings
+      displayName: Cloudflare Workers & Bindings
       auth:
         mode: oauth
       policy:
@@ -193,5 +193,7 @@ members:
     name: builtin-auto-read
   - type: mcp.policy
     name: builtin-manual-read
+  - type: mcp.policy
+    name: builtin-auto-write
   - type: mcp.policy
     name: builtin-manual-write

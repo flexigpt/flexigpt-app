@@ -1093,12 +1093,12 @@ func (m *MCPRuntimeManager) session(
 	ref mcpServer.ServerID,
 ) (*sessionState, bool) {
 	m.mu.RLock()
-	state := m.sessions[ref]
+	state := cloneSessionState(m.sessions[ref])
 	m.mu.RUnlock()
 	if state == nil {
 		return nil, false
 	}
-	return cloneSessionState(state), true
+	return state, true
 }
 
 func (m *MCPRuntimeManager) beginConnection(

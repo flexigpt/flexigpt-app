@@ -332,7 +332,8 @@ func (m *AuthManager) BuildAuthHealth(
 	}
 
 	if status.AuthMode == mcpServer.MCPHTTPAuthOAuth &&
-		status.State != MCPAuthStateAuthorized &&
+		status.State == MCPAuthStateRequired &&
+		status.LastError == "" &&
 		m != nil &&
 		m.oauthTokenStore != nil {
 		if token, err := m.oauthTokenStore.LoadOAuthToken(

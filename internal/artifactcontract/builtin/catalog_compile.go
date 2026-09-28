@@ -1,6 +1,7 @@
 package builtin
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"path/filepath"
@@ -160,6 +161,11 @@ func Compile(
 	}
 
 	inputs := append([]PackageInput(nil), config.Packages...)
+	for index := range inputs {
+		inputs[index].Files = normalizePackageFileLineEndings(
+			inputs[index].Files,
+		)
+	}
 	sort.Slice(inputs, func(left, right int) bool {
 		leftDirectory, _ := inputs[left].Address.Directory()
 		rightDirectory, _ := inputs[right].Address.Directory()
@@ -252,6 +258,26 @@ func Compile(
 	})
 
 	return output, nil
+}
+
+// normalizePackageFileLineEndings makes generated package bytes independent
+// of CRLF checkout conversion before publication and content hashing.
+func normalizePackageFileLineEndings(
+	files []source.ManagedPackageFile,
+) []source.ManagedPackageFile {
+	normalized := append([]source.ManagedPackageFile(nil), files...)
+	for index := range normalized {
+		content := normalized[index].Content
+		if !bytes.Contains(content, []byte("\r\n")) {
+			continue
+		}
+		normalized[index].Content = bytes.ReplaceAll(
+			content,
+			[]byte("\r\n"),
+			[]byte("\n"),
+		)
+	}
+	return normalized
 }
 
 func (p PackageInput) rootExpectation() (Expectation, error) {

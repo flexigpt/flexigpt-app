@@ -403,6 +403,25 @@ func validateParts(
 			inputName,
 		)
 	}
+	if err := validateWholeURLInputReference(
+		"mcpServer.url",
+		core.URL,
+		declared,
+	); err != nil {
+		return err
+	}
+	for profileName, profile := range extension.ConnectionProfiles {
+		if profile.HTTP == nil || profile.HTTP.URL == nil {
+			continue
+		}
+		if err := validateWholeURLInputReference(
+			"connectionProfiles."+profileName+".http.url",
+			*profile.HTTP.URL,
+			declared,
+		); err != nil {
+			return err
+		}
+	}
 	if err := validateClientIDMetadataDocumentURLTemplate(
 		extension.Auth.ClientIDMetadataDocumentURL,
 	); err != nil {
@@ -882,6 +901,9 @@ func validateURLTemplate(raw string) error {
 			basespec.ErrInvalid,
 		)
 	}
+	if _, whole := wholeURLPlaceholderName(raw); whole {
+		return nil
+	}
 	probe := placeholderPattern.ReplaceAllString(raw, "example")
 	value, err := url.Parse(probe)
 	if err != nil {
@@ -903,6 +925,34 @@ func validateURLTemplate(raw string) error {
 			basespec.ErrInvalid,
 		)
 	}
+}
+
+func validateWholeURLInputReference(
+	field string,
+	raw string,
+	inputs map[string]InputDeclaration,
+) error {
+	inputName, whole := wholeURLPlaceholderName(raw)
+	if !whole {
+		return nil
+	}
+	input, found := inputs[inputName]
+	if !found || input.Kind != InputText {
+		return fmt.Errorf(
+			"%w: whole MCP URL placeholder in %s requires a text installation input",
+			basespec.ErrInvalid,
+			field,
+		)
+	}
+	return nil
+}
+
+func wholeURLPlaceholderName(value string) (string, bool) {
+	matches := placeholderPattern.FindStringSubmatch(value)
+	if len(matches) != 2 || matches[0] != value {
+		return "", false
+	}
+	return matches[1], true
 }
 
 func validateClientIDMetadataDocumentURLTemplate(

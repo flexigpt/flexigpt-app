@@ -11,10 +11,19 @@ members:
       timeoutMS: 60000
       auth:
         mode: oauth
+        clientCredentialsInput: CANVA_OAUTH_CLIENT
       install:
-        note:
-          Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires
-          client registration.
+        note: >-
+          Official Canva remote MCP server. Dynamic client registration is used
+          when available. If Canva requires manual registration, register the
+          FlexiGPT OAuth redirect URL and configure the registered client below.
+        inputs:
+          CANVA_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: Canva OAuth Client
+            description: Client ID and optional client secret for a manually registered Canva OAuth client.
+            required: false
+            clientSecretRequired: false
       policy:
         required: true
         name: builtin-manual-write
@@ -27,7 +36,10 @@ members:
       auth:
         mode: oauth
       install:
-        note: Official Figma remote MCP server. Figma canvas mutations remain manually approved.
+        note: >-
+          Official Figma remote MCP server. Only clients accepted by the Figma
+          MCP Catalog can connect. Figma canvas mutations remain manually
+          approved.
       policy:
         required: true
         name: builtin-manual-write-no-destructive

@@ -55,6 +55,11 @@ var mcpURLTemplatePattern = regexp.MustCompile(
 	`\$\{[A-Za-z_][A-Za-z0-9_]*\}`,
 )
 
+func wholeMCPURLInputReference(value string) bool {
+	return value != "" &&
+		mcpURLTemplatePattern.FindString(value) == value
+}
+
 type Include struct {
 	Tools     []string `json:"tools,omitempty"`
 	Resources []string `json:"resources,omitempty"`
@@ -345,6 +350,9 @@ func (v MCPDocument) validateFields() error {
 func validateMCPURL(
 	value string,
 ) error {
+	if wholeMCPURLInputReference(value) {
+		return nil
+	}
 	return declaration.ValidateAbsoluteURL(
 		"MCP URL",
 		mcpURLTemplatePattern.ReplaceAllString(

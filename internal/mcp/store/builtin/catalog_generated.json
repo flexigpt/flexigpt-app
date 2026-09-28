@@ -206,7 +206,7 @@
                         },
                         "displayName": "Cloudflare Docs",
                         "policy": {
-                          "name": "builtin-auto-read",
+                          "name": "builtin-auto-write",
                           "required": true
                         },
                         "transport": "streamableHTTP",
@@ -284,7 +284,7 @@
                         "auth": {
                           "mode": "oauth"
                         },
-                        "displayName": "Cloudflare Workers and Bindings",
+                        "displayName": "Cloudflare Workers \u0026 Bindings",
                         "policy": {
                           "name": "builtin-manual-write",
                           "required": true
@@ -303,6 +303,10 @@
                       "type": "mcp.policy"
                     },
                     {
+                      "name": "builtin-auto-write",
+                      "type": "mcp.policy"
+                    },
+                    {
                       "name": "builtin-manual-write",
                       "type": "mcp.policy"
                     }
@@ -311,7 +315,7 @@
                   "type": "plugin"
                 },
                 "description": "Cloudflare fully managed remote MCP servers.",
-                "digest": "sha256:f464234a4a3fbda04d3ef9102d7e3f2ab6d896d1f1eaac1bb2a5e3efe3a9fd5c",
+                "digest": "sha256:815c9832056446dba09989ed6f3412a013ee7fa6bd031d830d23e0e781356a7a",
                 "displayName": "mcp-cloudflare",
                 "kind": "plugin",
                 "logicalName": "mcp-cloudflare",
@@ -528,14 +532,14 @@
                   "displayName": "Cloudflare Docs",
                   "name": "cloudflare-docs",
                   "policy": {
-                    "name": "builtin-auto-read",
+                    "name": "builtin-auto-write",
                     "required": true
                   },
                   "transport": "streamableHTTP",
                   "type": "mcp",
                   "url": "https://docs.mcp.cloudflare.com/mcp"
                 },
-                "digest": "sha256:5000216566f82ae15106580764a85e7b51415b4ac4293c5f59ab7b7bf7008dce",
+                "digest": "sha256:13f8efb41b509c265fbb45e5836396f69ae4d08e9a185879fcc05e45c41f6c07",
                 "displayName": "Cloudflare Docs",
                 "kind": "mcp",
                 "logicalName": "cloudflare-docs",
@@ -725,7 +729,7 @@
                   "auth": {
                     "mode": "oauth"
                   },
-                  "displayName": "Cloudflare Workers and Bindings",
+                  "displayName": "Cloudflare Workers \u0026 Bindings",
                   "name": "workers",
                   "policy": {
                     "name": "builtin-manual-write",
@@ -735,8 +739,8 @@
                   "type": "mcp",
                   "url": "https://bindings.mcp.cloudflare.com/mcp"
                 },
-                "digest": "sha256:432fd15201a4e88e4e6e3c0b08a919d7fff8930d895daf2da1b42502db9fc213",
-                "displayName": "Cloudflare Workers and Bindings",
+                "digest": "sha256:9da6135c4cfc0d66b418bd041f3750e548e12de6f31856242e9b5f2d09c053d8",
+                "displayName": "Cloudflare Workers \u0026 Bindings",
                 "kind": "mcp",
                 "logicalName": "workers",
                 "schemaID": "artifact.mcp.v1",
@@ -745,20 +749,20 @@
               "subresource": "members/mcp/workers"
             }
           ],
-          "digest": "sha256:beff391901ab8ebe713dff85b316223e22ed3ca5ee21c6fc55b9f4ef66dd4615",
+          "digest": "sha256:15065f4a6ecbe7db66162a1912678e4c259314c7261c5341575ed2779cf713a7",
           "locator": "plugin.yaml"
         }
       ],
       "embeddedRoot": "cloudflare",
       "files": [
         {
-          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1jbG91ZGZsYXJlCmRlc2NyaXB0aW9uOiBDbG91ZGZsYXJlIGZ1bGx5IG1hbmFnZWQgcmVtb3RlIE1DUCBzZXJ2ZXJzLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhZ2VudHMtZG9jcwogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnRzLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBBZ2VudHMgU0RLIERvY3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhaS1nYXRld2F5CiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9haS1nYXRld2F5Lm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQUkgR2F0ZXdheQogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGFwaQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vbWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBBUEkKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhdWRpdGxvZ3MKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2F1ZGl0bG9ncy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIEF1ZGl0IExvZ3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhdXRvcmFnCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9hdXRvcmFnLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQUkgU2VhcmNoIC8gQXV0b1JBRwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGJyb3dzZXItcnVuCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9icm93c2VyLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQnJvd3NlciBSdW4KICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBidWlsZHMKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2J1aWxkcy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIEJ1aWxkcwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNhc2IKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2Nhc2IubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBPbmUgQ0FTQgogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNvbnRhaW5lcgogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vY29udGFpbmVycy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIENvbnRhaW5lcgogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGRleAogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vZGV4Lm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgRGlnaXRhbCBFeHBlcmllbmNlIE1vbml0b3JpbmcKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBkbnMtYW5hbHl0aWNzCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9kbnMtYW5hbHl0aWNzLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgRE5TIEFuYWx5dGljcwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNsb3VkZmxhcmUtZG9jcwogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vZG9jcy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIERvY3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBncmFwaHFsCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9ncmFwaHFsLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgR3JhcGhRTAogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGxvZ3MKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2xvZ3MubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBMb2dzCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1hdXRvLXJlYWQKICAtIHR5cGU6IG1jcAogICAgbmFtZTogb2JzZXJ2YWJpbGl0eQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vb2JzZXJ2YWJpbGl0eS5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIE9ic2VydmFiaWxpdHkKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IHJhZGFyCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9yYWRhci5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIFJhZGFyCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1hdXRvLXJlYWQKICAtIHR5cGU6IG1jcAogICAgbmFtZTogd29ya2VycwogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYmluZGluZ3MubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBXb3JrZXJzIGFuZCBCaW5kaW5ncwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1tYW51YWwtcmVhZAogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUK",
-          "digest": "sha256:beff391901ab8ebe713dff85b316223e22ed3ca5ee21c6fc55b9f4ef66dd4615",
+          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1jbG91ZGZsYXJlCmRlc2NyaXB0aW9uOiBDbG91ZGZsYXJlIGZ1bGx5IG1hbmFnZWQgcmVtb3RlIE1DUCBzZXJ2ZXJzLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhZ2VudHMtZG9jcwogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnRzLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBBZ2VudHMgU0RLIERvY3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhaS1nYXRld2F5CiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9haS1nYXRld2F5Lm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQUkgR2F0ZXdheQogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGFwaQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vbWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBBUEkKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhdWRpdGxvZ3MKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2F1ZGl0bG9ncy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIEF1ZGl0IExvZ3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBhdXRvcmFnCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9hdXRvcmFnLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQUkgU2VhcmNoIC8gQXV0b1JBRwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGJyb3dzZXItcnVuCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9icm93c2VyLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgQnJvd3NlciBSdW4KICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBidWlsZHMKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2J1aWxkcy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIEJ1aWxkcwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNhc2IKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2Nhc2IubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBPbmUgQ0FTQgogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNvbnRhaW5lcgogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vY29udGFpbmVycy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIENvbnRhaW5lcgogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGRleAogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vZGV4Lm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgRGlnaXRhbCBFeHBlcmllbmNlIE1vbml0b3JpbmcKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBkbnMtYW5hbHl0aWNzCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9kbnMtYW5hbHl0aWNzLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgRE5TIEFuYWx5dGljcwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGNsb3VkZmxhcmUtZG9jcwogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vZG9jcy5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIERvY3MKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8td3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogZ3JhcGhxbAogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vZ3JhcGhxbC5tY3AuY2xvdWRmbGFyZS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDbG91ZGZsYXJlIEdyYXBoUUwKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBsb2dzCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9sb2dzLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgTG9ncwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IG9ic2VydmFiaWxpdHkKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL29ic2VydmFiaWxpdHkubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBPYnNlcnZhYmlsaXR5CiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiByYWRhcgogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vcmFkYXIubWNwLmNsb3VkZmxhcmUuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogQ2xvdWRmbGFyZSBSYWRhcgogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IHdvcmtlcnMKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2JpbmRpbmdzLm1jcC5jbG91ZGZsYXJlLmNvbS9tY3AKICAgICAgZGlzcGxheU5hbWU6IENsb3VkZmxhcmUgV29ya2VycyAmIEJpbmRpbmdzCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC1yZWFkCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLWF1dG8td3JpdGUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCg==",
+          "digest": "sha256:15065f4a6ecbe7db66162a1912678e4c259314c7261c5341575ed2779cf713a7",
           "locator": "plugin.yaml",
-          "size": 4917
+          "size": 4966
         }
       ],
-      "fingerprint": "sha256:be299ea3e810c2023b2f951e929096221b5cc19d3904f4bb9d586a641504b45a"
+      "fingerprint": "sha256:77c95bebbd5d547754c3b8b4381833458670ddb6c5600703a251c3dc3f38ca89"
     },
     {
       "address": {
@@ -778,11 +782,21 @@
                       "name": "canva",
                       "parameters": {
                         "auth": {
+                          "clientCredentialsInput": "CANVA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
                         "displayName": "Canva",
                         "install": {
-                          "note": "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+                          "inputs": {
+                            "CANVA_OAUTH_CLIENT": {
+                              "clientSecretRequired": false,
+                              "description": "Client ID and optional client secret for a manually registered Canva OAuth client.",
+                              "kind": "oauthClientCredentials",
+                              "label": "Canva OAuth Client",
+                              "required": false
+                            }
+                          },
+                          "note": "Official Canva remote MCP server. Dynamic client registration is used when available. If Canva requires manual registration, register the FlexiGPT OAuth redirect URL and configure the registered client below."
                         },
                         "policy": {
                           "name": "builtin-manual-write",
@@ -802,7 +816,7 @@
                         },
                         "displayName": "Figma (Remote)",
                         "install": {
-                          "note": "Official Figma remote MCP server. Figma canvas mutations remain manually approved."
+                          "note": "Official Figma remote MCP server. Only clients accepted by the Figma MCP Catalog can connect. Figma canvas mutations remain manually approved."
                         },
                         "policy": {
                           "name": "builtin-manual-write-no-destructive",
@@ -826,7 +840,7 @@
                   "type": "plugin"
                 },
                 "description": "Built-in MCP server definitions for design tools.",
-                "digest": "sha256:3bd77155514d31c8c0c68fcae543d886f7c761a8744186ebbf4d5b95436a36c7",
+                "digest": "sha256:74d7cf07d9c600231e0b588f35671f8dcc155158d11a743a8b33f3512ad40366",
                 "displayName": "mcp-design",
                 "kind": "plugin",
                 "logicalName": "mcp-design",
@@ -838,11 +852,21 @@
               "definition": {
                 "body": {
                   "auth": {
+                    "clientCredentialsInput": "CANVA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
                   "displayName": "Canva",
                   "install": {
-                    "note": "Official Canva remote MCP server. Register FlexiGPT's OAuth redirect URL if the provider requires client registration."
+                    "inputs": {
+                      "CANVA_OAUTH_CLIENT": {
+                        "clientSecretRequired": false,
+                        "description": "Client ID and optional client secret for a manually registered Canva OAuth client.",
+                        "kind": "oauthClientCredentials",
+                        "label": "Canva OAuth Client",
+                        "required": false
+                      }
+                    },
+                    "note": "Official Canva remote MCP server. Dynamic client registration is used when available. If Canva requires manual registration, register the FlexiGPT OAuth redirect URL and configure the registered client below."
                   },
                   "name": "canva",
                   "policy": {
@@ -854,7 +878,7 @@
                   "type": "mcp",
                   "url": "https://mcp.canva.com/mcp"
                 },
-                "digest": "sha256:eb7069bac53e46e971003a63e2a71b96c1a0edfdceec77cc813a421f3670a536",
+                "digest": "sha256:fe865034b938aa7d78e7809da62474ef61b7ce8a2c0dc724faf05d99b7b0baab",
                 "displayName": "Canva",
                 "kind": "mcp",
                 "logicalName": "canva",
@@ -871,7 +895,7 @@
                   },
                   "displayName": "Figma (Remote)",
                   "install": {
-                    "note": "Official Figma remote MCP server. Figma canvas mutations remain manually approved."
+                    "note": "Official Figma remote MCP server. Only clients accepted by the Figma MCP Catalog can connect. Figma canvas mutations remain manually approved."
                   },
                   "name": "figma-remote",
                   "policy": {
@@ -882,7 +906,7 @@
                   "type": "mcp",
                   "url": "https://mcp.figma.com/mcp"
                 },
-                "digest": "sha256:f920c8504a4862d5b26c2c230e5fe288e1b5f075c3dd0d5f179acae14b7107da",
+                "digest": "sha256:c70114eacc66ca486307977d6b331c052b0a21f445cf44f1dc0545b60dda8019",
                 "displayName": "Figma (Remote)",
                 "kind": "mcp",
                 "logicalName": "figma-remote",
@@ -892,20 +916,20 @@
               "subresource": "members/mcp/figma-remote"
             }
           ],
-          "digest": "sha256:81ffb1e83d6b7be5253f1cde3ad9ea9dec375375ac9829b86dd698c07d38d576",
+          "digest": "sha256:111e8c6668ec01ade9626f4c8b1bf34abf34da67716885f8d1fee84117b8523e",
           "locator": "plugin.yaml"
         }
       ],
       "embeddedRoot": "design",
       "files": [
         {
-          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1kZXNpZ24KZGVzY3JpcHRpb246IEJ1aWx0LWluIE1DUCBzZXJ2ZXIgZGVmaW5pdGlvbnMgZm9yIGRlc2lnbiB0b29scy4KbWVtYmVyczoKICAtIHR5cGU6IG1jcAogICAgbmFtZTogY2FudmEKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL21jcC5jYW52YS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDYW52YQogICAgICB0aW1lb3V0TVM6IDYwMDAwCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOgogICAgICAgICAgT2ZmaWNpYWwgQ2FudmEgcmVtb3RlIE1DUCBzZXJ2ZXIuIFJlZ2lzdGVyIEZsZXhpR1BUJ3MgT0F1dGggcmVkaXJlY3QgVVJMIGlmIHRoZSBwcm92aWRlciByZXF1aXJlcwogICAgICAgICAgY2xpZW50IHJlZ2lzdHJhdGlvbi4KICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogZmlnbWEtcmVtb3RlCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9tY3AuZmlnbWEuY29tL21jcAogICAgICBkaXNwbGF5TmFtZTogRmlnbWEgKFJlbW90ZSkKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBpbnN0YWxsOgogICAgICAgIG5vdGU6IE9mZmljaWFsIEZpZ21hIHJlbW90ZSBNQ1Agc2VydmVyLiBGaWdtYSBjYW52YXMgbXV0YXRpb25zIHJlbWFpbiBtYW51YWxseSBhcHByb3ZlZC4KICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUtbm8tZGVzdHJ1Y3RpdmUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZS1uby1kZXN0cnVjdGl2ZQo=",
-          "digest": "sha256:81ffb1e83d6b7be5253f1cde3ad9ea9dec375375ac9829b86dd698c07d38d576",
+          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1kZXNpZ24KZGVzY3JpcHRpb246IEJ1aWx0LWluIE1DUCBzZXJ2ZXIgZGVmaW5pdGlvbnMgZm9yIGRlc2lnbiB0b29scy4KbWVtYmVyczoKICAtIHR5cGU6IG1jcAogICAgbmFtZTogY2FudmEKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL21jcC5jYW52YS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBDYW52YQogICAgICB0aW1lb3V0TVM6IDYwMDAwCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgICBjbGllbnRDcmVkZW50aWFsc0lucHV0OiBDQU5WQV9PQVVUSF9DTElFTlQKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOiA+LQogICAgICAgICAgT2ZmaWNpYWwgQ2FudmEgcmVtb3RlIE1DUCBzZXJ2ZXIuIER5bmFtaWMgY2xpZW50IHJlZ2lzdHJhdGlvbiBpcyB1c2VkCiAgICAgICAgICB3aGVuIGF2YWlsYWJsZS4gSWYgQ2FudmEgcmVxdWlyZXMgbWFudWFsIHJlZ2lzdHJhdGlvbiwgcmVnaXN0ZXIgdGhlCiAgICAgICAgICBGbGV4aUdQVCBPQXV0aCByZWRpcmVjdCBVUkwgYW5kIGNvbmZpZ3VyZSB0aGUgcmVnaXN0ZXJlZCBjbGllbnQgYmVsb3cuCiAgICAgICAgaW5wdXRzOgogICAgICAgICAgQ0FOVkFfT0FVVEhfQ0xJRU5UOgogICAgICAgICAgICBraW5kOiBvYXV0aENsaWVudENyZWRlbnRpYWxzCiAgICAgICAgICAgIGxhYmVsOiBDYW52YSBPQXV0aCBDbGllbnQKICAgICAgICAgICAgZGVzY3JpcHRpb246IENsaWVudCBJRCBhbmQgb3B0aW9uYWwgY2xpZW50IHNlY3JldCBmb3IgYSBtYW51YWxseSByZWdpc3RlcmVkIENhbnZhIE9BdXRoIGNsaWVudC4KICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICAgIGNsaWVudFNlY3JldFJlcXVpcmVkOiBmYWxzZQogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBmaWdtYS1yZW1vdGUKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL21jcC5maWdtYS5jb20vbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBGaWdtYSAoUmVtb3RlKQogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIGluc3RhbGw6CiAgICAgICAgbm90ZTogPi0KICAgICAgICAgIE9mZmljaWFsIEZpZ21hIHJlbW90ZSBNQ1Agc2VydmVyLiBPbmx5IGNsaWVudHMgYWNjZXB0ZWQgYnkgdGhlIEZpZ21hCiAgICAgICAgICBNQ1AgQ2F0YWxvZyBjYW4gY29ubmVjdC4gRmlnbWEgY2FudmFzIG11dGF0aW9ucyByZW1haW4gbWFudWFsbHkKICAgICAgICAgIGFwcHJvdmVkLgogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZS1uby1kZXN0cnVjdGl2ZQogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlLW5vLWRlc3RydWN0aXZlCg==",
+          "digest": "sha256:111e8c6668ec01ade9626f4c8b1bf34abf34da67716885f8d1fee84117b8523e",
           "locator": "plugin.yaml",
-          "size": 1043
+          "size": 1591
         }
       ],
-      "fingerprint": "sha256:b40534ea5ab975a7d71e80e20f600eb9cfa7167d385b1862bd37d51704fe4bf0"
+      "fingerprint": "sha256:7226e9c8cef7bd404890a83c7f0534f09feda7a66b75375b18fa085a43d3b72b"
     },
     {
       "address": {
@@ -1535,6 +1559,13 @@
                           "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
+                        "connectionProfiles": {
+                          "full-url": {
+                            "http": {
+                              "url": "${MICROSOFT_M365_COPILOT_MCP_URL}"
+                            }
+                          }
+                        },
                         "displayName": "Microsoft 365 Copilot",
                         "install": {
                           "inputs": {
@@ -1545,12 +1576,19 @@
                               "label": "Microsoft Entra OAuth Client",
                               "required": true
                             },
+                            "MICROSOFT_M365_COPILOT_MCP_URL": {
+                              "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                              "kind": "text",
+                              "label": "Microsoft 365 Copilot MCP URL",
+                              "required": false
+                            },
                             "MICROSOFT_TENANT_ID": {
                               "kind": "text",
                               "label": "Microsoft Entra Tenant ID",
-                              "required": true
+                              "required": false
                             }
-                          }
+                          },
+                          "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL. Register FlexiGPT's OAuth redirect URL in the Entra app registration."
                         },
                         "policy": {
                           "name": "builtin-manual-read",
@@ -1569,6 +1607,13 @@
                           "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
+                        "connectionProfiles": {
+                          "full-url": {
+                            "http": {
+                              "url": "${MICROSOFT_ONEDRIVE_MCP_URL}"
+                            }
+                          }
+                        },
                         "displayName": "Microsoft OneDrive",
                         "install": {
                           "inputs": {
@@ -1578,12 +1623,19 @@
                               "label": "Microsoft Entra OAuth Client",
                               "required": true
                             },
+                            "MICROSOFT_ONEDRIVE_MCP_URL": {
+                              "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                              "kind": "text",
+                              "label": "Microsoft OneDrive MCP URL",
+                              "required": false
+                            },
                             "MICROSOFT_TENANT_ID": {
                               "kind": "text",
                               "label": "Microsoft Entra Tenant ID",
-                              "required": true
+                              "required": false
                             }
-                          }
+                          },
+                          "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                         },
                         "policy": {
                           "name": "builtin-manual-write",
@@ -1602,6 +1654,13 @@
                           "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
+                        "connectionProfiles": {
+                          "full-url": {
+                            "http": {
+                              "url": "${MICROSOFT_SHAREPOINT_MCP_URL}"
+                            }
+                          }
+                        },
                         "displayName": "Microsoft SharePoint",
                         "install": {
                           "inputs": {
@@ -1611,12 +1670,19 @@
                               "label": "Microsoft Entra OAuth Client",
                               "required": true
                             },
+                            "MICROSOFT_SHAREPOINT_MCP_URL": {
+                              "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                              "kind": "text",
+                              "label": "Microsoft SharePoint MCP URL",
+                              "required": false
+                            },
                             "MICROSOFT_TENANT_ID": {
                               "kind": "text",
                               "label": "Microsoft Entra Tenant ID",
-                              "required": true
+                              "required": false
                             }
-                          }
+                          },
+                          "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                         },
                         "policy": {
                           "name": "builtin-manual-write",
@@ -1635,6 +1701,13 @@
                           "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
+                        "connectionProfiles": {
+                          "full-url": {
+                            "http": {
+                              "url": "${MICROSOFT_TEAMS_MCP_URL}"
+                            }
+                          }
+                        },
                         "displayName": "Microsoft Teams",
                         "install": {
                           "inputs": {
@@ -1644,12 +1717,19 @@
                               "label": "Microsoft Entra OAuth Client",
                               "required": true
                             },
+                            "MICROSOFT_TEAMS_MCP_URL": {
+                              "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                              "kind": "text",
+                              "label": "Microsoft Teams MCP URL",
+                              "required": false
+                            },
                             "MICROSOFT_TENANT_ID": {
                               "kind": "text",
                               "label": "Microsoft Entra Tenant ID",
-                              "required": true
+                              "required": false
                             }
-                          }
+                          },
+                          "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                         },
                         "policy": {
                           "name": "builtin-manual-write",
@@ -1667,6 +1747,13 @@
                           "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
+                        "connectionProfiles": {
+                          "full-url": {
+                            "http": {
+                              "url": "${MICROSOFT_USER_MCP_URL}"
+                            }
+                          }
+                        },
                         "displayName": "Microsoft User Profile",
                         "install": {
                           "inputs": {
@@ -1679,9 +1766,16 @@
                             "MICROSOFT_TENANT_ID": {
                               "kind": "text",
                               "label": "Microsoft Entra Tenant ID",
-                              "required": true
+                              "required": false
+                            },
+                            "MICROSOFT_USER_MCP_URL": {
+                              "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                              "kind": "text",
+                              "label": "Microsoft User Profile MCP URL",
+                              "required": false
                             }
-                          }
+                          },
+                          "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                         },
                         "policy": {
                           "name": "builtin-auto-read",
@@ -1709,7 +1803,7 @@
                   "type": "plugin"
                 },
                 "description": "Microsoft-hosted remote MCP servers.",
-                "digest": "sha256:af4ba9514371f87822b80a1c003d8d3ea9ecfeee0ff3f3902168347d9a87ecac",
+                "digest": "sha256:a5cec1dfbd8e0a87eab5d43f90b62a9320574aa6190f9959113895e7dbebfdd3",
                 "displayName": "mcp-microsoft",
                 "kind": "plugin",
                 "logicalName": "mcp-microsoft",
@@ -1724,6 +1818,13 @@
                     "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
+                  "connectionProfiles": {
+                    "full-url": {
+                      "http": {
+                        "url": "${MICROSOFT_M365_COPILOT_MCP_URL}"
+                      }
+                    }
+                  },
                   "displayName": "Microsoft 365 Copilot",
                   "install": {
                     "inputs": {
@@ -1734,12 +1835,19 @@
                         "label": "Microsoft Entra OAuth Client",
                         "required": true
                       },
+                      "MICROSOFT_M365_COPILOT_MCP_URL": {
+                        "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                        "kind": "text",
+                        "label": "Microsoft 365 Copilot MCP URL",
+                        "required": false
+                      },
                       "MICROSOFT_TENANT_ID": {
                         "kind": "text",
                         "label": "Microsoft Entra Tenant ID",
-                        "required": true
+                        "required": false
                       }
-                    }
+                    },
+                    "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL. Register FlexiGPT's OAuth redirect URL in the Entra app registration."
                   },
                   "name": "m365-copilot",
                   "policy": {
@@ -1751,7 +1859,7 @@
                   "type": "mcp",
                   "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_M365Copilot"
                 },
-                "digest": "sha256:a7477403e8fe70fd376615fbc793c5170efad45490135d431a5824eeb2fefd5f",
+                "digest": "sha256:7a856fe6f80b307b2d9bc3c27751f2b66a4a6ef7cb56dc8643bc042f3bb596b6",
                 "displayName": "Microsoft 365 Copilot",
                 "kind": "mcp",
                 "logicalName": "m365-copilot",
@@ -1767,6 +1875,13 @@
                     "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
+                  "connectionProfiles": {
+                    "full-url": {
+                      "http": {
+                        "url": "${MICROSOFT_ONEDRIVE_MCP_URL}"
+                      }
+                    }
+                  },
                   "displayName": "Microsoft OneDrive",
                   "install": {
                     "inputs": {
@@ -1776,12 +1891,19 @@
                         "label": "Microsoft Entra OAuth Client",
                         "required": true
                       },
+                      "MICROSOFT_ONEDRIVE_MCP_URL": {
+                        "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                        "kind": "text",
+                        "label": "Microsoft OneDrive MCP URL",
+                        "required": false
+                      },
                       "MICROSOFT_TENANT_ID": {
                         "kind": "text",
                         "label": "Microsoft Entra Tenant ID",
-                        "required": true
+                        "required": false
                       }
-                    }
+                    },
+                    "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                   },
                   "name": "onedrive",
                   "policy": {
@@ -1793,7 +1915,7 @@
                   "type": "mcp",
                   "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_OneDriveRemoteServer"
                 },
-                "digest": "sha256:e17603a548cf125af37c54f9d6bfcd599890ee90f2fb8c1d3f26d47b530701b0",
+                "digest": "sha256:76bd16a0e6a70f81400c10ce0134d63d56391e87a7afd8059ccf85b2e8c63c2c",
                 "displayName": "Microsoft OneDrive",
                 "kind": "mcp",
                 "logicalName": "onedrive",
@@ -1809,6 +1931,13 @@
                     "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
+                  "connectionProfiles": {
+                    "full-url": {
+                      "http": {
+                        "url": "${MICROSOFT_SHAREPOINT_MCP_URL}"
+                      }
+                    }
+                  },
                   "displayName": "Microsoft SharePoint",
                   "install": {
                     "inputs": {
@@ -1818,12 +1947,19 @@
                         "label": "Microsoft Entra OAuth Client",
                         "required": true
                       },
+                      "MICROSOFT_SHAREPOINT_MCP_URL": {
+                        "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                        "kind": "text",
+                        "label": "Microsoft SharePoint MCP URL",
+                        "required": false
+                      },
                       "MICROSOFT_TENANT_ID": {
                         "kind": "text",
                         "label": "Microsoft Entra Tenant ID",
-                        "required": true
+                        "required": false
                       }
-                    }
+                    },
+                    "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                   },
                   "name": "sharepoint",
                   "policy": {
@@ -1835,7 +1971,7 @@
                   "type": "mcp",
                   "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_SharePointRemoteServer"
                 },
-                "digest": "sha256:10e3651fb955d97848d326907385e80b6e46e64625318ab79e38328c4f93b3dd",
+                "digest": "sha256:174c51328257bce4c721b1d34b469d9cc4d072d9b31c97f6bbe7b1d1ac7c3976",
                 "displayName": "Microsoft SharePoint",
                 "kind": "mcp",
                 "logicalName": "sharepoint",
@@ -1851,6 +1987,13 @@
                     "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
+                  "connectionProfiles": {
+                    "full-url": {
+                      "http": {
+                        "url": "${MICROSOFT_TEAMS_MCP_URL}"
+                      }
+                    }
+                  },
                   "displayName": "Microsoft Teams",
                   "install": {
                     "inputs": {
@@ -1860,12 +2003,19 @@
                         "label": "Microsoft Entra OAuth Client",
                         "required": true
                       },
+                      "MICROSOFT_TEAMS_MCP_URL": {
+                        "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                        "kind": "text",
+                        "label": "Microsoft Teams MCP URL",
+                        "required": false
+                      },
                       "MICROSOFT_TENANT_ID": {
                         "kind": "text",
                         "label": "Microsoft Entra Tenant ID",
-                        "required": true
+                        "required": false
                       }
-                    }
+                    },
+                    "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                   },
                   "name": "teams",
                   "policy": {
@@ -1876,7 +2026,7 @@
                   "type": "mcp",
                   "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_TeamsServer"
                 },
-                "digest": "sha256:66a8ccfa168ef255405ee0f35a33e2240be140e7fec36a37c3e41b34f0ec8ba1",
+                "digest": "sha256:bdc58fca770c22533a06bf25d2de7a33147e9bc7fb79e1d6a83c9fd8455b1621",
                 "displayName": "Microsoft Teams",
                 "kind": "mcp",
                 "logicalName": "teams",
@@ -1892,6 +2042,13 @@
                     "clientCredentialsInput": "MICROSOFT_ENTRA_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
+                  "connectionProfiles": {
+                    "full-url": {
+                      "http": {
+                        "url": "${MICROSOFT_USER_MCP_URL}"
+                      }
+                    }
+                  },
                   "displayName": "Microsoft User Profile",
                   "install": {
                     "inputs": {
@@ -1904,9 +2061,16 @@
                       "MICROSOFT_TENANT_ID": {
                         "kind": "text",
                         "label": "Microsoft Entra Tenant ID",
-                        "required": true
+                        "required": false
+                      },
+                      "MICROSOFT_USER_MCP_URL": {
+                        "description": "Full tenant-scoped MCP URL preserved from a legacy installation.",
+                        "kind": "text",
+                        "label": "Microsoft User Profile MCP URL",
+                        "required": false
                       }
-                    }
+                    },
+                    "note": "Use the tenant ID for the standard endpoint, or select the full-url connection profile when importing a legacy or custom tenant-scoped URL."
                   },
                   "name": "user",
                   "policy": {
@@ -1917,7 +2081,7 @@
                   "type": "mcp",
                   "url": "https://agent365.svc.cloud.microsoft/agents/tenants/${MICROSOFT_TENANT_ID}/servers/mcp_MeServer"
                 },
-                "digest": "sha256:586df861eb57a208ff2adf3fda832075ded94a469ed74f9f245b43641dca7c87",
+                "digest": "sha256:21133dbe2f012bdee0b3617a22c8ebae3153a6c85fa55e423b1ddc4280d6ac17",
                 "displayName": "Microsoft User Profile",
                 "kind": "mcp",
                 "logicalName": "user",
@@ -1927,20 +2091,20 @@
               "subresource": "members/mcp/user"
             }
           ],
-          "digest": "sha256:969c08ae8d0a033e796db1fa4d30ad9bcde78d9fdee5a3012c72e36447034061",
+          "digest": "sha256:ea8008fd56a046ecd42b3445249b3042a766b9fdcdb518c881e68cc77764a74f",
           "locator": "plugin.yaml"
         }
       ],
       "embeddedRoot": "microsoft",
       "files": [
         {
-          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1taWNyb3NvZnQKZGVzY3JpcHRpb246IE1pY3Jvc29mdC1ob3N0ZWQgcmVtb3RlIE1DUCBzZXJ2ZXJzLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBtMzY1LWNvcGlsb3QKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FnZW50MzY1LnN2Yy5jbG91ZC5taWNyb3NvZnQvYWdlbnRzL3RlbmFudHMvJHtNSUNST1NPRlRfVEVOQU5UX0lEfS9zZXJ2ZXJzL21jcF9NMzY1Q29waWxvdAogICAgICBkaXNwbGF5TmFtZTogTWljcm9zb2Z0IDM2NSBDb3BpbG90CiAgICAgIHRpbWVvdXRNUzogNjAwMDAKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICAgIGNsaWVudENyZWRlbnRpYWxzSW5wdXQ6IE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQKICAgICAgaW5zdGFsbDoKICAgICAgICBpbnB1dHM6CiAgICAgICAgICBNSUNST1NPRlRfVEVOQU5UX0lEOgogICAgICAgICAgICBraW5kOiB0ZXh0CiAgICAgICAgICAgIGxhYmVsOiBNaWNyb3NvZnQgRW50cmEgVGVuYW50IElECiAgICAgICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgICBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UOgogICAgICAgICAgICBraW5kOiBvYXV0aENsaWVudENyZWRlbnRpYWxzCiAgICAgICAgICAgIGxhYmVsOiBNaWNyb3NvZnQgRW50cmEgT0F1dGggQ2xpZW50CiAgICAgICAgICAgIGRlc2NyaXB0aW9uOiBDbGllbnQgSUQgYW5kIG9wdGlvbmFsIGNsaWVudCBzZWNyZXQgZm9yIGEgcHVibGljIFBLQ0Ugb3IgY29uZmlkZW50aWFsIEVudHJhIGFwcGxpY2F0aW9uLgogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgICBjbGllbnRTZWNyZXRSZXF1aXJlZDogZmFsc2UKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBvbmVkcml2ZQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnQzNjUuc3ZjLmNsb3VkLm1pY3Jvc29mdC9hZ2VudHMvdGVuYW50cy8ke01JQ1JPU09GVF9URU5BTlRfSUR9L3NlcnZlcnMvbWNwX09uZURyaXZlUmVtb3RlU2VydmVyCiAgICAgIGRpc3BsYXlOYW1lOiBNaWNyb3NvZnQgT25lRHJpdmUKICAgICAgdGltZW91dE1TOiA2MDAwMAogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgICAgY2xpZW50Q3JlZGVudGlhbHNJbnB1dDogTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVAogICAgICBpbnN0YWxsOgogICAgICAgIGlucHV0czoKICAgICAgICAgIE1JQ1JPU09GVF9URU5BTlRfSUQ6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBUZW5hbnQgSUQKICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICAgIE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQ6CiAgICAgICAgICAgIGtpbmQ6IG9hdXRoQ2xpZW50Q3JlZGVudGlhbHMKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBPQXV0aCBDbGllbnQKICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICAgICAgY2xpZW50U2VjcmV0UmVxdWlyZWQ6IGZhbHNlCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IHNoYXJlcG9pbnQKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FnZW50MzY1LnN2Yy5jbG91ZC5taWNyb3NvZnQvYWdlbnRzL3RlbmFudHMvJHtNSUNST1NPRlRfVEVOQU5UX0lEfS9zZXJ2ZXJzL21jcF9TaGFyZVBvaW50UmVtb3RlU2VydmVyCiAgICAgIGRpc3BsYXlOYW1lOiBNaWNyb3NvZnQgU2hhcmVQb2ludAogICAgICB0aW1lb3V0TVM6IDYwMDAwCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgICBjbGllbnRDcmVkZW50aWFsc0lucHV0OiBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UCiAgICAgIGluc3RhbGw6CiAgICAgICAgaW5wdXRzOgogICAgICAgICAgTUlDUk9TT0ZUX1RFTkFOVF9JRDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIFRlbmFudCBJRAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVDoKICAgICAgICAgICAga2luZDogb2F1dGhDbGllbnRDcmVkZW50aWFscwogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIE9BdXRoIENsaWVudAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgICBjbGllbnRTZWNyZXRSZXF1aXJlZDogZmFsc2UKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogdGVhbXMKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FnZW50MzY1LnN2Yy5jbG91ZC5taWNyb3NvZnQvYWdlbnRzL3RlbmFudHMvJHtNSUNST1NPRlRfVEVOQU5UX0lEfS9zZXJ2ZXJzL21jcF9UZWFtc1NlcnZlcgogICAgICBkaXNwbGF5TmFtZTogTWljcm9zb2Z0IFRlYW1zCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgICBjbGllbnRDcmVkZW50aWFsc0lucHV0OiBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UCiAgICAgIGluc3RhbGw6CiAgICAgICAgaW5wdXRzOgogICAgICAgICAgTUlDUk9TT0ZUX1RFTkFOVF9JRDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIFRlbmFudCBJRAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVDoKICAgICAgICAgICAga2luZDogb2F1dGhDbGllbnRDcmVkZW50aWFscwogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIE9BdXRoIENsaWVudAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgICBjbGllbnRTZWNyZXRSZXF1aXJlZDogZmFsc2UKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogdXNlcgogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnQzNjUuc3ZjLmNsb3VkLm1pY3Jvc29mdC9hZ2VudHMvdGVuYW50cy8ke01JQ1JPU09GVF9URU5BTlRfSUR9L3NlcnZlcnMvbWNwX01lU2VydmVyCiAgICAgIGRpc3BsYXlOYW1lOiBNaWNyb3NvZnQgVXNlciBQcm9maWxlCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgICBjbGllbnRDcmVkZW50aWFsc0lucHV0OiBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UCiAgICAgIGluc3RhbGw6CiAgICAgICAgaW5wdXRzOgogICAgICAgICAgTUlDUk9TT0ZUX1RFTkFOVF9JRDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIFRlbmFudCBJRAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVDoKICAgICAgICAgICAga2luZDogb2F1dGhDbGllbnRDcmVkZW50aWFscwogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIE9BdXRoIENsaWVudAogICAgICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgICAgICBjbGllbnRTZWNyZXRSZXF1aXJlZDogZmFsc2UKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1hdXRvLXJlYWQKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXJlYWQKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLWF1dG8tcmVhZAo=",
-          "digest": "sha256:969c08ae8d0a033e796db1fa4d30ad9bcde78d9fdee5a3012c72e36447034061",
+          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1taWNyb3NvZnQKZGVzY3JpcHRpb246IE1pY3Jvc29mdC1ob3N0ZWQgcmVtb3RlIE1DUCBzZXJ2ZXJzLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBtMzY1LWNvcGlsb3QKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FnZW50MzY1LnN2Yy5jbG91ZC5taWNyb3NvZnQvYWdlbnRzL3RlbmFudHMvJHtNSUNST1NPRlRfVEVOQU5UX0lEfS9zZXJ2ZXJzL21jcF9NMzY1Q29waWxvdAogICAgICBkaXNwbGF5TmFtZTogTWljcm9zb2Z0IDM2NSBDb3BpbG90CiAgICAgIHRpbWVvdXRNUzogNjAwMDAKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICAgIGNsaWVudENyZWRlbnRpYWxzSW5wdXQ6IE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOiA+LQogICAgICAgICAgVXNlIHRoZSB0ZW5hbnQgSUQgZm9yIHRoZSBzdGFuZGFyZCBlbmRwb2ludCwgb3Igc2VsZWN0IHRoZSBmdWxsLXVybAogICAgICAgICAgY29ubmVjdGlvbiBwcm9maWxlIHdoZW4gaW1wb3J0aW5nIGEgbGVnYWN5IG9yIGN1c3RvbSB0ZW5hbnQtc2NvcGVkIFVSTC4KICAgICAgICAgIFJlZ2lzdGVyIEZsZXhpR1BUJ3MgT0F1dGggcmVkaXJlY3QgVVJMIGluIHRoZSBFbnRyYSBhcHAgcmVnaXN0cmF0aW9uLgogICAgICAgIGlucHV0czoKICAgICAgICAgIE1JQ1JPU09GVF9URU5BTlRfSUQ6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBUZW5hbnQgSUQKICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICBNSUNST1NPRlRfTTM2NV9DT1BJTE9UX01DUF9VUkw6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCAzNjUgQ29waWxvdCBNQ1AgVVJMCiAgICAgICAgICAgIGRlc2NyaXB0aW9uOiBGdWxsIHRlbmFudC1zY29wZWQgTUNQIFVSTCBwcmVzZXJ2ZWQgZnJvbSBhIGxlZ2FjeSBpbnN0YWxsYXRpb24uCiAgICAgICAgICAgIHJlcXVpcmVkOiBmYWxzZQogICAgICAgICAgTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVDoKICAgICAgICAgICAga2luZDogb2F1dGhDbGllbnRDcmVkZW50aWFscwogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIE9BdXRoIENsaWVudAogICAgICAgICAgICBkZXNjcmlwdGlvbjogQ2xpZW50IElEIGFuZCBvcHRpb25hbCBjbGllbnQgc2VjcmV0IGZvciBhIHB1YmxpYyBQS0NFIG9yIGNvbmZpZGVudGlhbCBFbnRyYSBhcHBsaWNhdGlvbi4KICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICAgICAgY2xpZW50U2VjcmV0UmVxdWlyZWQ6IGZhbHNlCiAgICAgIGNvbm5lY3Rpb25Qcm9maWxlczoKICAgICAgICBmdWxsLXVybDoKICAgICAgICAgIGh0dHA6CiAgICAgICAgICAgIHVybDogIiR7TUlDUk9TT0ZUX00zNjVfQ09QSUxPVF9NQ1BfVVJMfSIKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtcmVhZAogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBvbmVkcml2ZQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnQzNjUuc3ZjLmNsb3VkLm1pY3Jvc29mdC9hZ2VudHMvdGVuYW50cy8ke01JQ1JPU09GVF9URU5BTlRfSUR9L3NlcnZlcnMvbWNwX09uZURyaXZlUmVtb3RlU2VydmVyCiAgICAgIGRpc3BsYXlOYW1lOiBNaWNyb3NvZnQgT25lRHJpdmUKICAgICAgdGltZW91dE1TOiA2MDAwMAogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgICAgY2xpZW50Q3JlZGVudGlhbHNJbnB1dDogTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVAogICAgICBpbnN0YWxsOgogICAgICAgIG5vdGU6ID4tCiAgICAgICAgICBVc2UgdGhlIHRlbmFudCBJRCBmb3IgdGhlIHN0YW5kYXJkIGVuZHBvaW50LCBvciBzZWxlY3QgdGhlIGZ1bGwtdXJsCiAgICAgICAgICBjb25uZWN0aW9uIHByb2ZpbGUgd2hlbiBpbXBvcnRpbmcgYSBsZWdhY3kgb3IgY3VzdG9tIHRlbmFudC1zY29wZWQgVVJMLgogICAgICAgIGlucHV0czoKICAgICAgICAgIE1JQ1JPU09GVF9URU5BTlRfSUQ6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBUZW5hbnQgSUQKICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICBNSUNST1NPRlRfT05FRFJJVkVfTUNQX1VSTDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IE9uZURyaXZlIE1DUCBVUkwKICAgICAgICAgICAgZGVzY3JpcHRpb246IEZ1bGwgdGVuYW50LXNjb3BlZCBNQ1AgVVJMIHByZXNlcnZlZCBmcm9tIGEgbGVnYWN5IGluc3RhbGxhdGlvbi4KICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UOgogICAgICAgICAgICBraW5kOiBvYXV0aENsaWVudENyZWRlbnRpYWxzCiAgICAgICAgICAgIGxhYmVsOiBNaWNyb3NvZnQgRW50cmEgT0F1dGggQ2xpZW50CiAgICAgICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgICAgIGNsaWVudFNlY3JldFJlcXVpcmVkOiBmYWxzZQogICAgICBjb25uZWN0aW9uUHJvZmlsZXM6CiAgICAgICAgZnVsbC11cmw6CiAgICAgICAgICBodHRwOgogICAgICAgICAgICB1cmw6ICIke01JQ1JPU09GVF9PTkVEUklWRV9NQ1BfVVJMfSIKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogc2hhcmVwb2ludAogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnQzNjUuc3ZjLmNsb3VkLm1pY3Jvc29mdC9hZ2VudHMvdGVuYW50cy8ke01JQ1JPU09GVF9URU5BTlRfSUR9L3NlcnZlcnMvbWNwX1NoYXJlUG9pbnRSZW1vdGVTZXJ2ZXIKICAgICAgZGlzcGxheU5hbWU6IE1pY3Jvc29mdCBTaGFyZVBvaW50CiAgICAgIHRpbWVvdXRNUzogNjAwMDAKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICAgIGNsaWVudENyZWRlbnRpYWxzSW5wdXQ6IE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOiA+LQogICAgICAgICAgVXNlIHRoZSB0ZW5hbnQgSUQgZm9yIHRoZSBzdGFuZGFyZCBlbmRwb2ludCwgb3Igc2VsZWN0IHRoZSBmdWxsLXVybAogICAgICAgICAgY29ubmVjdGlvbiBwcm9maWxlIHdoZW4gaW1wb3J0aW5nIGEgbGVnYWN5IG9yIGN1c3RvbSB0ZW5hbnQtc2NvcGVkIFVSTC4KICAgICAgICBpbnB1dHM6CiAgICAgICAgICBNSUNST1NPRlRfVEVOQU5UX0lEOgogICAgICAgICAgICBraW5kOiB0ZXh0CiAgICAgICAgICAgIGxhYmVsOiBNaWNyb3NvZnQgRW50cmEgVGVuYW50IElECiAgICAgICAgICAgIHJlcXVpcmVkOiBmYWxzZQogICAgICAgICAgTUlDUk9TT0ZUX1NIQVJFUE9JTlRfTUNQX1VSTDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IFNoYXJlUG9pbnQgTUNQIFVSTAogICAgICAgICAgICBkZXNjcmlwdGlvbjogRnVsbCB0ZW5hbnQtc2NvcGVkIE1DUCBVUkwgcHJlc2VydmVkIGZyb20gYSBsZWdhY3kgaW5zdGFsbGF0aW9uLgogICAgICAgICAgICByZXF1aXJlZDogZmFsc2UKICAgICAgICAgIE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQ6CiAgICAgICAgICAgIGtpbmQ6IG9hdXRoQ2xpZW50Q3JlZGVudGlhbHMKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBPQXV0aCBDbGllbnQKICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICAgICAgY2xpZW50U2VjcmV0UmVxdWlyZWQ6IGZhbHNlCiAgICAgIGNvbm5lY3Rpb25Qcm9maWxlczoKICAgICAgICBmdWxsLXVybDoKICAgICAgICAgIGh0dHA6CiAgICAgICAgICAgIHVybDogIiR7TUlDUk9TT0ZUX1NIQVJFUE9JTlRfTUNQX1VSTH0iCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IHRlYW1zCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9hZ2VudDM2NS5zdmMuY2xvdWQubWljcm9zb2Z0L2FnZW50cy90ZW5hbnRzLyR7TUlDUk9TT0ZUX1RFTkFOVF9JRH0vc2VydmVycy9tY3BfVGVhbXNTZXJ2ZXIKICAgICAgZGlzcGxheU5hbWU6IE1pY3Jvc29mdCBUZWFtcwogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgICAgY2xpZW50Q3JlZGVudGlhbHNJbnB1dDogTUlDUk9TT0ZUX0VOVFJBX09BVVRIX0NMSUVOVAogICAgICBpbnN0YWxsOgogICAgICAgIG5vdGU6ID4tCiAgICAgICAgICBVc2UgdGhlIHRlbmFudCBJRCBmb3IgdGhlIHN0YW5kYXJkIGVuZHBvaW50LCBvciBzZWxlY3QgdGhlIGZ1bGwtdXJsCiAgICAgICAgICBjb25uZWN0aW9uIHByb2ZpbGUgd2hlbiBpbXBvcnRpbmcgYSBsZWdhY3kgb3IgY3VzdG9tIHRlbmFudC1zY29wZWQgVVJMLgogICAgICAgIGlucHV0czoKICAgICAgICAgIE1JQ1JPU09GVF9URU5BTlRfSUQ6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBUZW5hbnQgSUQKICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICBNSUNST1NPRlRfVEVBTVNfTUNQX1VSTDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IFRlYW1zIE1DUCBVUkwKICAgICAgICAgICAgZGVzY3JpcHRpb246IEZ1bGwgdGVuYW50LXNjb3BlZCBNQ1AgVVJMIHByZXNlcnZlZCBmcm9tIGEgbGVnYWN5IGluc3RhbGxhdGlvbi4KICAgICAgICAgICAgcmVxdWlyZWQ6IGZhbHNlCiAgICAgICAgICBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UOgogICAgICAgICAgICBraW5kOiBvYXV0aENsaWVudENyZWRlbnRpYWxzCiAgICAgICAgICAgIGxhYmVsOiBNaWNyb3NvZnQgRW50cmEgT0F1dGggQ2xpZW50CiAgICAgICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgICAgIGNsaWVudFNlY3JldFJlcXVpcmVkOiBmYWxzZQogICAgICBjb25uZWN0aW9uUHJvZmlsZXM6CiAgICAgICAgZnVsbC11cmw6CiAgICAgICAgICBodHRwOgogICAgICAgICAgICB1cmw6ICIke01JQ1JPU09GVF9URUFNU19NQ1BfVVJMfSIKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogdXNlcgogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vYWdlbnQzNjUuc3ZjLmNsb3VkLm1pY3Jvc29mdC9hZ2VudHMvdGVuYW50cy8ke01JQ1JPU09GVF9URU5BTlRfSUR9L3NlcnZlcnMvbWNwX01lU2VydmVyCiAgICAgIGRpc3BsYXlOYW1lOiBNaWNyb3NvZnQgVXNlciBQcm9maWxlCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgICBjbGllbnRDcmVkZW50aWFsc0lucHV0OiBNSUNST1NPRlRfRU5UUkFfT0FVVEhfQ0xJRU5UCiAgICAgIGluc3RhbGw6CiAgICAgICAgbm90ZTogPi0KICAgICAgICAgIFVzZSB0aGUgdGVuYW50IElEIGZvciB0aGUgc3RhbmRhcmQgZW5kcG9pbnQsIG9yIHNlbGVjdCB0aGUgZnVsbC11cmwKICAgICAgICAgIGNvbm5lY3Rpb24gcHJvZmlsZSB3aGVuIGltcG9ydGluZyBhIGxlZ2FjeSBvciBjdXN0b20gdGVuYW50LXNjb3BlZCBVUkwuCiAgICAgICAgaW5wdXRzOgogICAgICAgICAgTUlDUk9TT0ZUX1RFTkFOVF9JRDoKICAgICAgICAgICAga2luZDogdGV4dAogICAgICAgICAgICBsYWJlbDogTWljcm9zb2Z0IEVudHJhIFRlbmFudCBJRAogICAgICAgICAgICByZXF1aXJlZDogZmFsc2UKICAgICAgICAgIE1JQ1JPU09GVF9VU0VSX01DUF9VUkw6CiAgICAgICAgICAgIGtpbmQ6IHRleHQKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBVc2VyIFByb2ZpbGUgTUNQIFVSTAogICAgICAgICAgICBkZXNjcmlwdGlvbjogRnVsbCB0ZW5hbnQtc2NvcGVkIE1DUCBVUkwgcHJlc2VydmVkIGZyb20gYSBsZWdhY3kgaW5zdGFsbGF0aW9uLgogICAgICAgICAgICByZXF1aXJlZDogZmFsc2UKICAgICAgICAgIE1JQ1JPU09GVF9FTlRSQV9PQVVUSF9DTElFTlQ6CiAgICAgICAgICAgIGtpbmQ6IG9hdXRoQ2xpZW50Q3JlZGVudGlhbHMKICAgICAgICAgICAgbGFiZWw6IE1pY3Jvc29mdCBFbnRyYSBPQXV0aCBDbGllbnQKICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICAgICAgY2xpZW50U2VjcmV0UmVxdWlyZWQ6IGZhbHNlCiAgICAgIGNvbm5lY3Rpb25Qcm9maWxlczoKICAgICAgICBmdWxsLXVybDoKICAgICAgICAgIGh0dHA6CiAgICAgICAgICAgIHVybDogIiR7TUlDUk9TT0ZUX1VTRVJfTUNQX1VSTH0iCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by1yZWFkCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC1yZWFkCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1hdXRvLXJlYWQK",
+          "digest": "sha256:ea8008fd56a046ecd42b3445249b3042a766b9fdcdb518c881e68cc77764a74f",
           "locator": "plugin.yaml",
-          "size": 4181
+          "size": 6825
         }
       ],
-      "fingerprint": "sha256:3f8e3e948f4dc9c9b0cae4517350449f4ac6b8375b8a44b8c3162cfb4e9b41bd"
+      "fingerprint": "sha256:7185c2f904fed55d35eb94fc4a74980b0afe4b3b34a34595425872622f93e898"
     },
     {
       "address": {
@@ -2576,9 +2740,22 @@
                       "name": "github-oauth",
                       "parameters": {
                         "auth": {
+                          "clientCredentialsInput": "GITHUB_OAUTH_CLIENT",
                           "mode": "oauth"
                         },
                         "displayName": "GitHub",
+                        "install": {
+                          "inputs": {
+                            "GITHUB_OAUTH_CLIENT": {
+                              "clientSecretRequired": true,
+                              "description": "Client ID and client secret for your registered GitHub OAuth App.",
+                              "kind": "oauthClientCredentials",
+                              "label": "GitHub OAuth Client",
+                              "required": true
+                            }
+                          },
+                          "note": "Configure a GitHub OAuth App for FlexiGPT and register the loopback callback shown in MCP authentication settings."
+                        },
                         "policy": {
                           "name": "builtin-manual-write",
                           "required": true
@@ -2685,7 +2862,7 @@
                   "type": "plugin"
                 },
                 "description": "Built-in MCP servers for GitHub, Vercel, Netlify, and Hugging Face.",
-                "digest": "sha256:e30cc9a1323e83669d55989057e048dae302252c90580d236467cf1a7f9cf07d",
+                "digest": "sha256:c1cd6d2162f31b5fea39fc9d0207b30b2b4b839004ac9f4a597bc8e421e247ff",
                 "displayName": "mcp-software-dev-hosting",
                 "kind": "plugin",
                 "logicalName": "mcp-software-dev-hosting",
@@ -2697,9 +2874,22 @@
               "definition": {
                 "body": {
                   "auth": {
+                    "clientCredentialsInput": "GITHUB_OAUTH_CLIENT",
                     "mode": "oauth"
                   },
                   "displayName": "GitHub",
+                  "install": {
+                    "inputs": {
+                      "GITHUB_OAUTH_CLIENT": {
+                        "clientSecretRequired": true,
+                        "description": "Client ID and client secret for your registered GitHub OAuth App.",
+                        "kind": "oauthClientCredentials",
+                        "label": "GitHub OAuth Client",
+                        "required": true
+                      }
+                    },
+                    "note": "Configure a GitHub OAuth App for FlexiGPT and register the loopback callback shown in MCP authentication settings."
+                  },
                   "name": "github-oauth",
                   "policy": {
                     "name": "builtin-manual-write",
@@ -2709,7 +2899,7 @@
                   "type": "mcp",
                   "url": "https://api.githubcopilot.com/mcp/"
                 },
-                "digest": "sha256:52386c13999a435aff19dd2046fe0edc6605280f2e6b67e879e9ec4e2f118a46",
+                "digest": "sha256:91b17e07fdff7c7dbe99bc9223e8bb37181e2fcf5bba3739caff2452e7764455",
                 "displayName": "GitHub",
                 "kind": "mcp",
                 "logicalName": "github-oauth",
@@ -2835,20 +3025,20 @@
               "subresource": "members/mcp/vercel"
             }
           ],
-          "digest": "sha256:f965c9723dac3125d80aaaf78f641510573468f3b0b201d1b21e836ea129dda9",
+          "digest": "sha256:ba3d818cb48aeac6b6666a62573ce41571699e57ebd3df72378512c8ad63b565",
           "locator": "plugin.yaml"
         }
       ],
       "embeddedRoot": "software-dev-hosting",
       "files": [
         {
-          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1zb2Z0d2FyZS1kZXYtaG9zdGluZwpkZXNjcmlwdGlvbjogQnVpbHQtaW4gTUNQIHNlcnZlcnMgZm9yIEdpdEh1YiwgVmVyY2VsLCBOZXRsaWZ5LCBhbmQgSHVnZ2luZyBGYWNlLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBnaXRodWItb2F1dGgKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FwaS5naXRodWJjb3BpbG90LmNvbS9tY3AvCiAgICAgIGRpc3BsYXlOYW1lOiBHaXRIdWIKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICBwb2xpY3k6CiAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBnaXRodWItcGF0CiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9hcGkuZ2l0aHViY29waWxvdC5jb20vbWNwLwogICAgICBoZWFkZXJzOgogICAgICAgIEF1dGhvcml6YXRpb246IEJlYXJlciAke0dJVEhVQl9QQVR9CiAgICAgICAgWC1NQ1AtSW5zaWRlcnM6ICJ0cnVlIgogICAgICBkaXNwbGF5TmFtZTogR2l0SHViIChQQVQpCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogYXBpS2V5CiAgICAgIGluc3RhbGw6CiAgICAgICAgbm90ZTogVXNlIGEgbWluaW1hbGx5IHNjb3BlZCBHaXRIdWIgcGVyc29uYWwgYWNjZXNzIHRva2VuLiBPQXV0aCByZW1haW5zIHByZWZlcnJlZCB3aGVuIGF2YWlsYWJsZS4KICAgICAgICBpbnB1dHM6CiAgICAgICAgICBHSVRIVUJfUEFUOgogICAgICAgICAgICBraW5kOiBzZWNyZXQKICAgICAgICAgICAgbGFiZWw6IEdpdEh1YiBQZXJzb25hbCBBY2Nlc3MgVG9rZW4KICAgICAgICAgICAgZGVzY3JpcHRpb246IFNlbnQgYXMgYW4gQXV0aG9yaXphdGlvbiBiZWFyZXIgdG9rZW4uCiAgICAgICAgICAgIHBsYWNlaG9sZGVyOiBnaXRodWJfcGF0Xy4uLiBvciBnaHBfLi4uCiAgICAgICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tYXV0by13cml0ZS1hcHBzCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGh1Z2dpbmdmYWNlCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9odWdnaW5nZmFjZS5jby9tY3AKICAgICAgZGlzcGxheU5hbWU6IEh1Z2dpbmcgRmFjZQogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlLW5vLWRlc3RydWN0aXZlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IG5ldGxpZnkKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL25ldGxpZnktbWNwLm5ldGxpZnkuYXBwL21jcAogICAgICBkaXNwbGF5TmFtZTogTmV0bGlmeQogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IHZlcmNlbAogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vbWNwLnZlcmNlbC5jb20KICAgICAgZGlzcGxheU5hbWU6IFZlcmNlbAogICAgICBhdXRoOgogICAgICAgIG1vZGU6IG9hdXRoCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZQogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUtbm8tZGVzdHJ1Y3RpdmUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tYXV0by13cml0ZS1hcHBzCg==",
-          "digest": "sha256:f965c9723dac3125d80aaaf78f641510573468f3b0b201d1b21e836ea129dda9",
+          "content": "dHlwZTogcGx1Z2luCm5hbWU6IG1jcC1zb2Z0d2FyZS1kZXYtaG9zdGluZwpkZXNjcmlwdGlvbjogQnVpbHQtaW4gTUNQIHNlcnZlcnMgZm9yIEdpdEh1YiwgVmVyY2VsLCBOZXRsaWZ5LCBhbmQgSHVnZ2luZyBGYWNlLgptZW1iZXJzOgogIC0gdHlwZTogbWNwCiAgICBuYW1lOiBnaXRodWItb2F1dGgKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FwaS5naXRodWJjb3BpbG90LmNvbS9tY3AvCiAgICAgIGRpc3BsYXlOYW1lOiBHaXRIdWIKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBvYXV0aAogICAgICAgIGNsaWVudENyZWRlbnRpYWxzSW5wdXQ6IEdJVEhVQl9PQVVUSF9DTElFTlQKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOiA+LQogICAgICAgICAgQ29uZmlndXJlIGEgR2l0SHViIE9BdXRoIEFwcCBmb3IgRmxleGlHUFQgYW5kIHJlZ2lzdGVyIHRoZSBsb29wYmFjawogICAgICAgICAgY2FsbGJhY2sgc2hvd24gaW4gTUNQIGF1dGhlbnRpY2F0aW9uIHNldHRpbmdzLgogICAgICAgIGlucHV0czoKICAgICAgICAgIEdJVEhVQl9PQVVUSF9DTElFTlQ6CiAgICAgICAgICAgIGtpbmQ6IG9hdXRoQ2xpZW50Q3JlZGVudGlhbHMKICAgICAgICAgICAgbGFiZWw6IEdpdEh1YiBPQXV0aCBDbGllbnQKICAgICAgICAgICAgZGVzY3JpcHRpb246IENsaWVudCBJRCBhbmQgY2xpZW50IHNlY3JldCBmb3IgeW91ciByZWdpc3RlcmVkIEdpdEh1YiBPQXV0aCBBcHAuCiAgICAgICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgICAgIGNsaWVudFNlY3JldFJlcXVpcmVkOiB0cnVlCiAgICAgIHBvbGljeToKICAgICAgICByZXF1aXJlZDogdHJ1ZQogICAgICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AKICAgIG5hbWU6IGdpdGh1Yi1wYXQKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2FwaS5naXRodWJjb3BpbG90LmNvbS9tY3AvCiAgICAgIGhlYWRlcnM6CiAgICAgICAgQXV0aG9yaXphdGlvbjogQmVhcmVyICR7R0lUSFVCX1BBVH0KICAgICAgICBYLU1DUC1JbnNpZGVyczogInRydWUiCiAgICAgIGRpc3BsYXlOYW1lOiBHaXRIdWIgKFBBVCkKICAgICAgYXV0aDoKICAgICAgICBtb2RlOiBhcGlLZXkKICAgICAgaW5zdGFsbDoKICAgICAgICBub3RlOiBVc2UgYSBtaW5pbWFsbHkgc2NvcGVkIEdpdEh1YiBwZXJzb25hbCBhY2Nlc3MgdG9rZW4uIE9BdXRoIHJlbWFpbnMgcHJlZmVycmVkIHdoZW4gYXZhaWxhYmxlLgogICAgICAgIGlucHV0czoKICAgICAgICAgIEdJVEhVQl9QQVQ6CiAgICAgICAgICAgIGtpbmQ6IHNlY3JldAogICAgICAgICAgICBsYWJlbDogR2l0SHViIFBlcnNvbmFsIEFjY2VzcyBUb2tlbgogICAgICAgICAgICBkZXNjcmlwdGlvbjogU2VudCBhcyBhbiBBdXRob3JpemF0aW9uIGJlYXJlciB0b2tlbi4KICAgICAgICAgICAgcGxhY2Vob2xkZXI6IGdpdGh1Yl9wYXRfLi4uIG9yIGdocF8uLi4KICAgICAgICAgICAgcmVxdWlyZWQ6IHRydWUKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1hdXRvLXdyaXRlLWFwcHMKICAtIHR5cGU6IG1jcAogICAgbmFtZTogaHVnZ2luZ2ZhY2UKICAgIHBhcmFtZXRlcnM6CiAgICAgIHRyYW5zcG9ydDogc3RyZWFtYWJsZUhUVFAKICAgICAgdXJsOiBodHRwczovL2h1Z2dpbmdmYWNlLmNvL21jcAogICAgICBkaXNwbGF5TmFtZTogSHVnZ2luZyBGYWNlCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUtbm8tZGVzdHJ1Y3RpdmUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogbmV0bGlmeQogICAgcGFyYW1ldGVyczoKICAgICAgdHJhbnNwb3J0OiBzdHJlYW1hYmxlSFRUUAogICAgICB1cmw6IGh0dHBzOi8vbmV0bGlmeS1tY3AubmV0bGlmeS5hcHAvbWNwCiAgICAgIGRpc3BsYXlOYW1lOiBOZXRsaWZ5CiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcAogICAgbmFtZTogdmVyY2VsCiAgICBwYXJhbWV0ZXJzOgogICAgICB0cmFuc3BvcnQ6IHN0cmVhbWFibGVIVFRQCiAgICAgIHVybDogaHR0cHM6Ly9tY3AudmVyY2VsLmNvbQogICAgICBkaXNwbGF5TmFtZTogVmVyY2VsCiAgICAgIGF1dGg6CiAgICAgICAgbW9kZTogb2F1dGgKICAgICAgcG9saWN5OgogICAgICAgIHJlcXVpcmVkOiB0cnVlCiAgICAgICAgbmFtZTogYnVpbHRpbi1tYW51YWwtd3JpdGUKICAtIHR5cGU6IG1jcC5wb2xpY3kKICAgIG5hbWU6IGJ1aWx0aW4tbWFudWFsLXdyaXRlCiAgLSB0eXBlOiBtY3AucG9saWN5CiAgICBuYW1lOiBidWlsdGluLW1hbnVhbC13cml0ZS1uby1kZXN0cnVjdGl2ZQogIC0gdHlwZTogbWNwLnBvbGljeQogICAgbmFtZTogYnVpbHRpbi1hdXRvLXdyaXRlLWFwcHMK",
+          "digest": "sha256:ba3d818cb48aeac6b6666a62573ce41571699e57ebd3df72378512c8ad63b565",
           "locator": "plugin.yaml",
-          "size": 2077
+          "size": 2580
         }
       ],
-      "fingerprint": "sha256:4b79e4b4fae4e6f0e9507ce9687030ceb246ddaaa3a79c631b9198161514680a"
+      "fingerprint": "sha256:051cb31803fab179d1d855d6c1564146552e584888fadcfd5770fdd0e35ce3c9"
     },
     {
       "address": {

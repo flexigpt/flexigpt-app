@@ -6,7 +6,7 @@ go 1.27
 require (
 	github.com/adrg/xdg v0.5.3
 	github.com/flexigpt/agentskills-go v0.21.4
-	github.com/flexigpt/inference-go v0.27.0
+	github.com/flexigpt/inference-go v0.28.1
 	github.com/flexigpt/llmtools-go v0.24.3
 	github.com/flexigpt/mapstore-go v0.4.3
 	github.com/glebarez/go-sqlite v1.23.0
@@ -85,7 +85,7 @@ require (
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
-	github.com/openai/openai-go/v3 v3.65.0 // indirect
+	github.com/openai/openai-go/v3 v3.66.0 // indirect
 	github.com/pb33f/ordered-map/v2 v2.3.1 // indirect
 	github.com/pjbgf/sha1cd v0.6.0 // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect

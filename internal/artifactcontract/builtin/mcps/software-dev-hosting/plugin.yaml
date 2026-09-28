@@ -10,6 +10,18 @@ members:
       displayName: GitHub
       auth:
         mode: oauth
+        clientCredentialsInput: GITHUB_OAUTH_CLIENT
+      install:
+        note: >-
+          Configure a GitHub OAuth App for FlexiGPT and register the loopback
+          callback shown in MCP authentication settings.
+        inputs:
+          GITHUB_OAUTH_CLIENT:
+            kind: oauthClientCredentials
+            label: GitHub OAuth Client
+            description: Client ID and client secret for your registered GitHub OAuth App.
+            required: true
+            clientSecretRequired: true
       policy:
         required: true
         name: builtin-manual-write

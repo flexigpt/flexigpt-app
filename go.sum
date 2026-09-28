@@ -67,8 +67,8 @@ github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/flexigpt/agentskills-go v0.21.4 h1:+XtXD8rlLNJqEMqwLn5TqG2BPQ+l4TPBYauDnhlA3BM=
 github.com/flexigpt/agentskills-go v0.21.4/go.mod h1:H0XodljahKMXA9HAa9RGYVnQdmVVhs92A6zXI/3qIHA=
-github.com/flexigpt/inference-go v0.27.0 h1:aimGZgT4lLMVA5vf8aJBR2e22LzJafVsoDGbKa6v3aM=
-github.com/flexigpt/inference-go v0.27.0/go.mod h1:U+RS/CnngqBaq+JT6nFycE807eRqxmzSGeUpnkOlBtE=
+github.com/flexigpt/inference-go v0.28.1 h1:qw4AhqfRhg61v1nFveQChWKAB9p/NptVaut3nS0unHM=
+github.com/flexigpt/inference-go v0.28.1/go.mod h1:J8wBikby2QbnDND7k5mIXUXQqjcj1SbrQ8tdfrm2ZyE=
 github.com/flexigpt/llmtools-go v0.24.3 h1:tYcU2wUSLe2UvEJ4cYa958Jxk6e8I7T5U1iLlql+yxw=
 github.com/flexigpt/llmtools-go v0.24.3/go.mod h1:1mHQ3MpDRuWUytL1flpwI6/6LJh0eF9Q+lMM6qRNFKs=
 github.com/flexigpt/mapstore-go v0.4.3 h1:zc79HJU3CJferL7Ld7MaFCPhG0tjsfv6jt5x+s0IbVg=
@@ -195,8 +195,8 @@ github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOF
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
 github.com/onsi/gomega v1.34.1 h1:EUMJIKUjM8sKjYbtxQI9A4z2o+rruxnzNvpknOXie6k=
 github.com/onsi/gomega v1.34.1/go.mod h1:kU1QgUvBDLXBJq618Xvm2LUX6rSAfRaFRTcdOeDLwwY=
-github.com/openai/openai-go/v3 v3.65.0 h1:BdG4edzQrSRg4pzfCKc2uXIb1yORrjDrQxP5c/6qB4c=
-github.com/openai/openai-go/v3 v3.65.0/go.mod h1:+dSPa+nbX+dNoXg1jecMnVpgRP+E/5IBA6Jiz9Pc8WM=
+github.com/openai/openai-go/v3 v3.66.0 h1:hykUFik2rqpkKf8O2bc41OpSZuVA1lGFUu+UfjvYn1k=
+github.com/openai/openai-go/v3 v3.66.0/go.mod h1:+dSPa+nbX+dNoXg1jecMnVpgRP+E/5IBA6Jiz9Pc8WM=
 github.com/pb33f/ordered-map/v2 v2.3.1 h1:5319HDO0aw4DA4gzi+zv4FXU9UlSs3xGZ40wcP1nBjY=
 github.com/pb33f/ordered-map/v2 v2.3.1/go.mod h1:qxFQgd0PkVUtOMCkTapqotNgzRhMPL7VvaHKbd1HnmQ=
 github.com/pjbgf/sha1cd v0.6.0 h1:3WJ8Wz8gvDz29quX1OcEmkAlUg9diU4GxJHqs0/XiwU=

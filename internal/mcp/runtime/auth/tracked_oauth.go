@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"slices"
 	"strings"
@@ -121,6 +122,7 @@ func (h *trackedOAuthHandler) Authorize(
 
 	err := h.inner.Authorize(ctx, req, resp)
 	if err != nil {
+		err = redactAuthError(explainOAuthRegistrationError(err), h.sensitiveValues)
 		h.publish(ctx, authStatusFromHTTPFailure(h.status, resp, err))
 		return err
 	}
@@ -137,6 +139,24 @@ func (h *trackedOAuthHandler) Authorize(
 	}
 	h.publish(ctx, tokenStatus)
 	return nil
+}
+
+// The SDK reports this selection failure as text. Match it only to improve
+// diagnostics; never use the match to bypass OAuth validation or retry.
+func explainOAuthRegistrationError(err error) error {
+	if err == nil || !strings.Contains(
+		err.Error(),
+		"no configured client registration method is supported",
+	) {
+		return err
+	}
+	return fmt.Errorf(
+		"%w: %w; configure a preregistered OAuth client or a supported "+
+			"client-ID metadata document; dynamic client registration "+
+			"requires authorization-server support",
+		ErrMCPAuthRequired,
+		err,
+	)
 }
 
 func (h *trackedOAuthHandler) persistedTokenSource(ctx context.Context) (oauth2.TokenSource, error) {

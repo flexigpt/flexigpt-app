@@ -13,17 +13,30 @@ members:
         mode: oauth
         clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
       install:
+        note: >-
+          Use the tenant ID for the standard endpoint, or select the full-url
+          connection profile when importing a legacy or custom tenant-scoped URL.
+          Register FlexiGPT's OAuth redirect URL in the Entra app registration.
         inputs:
           MICROSOFT_TENANT_ID:
             kind: text
             label: Microsoft Entra Tenant ID
-            required: true
+            required: false
+          MICROSOFT_M365_COPILOT_MCP_URL:
+            kind: text
+            label: Microsoft 365 Copilot MCP URL
+            description: Full tenant-scoped MCP URL preserved from a legacy installation.
+            required: false
           MICROSOFT_ENTRA_OAUTH_CLIENT:
             kind: oauthClientCredentials
             label: Microsoft Entra OAuth Client
             description: Client ID and optional client secret for a public PKCE or confidential Entra application.
             required: true
             clientSecretRequired: false
+      connectionProfiles:
+        full-url:
+          http:
+            url: "${MICROSOFT_M365_COPILOT_MCP_URL}"
       policy:
         required: true
         name: builtin-manual-read
@@ -38,16 +51,28 @@ members:
         mode: oauth
         clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
       install:
+        note: >-
+          Use the tenant ID for the standard endpoint, or select the full-url
+          connection profile when importing a legacy or custom tenant-scoped URL.
         inputs:
           MICROSOFT_TENANT_ID:
             kind: text
             label: Microsoft Entra Tenant ID
-            required: true
+            required: false
+          MICROSOFT_ONEDRIVE_MCP_URL:
+            kind: text
+            label: Microsoft OneDrive MCP URL
+            description: Full tenant-scoped MCP URL preserved from a legacy installation.
+            required: false
           MICROSOFT_ENTRA_OAUTH_CLIENT:
             kind: oauthClientCredentials
             label: Microsoft Entra OAuth Client
             required: true
             clientSecretRequired: false
+      connectionProfiles:
+        full-url:
+          http:
+            url: "${MICROSOFT_ONEDRIVE_MCP_URL}"
       policy:
         required: true
         name: builtin-manual-write
@@ -62,16 +87,28 @@ members:
         mode: oauth
         clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
       install:
+        note: >-
+          Use the tenant ID for the standard endpoint, or select the full-url
+          connection profile when importing a legacy or custom tenant-scoped URL.
         inputs:
           MICROSOFT_TENANT_ID:
             kind: text
             label: Microsoft Entra Tenant ID
-            required: true
+            required: false
+          MICROSOFT_SHAREPOINT_MCP_URL:
+            kind: text
+            label: Microsoft SharePoint MCP URL
+            description: Full tenant-scoped MCP URL preserved from a legacy installation.
+            required: false
           MICROSOFT_ENTRA_OAUTH_CLIENT:
             kind: oauthClientCredentials
             label: Microsoft Entra OAuth Client
             required: true
             clientSecretRequired: false
+      connectionProfiles:
+        full-url:
+          http:
+            url: "${MICROSOFT_SHAREPOINT_MCP_URL}"
       policy:
         required: true
         name: builtin-manual-write
@@ -85,16 +122,28 @@ members:
         mode: oauth
         clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
       install:
+        note: >-
+          Use the tenant ID for the standard endpoint, or select the full-url
+          connection profile when importing a legacy or custom tenant-scoped URL.
         inputs:
           MICROSOFT_TENANT_ID:
             kind: text
             label: Microsoft Entra Tenant ID
-            required: true
+            required: false
+          MICROSOFT_TEAMS_MCP_URL:
+            kind: text
+            label: Microsoft Teams MCP URL
+            description: Full tenant-scoped MCP URL preserved from a legacy installation.
+            required: false
           MICROSOFT_ENTRA_OAUTH_CLIENT:
             kind: oauthClientCredentials
             label: Microsoft Entra OAuth Client
             required: true
             clientSecretRequired: false
+      connectionProfiles:
+        full-url:
+          http:
+            url: "${MICROSOFT_TEAMS_MCP_URL}"
       policy:
         required: true
         name: builtin-manual-write
@@ -108,16 +157,28 @@ members:
         mode: oauth
         clientCredentialsInput: MICROSOFT_ENTRA_OAUTH_CLIENT
       install:
+        note: >-
+          Use the tenant ID for the standard endpoint, or select the full-url
+          connection profile when importing a legacy or custom tenant-scoped URL.
         inputs:
           MICROSOFT_TENANT_ID:
             kind: text
             label: Microsoft Entra Tenant ID
-            required: true
+            required: false
+          MICROSOFT_USER_MCP_URL:
+            kind: text
+            label: Microsoft User Profile MCP URL
+            description: Full tenant-scoped MCP URL preserved from a legacy installation.
+            required: false
           MICROSOFT_ENTRA_OAUTH_CLIENT:
             kind: oauthClientCredentials
             label: Microsoft Entra OAuth Client
             required: true
             clientSecretRequired: false
+      connectionProfiles:
+        full-url:
+          http:
+            url: "${MICROSOFT_USER_MCP_URL}"
       policy:
         required: true
         name: builtin-auto-read

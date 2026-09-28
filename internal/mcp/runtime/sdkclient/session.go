@@ -3,6 +3,7 @@ package sdkclient
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"maps"
@@ -14,6 +15,7 @@ import (
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -121,6 +123,18 @@ func (s *Session) Discover(
 
 	wait.Wait()
 
+	if err := ctx.Err(); err != nil {
+		return out, err
+	}
+	if err := errors.Join(
+		discoveryListError("tools/list", toolsErr, caps != nil && caps.Tools != nil),
+		discoveryListError("resources/list", resourcesErr, caps != nil && caps.Resources != nil),
+		discoveryListError("resources/templates/list", resourceTemplatesErr, false),
+		discoveryListError("prompts/list", promptsErr, caps != nil && caps.Prompts != nil),
+	); err != nil {
+		return out, err
+	}
+
 	if config.Include != nil {
 		tools = filterIncludedTools(tools, config.Include.Tools)
 		resources = filterIncludedResources(
@@ -159,6 +173,20 @@ func (s *Session) Discover(
 	}
 
 	return out, nil
+}
+
+// Missing optional methods are compatible with older servers. Authentication,
+// transport, and advertised-capability failures must fail discovery.
+func discoveryListError(method string, err error, advertised bool) error {
+	if err == nil {
+		return nil
+	}
+	var rpcErr *jsonrpc.Error
+	if !advertised && errors.As(err, &rpcErr) &&
+		rpcErr.Code == jsonrpc.CodeMethodNotFound {
+		return nil
+	}
+	return fmt.Errorf("%s: %w", method, err)
 }
 
 func (s *Session) CallTool(
