@@ -79,7 +79,7 @@ function MCPServerSetupModalContent({
 				!reset &&
 				(input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path
 					? Boolean(input.boundValue?.trim() || input.declaration.default?.trim())
-					: Boolean(input.boundSecretRef?.trim()));
+					: input.secretConfigured);
 
 			if (input.declaration.kind === MCPInputKind.OAuthClientCredentials) {
 				const hasClientID = Boolean(row.clientID.trim());
@@ -283,7 +283,7 @@ function MCPServerSetupModalContent({
 										) : (
 											<span />
 										)}
-										{input.boundSecretRef || input.boundValue ? (
+										{input.secretConfigured || input.boundValue ? (
 											<span className="text-base-content/60 text-xs">Configured. Leave blank to keep it.</span>
 										) : null}
 									</div>

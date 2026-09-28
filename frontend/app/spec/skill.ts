@@ -77,6 +77,25 @@ export interface SkillArtifactView {
 	modifiedAt: string;
 }
 
+/**
+ * Exact frontend projection of generated `consumerapi.SkillListItem`.
+ *
+ * Management listing paths must use this lightweight object. A full
+ * `StoreArtifact` is fetched only by direct edit, delete, and source flows.
+ */
+export interface StoreSkillListItem {
+	ref: ArtifactRef;
+	name: string;
+	displayName: string;
+	description?: string;
+	state: ArtifactState;
+	enabled: boolean;
+	revision: number;
+	definitionDigest?: ArtifactDigest;
+	builtIn: boolean;
+	managed: boolean;
+}
+
 export interface SkillDocumentInput {
 	name: string;
 	displayName?: string;
@@ -268,8 +287,8 @@ export interface Skill {
 	adoption: ArtifactAdoptionMode;
 	state: ArtifactState;
 	diagnostics?: ArtifactDiagnostic[];
-	createdAt: string;
-	modifiedAt: string;
+	createdAt?: string;
+	modifiedAt?: string;
 }
 
 export interface SkillBundle {
@@ -292,8 +311,8 @@ export interface SkillBundle {
 	sourceID: ArtifactSourceID;
 
 	attachments: SkillBundleAttachmentView[];
-	createdAt: string;
-	modifiedAt: string;
+	createdAt?: string;
+	modifiedAt?: string;
 }
 
 export interface SkillListItem {

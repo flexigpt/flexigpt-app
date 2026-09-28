@@ -1,5 +1,5 @@
-import type { ArtifactRef, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
-import type { CollectionCapabilityPlan, CollectionView } from '@/spec/collection';
+import type { ArtifactRef, ArtifactState, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
+import type { CollectionCapabilityPlan, CollectionListItem, CollectionView } from '@/spec/collection';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
@@ -181,7 +181,7 @@ export interface MCPPolicy {
 	appsPolicy: MCPAppsPolicy;
 }
 
-export interface MCPInputBinding {
+interface MCPInputBinding {
 	value?: string;
 	secretRef?: string;
 }
@@ -190,6 +190,17 @@ export interface MCPServerData {
 	schemaVersion: string;
 	selectedConnectionProfile?: string;
 	inputs?: Record<string, MCPInputBinding>;
+	additionalPolicies?: ArtifactRef[];
+}
+
+interface MCPInstallationInputView {
+	value?: string;
+	secretConfigured: boolean;
+}
+
+export interface MCPServerInstallationDataView {
+	selectedConnectionProfile?: string;
+	inputs?: Record<string, MCPInstallationInputView>;
 	additionalPolicies?: ArtifactRef[];
 }
 
@@ -313,8 +324,8 @@ export interface MCPProviderToolMapping {
 	choiceID: string;
 	toolName: string;
 	toolDigest: string;
-	approvalRule: MCPApprovalRule;
-	executionMode: MCPExecutionMode;
+	approvalRule?: MCPApprovalRule;
+	executionMode?: MCPExecutionMode;
 	appResourceUri?: string;
 	visibility?: MCPAppVisibility[];
 }
@@ -649,7 +660,7 @@ export interface ManagedMCPPolicyUpsertResult {
 export interface MCPStoreServerInstallationView {
 	artifact: StoreArtifact;
 	document: MCPServerDocument;
-	installation: MCPServerData;
+	installation: MCPServerInstallationDataView;
 	installationRevision: number;
 	builtIn: boolean;
 }
@@ -657,6 +668,18 @@ export interface MCPStoreServerInstallationView {
 export interface MCPStorePolicyView {
 	artifact: StoreArtifact;
 	body: MCPPolicy;
+	builtIn: boolean;
+}
+
+export interface MCPServerListItem {
+	ref: ArtifactRef;
+	name: string;
+	displayName: string;
+	description?: string;
+	state: ArtifactState;
+	enabled: boolean;
+	revision: number;
+	definitionDigest?: string;
 	builtIn: boolean;
 }
 
@@ -740,7 +763,7 @@ export interface ManagedMCPReplaceResult {
 }
 
 export interface MCPBundleView {
-	collection: CollectionView;
+	collection: CollectionListItem;
 	ref: ArtifactRef;
 	displayName: string;
 	logicalName: string;
@@ -760,7 +783,7 @@ export interface MCPServerView {
 	logicalName: string;
 	displayName: string;
 	document?: MCPServerDocument;
-	installation?: MCPServerData;
+	installation?: MCPServerInstallationDataView;
 	installationRevision?: number;
 	enabled: boolean;
 	builtIn: boolean;
@@ -779,7 +802,7 @@ export interface MCPSetupInputView {
 	declaration: MCPInputDeclaration;
 	target?: MCPSetupSecretTarget;
 	boundValue?: string;
-	boundSecretRef?: string;
+	secretConfigured: boolean;
 }
 
 export interface MCPSetupSubmissionValue {
@@ -791,7 +814,7 @@ export interface MCPSetupSubmissionValue {
 export interface MCPStdioSecretDraft {
 	inputName?: string;
 	envName: string;
-	existingSecretRef?: string;
+	existingSecretConfigured?: boolean;
 	secretValue: string;
 	deleteExisting: boolean;
 }
@@ -801,14 +824,14 @@ export interface MCPHTTPSecretDraft {
 	headerName: string;
 	valuePrefix: string;
 	valueSuffix: string;
-	existingSecretRef?: string;
+	existingSecretConfigured?: boolean;
 	secretValue: string;
 	deleteExisting: boolean;
 }
 
 interface MCPOAuthClientCredentialsDraft {
 	inputName?: string;
-	existingSecretRef?: string;
+	existingSecretConfigured?: boolean;
 	secretJSON: string;
 	deleteExisting: boolean;
 	useClientCredentials: boolean;

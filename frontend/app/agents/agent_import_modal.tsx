@@ -6,7 +6,7 @@ import { AgentImportIssueSeverity } from '@/spec/agent';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import { agentCollectionKey, collectionDisplayName } from '@/apis/agent_management';
+import { agentArtifactRefKey } from '@/apis/agent_management';
 import { agentStoreAPI, backendAPI } from '@/apis/baseapi';
 
 import { Dropdown } from '@/components/dropdown';
@@ -44,7 +44,7 @@ function getIssueClass(severity: AgentImportIssueSeverity): string {
 }
 
 function getDestinationLabel(destination: AgentImportDestination): string {
-	const collectionName = collectionDisplayName(destination.collection);
+	const collectionName = destination.collectionDisplayName || destination.collectionName;
 	const rootName = destination.rootDisplayName?.trim();
 
 	if (!rootName || rootName === collectionName) {
@@ -84,14 +84,23 @@ function AgentImportModalContent({
 	const [isCommitting, setIsCommitting] = useState(false);
 
 	const destinationByKey = useMemo(
-		() => new Map(destinations.map(destination => [agentCollectionKey(destination.collection), destination] as const)),
+		() =>
+			new Map(
+				destinations.map(
+					destination =>
+						[`${destination.collection.rootID}:${destination.collection.artifactID}` as string, destination] as const
+				)
+			),
 		[destinations]
 	);
 
 	const dropdownItems = useMemo<Record<string, { isEnabled: boolean }>>(
 		() =>
 			Object.fromEntries(
-				destinations.map(destination => [agentCollectionKey(destination.collection), { isEnabled: true }] as const)
+				destinations.map(
+					destination =>
+						[`${destination.collection.rootID}:${destination.collection.artifactID}`, { isEnabled: true }] as const
+				)
 			),
 		[destinations]
 	);
@@ -155,10 +164,7 @@ function AgentImportModalContent({
 		try {
 			const value = await agentStoreAPI.previewAgentImport({
 				path: path.trim(),
-				collection: {
-					rootID: selectedDestination.collection.artifact.rootID,
-					artifactID: selectedDestination.collection.artifact.id,
-				},
+				collection: selectedDestination.collection,
 				expectedCollectionRevision: selectedDestination.collectionRevision,
 			});
 
@@ -222,7 +228,7 @@ function AgentImportModalContent({
 							<ModalField label="Agent Collection" htmlFor="agent-import-destination" required>
 								<Dropdown<string>
 									dropdownItems={dropdownItems}
-									orderedKeys={destinations.map(destination => agentCollectionKey(destination.collection))}
+									orderedKeys={destinations.map(destination => agentArtifactRefKey(destination.collection))}
 									selectedKey={destinationKey}
 									onChange={value => {
 										setDestinationKey(value);
@@ -469,9 +475,9 @@ export function AgentImportModal({
 	}
 
 	const initialDestinationKey = initialDestination
-		? agentCollectionKey(initialDestination.collection)
+		? `${initialDestination.collection.rootID}:${initialDestination.collection.artifactID}`
 		: destinations[0]
-			? agentCollectionKey(destinations[0].collection)
+			? `${destinations[0].collection.rootID}:${destinations[0].collection.artifactID}`
 			: '';
 
 	return (

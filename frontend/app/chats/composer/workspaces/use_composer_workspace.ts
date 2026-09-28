@@ -72,6 +72,7 @@ export interface ComposerWorkspaceController {
 	updateSelectionFromCurrentContents: () => Promise<void>;
 	toggleContext: (context: WorkspacePromptContribution, selected: boolean) => void;
 	toggleSkill: (skill: WorkspaceSkill, selected: boolean) => Promise<void>;
+	setSkillActive: (skill: WorkspaceSkill, active: boolean) => Promise<void>;
 	removeContextRef: (artifact: ArtifactRef) => void;
 	removeSkillRef: (artifact: ArtifactRef) => Promise<void>;
 	refreshSelectedWorkspace: () => Promise<void>;
@@ -405,6 +406,52 @@ export function useComposerWorkspace({
 		[plan, replaceSelection, syncWorkspaceSkills]
 	);
 
+	const setSkillActive = useCallback(
+		async (skill: WorkspaceSkill, active: boolean) => {
+			if (skill.insert !== WorkspaceInsertTarget.Instructions) {
+				return;
+			}
+
+			const current = selectionRef.current;
+			if (!current || !plan) {
+				return;
+			}
+
+			const selectedSkillKeys = new Set((current.skillRefs ?? []).map(ref => refKey(ref.artifact)));
+			if (!selectedSkillKeys.has(refKey(skill.artifact))) {
+				return;
+			}
+
+			const enabled = plan.skills.skills
+				.filter(
+					candidate =>
+						candidate.insert === WorkspaceInsertTarget.Instructions && selectedSkillKeys.has(refKey(candidate.artifact))
+				)
+				.map(candidate => candidate.artifact as SkillRef);
+			const enabledKeys = new Set(
+				enabled.map(e => {
+					return refKey(e);
+				})
+			);
+			const activeByKey = new Map(
+				getCurrentActiveSkillRefs()
+					.filter(ref => enabledKeys.has(refKey(ref)))
+					.map(ref => [refKey(ref), ref] as const)
+			);
+
+			if (active) {
+				activeByKey.set(refKey(skill.artifact), skill.artifact as SkillRef);
+			} else {
+				activeByKey.delete(refKey(skill.artifact));
+			}
+
+			await applyWorkspaceSkillSelectionState(current.workspace, enabled, [...activeByKey.values()], {
+				syncSession: SkillSessionSyncMode.IfSessionExists,
+			});
+		},
+		[applyWorkspaceSkillSelectionState, getCurrentActiveSkillRefs, plan]
+	);
+
 	const removeContextRef = useCallback(
 		(artifact: ArtifactRef) => {
 			const current = selectionRef.current;
@@ -558,6 +605,7 @@ export function useComposerWorkspace({
 		updateSelectionFromCurrentContents,
 		toggleContext,
 		toggleSkill,
+		setSkillActive,
 		removeContextRef,
 		removeSkillRef,
 		refreshSelectedWorkspace,

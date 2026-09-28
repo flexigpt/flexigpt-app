@@ -1,4 +1,5 @@
 import type {
+	AgentCapabilityPlan,
 	AgentExportResult,
 	AgentImportCommitRequest,
 	AgentImportCommitResult,
@@ -10,15 +11,17 @@ import type {
 	AgentView,
 	ListAgentsRequest,
 } from '@/spec/agent';
-import type { ArtifactRef, ArtifactRootID, CapabilityPlan, StoreArtifact } from '@/spec/artifact';
+import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
 	CollectionCapabilityPlan,
+	CollectionListItem,
 	CollectionView,
 	CreateCollectionRequest,
 	UpdateCollectionRequest,
 } from '@/spec/collection';
 
 import type { IAgentStoreAPI } from '@/apis/interface';
+import { agentViewFromWails, collectionListItemFromWails } from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CommitAgentImport,
@@ -45,18 +48,19 @@ import {
 
 export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	async listAgents(request: ListAgentsRequest): Promise<AgentView[]> {
-		return wailsObjectArrayOrEmpty<AgentView>(
-			await ListAgents(request as Parameters<typeof ListAgents>[0]),
-			'ListAgents'
+		return wailsObjectArrayOrEmpty(await ListAgents(request as Parameters<typeof ListAgents>[0]), 'ListAgents').map(
+			(value, index) => agentViewFromWails(value, `ListAgents[${index}]`)
 		);
 	}
 
 	async listAgentsForManagement(): Promise<AgentView[]> {
-		return wailsObjectArrayOrEmpty<AgentView>(await ListAgentsForManagement(), 'ListAgentsForManagement');
+		return wailsObjectArrayOrEmpty(await ListAgentsForManagement(), 'ListAgentsForManagement').map((value, index) =>
+			agentViewFromWails(value, `ListAgentsForManagement[${index}]`)
+		);
 	}
 
 	async getAgent(agent: ArtifactRef): Promise<AgentView> {
-		return requiredObject<AgentView>(await GetAgent(agent as Parameters<typeof GetAgent>[0]), 'GetAgent');
+		return agentViewFromWails(await GetAgent(agent as Parameters<typeof GetAgent>[0]), 'GetAgent');
 	}
 
 	async materializeAgentText(text: ArtifactRef): Promise<AgentTextMaterialization> {
@@ -73,15 +77,15 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		);
 	}
 
-	async resolveAgentCapabilities(agent: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
+	async resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan> {
+		return requiredObject<AgentCapabilityPlan>(
 			await ResolveAgentCapabilities(agent as Parameters<typeof ResolveAgentCapabilities>[0]),
 			'ResolveAgentCapabilities'
 		);
 	}
 
-	async setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return requiredObject<StoreArtifact>(
+	async setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView> {
+		return agentViewFromWails(
 			await SetAgentEnabled(agent as Parameters<typeof SetAgentEnabled>[0], expectedRevision, enabled),
 			'SetAgentEnabled'
 		);
@@ -108,17 +112,16 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		);
 	}
 
-	async listAgentCollections(rootID: ArtifactRootID): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(
+	async listAgentCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(
 			await ListAgentCollections(rootID as Parameters<typeof ListAgentCollections>[0]),
 			'ListAgentCollections'
-		);
+		).map((value, index) => collectionListItemFromWails(value, `ListAgentCollections[${index}]`));
 	}
 
-	async listAgentCollectionsForManagement(): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(
-			await ListAgentCollectionsForManagement(),
-			'ListAgentCollectionsForManagement'
+	async listAgentCollectionsForManagement(): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListAgentCollectionsForManagement(), 'ListAgentCollectionsForManagement').map(
+			(value, index) => collectionListItemFromWails(value, `ListAgentCollectionsForManagement[${index}]`)
 		);
 	}
 

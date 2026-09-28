@@ -11,6 +11,7 @@ import type {
 	AddMemberRequest,
 	ArtifactMembershipView,
 	CollectionCapabilityPlan,
+	CollectionListItem,
 	CollectionView,
 	CreateCollectionRequest,
 	DeleteCollectionRequest,
@@ -26,9 +27,11 @@ import type {
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
+	StoreSkillListItem,
 } from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
+import { collectionListItemFromWails, storeSkillListItemFromWails } from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddSkillCollectionMember,
@@ -128,29 +131,29 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		);
 	}
 
-	async listSkillCollections(rootID: ArtifactRootID): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(
+	async listSkillCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(
 			await ListSkillCollections(rootID as Parameters<typeof ListSkillCollections>[0]),
 			'ListSkillCollections'
+		).map((value, index) => collectionListItemFromWails(value, `ListSkillCollections[${index}]`));
+	}
+
+	async listSkillCollectionsForManagement(): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListSkillCollectionsForManagement(), 'ListSkillCollectionsForManagement').map(
+			(value, index) => collectionListItemFromWails(value, `ListSkillCollectionsForManagement[${index}]`)
 		);
 	}
 
-	async listSkillCollectionsForManagement(): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(
-			await ListSkillCollectionsForManagement(),
-			'ListSkillCollectionsForManagement'
+	async listSkills(rootID: ArtifactRootID): Promise<StoreSkillListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListSkills(rootID as Parameters<typeof ListSkills>[0]), 'ListSkills').map(
+			(value, index) => storeSkillListItemFromWails(value, `ListSkills[${index}]`)
 		);
 	}
 
-	async listSkills(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(
-			await ListSkills(rootID as Parameters<typeof ListSkills>[0]),
-			'ListSkills'
+	async listSkillsForManagement(): Promise<StoreSkillListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListSkillsForManagement(), 'ListSkillsForManagement').map((value, index) =>
+			storeSkillListItemFromWails(value, `ListSkillsForManagement[${index}]`)
 		);
-	}
-
-	async listSkillsForManagement(): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(await ListSkillsForManagement(), 'ListSkillsForManagement');
 	}
 
 	async purgeSkill(skill: ArtifactRef, expectedRevision: number): Promise<void> {

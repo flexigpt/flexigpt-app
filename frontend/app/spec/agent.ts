@@ -3,9 +3,8 @@ import type {
 	ArtifactRef,
 	ArtifactRootID,
 	ArtifactSourceID,
-	CapabilityPlan,
+	ArtifactState,
 	MappedTarget,
-	StoreArtifact,
 } from '@/spec/artifact';
 import type { CollectionView } from '@/spec/collection';
 import type { MCPHTTPAuthMode, MCPInputKind, MCPTransportType } from '@/spec/mcp';
@@ -30,20 +29,48 @@ export enum AgentImportRelationshipStatus {
 	Ambiguous = 'ambiguous',
 }
 
-export interface AgentView {
-	artifact: StoreArtifact;
+export enum AgentSkillUseMode {
+	Available = 'available',
+	Active = 'active',
+	Instructions = 'instructions',
+}
 
+export interface AgentView {
+	ref: ArtifactRef;
 	name: string;
 	displayName: string;
 	description?: string;
-
+	state: ArtifactState;
+	enabled: boolean;
+	revision: number;
+	definitionDigest?: ArtifactDigest;
 	builtIn: boolean;
 	managed: boolean;
 }
 
+export interface AgentCapabilityOccurrence {
+	path: string;
+	type: string;
+	name?: string;
+	status: string;
+	required: boolean;
+	artifact?: ArtifactRef;
+	mapped?: MappedTarget;
+	autoExecute?: boolean;
+	includeSystemPrompt?: boolean;
+	skillUseMode?: AgentSkillUseMode;
+	code?: string;
+	message?: string;
+}
+
+export interface AgentCapabilityPlan {
+	occurrences: AgentCapabilityOccurrence[];
+	complete: boolean;
+}
+
 export interface AgentResolution {
 	agent: AgentView;
-	capabilities: CapabilityPlan;
+	capabilities: AgentCapabilityPlan;
 }
 
 export interface AgentTextMaterialization {
@@ -77,7 +104,7 @@ export interface AgentImportDestination {
 	rootID: ArtifactRootID;
 	rootDisplayName?: string;
 	sourceID: ArtifactSourceID;
-	collection: CollectionView;
+	collection: ArtifactRef;
 
 	collectionRevision: number;
 	collectionName: string;
@@ -194,11 +221,6 @@ export interface AgentImportCommitResult {
 	preparedFingerprint: ArtifactDigest;
 }
 
-interface AgentResolutionIssue {
-	code: string;
-	message: string;
-}
-
 export interface AgentExportResult {
 	type: string;
 	name: string;
@@ -210,8 +232,4 @@ export interface AgentExportResult {
 	artifactRevision: number;
 	builtIn: boolean;
 	managed: boolean;
-
-	resolution?: CapabilityPlan;
-	resolutionIssue?: AgentResolutionIssue;
-	mcpSetupDescriptors?: AgentMCPSetupDescriptor[];
 }

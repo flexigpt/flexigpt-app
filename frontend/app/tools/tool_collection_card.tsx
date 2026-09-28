@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiRefreshCw } from 'react-icons/fi';
 
-import type { CollectionView } from '@/spec/collection';
-import type { ToolView } from '@/spec/tool';
-import { ToolImplType } from '@/spec/tool';
+import type { CollectionListItem } from '@/spec/collection';
+import type { ToolStoreListItem } from '@/spec/tool';
 
 import { usePendingActions } from '@/hooks/use_pending_actions';
 
@@ -18,18 +17,24 @@ import { MetadataPill } from '@/components/managementui/metadata_pill';
 import { StatusBadge } from '@/components/managementui/status_badge';
 
 interface ToolCollectionCardProps {
-	collection: CollectionView;
-	tools: ToolView[];
+	collection: CollectionListItem;
+	tools: ToolStoreListItem[];
+	toolsLoaded: boolean;
+	isLoadingTools: boolean;
 	toolLoadError?: string;
+	onLoadTools: () => Promise<void>;
 	onRefreshTools: () => Promise<void>;
-	onToggleCollectionEnable: (collection: CollectionView, enabled: boolean) => Promise<void>;
-	onToggleToolEnable: (collection: CollectionView, tool: ToolView, enabled: boolean) => Promise<void>;
+	onToggleCollectionEnable: (collection: CollectionListItem, enabled: boolean) => Promise<void>;
+	onToggleToolEnable: (collection: CollectionListItem, tool: ToolStoreListItem, enabled: boolean) => Promise<void>;
 }
 
 export function ToolCollectionCard({
 	collection,
 	tools,
+	toolsLoaded,
+	isLoadingTools,
 	toolLoadError,
+	onLoadTools,
 	onRefreshTools,
 	onToggleCollectionEnable,
 	onToggleToolEnable,
@@ -46,6 +51,14 @@ export function ToolCollectionCard({
 		}
 	};
 
+	const toggleExpanded = () => {
+		const next = !expanded;
+		setExpanded(next);
+		if (next && !toolsLoaded && !isLoadingTools) {
+			void onLoadTools();
+		}
+	};
+
 	return (
 		<>
 			<ManagementCollectionCard
@@ -54,10 +67,10 @@ export function ToolCollectionCard({
 				description={collection.description}
 				status={
 					<>
-						<StatusBadge tone={collection.artifact.enabled ? 'success' : 'neutral'}>
-							{collection.artifact.enabled ? 'Enabled' : 'Disabled'}
+						<StatusBadge tone={collection.enabled ? 'success' : 'neutral'}>
+							{collection.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
-						<StatusBadge>Built-in</StatusBadge>
+						{collection.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
 					</>
 				}
 				disclosure={
@@ -66,17 +79,17 @@ export function ToolCollectionCard({
 						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={expanded}
 						onClick={() => {
-							setExpanded(previous => !previous);
+							toggleExpanded();
 						}}
 					>
-						<span>Tools: {collection.members.length}</span>
+						<span>{toolsLoaded ? `Tools: ${tools.length}` : `Tools: ${collection.memberCount}`}</span>
 						{expanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
 				}
 				actionLeading={
 					<EnabledControl
-						id={`tool-collection-${collection.artifact.id}`}
-						checked={collection.artifact.enabled}
+						id={`tool-collection-${collection.ref.rootID}-${collection.ref.artifactID}`}
+						checked={collection.enabled}
 						onChange={enabled => {
 							void run('collection:toggle', () => onToggleCollectionEnable(collection, enabled));
 						}}
@@ -118,47 +131,43 @@ export function ToolCollectionCard({
 					</output>
 				) : null}
 
+				{expanded && !toolsLoaded && !toolLoadError ? (
+					<ManagementEmptyState>
+						{isLoadingTools ? 'Loading tools in this Collection...' : 'Tool contents have not been loaded.'}
+					</ManagementEmptyState>
+				) : null}
+
 				{expanded ? (
 					<div className="mt-6 space-y-3">
 						{tools.map(tool => {
-							const implementation = tool.implementation;
-							const toggleKey = `${tool.artifact.id}:toggle`;
-							const effectiveEnabled = collection.artifact.enabled && tool.artifact.enabled;
+							const toggleKey = `${tool.ref.artifactID}:toggle`;
+							const effectiveEnabled = collection.enabled && tool.enabled;
 
 							return (
 								<ManagementItemCard
-									key={tool.artifact.id}
+									key={`${tool.ref.rootID}:${tool.ref.artifactID}`}
 									title={toolDisplayName(tool)}
-									subtitle={`${tool.name} / version ${tool.version}`}
+									subtitle={tool.name}
 									description={tool.description}
 									status={
 										<>
 											<StatusBadge tone={effectiveEnabled ? 'success' : 'neutral'}>
-												{effectiveEnabled ? 'Enabled' : tool.artifact.enabled ? 'Collection disabled' : 'Disabled'}
+												{effectiveEnabled ? 'Enabled' : tool.enabled ? 'Collection disabled' : 'Disabled'}
 											</StatusBadge>
-											<StatusBadge>Built-in</StatusBadge>
+											{tool.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
 										</>
 									}
 									metadata={
 										<>
-											<MetadataPill label="Implementation">
-												{implementation.kind === ToolImplType.Go ? 'Go' : 'Provider API'}
-											</MetadataPill>
-											<MetadataPill label="Execution">
-												{implementation.kind === ToolImplType.Go ? 'Local runtime' : 'Provider inference'}
-											</MetadataPill>
-											{implementation.kind === ToolImplType.SDK ? (
-												<MetadataPill label="SDK">{implementation.sdkType}</MetadataPill>
-											) : (
-												<MetadataPill label="Auto-execute default">{tool.autoExecute ? 'Yes' : 'No'}</MetadataPill>
-											)}
+											<MetadataPill label="State">{tool.state}</MetadataPill>
+											{tool.definitionDigest ? <MetadataPill label="Definition">Available</MetadataPill> : null}
 										</>
 									}
 								>
 									<div className="mt-4 flex flex-wrap items-center gap-3">
 										<EnabledControl
-											id={`tool-${tool.artifact.id}`}
-											checked={tool.artifact.enabled}
+											id={`tool-${tool.ref.rootID}-${tool.ref.artifactID}`}
+											checked={tool.enabled}
 											onChange={enabled => {
 												void run(toggleKey, () => onToggleToolEnable(collection, tool, enabled));
 											}}
@@ -172,7 +181,7 @@ export function ToolCollectionCard({
 							);
 						})}
 
-						{tools.length === 0 && !toolLoadError ? (
+						{toolsLoaded && tools.length === 0 && !toolLoadError ? (
 							<ManagementEmptyState>No tools are registered in this Collection.</ManagementEmptyState>
 						) : null}
 					</div>

@@ -4,6 +4,7 @@ import type {
 	AddMemberRequest,
 	ArtifactMembershipView,
 	CollectionCapabilityPlan,
+	CollectionListItem,
 	CollectionView,
 	CreateCollectionRequest,
 	DeleteCollectionRequest,
@@ -13,12 +14,21 @@ import type {
 import type {
 	MCPEffectivePolicy,
 	MCPManagementPage,
+	MCPServerInstallationDataView,
+	MCPServerListItem,
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
-import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { collectionListItemFromWails, mcpServerListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	optionalWailsString,
+	requiredObject,
+	requireWailsBoolean,
+	wailsObjectArrayOrEmpty,
+	wailsRecordOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	AddMCPCollectionMember,
 	AttachMCPArtifactToCollection,
@@ -42,6 +52,42 @@ import {
 	SetMCPServerEnabled,
 	UpdateMCPCollection,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
+
+function installationViewFromWails(value: unknown, operation: string): MCPStoreServerInstallationView {
+	const view = requiredObject<MCPStoreServerInstallationView>(value, operation);
+	const rawInstallation = requiredObject<Record<string, unknown>>(view.installation, `${operation}.installation`);
+	const rawInputs = wailsRecordOrEmpty(rawInstallation.inputs, `${operation}.installation.inputs`);
+	const inputs = Object.fromEntries(
+		Object.entries(rawInputs).map(([name, rawInput]) => {
+			const input = requiredObject<Record<string, unknown>>(rawInput, `${operation}.installation.inputs.${name}`);
+			return [
+				name,
+				{
+					value: optionalWailsString(input.value, `${operation}.installation.inputs.${name}.value`),
+					secretConfigured: requireWailsBoolean(
+						input.secretConfigured,
+						`${operation}.installation.inputs.${name}.secretConfigured`
+					),
+				},
+			] as const;
+		})
+	);
+
+	return {
+		...view,
+		installation: {
+			selectedConnectionProfile: optionalWailsString(
+				rawInstallation.selectedConnectionProfile,
+				`${operation}.installation.selectedConnectionProfile`
+			),
+			inputs,
+			additionalPolicies: wailsObjectArrayOrEmpty(
+				rawInstallation.additionalPolicies,
+				`${operation}.installation.additionalPolicies`
+			),
+		} satisfies MCPServerInstallationDataView,
+	};
+}
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	async addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
@@ -84,7 +130,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView> {
-		return requiredObject<MCPStoreServerInstallationView>(
+		return installationViewFromWails(
 			await GetMCPServerInstallation(server as Parameters<typeof GetMCPServerInstallation>[0]),
 			'GetMCPServerInstallation'
 		);
@@ -97,18 +143,25 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async listMCPCollections(rootID: ArtifactRootID): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(
+	async listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(
 			await ListMCPCollections(rootID as Parameters<typeof ListMCPCollections>[0]),
 			'ListMCPCollections'
-		);
+		).map((value, index) => collectionListItemFromWails(value, `ListMCPCollections[${index}]`));
 	}
 
-	async listMCPCollectionsPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<CollectionView>> {
-		return requiredObject<MCPManagementPage<CollectionView>>(
+	async listMCPCollectionsPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<CollectionListItem>> {
+		const page = requiredObject<Record<string, unknown>>(
 			await ListMCPCollectionsPage(pageSize, pageToken),
 			'ListMCPCollectionsPage'
 		);
+
+		return {
+			items: wailsObjectArrayOrEmpty(page.items, 'ListMCPCollectionsPage.items').map((value, index) =>
+				collectionListItemFromWails(value, `ListMCPCollectionsPage.items[${index}]`)
+			),
+			nextPageToken: optionalWailsString(page.nextPageToken, 'ListMCPCollectionsPage.nextPageToken') || undefined,
+		};
 	}
 
 	async listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
@@ -118,18 +171,25 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async listMCPServers(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(
+	async listMCPServers(rootID: ArtifactRootID): Promise<MCPServerListItem[]> {
+		return wailsObjectArrayOrEmpty(
 			await ListMCPServers(rootID as Parameters<typeof ListMCPServers>[0]),
 			'ListMCPServers'
-		);
+		).map((value, index) => mcpServerListItemFromWails(value, `ListMCPServers[${index}]`));
 	}
 
-	async listMCPServersPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<StoreArtifact>> {
-		return requiredObject<MCPManagementPage<StoreArtifact>>(
+	async listMCPServersPage(pageSize: number, pageToken = ''): Promise<MCPManagementPage<MCPServerListItem>> {
+		const page = requiredObject<Record<string, unknown>>(
 			await ListMCPServersPage(pageSize, pageToken),
 			'ListMCPServersPage'
 		);
+
+		return {
+			items: wailsObjectArrayOrEmpty(page.items, 'ListMCPServersPage.items').map((value, index) =>
+				mcpServerListItemFromWails(value, `ListMCPServersPage.items[${index}]`)
+			),
+			nextPageToken: optionalWailsString(page.nextPageToken, 'ListMCPServersPage.nextPageToken') || undefined,
+		};
 	}
 
 	async removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
@@ -195,12 +255,19 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 			policy: MCPEffectivePolicy;
 		}>
 	> {
-		return wailsObjectArrayOrEmpty<{
-			installation: MCPStoreServerInstallationView;
-			policy: MCPEffectivePolicy;
-		}>(
+		return wailsObjectArrayOrEmpty(
 			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
 			'ListMCPCollectionServers'
-		);
+		).map((value, index) => {
+			const record = requiredObject<{
+				installation: MCPStoreServerInstallationView;
+				policy: MCPEffectivePolicy;
+			}>(value, `ListMCPCollectionServers[${index}]`);
+
+			return {
+				installation: installationViewFromWails(record.installation, `ListMCPCollectionServers[${index}].installation`),
+				policy: requiredObject<MCPEffectivePolicy>(record.policy, `ListMCPCollectionServers[${index}].policy`),
+			};
+		});
 	}
 }

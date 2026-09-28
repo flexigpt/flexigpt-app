@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { FiRefreshCw } from 'react-icons/fi';
 
-import type { CollectionView } from '@/spec/collection';
-import type { ToolView } from '@/spec/tool';
+import type { CollectionListItem } from '@/spec/collection';
+import type { ToolStoreListItem } from '@/spec/tool';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
@@ -32,27 +32,20 @@ export default function ToolsPage() {
 	} = useAsyncResource(loadPageData, { initialData: [] as ToolCollectionData[] });
 
 	const refreshCollection = useCallback(
-		async (collection: CollectionView) => {
-			const ref = toolCollectionRef(collection);
-			const [freshCollection, freshTools] = await Promise.all([
-				toolManagementAPI.getToolCollection(ref),
-				toolManagementAPI.listCollectionTools(ref),
-			]);
-			const key = toolArtifactKey(ref);
+		async (collection: CollectionListItem) => {
+			const result = await toolManagementAPI.loadCollectionTools(collection, new AbortController().signal);
+			const key = toolArtifactKey(toolCollectionRef(collection));
 
 			setCollections(previous =>
 				(previous ?? []).map(item => {
 					if (toolArtifactKey(toolCollectionRef(item.collection)) !== key) {
 						return item;
 					}
-					const oldTools = new Map(item.tools.map(tool => [toolArtifactKey(toolArtifactRef(tool)), tool]));
+
 					return {
-						collection:
-							item.collection.artifact.revision > freshCollection.artifact.revision ? item.collection : freshCollection,
-						tools: freshTools.map(tool => {
-							const old = oldTools.get(toolArtifactKey(toolArtifactRef(tool)));
-							return old && old.artifact.revision > tool.artifact.revision ? old : tool;
-						}),
+						...item,
+						...result,
+						isLoadingTools: false,
 					};
 				})
 			);
@@ -60,10 +53,43 @@ export default function ToolsPage() {
 		[setCollections]
 	);
 
+	const loadCollectionTools = useCallback(
+		async (collection: CollectionListItem) => {
+			const key = toolArtifactKey(toolCollectionRef(collection));
+
+			setCollections(previous =>
+				(previous ?? []).map(item =>
+					toolArtifactKey(toolCollectionRef(item.collection)) === key
+						? {
+								...item,
+								isLoadingTools: true,
+								toolLoadError: undefined,
+							}
+						: item
+				)
+			);
+
+			const result = await toolManagementAPI.loadCollectionTools(collection, new AbortController().signal);
+
+			setCollections(previous =>
+				(previous ?? []).map(item =>
+					toolArtifactKey(toolCollectionRef(item.collection)) === key
+						? {
+								...item,
+								...result,
+								isLoadingTools: false,
+							}
+						: item
+				)
+			);
+		},
+		[setCollections]
+	);
+
 	const toggleCollection = useCallback(
-		async (collection: CollectionView, enabled: boolean) => {
+		async (collection: CollectionListItem, enabled: boolean) => {
 			const ref = toolCollectionRef(collection);
-			const updated = await toolManagementAPI.setToolCollectionEnabled(ref, collection.artifact.revision, enabled);
+			const updated = await toolManagementAPI.setToolCollectionEnabled(ref, collection.revision, enabled);
 			const key = toolArtifactKey(ref);
 
 			setCollections(previous =>
@@ -71,7 +97,7 @@ export default function ToolsPage() {
 					toolArtifactKey(toolCollectionRef(item.collection)) === key
 						? {
 								...item,
-								collection: item.collection.artifact.revision > updated.artifact.revision ? item.collection : updated,
+								collection: toolManagementAPI.collectionListItemFromView(updated),
 							}
 						: item
 				)
@@ -81,8 +107,8 @@ export default function ToolsPage() {
 	);
 
 	const toggleTool = useCallback(
-		async (collection: CollectionView, tool: ToolView, enabled: boolean) => {
-			const updated = await toolManagementAPI.setToolEnabled(toolArtifactRef(tool), tool.artifact.revision, enabled);
+		async (collection: CollectionListItem, tool: ToolStoreListItem, enabled: boolean) => {
+			const updated = await toolManagementAPI.setToolEnabled(toolArtifactRef(tool), tool.revision, enabled);
 			const collectionKey = toolArtifactKey(toolCollectionRef(collection));
 			const toolKey = toolArtifactKey(toolArtifactRef(tool));
 
@@ -93,8 +119,8 @@ export default function ToolsPage() {
 								...item,
 								tools: item.tools.map(candidate =>
 									toolArtifactKey(toolArtifactRef(candidate)) === toolKey &&
-									candidate.artifact.revision <= updated.artifact.revision
-										? updated
+									candidate.revision <= updated.artifact.revision
+										? toolManagementAPI.toolListItemFromView(updated)
 										: candidate
 								),
 							}
@@ -151,7 +177,10 @@ export default function ToolsPage() {
 							key={toolArtifactKey(toolCollectionRef(item.collection))}
 							collection={item.collection}
 							tools={item.tools}
+							toolsLoaded={item.toolsLoaded}
+							isLoadingTools={item.isLoadingTools}
 							toolLoadError={item.toolLoadError}
+							onLoadTools={() => loadCollectionTools(item.collection)}
 							onRefreshTools={() => refreshCollection(item.collection)}
 							onToggleCollectionEnable={toggleCollection}
 							onToggleToolEnable={toggleTool}

@@ -319,7 +319,7 @@ export default function MCPServersPage() {
 					item => item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
 				);
 
-				const sameRevision = existing?.bundle.collection.artifact.revision === bundle.collection.artifact.revision;
+				const sameRevision = existing?.bundle.collection.revision === bundle.collection.revision;
 
 				if (existing && sameRevision && existing.serversLoaded) {
 					return {
@@ -453,34 +453,6 @@ export default function MCPServersPage() {
 	);
 
 	const refreshBundle = loadBundleServers;
-
-	useEffect(() => {
-		if (isInitialLoading || pageLoadError) {
-			return;
-		}
-
-		const candidates = bundles.filter(bundle => {
-			const key = artifactKey(bundle.bundle.ref);
-			return (
-				!bundle.serversLoaded &&
-				!bundle.isLoadingServers &&
-				!bundle.serverLoadError &&
-				!bundlePrefetchKeysRef.current.has(key)
-			);
-		});
-		if (candidates.length === 0) {
-			return;
-		}
-
-		for (const bundle of candidates) {
-			bundlePrefetchKeysRef.current.add(artifactKey(bundle.bundle.ref));
-		}
-
-		void mapWithConcurrency(candidates, 2, async bundle => {
-			await loadBundleServers(bundle.bundle.ref);
-			return undefined;
-		}).catch(() => undefined);
-	}, [bundles, isInitialLoading, loadBundleServers, pageLoadError]);
 
 	const refreshSingleServer = useCallback(
 		async (server: MCPServerView) => {
@@ -753,10 +725,7 @@ export default function MCPServersPage() {
 						enabled,
 						collection: {
 							...item.bundle.collection,
-							artifact: {
-								...item.bundle.collection.artifact,
-								enabled,
-							},
+							enabled,
 						},
 					},
 				};

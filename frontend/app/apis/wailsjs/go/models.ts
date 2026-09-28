@@ -1505,6 +1505,10 @@ export namespace consumerapi {
 	    status: string;
 	    required: boolean;
 	    artifact?: artifact.ArtifactRef;
+	    mapped?: resolve.MappedTarget;
+	    autoExecute?: boolean;
+	    includeSystemPrompt?: boolean;
+	    skillUseMode?: string;
 	    code?: string;
 	    message?: string;
 	
@@ -1520,6 +1524,10 @@ export namespace consumerapi {
 	        this.status = source["status"];
 	        this.required = source["required"];
 	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
+	        this.autoExecute = source["autoExecute"];
+	        this.includeSystemPrompt = source["includeSystemPrompt"];
+	        this.skillUseMode = source["skillUseMode"];
 	        this.code = source["code"];
 	        this.message = source["message"];
 	    }

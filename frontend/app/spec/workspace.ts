@@ -79,14 +79,47 @@ export interface WorkspaceDirectoryView {
 	diagnostics?: ArtifactDiagnostic[];
 }
 
+/**
+ * Exact frontend projection of generated
+ * `consumerapi.WorkspaceDirectoryListItem`.
+ *
+ * The paged directory endpoint deliberately does not return Root,
+ * Source, Workspace, or diagnostic detail.
+ */
+export interface WorkspaceDirectoryListItem {
+	ref: WorkspaceDirectoryRef;
+	rootID: ArtifactRootID;
+	rootDisplayName: string;
+	enabled: boolean;
+	directorySourceID: ArtifactSourceID;
+	directorySourceRevision: number;
+	policyID: string;
+	policyVersion: string;
+	policyDigest: ArtifactDigest;
+}
+
 export interface WorkspacePageRequest {
 	cursor?: string;
 	limit?: number;
 }
 
 export interface WorkspacePage {
-	items: WorkspaceDirectoryView[];
+	items: WorkspaceDirectoryListItem[];
 	nextCursor?: string;
+}
+
+export function workspaceDirectoryListItemFromView(view: WorkspaceDirectoryView): WorkspaceDirectoryListItem {
+	return {
+		ref: view.ref,
+		rootID: view.root.id,
+		rootDisplayName: view.root.displayName,
+		enabled: view.enabled,
+		directorySourceID: view.directorySource.id,
+		directorySourceRevision: view.directorySource.revision,
+		policyID: view.policyID,
+		policyVersion: view.policyVersion,
+		policyDigest: view.policyDigest,
+	};
 }
 
 export interface WorkspaceDefaultPolicyView {

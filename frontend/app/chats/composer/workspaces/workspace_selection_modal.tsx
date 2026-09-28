@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFileText, FiRefreshCw, FiSettings, FiZap } from 'react-icons/fi';
 
@@ -23,7 +22,6 @@ interface WorkspaceSelectionModalProps {
 	onClose: () => void;
 	state: ComposerWorkspaceController;
 	activeSkillRefs: SkillRef[];
-	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
 }
 
@@ -77,7 +75,6 @@ function mcpSetupTargets(plan: WorkspaceRuntimePlan | undefined): WorkspaceMCPSe
 function WorkspaceDirectorySelectionModalContent({
 	state,
 	activeSkillRefs,
-	setActiveSkillRefs,
 	isInputLocked = false,
 }: Omit<WorkspaceSelectionModalProps, 'isOpen' | 'onClose'>) {
 	const { requestClose } = useModalDialogController();
@@ -212,18 +209,7 @@ function WorkspaceDirectorySelectionModalContent({
 													checked={active}
 													disabled={isInputLocked}
 													onChange={event => {
-														setActiveSkillRefs(previous => {
-															const next = new Map(previous.map(value => [skillRefKey(value), value]));
-															const key = skillRefKey(skill.artifact as SkillRef);
-
-															if (event.currentTarget.checked) {
-																next.set(key, skill.artifact as SkillRef);
-															} else {
-																next.delete(key);
-															}
-
-															return [...next.values()];
-														});
+														void state.setSkillActive(skill, event.currentTarget.checked);
 													}}
 												/>
 											</label>

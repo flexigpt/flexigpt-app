@@ -164,7 +164,7 @@ function AgentMCPSetupContent({
 					return [];
 				}
 
-				return binding?.secretRef?.trim() ? [] : [label];
+				return binding?.secretConfigured ? [] : [label];
 			}
 
 			if (!declaration.required) {
@@ -177,7 +177,7 @@ function AgentMCPSetupContent({
 					return submitted.value?.trim() || binding?.value?.trim() || declaration.default?.trim() ? [] : [label];
 
 				case MCPInputKind.Secret:
-					return submitted.value?.trim() || binding?.secretRef?.trim() ? [] : [label];
+					return submitted.value?.trim() || binding?.secretConfigured ? [] : [label];
 
 				default:
 					return [label];
@@ -260,7 +260,7 @@ function AgentMCPSetupContent({
 											const configured =
 												declaration.kind === MCPInputKind.Text || declaration.kind === MCPInputKind.Path
 													? Boolean(binding?.value?.trim() || declaration.default?.trim())
-													: Boolean(binding?.secretRef?.trim());
+													: Boolean(binding?.secretConfigured);
 
 											if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
 												return (

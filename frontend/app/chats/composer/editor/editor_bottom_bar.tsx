@@ -42,7 +42,6 @@ interface EditorBottomBarProps {
 	mcpMenuState: MenuStore;
 	workspaceMenuState: MenuStore;
 	workspaceState: ComposerWorkspaceController;
-	onInsertWorkspaceTemplateText: (text: string) => Promise<void> | void;
 
 	templateButtonRef: RefObject<HTMLButtonElement | null>;
 	toolButtonRef: RefObject<HTMLButtonElement | null>;
@@ -83,7 +82,6 @@ interface EditorBottomBarProps {
 	onRefreshSkills: () => Promise<void>;
 	systemPrompt: AgentSystemPromptController;
 	workspaceActiveSkillRefs: SkillRef[];
-	setWorkspaceActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
 	mcpState: UseComposerMCPResult;
 	mcpAppContextUpdateCount?: number;
@@ -105,7 +103,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	mcpMenuState,
 	workspaceMenuState,
 	workspaceState,
-	onInsertWorkspaceTemplateText,
 	templateButtonRef,
 	toolButtonRef,
 	attachmentButtonRef,
@@ -139,7 +136,6 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 	onRefreshSkills,
 	systemPrompt,
 	workspaceActiveSkillRefs,
-	setWorkspaceActiveSkillRefs,
 	isInputLocked = false,
 	mcpState,
 	mcpAppContextUpdateCount = 0,
@@ -180,9 +176,7 @@ export const EditorBottomBar = memo(function EditorBottomBar({
 						store={workspaceMenuState}
 						state={workspaceState}
 						activeSkillRefs={workspaceActiveSkillRefs}
-						setActiveSkillRefs={setWorkspaceActiveSkillRefs}
 						isInputLocked={isInputLocked}
-						onInsertTemplateText={onInsertWorkspaceTemplateText}
 					/>
 
 					<SkillsBottomBarChip

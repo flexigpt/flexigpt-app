@@ -16,6 +16,7 @@ import type {
 	WorkspaceSkillLoadPlan,
 } from '@/spec/workspace';
 
+import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type {
@@ -27,6 +28,7 @@ import type {
 } from '@/apis/interface';
 
 const COMPOSER_WORKSPACE_PAGE_SIZE = 100;
+const COMPOSER_WORKSPACE_READ_CONCURRENCY = 4;
 const MAX_COMPOSER_WORKSPACE_PAGE_HOPS = 10_000;
 
 export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
@@ -42,8 +44,8 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 	);
 
 	/**
-	 * Shared directory and Workspace declaration catalog.
-	 * It intentionally excludes Workspace runtime plans.
+	 * Shared hydrated declaration catalog for Composer workspace selection.
+	 * Runtime plans remain uncached and are resolved only after selection.
 	 */
 	listComposerWorkspaceDirectories(force = false): Promise<WorkspaceDirectoryView[]> {
 		return this.composerWorkspaceDirectoriesCatalog.load(force);
@@ -54,7 +56,7 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 	}
 
 	private async listComposerWorkspaceDirectoriesUncached(): Promise<WorkspaceDirectoryView[]> {
-		const output: WorkspaceDirectoryView[] = [];
+		const summaries = [];
 		const cursors = new Set<string>();
 		let cursor: string | undefined;
 
@@ -63,10 +65,14 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 				cursor,
 				limit: COMPOSER_WORKSPACE_PAGE_SIZE,
 			});
-			output.push(...(page.items ?? []));
+			summaries.push(...(page.items ?? []));
 
 			if (!page.nextCursor) {
-				return output.toSorted((left, right) =>
+				const directories = await mapWithConcurrency(summaries, COMPOSER_WORKSPACE_READ_CONCURRENCY, summary =>
+					this.store.getWorkspaceDirectory(summary.ref)
+				);
+
+				return directories.toSorted((left, right) =>
 					left.root.displayName.localeCompare(right.root.displayName, undefined, {
 						sensitivity: 'base',
 					})

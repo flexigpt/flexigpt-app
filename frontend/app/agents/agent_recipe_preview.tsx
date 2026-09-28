@@ -61,7 +61,7 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 	const modelRelationship = (recipe.resolution.capabilities?.occurrences ?? []).find(
 		occurrence => occurrence.type === 'model' && occurrence.status === 'available'
 	);
-	const modelLabel = modelRelationship?.mapped?.name || modelRelationship?.name;
+	const modelLabel = modelRelationship?.name;
 
 	return (
 		<div className="space-y-3">
@@ -141,8 +141,8 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 				<div className="alert alert-warning rounded-2xl text-sm">
 					<FiAlertCircle size={15} />
 					<span>
-						{recipe.textArtifacts.length} text declaration{recipe.textArtifacts.length === 1 ? '' : 's'} cannot
-						currently be added to this conversation starter.
+						{recipe.textArtifacts.length} text declaration{recipe.textArtifacts.length === 1 ? '' : 's'} were
+						materialized while preparing this starter.
 					</span>
 				</div>
 			) : null}

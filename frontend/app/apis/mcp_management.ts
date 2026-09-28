@@ -1,6 +1,6 @@
 // oxlint-disable typescript/parameter-properties
 import type { ArtifactRef, ArtifactRootID, MappedTarget, StoreArtifact } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
+import type { CollectionListItem } from '@/spec/collection';
 import type {
 	InvokeMCPToolRequestBody,
 	ManagedMCPPolicyUpsertRequest,
@@ -22,7 +22,6 @@ import type {
 	MCPGlobalSettings,
 	MCPHTTPAuthMode,
 	MCPHTTPSecretDraft,
-	MCPInputBinding,
 	MCPOAuthAuthorization,
 	MCPPolicy,
 	MCPPolicyManagementView,
@@ -39,6 +38,8 @@ import type {
 	MCPServerData,
 	MCPServerDocument,
 	MCPServerDraft,
+	MCPServerInstallationDataView,
+	MCPServerListItem,
 	MCPServerManagementView,
 	MCPServerRuntimeSnapshot,
 	MCPServerView,
@@ -53,6 +54,7 @@ import type {
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
+import { collectionListItemFromCollectionView } from '@/spec/collection';
 import {
 	MCP_SCHEMA_VERSION,
 	MCPApprovalRule,
@@ -103,8 +105,8 @@ interface PlannedSecretWrite {
 
 interface ServerDocumentBuild {
 	document: MCPServerDocument;
-	preReplaceData: MCPServerData;
 	secretWrites: PlannedSecretWrite[];
+	secretDeletes: MCPSecretTarget[];
 }
 
 function cloneJSON<T>(value: T): T {
@@ -113,10 +115,6 @@ function cloneJSON<T>(value: T): T {
 
 function artifactRefKey(value: ArtifactRef): string {
 	return `${value.rootID}:${value.artifactID}`;
-}
-
-function sameJSON(left: unknown, right: unknown): boolean {
-	return JSON.stringify(left) === JSON.stringify(right);
 }
 
 function normalizeInputName(value: string): string {
@@ -178,10 +176,22 @@ function defaultPolicy(): MCPPolicy {
 	};
 }
 
-function defaultServerData(): MCPServerData {
+/**
+ * A read response never reveals secret refs. The backend treats omitted secret
+ * bindings as retained bindings when installation data is updated. Only visible
+ * text values and newly written secret refs are sent back to the backend.
+ */
+function writableServerData(installation?: MCPServerInstallationDataView): MCPServerData {
+	const inputs = Object.fromEntries(
+		Object.entries(installation?.inputs ?? {}).flatMap(([name, input]) =>
+			input.value === undefined ? [] : [[name, { value: input.value }] as const]
+		)
+	);
+
 	return {
 		schemaVersion: MCP_SCHEMA_VERSION,
-		inputs: {},
+		selectedConnectionProfile: installation?.selectedConnectionProfile,
+		...(Object.keys(inputs).length > 0 ? { inputs } : {}),
 	};
 }
 
@@ -222,7 +232,7 @@ function findSecretTargets(document: MCPServerDocument): Map<string, MCPSecretTa
 	return targets;
 }
 
-function inputBindingFor(data: MCPServerData | undefined, inputName: string): MCPInputBinding | undefined {
+function inputBindingFor(data: MCPServerInstallationDataView | undefined, inputName: string) {
 	return data?.inputs?.[inputName];
 }
 
@@ -249,13 +259,15 @@ function buildServerDocument(
 	policyName: string
 ): ServerDocumentBuild {
 	const previous = existing?.document;
-	const previousData = cloneJSON(existing?.installation ?? defaultServerData());
+	const previousInstallation = existing?.installation;
+	const previousData = writableServerData(previousInstallation);
 	const previousTargets = previous ? findSecretTargets(previous) : new Map<string, MCPSecretTarget>();
 	const previousOAuthInput = previous?.configuration.auth.clientCredentialsInput;
 	const previousInputs = cloneJSON(previous?.configuration.install.inputs ?? {});
 	const nextData = cloneJSON(previousData);
 	let nextInputs = previousInputs;
 	let nextBindings = cloneJSON(nextData.inputs ?? {});
+	const secretDeletes: MCPSecretTarget[] = [];
 
 	nextData.schemaVersion = MCP_SCHEMA_VERSION;
 
@@ -310,16 +322,10 @@ function buildServerDocument(
 			env[envName] = `\${${inputName}}`;
 
 			const oldTarget = row.inputName ? previousTargets.get(row.inputName) : undefined;
-			const oldBinding = row.inputName ? previousData.inputs?.[row.inputName] : undefined;
+			const oldBinding = row.inputName ? previousInstallation?.inputs?.[row.inputName] : undefined;
 
-			if (
-				oldBinding?.secretRef &&
-				oldTarget?.kind === MCPSecretKindValue.StdioEnv &&
-				sameSecretSlot(oldTarget.slot, envName) &&
-				!row.secretValue &&
-				!row.deleteExisting
-			) {
-				nextBindings[inputName] = oldBinding;
+			if (row.deleteExisting && oldBinding?.secretConfigured && oldTarget) {
+				secretDeletes.push(oldTarget);
 			}
 
 			if (row.secretValue) {
@@ -351,16 +357,10 @@ function buildServerDocument(
 			headers[headerName] = `${apiKey.valuePrefix}\${${inputName}}${apiKey.valueSuffix}`;
 
 			const oldTarget = apiKey.inputName ? previousTargets.get(apiKey.inputName) : undefined;
-			const oldBinding = apiKey.inputName ? previousData.inputs?.[apiKey.inputName] : undefined;
+			const oldBinding = apiKey.inputName ? previousInstallation?.inputs?.[apiKey.inputName] : undefined;
 
-			if (
-				oldBinding?.secretRef &&
-				oldTarget?.kind === MCPSecretKindValue.HTTPHeader &&
-				sameSecretSlot(oldTarget.slot, headerName) &&
-				!apiKey.secretValue &&
-				!apiKey.deleteExisting
-			) {
-				nextBindings[inputName] = oldBinding;
+			if (apiKey.deleteExisting && oldBinding?.secretConfigured && oldTarget) {
+				secretDeletes.push(oldTarget);
 			}
 
 			if (apiKey.secretValue) {
@@ -402,9 +402,9 @@ function buildServerDocument(
 		};
 		auth.clientCredentialsInput = inputName;
 
-		const oldBinding = oauth.inputName ? previousData.inputs?.[oauth.inputName] : undefined;
-		if (oldBinding?.secretRef && !oauth.secretJSON.trim() && !oauth.deleteExisting) {
-			nextBindings[inputName] = oldBinding;
+		const oldBinding = oauth.inputName ? previousInstallation?.inputs?.[oauth.inputName] : undefined;
+		if (oauth.deleteExisting && oldBinding?.secretConfigured) {
+			secretDeletes.push({ kind: MCPSecretKindValue.OAuthClientCredentials, slot: 'clientCredentials' });
 		}
 
 		if (oauth.secretJSON.trim()) {
@@ -443,8 +443,8 @@ function buildServerDocument(
 				},
 			},
 		},
-		preReplaceData: nextData,
 		secretWrites,
+		secretDeletes,
 	};
 }
 
@@ -505,7 +505,7 @@ export function serverSetupInputs(server: MCPServerView): MCPSetupInputView[] {
 				declaration,
 				target,
 				boundValue: binding?.value,
-				boundSecretRef: binding?.secretRef,
+				secretConfigured: binding?.secretConfigured ?? false,
 			};
 		})
 		.toSorted((left, right) => left.name.localeCompare(right.name));
@@ -523,7 +523,7 @@ export function getMCPServerSetupStatus(server: MCPServerView): {
 		if (input.declaration.kind === MCPInputKindValue.Text || input.declaration.kind === MCPInputKindValue.Path) {
 			return Boolean(input.boundValue?.trim() || input.declaration.default?.trim());
 		}
-		return Boolean(input.boundSecretRef?.trim());
+		return input.secretConfigured;
 	});
 
 	return {
@@ -551,7 +551,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 			stdioSecrets.push({
 				inputName,
 				envName: target.slot,
-				existingSecretRef: binding?.secretRef,
+				existingSecretConfigured: binding?.secretConfigured,
 				secretValue: '',
 				deleteExisting: false,
 			});
@@ -566,7 +566,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 			headerName: target.slot,
 			valuePrefix: affixes.prefix,
 			valueSuffix: affixes.suffix,
-			existingSecretRef: binding?.secretRef,
+			existingSecretConfigured: binding?.secretConfigured,
 			secretValue: '',
 			deleteExisting: false,
 		};
@@ -598,7 +598,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 		httpAPIKey,
 		httpOAuthClientCredentials: {
 			inputName: oauthInputName,
-			existingSecretRef: oauthBinding?.secretRef,
+			existingSecretConfigured: oauthBinding?.secretConfigured,
 			secretJSON: '',
 			deleteExisting: false,
 			useClientCredentials: Boolean(oauthInputName),
@@ -636,11 +636,11 @@ export class MCPManagementAPI {
 		this.composerMCPDeclarationsCatalog.invalidate();
 	}
 
-	async listMCPCollectionsForManagement(): Promise<CollectionView[]> {
+	async listMCPCollectionsForManagement(): Promise<CollectionListItem[]> {
 		return this.collectPages(pageToken => this.store.listMCPCollectionsPage(MANAGEMENT_PAGE_SIZE, pageToken));
 	}
 
-	async listMCPServersForManagement(): Promise<StoreArtifact[]> {
+	async listMCPServersForManagement(): Promise<MCPServerListItem[]> {
 		return this.collectPages(pageToken => this.store.listMCPServersPage(MANAGEMENT_PAGE_SIZE, pageToken));
 	}
 
@@ -658,7 +658,7 @@ export class MCPManagementAPI {
 	}
 
 	async getMCPBundle(collection: ArtifactRef): Promise<MCPBundleView> {
-		return this.toBundleView(await this.store.getMCPCollection(collection));
+		return this.toBundleView(collectionListItemFromCollectionView(await this.store.getMCPCollection(collection)));
 	}
 
 	async listMCPServers(bundle: MCPBundleView): Promise<MCPServerView[]> {
@@ -689,7 +689,7 @@ export class MCPManagementAPI {
 			description,
 		});
 		this.invalidateComposerMCPDeclarations();
-		return this.toBundleView(collection);
+		return this.toBundleView(collectionListItemFromCollectionView(collection));
 	}
 
 	async saveMCPServer(
@@ -703,20 +703,10 @@ export class MCPManagementAPI {
 
 		const policyName = existing?.document?.configuration.policy?.name ?? draft.logicalName.trim();
 		const built = buildServerDocument(existing, draft, policyName);
-		let artifactRevision = existing?.artifact.revision;
-
-		if (existing && !sameJSON(existing.installation ?? defaultServerData(), built.preReplaceData)) {
-			const updated = await this.aggregate.updateMCPServerInstallation(
-				existing.ref,
-				existing.artifact.revision,
-				built.preReplaceData
-			);
-			artifactRevision = updated.revision;
-		}
 
 		const policy = await this.aggregate.upsertManagedMCPPolicy({
 			collection: bundle.ref,
-			expectedCollectionRevision: bundle.collection.artifact.revision,
+			expectedCollectionRevision: bundle.collection.revision,
 			name: policyName,
 			description: `${draft.displayName.trim()} policy`,
 			policy: {
@@ -733,7 +723,7 @@ export class MCPManagementAPI {
 					collection: bundle.ref,
 					expectedCollectionRevision: policy.collection.artifact.revision,
 					artifact: existing.ref,
-					expectedArtifactRevision: artifactRevision ?? existing.artifact.revision,
+					expectedArtifactRevision: existing.artifact.revision,
 					document: built.document,
 					enabled: draft.enabled,
 				})
@@ -748,18 +738,25 @@ export class MCPManagementAPI {
 			rootID: result.artifact.rootID,
 			artifactID: result.artifact.id,
 		};
+
+		for (const target of built.secretDeletes) {
+			await this.aggregate.deleteMCPServerSecret(serverRef, target.kind, target.slot);
+		}
+
 		const installation = await this.store.getMCPServerInstallation(serverRef);
-		const nextData = cloneJSON(installation.installation);
+		const nextData = writableServerData(installation.installation);
 		nextData.inputs = cloneJSON(nextData.inputs ?? {});
+		let installationChanged = false;
 
 		for (const write of built.secretWrites) {
 			const value = await this.aggregate.putMCPServerSecret(serverRef, write.kind, write.slot, write.secret);
 			nextData.inputs[write.inputName] = {
 				secretRef: value.secretRef,
 			};
+			installationChanged = true;
 		}
 
-		if (!sameJSON(installation.installation, nextData)) {
+		if (installationChanged) {
 			await this.aggregate.updateMCPServerInstallation(serverRef, installation.artifact.revision, nextData);
 		}
 
@@ -777,7 +774,7 @@ export class MCPManagementAPI {
 	}
 
 	async setMCPBundleEnabled(bundle: MCPBundleView, enabled: boolean): Promise<void> {
-		await this.store.setMCPCollectionEnabled(bundle.ref, bundle.collection.artifact.revision, enabled);
+		await this.store.setMCPCollectionEnabled(bundle.ref, bundle.collection.revision, enabled);
 		this.invalidateComposerMCPDeclarations();
 	}
 
@@ -859,10 +856,11 @@ export class MCPManagementAPI {
 	): Promise<void> {
 		const serverRef = 'ref' in server ? server.ref : server;
 		const latest = await this.store.getMCPServerInstallation(serverRef);
-		const nextData = cloneJSON(latest.installation);
+		const nextData = writableServerData(latest.installation);
 		nextData.inputs = cloneJSON(nextData.inputs ?? {});
 		const inputs = latest.document.configuration.install.inputs ?? {};
 		const targets = findSecretTargets(latest.document);
+		let changed = false;
 
 		for (const [inputName, declaration] of Object.entries(inputs)) {
 			const submitted = values[inputName];
@@ -873,8 +871,10 @@ export class MCPManagementAPI {
 					nextData.inputs[inputName] = {
 						value: submitted.value,
 					};
-				} else if (reset) {
+					changed = true;
+				} else if (reset && existing?.value !== undefined) {
 					nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
+					changed = true;
 				}
 				continue;
 			}
@@ -910,6 +910,7 @@ export class MCPManagementAPI {
 					nextData.inputs[inputName] = {
 						secretRef: result.secretRef,
 					};
+					changed = true;
 				} else if (reset && existing?.secretRef) {
 					await this.aggregate.deleteMCPServerSecret(
 						serverRef,
@@ -917,6 +918,7 @@ export class MCPManagementAPI {
 						'clientCredentials'
 					);
 					nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
+					changed = true;
 				}
 				continue;
 			}
@@ -935,10 +937,16 @@ export class MCPManagementAPI {
 				nextData.inputs[inputName] = {
 					secretRef: result.secretRef,
 				};
+				changed = true;
 			} else if (reset && existing?.secretRef) {
 				await this.aggregate.deleteMCPServerSecret(serverRef, target.kind, target.slot);
 				nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
+				changed = true;
 			}
+		}
+
+		if (!changed) {
+			return;
 		}
 
 		if (latest.builtIn) {
@@ -1200,19 +1208,19 @@ export class MCPManagementAPI {
 		return this.modelPresetStore.resolveMappedModelTarget(target);
 	}
 
-	private toBundleView(collection: CollectionView): MCPBundleView {
-		const builtIn = !collection.baseline && !collection.editable && !collection.deletable;
+	private toBundleView(collection: CollectionListItem): MCPBundleView {
+		const builtIn = collection.builtIn;
 
 		return {
 			collection,
 			ref: {
-				rootID: collection.artifact.rootID,
-				artifactID: collection.artifact.id,
+				rootID: collection.ref.rootID,
+				artifactID: collection.ref.artifactID,
 			},
 			displayName: collection.displayName || collection.name,
 			logicalName: collection.name,
 			description: collection.description,
-			enabled: collection.artifact.enabled,
+			enabled: collection.enabled,
 			builtIn,
 			editable: collection.baseline || collection.editable,
 			deletable: !collection.baseline && collection.deletable,

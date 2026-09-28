@@ -17,7 +17,7 @@ import { ModalSection } from '@/components/modal/modal_section';
 
 import { AgentMCPSetupModal } from '@/agents/agent_mcp_setup_modal';
 import { AgentRecipePreview } from '@/agents/agent_recipe_preview';
-import { formatDateish, getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/lib/agent_management_utils';
+import { getAgentRelationshipBadgeClass, textToBase64 } from '@/agents/lib/agent_management_utils';
 
 interface AgentDetailsModalProps {
 	isOpen: boolean;
@@ -66,23 +66,13 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 		void (async () => {
 			try {
 				const value = await agentStoreAPI.exportAgent(agentRef);
+				if (!cancelled) {
+					setExportResult(value);
+				}
 				if (cancelled) {
 					return;
 				}
 
-				setExportResult(value);
-				if (value.resolution) {
-					setResolution({
-						agent,
-						capabilities: value.resolution,
-					});
-					setResolutionError('');
-					return;
-				}
-
-				if (value.resolutionIssue) {
-					setResolutionError(value.resolutionIssue.message);
-				}
 				await resolveFallback();
 			} catch (error) {
 				if (!cancelled) {
@@ -119,8 +109,14 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 		}
 	};
 
-	const setupDescriptors = exportResult?.mcpSetupDescriptors ?? [];
 	const occurrences = resolution?.capabilities?.occurrences ?? [];
+	const setupDescriptors = occurrences
+		.filter(occurrence => occurrence.type === 'mcp')
+		.map(occurrence => ({
+			occurrencePath: occurrence.path,
+			name: occurrence.name || 'MCP server',
+			artifact: occurrence.artifact,
+		}));
 
 	return (
 		<>
@@ -136,10 +132,10 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 								</ManagementInfoRow>
 								<ManagementInfoRow label="Managed">{agent.managed ? 'Yes' : 'No'}</ManagementInfoRow>
 								<ManagementInfoRow label="Built-in">{agent.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
-								<ManagementInfoRow label="Enabled">{agent.artifact.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-								<ManagementInfoRow label="State">{agent.artifact.state}</ManagementInfoRow>
-								<ManagementInfoRow label="Created">{formatDateish(agent.artifact.createdAt)}</ManagementInfoRow>
-								<ManagementInfoRow label="Modified">{formatDateish(agent.artifact.modifiedAt)}</ManagementInfoRow>
+								<ManagementInfoRow label="Enabled">{agent.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+								<ManagementInfoRow label="State">{agent.state}</ManagementInfoRow>
+								<ManagementInfoRow label="Revision">{agent.revision}</ManagementInfoRow>
+								<ManagementInfoRow label="Definition">{agent.definitionDigest || '—'}</ManagementInfoRow>
 								<ManagementInfoRow label="Description">
 									<span className="whitespace-pre-wrap">{agent.description || '—'}</span>
 								</ManagementInfoRow>
@@ -196,13 +192,6 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 									<pre className="bg-base-300 max-h-96 overflow-auto rounded-2xl p-3 text-xs whitespace-pre-wrap">
 										{exportResult.content}
 									</pre>
-
-									{exportResult.resolutionIssue ? (
-										<div className="alert alert-warning rounded-2xl text-sm">
-											<FiAlertCircle size={16} />
-											<span>{exportResult.resolutionIssue.message}</span>
-										</div>
-									) : null}
 								</div>
 							) : null}
 						</ModalSection>
@@ -242,14 +231,6 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 												{occurrence.required ? <span className="badge badge-outline badge-sm">Required</span> : null}
 											</div>
 
-											{occurrence.scope ? (
-												<div className="text-base-content/70 mt-1 text-xs">Scope: {occurrence.scope}</div>
-											) : null}
-
-											{occurrence.mapped ? (
-												<div className="text-base-content/70 mt-1 text-xs">Resolved to: {occurrence.mapped.name}</div>
-											) : null}
-
 											{occurrence.message ? (
 												<div className="text-warning mt-2 text-xs">{occurrence.message}</div>
 											) : null}
@@ -281,11 +262,6 @@ function AgentDetailsModalContent({ agent, onClose }: AgentDetailsModalContentPr
 												<div className="flex items-center gap-2 font-medium">
 													<FiServer size={15} />
 													<span>{descriptor.name}</span>
-												</div>
-												<div className="text-base-content/70 mt-1 text-xs">
-													{descriptor.transport || 'named MCP relationship'}
-													{descriptor.authMode ? ` · ${descriptor.authMode}` : ''}
-													{descriptor.inputs?.length ? ` · ${descriptor.inputs.length} input(s)` : ''}
 												</div>
 											</div>
 
@@ -333,7 +309,7 @@ export function AgentDetailsModal({ isOpen, agent, onClose }: AgentDetailsModalP
 	return (
 		<ModalDialog isOpen={isOpen} onClose={onClose}>
 			<AgentDetailsModalContent
-				key={`${agent.artifact.rootID}:${agent.artifact.id}:${agent.artifact.revision}`}
+				key={`${agent.ref.rootID}:${agent.ref.artifactID}:${agent.revision}`}
 				agent={agent}
 				onClose={onClose}
 			/>

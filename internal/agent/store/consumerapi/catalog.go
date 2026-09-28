@@ -2,6 +2,7 @@ package consumerapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
@@ -86,6 +87,10 @@ func (a *API) ResolveAgent(
 	if err != nil {
 		return AgentResolution{}, err
 	}
+	projectedPlan, err := projectAgentCapabilityPlan(plan)
+	if err != nil {
+		return AgentResolution{}, err
+	}
 	if plan.RootArtifact == nil {
 		return AgentResolution{}, fmt.Errorf(
 			"%w: Agent resolution has no Artifact root",
@@ -98,7 +103,7 @@ func (a *API) ResolveAgent(
 	}
 	return AgentResolution{
 		Agent:        agent,
-		Capabilities: projectAgentCapabilityPlan(plan),
+		Capabilities: projectedPlan,
 	}, nil
 }
 
@@ -113,12 +118,13 @@ func (a *API) ResolveAgentCapabilities(
 	if err != nil {
 		return AgentCapabilityPlan{}, err
 	}
-	return projectAgentCapabilityPlan(value), nil
+
+	return projectAgentCapabilityPlan(value)
 }
 
 func projectAgentCapabilityPlan(
 	value resolve.CapabilityPlan,
-) AgentCapabilityPlan {
+) (AgentCapabilityPlan, error) {
 	output := AgentCapabilityPlan{
 		Occurrences: make(
 			[]AgentCapabilityOccurrence,
@@ -141,9 +147,78 @@ func projectAgentCapabilityPlan(
 			ref := *occurrence.Artifact
 			projected.Artifact = &ref
 		}
+		if occurrence.Mapped != nil {
+			target := *occurrence.Mapped
+			projected.Mapped = &target
+		}
+
+		if raw, found := occurrence.Overrides["autoExecute"]; found {
+			value, err := projectAgentBoolean(raw, "autoExecute")
+			if err != nil {
+				return AgentCapabilityPlan{}, fmt.Errorf(
+					"agent capability %q autoExecute override: %w",
+					occurrence.Path,
+					err,
+				)
+			}
+			projected.AutoExecute = value
+		}
+
+		if raw, found := occurrence.Overrides["includeSystemPrompt"]; found {
+			value, err := projectAgentBoolean(raw, "includeSystemPrompt")
+			if err != nil {
+				return AgentCapabilityPlan{}, fmt.Errorf(
+					"agent capability %q includeSystemPrompt override: %w",
+					occurrence.Path,
+					err,
+				)
+			}
+			projected.IncludeSystemPrompt = value
+		}
+
+		if raw, found := occurrence.Use["mode"]; found {
+			var mode AgentSkillUseMode
+			if err := json.Unmarshal(raw, &mode); err != nil {
+				return AgentCapabilityPlan{}, fmt.Errorf(
+					"agent capability %q Skill use mode: %w",
+					occurrence.Path,
+					err,
+				)
+			}
+
+			switch mode {
+			case AgentSkillUseModeAvailable,
+				AgentSkillUseModeActive,
+				AgentSkillUseModeInstructions:
+				projected.SkillUseMode = mode
+			default:
+				return AgentCapabilityPlan{}, fmt.Errorf(
+					"%w: Agent capability %q has unsupported Skill use mode %q",
+					basespec.ErrInvalid,
+					occurrence.Path,
+					mode,
+				)
+			}
+		}
+
 		output.Occurrences = append(output.Occurrences, projected)
 	}
-	return output
+	return output, nil
+}
+
+func projectAgentBoolean(
+	raw json.RawMessage,
+	name string,
+) (*bool, error) {
+	var value bool
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, fmt.Errorf(
+			"%w: Agent relationship field %q must be boolean",
+			basespec.ErrInvalid,
+			name,
+		)
+	}
+	return &value, nil
 }
 
 func (a *API) listCollectionAgentRefs(

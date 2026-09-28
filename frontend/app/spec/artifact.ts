@@ -42,8 +42,8 @@ export interface ArtifactCollectionRef {
 }
 
 export interface ArtifactAddress extends ArtifactRef {
-	collectionID: ArtifactCollectionID;
 	kind: ArtifactKind;
+	logicalName: string;
 }
 
 interface ArtifactDiagnosticLocation {

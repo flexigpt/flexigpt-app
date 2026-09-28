@@ -1,4 +1,5 @@
 import type {
+	AgentCapabilityPlan,
 	AgentExportResult,
 	AgentImportCommitRequest,
 	AgentImportCommitResult,
@@ -31,6 +32,7 @@ import type {
 	AddMemberRequest,
 	ArtifactMembershipView,
 	CollectionCapabilityPlan,
+	CollectionListItem,
 	CollectionView,
 	CreateCollectionRequest,
 	DeleteCollectionRequest,
@@ -71,6 +73,7 @@ import type {
 	MCPSecretKind,
 	MCPSecretWriteResult,
 	MCPServerData,
+	MCPServerListItem,
 	MCPServerRuntimeSnapshot,
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
@@ -106,8 +109,9 @@ import type {
 	SkillPathRegistration,
 	SkillPathRegistrationResult,
 	StoreManagedSkillDocument,
+	StoreSkillListItem,
 } from '@/spec/skill';
-import type { ResolvedToolView, ToolSelection, ToolView } from '@/spec/tool';
+import type { ResolvedToolView, ToolSelection, ToolStoreListItem, ToolView } from '@/spec/tool';
 import type { InvokeToolResponse } from '@/spec/toolruntime';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 import type {
@@ -197,11 +201,11 @@ export interface IToolRuntimeAPI {
 }
 
 export interface IToolStoreAPI {
-	listToolCollections(): Promise<CollectionView[]>;
+	listToolCollections(): Promise<CollectionListItem[]>;
 
 	getToolCollection(collection: ArtifactRef): Promise<CollectionView>;
 
-	listCollectionTools(collection: ArtifactRef): Promise<ToolView[]>;
+	listCollectionTools(collection: ArtifactRef): Promise<ToolStoreListItem[]>;
 
 	getTool(tool: ArtifactRef): Promise<ToolView>;
 
@@ -237,9 +241,9 @@ export interface IAgentStoreAPI {
 
 	resolveAgent(agent: ArtifactRef): Promise<AgentResolution>;
 
-	resolveAgentCapabilities(agent: ArtifactRef): Promise<CapabilityPlan>;
+	resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan>;
 
-	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
+	setAgentEnabled(agent: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<AgentView>;
 
 	listAgentCollectionMembers(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;
 
@@ -247,9 +251,9 @@ export interface IAgentStoreAPI {
 
 	getAgentCollection(collection: ArtifactRef): Promise<CollectionView>;
 
-	listAgentCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;
+	listAgentCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
 
-	listAgentCollectionsForManagement(): Promise<CollectionView[]>;
+	listAgentCollectionsForManagement(): Promise<CollectionListItem[]>;
 
 	updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
 
@@ -295,13 +299,13 @@ export interface ISkillStoreAPI {
 
 	listSkillCollectionMemberships(skill: ArtifactRef): Promise<ArtifactMembershipView[]>;
 
-	listSkillCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;
+	listSkillCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
 
-	listSkillCollectionsForManagement(): Promise<CollectionView[]>;
+	listSkillCollectionsForManagement(): Promise<CollectionListItem[]>;
 
-	listSkills(rootID: ArtifactRootID): Promise<StoreArtifact[]>;
+	listSkills(rootID: ArtifactRootID): Promise<StoreSkillListItem[]>;
 
-	listSkillsForManagement(): Promise<StoreArtifact[]>;
+	listSkillsForManagement(): Promise<StoreSkillListItem[]>;
 
 	purgeSkill(skill: ArtifactRef, expectedRevision: number): Promise<void>;
 
@@ -520,15 +524,15 @@ export interface IMCPStoreAPI {
 
 	listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]>;
 
-	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionView[]>;
+	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
 
 	listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]>;
 
-	listMCPServers(rootID: ArtifactRootID): Promise<StoreArtifact[]>;
+	listMCPServers(rootID: ArtifactRootID): Promise<MCPServerListItem[]>;
 
-	listMCPCollectionsPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<CollectionView>>;
+	listMCPCollectionsPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<CollectionListItem>>;
 
-	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<StoreArtifact>>;
+	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<MCPServerListItem>>;
 
 	resolveMCPArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan>;
 

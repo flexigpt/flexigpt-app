@@ -1,18 +1,13 @@
 // oxlint-disable typescript/parameter-properties
-import type {
-	ArtifactAdoptionMode,
-	ArtifactRef,
-	ArtifactSourceBinding,
-	MappedTarget,
-	StoreArtifact,
-} from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
+import type { ArtifactRef, MappedTarget, StoreArtifact } from '@/spec/artifact';
+import type { CollectionListItem, CollectionView } from '@/spec/collection';
 import type { ModelPresetRef } from '@/spec/modelpreset';
 import type {
 	ArtifactRuntimeSkillListItem,
 	ArtifactSkillFilter,
 	ArtifactSkillSession,
 	ArtifactSkillSessionOptions,
+	ArtifactSkillSummary,
 	InvokeSkillToolResponse,
 	ManagedSkillDocumentView,
 	ManagedSkillReplaceRequest,
@@ -31,18 +26,21 @@ import type {
 	SkillListItem,
 	SkillManagementView,
 	SkillPresenceStatus,
+	StoreSkillListItem,
 } from '@/spec/skill';
 import type { ResolvedToolView } from '@/spec/tool';
-import { ArtifactAdoptionMode as ArtifactAdoptionModeValue, ArtifactState } from '@/spec/artifact';
+import { ArtifactAdoptionMode, ArtifactState } from '@/spec/artifact';
+import { collectionListItemFromCollectionView } from '@/spec/collection';
 import {
 	RuntimeSkillActivity,
-	SkillBundleAttachmentRole as SkillBundleAttachmentRoleValue,
+	SkillBundleAttachmentRole,
 	SkillInsert,
 	SkillPresenceStatus as SkillPresenceStatusValue,
 	SkillType,
 } from '@/spec/skill';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
+import { mapWithConcurrency } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
@@ -53,6 +51,38 @@ import type {
 	ISkillStoreAPI,
 	IToolTargetResolver,
 } from '@/apis/interface';
+
+const SKILL_READ_CONCURRENCY = 4;
+
+interface SkillCollectionRef {
+	ref: ArtifactRef;
+	revision: number;
+	enabled: boolean;
+	baseline: boolean;
+	editable: boolean;
+	deletable: boolean;
+	builtIn?: boolean;
+	name: string;
+	displayName: string;
+	description?: string;
+	sourceID?: string;
+}
+
+interface ResolvedRuntimeArtifactSet {
+	definitions: RuntimeSkillDefinition[];
+	byArtifactKey: Map<string, ResolvedArtifactSkill>;
+	artifactByDefinitionKey: Map<string, ArtifactRef>;
+}
+
+interface PrefetchedRuntimeMetadata {
+	record?: RuntimeSkillRecord;
+	error?: string;
+}
+
+export interface SkillManagementPageData {
+	skillBundles: SkillBundle[];
+	skillListItems: SkillListItem[];
+}
 
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
@@ -70,7 +100,22 @@ function emptyResources(): Skill['resources'] {
 	};
 }
 
-function presenceStatusFor(artifact: StoreArtifact): SkillPresenceStatus {
+function collectionRef(collection: SkillCollectionRef | CollectionView): ArtifactRef {
+	if ('ref' in collection) {
+		return collection.ref;
+	}
+
+	return {
+		rootID: collection.artifact.rootID,
+		artifactID: collection.artifact.id,
+	};
+}
+
+function isUserMutableCollection(collection: SkillCollectionRef | CollectionView): boolean {
+	return collection.baseline || collection.editable;
+}
+
+function presenceStatusFor(artifact: Pick<StoreSkillListItem, 'state'>): SkillPresenceStatus {
 	switch (artifact.state) {
 		case ArtifactState.Available:
 			return SkillPresenceStatusValue.Present;
@@ -84,76 +129,40 @@ function presenceStatusFor(artifact: StoreArtifact): SkillPresenceStatus {
 	}
 }
 
-function isReadOnlyCollection(collection: CollectionView): boolean {
-	// A user baseline is application-provisioned and non-deletable, but its
-	// managed Source and memberships are writable.
-	return !collection.baseline && !collection.editable && !collection.deletable;
-}
-
-function collectionRef(collection: CollectionView): ArtifactRef {
-	return {
-		rootID: collection.artifact.rootID,
-		artifactID: collection.artifact.id,
-	};
-}
-
-function toBundleAttachment(collection: CollectionView, readOnly: boolean): SkillBundle['attachments'][number] {
-	return {
-		sourceID: collection.artifact.binding.sourceID,
-		revision: collection.artifact.revision,
-		role: readOnly ? SkillBundleAttachmentRoleValue.BuiltIn : SkillBundleAttachmentRoleValue.Managed,
-		enabled: true,
-	};
-}
-
-function toSkillBundle(collection: CollectionView): SkillBundle {
-	const isBuiltIn = isReadOnlyCollection(collection);
+function toSkillBundle(collection: CollectionListItem): SkillBundle {
+	const builtIn = collection.builtIn;
 
 	return {
 		schemaVersion: 'collection/v1',
-		id: collection.artifact.id,
-		rootID: collection.artifact.rootID,
+		id: collection.ref.artifactID,
+		rootID: collection.ref.rootID,
 		ref: {
-			rootID: collection.artifact.rootID,
-			collectionID: collection.artifact.id,
+			rootID: collection.ref.rootID,
+			collectionID: collection.ref.artifactID,
 		},
-		revision: collection.artifact.revision,
+		revision: collection.revision,
 		slug: collection.name,
-		logicalVersion: collection.artifact.logicalVersion,
 		displayName: collection.displayName || collection.name,
-		description: collection.description || undefined,
-		managedSourceID: collection.artifact.binding.sourceID,
-		isEnabled: collection.artifact.enabled,
-		isBuiltIn,
+		description: collection.description,
+		managedSourceID: collection.sourceID,
+		isEnabled: collection.enabled,
+		isBuiltIn: builtIn,
 		isEditable: isUserMutableCollection(collection),
 		isDeletable: isUserMutableCollection(collection) && !collection.baseline && collection.deletable,
 		isBaseline: collection.baseline,
-		sourceID: collection.artifact.binding.sourceID,
-		attachments: [toBundleAttachment(collection, isBuiltIn)],
-		createdAt: collection.artifact.createdAt,
-		modifiedAt: collection.artifact.modifiedAt,
+		sourceID: collection.sourceID,
+		attachments: [
+			{
+				sourceID: collection.sourceID,
+				revision: collection.revision,
+				role: builtIn ? SkillBundleAttachmentRole.BuiltIn : SkillBundleAttachmentRole.Managed,
+				enabled: collection.enabled,
+			},
+		],
 	};
 }
 
-export interface SkillManagementPageData {
-	skillBundles: SkillBundle[];
-	skillListItems: SkillListItem[];
-}
-
-function toLegacyBinding(artifact: StoreArtifact): ArtifactSourceBinding {
-	return {
-		sourceID: artifact.binding.sourceID,
-		locator: artifact.binding.locator,
-		subresourceLocator: artifact.binding.subresourceLocator,
-		expectedKind: artifact.kind,
-	};
-}
-
-function toLegacyArtifactView(bundle: SkillBundle, artifact: StoreArtifact, isManaged: boolean): SkillArtifactView {
-	const adoption: ArtifactAdoptionMode = isManaged
-		? ArtifactAdoptionModeValue.Pinned
-		: ArtifactAdoptionModeValue.Observed;
-
+function toManagedSkillArtifactView(artifact: StoreArtifact): SkillArtifactView {
 	return {
 		artifact: {
 			rootID: artifact.rootID,
@@ -162,16 +171,21 @@ function toLegacyArtifactView(bundle: SkillBundle, artifact: StoreArtifact, isMa
 		address: {
 			rootID: artifact.rootID,
 			artifactID: artifact.id,
-			collectionID: bundle.id,
 			kind: artifact.kind,
+			logicalName: artifact.logicalName,
 		},
 		revision: artifact.revision,
 		name: artifact.logicalName,
 		kind: artifact.kind,
 		enabled: artifact.enabled,
-		adoption,
+		adoption: ArtifactAdoptionMode.Pinned,
 		state: artifact.state,
-		binding: toLegacyBinding(artifact),
+		binding: {
+			sourceID: artifact.binding.sourceID,
+			locator: artifact.binding.locator,
+			subresourceLocator: artifact.binding.subresourceLocator,
+			expectedKind: artifact.kind,
+		},
 		definitionDigest: artifact.resolvedDefinition,
 		diagnostics: artifact.diagnostics,
 		createdAt: artifact.createdAt,
@@ -179,34 +193,27 @@ function toLegacyArtifactView(bundle: SkillBundle, artifact: StoreArtifact, isMa
 	};
 }
 
-interface ResolvedRuntimeArtifactSet {
-	definitions: RuntimeSkillDefinition[];
-	byArtifactKey: Map<string, ResolvedArtifactSkill>;
-	artifactByDefinitionKey: Map<string, ArtifactRef>;
-}
-
-interface PrefetchedRuntimeMetadata {
-	record?: RuntimeSkillRecord;
-	error?: string;
-}
-
-function isUserMutableCollection(collection: CollectionView): boolean {
-	// Baselines are application-provisioned and non-deletable, but their
-	// memberships and managed Source are intentionally writable.
-	return collection.baseline || collection.editable;
-}
-
-function isManagedSkillArtifact(bundle: SkillBundle, artifact: StoreArtifact): boolean {
-	const segments = artifact.binding.locator.split('/');
-
-	return (
-		!bundle.isBuiltIn &&
-		artifact.binding.sourceID === bundle.managedSourceID &&
-		!artifact.binding.subresourceLocator &&
-		segments.length === 4 &&
-		segments[0] === 'skill' &&
-		segments[3] === 'SKILL.md'
-	);
+function storeSkillListItemFromArtifact(
+	artifact: StoreArtifact,
+	options: {
+		builtIn: boolean;
+		managed: boolean;
+	}
+): StoreSkillListItem {
+	return {
+		ref: {
+			rootID: artifact.rootID,
+			artifactID: artifact.id,
+		},
+		name: artifact.logicalName,
+		displayName: artifact.displayName,
+		state: artifact.state,
+		enabled: artifact.enabled,
+		revision: artifact.revision,
+		definitionDigest: artifact.resolvedDefinition,
+		builtIn: options.builtIn,
+		managed: options.managed,
+	};
 }
 
 export class SkillManagementAPI {
@@ -221,10 +228,9 @@ export class SkillManagementAPI {
 	private readonly composerSkillsCatalog = createSharedAsyncCatalog<SkillListItem[]>(async () => {
 		const skills = await this.listSkills(undefined, false, true);
 
-		// projectSkill intentionally has an instructions fallback for generic
-		// management views. Composer routing must not use that fallback:
-		// otherwise a user-message template whose runtime metadata is
-		// temporarily unavailable would incorrectly appear in Skills.
+		// User-message Skills are the source for the Template UI. Runtime
+		// metadata is required here so an unavailable Skill is never guessed to
+		// be an instruction or template Skill.
 		return skills.filter(item => {
 			const skill = item.skillDefinition;
 
@@ -242,8 +248,8 @@ export class SkillManagementAPI {
 		const allowConfigured = options.allowArtifacts !== undefined;
 		const allowedRefs = options.allowArtifacts ?? [];
 		const allowedKeys = new Set(
-			allowedRefs.map(a => {
-				return artifactRefKey(a);
+			allowedRefs.map(r => {
+				return artifactRefKey(r);
 			})
 		);
 		const activeRefs = (options.activeArtifacts ?? []).filter(
@@ -258,6 +264,7 @@ export class SkillManagementAPI {
 
 			for (const ref of refs) {
 				const value = resolved.byArtifactKey.get(artifactRefKey(ref));
+
 				if (!value) {
 					throw new Error(`Runtime definition was not resolved for Skill ${ref.artifactID}.`);
 				}
@@ -279,7 +286,7 @@ export class SkillManagementAPI {
 			maxActivePerSession: options.maxActivePerSession,
 			allowedSkills: allowConfigured ? definitionsFor(allowedRefs) : undefined,
 			activeSkills: definitionsFor(activeRefs),
-		} as RuntimeSkillSessionOptions);
+		} satisfies RuntimeSkillSessionOptions);
 
 		const activeArtifacts: ArtifactRef[] = [];
 		const seen = new Set<string>();
@@ -306,6 +313,10 @@ export class SkillManagementAPI {
 
 	closeSkillSession(sessionID: string): Promise<void> {
 		return this.runtime.closeSkillSession(sessionID);
+	}
+
+	describeArtifactSkill(skill: ArtifactRef): Promise<ArtifactSkillSummary> {
+		return this.aggregate.describeArtifactSkill(skill);
 	}
 
 	async renderArtifactSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RuntimeSkillRenderResult> {
@@ -420,22 +431,25 @@ export class SkillManagementAPI {
 		includeDisabled = true,
 		includeRuntimeMetadata = true
 	): Promise<SkillManagementPageData> {
-		const collections = await this.store.listSkillCollectionsForManagement();
+		const [collections, artifacts] = await Promise.all([
+			this.store.listSkillCollectionsForManagement(),
+			this.store.listSkillsForManagement(),
+		]);
 		const skillBundles = this.skillBundlesFromCollections(collections, undefined, includeDisabled);
 		const skillListItems = await this.listSkillsFromCollections(
 			skillBundles,
 			collections,
+			artifacts,
 			includeDisabled,
 			includeRuntimeMetadata
 		);
 
-		return { skillBundles, skillListItems };
+		return {
+			skillBundles,
+			skillListItems,
+		};
 	}
 
-	/**
-	 * Shared declaration catalog for every mounted composer.
-	 * It is not a Skill Runtime session cache.
-	 */
 	listComposerSkills(force = false): Promise<SkillListItem[]> {
 		return this.composerSkillsCatalog.load(force);
 	}
@@ -446,94 +460,18 @@ export class SkillManagementAPI {
 		return this.skillBundlesFromCollections(collections, bundleIDs, includeDisabled);
 	}
 
-	private skillBundlesFromCollections(
-		collections: CollectionView[],
-		bundleIDs?: string[],
-		includeDisabled = true
-	): SkillBundle[] {
-		const requested = bundleIDs ? new Set(bundleIDs) : undefined;
-		return collections
-			.filter(collection => requested === undefined || requested.has(collection.artifact.id))
-			.filter(collection => includeDisabled || collection.artifact.enabled)
-			.map(s => {
-				return toSkillBundle(s);
-			})
-			.toSorted((left, right) => {
-				if (left.isBuiltIn !== right.isBuiltIn) {
-					return left.isBuiltIn ? -1 : 1;
-				}
-
-				return (left.displayName || left.slug).localeCompare(right.displayName || right.slug, undefined, {
-					sensitivity: 'base',
-				});
-			});
-	}
-
 	async listSkills(
 		bundleIDs?: string[],
 		includeDisabled = true,
 		includeRuntimeMetadata = true
 	): Promise<SkillListItem[]> {
-		const collections = await this.store.listSkillCollectionsForManagement();
+		const [collections, artifacts] = await Promise.all([
+			this.store.listSkillCollectionsForManagement(),
+			this.store.listSkillsForManagement(),
+		]);
 		const bundles = this.skillBundlesFromCollections(collections, bundleIDs, includeDisabled);
-		return this.listSkillsFromCollections(bundles, collections, includeDisabled, includeRuntimeMetadata);
-	}
 
-	private async listSkillsFromCollections(
-		bundles: SkillBundle[],
-		collections: CollectionView[],
-		includeDisabled: boolean,
-		includeRuntimeMetadata: boolean
-	): Promise<SkillListItem[]> {
-		const collectionsByID = new Map(collections.map(collection => [collection.artifact.id, collection] as const));
-		const candidateGroups = await Promise.all(
-			bundles.map(async bundle => {
-				const collection = collectionsByID.get(bundle.id);
-				if (!collection) {
-					throw new Error(`Skill Bundle ${bundle.id} disappeared while loading skills.`);
-				}
-				const artifacts = await this.listCollectionSkillArtifacts(collection);
-				return artifacts.map(artifact => ({ bundle, artifact }));
-			})
-		);
-		const candidates = candidateGroups.flat();
-
-		const runtimeMetadata = includeRuntimeMetadata
-			? await this.resolveRuntimeMetadata(candidates.map(candidate => candidate.artifact))
-			: new Map<string, PrefetchedRuntimeMetadata>();
-		const projected = await Promise.all(
-			candidates.map(({ bundle, artifact }) =>
-				this.projectSkill(
-					bundle,
-					artifact,
-					includeRuntimeMetadata,
-					runtimeMetadata.get(artifactRefKey({ rootID: artifact.rootID, artifactID: artifact.id }))
-				)
-			)
-		);
-
-		const output: SkillListItem[] = [];
-		for (const [index, skill] of projected.entries()) {
-			if (!includeDisabled && !skill.isEnabled) {
-				continue;
-			}
-			const bundle = candidates[index].bundle;
-			output.push({
-				bundleID: bundle.id,
-				bundleSlug: bundle.slug,
-				skillSlug: skill.slug,
-				skillDefinition: skill,
-			});
-		}
-
-		return output.toSorted((left, right) => {
-			const leftName = left.skillDefinition.displayName || left.skillDefinition.name || left.skillDefinition.slug;
-			const rightName = right.skillDefinition.displayName || right.skillDefinition.name || right.skillDefinition.slug;
-
-			return leftName.localeCompare(rightName, undefined, {
-				sensitivity: 'base',
-			});
-		});
+		return this.listSkillsFromCollections(bundles, collections, artifacts, includeDisabled, includeRuntimeMetadata);
 	}
 
 	async putSkillBundle(
@@ -546,7 +484,8 @@ export class SkillManagementAPI {
 	): Promise<void> {
 		const collections = await this.store.listSkillCollectionsForManagement();
 		const hasRequestedBaseline =
-			rootID !== '' && collections.some(collection => collection.baseline && collection.artifact.rootID === rootID);
+			rootID !== '' && collections.some(collection => collection.baseline && collection.ref.rootID === rootID);
+
 		if (rootID !== '' && !hasRequestedBaseline) {
 			throw new Error('The selected Root does not have a user Skill baseline.');
 		}
@@ -569,19 +508,20 @@ export class SkillManagementAPI {
 	async patchSkillBundle(bundleID: string, enabled: boolean): Promise<void> {
 		const collection = await this.resolveBundleCollection(bundleID);
 
-		await this.store.setSkillCollectionEnabled(collectionRef(collection), collection.artifact.revision, enabled);
+		await this.store.setSkillCollectionEnabled(collection.ref, collection.revision, enabled);
 		this.invalidateComposerSkillsCatalog();
 	}
 
 	async updateSkillBundleMetadata(bundleID: string, displayName: string, description?: string): Promise<void> {
 		const collection = await this.requireUserMutableBundle(bundleID);
+
 		if (collection.baseline || !collection.editable) {
-			throw new Error('Baseline Skill Bundle metadata is application-managed.');
+			throw new Error('Baseline Skill Collection metadata is application-managed.');
 		}
 
 		await this.store.updateSkillCollection({
-			collection: collectionRef(collection),
-			expectedRevision: collection.artifact.revision,
+			collection: collection.ref,
+			expectedRevision: collection.revision,
 			displayName,
 			description,
 		});
@@ -590,21 +530,30 @@ export class SkillManagementAPI {
 
 	async refreshSkillBundle(bundleID: string): Promise<void> {
 		const collection = await this.resolveBundleCollection(bundleID);
-		const artifacts = await this.listCollectionSkillArtifacts(collection);
-		const sources = new Map<string, { rootID: string; sourceID: string }>();
+		const listedArtifacts = await this.listCollectionSkillItemsForRead(collection);
+		const sourceRefs = new Map<string, { rootID: string; sourceID: string }>();
 
-		const addSource = (rootID: string, sourceID: string) => {
-			sources.set(`${rootID}:${sourceID}`, { rootID, sourceID });
-		};
+		// oxlint-disable-next-line unicorn/no-immediate-mutation
+		sourceRefs.set(`${collection.ref.rootID}:${collection.sourceID}`, {
+			rootID: collection.ref.rootID,
+			sourceID: collection.sourceID,
+		});
 
-		addSource(collection.artifact.rootID, collection.artifact.binding.sourceID);
+		const artifacts = await mapWithConcurrency(listedArtifacts, SKILL_READ_CONCURRENCY, item =>
+			this.store.getSkill(item.ref)
+		);
+
 		for (const artifact of artifacts) {
-			addSource(artifact.rootID, artifact.binding.sourceID);
+			sourceRefs.set(`${artifact.rootID}:${artifact.binding.sourceID}`, {
+				rootID: artifact.rootID,
+				sourceID: artifact.binding.sourceID,
+			});
 		}
 
-		for (const source of [...sources.values()].toSorted((left, right) => {
+		for (const source of [...sourceRefs.values()].toSorted((left, right) => {
 			const leftKey = `${left.rootID}:${left.sourceID}`;
 			const rightKey = `${right.rootID}:${right.sourceID}`;
+
 			return leftKey.localeCompare(rightKey);
 		})) {
 			await this.store.refreshSkillSource(source.rootID, source.sourceID);
@@ -617,12 +566,12 @@ export class SkillManagementAPI {
 		const collection = await this.resolveBundleCollection(bundleID);
 
 		if (!collection.deletable || collection.baseline) {
-			throw new Error('This Skill Bundle cannot be deleted.');
+			throw new Error('This Skill Collection cannot be deleted.');
 		}
 
 		await this.store.deleteSkillCollection({
-			collection: collectionRef(collection),
-			expectedRevision: collection.artifact.revision,
+			collection: collection.ref,
+			expectedRevision: collection.revision,
 		});
 		this.invalidateComposerSkillsCatalog();
 	}
@@ -632,29 +581,34 @@ export class SkillManagementAPI {
 		const skillMD = this.encodeManagedSkillMarkdown(input);
 
 		const result = await this.store.createManagedSkill({
-			collection: collectionRef(collection),
-			expectedCollectionRevision: collection.artifact.revision,
+			collection: collection.ref,
+			expectedCollectionRevision: collection.revision,
 			skillName: input.name,
 			skillMD,
 			enabled: input.isEnabled,
 		});
 
 		this.invalidateComposerSkillsCatalog();
-		const bundle = toSkillBundle(result.collection);
-		return this.projectSkill(bundle, result.artifact, true, undefined, true);
+
+		return this.projectSkill(
+			toSkillBundle(collectionListItemFromCollectionView(result.collection)),
+			storeSkillListItemFromArtifact(result.artifact, {
+				builtIn: false,
+				managed: true,
+			}),
+			true,
+			undefined,
+			true
+		);
 	}
 
 	async replaceManagedSkill(bundleID: string, artifactID: string, input: SkillArtifactCreateInput): Promise<void> {
 		const collection = await this.requireUserMutableBundle(bundleID);
-		const artifact = await this.findCollectionSkillArtifact(collection, artifactID);
-		const ref: ArtifactRef = {
-			rootID: artifact.rootID,
-			artifactID: artifact.id,
-		};
+		const artifact = await this.findCollectionSkillItem(collection, artifactID);
 		const bundle = toSkillBundle(collection);
 		const current = await this.projectSkill(bundle, artifact, true, undefined, true);
 
-		if (!current.isManaged) {
+		if (!artifact.managed || !current.isManaged) {
 			throw new Error('Only managed Skills can be edited.');
 		}
 		if (current.resources.hasResources || current.resources.totalCount > 0) {
@@ -663,14 +617,13 @@ export class SkillManagementAPI {
 			);
 		}
 
-		const skillMD = this.encodeManagedSkillMarkdown(input);
 		const request: ManagedSkillReplaceRequest = {
-			collection: collectionRef(collection),
-			expectedCollectionRevision: collection.artifact.revision,
-			artifact: ref,
+			collection: collection.ref,
+			expectedCollectionRevision: collection.revision,
+			artifact: artifact.ref,
 			expectedArtifactRevision: artifact.revision,
 			skillName: input.name,
-			skillMD,
+			skillMD: this.encodeManagedSkillMarkdown(input),
 			enabled: input.isEnabled,
 		};
 
@@ -680,18 +633,16 @@ export class SkillManagementAPI {
 
 	async getManagedSkillDocument(bundleID: string, artifactID: string): Promise<ManagedSkillDocumentView> {
 		const collection = await this.resolveBundleCollection(bundleID);
-		const artifact = await this.findCollectionSkillArtifact(collection, artifactID);
+		const artifact = await this.findCollectionSkillItem(collection, artifactID);
 
-		const managed = await this.store.getManagedSkillDocument({
-			rootID: artifact.rootID,
-			artifactID: artifact.id,
-		});
+		if (!artifact.managed) {
+			throw new Error('Only managed Skills expose editable Skill documents.');
+		}
 
-		const bundle = toSkillBundle(collection);
-		const isManaged = true;
+		const managed = await this.store.getManagedSkillDocument(artifact.ref);
 
 		return {
-			artifact: toLegacyArtifactView(bundle, managed.artifact, isManaged),
+			artifact: toManagedSkillArtifactView(managed.artifact),
 			document: managed.document,
 		};
 	}
@@ -700,25 +651,28 @@ export class SkillManagementAPI {
 		let collection = await this.requireUserMutableBundle(bundleID);
 
 		const source = await this.store.registerSkillDirectory({
-			rootID: collection.artifact.rootID,
+			rootID: collection.ref.rootID,
 			rootPath,
 			sourceDisplayName,
 		});
 
-		const discovered = await this.store.listSkills(collection.artifact.rootID);
-
+		const listed = await this.store.listSkills(collection.ref.rootID);
+		const discovered = await mapWithConcurrency(listed, SKILL_READ_CONCURRENCY, item => this.store.getSkill(item.ref));
 		const sourceSkills = discovered.filter(artifact => artifact.binding.sourceID === source.id);
 
 		for (const artifact of sourceSkills) {
-			collection = await this.store.attachSkillArtifactToCollection({
-				collection: collectionRef(collection),
-				expectedRevision: collection.artifact.revision,
+			const updated = await this.store.attachSkillArtifactToCollection({
+				collection: collection.ref,
+				expectedRevision: collection.revision,
 				artifact: {
 					rootID: artifact.rootID,
 					artifactID: artifact.id,
 				},
 			});
+
+			collection = collectionListItemFromCollectionView(updated);
 		}
+
 		this.invalidateComposerSkillsCatalog();
 	}
 
@@ -733,18 +687,15 @@ export class SkillManagementAPI {
 	): Promise<void> {
 		if (displayName !== undefined || description !== undefined || tags !== undefined) {
 			const collection = await this.requireUserMutableBundle(bundleID);
-			const artifact = await this.findCollectionSkillArtifact(collection, artifactID);
-			const ref: ArtifactRef = {
-				rootID: artifact.rootID,
-				artifactID: artifact.id,
-			};
-			const managed = await this.store.getManagedSkillDocument(ref);
-			const bundle = toSkillBundle(collection);
-			const current = await this.projectSkill(bundle, artifact, true, undefined, true);
+			const artifact = await this.findCollectionSkillItem(collection, artifactID);
 
-			if (!current.isManaged) {
+			if (!artifact.managed) {
 				throw new Error('Only managed Skills can be edited.');
 			}
+
+			const managed = await this.store.getManagedSkillDocument(artifact.ref);
+			const current = await this.projectSkill(toSkillBundle(collection), artifact, true, undefined, true);
+
 			if (current.resources.hasResources || current.resources.totalCount > 0) {
 				throw new Error(
 					'Skills with package resources cannot be edited yet. Fork the Skill to create a new managed Skill.'
@@ -761,7 +712,6 @@ export class SkillManagementAPI {
 				markdownBody: managed.document.markdownBody,
 				isEnabled: isEnabled ?? artifact.enabled,
 			});
-			this.invalidateComposerSkillsCatalog();
 			return;
 		}
 
@@ -770,35 +720,23 @@ export class SkillManagementAPI {
 		}
 
 		const collection = await this.resolveBundleCollection(bundleID);
-		const artifact = await this.findCollectionSkillArtifact(collection, artifactID);
+		const artifact = await this.findCollectionSkillItem(collection, artifactID);
 
-		await this.store.setSkillEnabled(
-			{
-				rootID: artifact.rootID,
-				artifactID: artifact.id,
-			},
-			artifact.revision,
-			isEnabled
-		);
+		await this.store.setSkillEnabled(artifact.ref, artifact.revision, isEnabled);
 		this.invalidateComposerSkillsCatalog();
 	}
 
 	async deleteSkill(bundleID: string, artifactID: string): Promise<void> {
 		const collection = await this.requireUserMutableBundle(bundleID);
-		const artifact = await this.findCollectionSkillArtifact(collection, artifactID);
-		const ref: ArtifactRef = {
-			rootID: artifact.rootID,
-			artifactID: artifact.id,
-		};
-
-		const memberships = await this.store.listSkillCollectionMemberships(ref);
+		const artifact = await this.findCollectionSkillItem(collection, artifactID);
+		const memberships = await this.store.listSkillCollectionMemberships(artifact.ref);
 		const membership = memberships.find(
 			value =>
-				value.collection.rootID === collection.artifact.rootID && value.collection.artifactID === collection.artifact.id
+				value.collection.rootID === collection.ref.rootID && value.collection.artifactID === collection.ref.artifactID
 		);
 
 		if (!membership) {
-			throw new Error('Skill is not a direct member of this Skill Bundle.');
+			throw new Error('Skill is not a direct member of this Skill Collection.');
 		}
 
 		await this.store.removeSkillCollectionMember({
@@ -809,25 +747,16 @@ export class SkillManagementAPI {
 
 		this.invalidateComposerSkillsCatalog();
 
-		let isManaged: boolean;
-		try {
-			await this.store.getManagedSkillDocument(ref);
-			isManaged = true;
-		} catch {
-			isManaged = false;
-		}
-
-		if (!isManaged) {
+		if (!artifact.managed) {
 			return;
 		}
 
-		const remainingMemberships = await this.store.listSkillCollectionMemberships(ref);
-
+		const remainingMemberships = await this.store.listSkillCollectionMemberships(artifact.ref);
 		if (remainingMemberships.length > 0) {
 			return;
 		}
 
-		await this.store.purgeSkill(ref, artifact.revision);
+		await this.store.purgeSkill(artifact.ref, artifact.revision);
 	}
 
 	async renderSkill(skill: ArtifactRef, args?: Record<string, string>): Promise<RenderSkillResponse> {
@@ -856,50 +785,158 @@ export class SkillManagementAPI {
 		return this.modelPresetStore.resolveMappedModelTarget(target);
 	}
 
-	private async resolveBundleCollection(bundleID: string): Promise<CollectionView> {
+	private skillBundlesFromCollections(
+		collections: CollectionListItem[],
+		bundleIDs?: string[],
+		includeDisabled = true
+	): SkillBundle[] {
+		const requested = bundleIDs ? new Set(bundleIDs) : undefined;
+
+		return collections
+			.filter(collection => requested === undefined || requested.has(collection.ref.artifactID))
+			.filter(collection => includeDisabled || collection.enabled)
+			.map(b => {
+				return toSkillBundle(b);
+			})
+			.toSorted((left, right) => {
+				if (left.isBuiltIn !== right.isBuiltIn) {
+					return left.isBuiltIn ? -1 : 1;
+				}
+
+				return (left.displayName || left.slug).localeCompare(right.displayName || right.slug, undefined, {
+					sensitivity: 'base',
+				});
+			});
+	}
+
+	private async listSkillsFromCollections(
+		bundles: SkillBundle[],
+		collections: CollectionListItem[],
+		artifacts: StoreSkillListItem[],
+		includeDisabled: boolean,
+		includeRuntimeMetadata: boolean
+	): Promise<SkillListItem[]> {
+		const collectionsByID = new Map(collections.map(collection => [collection.ref.artifactID, collection] as const));
+		const artifactsByRef = new Map(artifacts.map(artifact => [artifactRefKey(artifact.ref), artifact] as const));
+
+		const candidateGroups = await mapWithConcurrency(bundles, SKILL_READ_CONCURRENCY, async bundle => {
+			const collection = collectionsByID.get(bundle.id);
+
+			if (!collection) {
+				throw new Error(`Skill Collection ${bundle.id} disappeared while loading Skills.`);
+			}
+
+			const members = await this.listCollectionSkillItems(collection, artifactsByRef);
+
+			return members.map(artifact => ({
+				bundle,
+				artifact,
+			}));
+		});
+		const candidates = candidateGroups.flat();
+
+		const runtimeMetadata = includeRuntimeMetadata
+			? await this.resolveRuntimeMetadata(candidates.map(candidate => candidate.artifact))
+			: new Map<string, PrefetchedRuntimeMetadata>();
+
+		const projected = await Promise.all(
+			candidates.map(({ bundle, artifact }) =>
+				this.projectSkill(bundle, artifact, includeRuntimeMetadata, runtimeMetadata.get(artifactRefKey(artifact.ref)))
+			)
+		);
+
+		const output: SkillListItem[] = [];
+
+		for (const [index, skill] of projected.entries()) {
+			if (!includeDisabled && !skill.isEnabled) {
+				continue;
+			}
+
+			const bundle = candidates[index].bundle;
+			output.push({
+				bundleID: bundle.id,
+				bundleSlug: bundle.slug,
+				skillSlug: skill.slug,
+				skillDefinition: skill,
+			});
+		}
+
+		return output.toSorted((left, right) => {
+			const leftName = left.skillDefinition.displayName || left.skillDefinition.name || left.skillDefinition.slug;
+			const rightName = right.skillDefinition.displayName || right.skillDefinition.name || right.skillDefinition.slug;
+
+			return leftName.localeCompare(rightName, undefined, {
+				sensitivity: 'base',
+			});
+		});
+	}
+
+	private async resolveBundleCollection(bundleID: string): Promise<CollectionListItem> {
 		const collections = await this.store.listSkillCollectionsForManagement();
-		const collection = collections.find(value => value.artifact.id === bundleID);
+		const collection = collections.find(value => value.ref.artifactID === bundleID);
 
 		if (!collection) {
-			throw new Error('Skill Bundle not found.');
+			throw new Error('Skill Collection not found.');
 		}
 
 		return collection;
 	}
 
-	private async requireUserMutableBundle(bundleID: string): Promise<CollectionView> {
+	private async requireUserMutableBundle(bundleID: string): Promise<CollectionListItem> {
 		const collection = await this.resolveBundleCollection(bundleID);
 
 		if (!isUserMutableCollection(collection)) {
-			throw new Error('This Skill Bundle only supports enable and disable actions.');
+			throw new Error('This Skill Collection only supports enable and disable actions.');
 		}
 
 		return collection;
 	}
 
-	private async listCollectionSkillArtifacts(collection: CollectionView): Promise<StoreArtifact[]> {
-		const plan = await this.store.resolveSkillCollection(collectionRef(collection));
-		const refs = new Map<string, ArtifactRef>();
+	private async listCollectionSkillItems(
+		collection: CollectionListItem,
+		availableByRef: ReadonlyMap<string, StoreSkillListItem>
+	): Promise<StoreSkillListItem[]> {
+		const plan = await this.store.resolveSkillCollection(collection.ref);
+		const output: StoreSkillListItem[] = [];
+		const seen = new Set<string>();
 
-		// Empty Collection capability plans can cross the Wails boundary as
-		// null. They represent an empty Collection, not a failed operation.
-		for (const occurrence of plan?.occurrences ?? []) {
+		for (const occurrence of plan.occurrences ?? []) {
 			if (occurrence.type !== 'skill' || occurrence.status !== 'available' || !occurrence.artifact) {
 				continue;
 			}
 
-			refs.set(artifactRefKey(occurrence.artifact), occurrence.artifact);
+			const key = artifactRefKey(occurrence.artifact);
+			if (seen.has(key)) {
+				continue;
+			}
+
+			seen.add(key);
+
+			const item = availableByRef.get(key);
+			if (item) {
+				output.push(item);
+			}
 		}
 
-		return Promise.all([...refs.values()].map(ref => this.store.getSkill(ref)));
+		return output;
 	}
 
-	private async findCollectionSkillArtifact(collection: CollectionView, artifactID: string): Promise<StoreArtifact> {
-		const artifacts = await this.listCollectionSkillArtifacts(collection);
-		const artifact = artifacts.find(value => value.id === artifactID);
+	private async listCollectionSkillItemsForRead(collection: CollectionListItem): Promise<StoreSkillListItem[]> {
+		const artifacts = await this.store.listSkills(collection.ref.rootID);
+		const byRef = new Map(artifacts.map(artifact => [artifactRefKey(artifact.ref), artifact] as const));
+
+		return this.listCollectionSkillItems(collection, byRef);
+	}
+
+	private async findCollectionSkillItem(
+		collection: CollectionListItem,
+		artifactID: string
+	): Promise<StoreSkillListItem> {
+		const artifacts = await this.listCollectionSkillItemsForRead(collection);
+		const artifact = artifacts.find(value => value.ref.artifactID === artifactID);
 
 		if (!artifact) {
-			throw new Error('Skill is not a resolved member of this Skill Bundle.');
+			throw new Error('Skill is not a resolved member of this Skill Collection.');
 		}
 
 		return artifact;
@@ -907,26 +944,18 @@ export class SkillManagementAPI {
 
 	private async projectSkill(
 		bundle: SkillBundle,
-		artifact: StoreArtifact,
+		artifact: StoreSkillListItem,
 		includeRuntimeMetadata: boolean,
 		prefetchedRuntime?: PrefetchedRuntimeMetadata,
 		loadManagedDocument = false
 	): Promise<Skill> {
-		const ref: ArtifactRef = {
-			rootID: artifact.rootID,
-			artifactID: artifact.id,
-		};
-
+		const ref = artifact.ref;
+		const isManaged = artifact.managed && !bundle.isBuiltIn;
 		let managedDocument: SkillDocumentInput | undefined;
-		const isManaged = isManagedSkillArtifact(bundle, artifact);
 
-		// Management lists must not open one verified Source session per
-		// Skill. The complete managed document is loaded only by direct
-		// create/edit/view workflows.
 		if (isManaged && loadManagedDocument) {
 			try {
-				const result = await this.store.getManagedSkillDocument(ref);
-				managedDocument = result.document;
+				managedDocument = (await this.store.getManagedSkillDocument(ref)).document;
 			} catch {
 				managedDocument = undefined;
 			}
@@ -936,7 +965,7 @@ export class SkillManagementAPI {
 		let runtimeError: string | undefined;
 
 		if (includeRuntimeMetadata) {
-			if (prefetchedRuntime !== undefined) {
+			if (prefetchedRuntime) {
 				runtimeRecord = prefetchedRuntime.record;
 				runtimeError = prefetchedRuntime.error;
 			} else {
@@ -959,54 +988,46 @@ export class SkillManagementAPI {
 
 		return {
 			schemaVersion: 'collection/v1',
-			id: artifact.id,
+			id: artifact.ref.artifactID,
 			ref,
 			revision: artifact.revision,
-			slug: artifact.logicalName,
-			name: runtimeRecord?.name || managedDocument?.name || artifact.logicalName,
-			displayName:
-				runtimeRecord?.displayName || managedDocument?.displayName || artifact.displayName || artifact.logicalName,
-			description: runtimeRecord?.description || managedDocument?.description,
-			type: bundle.isBuiltIn ? SkillType.EmbeddedFS : SkillType.FS,
-			location: runtimeRecord?.def.location || artifact.binding.locator,
+			slug: artifact.name,
+			name: runtimeRecord?.name || managedDocument?.name || artifact.name,
+			displayName: runtimeRecord?.displayName || managedDocument?.displayName || artifact.displayName || artifact.name,
+			description: runtimeRecord?.description || managedDocument?.description || artifact.description,
+			type: artifact.builtIn ? SkillType.EmbeddedFS : SkillType.FS,
+			location: runtimeRecord?.def.location ?? '',
 			insert,
 			arguments: runtimeRecord?.arguments ?? managedDocument?.arguments,
 			tags: runtimeRecord?.tags ?? managedDocument?.tags,
 			resources: runtimeRecord?.resources ?? emptyResources(),
-			digest: runtimeRecord?.digest ?? artifact.resolvedDefinition,
+			digest: runtimeRecord?.digest ?? artifact.definitionDigest,
 			rawFrontmatter: runtimeRecord?.rawFrontmatter ?? managedDocument?.rawFrontmatter,
 			runtimeWarnings: runtimeRecord?.warnings,
 			runtimeError,
 			presence: {
 				status: presenceStatusFor(artifact),
-				lastCheckedAt: artifact.modifiedAt,
-				lastSeenAt: artifact.state === ArtifactState.Available ? artifact.modifiedAt : undefined,
-				missingSince: artifact.state === ArtifactState.Missing ? artifact.modifiedAt : undefined,
 				lastCheckError:
 					artifact.state === ArtifactState.Invalid || artifact.state === ArtifactState.Incompatible
-						? artifact.diagnostics?.map(diagnostic => diagnostic.message).join('\n')
+						? 'The Artifact Store reported an invalid or incompatible Skill.'
 						: runtimeError,
 			},
 			isEnabled: artifact.enabled,
-			isBuiltIn: bundle.isBuiltIn,
+			isBuiltIn: artifact.builtIn,
 			isManaged,
-			adoption: isManaged ? ArtifactAdoptionModeValue.Pinned : ArtifactAdoptionModeValue.Observed,
+			adoption: isManaged ? ArtifactAdoptionMode.Pinned : ArtifactAdoptionMode.Observed,
 			state: artifact.state,
-			diagnostics: artifact.diagnostics,
-			createdAt: artifact.createdAt,
-			modifiedAt: artifact.modifiedAt,
 		};
 	}
 
-	private async resolveRuntimeMetadata(artifacts: StoreArtifact[]): Promise<Map<string, PrefetchedRuntimeMetadata>> {
+	private async resolveRuntimeMetadata(
+		artifacts: StoreSkillListItem[]
+	): Promise<Map<string, PrefetchedRuntimeMetadata>> {
 		const output = new Map<string, PrefetchedRuntimeMetadata>();
 		const refsByRoot = new Map<string, Map<string, ArtifactRef>>();
 
 		for (const artifact of artifacts) {
-			const ref: ArtifactRef = {
-				rootID: artifact.rootID,
-				artifactID: artifact.id,
-			};
+			const ref = artifact.ref;
 			const key = artifactRefKey(ref);
 
 			if (artifact.state !== ArtifactState.Available) {
@@ -1015,6 +1036,7 @@ export class SkillManagementAPI {
 				});
 				continue;
 			}
+
 			if (!artifact.enabled) {
 				output.set(key, {
 					error: 'Runtime metadata is unavailable because this Skill is disabled.',
@@ -1022,20 +1044,25 @@ export class SkillManagementAPI {
 				continue;
 			}
 
-			const refs = refsByRoot.get(ref.rootID) ?? new Map<string, ArtifactRef>();
-			refs.set(artifactRefKey(ref), ref);
-			refsByRoot.set(ref.rootID, refs);
+			const rootRefs = refsByRoot.get(ref.rootID) ?? new Map<string, ArtifactRef>();
+			rootRefs.set(key, ref);
+			refsByRoot.set(ref.rootID, rootRefs);
 		}
 
 		const resolved: ResolvedArtifactSkill[] = [];
-		for (const refsByKey of refsByRoot.values()) {
-			const refs = [...refsByKey.values()];
+
+		for (const rootRefs of refsByRoot.values()) {
+			const refs = [...rootRefs.values()];
+
 			try {
 				resolved.push(...(await this.aggregate.resolveArtifactSkills(refs)));
 			} catch (error) {
 				const message = getErrorMessage(error, 'Runtime metadata is unavailable for this Skill Root.');
+
 				for (const ref of refs) {
-					output.set(artifactRefKey(ref), { error: message });
+					output.set(artifactRefKey(ref), {
+						error: message,
+					});
 				}
 			}
 		}
@@ -1045,6 +1072,7 @@ export class SkillManagementAPI {
 		}
 
 		let records: RuntimeSkillRecord[];
+
 		try {
 			records =
 				(await this.runtime.listRuntimeSkills({
@@ -1052,18 +1080,28 @@ export class SkillManagementAPI {
 				})) ?? [];
 		} catch (error) {
 			const message = getErrorMessage(error, 'Runtime metadata is unavailable.');
+
 			for (const value of resolved) {
-				output.set(artifactRefKey(value.Artifact), { error: message });
+				output.set(artifactRefKey(value.Artifact), {
+					error: message,
+				});
 			}
+
 			return output;
 		}
 
 		const recordsByDefinition = new Map(records.map(record => [runtimeDefinitionKey(record.def), record] as const));
+
 		for (const value of resolved) {
 			const record = recordsByDefinition.get(runtimeDefinitionKey(value.Definition));
+
 			output.set(
 				artifactRefKey(value.Artifact),
-				record ? { record } : { error: 'The runtime did not index this Skill after catalog synchronization.' }
+				record
+					? { record }
+					: {
+							error: 'The runtime did not index this Skill after catalog synchronization.',
+						}
 			);
 		}
 
@@ -1086,7 +1124,6 @@ export class SkillManagementAPI {
 		}
 
 		const values = await this.aggregate.resolveArtifactSkills([...uniqueRefs.values()]);
-
 		const definitions: RuntimeSkillDefinition[] = [];
 		const byArtifactKey = new Map<string, ResolvedArtifactSkill>();
 		const artifactByDefinitionKey = new Map<string, ArtifactRef>();
@@ -1131,6 +1168,7 @@ export class SkillManagementAPI {
 
 		if (input.tags?.length) {
 			lines.push('tags:');
+
 			for (const tag of input.tags) {
 				lines.push(`  - ${this.yamlString(tag)}`);
 			}
@@ -1138,8 +1176,10 @@ export class SkillManagementAPI {
 
 		if (input.arguments?.length) {
 			lines.push('arguments:');
+
 			for (const argument of input.arguments) {
 				lines.push(`  - name: ${this.yamlString(argument.name)}`);
+
 				if (argument.description?.trim()) {
 					lines.push(`    description: ${this.yamlString(argument.description.trim())}`);
 				}

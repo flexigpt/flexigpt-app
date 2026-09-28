@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { FiChevronDown, FiChevronUp, FiDownload, FiEdit2, FiEye, FiPlus, FiTrash2, FiUpload } from 'react-icons/fi';
+import {
+	FiChevronDown,
+	FiChevronUp,
+	FiDownload,
+	FiEdit2,
+	FiEye,
+	FiPlus,
+	FiRefreshCw,
+	FiTrash2,
+	FiUpload,
+} from 'react-icons/fi';
 
 import type { AgentImportCommitResult, AgentImportDestination, AgentView } from '@/spec/agent';
-import type { CollectionView } from '@/spec/collection';
+import type { CollectionListItem, CollectionView } from '@/spec/collection';
 import { ArtifactState } from '@/spec/artifact';
+import { collectionListItemFromCollectionView } from '@/spec/collection';
 
 import { throwIfAborted } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import type { AgentCollectionData, AgentManagementPageData } from '@/apis/agent_management';
 import {
 	agentArtifactRef,
 	agentCollectionKey,
-	agentCollectionRef,
 	agentDisplayName,
 	canDeleteAgentCollection,
 	canEditAgentCollectionMetadata,
@@ -64,21 +75,35 @@ interface AgentManagementPageDataLoad {
 	promise: Promise<AgentManagementPageData>;
 }
 
+interface CollectionDetailsState {
+	collection: CollectionListItem;
+	view?: CollectionView;
+	error?: string;
+	loading: boolean;
+}
+
 let agentManagementPageDataCache: AgentManagementPageDataCache | undefined;
 let agentManagementPageDataLoad: AgentManagementPageDataLoad | undefined;
 let agentManagementPageDataCacheGeneration = 0;
 
-function invalidateAgentManagementPageDataCache() {
+function invalidateAgentManagementPageDataCache(): void {
 	agentManagementPageDataCacheGeneration += 1;
 	agentManagementPageDataCache = undefined;
 }
 
-function rememberAgentManagementPageData(data: AgentManagementPageData) {
-	agentManagementPageDataCacheGeneration += 1;
+function rememberAgentManagementPageData(data: AgentManagementPageData): void {
 	agentManagementPageDataCache = {
 		data,
 		loadedAt: Date.now(),
 	};
+}
+
+function agentRefKey(agent: AgentView): string {
+	return `${agent.ref.rootID}:${agent.ref.artifactID}`;
+}
+
+function collectionRefKey(collection: CollectionListItem): string {
+	return `${collection.ref.rootID}:${collection.ref.artifactID}`;
 }
 
 async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentManagementPageData> {
@@ -91,14 +116,23 @@ async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentMa
 
 	const generation = agentManagementPageDataCacheGeneration;
 	let load = agentManagementPageDataLoad;
+
 	if (!load || load.generation !== generation) {
 		const promise = agentManagementAPI.loadManagementPageData(new AbortController().signal).then(data => {
 			if (agentManagementPageDataCacheGeneration === generation) {
-				agentManagementPageDataCache = { data, loadedAt: Date.now() };
+				agentManagementPageDataCache = {
+					data,
+					loadedAt: Date.now(),
+				};
 			}
+
 			return data;
 		});
-		load = { generation, promise };
+
+		load = {
+			generation,
+			promise,
+		};
 		agentManagementPageDataLoad = load;
 
 		const clear = () => {
@@ -116,16 +150,17 @@ async function loadAgentManagementPageData(signal: AbortSignal): Promise<AgentMa
 
 interface AgentCollectionCardProps {
 	data: AgentCollectionData;
-	onLoadAgents: (collection: CollectionView) => Promise<void>;
-	onViewCollection: (collection: CollectionView) => void;
-	onEditCollection: (collection: CollectionView) => void;
-	onDeleteCollection: (collection: CollectionView) => void;
+	onLoadAgents: (collection: CollectionListItem) => Promise<void>;
+	onViewCollection: (collection: CollectionListItem) => void;
+	onEditCollection: (collection: CollectionListItem) => void;
+	onDeleteCollection: (collection: CollectionListItem) => void;
 	onImportAgent: (destination: AgentImportDestination) => void;
-	onToggleCollectionEnabled: (collection: CollectionView, enabled: boolean) => Promise<void>;
+	onToggleCollectionEnabled: (collection: CollectionListItem, enabled: boolean) => Promise<void>;
 	onViewAgent: (agent: AgentView) => void;
 	onExportAgent: (agent: AgentView) => Promise<void>;
 	onDeleteAgent: (agent: AgentView) => void;
 	onToggleAgentEnabled: (agent: AgentView, enabled: boolean) => Promise<void>;
+	onActionError: (message: string) => void;
 }
 
 function AgentCollectionCard({
@@ -140,18 +175,40 @@ function AgentCollectionCard({
 	onExportAgent,
 	onDeleteAgent,
 	onToggleAgentEnabled,
+	onActionError,
 }: AgentCollectionCardProps) {
 	const [isExpanded, setIsExpanded] = useState(false);
+	const { isPending, runAction } = usePendingActions();
+
 	const collection = data.collection;
 	const builtIn = isBuiltInAgentCollection(collection);
 	const displayName = collectionDisplayName(collection);
 	const secondaryName = displayName === collection.name ? undefined : collection.name;
+	const collectionAvailable = collection.state === ArtifactState.Available;
+
+	const run = (key: string, action: () => Promise<void>, fallback: string) => {
+		void runAction(key, action).catch((error: unknown) => {
+			onActionError(getErrorMessage(error, fallback));
+		});
+	};
 
 	const loadAgents = () => {
 		if (data.agentsLoaded || data.isLoadingAgents) {
 			return;
 		}
-		void onLoadAgents(collection);
+
+		void onLoadAgents(collection).catch((error: unknown) => {
+			onActionError(getErrorMessage(error, 'Agents could not be loaded for this Collection.'));
+		});
+	};
+
+	const toggleExpanded = () => {
+		const next = !isExpanded;
+		setIsExpanded(next);
+
+		if (next) {
+			loadAgents();
+		}
 	};
 
 	return (
@@ -161,9 +218,12 @@ function AgentCollectionCard({
 			description={collection.description}
 			status={
 				<>
-					<StatusBadge tone={collection.artifact.enabled ? 'success' : 'neutral'}>
-						{collection.artifact.enabled ? 'Enabled' : 'Disabled'}
+					<StatusBadge tone={collection.enabled ? 'success' : 'neutral'}>
+						{collection.enabled ? 'Enabled' : 'Disabled'}
 					</StatusBadge>
+					{collection.state !== ArtifactState.Available ? (
+						<StatusBadge tone="warning">{collection.state}</StatusBadge>
+					) : null}
 					{builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
 					{collection.baseline ? <StatusBadge>Baseline</StatusBadge> : null}
 				</>
@@ -173,30 +233,31 @@ function AgentCollectionCard({
 					type="button"
 					className="btn btn-sm btn-ghost rounded-xl"
 					aria-expanded={isExpanded}
-					onClick={() => {
-						const next = !isExpanded;
-						setIsExpanded(next);
-						if (next) {
-							loadAgents();
-						}
-					}}
+					onClick={toggleExpanded}
 				>
 					<span>
 						{data.isLoadingAgents
 							? 'Loading Agents...'
 							: data.agentsLoaded
 								? `Agents: ${data.agents.length}`
-								: 'Agents: not loaded'}
+								: `Agents: ${collection.memberCount}`}
 					</span>
 					{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 				</button>
 			}
 			actionLeading={
 				<EnabledControl
-					id={`agent-collection-${collection.artifact.rootID}-${collection.artifact.id}`}
-					checked={collection.artifact.enabled}
-					onChange={() => {
-						void onToggleCollectionEnabled(collection, !collection.artifact.enabled);
+					id={`agent-collection-${collection.ref.rootID}-${collection.ref.artifactID}`}
+					checked={collection.enabled}
+					disabled={!collectionAvailable || isPending('collection:toggle')}
+					busy={isPending('collection:toggle')}
+					title={!collectionAvailable ? 'This Agent Collection is unavailable.' : undefined}
+					onChange={enabled => {
+						run(
+							'collection:toggle',
+							() => onToggleCollectionEnabled(collection, enabled),
+							'Failed to update Agent Collection enablement.'
+						);
 					}}
 				/>
 			}
@@ -226,14 +287,13 @@ function AgentCollectionCard({
 						</button>
 					) : null}
 
-					{data.importDestination ? (
+					{data.importDestination !== undefined && data.importDestination !== null ? (
 						<button
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={!collectionAvailable}
 							onClick={() => {
-								if (data.importDestination) {
-									onImportAgent(data.importDestination);
-								}
+								onImportAgent(data.importDestination as AgentImportDestination);
 							}}
 						>
 							<FiUpload size={16} />
@@ -246,6 +306,15 @@ function AgentCollectionCard({
 							type="button"
 							className="btn btn-sm btn-ghost rounded-xl"
 							disabled={!data.agentsLoaded || data.agents.length > 0 || Boolean(data.agentLoadError)}
+							title={
+								!data.agentsLoaded
+									? 'Load Collection Agents before deletion.'
+									: data.agentLoadError
+										? 'Reload Collection Agents before deletion.'
+										: data.agents.length > 0
+											? 'Remove all Agents before deleting this Collection.'
+											: undefined
+							}
 							onClick={() => {
 								onDeleteCollection(collection);
 							}}
@@ -266,8 +335,11 @@ function AgentCollectionCard({
 					<button
 						type="button"
 						className="btn btn-sm rounded-xl"
+						disabled={data.isLoadingAgents}
 						onClick={() => {
-							void onLoadAgents(collection);
+							void onLoadAgents(collection).catch((error: unknown) => {
+								onActionError(getErrorMessage(error, 'Agents could not be loaded for this Collection.'));
+							});
 						}}
 					>
 						Retry
@@ -283,82 +355,104 @@ function AgentCollectionCard({
 								? 'Loading Agents in this Collection...'
 								: data.agentLoadError
 									? 'Agent contents are unavailable.'
-									: 'Expand this Collection to load its Agents.'}
+									: 'Agent contents have not been loaded.'}
 						</ManagementEmptyState>
 					) : null}
 
 					{data.agentsLoaded
-						? data.agents.map(agent => (
-								<ManagementItemCard
-									key={`${agent.artifact.rootID}:${agent.artifact.id}`}
-									title={agentDisplayName(agent)}
-									subtitle={agent.name === agentDisplayName(agent) ? undefined : agent.name}
-									description={agent.description}
-									status={
-										<>
-											<StatusBadge tone={agent.artifact.enabled ? 'success' : 'neutral'}>
-												{agent.artifact.enabled ? 'Enabled' : 'Disabled'}
-											</StatusBadge>
-											{agent.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
-											{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
-										</>
-									}
-									metadata={<MetadataPill label="State">{agent.artifact.state}</MetadataPill>}
-								>
-									<ActionRow
-										leading={
-											<EnabledControl
-												id={`agent-${agent.artifact.rootID}-${agent.artifact.id}`}
-												checked={agent.artifact.enabled}
-												onChange={() => {
-													void onToggleAgentEnabled(agent, !agent.artifact.enabled);
-												}}
-											/>
+						? data.agents.map(agent => {
+								const agentAvailable = agent.state === ArtifactState.Available;
+								const toggleKey = `agent:${agent.ref.rootID}:${agent.ref.artifactID}:toggle`;
+								const exportKey = `agent:${agent.ref.rootID}:${agent.ref.artifactID}:export`;
+
+								return (
+									<ManagementItemCard
+										key={agentRefKey(agent)}
+										title={agentDisplayName(agent)}
+										subtitle={agent.name === agentDisplayName(agent) ? undefined : agent.name}
+										description={agent.description}
+										status={
+											<>
+												<StatusBadge tone={agent.enabled ? 'success' : 'neutral'}>
+													{agent.enabled ? 'Enabled' : 'Disabled'}
+												</StatusBadge>
+												{agent.state !== ArtifactState.Available ? (
+													<StatusBadge tone="warning">{agent.state}</StatusBadge>
+												) : null}
+												{agent.builtIn ? <StatusBadge>Built-in</StatusBadge> : null}
+												{agent.managed ? <StatusBadge>Managed</StatusBadge> : null}
+											</>
+										}
+										metadata={
+											<>
+												<MetadataPill label="Revision">{agent.revision}</MetadataPill>
+												{agent.definitionDigest ? <MetadataPill label="Definition">Available</MetadataPill> : null}
+											</>
 										}
 									>
-										<button
-											type="button"
-											className="btn btn-sm btn-ghost rounded-xl"
-											onClick={() => {
-												onViewAgent(agent);
-											}}
+										<ActionRow
+											leading={
+												<EnabledControl
+													id={`agent-${agent.ref.rootID}-${agent.ref.artifactID}`}
+													checked={agent.enabled}
+													disabled={!agentAvailable || isPending(toggleKey)}
+													busy={isPending(toggleKey)}
+													title={!agentAvailable ? 'This Agent Artifact is unavailable.' : undefined}
+													onChange={enabled => {
+														run(
+															toggleKey,
+															() => onToggleAgentEnabled(agent, enabled),
+															'Failed to update Agent enablement.'
+														);
+													}}
+												/>
+											}
 										>
-											<FiEye size={15} />
-											<span>View</span>
-										</button>
-
-										{agent.artifact.state === ArtifactState.Available ? (
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"
 												onClick={() => {
-													void onExportAgent(agent);
+													onViewAgent(agent);
 												}}
 											>
-												<FiDownload size={15} />
-												<span>Export</span>
+												<FiEye size={15} />
+												<span>View</span>
 											</button>
-										) : null}
 
-										{agent.managed && !agent.builtIn ? (
-											<button
-												type="button"
-												className="btn btn-sm btn-ghost rounded-xl"
-												onClick={() => {
-													onDeleteAgent(agent);
-												}}
-											>
-												<FiTrash2 size={15} />
-												<span>Delete</span>
-											</button>
-										) : null}
-									</ActionRow>
-								</ManagementItemCard>
-							))
+											{agentAvailable ? (
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													disabled={isPending(exportKey)}
+													onClick={() => {
+														run(exportKey, () => onExportAgent(agent), 'Failed to export Agent YAML.');
+													}}
+												>
+													<FiDownload size={15} />
+													<span>{isPending(exportKey) ? 'Exporting...' : 'Export'}</span>
+												</button>
+											) : null}
+
+											{agent.managed && !agent.builtIn ? (
+												<button
+													type="button"
+													className="btn btn-sm btn-ghost rounded-xl"
+													onClick={() => {
+														onDeleteAgent(agent);
+													}}
+												>
+													<FiTrash2 size={15} />
+													<span>Delete</span>
+												</button>
+											) : null}
+										</ActionRow>
+									</ManagementItemCard>
+								);
+							})
 						: null}
 
 					{data.agentsLoaded && data.agents.length === 0 ? (
-						<ManagementEmptyState>No currently available Agents in this Collection.</ManagementEmptyState>
+						<ManagementEmptyState>No resolved Agents are currently available in this Collection.</ManagementEmptyState>
 					) : null}
 				</div>
 			) : null}
@@ -371,7 +465,7 @@ function AgentCollectionEditModalContent({
 	onClose,
 	onSubmit,
 }: {
-	collection: CollectionView;
+	collection: CollectionListItem;
 	onClose: () => void;
 	onSubmit: (displayName: string, description?: string) => Promise<void>;
 }) {
@@ -405,7 +499,7 @@ function AgentCollectionEditModalContent({
 		<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
 			<ModalHeader
 				title="Edit Agent Collection"
-				description="The logical Collection name remains stable. Agents themselves remain immutable after import."
+				description="The logical Collection name remains stable. Imported Agents remain immutable."
 				onClose={onClose}
 				closeDisabled={isSubmitting}
 			/>
@@ -474,23 +568,92 @@ function AgentCollectionEditModal({
 	onClose,
 	onSubmit,
 }: {
-	collection: CollectionView | null;
+	collection: CollectionListItem | null;
 	onClose: () => void;
-	onSubmit: (collection: CollectionView, displayName: string, description?: string) => Promise<void>;
+	onSubmit: (collection: CollectionListItem, displayName: string, description?: string) => Promise<void>;
 }) {
 	if (!collection) {
 		return null;
 	}
 
 	return (
-		<ModalDialog isOpen={true} onClose={onClose}>
+		<ModalDialog isOpen={true} onClose={onClose} blockCancel>
 			<AgentCollectionEditModalContent
-				key={`${collection.artifact.rootID}:${collection.artifact.id}:${collection.artifact.revision}`}
+				key={`${collection.ref.rootID}:${collection.ref.artifactID}:${collection.revision}`}
 				collection={collection}
 				onClose={onClose}
 				onSubmit={(displayName, description) => onSubmit(collection, displayName, description)}
 			/>
 		</ModalDialog>
+	);
+}
+
+function AgentCollectionDetailsModal({
+	state,
+	onClose,
+}: {
+	state: CollectionDetailsState | null;
+	onClose: () => void;
+}) {
+	if (!state) {
+		return null;
+	}
+
+	const collection = state.view ?? state.collection;
+	const modalKey = state.view
+		? `agent-collection:${state.view.artifact.rootID}:${state.view.artifact.id}:${state.view.artifact.revision}`
+		: `agent-collection:${state.collection.ref.rootID}:${state.collection.ref.artifactID}:${state.collection.revision}`;
+
+	return (
+		<ManagementDetailsModal isOpen={true} onClose={onClose} title="Agent Collection Details" modalKey={modalKey}>
+			{state.loading ? <Loader text="Loading Agent Collection details..." /> : null}
+
+			{state.error ? (
+				<ManagementResourceError
+					title="Agent Collection details could not be loaded"
+					error={state.error}
+					isRetrying={false}
+					onRetry={async () => undefined}
+				/>
+			) : null}
+
+			<ManagementInfoGrid>
+				<ManagementInfoRow label="Display Name">{collectionDisplayName(collection)}</ManagementInfoRow>
+				<ManagementInfoRow label="Name" mono>
+					{collection.name}
+				</ManagementInfoRow>
+				<ManagementInfoRow label="Built-in">{isBuiltInAgentCollection(collection) ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Baseline">{collection.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="Enabled">
+					{'artifact' in collection ? (collection.artifact.enabled ? 'Yes' : 'No') : collection.enabled ? 'Yes' : 'No'}
+				</ManagementInfoRow>
+				<ManagementInfoRow label="State">
+					{'artifact' in collection ? collection.artifact.state : collection.state}
+				</ManagementInfoRow>
+				<ManagementInfoRow label="Revision">
+					{'artifact' in collection ? collection.artifact.revision : collection.revision}
+				</ManagementInfoRow>
+				{'artifact' in collection ? (
+					<>
+						<ManagementInfoRow label="Source" mono>
+							{collection.artifact.binding.sourceID}
+						</ManagementInfoRow>
+						<ManagementInfoRow label="Created">{formatDateish(collection.artifact.createdAt)}</ManagementInfoRow>
+						<ManagementInfoRow label="Modified">{formatDateish(collection.artifact.modifiedAt)}</ManagementInfoRow>
+					</>
+				) : (
+					<>
+						<ManagementInfoRow label="Source" mono>
+							{collection.sourceID}
+						</ManagementInfoRow>
+						<ManagementInfoRow label="Declared members">{collection.memberCount}</ManagementInfoRow>
+					</>
+				)}
+				<ManagementInfoRow label="Description">
+					<span className="whitespace-pre-wrap">{collection.description || '—'}</span>
+				</ManagementInfoRow>
+			</ManagementInfoGrid>
+		</ManagementDetailsModal>
 	);
 }
 
@@ -506,7 +669,7 @@ export default function AgentsPage() {
 		reloadOrThrow,
 		setData: setPageData,
 	} = useAsyncResource(loadPageData, {
-		initialData: agentManagementPageDataCache?.data ?? (EMPTY_AGENT_MANAGEMENT_PAGE_DATA as AgentManagementPageData),
+		initialData: agentManagementPageDataCache?.data ?? EMPTY_AGENT_MANAGEMENT_PAGE_DATA,
 	});
 
 	const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
@@ -514,9 +677,9 @@ export default function AgentsPage() {
 	const [importDestination, setImportDestination] = useState<AgentImportDestination | null>(null);
 	const [agentToView, setAgentToView] = useState<AgentView | null>(null);
 	const [agentToDelete, setAgentToDelete] = useState<AgentView | null>(null);
-	const [collectionToDelete, setCollectionToDelete] = useState<CollectionView | null>(null);
-	const [collectionToEdit, setCollectionToEdit] = useState<CollectionView | null>(null);
-	const [collectionToView, setCollectionToView] = useState<CollectionView | null>(null);
+	const [collectionToDelete, setCollectionToDelete] = useState<CollectionListItem | null>(null);
+	const [collectionToEdit, setCollectionToEdit] = useState<CollectionListItem | null>(null);
+	const [collectionDetails, setCollectionDetails] = useState<CollectionDetailsState | null>(null);
 	const [isDeletingAgent, setIsDeletingAgent] = useState(false);
 	const [isDeletingCollection, setIsDeletingCollection] = useState(false);
 	const [alertMessage, setAlertMessage] = useState('');
@@ -525,8 +688,7 @@ export default function AgentsPage() {
 	const mountedRef = useRef(false);
 	const agentLoadRequestIDRef = useRef<Record<string, number>>({});
 	const agentLoadEpochRef = useRef(0);
-	const agentPrefetchKeysRef = useRef<Set<string>>(new Set());
-	const agentCatalogWarmupStartedRef = useRef(false);
+	const collectionDetailsRequestIDRef = useRef(0);
 
 	const collectionCreationRoots = useMemo(
 		() =>
@@ -538,9 +700,9 @@ export default function AgentsPage() {
 						.map(
 							collection =>
 								[
-									collection.artifact.rootID,
+									collection.ref.rootID,
 									{
-										rootID: collection.artifact.rootID,
+										rootID: collection.ref.rootID,
 										label: collectionDisplayName(collection),
 									},
 								] as const
@@ -556,14 +718,18 @@ export default function AgentsPage() {
 		? collectionCreationRootID
 		: (collectionCreationRoots[0]?.rootID ?? '');
 
+	const showAlert = useCallback((message: string) => {
+		setAlertMessage(message);
+	}, []);
+
 	useEffect(() => {
-		const prefetchedKeys = agentPrefetchKeysRef.current;
 		mountedRef.current = true;
+
 		return () => {
 			mountedRef.current = false;
 			agentLoadRequestIDRef.current = {};
 			agentLoadEpochRef.current += 1;
-			prefetchedKeys.clear();
+			collectionDetailsRequestIDRef.current += 1;
 		};
 	}, []);
 
@@ -573,18 +739,14 @@ export default function AgentsPage() {
 			!pageLoadError &&
 			!isLoading &&
 			!isRefreshing &&
-			pageData.collections.every(value => !value.isLoadingAgents)
+			pageData.collections.every(collection => !collection.isLoadingAgents)
 		) {
 			rememberAgentManagementPageData(pageData);
 		}
 	}, [hasResolved, isLoading, isRefreshing, pageData, pageLoadError]);
 
-	const showAlert = (message: string) => {
-		setAlertMessage(message);
-	};
-
 	const loadCollectionAgents = useCallback(
-		async (collection: CollectionView) => {
+		async (collection: CollectionListItem) => {
 			const key = agentCollectionKey(collection);
 			const epoch = agentLoadEpochRef.current;
 			const requestID = (agentLoadRequestIDRef.current[key] ?? 0) + 1;
@@ -604,6 +766,7 @@ export default function AgentsPage() {
 			}));
 
 			let result: Pick<AgentCollectionData, 'agents' | 'agentsLoaded' | 'agentLoadError'>;
+
 			try {
 				result = await agentManagementAPI.loadCollectionAgents(collection, new AbortController().signal);
 			} catch (error) {
@@ -638,88 +801,121 @@ export default function AgentsPage() {
 		[setPageData]
 	);
 
-	useEffect(() => {
-		if (!hasResolved || pageLoadError) {
-			return;
-		}
-
-		if (!agentCatalogWarmupStartedRef.current) {
-			agentCatalogWarmupStartedRef.current = true;
-			void agentManagementAPI.preloadAgentCatalog().catch(() => undefined);
-		}
-
-		const candidates = pageData.collections.filter(value => {
-			const key = agentCollectionKey(value.collection);
-			return (
-				!value.agentsLoaded && !value.isLoadingAgents && !value.agentLoadError && !agentPrefetchKeysRef.current.has(key)
-			);
-		});
-		if (candidates.length === 0) {
-			return;
-		}
-
-		for (const value of candidates) {
-			agentPrefetchKeysRef.current.add(agentCollectionKey(value.collection));
-		}
-
-		let cursor = 0;
-		const worker = async () => {
-			while (cursor < candidates.length) {
-				const index = cursor;
-				cursor += 1;
-				await loadCollectionAgents(candidates[index].collection);
-			}
-		};
-
-		const workerCount = Math.min(3, candidates.length);
-		void Promise.all(Array.from({ length: workerCount }, () => worker())).catch(() => undefined);
-	}, [hasResolved, loadCollectionAgents, pageData.collections, pageLoadError]);
-
 	const refreshPage = useCallback(async () => {
+		invalidateAgentManagementPageDataCache();
+		agentManagementAPI.invalidateAgentCatalog();
+		agentLoadEpochRef.current += 1;
+		agentLoadRequestIDRef.current = {};
+
 		try {
-			invalidateAgentManagementPageDataCache();
-			agentManagementAPI.invalidateAgentCatalog();
-			agentLoadEpochRef.current += 1;
-			agentPrefetchKeysRef.current.clear();
-			agentCatalogWarmupStartedRef.current = false;
 			await reloadOrThrow();
 		} catch (error) {
 			showAlert(getErrorMessage(error, 'Agent management data could not be refreshed.'));
 		}
-	}, [reloadOrThrow]);
+	}, [reloadOrThrow, showAlert]);
+
+	const updateCollectionSummary = useCallback(
+		(updatedView: CollectionView) => {
+			const updated = collectionListItemFromCollectionView(updatedView);
+			const key = collectionRefKey(updated);
+
+			setPageData(previous => ({
+				...previous,
+				collections: previous.collections.map(data =>
+					collectionRefKey(data.collection) === key
+						? {
+								...data,
+								collection: updated,
+							}
+						: data
+				),
+			}));
+
+			setCollectionDetails(previous => {
+				if (!previous || collectionRefKey(previous.collection) !== key) {
+					return previous;
+				}
+
+				return {
+					...previous,
+					collection: updated,
+					view: updatedView,
+					error: undefined,
+					loading: false,
+				};
+			});
+		},
+		[setPageData]
+	);
+
+	const openCollectionDetails = useCallback((collection: CollectionListItem) => {
+		const requestID = collectionDetailsRequestIDRef.current + 1;
+		collectionDetailsRequestIDRef.current = requestID;
+
+		setCollectionDetails({
+			collection,
+			loading: true,
+		});
+
+		void agentStoreAPI
+			.getAgentCollection(collection.ref)
+			.then(view => {
+				if (!mountedRef.current || collectionDetailsRequestIDRef.current !== requestID) {
+					return;
+				}
+
+				setCollectionDetails({
+					collection: collectionListItemFromCollectionView(view),
+					view,
+					loading: false,
+				});
+			})
+			.catch((error: unknown) => {
+				if (!mountedRef.current || collectionDetailsRequestIDRef.current !== requestID) {
+					return;
+				}
+
+				setCollectionDetails({
+					collection,
+					loading: false,
+					error: getErrorMessage(error, 'Agent Collection details could not be loaded.'),
+				});
+			});
+	}, []);
 
 	const toggleCollectionEnabled = useCallback(
-		async (collection: CollectionView, enabled: boolean) => {
-			try {
-				await agentStoreAPI.setAgentCollectionEnabled(
-					agentCollectionRef(collection),
-					collection.artifact.revision,
-					enabled
-				);
-				await refreshPage();
-			} catch (error) {
-				showAlert(getErrorMessage(error, 'Failed to update Agent Collection enablement.'));
-			}
+		async (collection: CollectionListItem, enabled: boolean) => {
+			const updated = await agentStoreAPI.setAgentCollectionEnabled(collection.ref, collection.revision, enabled);
+
+			updateCollectionSummary(updated);
+			agentManagementAPI.invalidateAgentCatalog();
 		},
-		[refreshPage]
+		[updateCollectionSummary]
 	);
 
 	const toggleAgentEnabled = useCallback(
 		async (agent: AgentView, enabled: boolean) => {
-			try {
-				await agentStoreAPI.setAgentEnabled(agentArtifactRef(agent), agent.artifact.revision, enabled);
-				await refreshPage();
-			} catch (error) {
-				showAlert(getErrorMessage(error, 'Failed to update Agent enablement.'));
-			}
+			const updated = await agentStoreAPI.setAgentEnabled(agentArtifactRef(agent), agent.revision, enabled);
+			const key = agentRefKey(updated);
+
+			setPageData(previous => ({
+				...previous,
+				collections: previous.collections.map(collection => ({
+					...collection,
+					agents: collection.agents.map(candidate => (agentRefKey(candidate) === key ? updated : candidate)),
+				})),
+			}));
+
+			setAgentToView(previous => (previous && agentRefKey(previous) === key ? updated : previous));
+			agentManagementAPI.invalidateAgentCatalog();
 		},
-		[refreshPage]
+		[setPageData]
 	);
 
 	const createCollection = useCallback(
 		async (slug: string, displayName: string, description?: string) => {
 			await agentStoreAPI.createAgentCollection({
-				rootID: effectiveCollectionCreationRootID ? effectiveCollectionCreationRootID : '',
+				rootID: effectiveCollectionCreationRootID,
 				name: slug,
 				displayName,
 				description,
@@ -731,17 +927,18 @@ export default function AgentsPage() {
 	);
 
 	const updateCollection = useCallback(
-		async (collection: CollectionView, displayName: string, description?: string) => {
-			await agentStoreAPI.updateAgentCollection({
-				collection: agentCollectionRef(collection),
-				expectedRevision: collection.artifact.revision,
+		async (collection: CollectionListItem, displayName: string, description?: string) => {
+			const updated = await agentStoreAPI.updateAgentCollection({
+				collection: collection.ref,
+				expectedRevision: collection.revision,
 				displayName,
 				description,
 			});
 
-			await refreshPage();
+			updateCollectionSummary(updated);
+			agentManagementAPI.invalidateAgentCatalog();
 		},
-		[refreshPage]
+		[updateCollectionSummary]
 	);
 
 	const deleteAgent = useCallback(async () => {
@@ -752,15 +949,17 @@ export default function AgentsPage() {
 		setIsDeletingAgent(true);
 
 		try {
-			await agentStoreAPI.deleteManagedAgent(agentArtifactRef(agentToDelete), agentToDelete.artifact.revision);
+			await agentStoreAPI.deleteManagedAgent(agentArtifactRef(agentToDelete), agentToDelete.revision);
 			setAgentToDelete(null);
 			await refreshPage();
 		} catch (error) {
 			showAlert(getErrorMessage(error, 'Failed to delete Agent.'));
 		} finally {
-			setIsDeletingAgent(false);
+			if (mountedRef.current) {
+				setIsDeletingAgent(false);
+			}
 		}
-	}, [agentToDelete, isDeletingAgent, refreshPage]);
+	}, [agentToDelete, isDeletingAgent, refreshPage, showAlert]);
 
 	const deleteCollection = useCallback(async () => {
 		if (!collectionToDelete || isDeletingCollection) {
@@ -768,7 +967,7 @@ export default function AgentsPage() {
 		}
 
 		const collectionData = pageData.collections.find(
-			value => agentCollectionKey(value.collection) === agentCollectionKey(collectionToDelete)
+			value => collectionRefKey(value.collection) === collectionRefKey(collectionToDelete)
 		);
 
 		if (!canDeleteAgentCollection(collectionToDelete)) {
@@ -778,7 +977,7 @@ export default function AgentsPage() {
 		}
 
 		if (!collectionData?.agentsLoaded || collectionData.agentLoadError || collectionData.agents.length > 0) {
-			showAlert('Reload and remove all currently available Agents before deleting this Collection.');
+			showAlert('Load the Collection and remove all resolved Agents before deleting it.');
 			setCollectionToDelete(null);
 			return;
 		}
@@ -786,10 +985,7 @@ export default function AgentsPage() {
 		setIsDeletingCollection(true);
 
 		try {
-			await agentStoreAPI.deleteAgentCollection(
-				agentCollectionRef(collectionToDelete),
-				collectionToDelete.artifact.revision
-			);
+			await agentStoreAPI.deleteAgentCollection(collectionToDelete.ref, collectionToDelete.revision);
 			setCollectionToDelete(null);
 			await refreshPage();
 		} catch (error) {
@@ -800,23 +996,21 @@ export default function AgentsPage() {
 				)
 			);
 		} finally {
-			setIsDeletingCollection(false);
+			if (mountedRef.current) {
+				setIsDeletingCollection(false);
+			}
 		}
-	}, [collectionToDelete, isDeletingCollection, pageData.collections, refreshPage]);
+	}, [collectionToDelete, isDeletingCollection, pageData.collections, refreshPage, showAlert]);
 
 	const exportAgent = useCallback(async (agent: AgentView) => {
-		try {
-			const exported = await agentStoreAPI.exportAgent(agentArtifactRef(agent));
+		const exported = await agentStoreAPI.exportAgent(agentArtifactRef(agent));
 
-			await backendAPI.saveFile(exported.suggestedFileName, textToBase64(exported.content), [
-				{
-					DisplayName: 'YAML',
-					Extensions: ['yaml', 'yml'],
-				},
-			]);
-		} catch (error) {
-			showAlert(getErrorMessage(error, 'Failed to export Agent YAML.'));
-		}
+		await backendAPI.saveFile(exported.suggestedFileName, textToBase64(exported.content), [
+			{
+				DisplayName: 'YAML',
+				Extensions: ['yaml', 'yml'],
+			},
+		]);
 	}, []);
 
 	const importCommitted = useCallback(
@@ -827,6 +1021,11 @@ export default function AgentsPage() {
 		[refreshPage]
 	);
 
+	const closeCollectionDetails = useCallback(() => {
+		collectionDetailsRequestIDRef.current += 1;
+		setCollectionDetails(null);
+	}, []);
+
 	if (isLoading && !hasResolved) {
 		return <Loader text="Loading Agent Collections..." />;
 	}
@@ -836,13 +1035,13 @@ export default function AgentsPage() {
 			<div className="flex size-full flex-col items-center overflow-hidden">
 				<ManagementPageHeader
 					title="Agent Collections"
-					description="Import immutable Agent JSON or YAML recipes, inspect their declarations, configure MCP dependencies, and use them as reusable conversation starters."
+					description="Import immutable Agent recipes, inspect their resolved capabilities, configure MCP dependencies, and apply them as Composer starters."
 					actions={
 						<>
 							{collectionCreationRoots.length > 1 ? (
 								<select
 									className="select select-sm max-w-72 rounded-xl"
-									aria-label="Agent Collection group"
+									aria-label="Agent Collection Root"
 									value={effectiveCollectionCreationRootID}
 									onChange={event => {
 										setCollectionCreationRootID(event.currentTarget.value);
@@ -855,6 +1054,18 @@ export default function AgentsPage() {
 									))}
 								</select>
 							) : null}
+
+							<button
+								type="button"
+								className="btn btn-ghost rounded-xl"
+								disabled={isRefreshing}
+								onClick={() => {
+									void refreshPage();
+								}}
+							>
+								<FiRefreshCw className={isRefreshing ? 'animate-spin' : undefined} size={18} />
+								<span>{isRefreshing ? 'Refreshing' : 'Refresh'}</span>
+							</button>
 
 							<button
 								type="button"
@@ -889,11 +1100,11 @@ export default function AgentsPage() {
 							title="Agent Collections could not be loaded"
 							error={pageLoadError}
 							isRetrying={isRefreshing}
-							onRetry={reloadOrThrow}
+							onRetry={refreshPage}
 						/>
 					) : null}
 
-					{pageData.collections.length === 0 ? (
+					{pageData.collections.length === 0 && !pageLoadError ? (
 						<p className="mt-8 text-center text-sm">No Agent Collections are currently available.</p>
 					) : null}
 
@@ -902,7 +1113,7 @@ export default function AgentsPage() {
 							key={agentCollectionKey(data.collection)}
 							data={data}
 							onLoadAgents={loadCollectionAgents}
-							onViewCollection={setCollectionToView}
+							onViewCollection={openCollectionDetails}
 							onEditCollection={setCollectionToEdit}
 							onDeleteCollection={setCollectionToDelete}
 							onImportAgent={destination => {
@@ -914,6 +1125,7 @@ export default function AgentsPage() {
 							onExportAgent={exportAgent}
 							onDeleteAgent={setAgentToDelete}
 							onToggleAgentEnabled={toggleAgentEnabled}
+							onActionError={showAlert}
 						/>
 					))}
 				</ManagementPageContent>
@@ -927,10 +1139,10 @@ export default function AgentsPage() {
 					}}
 					onSubmit={createCollection}
 					existingSlugs={pageData.collections
-						.filter(data => data.collection.artifact.rootID === effectiveCollectionCreationRootID)
+						.filter(data => data.collection.ref.rootID === effectiveCollectionCreationRootID)
 						.map(data => data.collection.name)}
 					existingDisplayNames={pageData.collections
-						.filter(data => data.collection.artifact.rootID === effectiveCollectionCreationRootID)
+						.filter(data => data.collection.ref.rootID === effectiveCollectionCreationRootID)
 						.map(data => collectionDisplayName(data.collection))}
 					failureMessage="Failed to create Agent Collection."
 				/>
@@ -962,41 +1174,7 @@ export default function AgentsPage() {
 					onSubmit={updateCollection}
 				/>
 
-				<ManagementDetailsModal
-					isOpen={collectionToView !== null}
-					onClose={() => {
-						setCollectionToView(null);
-					}}
-					title="Agent Collection Details"
-					modalKey={
-						collectionToView
-							? `agent-collection:${collectionToView.artifact.rootID}:${collectionToView.artifact.id}:${collectionToView.artifact.revision}`
-							: 'agent-collection'
-					}
-				>
-					{collectionToView ? (
-						<ManagementInfoGrid>
-							<ManagementInfoRow label="Display Name">{collectionDisplayName(collectionToView)}</ManagementInfoRow>
-							<ManagementInfoRow label="Name" mono>
-								{collectionToView.name}
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Built-in">
-								{isBuiltInAgentCollection(collectionToView) ? 'Yes' : 'No'}
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Baseline">{collectionToView.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
-							<ManagementInfoRow label="Enabled">{collectionToView.artifact.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
-							<ManagementInfoRow label="Description">
-								<span className="whitespace-pre-wrap">{collectionToView.description || '—'}</span>
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Created">
-								{formatDateish(collectionToView.artifact.createdAt)}
-							</ManagementInfoRow>
-							<ManagementInfoRow label="Modified">
-								{formatDateish(collectionToView.artifact.modifiedAt)}
-							</ManagementInfoRow>
-						</ManagementInfoGrid>
-					) : null}
-				</ManagementDetailsModal>
+				<AgentCollectionDetailsModal state={collectionDetails} onClose={closeCollectionDetails} />
 
 				<DeleteConfirmationModal
 					isOpen={agentToDelete !== null}
@@ -1007,8 +1185,8 @@ export default function AgentsPage() {
 					}}
 					onConfirm={deleteAgent}
 					title="Delete Managed Agent"
-					message={`Delete "${agentToDelete ? agentDisplayName(agentToDelete) : ''}"? Its Collection memberships remain declared and become unavailable until an exact Agent is restored.`}
-					confirmButtonText="Delete"
+					message={`Delete "${agentToDelete ? agentDisplayName(agentToDelete) : ''}"? Existing Collection relationships remain declared and become unavailable until an exact Agent is restored.`}
+					confirmButtonText={isDeletingAgent ? 'Deleting...' : 'Delete'}
 				/>
 
 				<DeleteConfirmationModal
@@ -1021,7 +1199,7 @@ export default function AgentsPage() {
 					onConfirm={deleteCollection}
 					title="Delete Agent Collection"
 					message={`Delete empty Agent Collection "${collectionToDelete ? collectionDisplayName(collectionToDelete) : ''}"?`}
-					confirmButtonText="Delete"
+					confirmButtonText={isDeletingCollection ? 'Deleting...' : 'Delete'}
 				/>
 
 				<ActionDeniedAlertModal

@@ -30,6 +30,14 @@ type AgentListItem struct {
 	AgentView
 }
 
+type AgentSkillUseMode string
+
+const (
+	AgentSkillUseModeAvailable    AgentSkillUseMode = "available"
+	AgentSkillUseModeActive       AgentSkillUseMode = "active"
+	AgentSkillUseModeInstructions AgentSkillUseMode = "instructions"
+)
+
 type AgentCapabilityOccurrence struct {
 	Path     string                   `json:"path"`
 	Type     declaration.Type         `json:"type"`
@@ -37,9 +45,13 @@ type AgentCapabilityOccurrence struct {
 	Status   resolve.ResolutionStatus `json:"status"`
 	Required bool                     `json:"required"`
 
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Code     string                `json:"code,omitempty"`
-	Message  string                `json:"message,omitempty"`
+	Artifact            *artifact.ArtifactRef `json:"artifact,omitempty"`
+	Mapped              *resolve.MappedTarget `json:"mapped,omitempty"`
+	AutoExecute         *bool                 `json:"autoExecute,omitempty"`
+	IncludeSystemPrompt *bool                 `json:"includeSystemPrompt,omitempty"`
+	SkillUseMode        AgentSkillUseMode     `json:"skillUseMode,omitempty"`
+	Code                string                `json:"code,omitempty"`
+	Message             string                `json:"message,omitempty"`
 }
 
 type AgentCapabilityPlan struct {

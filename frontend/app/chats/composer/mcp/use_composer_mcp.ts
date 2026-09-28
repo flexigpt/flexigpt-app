@@ -27,6 +27,7 @@ import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
 import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
 import { getAuthMode, isServerOperational } from '@/apis/mcp_management';
+import { collectAllPages } from '@/apis/wailsapi/transport';
 
 import type {
 	MCPComposerServerOption,
@@ -49,6 +50,8 @@ type MCPDiscoveryLoadResult = Pick<MCPComposerServerOption, 'tools' | 'resources
 
 const MCP_CONNECTION_POLL_MS = 500;
 const MCP_CONNECTION_TIMEOUT_MS = 11 * 60 * 1000;
+const MCP_DISCOVERY_PAGE_SIZE = 100;
+const MCP_DISCOVERY_MAX_PAGES = 10_000;
 
 interface NormalizedMCPDiscoveryList<T> {
 	items: T[];
@@ -377,10 +380,23 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 			const promise = (async (): Promise<MCPDiscoveryLoadResult | undefined> => {
 				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
-					mcpManagementAPI.listMCPServerTools(server),
-					mcpManagementAPI.listMCPServerResources(server),
-					mcpManagementAPI.listMCPServerResourceTemplates(server),
-					mcpManagementAPI.listMCPServerPrompts(server),
+					collectAllPages(
+						pageToken => mcpManagementAPI.listMCPServerToolsPage(server, MCP_DISCOVERY_PAGE_SIZE, pageToken),
+						MCP_DISCOVERY_MAX_PAGES
+					),
+					collectAllPages(
+						pageToken => mcpManagementAPI.listMCPServerResourcesPage(server, MCP_DISCOVERY_PAGE_SIZE, pageToken),
+						MCP_DISCOVERY_MAX_PAGES
+					),
+					collectAllPages(
+						pageToken =>
+							mcpManagementAPI.listMCPServerResourceTemplatesPage(server, MCP_DISCOVERY_PAGE_SIZE, pageToken),
+						MCP_DISCOVERY_MAX_PAGES
+					),
+					collectAllPages(
+						pageToken => mcpManagementAPI.listMCPServerPromptsPage(server, MCP_DISCOVERY_PAGE_SIZE, pageToken),
+						MCP_DISCOVERY_MAX_PAGES
+					),
 				]);
 
 				const toolsDiscovery = normalizeMCPDiscoveryList<MCPToolCapability>(toolsResult, 'tools');

@@ -19,7 +19,7 @@ export class WailsSkillAggregateAPI implements ISkillAggregateAPI {
 	}
 
 	async resolveArtifactSkills(skills: ArtifactRef[]): Promise<ResolvedArtifactSkill[]> {
-		return requiredObject<ResolvedArtifactSkill[]>(
+		return wailsObjectArrayOrEmpty<ResolvedArtifactSkill>(
 			await ResolveArtifactSkills(skills as Parameters<typeof ResolveArtifactSkills>[0]),
 			'ResolveArtifactSkills'
 		);

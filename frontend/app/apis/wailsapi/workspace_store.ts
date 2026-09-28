@@ -2,6 +2,7 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	WorkspaceArtifactView,
 	WorkspaceDefaultPolicyView,
+	WorkspaceDirectoryListItem,
 	WorkspaceDirectoryRef,
 	WorkspaceDirectoryView,
 	WorkspaceDirectoryWorkspace,
@@ -11,6 +12,7 @@ import type {
 import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import type { IWorkspaceStoreAPI } from '@/apis/interface';
+import { workspaceDirectoryListItemFromWails } from '@/apis/wailsapi/list_item_projection';
 import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	GetWorkspaceDefaultPolicy,
@@ -52,9 +54,13 @@ export class WailsWorkspaceStoreAPI implements IWorkspaceStoreAPI {
 			'ListWorkspaceDirectories'
 		);
 
-		page.items = page.items.map(directory => projectWorkspaceDirectory(directory, 'ListWorkspaceDirectories.items'));
-
-		return page;
+		return {
+			...page,
+			items: wailsObjectArrayOrEmpty(page.items, 'ListWorkspaceDirectories.items').map(
+				(value, index): WorkspaceDirectoryListItem =>
+					workspaceDirectoryListItemFromWails(value, `ListWorkspaceDirectories.items[${index}]`)
+			),
+		};
 	}
 
 	async listWorkspaceDirectoryArtifacts(directory: WorkspaceDirectoryRef): Promise<WorkspaceArtifactView[]> {

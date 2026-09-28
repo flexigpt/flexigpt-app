@@ -1,11 +1,19 @@
 // oxlint-disable typescript/parameter-properties
 import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
+import type { CollectionListItem, CollectionView } from '@/spec/collection';
 import type { ToolChoice } from '@/spec/inference';
-import type { ResolvedToolView, ToolListItem, ToolSelection, ToolStoreChoice, ToolView } from '@/spec/tool';
+import type {
+	ResolvedToolView,
+	ToolListItem,
+	ToolSelection,
+	ToolStoreChoice,
+	ToolStoreListItem,
+	ToolView,
+} from '@/spec/tool';
 import type { InvokeToolResponse } from '@/spec/toolruntime';
 import { ArtifactState } from '@/spec/artifact';
-import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
+import { collectionListItemFromCollectionView } from '@/spec/collection';
+import { ToolImplType, ToolStoreChoiceType, toolStoreListItemFromView } from '@/spec/tool';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 import { mapWithConcurrency, throwIfAborted } from '@/lib/async_utils';
@@ -16,19 +24,31 @@ import { getUUIDv7 } from '@/lib/uuid_utils';
 import type { IToolAggregateAPI, IToolRuntimeAPI, IToolStoreAPI } from '@/apis/interface';
 
 export interface ToolCollectionData {
-	collection: CollectionView;
-	tools: ToolView[];
+	collection: CollectionListItem;
+	tools: ToolStoreListItem[];
+	toolsLoaded: boolean;
+	isLoadingTools: boolean;
 	toolLoadError?: string;
 }
 
-export function toolArtifactRef(tool: ToolView): ArtifactRef {
+type ToolCollection = CollectionListItem | CollectionView;
+
+export function toolArtifactRef(tool: ToolView | ToolStoreListItem): ArtifactRef {
+	if ('ref' in tool) {
+		return tool.ref;
+	}
+
 	return {
 		rootID: tool.artifact.rootID,
 		artifactID: tool.artifact.id,
 	};
 }
 
-export function toolCollectionRef(collection: CollectionView): ArtifactRef {
+export function toolCollectionRef(collection: ToolCollection): ArtifactRef {
+	if ('ref' in collection) {
+		return collection.ref;
+	}
+
 	return {
 		rootID: collection.artifact.rootID,
 		artifactID: collection.artifact.id,
@@ -39,16 +59,18 @@ export function toolArtifactKey(ref: ArtifactRef): string {
 	return JSON.stringify([ref.rootID, ref.artifactID]);
 }
 
-export function toolDisplayName(tool: ToolView): string {
+export function toolDisplayName(tool: Pick<ToolView | ToolStoreListItem, 'displayName' | 'name'>): string {
 	return tool.displayName || tool.name;
 }
 
-export function toolCollectionDisplayName(collection: CollectionView): string {
+export function toolCollectionDisplayName(collection: CollectionListItem): string {
 	return collection.displayName || collection.name;
 }
 
 function toolChoiceType(tool: ToolView): ToolStoreChoiceType {
-	return tool.implementation.kind === ToolImplType.Go ? ToolStoreChoiceType.Function : tool.implementation.sdkToolType;
+	return tool.implementation.kind === ToolImplType.Go
+		? ToolStoreChoiceType.Function
+		: (tool.implementation.sdkToolType ?? ToolStoreChoiceType.Function);
 }
 
 export function toolStoreChoiceFromSelection(selection: ToolSelection, resolved: ResolvedToolView): ToolStoreChoice {
@@ -100,7 +122,7 @@ export class ToolManagementAPI {
 		this.listSelectableToolsUncached()
 	);
 
-	listToolCollections(): Promise<CollectionView[]> {
+	listToolCollections(): Promise<CollectionListItem[]> {
 		return this.store.listToolCollections();
 	}
 
@@ -108,7 +130,7 @@ export class ToolManagementAPI {
 		return this.store.getToolCollection(collection);
 	}
 
-	listCollectionTools(collection: ArtifactRef): Promise<ToolView[]> {
+	listCollectionTools(collection: ArtifactRef): Promise<ToolStoreListItem[]> {
 		return this.store.listCollectionTools(collection);
 	}
 
@@ -136,29 +158,45 @@ export class ToolManagementAPI {
 		const collections = await this.store.listToolCollections();
 		throwIfAborted(signal);
 
-		return mapWithConcurrency(
-			collections.toSorted((left, right) =>
-				toolCollectionDisplayName(left).localeCompare(toolCollectionDisplayName(right), undefined, {
-					sensitivity: 'base',
-				})
-			),
-			4,
-			async collection => {
-				try {
-					const tools = await this.store.listCollectionTools(toolCollectionRef(collection));
-					throwIfAborted(signal);
-					return { collection, tools };
-				} catch (error) {
-					throwIfAborted(signal);
-					return {
-						collection,
-						tools: [],
-						toolLoadError: getErrorMessage(error, 'Tools could not be loaded for this Collection.'),
-					};
-				}
-			},
-			signal
-		);
+		return collections
+			.map(collection => ({
+				collection,
+				tools: [],
+				toolsLoaded: false,
+				isLoadingTools: false,
+			}))
+			.toSorted((left, right) =>
+				toolCollectionDisplayName(left.collection).localeCompare(
+					toolCollectionDisplayName(right.collection),
+					undefined,
+					{
+						sensitivity: 'base',
+					}
+				)
+			);
+	}
+
+	async loadCollectionTools(
+		collection: CollectionListItem,
+		signal: AbortSignal
+	): Promise<Pick<ToolCollectionData, 'tools' | 'toolsLoaded' | 'toolLoadError'>> {
+		try {
+			const tools = await this.store.listCollectionTools(toolCollectionRef(collection));
+			throwIfAborted(signal);
+
+			return {
+				tools,
+				toolsLoaded: true,
+			};
+		} catch (error) {
+			throwIfAborted(signal);
+
+			return {
+				tools: [],
+				toolsLoaded: false,
+				toolLoadError: getErrorMessage(error, 'Tools could not be loaded for this Collection.'),
+			};
+		}
 	}
 
 	/**
@@ -179,15 +217,15 @@ export class ToolManagementAPI {
 			throwIfAborted(signal);
 		}
 
-		const enabledCollections = collections.filter(
-			value => value.artifact.enabled && value.artifact.state === ArtifactState.Available
-		);
+		const enabledCollections = collections.filter(value => value.enabled && value.state === ArtifactState.Available);
 		const groups = await mapWithConcurrency(
 			enabledCollections,
 			4,
 			async collection => {
 				const tools = await this.store.listCollectionTools(toolCollectionRef(collection));
-				return tools.filter(tool => tool.artifact.enabled && tool.artifact.state === ArtifactState.Available);
+				return tools
+					.filter(tool => tool.enabled && tool.state === ArtifactState.Available)
+					.map(tool => ({ collection, tool }));
 			},
 			signal
 		);
@@ -195,14 +233,17 @@ export class ToolManagementAPI {
 		const items = await mapWithConcurrency(
 			groups.flat(),
 			4,
-			async tool => {
-				const target = await this.aggregate.mapToolTarget(toolArtifactRef(tool));
-				const resolved = await this.aggregate.resolveMappedTool(target);
+			async ({ collection, tool: listed }) => {
+				const [tool, target] = await Promise.all([
+					this.store.getTool(toolArtifactRef(listed)),
+					this.aggregate.mapToolTarget(toolArtifactRef(listed)),
+				]);
+
 				return {
 					target,
-					collectionRef: toolCollectionRef(resolved.collection),
-					collectionName: resolved.collection.name,
-					toolDefinition: resolved.tool,
+					collectionRef: toolCollectionRef(collection),
+					collectionName: collection.name,
+					toolDefinition: tool,
 				};
 			},
 			signal
@@ -252,5 +293,13 @@ export class ToolManagementAPI {
 	 */
 	invokeGoTool(functionName: string, args?: JSONRawString, timeoutMS?: number): Promise<InvokeToolResponse> {
 		return this.runtime.invokeTool(functionName, args, timeoutMS);
+	}
+
+	collectionListItemFromView(collection: CollectionView): CollectionListItem {
+		return collectionListItemFromCollectionView(collection);
+	}
+
+	toolListItemFromView(tool: ToolView): ToolStoreListItem {
+		return toolStoreListItemFromView(tool);
 	}
 }

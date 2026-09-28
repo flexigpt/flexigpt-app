@@ -18,6 +18,7 @@ import { useAsyncResource } from '@/hooks/use_async_resource';
 
 import { mcpManagementAPI } from '@/apis/baseapi';
 import { getAuthMode, requireMCPRuntimeServerID } from '@/apis/mcp_management';
+import { collectAllPages } from '@/apis/wailsapi/transport';
 
 import { ManagementDetailsModal } from '@/components/managementui/management_details_modal';
 import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
@@ -56,6 +57,8 @@ interface DiscoveryData {
 	prompts: MCPPromptRef[];
 	error?: string;
 }
+
+const DISCOVERY_PAGE_SIZE = 100;
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
 	return <ManagementInfoRow label={label}>{children}</ManagementInfoRow>;
@@ -110,10 +113,23 @@ function MCPServerDetailsModalContent({
 
 			const runtimeServerID = requireMCPRuntimeServerID(server);
 			const results = await Promise.allSettled([
-				mcpManagementAPI.listMCPServerTools(runtimeServerID),
-				mcpManagementAPI.listMCPServerResources(runtimeServerID),
-				mcpManagementAPI.listMCPServerResourceTemplates(runtimeServerID),
-				mcpManagementAPI.listMCPServerPrompts(runtimeServerID),
+				collectAllPages(
+					pageToken => mcpManagementAPI.listMCPServerToolsPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					10_000
+				),
+				collectAllPages(
+					pageToken => mcpManagementAPI.listMCPServerResourcesPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					10_000
+				),
+				collectAllPages(
+					pageToken =>
+						mcpManagementAPI.listMCPServerResourceTemplatesPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					10_000
+				),
+				collectAllPages(
+					pageToken => mcpManagementAPI.listMCPServerPromptsPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					10_000
+				),
 			]);
 
 			const [tools, resources, templates, prompts] = results;
@@ -188,8 +204,8 @@ function MCPServerDetailsModalContent({
 					<Field label="Authentication">{getMCPHTTPAuthModeLabel(getAuthMode(server))}</Field>
 					<Field label="Built-in">{server.builtIn ? 'Yes' : 'No'}</Field>
 					<Field label="Enabled">{server.enabled ? 'Yes' : 'No'}</Field>
-					<Field label="Created">{server.artifact.createdAt.toLocaleString()}</Field>
-					<Field label="Modified">{server.artifact.modifiedAt.toLocaleString()}</Field>
+					<Field label="Created">{new Date(server.artifact.createdAt).toLocaleString()}</Field>
+					<Field label="Modified">{new Date(server.artifact.modifiedAt).toLocaleString()}</Field>
 
 					<Field label="Connection">
 						<span className={`badge rounded-xl ${getMCPStatusBadgeClass(status)}`}>{getMCPStatusLabel(status)}</span>

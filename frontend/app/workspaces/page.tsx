@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from 'react';
-import { FiFolderPlus, FiSearch, FiX } from 'react-icons/fi';
+import { FiEye, FiFolderPlus, FiSearch, FiTrash2, FiX } from 'react-icons/fi';
 
-import type { WorkspaceDirectoryView } from '@/spec/workspace';
+import type { WorkspaceDirectoryListItem, WorkspaceDirectoryView } from '@/spec/workspace';
+import { workspaceDirectoryListItemFromView } from '@/spec/workspace';
 
 import { throwIfAborted } from '@/lib/async_utils';
+import { omitManyKeys } from '@/lib/obj_utils';
 
 import { useAsyncResource } from '@/hooks/use_async_resource';
 
@@ -11,10 +13,12 @@ import { workspaceManagementAPI } from '@/apis/baseapi';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { Loader } from '@/components/loader';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
 import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
 import { ManagementPageContent } from '@/components/managementui/management_page_content';
 import { ManagementPageHeader } from '@/components/managementui/management_page_header';
 import { ManagementResourceError } from '@/components/managementui/management_resource_error';
+import { StatusBadge } from '@/components/managementui/status_badge';
 import { ModalConfirmDialog } from '@/components/modal/modal_confirm_dialog';
 import { PageFrame } from '@/components/page_frame';
 
@@ -25,12 +29,62 @@ import { WorkspaceDirectoryRegistrationModal } from '@/workspaces/workspace_dire
 const DIRECTORY_PAGE_SIZE = 100;
 const MAX_DIRECTORY_PAGE_HOPS = 10_000;
 
-function directoryKey(directory: WorkspaceDirectoryView): string {
+function directoryKey(directory: Pick<WorkspaceDirectoryListItem, 'ref'>): string {
 	return directory.ref.rootID;
 }
 
-async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<WorkspaceDirectoryView[]> {
-	const items: WorkspaceDirectoryView[] = [];
+interface WorkspaceDirectoryRemovalTarget {
+	ref: WorkspaceDirectoryListItem['ref'];
+	displayName: string;
+	expectedRevision: number;
+}
+
+function WorkspaceDirectorySummaryCard({
+	directory,
+	isLoading,
+	error,
+	onManage,
+	onRequestRemove,
+}: {
+	directory: WorkspaceDirectoryListItem;
+	isLoading: boolean;
+	error?: string;
+	onManage: () => void;
+	onRequestRemove: () => void;
+}) {
+	return (
+		<ManagementBundleCard
+			title={directory.rootDisplayName}
+			identity={<span className="font-mono text-xs">{directory.rootID}</span>}
+			description="Repository-oriented Workspace directory"
+			status={
+				<>
+					<StatusBadge tone={directory.enabled ? 'success' : 'warning'}>
+						{directory.enabled ? 'Enabled' : 'Disabled'}
+					</StatusBadge>
+					<StatusBadge>Summary loaded</StatusBadge>
+				</>
+			}
+			actions={
+				<>
+					<button type="button" className="btn btn-sm btn-ghost rounded-xl" disabled={isLoading} onClick={onManage}>
+						<FiEye size={15} />
+						<span>{isLoading ? 'Loading...' : 'Manage'}</span>
+					</button>
+					<button type="button" className="btn btn-sm btn-ghost text-error rounded-xl" onClick={onRequestRemove}>
+						<FiTrash2 size={15} />
+						<span>Remove</span>
+					</button>
+				</>
+			}
+		>
+			{error ? <div className="alert alert-warning mt-3 rounded-2xl text-sm">{error}</div> : null}
+		</ManagementBundleCard>
+	);
+}
+
+async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<WorkspaceDirectoryListItem[]> {
+	const items: WorkspaceDirectoryListItem[] = [];
 	const seenCursors = new Set<string>();
 	let cursor: string | undefined;
 
@@ -45,7 +99,7 @@ async function loadAllWorkspaceDirectories(signal: AbortSignal): Promise<Workspa
 
 		if (!page?.nextCursor) {
 			return items.toSorted((left, right) =>
-				left.root.displayName.localeCompare(right.root.displayName, undefined, {
+				left.rootDisplayName.localeCompare(right.rootDisplayName, undefined, {
 					sensitivity: 'base',
 				})
 			);
@@ -73,14 +127,17 @@ export default function WorkspaceDirectoryManagement() {
 		reloadOrThrow,
 		setData: setDirectories,
 	} = useAsyncResource(loadDirectories, {
-		initialData: [] as WorkspaceDirectoryView[],
+		initialData: [] as WorkspaceDirectoryListItem[],
 	});
 
 	const [search, setSearch] = useState('');
 	const [isRegisterOpen, setIsRegisterOpen] = useState(false);
 	const [isPolicyOpen, setIsPolicyOpen] = useState(false);
-	const [directoryToRemove, setDirectoryToRemove] = useState<WorkspaceDirectoryView | null>(null);
+	const [directoryToRemove, setDirectoryToRemove] = useState<WorkspaceDirectoryRemovalTarget | null>(null);
 	const [actionError, setActionError] = useState('');
+	const [detailsByDirectoryKey, setDetailsByDirectoryKey] = useState<Record<string, WorkspaceDirectoryView>>({});
+	const [loadingDirectoryKeys, setLoadingDirectoryKeys] = useState<Set<string>>(new Set());
+	const [directoryErrors, setDirectoryErrors] = useState<Record<string, string>>({});
 
 	const visibleDirectories = useMemo(() => {
 		const query = search.trim().toLowerCase();
@@ -89,13 +146,7 @@ export default function WorkspaceDirectoryManagement() {
 		}
 
 		return directories.filter(directory =>
-			[
-				directory.root.displayName,
-				directory.directorySource.displayName,
-				...directory.workspaces.map(entry => entry.workspace.artifact.displayName),
-				...directory.workspaces.map(entry => entry.workspace.artifact.logicalName),
-				...directory.workspaces.map(entry => entry.manifestLocator),
-			]
+			[directory.rootDisplayName, directory.rootID, directory.directorySourceID, directory.policyID]
 				.filter(Boolean)
 				.join('\n')
 				.toLowerCase()
@@ -103,29 +154,75 @@ export default function WorkspaceDirectoryManagement() {
 		);
 	}, [directories, search]);
 
-	const replaceDirectory = (next: WorkspaceDirectoryView) => {
-		setDirectories(previous =>
-			previous
-				.map(value => (directoryKey(value) === directoryKey(next) ? next : value))
-				.toSorted((left, right) =>
-					left.root.displayName.localeCompare(right.root.displayName, undefined, {
-						sensitivity: 'base',
-					})
-				)
-		);
-	};
+	const replaceDirectory = useCallback(
+		(next: WorkspaceDirectoryView) => {
+			const summary = workspaceDirectoryListItemFromView(next);
+			setDirectories(previous =>
+				previous
+					.map(value => (directoryKey(value) === directoryKey(summary) ? summary : value))
+					.toSorted((left, right) =>
+						left.rootDisplayName.localeCompare(right.rootDisplayName, undefined, {
+							sensitivity: 'base',
+						})
+					)
+			);
+			setDetailsByDirectoryKey(previous => ({
+				...previous,
+				[directoryKey(summary)]: next,
+			}));
+		},
+		[setDirectories]
+	);
+
+	const loadDirectoryDetails = useCallback(
+		async (directory: WorkspaceDirectoryListItem) => {
+			const key = directoryKey(directory);
+			if (detailsByDirectoryKey[key] || loadingDirectoryKeys.has(key)) {
+				return;
+			}
+
+			setLoadingDirectoryKeys(previous => new Set(previous).add(key));
+			setDirectoryErrors(previous => {
+				let next = { ...previous };
+				next = omitManyKeys(next, [key]);
+				return next;
+			});
+
+			try {
+				const detail = await workspaceManagementAPI.getWorkspaceDirectory(directory.ref);
+				replaceDirectory(detail);
+			} catch (cause) {
+				setDirectoryErrors(previous => ({
+					...previous,
+					[key]: cause instanceof Error ? cause.message : 'Workspace directory details could not be loaded.',
+				}));
+			} finally {
+				setLoadingDirectoryKeys(previous => {
+					const next = new Set(previous);
+					next.delete(key);
+					return next;
+				});
+			}
+		},
+		[detailsByDirectoryKey, replaceDirectory, loadingDirectoryKeys]
+	);
 
 	const registerDirectory = async (path: string) => {
 		const directory = await workspaceManagementAPI.registerWorkspaceDirectory(path);
+		const summary = workspaceDirectoryListItemFromView(directory);
 
 		setDirectories(previous => {
-			const withoutCurrent = previous.filter(value => directoryKey(value) !== directoryKey(directory));
-			return [...withoutCurrent, directory].toSorted((left, right) =>
-				left.root.displayName.localeCompare(right.root.displayName, undefined, {
+			const withoutCurrent = previous.filter(value => directoryKey(value) !== directoryKey(summary));
+			return [...withoutCurrent, summary].toSorted((left, right) =>
+				left.rootDisplayName.localeCompare(right.rootDisplayName, undefined, {
 					sensitivity: 'base',
 				})
 			);
 		});
+		setDetailsByDirectoryKey(previous => ({
+			...previous,
+			[directoryKey(summary)]: directory,
+		}));
 	};
 
 	const removeDirectory = async () => {
@@ -134,11 +231,8 @@ export default function WorkspaceDirectoryManagement() {
 		}
 
 		try {
-			await workspaceManagementAPI.removeWorkspaceDirectory(
-				directoryToRemove.ref,
-				directoryToRemove.directorySource.revision
-			);
-			setDirectories(previous => previous.filter(value => directoryKey(value) !== directoryKey(directoryToRemove)));
+			await workspaceManagementAPI.removeWorkspaceDirectory(directoryToRemove.ref, directoryToRemove.expectedRevision);
+			setDirectories(previous => previous.filter(value => directoryKey(value) !== directoryToRemove.ref.rootID));
 			setDirectoryToRemove(null);
 		} catch (cause) {
 			setActionError(cause instanceof Error ? cause.message : 'Workspace directory removal failed.');
@@ -229,17 +323,45 @@ export default function WorkspaceDirectoryManagement() {
 					</div>
 
 					<div className="space-y-4 pb-8">
-						{visibleDirectories.map(directory => (
-							<WorkspaceDirectoryCard
-								key={directory.ref.rootID}
-								directory={directory}
-								onChanged={replaceDirectory}
-								onRequestRemove={setDirectoryToRemove}
-								onShowDefaultPolicy={() => {
-									setIsPolicyOpen(true);
-								}}
-							/>
-						))}
+						{visibleDirectories.map(directory => {
+							const key = directoryKey(directory);
+							const detail = detailsByDirectoryKey[key];
+
+							return detail ? (
+								<WorkspaceDirectoryCard
+									key={directory.ref.rootID}
+									directory={detail}
+									onChanged={replaceDirectory}
+									onRequestRemove={value => {
+										setDirectoryToRemove({
+											ref: value.ref,
+											displayName: value.root.displayName,
+											expectedRevision: value.directorySource.revision,
+										});
+									}}
+									onShowDefaultPolicy={() => {
+										setIsPolicyOpen(true);
+									}}
+								/>
+							) : (
+								<WorkspaceDirectorySummaryCard
+									key={directory.ref.rootID}
+									directory={directory}
+									isLoading={loadingDirectoryKeys.has(key)}
+									error={directoryErrors[key]}
+									onManage={() => {
+										void loadDirectoryDetails(directory);
+									}}
+									onRequestRemove={() => {
+										setDirectoryToRemove({
+											ref: directory.ref,
+											displayName: directory.rootDisplayName,
+											expectedRevision: directory.directorySourceRevision,
+										});
+									}}
+								/>
+							);
+						})}
 
 						{directories.length === 0 ? (
 							<ManagementEmptyState>
@@ -278,7 +400,7 @@ export default function WorkspaceDirectoryManagement() {
 				message={
 					<div className="space-y-2 text-sm">
 						<p>
-							Remove <span className="font-semibold">{directoryToRemove?.root.displayName}</span>?
+							Remove <span className="font-semibold">{directoryToRemove?.displayName}</span>?
 						</p>
 						<p className="text-base-content/70">
 							This removes the directory from FlexiGPT. Repository files are never deleted.

@@ -1,4 +1,3 @@
-import type { Dispatch, SetStateAction } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle, FiCheck, FiFolderPlus, FiRefreshCw, FiSearch, FiSettings, FiX } from 'react-icons/fi';
 
@@ -29,13 +28,7 @@ interface WorkspaceBottomBarChipProps {
 	store: MenuStore;
 	state: ComposerWorkspaceController;
 	activeSkillRefs: SkillRef[];
-	setActiveSkillRefs: Dispatch<SetStateAction<SkillRef[]>>;
 	isInputLocked?: boolean;
-
-	// Kept temporarily so composer callers do not need an unrelated migration.
-	// Directory Workspaces no longer use the old Workspace template insertion
-	// path. User-message Skills remain regular runtime capabilities.
-	onInsertTemplateText: (text: string) => Promise<void> | void;
 }
 
 function workspaceKey(candidate: ComposerWorkspaceCandidate): string {
@@ -99,7 +92,6 @@ export function WorkspaceBottomBarChip({
 	store,
 	state,
 	activeSkillRefs,
-	setActiveSkillRefs,
 	isInputLocked = false,
 }: WorkspaceBottomBarChipProps) {
 	useEffect(() => {
@@ -113,7 +105,6 @@ export function WorkspaceBottomBarChip({
 			store={store}
 			state={state}
 			activeSkillRefs={activeSkillRefs}
-			setActiveSkillRefs={setActiveSkillRefs}
 			isInputLocked={isInputLocked}
 		/>
 	);
@@ -123,9 +114,8 @@ function WorkspaceBottomBarChipContent({
 	store,
 	state,
 	activeSkillRefs,
-	setActiveSkillRefs,
 	isInputLocked = false,
-}: Omit<WorkspaceBottomBarChipProps, 'onInsertTemplateText'>) {
+}: WorkspaceBottomBarChipProps) {
 	const open = useStoreState(store, 'open');
 	const [search, setSearch] = useState('');
 	const [isDirectoryRegistrationOpen, setIsDirectoryRegistrationOpen] = useState(false);
@@ -464,7 +454,6 @@ function WorkspaceBottomBarChipContent({
 				}}
 				state={state}
 				activeSkillRefs={activeSkillRefs}
-				setActiveSkillRefs={setActiveSkillRefs}
 				isInputLocked={isInputLocked}
 			/>
 		</div>

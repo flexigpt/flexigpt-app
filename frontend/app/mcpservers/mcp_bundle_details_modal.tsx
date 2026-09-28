@@ -12,11 +12,6 @@ interface MCPBundleDetailsModalProps {
 	serversLoaded: boolean;
 }
 
-function formatTimestamp(value: string | Date): string {
-	const date = value instanceof Date ? value : new Date(value);
-	return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
 export function MCPBundleDetailsModal({
 	isOpen,
 	onClose,
@@ -36,7 +31,7 @@ export function MCPBundleDetailsModal({
 			description={
 				serversLoaded ? `${serverCount} configured server${serverCount === 1 ? '' : 's'}` : 'Server contents not loaded'
 			}
-			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.collection.artifact.revision}`}
+			modalKey={`mcp-bundle:${bundle.ref.rootID}:${bundle.ref.artifactID}:${bundle.collection.revision}`}
 		>
 			<ManagementInfoGrid>
 				<ManagementInfoRow label="Display Name">{bundle.displayName}</ManagementInfoRow>
@@ -46,12 +41,12 @@ export function MCPBundleDetailsModal({
 				<ManagementInfoRow label="Baseline">{bundle.baseline ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Built-in">{bundle.builtIn ? 'Yes' : 'No'}</ManagementInfoRow>
 				<ManagementInfoRow label="Enabled">{bundle.enabled ? 'Yes' : 'No'}</ManagementInfoRow>
+				<ManagementInfoRow label="State">{bundle.collection.state}</ManagementInfoRow>
+				<ManagementInfoRow label="Revision">{bundle.collection.revision}</ManagementInfoRow>
 				<ManagementInfoRow label="Servers">{serversLoaded ? serverCount : 'Not loaded'}</ManagementInfoRow>
 				<ManagementInfoRow label="Description">
 					<span className="whitespace-pre-wrap">{bundle.description || '—'}</span>
 				</ManagementInfoRow>
-				<ManagementInfoRow label="Created">{formatTimestamp(bundle.collection.artifact.createdAt)}</ManagementInfoRow>
-				<ManagementInfoRow label="Modified">{formatTimestamp(bundle.collection.artifact.modifiedAt)}</ManagementInfoRow>
 			</ManagementInfoGrid>
 		</ManagementDetailsModal>
 	);

@@ -1,9 +1,18 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
-import type { ToolView } from '@/spec/tool';
+import type { CollectionListItem, CollectionView } from '@/spec/collection';
+import type { ToolImplementationView, ToolStoreListItem, ToolView } from '@/spec/tool';
+import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { IToolStoreAPI } from '@/apis/interface';
-import { jsonSchemaFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { collectionListItemFromWails, toolStoreListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	enumFromWails,
+	jsonSchemaFromWails,
+	optionalWailsString,
+	requiredObject,
+	requireNonBlankString,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	GetTool,
 	GetToolCollection,
@@ -19,9 +28,30 @@ import {
  */
 export function toolViewFromWails(value: unknown, operation: string): ToolView {
 	const tool = requiredObject<ToolView>(value, operation);
+	const rawImplementation = requiredObject<Record<string, unknown>>(tool.implementation, `${operation}.implementation`);
+	const kind = enumFromWails(rawImplementation.kind, ToolImplType, `${operation}.implementation.kind`);
+	let implementation: ToolImplementationView;
+
+	if (kind === ToolImplType.SDK) {
+		implementation = {
+			kind,
+			sdkType: requireNonBlankString(rawImplementation.sdkType, `${operation}.implementation.sdkType`),
+			sdkToolType: enumFromWails(
+				rawImplementation.sdkToolType,
+				ToolStoreChoiceType,
+				`${operation}.implementation.sdkToolType`
+			),
+		};
+	} else {
+		implementation = {
+			kind,
+			function: optionalWailsString(rawImplementation.function, `${operation}.implementation.function`),
+		};
+	}
 
 	return {
 		...tool,
+		implementation,
 		inputSchema: jsonSchemaFromWails(tool.inputSchema, `${operation}.inputSchema`),
 		userArgSchema:
 			tool.userArgSchema === null || tool.userArgSchema === undefined
@@ -35,17 +65,19 @@ export function toolViewFromWails(value: unknown, operation: string): ToolView {
 }
 
 export class WailsToolStoreAPI implements IToolStoreAPI {
-	async listToolCollections(): Promise<CollectionView[]> {
-		return wailsObjectArrayOrEmpty<CollectionView>(await ListToolCollections(), 'ListToolCollections');
+	async listToolCollections(): Promise<CollectionListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListToolCollections(), 'ListToolCollections').map((value, index) =>
+			collectionListItemFromWails(value, `ListToolCollections[${index}]`)
+		);
 	}
 
 	async getToolCollection(collection: ArtifactRef): Promise<CollectionView> {
 		return requiredObject<CollectionView>(await GetToolCollection(collection), 'GetToolCollection');
 	}
 
-	async listCollectionTools(collection: ArtifactRef): Promise<ToolView[]> {
-		return wailsObjectArrayOrEmpty<ToolView>(await ListCollectionTools(collection), 'ListCollectionTools').map(
-			(tool, index) => toolViewFromWails(tool, `ListCollectionTools[${index}]`)
+	async listCollectionTools(collection: ArtifactRef): Promise<ToolStoreListItem[]> {
+		return wailsObjectArrayOrEmpty(await ListCollectionTools(collection), 'ListCollectionTools').map((tool, index) =>
+			toolStoreListItemFromWails(tool, `ListCollectionTools[${index}]`)
 		);
 	}
 

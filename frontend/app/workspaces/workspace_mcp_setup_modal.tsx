@@ -98,7 +98,7 @@ function WorkspaceMCPSetupForm({
 				!reset &&
 				(declaration.kind === MCPInputKind.Text || declaration.kind === MCPInputKind.Path
 					? Boolean(existing?.value?.trim() || declaration.default?.trim())
-					: Boolean(existing?.secretRef?.trim()));
+					: Boolean(existing?.secretConfigured));
 
 			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
 				const hasClientID = Boolean(row.clientID.trim());
@@ -277,7 +277,7 @@ function WorkspaceMCPSetupForm({
 								</ModalField>
 							)}
 
-							{binding?.secretRef || binding?.value ? (
+							{binding?.secretConfigured || binding?.value ? (
 								<div className="text-base-content/60 mt-2 text-xs">
 									Configured. Leave this field blank to preserve the existing value.
 								</div>

@@ -438,7 +438,7 @@ function AddEditMCPServerModalContent({
 
 				seen.add(key);
 
-				if (!row.existingSecretRef && !row.secretValue) {
+				if (!row.existingSecretConfigured && !row.secretValue) {
 					validation.stdioSecrets = `Secret value is required for ${name}.`;
 					break;
 				}
@@ -468,7 +468,7 @@ function AddEditMCPServerModalContent({
 				} else if (!/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(next.httpAPIKeyHeaderName.trim())) {
 					validation.httpAPIKey = 'API key header name contains invalid characters.';
 				} else if (
-					(!initialDraft.httpAPIKey?.existingSecretRef || next.httpAPIKeyDeleteExisting) &&
+					(!initialDraft.httpAPIKey?.existingSecretConfigured || next.httpAPIKeyDeleteExisting) &&
 					!next.httpAPIKeyValue
 				) {
 					validation.httpAPIKey = 'API key value is required.';
@@ -481,7 +481,7 @@ function AddEditMCPServerModalContent({
 
 			if (usesOAuthCredentials) {
 				const keepsExistingCredentials =
-					Boolean(initialDraft.httpOAuthClientCredentials.existingSecretRef) && !next.httpOAuthDeleteExisting;
+					Boolean(initialDraft.httpOAuthClientCredentials.existingSecretConfigured) && !next.httpOAuthDeleteExisting;
 
 				if (!keepsExistingCredentials && !next.httpOAuthCredentialsJSON.trim()) {
 					validation.httpCredentials = 'OAuth client credentials are required.';
@@ -849,7 +849,7 @@ function AddEditMCPServerModalContent({
 														/>
 													</ModalField>
 
-													<ModalField label={row.existingSecretRef ? 'Replace Secret Value' : 'Secret Value'}>
+													<ModalField label={row.existingSecretConfigured ? 'Replace Secret Value' : 'Secret Value'}>
 														<input
 															type="password"
 															value={row.secretValue}
@@ -862,14 +862,14 @@ function AddEditMCPServerModalContent({
 																});
 															}}
 														/>
-														{row.existingSecretRef ? (
+														{row.existingSecretConfigured ? (
 															<p className="text-base-content/60 mt-1 text-xs">
 																Configured. Leave blank to keep the existing secret.
 															</p>
 														) : null}
 													</ModalField>
 
-													{row.existingSecretRef ? (
+													{row.existingSecretConfigured ? (
 														<label className="label cursor-pointer justify-start gap-3">
 															<input
 																type="checkbox"
@@ -1024,14 +1024,14 @@ function AddEditMCPServerModalContent({
 												className={`input w-full rounded-xl ${errors.httpAPIKey ? 'input-error' : ''}`}
 												onChange={handleInput}
 											/>
-											{initialDraft.httpAPIKey?.existingSecretRef ? (
+											{initialDraft.httpAPIKey?.existingSecretConfigured ? (
 												<p className="text-base-content/60 mt-1 text-xs">
 													Configured. Leave blank to keep the existing key.
 												</p>
 											) : null}
 										</ModalField>
 
-										{initialDraft.httpAPIKey?.existingSecretRef ? (
+										{initialDraft.httpAPIKey?.existingSecretConfigured ? (
 											<label className="label cursor-pointer justify-start gap-3">
 												<input
 													type="checkbox"
@@ -1086,7 +1086,7 @@ function AddEditMCPServerModalContent({
 													}`}
 													onChange={handleInput}
 												/>
-												{initialDraft.httpOAuthClientCredentials.existingSecretRef ? (
+												{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
 													<p className="text-base-content/60 mt-1 text-xs">
 														Configured. Leave blank to keep the existing credentials.
 													</p>
@@ -1094,7 +1094,7 @@ function AddEditMCPServerModalContent({
 											</ModalField>
 										) : null}
 
-										{initialDraft.httpOAuthClientCredentials.existingSecretRef ? (
+										{initialDraft.httpOAuthClientCredentials.existingSecretConfigured ? (
 											<label className="label cursor-pointer justify-start gap-3">
 												<input
 													type="checkbox"
