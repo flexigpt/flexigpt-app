@@ -206,7 +206,9 @@ function buildOutputPrimaryContent(output: UIToolOutput): string {
 
 	lines.push(`### Summary: ${titleText}`, `### Tool: ${output.name}`, `### Call ID: \`${output.callID}\``);
 
-	if (typeof output.isError === 'boolean') {
+	if (output.isSkipped) {
+		lines.push('### Status: `skipped`');
+	} else if (typeof output.isError === 'boolean') {
 		lines.push(`### Status: \`${output.isError ? 'error' : 'ok'}\``);
 	}
 	const argumentsBlock = buildJSONOrTextCodeBlock(output.arguments);

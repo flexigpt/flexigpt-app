@@ -140,7 +140,7 @@ export const ComposerBox = memo(
 
 		const resetForNewConversation = useCallback(async () => {
 			resetComposerState();
-			await agent.ensureDefaultAgent();
+			await agent.resetToDefaultAgent();
 		}, [agent, resetComposerState]);
 
 		const handleSubmit = useCallback(
@@ -169,7 +169,17 @@ export const ComposerBox = memo(
 				loadWorkflowStarter: async starter => {
 					resetComposerState();
 					editorAreaRef.current?.setDraftText(starter.draft ?? '');
-					return starter.agent ? agent.selectAgent(starter.agent) : agent.ensureDefaultAgent();
+
+					if (!starter.agent) {
+						return agent.resetToDefaultAgent();
+					}
+
+					const applied = await agent.selectAgent(starter.agent);
+					if (!applied) {
+						await agent.resetToDefaultAgent();
+					}
+
+					return applied;
 				},
 				loadExternalMessage: message => editorAreaRef.current?.loadExternalMessage(message),
 				loadToolCalls: calls => editorAreaRef.current?.loadToolCalls(calls),
@@ -198,6 +208,10 @@ export const ComposerBox = memo(
 						forceResetSession: true,
 					});
 					editor?.setWorkspaceSelectionFromMessage(context.workspaceSelection, false);
+
+					// Preserve restored conversation state while retaining the
+					// Base/default Agent as the visible tracked selection.
+					void agent.trackDefaultAgentWithoutApplying();
 				},
 			}),
 			[agent, composerContext, resetForNewConversation, resetComposerState, systemPrompt]

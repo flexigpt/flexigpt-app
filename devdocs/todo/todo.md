@@ -11,17 +11,17 @@
 - [x] loading skills and mcps etc take a lot of time. may be a short circuit path that can actually compile and validate and keep things at compile time itself is needed?
 - [x] no user message skills available??
 - [x] system prompts didnt seem to get loaded, shows "no system instruction sources"
+- [x] copy button in different tab seems to lag when there is some other streaming etc going on. there is a large paint ongoing which may give a lag feeling. may look at it sometime later.
+- [x] base agent is not loaded. there is no agent at start.
+- [x] submit error button is there even if there is no run done yet for tool call chip.
 
-- [ ] copy button in different tab seems to lag when there is some other streaming etc going on.
+- [x] mcps that are not really configured are shown. we should not do such thing. only configured and connect pending things should be shown. other can be just a small line saying, configuration pending manage from managements page.
+- [x] mcp chip in messages is taller than others. why it uses different chip i dont know. also some ids etc that are internal are used in ui
+- [x] mcp servers not loaded still in management page
 
-- [ ] in thinking send in inference, make sure that the first message sent doesnt have encrypted thinking or any such input.
+- [ ] mcp oauth thing says no configuration client method sent in initialize.
 
-- [ ] submit error button is there even if there is no run done yet for tool chip.
-
-- [ ] mcps that are not really configured are shown. we should not do such thing. only configured and connect pending things should be shown. other can be just a small line saying, configuration pending manage from managements page.
-- [ ] mcp chip in messags is taller than others. why it uses different chip i dont know. also some ids etc that are internal are used in ui
-- [ ] mcp servers not loaded still
-- [ ] base agent is not loaded. there is no agent at start.
+- [ ] in thinking send in inference, make sure that the first message sent doesnt have encrypted thinking or any such input. same for tool output.
 
 - Testing
   - [ ] test enhanced mcp apps.

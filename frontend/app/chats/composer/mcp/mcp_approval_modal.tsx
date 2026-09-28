@@ -83,16 +83,10 @@ export function MCPApprovalModal({ approvalRequest, isResolving = false, error, 
 					<div className="space-y-4">
 						<div className="grid grid-cols-12 gap-2 text-sm">
 							<div className="col-span-3 font-semibold">Server</div>
-							<div className="col-span-9 break-all">
-								{summary.serverDisplayName?.trim() || summary.server}
-								<div className="text-base-content/60 font-mono text-xs">{summary.server}</div>
-							</div>
+							<div className="col-span-9 break-all">{summary.serverDisplayName?.trim() || 'MCP server'}</div>
 
 							<div className="col-span-3 font-semibold">Tool</div>
-							<div className="col-span-9 break-all">
-								{summary.toolName}
-								{summary.toolDigest ? <div className="text-base-content/60 text-xs">{summary.toolDigest}</div> : null}
-							</div>
+							<div className="col-span-9 break-all">{summary.toolName}</div>
 
 							<div className="col-span-3 font-semibold">Risk</div>
 							<div className="col-span-9">{getMCPToolRiskLabel(summary.risk)}</div>

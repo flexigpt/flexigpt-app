@@ -21,6 +21,11 @@ interface AgentRuntimeApplier {
 	applyAgentRuntime(recipe: PreparedAgentStarter): void;
 }
 
+type PendingDefaultAction = 'ensure' | 'reset' | 'track';
+
+const BASE_AGENT_NAME = 'base';
+const NO_SELECTABLE_AGENT_ERROR = 'No selectable Agent is available.';
+
 export interface AgentManagerState {
 	agentOptions: AgentCatalogOption[];
 	loading: boolean;
@@ -28,13 +33,21 @@ export interface AgentManagerState {
 	actionError: string | null;
 	isApplying: boolean;
 
+	baseAgentKey: string | null;
+	defaultAgentKey: string | null;
+	isDefaultAgentSelected: boolean;
+
 	selectedAgentKey: string | null;
 	selectedAgent: AgentCatalogOption | null;
 	preparedStarter: PreparedAgentStarter | null;
+	isTrackingOnly: boolean;
 
 	refreshAgents(): Promise<void>;
 	selectAgent(agentRef: ArtifactRef): Promise<boolean>;
 	ensureDefaultAgent(): Promise<boolean>;
+	resetToDefaultAgent(): Promise<boolean>;
+	reapplySelectedAgent(): Promise<boolean>;
+	trackDefaultAgentWithoutApplying(): Promise<boolean>;
 	clearAgentTracking(): void;
 }
 
@@ -66,26 +79,66 @@ export function useAgentManager(
 	const [error, setError] = useState<string | null>(null);
 	const [actionError, setActionError] = useState<string | null>(null);
 	const [isApplying, setIsApplying] = useState(false);
+	const [isTrackingOnly, setIsTrackingOnly] = useState(false);
 	const [selectedAgentKey, setSelectedAgentKey] = useState<string | null>(null);
 	const [preparedStarter, setPreparedStarter] = useState<PreparedAgentStarter | null>(null);
 
-	const pendingDefaultRef = useRef(false);
+	const selectedAgentKeyRef = useRef<string | null>(null);
+	const isApplyingRef = useRef(false);
+	const applyRequestSeqRef = useRef(0);
+	const catalogRequestSeqRef = useRef(0);
+	const pendingDefaultActionRef = useRef<PendingDefaultAction | null>(null);
+	const initialDefaultRequestRef = useRef(false);
+	const autoEnsureCatalogKeyRef = useRef<string | null>(null);
 	const appliedInstructionSourceKeysRef = useRef<Set<string>>(new Set());
+
+	const setTrackedAgent = useCallback(
+		(aKey: string | null, starter: PreparedAgentStarter | null, trackingOnly = false) => {
+			selectedAgentKeyRef.current = aKey;
+			setSelectedAgentKey(aKey);
+			setPreparedStarter(starter);
+			setIsTrackingOnly(trackingOnly);
+		},
+		[]
+	);
+
+	const cancelActiveAgentRequest = useCallback(() => {
+		applyRequestSeqRef.current += 1;
+		isApplyingRef.current = false;
+		setIsApplying(false);
+	}, []);
+
 	const loadAgentOptions = useCallback(async (force = false) => {
+		const requestSeq = catalogRequestSeqRef.current + 1;
+		catalogRequestSeqRef.current = requestSeq;
 		setLoading(true);
 		setError(null);
 
 		try {
-			setAgentOptions(await agentManagementAPI.listAgentCatalogOptions(force));
+			const nextOptions = await agentManagementAPI.listAgentCatalogOptions(force);
+			if (catalogRequestSeqRef.current !== requestSeq) {
+				return;
+			}
+
+			setAgentOptions(nextOptions);
 		} catch (loadError) {
+			if (catalogRequestSeqRef.current !== requestSeq) {
+				return;
+			}
+
 			setAgentOptions([]);
 			setError(getErrorMessage(loadError, 'Failed to load Agents.'));
 		} finally {
-			setLoading(false);
+			if (catalogRequestSeqRef.current === requestSeq) {
+				setLoading(false);
+			}
 		}
 	}, []);
 
-	const refreshAgents = useCallback(() => loadAgentOptions(true), [loadAgentOptions]);
+	const refreshAgents = useCallback(async () => {
+		autoEnsureCatalogKeyRef.current = null;
+		await loadAgentOptions(true);
+	}, [loadAgentOptions]);
 
 	useEffect(() => {
 		// oxlint-disable-next-line react/set-state-in-effect
@@ -97,9 +150,26 @@ export function useAgentManager(
 		[agentOptions, selectedAgentKey]
 	);
 
+	const baseAgent = useMemo(
+		() =>
+			agentOptions.find(option => option.agent.builtIn && option.agent.name.trim().toLowerCase() === BASE_AGENT_NAME) ??
+			null,
+		[agentOptions]
+	);
+	const defaultAgent = useMemo(
+		() => (baseAgent?.isSelectable ? baseAgent : (agentOptions.find(option => option.isSelectable) ?? null)),
+		[agentOptions, baseAgent]
+	);
+	const isDefaultAgentSelected = selectedAgent !== null && selectedAgent.key === defaultAgent?.key;
+
+	const hasTrackedAgent = useCallback(() => {
+		const trackedKey = selectedAgentKeyRef.current;
+		return trackedKey !== null && agentOptions.some(option => option.key === trackedKey);
+	}, [agentOptions]);
+
 	const selectAgent = useCallback(
 		async (agentRef: ArtifactRef): Promise<boolean> => {
-			if (isApplying) {
+			if (isApplyingRef.current) {
 				return false;
 			}
 
@@ -120,11 +190,19 @@ export function useAgentManager(
 				return false;
 			}
 
+			const requestSeq = applyRequestSeqRef.current + 1;
+			applyRequestSeqRef.current = requestSeq;
+			pendingDefaultActionRef.current = null;
 			setActionError(null);
+			isApplyingRef.current = true;
 			setIsApplying(true);
 
 			try {
 				const recipe = await agentManagementAPI.prepareAgentStarter(agentRef);
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
+
 				const recipeError = getRecipeError(recipe);
 
 				if (recipeError) {
@@ -213,56 +291,174 @@ export function useAgentManager(
 				}
 
 				appliedInstructionSourceKeysRef.current = nextInstructionSourceKeys;
-
 				runtimeCompiler.applyAgentRuntime(recipe);
-				setPreparedStarter(recipe);
-				setSelectedAgentKey(option.key);
+				setTrackedAgent(option.key, recipe);
 				return true;
 			} catch (prepareError) {
+				if (applyRequestSeqRef.current !== requestSeq) {
+					return false;
+				}
+
 				setActionError(getErrorMessage(prepareError, 'Failed to prepare the Agent starter recipe.'));
 				return false;
 			} finally {
-				setIsApplying(false);
+				if (applyRequestSeqRef.current === requestSeq) {
+					isApplyingRef.current = false;
+					setIsApplying(false);
+				}
 			}
 		},
-		[agentOptions, context, isApplying, runtimeCompiler, systemPrompt]
+		[agentOptions, context, runtimeCompiler, setTrackedAgent, systemPrompt]
 	);
 
-	const ensureDefaultAgent = useCallback(async (): Promise<boolean> => {
-		if (loading || !context.modelOptionsLoaded) {
-			pendingDefaultRef.current = true;
+	const applyDefaultAgent = useCallback(
+		async (force: boolean): Promise<boolean> => {
+			if (!force && hasTrackedAgent()) {
+				pendingDefaultActionRef.current = null;
+				return true;
+			}
+
+			if (loading || !context.modelOptionsLoaded || isApplyingRef.current) {
+				pendingDefaultActionRef.current = force ? 'reset' : 'ensure';
+				return false;
+			}
+
+			if (!defaultAgent) {
+				pendingDefaultActionRef.current = null;
+				setActionError(NO_SELECTABLE_AGENT_ERROR);
+				return false;
+			}
+
+			pendingDefaultActionRef.current = null;
+			return selectAgent(defaultAgent.ref);
+		},
+		[context.modelOptionsLoaded, defaultAgent, hasTrackedAgent, loading, selectAgent]
+	);
+
+	const ensureDefaultAgent = useCallback(() => applyDefaultAgent(false), [applyDefaultAgent]);
+	const resetToDefaultAgent = useCallback(() => applyDefaultAgent(true), [applyDefaultAgent]);
+
+	const reapplySelectedAgent = useCallback(async (): Promise<boolean> => {
+		const trackedKey = selectedAgentKeyRef.current;
+		const option = trackedKey ? agentOptions.find(agent => agent.key === trackedKey) : undefined;
+
+		if (!option) {
+			setActionError('No active Agent is available to reapply.');
 			return false;
 		}
 
-		const defaultAgent =
-			agentOptions.find(option => option.agent.builtIn && option.agent.name === 'base' && option.isSelectable) ??
-			agentOptions.find(option => option.isSelectable);
+		return selectAgent(option.ref);
+	}, [agentOptions, selectAgent]);
+
+	const trackDefaultAgentWithoutApplying = useCallback(async (): Promise<boolean> => {
+		if (hasTrackedAgent()) {
+			pendingDefaultActionRef.current = null;
+			return true;
+		}
+
+		// A restore must invalidate a still-running initial default application,
+		// otherwise it can overwrite restored Composer state when it resolves.
+		cancelActiveAgentRequest();
+
+		if (loading) {
+			pendingDefaultActionRef.current = 'track';
+			return false;
+		}
 
 		if (!defaultAgent) {
-			setActionError('No selectable Agent is available.');
+			pendingDefaultActionRef.current = null;
+			setActionError(NO_SELECTABLE_AGENT_ERROR);
 			return false;
 		}
 
-		pendingDefaultRef.current = false;
-		return selectAgent(defaultAgent.ref);
-	}, [agentOptions, context.modelOptionsLoaded, loading, selectAgent]);
+		pendingDefaultActionRef.current = null;
+		setActionError(null);
+		setTrackedAgent(defaultAgent.key, null, true);
+		return true;
+	}, [cancelActiveAgentRequest, defaultAgent, hasTrackedAgent, loading, setTrackedAgent]);
+
+	const clearAgentTracking = useCallback(() => {
+		cancelActiveAgentRequest();
+		pendingDefaultActionRef.current = null;
+		autoEnsureCatalogKeyRef.current = null;
+		setTrackedAgent(null, null);
+		setActionError(null);
+		// Retain applied Composer state and instruction-source keys. The next
+		// Agent application can remove only Agent-owned stale sources.
+	}, [cancelActiveAgentRequest, setTrackedAgent]);
+
+	const catalogIdentity = useMemo(
+		() => agentOptions.map(option => `${option.key}:${option.isSelectable ? '1' : '0'}`).join('|'),
+		[agentOptions]
+	);
 
 	useEffect(() => {
-		if (!pendingDefaultRef.current || loading || !context.modelOptionsLoaded) {
+		if (initialDefaultRequestRef.current) {
 			return;
 		}
 
+		initialDefaultRequestRef.current = true;
 		void ensureDefaultAgent();
-	}, [context.modelOptionsLoaded, ensureDefaultAgent, loading]);
+	}, [ensureDefaultAgent]);
 
-	const clearAgentTracking = useCallback(() => {
-		setSelectedAgentKey(null);
-		setPreparedStarter(null);
-		setActionError(null);
-		// Deliberately retain applied Composer state and instruction sources,
-		// including their keys. A later Agent selection can then remove only
-		// stale Agent-owned instruction sources.
-	}, []);
+	useEffect(() => {
+		const pendingAction = pendingDefaultActionRef.current;
+		if (!pendingAction) {
+			return;
+		}
+
+		if (pendingAction === 'track') {
+			if (loading) {
+				return;
+			}
+
+			pendingDefaultActionRef.current = null;
+			// oxlint-disable-next-line react/set-state-in-effect
+			void trackDefaultAgentWithoutApplying();
+			return;
+		}
+
+		if (loading || !context.modelOptionsLoaded || isApplying || isApplyingRef.current) {
+			return;
+		}
+
+		pendingDefaultActionRef.current = null;
+		if (pendingAction === 'reset') {
+			void resetToDefaultAgent();
+		} else {
+			void ensureDefaultAgent();
+		}
+	}, [
+		context.modelOptionsLoaded,
+		ensureDefaultAgent,
+		isApplying,
+		loading,
+		resetToDefaultAgent,
+		trackDefaultAgentWithoutApplying,
+	]);
+
+	useEffect(() => {
+		if (selectedAgentKey === null || selectedAgent !== null) {
+			return;
+		}
+
+		// oxlint-disable-next-line react/set-state-in-effect
+		clearAgentTracking();
+		void ensureDefaultAgent();
+	}, [clearAgentTracking, ensureDefaultAgent, selectedAgent, selectedAgentKey]);
+
+	useEffect(() => {
+		if (loading || !context.modelOptionsLoaded || isApplying || isApplyingRef.current || hasTrackedAgent()) {
+			return;
+		}
+
+		if (autoEnsureCatalogKeyRef.current === catalogIdentity) {
+			return;
+		}
+
+		autoEnsureCatalogKeyRef.current = catalogIdentity;
+		void ensureDefaultAgent();
+	}, [catalogIdentity, context.modelOptionsLoaded, ensureDefaultAgent, hasTrackedAgent, isApplying, loading]);
 
 	return {
 		agentOptions,
@@ -270,12 +466,20 @@ export function useAgentManager(
 		error,
 		actionError,
 		isApplying,
-		selectedAgentKey,
+		baseAgentKey: baseAgent?.key ?? null,
+		defaultAgentKey: defaultAgent?.key ?? null,
+		isDefaultAgentSelected,
+
+		selectedAgentKey: selectedAgent?.key ?? null,
 		selectedAgent,
-		preparedStarter,
+		preparedStarter: selectedAgent ? preparedStarter : null,
+		isTrackingOnly: selectedAgent ? isTrackingOnly : false,
 		refreshAgents,
 		selectAgent,
 		ensureDefaultAgent,
+		resetToDefaultAgent,
+		reapplySelectedAgent,
+		trackDefaultAgentWithoutApplying,
 		clearAgentTracking,
 	};
 }

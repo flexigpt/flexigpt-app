@@ -19,7 +19,7 @@ import {
 	MCPTrustLevel,
 } from '@/spec/mcp';
 
-import { getAuthMode, getServerAuthHealthState } from '@/apis/mcp_management';
+import { getAuthMode, getMCPServerSetupStatus, getServerAuthHealthState } from '@/apis/mcp_management';
 
 export function getMCPTransportLabel(value: MCPTransportType): string {
 	switch (value) {
@@ -87,6 +87,38 @@ export function getEffectiveMCPServerStatus(server: MCPServerView, runtimeStatus
 	}
 
 	return runtimeStatus ?? MCPServerStatusEnum.Disconnected;
+}
+
+export function isMCPServerConfiguredForUse(server: MCPServerView, authHealth?: MCPAuthHealth): boolean {
+	const setup = getMCPServerSetupStatus(server);
+
+	if (!setup.complete) {
+		return false;
+	}
+
+	const authMode = getAuthMode(server);
+
+	if (authMode === MCPHTTPAuthModeEnum.None) {
+		return true;
+	}
+
+	if (authMode === MCPHTTPAuthModeEnum.APIKey || authMode === MCPHTTPAuthModeEnum.ClientCredentials) {
+		return authHealth?.configured === true;
+	}
+
+	return getServerAuthHealthState(server, authHealth) !== MCPAuthHealthStateEnum.NotConfigured;
+}
+
+export function isMCPServerConnectionPending(
+	server: MCPServerView,
+	runtimeStatus?: MCPServerStatus,
+	authHealth?: MCPAuthHealth
+): boolean {
+	return (
+		runtimeStatus === MCPServerStatusEnum.Connecting ||
+		authHealth?.authorizationPending === true ||
+		getServerAuthHealthState(server, authHealth) === MCPAuthHealthStateEnum.AuthorizationPending
+	);
 }
 
 export function getMCPStatusLabel(value: MCPServerStatus): string {

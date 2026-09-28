@@ -554,6 +554,7 @@ export interface UIToolOutput {
 	webSearchToolOutputItems?: WebSearchToolOutputItemUnion[];
 
 	isError?: boolean;
+	isSkipped?: boolean;
 	errorMessage?: string;
 
 	/**

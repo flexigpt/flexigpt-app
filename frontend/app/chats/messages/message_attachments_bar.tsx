@@ -33,12 +33,14 @@ import {
 	WorkspaceConversationSkillUsageStatus,
 } from '@/spec/workspace';
 
+import type { MessageBarChipTone } from '@/chats/messages/message_bar_chip_utils';
 import { getAttachmentDisplayLabel } from '@/chats/composer/attachments/attachment_editor_utils';
 import {
 	getAttachmentContentBlockModeLabel,
 	getAttachmentContentBlockModeTooltip,
 } from '@/chats/composer/attachments/attachment_mode_menu_utils';
 import { MCPMessageContextChip } from '@/chats/messages/mcp_message_context_chip';
+import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
 import { formatSkillRef } from '@/skills/lib/skill_identity_utils';
 import { getPrettyToolName } from '@/tools/lib/tool_identity_utils';
 
@@ -63,8 +65,6 @@ function getAttachmentPath(att: Attachment): string {
 	return '';
 }
 
-type MessageBarChipTone = 'default' | 'info' | 'secondary';
-
 interface MessageBarChipProps {
 	icon: ReactNode;
 	label: ReactNode;
@@ -76,24 +76,6 @@ interface MessageBarChipProps {
 	children?: ReactNode;
 	tone?: MessageBarChipTone;
 	maxLabelWidthClass?: string;
-}
-
-function getMessageBarChipClassName(tone: MessageBarChipTone, fullWidth: boolean, interactive: boolean): string {
-	const toneClass =
-		tone === 'info'
-			? 'bg-info/10 border-info/50 gap-1'
-			: tone === 'secondary'
-				? 'bg-secondary/10 border-secondary/40 gap-1'
-				: 'border-base-content/20 mx-1 justify-between gap-2 bg-inherit';
-
-	return [
-		'text-base-content flex items-center rounded-2xl border px-2 py-0',
-		toneClass,
-		fullWidth ? 'w-full' : 'shrink-0',
-		interactive ? 'cursor-pointer' : '',
-	]
-		.filter(Boolean)
-		.join(' ');
 }
 
 /** Shared visual and interaction shell for every chip in the message attachments bar. */
@@ -349,10 +331,9 @@ function MessageToolCallChip({ call, fullWidth = false, onClick }: MessageToolCa
 	const isAutoExecute =
 		Boolean(call.toolStoreChoice?.autoExecute) || call.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 	const autoLabel = isAutoExecute ? ' • Auto-execute: enabled' : '';
-	const mcpLabel = call.mcpToolSelection
-		? `\nMCP server: ${call.mcpToolSelection.server}\nMCP tool: ${call.mcpToolSelection.toolName}`
-		: '';
+	const mcpLabel = call.mcpToolSelection ? `\nMCP tool: ${call.mcpToolSelection.toolName}` : '';
 	const title = `Suggested tool call: ${label}${statusLabel}${autoLabel}${mcpLabel}`;
+
 	return (
 		<MessageBarChip
 			icon={<FiTerminal size={14} />}
@@ -385,10 +366,12 @@ interface MessageToolOutputChipProps {
 function MessageToolOutputChip({ output, fullWidth = false, onClick }: MessageToolOutputChipProps) {
 	const prettyName = getPrettyToolName(output.name);
 	const label = output.summary || `Result: ${prettyName}`;
-	const titleLines = [label, `Tool: ${output.name}`, `Call ID: ${output.callID}`];
+	const titleLines = [label, `Tool: ${prettyName}`];
+
 	if (output.mcpToolSelection) {
-		titleLines.push(`MCP: ${output.mcpToolSelection.server}/${output.mcpToolSelection.toolName}`);
+		titleLines.push(`MCP tool: ${output.mcpToolSelection.toolName}`);
 	}
+
 	const title = titleLines.join('\n');
 
 	return (
@@ -414,7 +397,7 @@ function MessageWebSearchOutputChip({ output, fullWidth = false, onClick }: Mess
 	const resultCount = output.webSearchToolOutputItems?.length ?? 0;
 	const label = resultCount > 0 ? `${resultCount} result${resultCount === 1 ? '' : 's'}` : 'Web search results';
 
-	const title = [`Web search results`, `Tool: ${output.name}`, `Call ID: ${output.callID}`].join('\n');
+	const title = 'Web search results';
 
 	return (
 		<MessageBarChip

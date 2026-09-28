@@ -50,6 +50,7 @@ interface OAuthTarget {
 }
 
 const STATUS_READ_CONCURRENCY = 4;
+const BUNDLE_PREFETCH_CONCURRENCY = 3;
 
 function artifactKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
@@ -244,34 +245,32 @@ export default function MCPServersPage() {
 		[]
 	);
 
-	const loadBundleData = useCallback(
-		async (bundle: MCPBundleView, pending?: MCPOAuthAuthorization[]): Promise<BundleData> => {
-			try {
-				const servers = await mcpManagementAPI.listMCPServers(bundle);
-				const statuses = await readServerStatus(servers, pending);
+	const loadBundleServerList = useCallback(async (bundle: MCPBundleView): Promise<BundleData> => {
+		try {
+			const servers = await mcpManagementAPI.listMCPServers(bundle);
 
-				return {
-					bundle,
-					servers,
-					...statuses,
-					serversLoaded: true,
-					isLoadingServers: false,
-				};
-			} catch (error) {
-				return {
-					bundle,
-					servers: [],
-					runtimeByArtifactID: {},
-					authHealthByArtifactID: {},
-					readErrorsByArtifactID: {},
-					serverLoadError: getErrorMessage(error, 'Failed to load servers for this MCP Bundle.'),
-					serversLoaded: false,
-					isLoadingServers: false,
-				};
-			}
-		},
-		[readServerStatus]
-	);
+			return {
+				bundle,
+				servers,
+				runtimeByArtifactID: {},
+				authHealthByArtifactID: {},
+				readErrorsByArtifactID: {},
+				serversLoaded: true,
+				isLoadingServers: false,
+			};
+		} catch (error) {
+			return {
+				bundle,
+				servers: [],
+				runtimeByArtifactID: {},
+				authHealthByArtifactID: {},
+				readErrorsByArtifactID: {},
+				serverLoadError: getErrorMessage(error, 'Failed to load servers for this MCP Bundle.'),
+				serversLoaded: false,
+				isLoadingServers: false,
+			};
+		}
+	}, []);
 
 	const fetchAll = useCallback(async () => {
 		const requestID = loadIDRef.current + 1;
@@ -340,6 +339,7 @@ export default function MCPServersPage() {
 				} satisfies BundleData;
 			});
 
+			bundlesRef.current = shells;
 			setBundles(shells);
 			setWarnings(warningsNext);
 			loadedOnceRef.current = true;
@@ -363,18 +363,22 @@ export default function MCPServersPage() {
 	}, []);
 
 	useEffect(() => {
-		// oxlint-disable-next-line react/set-state-in-effect
 		void fetchAll().catch(() => undefined);
 	}, [fetchAll]);
 
 	const loadBundleServers = useCallback(
-		(bundleRef: MCPBundleView['ref']): Promise<void> => {
+		(bundleRef: MCPBundleView['ref'], waitForStatus = true): Promise<void> => {
 			const epoch = bundleLoadEpochRef.current;
 			const key = `${epoch}:${artifactKey(bundleRef)}`;
 			const inFlight = bundleLoadInFlightRef.current.get(key);
 			if (inFlight) {
 				return inFlight;
 			}
+
+			let resolveServerListReady: () => void = () => undefined;
+			const serverListReady = new Promise<void>(resolve => {
+				resolveServerListReady = resolve;
+			});
 
 			const task = (async () => {
 				const existing = bundlesRef.current.find(
@@ -405,17 +409,60 @@ export default function MCPServersPage() {
 					pendingAuthorizationsRef.current = pending;
 
 					const refreshedBundle = await mcpManagementAPI.getMCPBundle(bundleRef);
-					const refreshed = await loadBundleData(refreshedBundle, pending);
+					const loaded = await loadBundleServerList(refreshedBundle);
 
 					if (!mountedRef.current || bundleLoadEpochRef.current !== epoch) {
 						return;
 					}
+
+					// Show durable server definitions immediately. Runtime and
+					// authorization state are enrichment and should not delay the
+					// collection contents appearing on screen.
 					setBundles(previous =>
 						previous.map(item =>
 							item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
-								? refreshed
+								? loaded
 								: item
 						)
+					);
+
+					resolveServerListReady();
+
+					if (!loaded.serversLoaded || loaded.servers.length === 0) {
+						return;
+					}
+
+					const statuses = await readServerStatus(loaded.servers, pending).catch(() => undefined);
+
+					if (!statuses || !mountedRef.current || bundleLoadEpochRef.current !== epoch) {
+						return;
+					}
+
+					setBundles(previous =>
+						previous.map(item => {
+							if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
+								return item;
+							}
+
+							// Preserve newer local actions such as Connect,
+							// Disconnect, or Refresh if they completed while
+							// this background status hydration was running.
+							return {
+								...item,
+								runtimeByArtifactID: {
+									...statuses.runtimeByArtifactID,
+									...item.runtimeByArtifactID,
+								},
+								authHealthByArtifactID: {
+									...statuses.authHealthByArtifactID,
+									...item.authHealthByArtifactID,
+								},
+								readErrorsByArtifactID: {
+									...statuses.readErrorsByArtifactID,
+									...item.readErrorsByArtifactID,
+								},
+							};
+						})
 					);
 				} catch (error) {
 					if (mountedRef.current && bundleLoadEpochRef.current === epoch) {
@@ -437,6 +484,8 @@ export default function MCPServersPage() {
 						);
 					}
 					throw error;
+				} finally {
+					resolveServerListReady();
 				}
 			})();
 
@@ -447,12 +496,70 @@ export default function MCPServersPage() {
 				}
 			};
 			void task.then(clear, clear);
-			return task;
+			return waitForStatus ? task : serverListReady;
 		},
-		[loadBundleData]
+		[loadBundleServerList, readServerStatus]
 	);
 
 	const refreshBundle = loadBundleServers;
+
+	useEffect(() => {
+		if (isInitialLoading || isRefreshing || pageLoadError || bundles.length === 0) {
+			return;
+		}
+
+		const epoch = bundleLoadEpochRef.current;
+		const scheduledKeys: string[] = [];
+		const targets: MCPBundleView['ref'][] = [];
+
+		for (const bundleData of bundles) {
+			if (bundleData.serversLoaded || bundleData.isLoadingServers || bundleData.serverLoadError) {
+				continue;
+			}
+
+			const key = `${epoch}:${artifactKey(bundleData.bundle.ref)}`;
+
+			if (bundlePrefetchKeysRef.current.has(key)) {
+				continue;
+			}
+
+			bundlePrefetchKeysRef.current.add(key);
+			scheduledKeys.push(key);
+			targets.push(bundleData.bundle.ref);
+		}
+
+		if (targets.length === 0) {
+			return;
+		}
+
+		let started = false;
+		const timer = window.setTimeout(() => {
+			started = true;
+
+			void mapWithConcurrency(targets, BUNDLE_PREFETCH_CONCURRENCY, async bundleRef => {
+				if (bundleLoadEpochRef.current !== epoch) {
+					return;
+				}
+
+				// Automatic loading waits only for server definitions. Runtime
+				// and auth status continue enriching each card in the background.
+				await loadBundleServers(bundleRef, false).catch(() => undefined);
+			}).catch(() => undefined);
+		}, 0);
+
+		return () => {
+			window.clearTimeout(timer);
+
+			// React Strict Mode may clean up before the timer fires. Release
+			// those keys so the next effect invocation can schedule the work.
+			if (!started) {
+				for (const key of scheduledKeys) {
+					// oxlint-disable-next-line react-hooks/exhaustive-deps
+					bundlePrefetchKeysRef.current.delete(key);
+				}
+			}
+		};
+	}, [bundles, isInitialLoading, isRefreshing, loadBundleServers, pageLoadError]);
 
 	const refreshSingleServer = useCallback(
 		async (server: MCPServerView) => {

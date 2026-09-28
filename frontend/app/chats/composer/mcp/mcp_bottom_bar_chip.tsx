@@ -72,6 +72,8 @@ import {
 	getMCPStatusLabel,
 	getMCPTransportLabel,
 	isMCPAuthActionable,
+	isMCPServerConfiguredForUse,
+	isMCPServerConnectionPending,
 	isMCPToolVisibleToModel,
 } from '@/mcpservers/lib/mcp_server_utils';
 import { MCPOAuthAuthorizationModal } from '@/mcpservers/mcp_oauth_authorization_modal';
@@ -83,6 +85,13 @@ function stop(e: MouseEvent) {
 
 function isEnabledMCPOption(option: MCPComposerServerOption) {
 	return option.bundle.enabled && option.server.enabled && isServerOperational(option.server);
+}
+
+function isConfiguredOrConnectionPendingMCPOption(option: MCPComposerServerOption) {
+	return (
+		isMCPServerConfiguredForUse(option.server, option.authHealth) ||
+		isMCPServerConnectionPending(option.server, option.runtime?.status, option.authHealth)
+	);
 }
 
 function isOAuthModalRelevant(option: MCPComposerServerOption): boolean {
@@ -781,7 +790,7 @@ function ServerRow({
 					</div>
 
 					<div className="text-base-content/60 truncate text-xs">
-						{option.bundle.logicalName}/{option.server.logicalName} • {getMCPTransportLabel(option.transport)}
+						{option.bundle.displayName || 'MCP Collection'} / {getMCPTransportLabel(option.transport)}
 					</div>
 
 					{option.runtime?.lastError ? <div className="text-error mt-1 text-xs">{option.runtime.lastError}</div> : null}
@@ -870,10 +879,8 @@ function ServerRow({
 function getMCPOptionSearchFields(option: MCPComposerServerOption) {
 	return [
 		{ value: option.server.displayName, weight: 8 },
-		{ value: option.server.logicalName, weight: 7 },
 		{ value: option.bundle.displayName, weight: 5 },
-		{ value: option.bundle.logicalName, weight: 5 },
-		{ value: option.server.ref.artifactID, weight: 3 },
+		{ value: getMCPTransportLabel(option.transport), weight: 3 },
 		{ value: option.runtime?.lastError, weight: 2 },
 		{ value: option.authHealth?.lastError, weight: 2 },
 		{ value: option.tools.map(tool => tool.displayName || tool.toolName), weight: 2 },
@@ -916,10 +923,26 @@ export function MCPBottomBarChip({
 	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
 	const hasBlockingArgs = state.argumentsBlocked;
-	const visibleOptions = useMemo(() => state.options.filter(isEnabledMCPOption), [state.options]);
-	const hiddenDisabledServerCount = state.options.length - visibleOptions.length;
-	const hiddenDisabledServerLabel = hiddenDisabledServerCount === 1 ? 'server' : 'servers';
-	const hiddenDisabledServerVerb = hiddenDisabledServerCount === 1 ? 'is' : 'are';
+	const enabledOperationalOptions = useMemo(() => state.options.filter(isEnabledMCPOption), [state.options]);
+	const visibleOptions = useMemo(
+		() =>
+			enabledOperationalOptions.filter(o => {
+				return isConfiguredOrConnectionPendingMCPOption(o);
+			}),
+		[enabledOperationalOptions]
+	);
+	const configurationPendingServerCount = enabledOperationalOptions.length - visibleOptions.length;
+	const hiddenDisabledServerCount = state.options.filter(
+		option => !option.bundle.enabled || !option.server.enabled
+	).length;
+	const hiddenUnavailableServerCount = state.options.filter(
+		option => option.bundle.enabled && option.server.enabled && !isServerOperational(option.server)
+	).length;
+	const hasManagementHint =
+		state.options.length === 0 ||
+		configurationPendingServerCount > 0 ||
+		hiddenDisabledServerCount > 0 ||
+		hiddenUnavailableServerCount > 0;
 
 	const displayedVisibleOptions = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
@@ -1192,9 +1215,15 @@ export function MCPBottomBarChip({
 								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">Loading MCP servers…</div>
 							) : state.error ? (
 								<div className="text-error rounded-xl px-2 py-1 text-xs">{state.error}</div>
-							) : state.options.length === 0 ? (
+							) : visibleOptions.length === 0 ? (
 								<div className="text-base-content/60 rounded-xl px-2 py-1 text-xs">
-									No MCP servers configured. Add servers from the MCP Servers management page.
+									{state.options.length === 0
+										? 'No MCP servers have been added yet.'
+										: configurationPendingServerCount > 0
+											? `Configuration pending for ${configurationPendingServerCount} MCP server${
+													configurationPendingServerCount === 1 ? '' : 's'
+												}.`
+											: 'No enabled MCP servers are ready to use.'}
 								</div>
 							) : displayedVisibleOptions.length === 0 ? (
 								<div className={searchableMenuEmptyStateClasses}>No MCP servers match your search.</div>
@@ -1214,26 +1243,42 @@ export function MCPBottomBarChip({
 											}}
 										/>
 									))}
-
-									{hiddenDisabledServerCount > 0 ? (
-										<div className="border-base-300 text-base-content/70 mt-2 border-t pt-2 text-xs">
-											{hiddenDisabledServerCount} disabled MCP {hiddenDisabledServerLabel} {hiddenDisabledServerVerb}{' '}
-											hidden.{' '}
-											<Link
-												to="/mcpservers"
-												className="link link-info"
-												onClick={event => {
-													event.stopPropagation();
-													menu.hide();
-												}}
-											>
-												Go to MCP Servers
-											</Link>{' '}
-											to enable {hiddenDisabledServerCount === 1 ? 'it' : 'them'}.
-										</div>
-									) : null}
 								</>
 							)}
+
+							{!state.loading && !state.error && hasManagementHint ? (
+								<div className="border-base-300 text-base-content/70 mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 border-t pt-2 text-xs">
+									{state.options.length === 0 ? <span>No MCP servers are configured.</span> : null}
+									{configurationPendingServerCount > 0 ? (
+										<span>
+											Configuration pending for {configurationPendingServerCount} MCP server
+											{configurationPendingServerCount === 1 ? '' : 's'}.
+										</span>
+									) : null}
+									{hiddenDisabledServerCount > 0 ? (
+										<span>
+											{hiddenDisabledServerCount} disabled MCP server
+											{hiddenDisabledServerCount === 1 ? '' : 's'} hidden.
+										</span>
+									) : null}
+									{hiddenUnavailableServerCount > 0 ? (
+										<span>
+											{hiddenUnavailableServerCount} unavailable MCP server
+											{hiddenUnavailableServerCount === 1 ? '' : 's'} hidden.
+										</span>
+									) : null}
+									<Link
+										to="/mcpservers"
+										className="link link-info"
+										onClick={event => {
+											event.stopPropagation();
+											menu.hide();
+										}}
+									>
+										Manage MCP servers
+									</Link>
+								</div>
+							) : null}
 						</Menu>
 					</div>
 				</HoverTip>

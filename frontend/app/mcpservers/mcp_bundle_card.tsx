@@ -194,7 +194,7 @@ export function MCPBundleCard({
 								? 'Loading servers...'
 								: serversLoaded
 									? `Servers: ${servers.length}`
-									: 'Servers: not loaded'}
+									: 'Servers: loading'}
 						</span>
 						{isExpanded ? <FiChevronUp /> : <FiChevronDown />}
 					</button>
@@ -281,7 +281,7 @@ export function MCPBundleCard({
 									? 'Loading MCP servers...'
 									: serverLoadError
 										? 'Server contents are unavailable.'
-										: 'Expand this Collection to load its MCP servers.'}
+										: 'MCP servers are loading.'}
 							</ManagementEmptyState>
 						) : null}
 

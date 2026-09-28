@@ -5,6 +5,7 @@ import { Menu, MenuButton, useMenuStore, useStoreState } from '@ariakit/react';
 import type { MCPConversationContext } from '@/spec/mcp';
 
 import { toolExposureLabel } from '@/chats/messages/mcp_message_context_utils';
+import { getMessageBarChipClassName } from '@/chats/messages/message_bar_chip_utils';
 
 export function MCPMessageContextChip({ context }: { context?: MCPConversationContext }) {
 	const count = context?.servers?.length ?? 0;
@@ -19,22 +20,22 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 	const promptCount = context.prompts?.length ?? 0;
 
 	return (
-		<div
-			className="bg-secondary/10 text-base-content border-secondary/40 flex min-h-6 shrink-0 items-center gap-1 rounded-2xl border px-2 py-0"
-			title={`MCP\n${count} server${count === 1 ? '' : 's'}`}
-			data-message-chip="mcp-context"
-		>
-			<FiServer size={14} />
-			<span className="max-w-24 truncate">MCP</span>
-			<span className="text-base-content/60 whitespace-nowrap">{count}</span>
-
+		<div className="shrink-0">
 			<MenuButton
 				store={menu}
-				className="btn btn-ghost btn-xs h-5 min-h-0 p-0 shadow-none"
+				className={getMessageBarChipClassName('secondary', false, true)}
 				aria-label="Show MCP context for this message"
-				title="Show MCP context for this message"
+				title={`MCP\n${count} server${count === 1 ? '' : 's'}`}
+				data-message-chip="mcp-context"
 			>
-				<FiChevronRight size={14} />
+				<FiServer size={14} />
+				<span className="max-w-24 truncate">MCP</span>
+				<span className="text-base-content/60 whitespace-nowrap">{count}</span>
+				<FiChevronRight
+					className={`shrink-0 transition-transform ${open ? 'rotate-90' : ''}`}
+					aria-hidden="true"
+					size={14}
+				/>
 			</MenuButton>
 
 			{open ? (
@@ -48,9 +49,9 @@ export function MCPMessageContextChip({ context }: { context?: MCPConversationCo
 				>
 					<div className="text-base-content/70 mb-2 text-xs font-semibold">MCP context</div>
 
-					{context.servers.map(server => (
+					{context.servers.map((server, index) => (
 						<div key={server.server} className="bg-base-200 mb-1 rounded-xl px-2 py-1">
-							<div className="font-mono text-xs break-all">{server.server}</div>
+							<div className="text-xs font-medium">MCP server {index + 1}</div>
 							<div className="mt-1 flex flex-wrap gap-1">
 								<span className="badge badge-ghost badge-xs">{toolExposureLabel(server)}</span>
 								{server.includeServerInstructions ? (

@@ -1820,7 +1820,7 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 
 	const showAutoExecStopButton = autoExecStopVisible || activeAutoExecBatchCount >= 2;
 	const erroredToolOutputsReadyToSubmit =
-		toolOutputs.some(output => output.isError) &&
+		toolOutputs.some(output => output.isError && !output.isSkipped) &&
 		!hasPendingToolCalls &&
 		!hasRunningToolCalls &&
 		!hasBlockingToolArgs &&

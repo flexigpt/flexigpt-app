@@ -155,7 +155,8 @@ interface ToolCallComposerChipViewProps {
 /**
  * Interactive chip for a single pending / running / failed tool call.
  * - "Run" button executes the tool once.
- * - "×" discards the suggestion from the composer only.
+ * - "Skip" completes a pending call with an intentional error result.
+ * - A failed call can be retried or submitted as an error result.
  */
 function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetails }: ToolCallComposerChipViewProps) {
 	const label = toolCall.mcpToolSelection?.toolName
@@ -173,6 +174,12 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 		toolCall.mcpToolSelection?.executionMode === MCPExecutionMode.Auto;
 
 	const canRun = isRunnableType && (isPending || isFailed) && !isBusy;
+	const canSkipOrSubmitError = isPending || isFailed;
+	const completionActionLabel = isFailed ? 'Submit error' : 'Skip';
+	const completionActionTitle = isFailed
+		? 'Submit this failed tool call as an error result'
+		: 'Skip this tool call and tell the model it was not run';
+	const completionActionAriaLabel = isFailed ? 'Submit tool error result' : 'Skip tool call';
 
 	const errorClasses = isFailed ? 'border-error/70 bg-error/5 text-error' : '';
 
@@ -235,16 +242,18 @@ function ToolCallComposerChipView({ toolCall, isBusy, onRun, onDiscard, onDetail
 					/>
 				)}
 
-				{!isRunning ? (
+				{canSkipOrSubmitError ? (
 					<button
 						type="button"
-						className="btn btn-ghost btn-xs text-error gap-1 px-1 py-0 shadow-none"
+						className={`btn btn-ghost btn-xs gap-1 px-1 py-0 shadow-none ${
+							isFailed ? 'text-error' : 'text-base-content/60'
+						}`}
 						onClick={onDiscard}
-						title="Submit an error result without running this call"
-						aria-label="Submit tool error result"
+						title={completionActionTitle}
+						aria-label={completionActionAriaLabel}
 					>
 						<FiX size={12} />
-						<span className="text-xs">Submit error</span>
+						<span className="text-xs">{completionActionLabel}</span>
 					</button>
 				) : null}
 			</div>
@@ -268,19 +277,24 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 	const label = getPrettyToolName(output.name);
 	const truncatedLabel = label.length > 64 ? `${label.slice(0, 61)}…` : label;
 
-	const isError = !!output.isError;
+	const isSkipped = output.isSkipped === true;
+	const isError = !!output.isError && !isSkipped;
+	const hasWarningState = isSkipped || isError;
 
 	const hasResolvableStoredTool =
 		output.toolStoreChoice?.implementationKind === ToolImplType.Go &&
 		!!output.toolStoreChoice.target.provider &&
 		!!output.toolStoreChoice.target.identifier;
-	const canRetry = isError && (isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
+	const canRunAgain =
+		(isError || isSkipped) && (isSkillsToolName(output.name) || hasResolvableStoredTool || !!output.mcpToolSelection);
 	const titleLines = [
-		isError ? `Errored result from: ${label}` : label,
+		isSkipped ? `Skipped: ${label}` : isError ? `Errored result from: ${label}` : label,
 		`Tool: ${output.name}`,
 		`Call ID: ${output.callID}`,
 	];
-	if (isError && output.errorMessage) {
+	if (isSkipped) {
+		titleLines.push('The tool was not run. This skip result will be sent to the model.');
+	} else if (isError && output.errorMessage) {
 		titleLines.push(`Error: ${output.errorMessage}`);
 	}
 	if (isError) {
@@ -292,7 +306,7 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 		// Keep each action as a sibling native button. Nesting buttons produces
 		// invalid HTML and can cause the server and client DOM trees to differ.
 		<div
-			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${isError ? 'border-warning/70 bg-warning/10 text-warning-content border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
+			className={`flex min-w-48 shrink-0 cursor-pointer items-center gap-2 rounded-2xl px-2 py-0 transition-colors ${hasWarningState ? 'border-warning/70 bg-warning/10 text-warning-content border' : 'bg-base-200 text-base-content hover:bg-base-300/80'}`}
 			title={title}
 			data-attachment-chip="tool-output"
 		>
@@ -303,8 +317,10 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 				aria-label={`Open tool output for ${label}`}
 			>
 				<FiTool size={14} className="shrink-0" />
-				<span className={`shrink-0 text-[10px] uppercase ${isError ? 'font-semibold' : 'text-base-content/60'}`}>
-					{isError ? 'Error result' : 'Result'}
+				<span
+					className={`shrink-0 text-[10px] uppercase ${hasWarningState ? 'font-semibold' : 'text-base-content/60'}`}
+				>
+					{isSkipped ? 'Skipped' : isError ? 'Error result' : 'Result'}
 				</span>
 				<span className="max-w-64 truncate">{truncatedLabel}</span>
 
@@ -314,16 +330,16 @@ function ToolOutputComposerChipView({ output, onOpen, onRetry }: ToolOutputCompo
 			</button>
 
 			<div className="flex shrink-0 items-center gap-1">
-				{canRetry && (
+				{canRunAgain && (
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs gap-0 px-1 py-0 shadow-none"
 						onClick={onRetry}
-						title="Retry this tool"
-						aria-label="Retry this tool"
+						title={isSkipped ? 'Run this skipped tool' : 'Retry this tool'}
+						aria-label={isSkipped ? 'Run skipped tool' : 'Retry this tool'}
 					>
 						<FiPlay size={12} />
-						<span className="ml-1 text-xs">Retry</span>
+						<span className="ml-1 text-xs">{isSkipped ? 'Run' : 'Retry'}</span>
 					</button>
 				)}
 			</div>

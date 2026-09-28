@@ -22,10 +22,16 @@ export interface ComposerToolRuntimeState {
 
 function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
 	const name = toolCall.mcpToolSelection?.toolName || toolCall.name;
+	const wasSkipped = toolCall.status === UIToolCallStatus.Pending;
 	const originalError = toolCall.errorMessage?.trim();
-	const message = originalError
-		? `The tool call failed before producing a result: ${originalError}`
-		: 'The tool call was not executed because the user chose to submit an error result.';
+	let message: string;
+	if (wasSkipped) {
+		message = 'The tool call was skipped by the user and was not executed.';
+	} else if (originalError) {
+		message = `The tool call failed before producing a result: ${originalError}`;
+	} else {
+		message = 'The tool call failed before producing a result.';
+	}
 
 	return {
 		id: toolCall.id,
@@ -33,7 +39,7 @@ function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
 		name,
 		choiceID: toolCall.choiceID,
 		type: toolCall.type,
-		summary: `Tool error: ${name}`,
+		summary: wasSkipped ? `Tool skipped: ${name}` : `Tool error: ${name}`,
 		toolOutputs: [
 			{
 				kind: ToolOutputKind.Text,
@@ -47,7 +53,7 @@ function buildSkippedToolOutput(toolCall: UIToolCall): UIToolOutput {
 			},
 		],
 		isError: true,
-		errorMessage: originalError || message,
+		...(wasSkipped ? { isSkipped: true } : { errorMessage: originalError || message }),
 		arguments: toolCall.arguments,
 		webSearchToolCallItems: toolCall.webSearchToolCallItems,
 		toolStoreChoice: toolCall.toolStoreChoice,
