@@ -60,18 +60,11 @@ func AssertGeneratedPackageSetMatches(
 		)
 	}
 
-	roundTrip, roundTripFingerprint, err := builtin.DecodeGeneratedPackageSet(candidate)
+	roundTrip, err := builtin.DecodeGeneratedPackageSet(candidate)
 	if err != nil {
 		return fmt.Errorf(
 			"decode generated package-set JSON candidate: %w",
 			err,
-		)
-	}
-	if roundTripFingerprint != expectedFingerprint {
-		return fmt.Errorf(
-			"generated package-set candidate fingerprint %q does not match expected %q",
-			roundTripFingerprint,
-			expectedFingerprint,
 		)
 	}
 

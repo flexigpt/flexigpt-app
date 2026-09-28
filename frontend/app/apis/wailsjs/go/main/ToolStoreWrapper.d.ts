@@ -8,9 +8,9 @@ export function GetTool(arg1:artifact.ArtifactRef):Promise<consumerapi.ToolView>
 
 export function GetToolCollection(arg1:artifact.ArtifactRef):Promise<collection.CollectionView>;
 
-export function ListCollectionTools(arg1:artifact.ArtifactRef):Promise<Array<consumerapi.ToolView>>;
+export function ListCollectionTools(arg1:artifact.ArtifactRef):Promise<Array<consumerapi.ToolListItem>>;
 
-export function ListToolCollections():Promise<Array<collection.CollectionView>>;
+export function ListToolCollections():Promise<Array<collection.ListItem>>;
 
 export function SetToolCollectionEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<collection.CollectionView>;
 

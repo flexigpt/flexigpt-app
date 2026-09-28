@@ -32,6 +32,22 @@ type documentCacheValue[T any] struct {
 	cost  int
 }
 
+func (c *DocumentCache[T]) Get(
+	key definition.Key,
+) (T, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	element := c.values[key]
+	if element == nil {
+		var zero T
+		return zero, false
+	}
+	c.order.MoveToFront(element)
+	//nolint:errcheck,forcetypeassert // Ok.
+	return element.Value.(documentCacheValue[T]).value, true
+}
+
 func (c *DocumentCache[T]) GetOrLoad(
 	key definition.Key,
 	inputBytes int,

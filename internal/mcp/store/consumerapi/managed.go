@@ -290,14 +290,14 @@ func (a *API) ReplaceManagedMCP(
 		)
 	}
 
-	currentInstallation, err := a.GetServerInstallation(
+	currentMaterial, err := a.resolveServerMaterial(
 		ctx,
 		request.Artifact,
 	)
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if err := currentInstallation.Installation.ValidateFor(
+	if err := currentMaterial.Installation.ValidateFor(
 		request.Artifact,
 		request.Document,
 	); err != nil {

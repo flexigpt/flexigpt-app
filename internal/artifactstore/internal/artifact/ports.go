@@ -50,12 +50,14 @@ type CatalogReader interface {
 	ListCatalogByRoot(
 		ctx context.Context,
 		rootID root.RootID,
+		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
 	ListCatalogBySource(
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
+		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
 	FindCatalogByIdentity(
@@ -63,6 +65,7 @@ type CatalogReader interface {
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
 		logicalName basespec.LogicalName,
+		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
 	GetMany(

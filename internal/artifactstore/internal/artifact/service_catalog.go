@@ -32,12 +32,15 @@ func (s *Service) ListByRoot(
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
+	if err := validateCatalogListOptions(options); err != nil {
+		return nil, err
+	}
 
-	values, err := s.repository.ListCatalogByRoot(ctx, rootID)
+	values, err := s.repository.ListCatalogByRoot(ctx, rootID, options)
 	if err != nil {
 		return nil, err
 	}
-	return s.attachDocuments(ctx, values, options)
+	return s.attachDocuments(ctx, values, options.IncludeDocument)
 }
 
 func (s *Service) ListBySource(
@@ -64,16 +67,20 @@ func (s *Service) ListBySource(
 	if err := sourceID.Validate(); err != nil {
 		return nil, err
 	}
+	if err := validateCatalogListOptions(options); err != nil {
+		return nil, err
+	}
 
 	values, err := s.repository.ListCatalogBySource(
 		ctx,
 		rootID,
 		sourceID,
+		options,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return s.attachDocuments(ctx, values, options)
+	return s.attachDocuments(ctx, values, options.IncludeDocument)
 }
 
 func (s *Service) FindByIdentity(
@@ -104,17 +111,21 @@ func (s *Service) FindByIdentity(
 	if err := logicalName.Validate(); err != nil {
 		return nil, err
 	}
+	if err := validateCatalogListOptions(options); err != nil {
+		return nil, err
+	}
 
 	values, err := s.repository.FindCatalogByIdentity(
 		ctx,
 		rootID,
 		kind,
 		logicalName,
+		options,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return s.attachDocuments(ctx, values, options)
+	return s.attachDocuments(ctx, values, options.IncludeDocument)
 }
 
 func (s *Service) GetMany(
@@ -170,37 +181,13 @@ func (s *Service) GetDefinitions(
 func (s *Service) attachDocuments(
 	ctx context.Context,
 	values []catalog.Entry,
-	options catalog.ListOptions,
+	includeDocument bool,
 ) ([]catalog.Entry, error) {
-	if options.Kind != "" {
-		if err := options.Kind.Validate(); err != nil {
-			return nil, err
-		}
+	output := make([]catalog.Entry, len(values))
+	for index, value := range values {
+		output[index] = value.Clone()
 	}
-	names := make(map[basespec.LogicalName]struct{}, len(options.LogicalNames))
-	for _, name := range options.LogicalNames {
-		if err := name.Validate(); err != nil {
-			return nil, err
-		}
-		names[name] = struct{}{}
-	}
-
-	output := make([]catalog.Entry, 0, len(values))
-	for _, value := range values {
-		if options.Kind != "" && value.Kind != options.Kind {
-			continue
-		}
-		if options.Enabled != nil && value.Enabled != *options.Enabled {
-			continue
-		}
-		if len(names) != 0 {
-			if _, found := names[value.LogicalName]; !found {
-				continue
-			}
-		}
-		output = append(output, value.Clone())
-	}
-	if !options.IncludeDocument {
+	if !includeDocument {
 		return output, nil
 	}
 
@@ -252,4 +239,24 @@ func (s *Service) attachDocuments(
 		output[index].Document = &copyValue
 	}
 	return output, nil
+}
+
+func validateCatalogListOptions(
+	options catalog.ListOptions,
+) error {
+	if options.Kind != "" {
+		if err := options.Kind.Validate(); err != nil {
+			return err
+		}
+	}
+	for index, name := range options.LogicalNames {
+		if err := name.Validate(); err != nil {
+			return fmt.Errorf(
+				"catalog logicalNames[%d]: %w",
+				index,
+				err,
+			)
+		}
+	}
+	return nil
 }

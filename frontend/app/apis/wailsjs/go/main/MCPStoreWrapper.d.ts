@@ -24,13 +24,13 @@ export function ListMCPCollectionMemberships(arg1:artifact.ArtifactRef):Promise<
 
 export function ListMCPCollectionServers(arg1:artifact.ArtifactRef):Promise<Array<consumerapi.MCPCollectionServerView>>;
 
-export function ListMCPCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
+export function ListMCPCollections(arg1:root.RootID):Promise<Array<collection.ListItem>>;
 
 export function ListMCPCollectionsPage(arg1:number,arg2:string):Promise<consumerapi.CollectionPage>;
 
-export function ListMCPPolicies(arg1:root.RootID):Promise<Array<artifact.Artifact>>;
+export function ListMCPPolicies(arg1:root.RootID):Promise<Array<consumerapi.PolicyListItem>>;
 
-export function ListMCPServers(arg1:root.RootID):Promise<Array<artifact.Artifact>>;
+export function ListMCPServers(arg1:root.RootID):Promise<Array<consumerapi.ServerListItem>>;
 
 export function ListMCPServersPage(arg1:number,arg2:string):Promise<consumerapi.ServerPage>;
 

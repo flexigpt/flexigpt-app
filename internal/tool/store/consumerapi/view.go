@@ -30,8 +30,6 @@ type ToolListItem struct {
 	Revision         uint64            `json:"revision"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
 	BuiltIn          bool              `json:"builtIn"`
-
-	Document *toolv1.ToolDocument `json:"document,omitempty"`
 }
 
 type ToolView struct {

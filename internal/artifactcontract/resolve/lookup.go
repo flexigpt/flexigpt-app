@@ -1,13 +1,13 @@
 package resolve
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
@@ -629,7 +629,7 @@ func (r *Resolver) resolveContainedMember(
 	if err != nil {
 		return nil, err
 	}
-	targetRaw, err := target.CanonicalJSON()
+	expectedDefinition, err := decoder.DefinitionForEntry(target)
 	if err != nil {
 		return nil, err
 	}
@@ -637,6 +637,7 @@ func (r *Resolver) resolveContainedMember(
 	if err != nil {
 		return nil, err
 	}
+
 	subresource, err := containedMemberSubresource(
 		*from,
 		member,
@@ -670,13 +671,12 @@ func (r *Resolver) resolveContainedMember(
 			record.LogicalVersion != expectedVersion {
 			continue
 		}
-		definitionValue, err := r.artifacts.GetDefinition(ctx, record.Ref())
-		if err != nil {
-			return nil, err
+		if record.Definition == nil ||
+			record.Definition.Digest != expectedDefinition.Digest {
+			continue
 		}
-		if bytes.Equal(definitionValue.Body, targetRaw) {
-			matches = append(matches, record.Ref())
-		}
+
+		matches = append(matches, record.Ref())
 	}
 
 	switch len(matches) {

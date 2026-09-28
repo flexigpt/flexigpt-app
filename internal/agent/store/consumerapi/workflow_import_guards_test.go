@@ -222,9 +222,6 @@ func TestWorkflow_ManagedAgentImportRequiresDeclaredConfirmation(
 		},
 	)
 	requireNoError(t, err)
-	if !committed.Agent.Managed {
-		t.Fatalf("confirmed import did not create a managed Agent")
-	}
 
 	requireNoError(
 		t,
@@ -283,7 +280,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 
 	enabled, err := harness.api.SetAgentEnabled(
 		t.Context(),
-		disabled.Ref(),
+		disabled.Ref,
 		disabled.Revision,
 		true,
 	)
@@ -295,7 +292,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 	err = harness.api.DeleteManagedAgent(
 		t.Context(),
 		agentConsumerAPI.ManagedAgentDeleteRequest{
-			Agent:            enabled.Ref(),
+			Agent:            enabled.Ref,
 			ExpectedRevision: enabled.Revision,
 		},
 	)

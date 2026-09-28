@@ -204,19 +204,22 @@ func (r *ArtifactRepository) ListBySource(
 func (r *ArtifactRepository) ListCatalogByRoot(
 	ctx context.Context,
 	rootID root.RootID,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
-	return r.store.listArtifactCatalogByRoot(ctx, rootID)
+	return r.store.listArtifactCatalogByRoot(ctx, rootID, options)
 }
 
 func (r *ArtifactRepository) ListCatalogBySource(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	return r.store.listArtifactCatalogBySource(
 		ctx,
 		rootID,
 		sourceID,
+		options,
 	)
 }
 
@@ -225,12 +228,14 @@ func (r *ArtifactRepository) FindCatalogByIdentity(
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
 	logicalName basespec.LogicalName,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	return r.store.findArtifactCatalogByIdentity(
 		ctx,
 		rootID,
 		kind,
 		logicalName,
+		options,
 	)
 }
 

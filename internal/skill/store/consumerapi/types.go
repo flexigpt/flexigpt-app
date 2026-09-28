@@ -1,7 +1,6 @@
 package consumerapi
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -32,8 +31,6 @@ type ListSkillsRequest struct {
 	RootID root.RootID `json:"rootID"`
 
 	Enabled *bool `json:"enabled,omitempty"`
-
-	IncludeDocument bool `json:"includeDocument,omitempty"`
 }
 
 // SkillListItem is declaration metadata. Runtime registration, source files,
@@ -53,8 +50,6 @@ type SkillListItem struct {
 
 	BuiltIn bool `json:"builtIn"`
 	Managed bool `json:"managed"`
-
-	Document *skillv1.SkillDocument `json:"document,omitempty"`
 }
 
 type ManagedSkillCreateRequest struct {

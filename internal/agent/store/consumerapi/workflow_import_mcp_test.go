@@ -1,6 +1,7 @@
 package consumerapi_test
 
 import (
+	"strings"
 	"testing"
 
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
@@ -112,17 +113,14 @@ func TestWorkflow_ManagedAgentImportInlineMCPSetupAndConfirmation(
 	)
 	requireNoError(t, err)
 
-	exportedSetup := requireMCPSetupDescriptor(
-		t,
-		exported.MCPSetupDescriptors,
-		"local-stdio-mcp",
-	)
-	if exportedSetup.Artifact == nil {
-		t.Fatal("exported MCP setup has no contained MCP Artifact reference")
-	}
-	if exportedSetup.Transport != "stdio" ||
-		exportedSetup.Command != "workflow-mcp" {
-		t.Fatalf("exported MCP setup = %#v", exportedSetup)
+	// Export is intentionally declaration-only. Runtime setup descriptors are
+	// produced by import preview and commit, not by a read-only YAML export.
+	if !strings.Contains(exported.Content, "local-stdio-mcp") ||
+		!strings.Contains(exported.Content, "workflow-mcp") {
+		t.Fatalf(
+			"exported Agent YAML does not retain inline MCP declaration: %q",
+			exported.Content,
+		)
 	}
 
 	requireNoError(

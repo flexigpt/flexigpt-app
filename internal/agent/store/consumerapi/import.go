@@ -669,7 +669,7 @@ func (a *API) CommitAgentImport(
 		)
 	}
 
-	agent, err := a.GetAgentView(ctx, record.Ref())
+	agent, err := a.GetAgent(ctx, record.Ref())
 	if err != nil {
 		return AgentImportCommitResult{}, err
 	}

@@ -265,28 +265,13 @@ func (a *App) initManagers() {
 		)
 	}
 
-	goTools, err := a.toolRuntimeAPI.goToolLocator()
-	if err != nil {
-		slog.Error(
-			"couldn't initialize artifact-backed Tool Go Tool locator",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Tool Go Tool locator initialization failed\n" +
-				err.Error(),
-		)
-	}
-
 	err = InitToolStoreWrapper(
 		a.toolStoreAPI,
 		artifactComposition.Sources,
 		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
-		artifactComposition.Resources,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
-		goTools,
 	)
 	if err != nil {
 		slog.Error(

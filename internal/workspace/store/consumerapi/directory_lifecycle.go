@@ -431,12 +431,20 @@ func (a *StoreAPI) workspaceDirectoryRootIDs(
 	if err != nil {
 		return nil, err
 	}
+
 	output := make([]root.RootID, 0)
 	for _, value := range values {
+		if !strings.HasPrefix(
+			string(value.StorageKey),
+			WorkspaceRootStorageKeyPrefix,
+		) {
+			continue
+		}
 		sources, err := a.workspaceSources.load(ctx, value.ID)
 		if err != nil {
 			return nil, err
 		}
+
 		if sources.HasDirectory && sources.HasPolicy {
 			output = append(output, value.ID)
 		}

@@ -7,6 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
@@ -18,15 +19,24 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
-	value, err := a.composeWorkspacePrompt(
-		ctx,
-		workspace,
-		artifacts,
-	)
-	if err != nil {
-		return WorkspacePromptPlan{}, err
+	if a == nil || a.resources == nil {
+		return WorkspacePromptPlan{}, basespec.ErrClosed
 	}
-	return projectWorkspacePromptPlan(value), nil
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (WorkspacePromptPlan, error) {
+			value, err := a.composeWorkspacePrompt(
+				sessionCtx,
+				workspace,
+				artifacts,
+			)
+			if err != nil {
+				return WorkspacePromptPlan{}, err
+			}
+			return projectWorkspacePromptPlan(value), nil
+		},
+	)
 }
 
 func (a *StoreAPI) composeWorkspacePrompt(
@@ -63,15 +73,24 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
-	value, err := a.loadWorkspaceSkills(
-		ctx,
-		workspace,
-		artifacts,
-	)
-	if err != nil {
-		return WorkspaceSkillLoadPlan{}, err
+	if a == nil || a.resources == nil {
+		return WorkspaceSkillLoadPlan{}, basespec.ErrClosed
 	}
-	return projectWorkspaceSkillLoadPlan(value), nil
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (WorkspaceSkillLoadPlan, error) {
+			value, err := a.loadWorkspaceSkills(
+				sessionCtx,
+				workspace,
+				artifacts,
+			)
+			if err != nil {
+				return WorkspaceSkillLoadPlan{}, err
+			}
+			return projectWorkspaceSkillLoadPlan(value), nil
+		},
+	)
 }
 
 func (a *StoreAPI) loadWorkspaceSkills(
@@ -108,15 +127,24 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	workspace artifact.ArtifactRef,
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceMCPServerLoadPlan, error) {
-	value, err := a.loadWorkspaceMCPServersForRuntime(
-		ctx,
-		workspace,
-		artifacts,
-	)
-	if err != nil {
-		return WorkspaceMCPServerLoadPlan{}, err
+	if a == nil || a.resources == nil {
+		return WorkspaceMCPServerLoadPlan{}, basespec.ErrClosed
 	}
-	return projectWorkspaceMCPServerLoadPlan(value), nil
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (WorkspaceMCPServerLoadPlan, error) {
+			value, err := a.loadWorkspaceMCPServersForRuntime(
+				sessionCtx,
+				workspace,
+				artifacts,
+			)
+			if err != nil {
+				return WorkspaceMCPServerLoadPlan{}, err
+			}
+			return projectWorkspaceMCPServerLoadPlan(value), nil
+		},
+	)
 }
 
 func (a *StoreAPI) loadWorkspaceMCPServersForRuntime(
@@ -149,6 +177,27 @@ func (a *StoreAPI) loadWorkspaceMCPServersForRuntime(
 }
 
 func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
+	ctx context.Context,
+	workspace artifact.ArtifactRef,
+	selection WorkspaceRuntimeSelection,
+) (WorkspaceRuntimePlan, error) {
+	if a == nil || a.resources == nil {
+		return WorkspaceRuntimePlan{}, basespec.ErrClosed
+	}
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (WorkspaceRuntimePlan, error) {
+			return a.resolveWorkspaceRuntimePlan(
+				sessionCtx,
+				workspace,
+				selection,
+			)
+		},
+	)
+}
+
+func (a *StoreAPI) resolveWorkspaceRuntimePlan(
 	ctx context.Context,
 	workspace artifact.ArtifactRef,
 	selection WorkspaceRuntimeSelection,

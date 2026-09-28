@@ -28,13 +28,13 @@ export function GetSkillCollection(arg1:artifact.ArtifactRef):Promise<collection
 
 export function ListSkillCollectionMemberships(arg1:artifact.ArtifactRef):Promise<Array<collection.ArtifactMembershipView>>;
 
-export function ListSkillCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
+export function ListSkillCollections(arg1:root.RootID):Promise<Array<collection.ListItem>>;
 
-export function ListSkillCollectionsForManagement():Promise<Array<collection.CollectionView>>;
+export function ListSkillCollectionsForManagement():Promise<Array<collection.ListItem>>;
 
-export function ListSkills(arg1:root.RootID):Promise<Array<artifact.Artifact>>;
+export function ListSkills(arg1:root.RootID):Promise<Array<consumerapi.SkillListItem>>;
 
-export function ListSkillsForManagement():Promise<Array<artifact.Artifact>>;
+export function ListSkillsForManagement():Promise<Array<consumerapi.SkillListItem>>;
 
 export function PurgeSkill(arg1:artifact.ArtifactRef,arg2:number):Promise<void>;
 

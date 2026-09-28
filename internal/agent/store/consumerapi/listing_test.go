@@ -7,7 +7,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 )
 
-func TestAgentListDefaultsToMetadataAndCanIncludeDocument(
+func TestAgentListReturnsConsumerMetadataOnly(
 	t *testing.T,
 ) {
 	harness := newWorkflowHarness(t)
@@ -23,46 +23,16 @@ func TestAgentListDefaultsToMetadataAndCanIncludeDocument(
 	if len(metadata) == 0 {
 		t.Fatal("built-in Agent list is empty")
 	}
+
 	for _, item := range metadata {
-		if item.Document != nil {
+		if item.DefinitionDigest == "" {
 			t.Fatalf(
-				"metadata Agent list unexpectedly includes document for %q",
+				"Agent list item %q has no Definition digest",
 				item.Name,
 			)
 		}
-	}
-
-	withDocuments, err := harness.api.ListAgents(
-		t.Context(),
-		agentConsumerAPI.ListAgentsRequest{
-			RootID:          documentTopology.BuiltinRootID(),
-			IncludeDocument: true,
-		},
-	)
-	requireNoError(t, err)
-	if len(withDocuments) != len(metadata) {
-		t.Fatalf(
-			"Agent list with documents=%d, metadata list=%d",
-			len(withDocuments),
-			len(metadata),
-		)
-	}
-
-	foundDocument := false
-	for _, item := range withDocuments {
-		if item.Document == nil {
-			continue
+		if !item.BuiltIn {
+			t.Fatalf("built-in Agent %q is not marked BuiltIn", item.Name)
 		}
-		foundDocument = true
-		if item.Document.Name != string(item.Name) {
-			t.Fatalf(
-				"Agent document name=%q, list name=%q",
-				item.Document.Name,
-				item.Name,
-			)
-		}
-	}
-	if !foundDocument {
-		t.Fatal("Agent list with IncludeDocument has no documents")
 	}
 }

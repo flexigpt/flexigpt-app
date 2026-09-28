@@ -6,6 +6,10 @@ export function GetAppVersion() {
   return window['go']['main']['App']['GetAppVersion']();
 }
 
+export function GetArtifactInitializationError() {
+  return window['go']['main']['App']['GetArtifactInitializationError']();
+}
+
 export function GetPathsAsAttachments(arg1, arg2) {
   return window['go']['main']['App']['GetPathsAsAttachments'](arg1, arg2);
 }

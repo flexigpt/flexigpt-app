@@ -25,7 +25,7 @@ func (a *API) listCollectionTools(
 	entries, err := a.artifacts.ListByRoot(
 		ctx,
 		a.builtinRoot,
-		catalog.ListOptions{},
+		catalog.ListOptions{Kind: toolDomain.ToolArtifactKind},
 	)
 	if err != nil {
 		return nil, err

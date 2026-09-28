@@ -11,31 +11,31 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
-// DecodeGeneratedPackageSet reads embedded generated JSON through the same
-// canonical map representation used for compiler output fingerprints.
+// DecodeGeneratedPackageSet decodes one generated package set for runtime
+// installation. Generated catalogs are compile-time artifacts whose complete
+// admission is proven by generation tests, so runtime validates only the
+// bounded envelope required to safely use the payload.
 func DecodeGeneratedPackageSet(
 	raw []byte,
 ) (
 	topology.CompiledPackageSet,
-	cryptoutil.Digest,
 	error,
 ) {
 	if len(bytes.TrimSpace(raw)) == 0 {
-		return topology.CompiledPackageSet{}, "", fmt.Errorf(
+		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated built-in package set is empty",
 			basespec.ErrInvalid,
 		)
 	}
 
-	canonical, err := canonicalJSON(raw)
-	if err != nil {
-		return topology.CompiledPackageSet{}, "", fmt.Errorf(
-			"canonicalize generated built-in package set JSON: %w",
+	var value topology.CompiledPackageSet
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return topology.CompiledPackageSet{}, fmt.Errorf(
+			"decode generated built-in package set JSON: %w",
 			err,
 		)
 	}
-
-	return decodeCanonicalGeneratedPackageSet(canonical)
+	return validateGeneratedPackageSet(value)
 }
 
 // CanonicalGeneratedPackageSet converts a typed package set to the canonical
@@ -113,6 +113,27 @@ func canonicalGeneratedPackageSet(
 	return normalized, canonical, fingerprint, nil
 }
 
+func validateGeneratedPackageSet(
+	value topology.CompiledPackageSet,
+) (topology.CompiledPackageSet, error) {
+	if value.Format != topology.CompiledPackageSetFormat {
+		return topology.CompiledPackageSet{}, fmt.Errorf(
+			"%w: generated package format %q; regenerate built-in catalogs",
+			basespec.ErrUnsupported,
+			value.Format,
+		)
+	}
+	if value.Name == "" ||
+		value.Hydration.InstallerName == "" ||
+		value.Hydration.Fingerprint == "" {
+		return topology.CompiledPackageSet{}, fmt.Errorf(
+			"%w: generated built-in package set is incomplete",
+			basespec.ErrInvalid,
+		)
+	}
+	return value, nil
+}
+
 func decodeCanonicalGeneratedPackageSet(
 	canonical []byte,
 ) (
@@ -120,31 +141,10 @@ func decodeCanonicalGeneratedPackageSet(
 	cryptoutil.Digest,
 	error,
 ) {
-	var value topology.CompiledPackageSet
-	if err := json.Unmarshal(canonical, &value); err != nil {
-		return topology.CompiledPackageSet{}, "", fmt.Errorf(
-			"decode canonical generated built-in package set JSON: %w",
-			err,
-		)
+	value, err := DecodeGeneratedPackageSet(canonical)
+	if err != nil {
+		return topology.CompiledPackageSet{}, "", err
 	}
-
-	if value.Format != topology.CompiledPackageSetFormat {
-		return topology.CompiledPackageSet{}, "", fmt.Errorf(
-			"%w: generated package format %q; regenerate built-in catalogs",
-			basespec.ErrUnsupported,
-			value.Format,
-		)
-	}
-
-	if value.Name == "" ||
-		value.Hydration.InstallerName == "" ||
-		value.Hydration.Fingerprint == "" {
-		return topology.CompiledPackageSet{}, "", fmt.Errorf(
-			"%w: generated built-in package set is incomplete",
-			basespec.ErrInvalid,
-		)
-	}
-
 	return value, cryptoutil.DigestBytes(canonical), nil
 }
 

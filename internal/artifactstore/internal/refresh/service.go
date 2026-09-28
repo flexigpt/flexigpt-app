@@ -357,6 +357,16 @@ func (s *Service) InspectSource(
 	if err != nil {
 		return source.RefreshInspection{}, err
 	}
+
+	// A metadata difference already makes the Source stale. Do not open and
+	// fingerprint a potentially large filesystem tree immediately before the
+	// caller refreshes it.
+	if result.SourceRevisionChanged ||
+		result.DiscoveryChanged ||
+		result.DecoderChanged {
+		return result.Clone(), nil
+	}
+
 	return s.inspectSourceGeneration(ctx, value, result)
 }
 

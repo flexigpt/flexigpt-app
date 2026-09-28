@@ -45,7 +45,7 @@ func NewInstaller(
 		)
 	}
 
-	set, err := GeneratedCatalogSet()
+	set, err := generatedCatalogValue()
 	if err != nil {
 		return nil, err
 	}

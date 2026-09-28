@@ -2,7 +2,6 @@ package collection
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"sort"
 
@@ -12,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
@@ -21,8 +21,7 @@ import (
 // It contains only domain-owned listing choices. Generic Artifact Store query
 // details remain inside the Collection API.
 type ListRequest struct {
-	RootID          root.RootID `json:"rootID"`
-	IncludeDocument bool        `json:"includeDocument,omitempty"`
+	RootID root.RootID `json:"rootID"`
 }
 
 // ListItem is a lightweight Collection projection.
@@ -47,8 +46,6 @@ type ListItem struct {
 	Editable    bool `json:"editable"`
 	Deletable   bool `json:"deletable"`
 	Baseline    bool `json:"baseline"`
-
-	Document *pluginv1.PluginDocument `json:"document,omitempty"`
 }
 
 type collectionMemberShape struct {
@@ -85,45 +82,15 @@ func (a *API) listCollections(
 	entries, err := a.artifacts.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
-			IncludeDocument: request.IncludeDocument,
-		},
+		catalog.ListOptions{Kind: artifact.ArtifactKind(pluginv1.PluginType)},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	needDocuments := request.IncludeDocument
-	if !needDocuments {
-		for _, entry := range entries {
-			if entry.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-				entry.State != artifact.StateAvailable ||
-				entry.Binding.SubresourceLocator != "" ||
-				entry.Definition == nil {
-				continue
-			}
-			if _, found := a.catalogProjections.Load(
-				entry.Definition.Digest,
-			); !found {
-				needDocuments = true
-				break
-			}
-		}
-	}
-
-	// A Collection list needs a small direct-member projection for domain
-	// visibility, baseline classification, and editability. On a cold process
-	// this performs one bulk document attachment. Later ordinary list calls use
-	// only catalog metadata plus immutable Definition-digest cache entries.
-	if needDocuments && !request.IncludeDocument {
-		entries, err = a.artifacts.ListByRoot(
-			ctx,
-			request.RootID,
-			catalog.ListOptions{IncludeDocument: true},
-		)
-		if err != nil {
-			return nil, err
-		}
+	documents, err := a.collectionDocuments(ctx, entries)
+	if err != nil {
+		return nil, err
 	}
 
 	output := make([]ListItem, 0)
@@ -135,7 +102,16 @@ func (a *API) listCollections(
 			continue
 		}
 
-		projection, err := a.collectionProjectionFor(entry)
+		key := definition.Key{
+			RootID: entry.RootID,
+			Digest: entry.Definition.Digest,
+		}
+		var document *definition.Definition
+		if value, found := documents[key]; found {
+			copyValue := value.Clone()
+			document = &copyValue
+		}
+		projection, err := a.collectionProjectionFor(entry, document)
 		if err != nil {
 			return nil, err
 		}
@@ -185,13 +161,6 @@ func (a *API) listCollections(
 			Deletable:   editable && !baseline && len(projection.members) == 0,
 			Baseline:    baseline,
 		}
-		if request.IncludeDocument {
-			document, err := projection.document.Clone()
-			if err != nil {
-				return nil, err
-			}
-			item.Document = &document
-		}
 		output = append(output, item)
 	}
 
@@ -205,8 +174,57 @@ func (a *API) listCollections(
 	return output, nil
 }
 
+func (a *API) collectionDocuments(
+	ctx context.Context,
+	entries []catalog.Entry,
+) (map[definition.Key]definition.Definition, error) {
+	keys := make([]definition.Key, 0)
+	for _, entry := range entries {
+		if entry.State != artifact.StateAvailable ||
+			entry.Binding.SubresourceLocator != "" ||
+			entry.Definition == nil {
+			continue
+		}
+		key := definition.Key{
+			RootID: entry.RootID,
+			Digest: entry.Definition.Digest,
+		}
+		if _, found := a.catalogProjections.Get(key); found {
+			continue
+		}
+		keys = append(keys, key)
+	}
+	if len(keys) == 0 {
+		return map[definition.Key]definition.Definition{}, nil
+	}
+
+	values, err := a.artifacts.GetDefinitions(ctx, keys)
+	if err != nil {
+		return nil, err
+	}
+	if len(values) != len(keys) {
+		return nil, fmt.Errorf(
+			"%w: Collection Definition batch is incomplete",
+			basespec.ErrDefinitionNotFound,
+		)
+	}
+
+	output := make(map[definition.Key]definition.Definition, len(values))
+	for index, value := range values {
+		if value.Digest != keys[index].Digest {
+			return nil, fmt.Errorf(
+				"%w: Collection Definition batch returned another digest",
+				basespec.ErrDigestMismatch,
+			)
+		}
+		output[keys[index]] = value.Clone()
+	}
+	return output, nil
+}
+
 func (a *API) collectionProjectionFor(
 	entry catalog.Entry,
+	loaded *definition.Definition,
 ) (collectionProjection, error) {
 	if entry.Definition == nil {
 		return collectionProjection{}, fmt.Errorf(
@@ -215,63 +233,54 @@ func (a *API) collectionProjectionFor(
 		)
 	}
 
-	if cached, found := a.catalogProjections.Load(
-		entry.Definition.Digest,
-	); found {
-		v, ok := cached.(collectionProjection)
-		if !ok {
-			return collectionProjection{}, errors.New("collection projection not found")
-		}
-		return v, nil
+	key := definition.Key{
+		RootID: entry.RootID,
+		Digest: entry.Definition.Digest,
 	}
-	if entry.Document == nil {
+	if cached, found := a.catalogProjections.Get(key); found {
+		return cached, nil
+	}
+	if loaded == nil {
 		return collectionProjection{}, fmt.Errorf(
 			"%w: Collection listing requires an admitted Definition document",
 			basespec.ErrDefinitionNotFound,
 		)
 	}
 
-	document, err := pluginv1.DecodePluginJSON(entry.Document.Body)
-	if err != nil {
-		return collectionProjection{}, err
-	}
-	if document.Name != string(entry.LogicalName) {
-		return collectionProjection{}, fmt.Errorf(
-			"%w: Collection Definition identity differs from catalog identity",
-			basespec.ErrDigestMismatch,
-		)
-	}
-
-	projection := collectionProjection{
-		document: document,
-		members:  make([]collectionMemberShape, 0, len(document.Members)),
-	}
-	for _, member := range document.Members {
-		form, err := member.MemberForm()
-		if err != nil {
-			return collectionProjection{}, err
-		}
-		projection.members = append(
-			projection.members,
-			collectionMemberShape{
-				Type: member.Header().Type,
-				Form: form,
-			},
-		)
-	}
-
-	actual, loaded := a.catalogProjections.LoadOrStore(
-		entry.Definition.Digest,
-		projection,
+	return a.catalogProjections.GetOrLoad(
+		key,
+		len(loaded.Body),
+		func() (collectionProjection, error) {
+			document, err := pluginv1.DecodePluginJSON(loaded.Body)
+			if err != nil {
+				return collectionProjection{}, err
+			}
+			if document.Name != string(entry.LogicalName) {
+				return collectionProjection{}, fmt.Errorf(
+					"%w: Collection Definition identity differs from catalog identity",
+					basespec.ErrDigestMismatch,
+				)
+			}
+			projection := collectionProjection{
+				document: document,
+				members:  make([]collectionMemberShape, 0, len(document.Members)),
+			}
+			for _, member := range document.Members {
+				form, err := member.MemberForm()
+				if err != nil {
+					return collectionProjection{}, err
+				}
+				projection.members = append(
+					projection.members,
+					collectionMemberShape{
+						Type: member.Header().Type,
+						Form: form,
+					},
+				)
+			}
+			return projection, nil
+		},
 	)
-	if loaded {
-		v, ok := actual.(collectionProjection)
-		if !ok {
-			return collectionProjection{}, errors.New("collection projection not found")
-		}
-		return v, nil
-	}
-	return projection, nil
 }
 
 func (a *API) collectionVisibleInList(

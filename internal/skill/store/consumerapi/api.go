@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -31,8 +30,6 @@ type API struct {
 	collections      *collection.API
 
 	declarationResolver *resolve.Resolver
-
-	listDocuments consumerutil.DocumentCache[skillv1.SkillDocument]
 }
 
 func New(

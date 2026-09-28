@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -37,8 +36,6 @@ type API struct {
 
 	managedAgentProfile *declaration.ManagedProfilePolicy
 	importSigner        *signer.Signer
-
-	listDocuments consumerutil.DocumentCache[agentv1.AgentDocument]
 }
 
 type apiOptions struct {

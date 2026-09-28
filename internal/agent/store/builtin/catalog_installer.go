@@ -22,7 +22,7 @@ func NewInstaller(
 		return nil, errors.New("agent generated catalog installer dependencies are incomplete")
 	}
 
-	set, err := GeneratedCatalogSet()
+	set, err := generatedCatalogValue()
 	if err != nil {
 		return nil, err
 	}

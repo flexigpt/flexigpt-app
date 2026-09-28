@@ -4,14 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -40,12 +35,6 @@ func (a *API) ExportAgent(
 			record.ID,
 		)
 	}
-	if record.LogicalVersion != "" {
-		return AgentExportResult{}, fmt.Errorf(
-			"%w: Agent Artifact has an unexpected logical version",
-			basespec.ErrDigestMismatch,
-		)
-	}
 
 	definitionValue, err := a.artifacts.GetDefinition(
 		ctx,
@@ -53,24 +42,6 @@ func (a *API) ExportAgent(
 	)
 	if err != nil {
 		return AgentExportResult{}, err
-	}
-
-	if definitionValue.Kind != agentDomain.AgentArtifactKind {
-		return AgentExportResult{}, fmt.Errorf(
-			"%w: Agent Artifact Definition has another kind",
-			basespec.ErrDigestMismatch,
-		)
-	}
-
-	document, err := agentv1.DecodeAgentJSON(definitionValue.Body)
-	if err != nil {
-		return AgentExportResult{}, err
-	}
-	if document.Name != string(record.LogicalName) {
-		return AgentExportResult{}, fmt.Errorf(
-			"%w: Agent declaration name differs from Artifact identity",
-			basespec.ErrDigestMismatch,
-		)
 	}
 
 	content, err := yamlutil.CanonicalObjectYAML(
@@ -81,24 +52,7 @@ func (a *API) ExportAgent(
 		return AgentExportResult{}, err
 	}
 
-	var resolution *resolve.CapabilityPlan
-	var resolutionIssue *resolve.ResolutionIssue
-	value, err := a.ResolveAgentCapabilities(ctx, request.Agent)
-	if err != nil {
-		if ctx != nil && ctx.Err() != nil {
-			return AgentExportResult{}, ctx.Err()
-		}
-		resolutionIssue = &resolve.ResolutionIssue{
-			Code:    "agent.export.resolution-unavailable",
-			Message: diagnostic.BoundedMessage(err.Error()),
-		}
-	} else {
-		resolution = &value
-	}
-
-	setup := a.exportMCPSetupDescriptors(ctx, resolution)
-
-	view, err := a.agentView(ctx, record)
+	managed, err := a.agentManaged(ctx, record, nil)
 	if err != nil {
 		return AgentExportResult{}, err
 	}
@@ -112,53 +66,7 @@ func (a *API) ExportAgent(
 		ContentDigest:     cryptoutil.DigestBytes(content),
 		DefinitionDigest:  definitionValue.Digest,
 		ArtifactRevision:  record.Revision,
-		BuiltIn:           view.BuiltIn,
-		Managed:           view.Managed,
-
-		Resolution:          resolution,
-		ResolutionIssue:     resolutionIssue,
-		MCPSetupDescriptors: setup,
+		BuiltIn:           record.RootID == agentBuiltinRootID(),
+		Managed:           managed,
 	}, nil
-}
-
-func (a *API) exportMCPSetupDescriptors(
-	ctx context.Context,
-	plan *resolve.CapabilityPlan,
-) []AgentMCPSetupDescriptor {
-	if a == nil || a.artifacts == nil || plan == nil {
-		return nil
-	}
-
-	seen := make(map[artifact.ArtifactRef]struct{})
-	output := make([]AgentMCPSetupDescriptor, 0)
-
-	for _, occurrence := range plan.Occurrences {
-		if occurrence.Type != declaration.TypeMCP ||
-			occurrence.Status != resolve.ResolutionAvailable ||
-			occurrence.Artifact == nil {
-			continue
-		}
-
-		ref := *occurrence.Artifact
-		if _, duplicate := seen[ref]; duplicate {
-			continue
-		}
-		seen[ref] = struct{}{}
-
-		definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
-		if err != nil {
-			continue
-		}
-		document, err := mcpv1.DecodeMCPJSON(definitionValue.Body)
-		if err != nil {
-			continue
-		}
-
-		output = append(output, importMCPSetupDescriptor(
-			&ref,
-			agentDomain.MCPSetupDescriptorForDocument(occurrence.Path, document),
-		))
-	}
-
-	return output
 }

@@ -6,7 +6,6 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -36,9 +35,6 @@ type API struct {
 	baselinePolicy      mcpPolicy.MCPPolicy
 	declarationResolver *resolve.Resolver
 	collections         *collection.API
-
-	serverListDocuments consumerutil.DocumentCache[mcpDomainServer.ServerDocument]
-	policyListDocuments consumerutil.DocumentCache[mcppolicyv1.MCPPolicyDocument]
 }
 
 func New(
@@ -199,7 +195,7 @@ func (a *API) GetServerInstallation(
 	return ServerInstallationView{
 		Artifact:             material.Resource.Artifact.Clone(),
 		Document:             material.Document,
-		Installation:         material.Installation,
+		Installation:         installationDataView(material.Installation),
 		InstallationRevision: material.InstallationWriteRevision,
 		BuiltIn:              material.BuiltIn,
 	}, nil
@@ -434,22 +430,43 @@ func (a *API) listMCPCollectionServers(
 		return nil, err
 	}
 
-	plan, err := a.declarationResolver.ResolvePluginCapabilities(
+	plugin, err := a.declarationResolver.ResolvePluginMembers(
 		ctx,
 		collectionRef,
 	)
 	if err != nil {
 		return nil, err
 	}
+	if plugin == nil || plugin.Type != declaration.TypePlugin {
+		return nil, fmt.Errorf(
+			"%w: MCP Collection did not resolve as a Plugin",
+			basespec.ErrReferenceUnresolved,
+		)
+	}
 
 	refs := make(map[artifact.ArtifactRef]struct{})
-	for _, occurrence := range plan.Occurrences {
-		if occurrence.Type != declaration.TypeMCP ||
-			occurrence.Status != resolve.ResolutionAvailable ||
-			occurrence.Artifact == nil {
+	for _, relationship := range plugin.MemberResults {
+		if relationship.Declared.Header().Type != declaration.TypeMCP {
 			continue
 		}
-		refs[*occurrence.Artifact] = struct{}{}
+		if relationship.Status == resolve.ResolutionAvailable &&
+			relationship.Resolved != nil {
+			if ref, found := relationship.Resolved.ArtifactRef(); found {
+				refs[ref] = struct{}{}
+			}
+		}
+		if relationship.Selector == nil {
+			continue
+		}
+		for _, match := range relationship.Selector.Matches {
+			if match.Status != resolve.ResolutionAvailable ||
+				match.Resolved == nil {
+				continue
+			}
+			if ref, found := match.Resolved.ArtifactRef(); found {
+				refs[ref] = struct{}{}
+			}
+		}
 	}
 
 	ordered := make([]artifact.ArtifactRef, 0, len(refs))
@@ -492,7 +509,7 @@ func (a *API) listMCPCollectionServers(
 			Installation: ServerInstallationView{
 				Artifact:             material.Resource.Artifact.Clone(),
 				Document:             material.Document,
-				Installation:         material.Installation,
+				Installation:         installationDataView(material.Installation),
 				InstallationRevision: material.InstallationWriteRevision,
 				BuiltIn:              material.BuiltIn,
 			},

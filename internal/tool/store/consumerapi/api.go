@@ -1,11 +1,9 @@
 package consumerapi
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -13,41 +11,35 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type API struct {
-	sources          compositionapi.SourceAPI
 	discovery        compositionapi.DiscoveryAPI
 	artifacts        compositionapi.ArtifactAPI
-	resources        compositionapi.ResourceAPI
 	managedArtifacts compositionapi.ManagedArtifactAPI
 	protection       compositionapi.ProtectionAPI
 	collections      *collection.API
 
-	builtinRoot   root.RootID
-	builtinSource source.SourceID
-	goTools       toolDomain.GoToolLocator
+	builtinRoot      root.RootID
+	builtinSource    source.SourceID
+	collectionByTool map[basespec.LogicalName]basespec.LogicalName
 }
 
 func New(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	builtinRoot root.RootID,
-	goTools toolDomain.GoToolLocator,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
 		artifacts == nil ||
-		resources == nil ||
 		managedArtifacts == nil ||
-		protection == nil ||
-		goTools == nil {
+		protection == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Store dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -76,6 +68,10 @@ func New(
 			basespec.ErrInvalid,
 		)
 	}
+	collectionByTool, err := toolBuiltin.GeneratedToolCollectionIndex()
+	if err != nil {
+		return nil, err
+	}
 
 	// Built-in Tool Collections have direct named references and no aliases.
 	// A graph resolver is deliberately not installed here: the Tool target
@@ -93,16 +89,14 @@ func New(
 	}
 
 	return &API{
-		sources:          sources,
 		discovery:        discovery,
 		artifacts:        artifacts,
-		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
 		collections:      collections,
 		builtinRoot:      builtinRoot,
 		builtinSource:    builtinSource.ID,
-		goTools:          goTools,
+		collectionByTool: collectionByTool,
 	}, nil
 }
 
@@ -213,52 +207,7 @@ func (a *API) getTool(
 			basespec.ErrReferenceUnresolved,
 		)
 	}
-
-	if err := a.validateGoTool(ctx, value); err != nil {
-		return toolDomain.Tool{}, err
-	}
 	return value, nil
-}
-
-func (a *API) validateGoTool(
-	ctx context.Context,
-	value toolDomain.Tool,
-) error {
-	if value.Document.Implementation.Kind != toolv1.ImplementationKindGo {
-		return nil
-	}
-
-	registered, err := a.goTools.LookupGoTool(
-		ctx,
-		value.Document.Implementation.Function,
-	)
-	if err != nil {
-		return err
-	}
-	if registered.Name != value.Artifact.LogicalName ||
-		registered.Version != value.Document.Version ||
-		registered.Function != value.Document.Implementation.Function {
-		return fmt.Errorf(
-			"%w: Go Tool declaration does not match the registered Go Tool",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-
-	declaredSchema, err := jsonutil.Canonicalize(value.Document.InputSchema)
-	if err != nil {
-		return err
-	}
-	registeredSchema, err := jsonutil.Canonicalize(registered.InputSchema)
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(declaredSchema, registeredSchema) {
-		return fmt.Errorf(
-			"%w: Go Tool input schema differs from the registered Go Tool",
-			basespec.ErrDigestMismatch,
-		)
-	}
-	return nil
 }
 
 func (a *API) ready(ctx context.Context) error {

@@ -14,7 +14,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
-	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
 
 type ToolStoreWrapper struct {
@@ -26,10 +25,8 @@ func InitToolStoreWrapper(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
-	goTools toolDomain.GoToolLocator,
 ) error {
 	if wrapper == nil {
 		return errors.New("tool store wrapper is required")
@@ -39,11 +36,9 @@ func InitToolStoreWrapper(
 		sources,
 		discovery,
 		artifacts,
-		resources,
 		managedArtifacts,
 		protection,
 		documentTopology.BuiltinRootID(),
-		goTools,
 	)
 	if err != nil {
 		return err
@@ -78,12 +73,12 @@ func withToolStore[T any](
 }
 
 func (w *ToolStoreWrapper) ListToolCollections() (
-	[]collection.CollectionView,
+	[]collection.ListItem,
 	error,
 ) {
 	return withToolStore(
 		w,
-		func(api *toolConsumerAPI.API) ([]collection.CollectionView, error) {
+		func(api *toolConsumerAPI.API) ([]collection.ListItem, error) {
 			return api.ListToolCollections(context.Background())
 		},
 	)

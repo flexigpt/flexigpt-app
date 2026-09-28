@@ -48,34 +48,31 @@ func (a *API) getAgentRecord(
 	return value.Clone(), nil
 }
 
-func (a *API) GetAgentView(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (AgentView, error) {
-	return a.GetAgent(ctx, ref)
-}
-
 func (a *API) SetAgentEnabled(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (AgentView, error) {
 	if expectedRevision == 0 {
-		return artifact.Artifact{}, fmt.Errorf(
+		return AgentView{}, fmt.Errorf(
 			"%w: expected Agent Artifact revision is required",
 			basespec.ErrInvalid,
 		)
 	}
 	if _, err := a.getAgentRecord(ctx, ref); err != nil {
-		return artifact.Artifact{}, err
+		return AgentView{}, err
 	}
-	return a.artifacts.SetEnabled(
+	updated, err := a.artifacts.SetEnabled(
 		ctx,
 		ref,
 		expectedRevision,
 		enabled,
 	)
+	if err != nil {
+		return AgentView{}, err
+	}
+	return a.agentView(ctx, updated)
 }
 
 func (a *API) ResolveAgent(
@@ -101,18 +98,52 @@ func (a *API) ResolveAgent(
 	}
 	return AgentResolution{
 		Agent:        agent,
-		Capabilities: plan,
+		Capabilities: projectAgentCapabilityPlan(plan),
 	}, nil
 }
 
 func (a *API) ResolveAgentCapabilities(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
+) (AgentCapabilityPlan, error) {
 	if a == nil || a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
+		return AgentCapabilityPlan{}, basespec.ErrClosed
 	}
-	return a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
+	value, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
+	if err != nil {
+		return AgentCapabilityPlan{}, err
+	}
+	return projectAgentCapabilityPlan(value), nil
+}
+
+func projectAgentCapabilityPlan(
+	value resolve.CapabilityPlan,
+) AgentCapabilityPlan {
+	output := AgentCapabilityPlan{
+		Occurrences: make(
+			[]AgentCapabilityOccurrence,
+			0,
+			len(value.Occurrences),
+		),
+		Complete: value.Complete,
+	}
+	for _, occurrence := range value.Occurrences {
+		projected := AgentCapabilityOccurrence{
+			Path:     occurrence.Path,
+			Type:     occurrence.Type,
+			Name:     occurrence.Name,
+			Status:   occurrence.Status,
+			Required: occurrence.Required,
+			Code:     occurrence.Code,
+			Message:  occurrence.Message,
+		}
+		if occurrence.Artifact != nil {
+			ref := *occurrence.Artifact
+			projected.Artifact = &ref
+		}
+		output.Occurrences = append(output.Occurrences, projected)
+	}
+	return output
 }
 
 func (a *API) listCollectionAgentRefs(
@@ -202,48 +233,51 @@ func (a *API) agentViewWithSourceCache(
 	if err != nil {
 		return AgentView{}, err
 	}
-	if definitionValue.Kind != agentDomain.AgentArtifactKind {
-		return AgentView{}, fmt.Errorf(
-			"%w: Agent Artifact Definition has another kind",
-			basespec.ErrDigestMismatch,
-		)
-	}
-	if definitionValue.LogicalName != record.LogicalName ||
-		definitionValue.LogicalVersion != record.LogicalVersion {
-		return AgentView{}, fmt.Errorf(
-			"%w: Agent declaration name differs from Artifact identity",
-			basespec.ErrDigestMismatch,
-		)
-	}
-
 	view.Description = definitionValue.Description
+	managed, err := a.agentManaged(ctx, record, sourceCache)
+	if err != nil {
+		return AgentView{}, err
+	}
+	view.Managed = managed
+	return view, nil
+}
+
+func (a *API) agentManaged(
+	ctx context.Context,
+	record artifact.Artifact,
+	sourceCache map[agentSourceCacheKey]source.Summary,
+) (bool, error) {
+	if record.RootID == agentBuiltinRootID() ||
+		record.State != artifact.StateAvailable ||
+		record.Binding.SubresourceLocator != "" {
+		return false, nil
+	}
 	key := agentSourceCacheKey{
 		rootID:   record.RootID,
 		sourceID: record.Binding.SourceID,
 	}
 	sourceValue, found := sourceCache[key]
 	if !found {
-		sourceValue, err = a.sources.Get(
+		sourceValue, err := a.sources.Get(
 			ctx,
 			record.RootID,
 			record.Binding.SourceID,
 		)
 		if err != nil {
-			return AgentView{}, err
+			return false, err
 		}
 		if sourceCache != nil {
 			sourceCache[key] = sourceValue
 		}
 	}
 	if sourceValue.Kind != source.SourceKindManagedDirectory ||
-		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
-		record.Binding.SubresourceLocator != "" {
-		return view, nil
+		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
+		return false, nil
 	}
 	if _, err := agentDomain.ManagedPackageAddressFromAgentLocator(
 		record.Binding.Locator,
 	); err == nil {
-		view.Managed = true
+		return true, nil
 	}
-	return view, nil
+	return false, nil
 }

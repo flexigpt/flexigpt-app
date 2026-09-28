@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -38,6 +39,13 @@ const artifactCatalogColumns = `
 	d.schema_version,
 	d.description`
 
+const catalogListFilterSQL = `
+	  AND (? = '' OR a.kind = ?)
+	  AND (? < 0 OR a.enabled = ?)
+	  AND (? = 0 OR a.logical_name IN (
+		SELECT value FROM json_each(?)
+	  ))`
+
 const listArtifactCatalogByRootSQL = `
 	SELECT ` + artifactCatalogColumns + `
 	FROM artifact_artifacts a
@@ -52,6 +60,7 @@ const listArtifactCatalogByRootSQL = `
 	 AND a.state = 'available'
 	WHERE a.root_id = ?
 	  AND r.retired_at IS NULL
+` + catalogListFilterSQL + `
 	ORDER BY a.logical_name, a.root_id, a.id`
 
 const listArtifactCatalogBySourceSQL = `
@@ -69,6 +78,7 @@ const listArtifactCatalogBySourceSQL = `
 	WHERE a.root_id = ?
 	  AND a.source_id = ?
 	  AND r.retired_at IS NULL
+` + catalogListFilterSQL + `
 	ORDER BY a.locator, a.subresource_locator, a.kind, a.id`
 
 const findArtifactCatalogByIdentitySQL = `
@@ -87,6 +97,7 @@ const findArtifactCatalogByIdentitySQL = `
 	  AND a.kind = ?
 	  AND a.logical_name = ?
 	  AND r.retired_at IS NULL
+` + catalogListFilterSQL + `
 	ORDER BY a.source_id, a.locator, a.subresource_locator, a.id`
 
 const artifactQualifiedColumns = `
@@ -132,6 +143,7 @@ const artifactGetManyChunkSize = 256
 func (s *Store) listArtifactCatalogByRoot(
 	ctx context.Context,
 	rootID root.RootID,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -139,11 +151,16 @@ func (s *Store) listArtifactCatalogByRoot(
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
+	filter, err := catalogListFilterArguments(options)
+	if err != nil {
+		return nil, err
+	}
 
+	args := append([]any{string(rootID)}, filter...)
 	rows, err := s.db.QueryContext(
 		ctx,
 		listArtifactCatalogByRootSQL,
-		string(rootID),
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -157,6 +174,7 @@ func (s *Store) listArtifactCatalogBySource(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -167,12 +185,19 @@ func (s *Store) listArtifactCatalogBySource(
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
+	filter, err := catalogListFilterArguments(options)
+	if err != nil {
+		return nil, err
+	}
 
+	args := append(
+		[]any{string(rootID), string(sourceID)},
+		filter...,
+	)
 	rows, err := s.db.QueryContext(
 		ctx,
 		listArtifactCatalogBySourceSQL,
-		string(rootID),
-		string(sourceID),
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -187,6 +212,7 @@ func (s *Store) findArtifactCatalogByIdentity(
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
 	logicalName basespec.LogicalName,
+	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -200,13 +226,19 @@ func (s *Store) findArtifactCatalogByIdentity(
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
+	filter, err := catalogListFilterArguments(options)
+	if err != nil {
+		return nil, err
+	}
 
+	args := append(
+		[]any{string(rootID), string(kind), string(logicalName)},
+		filter...,
+	)
 	rows, err := s.db.QueryContext(
 		ctx,
 		findArtifactCatalogByIdentitySQL,
-		string(rootID),
-		string(kind),
-		string(logicalName),
+		args...,
 	)
 	if err != nil {
 		return nil, err
@@ -259,6 +291,55 @@ func (s *Store) getArtifactsByReferences(
 		output = append(output, values...)
 	}
 	return output, nil
+}
+
+func catalogListFilterArguments(
+	options catalog.ListOptions,
+) ([]any, error) {
+	if options.Kind != "" {
+		if err := options.Kind.Validate(); err != nil {
+			return nil, err
+		}
+	}
+
+	names := make(map[string]struct{}, len(options.LogicalNames))
+	for _, name := range options.LogicalNames {
+		if err := name.Validate(); err != nil {
+			return nil, err
+		}
+		names[string(name)] = struct{}{}
+	}
+	orderedNames := make([]string, 0, len(names))
+	for name := range names {
+		orderedNames = append(orderedNames, name)
+	}
+	sort.Strings(orderedNames)
+	namesJSON, err := json.Marshal(orderedNames)
+	if err != nil {
+		return nil, err
+	}
+
+	enabledFilter := -1
+	enabledValue := 0
+	if options.Enabled != nil {
+		enabledFilter = 1
+		enabledValue = boolInt(*options.Enabled)
+	}
+
+	hasNames := 0
+	if len(orderedNames) != 0 {
+		hasNames = 1
+	}
+
+	kind := string(options.Kind)
+	return []any{
+		kind,
+		kind,
+		enabledFilter,
+		enabledValue,
+		hasNames,
+		string(namesJSON),
+	}, nil
 }
 
 func scanArtifactCatalogEntries(

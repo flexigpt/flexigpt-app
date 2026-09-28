@@ -4,7 +4,6 @@ import {collection} from '../models';
 import {consumerapi} from '../models';
 import {artifact} from '../models';
 import {root} from '../models';
-import {resolve} from '../models';
 
 export function AddAgentCollectionArtifactMember(arg1:collection.AddArtifactMemberRequest):Promise<collection.CollectionView>;
 
@@ -26,15 +25,15 @@ export function GetAgentCollection(arg1:artifact.ArtifactRef):Promise<collection
 
 export function ListAgentCollectionMembers(arg1:artifact.ArtifactRef):Promise<collection.CollectionCapabilityPlan>;
 
-export function ListAgentCollections(arg1:root.RootID):Promise<Array<collection.CollectionView>>;
+export function ListAgentCollections(arg1:root.RootID):Promise<Array<collection.ListItem>>;
 
-export function ListAgentCollectionsForManagement():Promise<Array<collection.CollectionView>>;
+export function ListAgentCollectionsForManagement():Promise<Array<collection.ListItem>>;
 
 export function ListAgentImportDestinations():Promise<Array<consumerapi.AgentImportDestination>>;
 
-export function ListAgents(arg1:consumerapi.ListAgentsRequest):Promise<Array<consumerapi.AgentView>>;
+export function ListAgents(arg1:consumerapi.ListAgentsRequest):Promise<Array<consumerapi.AgentListItem>>;
 
-export function ListAgentsForManagement():Promise<Array<consumerapi.AgentView>>;
+export function ListAgentsForManagement():Promise<Array<consumerapi.AgentListItem>>;
 
 export function MaterializeAgentText(arg1:artifact.ArtifactRef):Promise<consumerapi.AgentTextMaterialization>;
 
@@ -44,10 +43,10 @@ export function RemoveAgentCollectionMember(arg1:collection.RemoveMemberRequest)
 
 export function ResolveAgent(arg1:artifact.ArtifactRef):Promise<consumerapi.AgentResolution>;
 
-export function ResolveAgentCapabilities(arg1:artifact.ArtifactRef):Promise<resolve.CapabilityPlan>;
+export function ResolveAgentCapabilities(arg1:artifact.ArtifactRef):Promise<consumerapi.AgentCapabilityPlan>;
 
 export function SetAgentCollectionEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<collection.CollectionView>;
 
-export function SetAgentEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
+export function SetAgentEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<consumerapi.AgentView>;
 
 export function UpdateAgentCollection(arg1:collection.UpdateRequest):Promise<collection.CollectionView>;

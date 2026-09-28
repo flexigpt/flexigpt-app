@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 )
 
 type resolutionState struct {
@@ -208,14 +207,8 @@ func (r *Resolver) resolveTyped(
 		return nil, err
 	}
 
-	return consumerutil.WithResourceVerificationSession(
-		ctx,
-		r.sourceEntries,
-		func(sessionCtx context.Context) (*ResolvedEntry, error) {
-			state := newResolutionState()
-			return r.resolveArtifact(sessionCtx, &state, ref, expected, "", 0)
-		},
-	)
+	state := newResolutionState()
+	return r.resolveArtifact(ctx, &state, ref, expected, "", 0)
 }
 
 func (r *Resolver) resolveArtifact(
@@ -367,17 +360,31 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		)
 	}
 
-	definitionValue, err := r.artifacts.GetDefinition(ctx, ref)
+	if record.ResolvedDefinition == nil {
+		return loadedDeclarationArtifact{}, fmt.Errorf(
+			"%w: Artifact %q has no current Definition",
+			basespec.ErrDefinitionNotFound,
+			record.ID,
+		)
+	}
+	definitions, err := r.artifacts.GetDefinitions(
+		ctx,
+		[]definition.Key{{
+			RootID: record.RootID,
+			Digest: *record.ResolvedDefinition,
+		}},
+	)
 	if err != nil {
 		return loadedDeclarationArtifact{}, err
 	}
-	if record.ResolvedDefinition == nil ||
-		definitionValue.Digest != *record.ResolvedDefinition {
+	if len(definitions) != 1 ||
+		definitions[0].Digest != *record.ResolvedDefinition {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition changed during resolution",
 			basespec.ErrRefreshRequired,
 		)
 	}
+	definitionValue := definitions[0]
 
 	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
 		return loadedDeclarationArtifact{}, err

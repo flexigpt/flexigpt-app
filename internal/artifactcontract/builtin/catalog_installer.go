@@ -38,9 +38,12 @@ func NewCatalogInstallerForSet(
 	}
 	slices.Sort(scopes)
 
+	// `set` is transferred into this installer. Generated callers retain the
+	// binary-owned immutable catalog, while the public GeneratedCatalogSet
+	// helpers still return defensive clones for ordinary callers.
 	return &CatalogInstaller{
 		registration: topology.CompiledRegistration{
-			Set:       set.Clone(),
+			Set:       set,
 			Lifecycle: lifecycle,
 		},
 		hydrator: hydrator,
@@ -117,8 +120,10 @@ func (i *CatalogInstaller) CompiledRegistration(
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return topology.CompiledRegistration{}, err
 	}
+	// Generated catalogs are immutable after construction. Avoid copying the
+	// complete package payload before every bootstrap registration.
 	return topology.CompiledRegistration{
-		Set:       i.registration.Set.Clone(),
+		Set:       i.registration.Set,
 		Lifecycle: i.registration.Lifecycle,
 	}, nil
 }

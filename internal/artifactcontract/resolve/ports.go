@@ -27,10 +27,10 @@ type ArtifactReader interface {
 		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
-	GetDefinition(
+	GetDefinitions(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (definition.Definition, error)
+		keys []definition.Key,
+	) ([]definition.Definition, error)
 }
 
 // SourceArtifactReader is required for member selector expansion only.

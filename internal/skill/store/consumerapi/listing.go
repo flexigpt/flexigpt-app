@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -41,9 +39,8 @@ func (a *API) ListSkills(
 		ctx,
 		request.RootID,
 		catalog.ListOptions{
-			IncludeDocument: request.IncludeDocument,
-			Kind:            skillDomain.SkillArtifactKind,
-			Enabled:         request.Enabled,
+			Kind:    skillDomain.SkillArtifactKind,
+			Enabled: request.Enabled,
 		},
 	)
 	if err != nil {
@@ -60,13 +57,6 @@ func (a *API) ListSkills(
 		}
 
 		item := skillListItem(entry)
-		if request.IncludeDocument && entry.Document != nil {
-			document, err := a.skillListDocument(entry)
-			if err != nil {
-				return nil, err
-			}
-			item.Document = document
-		}
 		output = append(output, item)
 	}
 
@@ -78,32 +68,6 @@ func (a *API) ListSkills(
 			output[right].Ref.ArtifactID
 	})
 	return output, nil
-}
-
-func (a *API) skillListDocument(
-	entry catalog.Entry,
-) (*skillv1.SkillDocument, error) {
-	if entry.Definition == nil || entry.Document == nil {
-		//nolint:nilnil // Ok.
-		return nil, nil
-	}
-
-	document, err := a.listDocuments.GetOrLoad(
-		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
-		len(entry.Document.Body),
-		func() (skillv1.SkillDocument, error) {
-			return skillv1.DecodeSkillJSON(entry.Document.Body)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := document.Clone()
-	if err != nil {
-		return nil, err
-	}
-	return &value, nil
 }
 
 func skillListItem(

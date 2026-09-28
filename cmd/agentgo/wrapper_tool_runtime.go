@@ -103,19 +103,6 @@ func (w *ToolRuntimeWrapper) InvokeTool(
 	)
 }
 
-// goToolLocator exposes the adapter only to application composition. It is
-// intentionally unexported so Wails does not generate a frontend endpoint for
-// the internal Go-tool registry.
-func (w *ToolRuntimeWrapper) goToolLocator() (
-	*llmtoolsadapter.Adapter,
-	error,
-) {
-	if w == nil || w.adapter == nil {
-		return nil, basespec.ErrClosed
-	}
-	return w.adapter, nil
-}
-
 func (w *ToolRuntimeWrapper) close() {
 	if w == nil {
 		return

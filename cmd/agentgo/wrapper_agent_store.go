@@ -174,10 +174,10 @@ func (w *AgentStoreWrapper) ResolveAgent(
 
 func (w *AgentStoreWrapper) ResolveAgentCapabilities(
 	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
+) (agentConsumerAPI.AgentCapabilityPlan, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (resolve.CapabilityPlan, error) {
+		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentCapabilityPlan, error) {
 			return api.ResolveAgentCapabilities(context.Background(), ref)
 		},
 	)
@@ -187,10 +187,10 @@ func (w *AgentStoreWrapper) SetAgentEnabled(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (agentConsumerAPI.AgentView, error) {
 	return withAgentStore(
 		w,
-		func(api *agentConsumerAPI.API) (artifact.Artifact, error) {
+		func(api *agentConsumerAPI.API) (agentConsumerAPI.AgentView, error) {
 			return api.SetAgentEnabled(
 				context.Background(),
 				ref,

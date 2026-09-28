@@ -167,8 +167,4 @@ type AgentExportResult struct {
 	ArtifactRevision  uint64               `json:"artifactRevision"`
 	BuiltIn           bool                 `json:"builtIn"`
 	Managed           bool                 `json:"managed"`
-
-	Resolution          *resolve.CapabilityPlan   `json:"resolution,omitempty"`
-	ResolutionIssue     *resolve.ResolutionIssue  `json:"resolutionIssue,omitempty"`
-	MCPSetupDescriptors []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors,omitempty"`
 }

@@ -6,12 +6,10 @@ import (
 	"sort"
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -100,10 +98,9 @@ func (a *API) ListAgents(
 			ctx,
 			rootID,
 			catalog.ListOptions{
-				IncludeDocument: request.IncludeDocument,
-				Kind:            agentDomain.AgentArtifactKind,
-				Enabled:         request.Enabled,
-				LogicalNames:    request.LogicalNames,
+				Kind:         agentDomain.AgentArtifactKind,
+				Enabled:      request.Enabled,
+				LogicalNames: request.LogicalNames,
 			},
 		)
 		if err != nil {
@@ -139,13 +136,6 @@ func (a *API) ListAgents(
 		item := AgentListItem{
 			AgentView: agentViewFromCatalog(entry),
 		}
-		if request.IncludeDocument && entry.Document != nil {
-			document, err := a.agentListDocument(entry)
-			if err != nil {
-				return nil, err
-			}
-			item.Document = document
-		}
 		output = append(output, item)
 	}
 
@@ -160,32 +150,6 @@ func (a *API) ListAgents(
 			output[right].Ref.ArtifactID
 	})
 	return output, nil
-}
-
-func (a *API) agentListDocument(
-	entry catalog.Entry,
-) (*agentv1.AgentDocument, error) {
-	if entry.Definition == nil || entry.Document == nil {
-		//nolint:nilnil // Ok.
-		return nil, nil
-	}
-
-	document, err := a.listDocuments.GetOrLoad(
-		definition.Key{RootID: entry.RootID, Digest: entry.Definition.Digest},
-		len(entry.Document.Body),
-		func() (agentv1.AgentDocument, error) {
-			return agentv1.DecodeAgentJSON(entry.Document.Body)
-		},
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	value, err := document.Clone()
-	if err != nil {
-		return nil, err
-	}
-	return &value, nil
 }
 
 func agentViewFromCatalog(

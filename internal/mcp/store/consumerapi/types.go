@@ -3,7 +3,6 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -14,9 +13,8 @@ import (
 )
 
 type ListServersRequest struct {
-	RootID          root.RootID `json:"rootID"`
-	Enabled         *bool       `json:"enabled,omitempty"`
-	IncludeDocument bool        `json:"includeDocument,omitempty"`
+	RootID  root.RootID `json:"rootID"`
+	Enabled *bool       `json:"enabled,omitempty"`
 }
 
 type ServerListItem struct {
@@ -31,14 +29,11 @@ type ServerListItem struct {
 	Revision         uint64            `json:"revision"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
 	BuiltIn          bool              `json:"builtIn"`
-
-	Document *mcpDomainServer.ServerDocument `json:"document,omitempty"`
 }
 
 type ListPoliciesRequest struct {
-	RootID          root.RootID `json:"rootID"`
-	Enabled         *bool       `json:"enabled,omitempty"`
-	IncludeDocument bool        `json:"includeDocument,omitempty"`
+	RootID  root.RootID `json:"rootID"`
+	Enabled *bool       `json:"enabled,omitempty"`
 }
 
 type PolicyListItem struct {
@@ -53,14 +48,23 @@ type PolicyListItem struct {
 	Revision         uint64            `json:"revision"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
 	BuiltIn          bool              `json:"builtIn"`
+}
 
-	Document *mcppolicyv1.MCPPolicyDocument `json:"document,omitempty"`
+type InstallationInputView struct {
+	Value            *string `json:"value,omitempty"`
+	SecretConfigured bool    `json:"secretConfigured"`
+}
+
+type ServerInstallationDataView struct {
+	SelectedConnectionProfile string                           `json:"selectedConnectionProfile,omitempty"`
+	Inputs                    map[string]InstallationInputView `json:"inputs,omitempty"`
+	AdditionalPolicies        []artifact.ArtifactRef           `json:"additionalPolicies,omitempty"`
 }
 
 type ServerInstallationView struct {
 	Artifact     artifact.Artifact              `json:"artifact"`
 	Document     mcpDomainServer.ServerDocument `json:"document"`
-	Installation mcpDomainServer.ServerData     `json:"installation"`
+	Installation ServerInstallationDataView     `json:"installation"`
 
 	// InstallationRevision is the optimistic-concurrency token for a write
 	// through UpdateServerInstallation or UpdateProtectedServerInstallation.
@@ -69,6 +73,27 @@ type ServerInstallationView struct {
 	// persisted overlay revision, which is zero when no overlay exists yet.
 	InstallationRevision uint64 `json:"installationRevision"`
 	BuiltIn              bool   `json:"builtIn"`
+}
+
+func installationDataView(
+	value mcpDomainServer.ServerData,
+) ServerInstallationDataView {
+	output := ServerInstallationDataView{
+		SelectedConnectionProfile: value.SelectedConnectionProfile,
+		Inputs:                    make(map[string]InstallationInputView, len(value.Inputs)),
+		AdditionalPolicies:        append([]artifact.ArtifactRef(nil), value.AdditionalPolicies...),
+	}
+	for name, binding := range value.Inputs {
+		input := InstallationInputView{
+			SecretConfigured: binding.SecretRef != "",
+		}
+		if binding.Value != nil {
+			copyValue := *binding.Value
+			input.Value = &copyValue
+		}
+		output.Inputs[name] = input
+	}
+	return output
 }
 
 // MCPCollectionServerView is the management-list projection for one available

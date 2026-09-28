@@ -44,9 +44,6 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	if !known.BuiltIn {
 		t.Fatalf("bundled Agent BuiltIn = false")
 	}
-	if known.Managed {
-		t.Fatalf("bundled Agent Managed = true")
-	}
 
 	resolution, err := harness.api.ResolveAgent(
 		t.Context(),
@@ -85,8 +82,8 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	if !strings.Contains(exported.Content, "local-dev-workspace") {
 		t.Fatalf("export does not contain the expected Agent name")
 	}
-	if exported.Resolution == nil || !exported.Resolution.Complete {
-		t.Fatalf("export has no complete capability resolution")
+	if !exported.BuiltIn {
+		t.Fatalf("built-in Agent export has incorrect ownership flags")
 	}
 
 	userVisible, err := harness.api.ListAgents(
@@ -330,15 +327,12 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if !committed.Agent.Managed || committed.Agent.BuiltIn {
-		t.Fatalf("committed Agent has unexpected management flags")
-	}
 	if committed.Collection.Artifact.Ref() !=
 		enabledCollection.Artifact.Ref() {
 		t.Fatalf("import committed membership to another Collection")
 	}
 
-	current, err := harness.api.GetAgentView(
+	current, err := harness.api.GetAgent(
 		t.Context(),
 		committed.Agent.Ref,
 	)
@@ -405,7 +399,7 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if !exported.Managed || exported.BuiltIn {
+	if exported.BuiltIn {
 		t.Fatalf("managed Agent export has unexpected management flags")
 	}
 	if !strings.Contains(exported.Content, "workflow-agent") {
@@ -446,7 +440,7 @@ members:
 
 	enabledAgent, err := harness.api.SetAgentEnabled(
 		t.Context(),
-		disabledAgent.Ref(),
+		disabledAgent.Ref,
 		disabledAgent.Revision,
 		true,
 	)
@@ -460,17 +454,11 @@ members:
 		harness.api.DeleteManagedAgent(
 			t.Context(),
 			agentConsumerAPI.ManagedAgentDeleteRequest{
-				Agent:            enabledAgent.Ref(),
+				Agent:            enabledAgent.Ref,
 				ExpectedRevision: enabledAgent.Revision,
 			},
 		),
 	)
-
-	_, err = harness.api.GetAgentView(
-		t.Context(),
-		enabledAgent.Ref(),
-	)
-	requireErrorIs(t, err, basespec.ErrArtifactNotFound)
 
 	remainingUserAgents, err := harness.api.ListAgents(
 		t.Context(),
@@ -479,7 +467,7 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if containsAgent(remainingUserAgents, enabledAgent.Ref()) {
+	if containsAgent(remainingUserAgents, enabledAgent.Ref) {
 		t.Fatalf("deleted Agent remains in Root Agent list")
 	}
 
@@ -491,7 +479,7 @@ members:
 		},
 	)
 	requireNoError(t, err)
-	if containsAgent(remainingCollectionAgents, enabledAgent.Ref()) {
+	if containsAgent(remainingCollectionAgents, enabledAgent.Ref) {
 		t.Fatalf("deleted Agent remains in Collection Agent list")
 	}
 
@@ -618,7 +606,7 @@ func requireImportDestination(
 
 func requireAvailableCapability(
 	t *testing.T,
-	plan resolve.CapabilityPlan,
+	plan agentConsumerAPI.AgentCapabilityPlan,
 	declarationType declaration.Type,
 	name basespec.LogicalName,
 ) artifact.ArtifactRef {

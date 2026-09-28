@@ -11,13 +11,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
@@ -247,15 +245,10 @@ func (a *API) EnsureBaseline(
 	); err != nil {
 		return CollectionView{}, err
 	}
-	if err := compositionapi.EnsureSourceCurrent(
-		ctx,
-		a.discovery,
-		rootID,
-		sourceValue.ID,
-	); err != nil {
-		return CollectionView{}, err
-	}
 
+	// Keep the managed declaration origin configured before inspecting the
+	// existing baseline. This is cheap on the steady path and repairs an
+	// incomplete discovery configuration without forcing a Source scan.
 	existing, err := a.artifacts.FindByOrigin(
 		ctx,
 		rootID,
@@ -263,6 +256,16 @@ func (a *API) EnsureBaseline(
 			SourceID: sourceValue.ID,
 			Locator:  locator,
 		},
+		artifact.ArtifactKind(pluginv1.PluginType),
+	)
+	if err != nil && !errors.Is(err, basespec.ErrArtifactNotFound) && !errors.Is(err, basespec.ErrNotFound) {
+		return CollectionView{}, err
+	} else if existing.State == artifact.StateAvailable {
+		return a.Read(ctx, existing.Ref())
+	}
+
+	existing, err = a.artifacts.FindByOrigin(
+		ctx, rootID, artifact.SourceBinding{SourceID: sourceValue.ID, Locator: locator},
 		artifact.ArtifactKind(pluginv1.PluginType),
 	)
 	switch {
@@ -516,9 +519,7 @@ func (a *API) readCollectionDocument(
 	if err != nil {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
-	if err := definitionValue.Validate(); err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
-	}
+
 	if record.ResolvedDefinition == nil ||
 		*record.ResolvedDefinition != definitionValue.Digest {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
@@ -530,22 +531,7 @@ func (a *API) readCollectionDocument(
 	if err != nil {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
 	}
-	entry, err := declaration.NewEntry(document)
-	if err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
-	}
-	expected, err := decoder.DefinitionForEntry(entry)
-	if err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
-	}
-	if definitionValue.Kind != expected.Kind ||
-		definitionValue.SchemaID != expected.SchemaID ||
-		definitionValue.SchemaVersion != expected.SchemaVersion {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
-			"%w: Collection definition has an unsupported schema",
-			basespec.ErrUnsupported,
-		)
-	}
+
 	if document.Name != string(record.LogicalName) {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",

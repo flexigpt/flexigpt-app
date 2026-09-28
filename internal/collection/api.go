@@ -13,7 +13,6 @@ import (
 	"path"
 	"sort"
 	"strings"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
@@ -25,6 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -40,8 +40,8 @@ type API struct {
 	domain           *DomainPolicy
 	resolver         *resolve.Resolver
 
-	// Immutable Plugin projections keyed by Definition digest.
-	catalogProjections sync.Map
+	// Immutable Plugin projections keyed by Root-local Definition digest.
+	catalogProjections consumerutil.DocumentCache[collectionProjection]
 }
 
 func NewWithResolver(

@@ -2,7 +2,6 @@ package consumerapi
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -25,17 +24,32 @@ type AgentView struct {
 	Managed          bool              `json:"managed"`
 }
 
-// AgentListItem is the lightweight Agent list response. Document is omitted
-// unless ListAgentsRequest.IncludeDocument is true.
+// AgentListItem is the consumer-facing Agent list projection. Declaration
+// documents remain an internal storage and export concern.
 type AgentListItem struct {
 	AgentView
+}
 
-	Document *agentv1.AgentDocument `json:"document,omitempty"`
+type AgentCapabilityOccurrence struct {
+	Path     string                   `json:"path"`
+	Type     declaration.Type         `json:"type"`
+	Name     basespec.LogicalName     `json:"name,omitempty"`
+	Status   resolve.ResolutionStatus `json:"status"`
+	Required bool                     `json:"required"`
+
+	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
+	Code     string                `json:"code,omitempty"`
+	Message  string                `json:"message,omitempty"`
+}
+
+type AgentCapabilityPlan struct {
+	Occurrences []AgentCapabilityOccurrence `json:"occurrences"`
+	Complete    bool                        `json:"complete"`
 }
 
 type AgentResolution struct {
-	Agent        AgentView              `json:"agent"`
-	Capabilities resolve.CapabilityPlan `json:"capabilities"`
+	Agent        AgentView           `json:"agent"`
+	Capabilities AgentCapabilityPlan `json:"capabilities"`
 }
 
 type AgentTextMaterialization struct {
@@ -65,8 +79,6 @@ type ListAgentsRequest struct {
 
 	// Enabled filters universal Artifact.Enabled metadata when non-nil.
 	Enabled *bool `json:"enabled,omitempty"`
-
-	IncludeDocument bool `json:"includeDocument,omitempty"`
 }
 
 type ManagedAgentDeleteRequest struct {
