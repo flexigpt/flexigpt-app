@@ -20,6 +20,8 @@
 
 - [ ] mcps that are not really configured are shown. we should not do such thing. only configured and connect pending things should be shown. other can be just a small line saying, configuration pending manage from managements page.
 - [ ] mcp chip in messags is taller than others. why it uses different chip i dont know. also some ids etc that are internal are used in ui
+- [ ] mcp servers not loaded still
+- [ ] base agent is not loaded.
 
 - Testing
   - [ ] test enhanced mcp apps.
