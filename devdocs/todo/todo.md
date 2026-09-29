@@ -3,6 +3,7 @@
 ## Laundry list
 
 - [ ] check similar any json raw strings needed double decode in go 1.27.
+- [ ] reading scrolling tables inside md is problematic. try to build a word wrap and a zoom out with wordwrap, option to enable disable disable it and then full screen zoom for it.
 
 - Testing
   - [ ] test enhanced mcp apps.
