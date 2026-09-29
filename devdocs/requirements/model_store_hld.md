@@ -935,3 +935,261 @@ Do not place new artifact-backed types inside `internal/modelpreset`.
 | Built-in override policy                               | Missing                      | Implement settings-backed overlays              |
 | Legacy data migration                                  | Missing                      | Implement after new read/resolve path is stable |
 | Existing old code behavior                             | Working                      | Do not modify in initial phases                 |
+
+## Some implementation decisions
+
+### Schema
+
+There should be no shared `modelcommon` package between Model and Provider declaration contracts.
+
+The only permitted common declaration bridge is a small named-reference type under `artifactcontract/declaration`, because both relationships need the same portable identity shape.
+
+```text
+Model -> Provider reference
+Provider -> default Model reference
+```
+
+Everything else belongs to either:
+
+```text
+modelv1
+modelproviderv1
+```
+
+note the schema should not be partial. It should support full range of features form inferencego.
+
+The following files must be the actual source of truth:
+
+```text
+internal/artifactcontract/declaration/modelv1/model-v1.schema.json
+internal/artifactcontract/declaration/modelproviderv1/model-provider-v1.schema.json
+```
+
+Each document implementation must use:
+
+```go
+//go:embed model-v1.schema.json
+var schemaJSON []byte
+```
+
+or:
+
+```go
+//go:embed model-provider-v1.schema.json
+var schemaJSON []byte
+```
+
+Provider and Model may repeat JSON Schema `$defs`. That duplication is intentional.
+
+Do not create a shared JSON Schema file and do not make one schema depend on the other through `$ref`.
+
+The only shared Go declaration type should be an identity reference:
+
+```go
+type ArtifactNameReference struct {
+  Name  basespec.LogicalName
+  Scope LookupScope
+}
+```
+
+### Provider default Model is a best-effort link
+
+Provider has an authored default Model reference:
+
+```yaml
+defaultModel:
+  name: <this shoudl be actual mdoel name and not slug etc i.e gpt-5.5-sol etc>
+```
+
+It can be overridden locally:
+
+- Mutable Provider: `Artifact.Data`.
+- Protected Provider: settings overlay.
+
+Resolution order:
+
+```text
+Provider local metadata defaultModel
+  -> Provider declaration defaultModel
+  -> first enabled resolved Model attached to this Provider
+```
+
+A stale or unresolved default does not invalidate the Provider. It falls back to the first enabled Model deterministically.
+
+### Capability merging is runtime logic
+
+The Model Store must not merge capability profiles.
+
+The Model Store returns:
+
+```text
+Provider declaration capability input
+Model declaration capability input
+Provider local overlay capability input, if allowed later
+Model local overlay capability input, if allowed later
+```
+
+The inference adapter owns:
+
+```text
+adapter base capabilities
++
+provider capability declaration
++
+model capability declaration
++
+runtime request validation
+```
+
+The store validates declaration syntax and identity only. It does not decide effective runtime capabilities.
+
+### No pointer slices
+
+Do not use:
+
+```go
+*[]string
+```
+
+Use ordinary slices:
+
+```go
+[]string
+```
+
+Semantics:
+
+- `nil` and `[]` mean the same thing for model/provider declarations.
+- Empty arrays do not mean “clear inherited values”.
+- If behavior must be disabled explicitly, use an explicit boolean property.
+
+Examples:
+
+```json
+{
+  "supportsReasoningConfig": false
+}
+```
+
+```json
+{
+  "isSupported": false
+}
+```
+
+```json
+{
+  "supportsTTL": false
+}
+```
+
+This matches the shape of `inference-go` capability structures better than pointer slices.
+The static Model and Provider schemas must support every field in `inference-go/spec.ModelCapabilities`.
+The implementation should be structurally identical to MCP's `SettingsOverlayRepository`, but use the Model namespace and Model-specific payload validation.
+
+### Sample target file layout
+
+```text
+internal/artifactcontract/declaration/
+  model_reference.go
+  modelv1/
+    document.go
+    model-v1.schema.json
+  modelproviderv1/
+    document.go
+    model-provider-v1.schema.json
+
+internal/model/
+  aggregate/
+    service.go
+    target.go
+
+  inferenceadapter/
+    catalog_adapter.go
+    runtime_adapter.go
+    runtime_capabilities.go
+    runtime_model_param.go
+    runtime_provider_param.go
+
+  store/
+    builtin/
+      catalog.go
+      catalog_generated.json
+      catalog_generated_test.go
+      catalog_installer.go
+      compile.go
+      prepare.go
+
+    consumerapi/
+      api.go
+      default_model.go
+      managed.go
+      metadata.go
+      resolve.go
+      types.go
+
+    domain/
+      const.go
+      package_layout.go
+      provider.go
+      model.go
+
+    overlay/
+      settings_overlay_repository.go
+      type_const.go
+```
+
+There should be no:
+
+```text
+internal/model/bootstrap
+internal/model/store/selection
+internal/artifactcontract/declaration/modelcommon
+```
+
+### Correct generated catalog structure
+
+The Model generated catalog must follow Tool conventions.
+
+- Required files
+
+```text
+internal/model/store/builtin/catalog.go
+internal/model/store/builtin/catalog_generated.json
+internal/model/store/builtin/catalog_generated_test.go
+internal/model/store/builtin/catalog_installer.go
+internal/model/store/builtin/compile.go
+```
+
+- Required behavior
+
+- `catalog.go` follows Tool's `generatedCatalogValue`, `GeneratedCatalogSet`, and `GeneratedCatalogFingerprint` pattern.
+- `compile.go` follows Tool's `Compile` pattern.
+- `catalog_generated_test.go` follows Tool's candidate-file test pattern.
+- Test failure writes:
+
+```text
+catalog_generated.next.json
+```
+
+- Developer manually renames the candidate:
+
+```text
+catalog_generated.next.json
+-> catalog_generated.json
+```
+
+- There is no `go generate`.
+- There is no second enablement manifest.
+- There is no precompiled package set being passed into `artifactcontract/builtin.Compile`.
+
+The correct generation flow is:
+
+```text
+inference-go catalog
+  -> external model inference catalog adapter
+  -> []PreparedPackage
+  -> artifactcontract/builtin.Compile
+  -> CompiledPackageSet
+  -> catalog_generated.json
+```
