@@ -21,6 +21,10 @@ linters:
     # Check whether the function uses a non-inherited context.
     - contextcheck
 
+    # Checks if package imports are in a list of acceptable packages.
+    # Useful to ban one package path to ban another itself to ban from another.
+    - depguard
+
     # Find duplicate words. Rare case but good to have.
     - dupword
 
@@ -202,10 +206,6 @@ linters:
     # I can have mixed things, like interface type and then its funcs and then other interface with its funcs etc.
     - decorder
 
-    # Checks if package imports are in a list of acceptable packages.
-    # I'm very picky about what I import, so no automation.
-    - depguard
-
     # Checks assignments with too many blank identifiers. I amy have this as a conscious choice, in tests etc.
     - dogsled
 
@@ -364,6 +364,28 @@ linters:
     copyloopvar:
       # Check all assigning the loop variable to another variable.
       check-alias: true
+
+    depguard:
+      rules:
+        # Isolate the artifactstore package completely
+        isolate_artifact_store:
+          # Applies to all files inside internal/artifactstore and its sub-packages
+          files:
+            - "**/internal/artifactstore/**/*.go"
+
+          # Only allow these specific packages/prefixes. Anything else is banned.
+          allow:
+            # Allowed to use Go standard library packages.
+            - "$gostd"
+            # Allowed to import its own sub-packages.
+            - "github.com/flexigpt/flexigpt-app/internal/artifactstore"
+            - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
+            - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
+            - "github.com/flexigpt/flexigpt-app/internal/clockutil"
+            - "github.com/flexigpt/flexigpt-app/internal/uuidutil"
+            - "github.com/flexigpt/mapstore-go"
+            - "github.com/glebarez/go-sqlite"
+            - "github.com/santhosh-tekuri/jsonschema/v6"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
