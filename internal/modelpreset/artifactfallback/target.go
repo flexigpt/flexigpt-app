@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -33,7 +33,7 @@ func (t TargetV1) Validate() error {
 	); err != nil {
 		return err
 	}
-	if err := bundleitemutils.ValidateTag(string(t.ModelPresetID)); err != nil {
+	if err := spec.ValidateTag(string(t.ModelPresetID)); err != nil {
 		return err
 	}
 	if err := basespec.ValidateRequiredText(

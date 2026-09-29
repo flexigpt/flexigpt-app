@@ -3,7 +3,7 @@ package store
 import (
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 

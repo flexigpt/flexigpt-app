@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/flexigpt-app/internal/overlay"
 )

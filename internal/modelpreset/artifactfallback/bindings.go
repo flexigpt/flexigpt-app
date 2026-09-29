@@ -2,7 +2,7 @@ package artifactfallback
 
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -26,7 +26,7 @@ func (b Binding) Validate() error {
 	); err != nil {
 		return err
 	}
-	return bundleitemutils.ValidateTag(string(b.ModelPresetID))
+	return spec.ValidateTag(string(b.ModelPresetID))
 }
 
 // Populate this list when two built-in providers expose the same portable

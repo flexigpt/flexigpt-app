@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/bundleitemutils"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/modelpreset"
@@ -254,12 +253,12 @@ func validateModelName(n inferenceSpec.ModelName) error {
 
 // validateModelSlug uses existing tag validator.
 func validateModelSlug(s spec.ModelSlug) error {
-	return bundleitemutils.ValidateTag(string(s))
+	return spec.ValidateTag(string(s))
 }
 
 // validateModelPresetID uses the same rule set as slugs for now.
 func validateModelPresetID(id modelpreset.ModelPresetID) error {
-	return bundleitemutils.ValidateTag(string(id))
+	return spec.ValidateTag(string(id))
 }
 
 // validateReasoning verifies the type/level/tokens combos.

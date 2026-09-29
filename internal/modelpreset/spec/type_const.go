@@ -2,12 +2,20 @@ package spec
 
 import (
 	"errors"
+	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
+
+// maxTokenLength is the maximum allowed length for slugs and versions.
+const maxTokenLength = 64
+
+var tagNameRE = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
 
 const (
 	ModelPresetsFile                     = "modelpresets.json" // Single JSON file.
@@ -125,4 +133,19 @@ type PresetsSchema struct {
 	SchemaVersion   string                                        `json:"schemaVersion"`
 	DefaultProvider inferenceSpec.ProviderName                    `json:"defaultProvider"`
 	ProviderPresets map[inferenceSpec.ProviderName]ProviderPreset `json:"providerPresets"`
+}
+
+// ValidateTag checks a single tag for format and length.
+func ValidateTag(tag string) error {
+	tag = strings.TrimSpace(tag)
+	if tag == "" {
+		return errors.New("tag is empty")
+	}
+	if len(tag) > maxTokenLength {
+		return fmt.Errorf("tag %q is too long (max %d)", tag, maxTokenLength)
+	}
+	if !tagNameRE.MatchString(tag) {
+		return fmt.Errorf("invalid tag %q", tag)
+	}
+	return nil
 }
