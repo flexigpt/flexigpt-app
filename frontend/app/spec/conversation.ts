@@ -15,7 +15,6 @@ import type {
 	URLCitation,
 } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext, MCPProviderToolMapping } from '@/spec/mcp';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection, WorkspaceConversationUsage } from '@/spec/workspace';
 
@@ -29,7 +28,7 @@ export interface StoreConversationMessage {
 	status: Status;
 
 	modelParam?: ModelParam;
-	modelPresetRef?: ModelPresetRef;
+	modelRef?: ArtifactRef;
 	inputs?: InputUnion[];
 	outputs?: OutputUnion[];
 
@@ -86,7 +85,7 @@ export interface ConversationSearchItem {
 }
 
 export interface RestorableConversationContext {
-	modelPresetRef?: ModelPresetRef;
+	modelRef?: ArtifactRef;
 	modelParam?: ModelParam;
 	toolChoices: ToolStoreChoice[];
 	toolSelectionIssues?: ToolSelectionIssue[];

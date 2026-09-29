@@ -1,6 +1,5 @@
 // oxlint-disable typescript/parameter-properties
 import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ResolvedToolView } from '@/spec/tool';
 import type {
 	WorkspaceArtifactView,
@@ -20,12 +19,12 @@ import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type {
-	IModelPresetStoreAPI,
 	IToolTargetResolver,
 	IWorkspaceManagementAPI,
 	IWorkspaceRuntimeAPI,
 	IWorkspaceStoreAPI,
 } from '@/apis/interface';
+import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
 const COMPOSER_WORKSPACE_PAGE_SIZE = 100;
 const COMPOSER_WORKSPACE_READ_CONCURRENCY = 4;
@@ -36,7 +35,7 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 		public readonly store: IWorkspaceStoreAPI,
 		public readonly runtime: IWorkspaceRuntimeAPI,
 		private readonly tools: IToolTargetResolver,
-		private readonly modelPresetStore: IModelPresetStoreAPI
+		private readonly models: ModelManagementAPI
 	) {}
 
 	private readonly composerWorkspaceDirectoriesCatalog = createSharedAsyncCatalog<WorkspaceDirectoryView[]>(() =>
@@ -170,7 +169,7 @@ export class WorkspaceManagementAPI implements IWorkspaceManagementAPI {
 		return this.tools.resolveMappedTool(target);
 	}
 
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {
-		return this.modelPresetStore.resolveMappedModelTarget(target);
+	resolveMappedModelTarget(target: MappedTarget): Promise<ModelManagementItem> {
+		return this.models.resolveMappedModelTarget(target);
 	}
 }

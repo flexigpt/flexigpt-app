@@ -8,12 +8,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -42,10 +41,8 @@ type ModelStoreWrapper struct {
 	management  *modelConsumerAPI.CatalogStore
 	settings    *modelSettingsAdapter
 	credentials *modelCredentialResolver
-}
-
-type ModelAggregateWrapper struct {
-	service *modelAggregate.Service
+	roots       compositionapi.RootAPI
+	protection  compositionapi.ProtectionAPI
 }
 
 type modelAuthKeyStore interface {
@@ -529,6 +526,32 @@ func (r *modelCredentialResolver) SetProviderCredential(
 	return ref, nil
 }
 
+func (r *modelCredentialResolver) DeleteProviderCredential(
+	ctx context.Context,
+	provider artifact.ArtifactRef,
+) error {
+	if r == nil || r.store == nil {
+		return basespec.ErrClosed
+	}
+	ref, err := modelCredentialRef(provider)
+	if err != nil {
+		return err
+	}
+	_, err = r.store.DeleteAuthKey(
+		ctx,
+		&settingSpec.DeleteAuthKeyRequest{
+			Type: settingSpec.AuthKeyTypeProvider,
+			KeyName: settingSpec.AuthKeyName(
+				modelCredentialStorageKey(ref),
+			),
+		},
+	)
+	if modelSettingMissing(err) {
+		return nil
+	}
+	return err
+}
+
 func InitModelWrappers(
 	ctx context.Context,
 	storeWrapper *ModelStoreWrapper,
@@ -536,6 +559,7 @@ func InitModelWrappers(
 	sources compositionapi.SourceAPI,
 	discovery compositionapi.DiscoveryAPI,
 	artifacts compositionapi.ArtifactAPI,
+	roots compositionapi.RootAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	hydrator topology.CompiledHydrationCoordinator,
@@ -548,6 +572,7 @@ func InitModelWrappers(
 		discovery == nil ||
 		artifacts == nil ||
 		managedArtifacts == nil ||
+		roots == nil ||
 		protection == nil ||
 		hydrator == nil ||
 		settingsStore == nil {
@@ -618,6 +643,8 @@ func InitModelWrappers(
 	storeWrapper.management = catalog
 	storeWrapper.settings = settings
 	storeWrapper.credentials = credentials
+	storeWrapper.roots = roots
+	storeWrapper.protection = protection
 	aggregateWrapper.service = aggregateService
 
 	_ = ctx
@@ -630,7 +657,21 @@ func (w *ModelStoreWrapper) ListModelProviders(
 	if w == nil || w.management == nil {
 		return nil, basespec.ErrClosed
 	}
-	return w.management.ListProviders(context.Background(), rootID)
+	ctx := context.Background()
+	roots, err := w.managementRootIDs(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]modelConsumerAPI.ProviderListItem, 0)
+	for _, currentRoot := range roots {
+		values, err := w.management.ListProviders(ctx, currentRoot)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, values...)
+	}
+	return output, nil
 }
 
 func (w *ModelStoreWrapper) ListModels(
@@ -639,7 +680,21 @@ func (w *ModelStoreWrapper) ListModels(
 	if w == nil || w.management == nil {
 		return nil, basespec.ErrClosed
 	}
-	return w.management.ListModels(context.Background(), rootID)
+	ctx := context.Background()
+	roots, err := w.managementRootIDs(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]modelConsumerAPI.ModelListItem, 0)
+	for _, currentRoot := range roots {
+		values, err := w.management.ListModels(ctx, currentRoot)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, values...)
+	}
+	return output, nil
 }
 
 func (w *ModelStoreWrapper) GetModelProvider(
@@ -666,6 +721,12 @@ func (w *ModelStoreWrapper) CreateModelProvider(
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ManagedProviderCreateResult{}, basespec.ErrClosed
 	}
+	rootID, err := w.writableManagementRoot(context.Background(), request.RootID)
+	if err != nil {
+		return modelConsumerAPI.ManagedProviderCreateResult{}, err
+	}
+	request.RootID = rootID
+
 	return w.api.CreateProvider(context.Background(), request)
 }
 
@@ -698,6 +759,12 @@ func (w *ModelStoreWrapper) CreateManagedModel(
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ManagedModelCreateResult{}, basespec.ErrClosed
 	}
+	rootID, err := w.writableManagementRoot(context.Background(), request.RootID)
+	if err != nil {
+		return modelConsumerAPI.ManagedModelCreateResult{}, err
+	}
+	request.RootID = rootID
+
 	return w.api.CreateModel(context.Background(), request)
 }
 
@@ -765,8 +832,9 @@ func (w *ModelStoreWrapper) SetModelProviderCredential(
 		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
 	}
 
+	ctx := context.Background()
 	current, err := w.api.GetProviderRuntimeOverlay(
-		context.Background(),
+		ctx,
 		provider,
 	)
 	if err != nil {
@@ -776,17 +844,20 @@ func (w *ModelStoreWrapper) SetModelProviderCredential(
 		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrConflict
 	}
 
-	ref, err := w.credentials.SetProviderCredential(
-		context.Background(),
-		provider,
-		secret,
-	)
-	if err != nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+	ref := ""
+	if strings.TrimSpace(secret) == "" {
+		if err := w.credentials.DeleteProviderCredential(ctx, provider); err != nil {
+			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+		}
+	} else {
+		ref, err = w.credentials.SetProviderCredential(ctx, provider, secret)
+		if err != nil {
+			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+		}
 	}
 
 	return w.api.UpdateProviderRuntimeOverlay(
-		context.Background(),
+		ctx,
 		modelConsumerAPI.ProviderRuntimeOverlayUpdateRequest{
 			Provider:          provider,
 			ExpectedRevision:  expectedOverlayRevision,
@@ -800,25 +871,160 @@ func (w *ModelStoreWrapper) SetModelProviderCredential(
 	)
 }
 
-func (w *ModelAggregateWrapper) ResolveRuntimeModel(
-	ref artifact.ArtifactRef,
-) (inferenceadapter.RuntimeConfiguration, error) {
-	if w == nil || w.service == nil {
-		return inferenceadapter.RuntimeConfiguration{}, basespec.ErrClosed
-	}
-	return w.service.ResolveRuntimeModel(context.Background(), ref)
+type ModelSelectionView struct {
+	Revision     uint64                `json:"revision"`
+	DefaultModel *artifact.ArtifactRef `json:"defaultModel,omitempty"`
 }
 
-func (w *ModelAggregateWrapper) targetMappers() (
-	map[declaration.Type]resolve.ArtifactTargetMapper,
-	error,
-) {
-	if w == nil || w.service == nil {
+type ModelSelectionUpdateRequest struct {
+	ExpectedRevision uint64                `json:"expectedRevision"`
+	DefaultModel     *artifact.ArtifactRef `json:"defaultModel,omitempty"`
+}
+
+type storedModelSelection struct {
+	SchemaVersion string                `json:"schemaVersion"`
+	Revision      uint64                `json:"revision"`
+	DefaultModel  *artifact.ArtifactRef `json:"defaultModel,omitempty"`
+}
+
+const (
+	modelSelectionSettingsKey   = "model.runtime.v1/selection"
+	modelSelectionSchemaVersion = "v1"
+)
+
+func (w *ModelStoreWrapper) GetModelSelection() (ModelSelectionView, error) {
+	if w == nil || w.settings == nil {
+		return ModelSelectionView{}, basespec.ErrClosed
+	}
+
+	raw, found, err := w.settings.GetModelRuntimeValue(
+		context.Background(),
+		modelSelectionSettingsKey,
+	)
+	if err != nil {
+		return ModelSelectionView{}, err
+	}
+	if !found {
+		return ModelSelectionView{}, nil
+	}
+
+	var stored storedModelSelection
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		raw,
+		&stored,
+		basespec.MaxLocalDataBytes,
+	); err != nil {
+		return ModelSelectionView{}, err
+	}
+	if stored.SchemaVersion != modelSelectionSchemaVersion || stored.Revision == 0 {
+		return ModelSelectionView{}, fmt.Errorf(
+			"%w: invalid Model selection settings",
+			basespec.ErrInvalid,
+		)
+	}
+	if stored.DefaultModel != nil {
+		if err := stored.DefaultModel.Validate(); err != nil {
+			return ModelSelectionView{}, err
+		}
+	}
+
+	return ModelSelectionView{
+		Revision:     stored.Revision,
+		DefaultModel: stored.DefaultModel,
+	}, nil
+}
+
+func (w *ModelStoreWrapper) UpdateModelSelection(
+	request ModelSelectionUpdateRequest,
+) (ModelSelectionView, error) {
+	if w == nil || w.api == nil || w.settings == nil {
+		return ModelSelectionView{}, basespec.ErrClosed
+	}
+
+	current, err := w.GetModelSelection()
+	if err != nil {
+		return ModelSelectionView{}, err
+	}
+	if request.ExpectedRevision != current.Revision {
+		return ModelSelectionView{}, basespec.ErrConflict
+	}
+	if request.DefaultModel != nil {
+		if _, err := w.api.GetModel(context.Background(), *request.DefaultModel); err != nil {
+			return ModelSelectionView{}, err
+		}
+	}
+
+	next := storedModelSelection{
+		SchemaVersion: modelSelectionSchemaVersion,
+		Revision:      current.Revision + 1,
+		DefaultModel:  request.DefaultModel,
+	}
+	raw, err := jsonutil.MarshalCanonicalObject(next, basespec.MaxLocalDataBytes)
+	if err != nil {
+		return ModelSelectionView{}, err
+	}
+	if err := w.settings.PutModelRuntimeValue(
+		context.Background(),
+		modelSelectionSettingsKey,
+		current.Revision,
+		raw,
+	); err != nil {
+		return ModelSelectionView{}, err
+	}
+
+	return ModelSelectionView{
+		Revision:     next.Revision,
+		DefaultModel: next.DefaultModel,
+	}, nil
+}
+
+func (w *ModelStoreWrapper) managementRootIDs(
+	ctx context.Context,
+	requested root.RootID,
+) ([]root.RootID, error) {
+	if w == nil || w.roots == nil || w.protection == nil {
 		return nil, basespec.ErrClosed
 	}
-	return map[declaration.Type]resolve.ArtifactTargetMapper{
-		declaration.TypeModel: w.service,
-	}, nil
+	if requested != "" {
+		if err := requested.Validate(); err != nil {
+			return nil, err
+		}
+		return []root.RootID{requested}, nil
+	}
+
+	values, err := w.roots.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	output := make([]root.RootID, 0, len(values))
+	for _, value := range values {
+		if value.RetiredAt != nil {
+			continue
+		}
+		output = append(output, value.ID)
+	}
+	slices.Sort(output)
+	return output, nil
+}
+
+func (w *ModelStoreWrapper) writableManagementRoot(
+	ctx context.Context,
+	requested root.RootID,
+) (root.RootID, error) {
+	roots, err := w.managementRootIDs(ctx, requested)
+	if err != nil {
+		return "", err
+	}
+	for _, rootID := range roots {
+		if !w.protection.IsProtectedRoot(rootID) {
+			return rootID, nil
+		}
+	}
+	return "", fmt.Errorf(
+		"%w: no writable Artifact Root is available for Model authoring",
+		basespec.ErrReferenceUnresolved,
+	)
 }
 
 func (w *ModelStoreWrapper) close() {
@@ -829,11 +1035,6 @@ func (w *ModelStoreWrapper) close() {
 	w.management = nil
 	w.settings = nil
 	w.credentials = nil
-}
-
-func (w *ModelAggregateWrapper) close() {
-	if w == nil {
-		return
-	}
-	w.service = nil
+	w.roots = nil
+	w.protection = nil
 }

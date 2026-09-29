@@ -4,7 +4,7 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -25,10 +25,15 @@ import {
 interface ProviderModelGroup {
 	providerName: string;
 	providerDisplayName: string;
-	options: UIChatOption[];
+	options: UIModelOption[];
 }
 
-const modelKey = (m: UIChatOption) => `${m.providerName}::${m.modelPresetID}`;
+const modelKey = (model: UIModelOption) => {
+	if (model.model) {
+		return `${model.model.rootID}::${model.model.artifactID}`;
+	}
+	return `${model.providerName}::${model.logicalName}`;
+};
 
 const modelDropdownCollator = new Intl.Collator(undefined, {
 	numeric: true,
@@ -39,12 +44,12 @@ const compareProviderGroups = (a: ProviderModelGroup, b: ProviderModelGroup) =>
 	modelDropdownCollator.compare(a.providerDisplayName, b.providerDisplayName) ||
 	modelDropdownCollator.compare(a.providerName, b.providerName);
 
-const compareModelOptions = (a: UIChatOption, b: UIChatOption) =>
+const compareModelOptions = (a: UIModelOption, b: UIModelOption) =>
 	modelDropdownCollator.compare(a.modelDisplayName, b.modelDisplayName) ||
 	modelDropdownCollator.compare(a.name, b.name) ||
-	modelDropdownCollator.compare(a.modelPresetID, b.modelPresetID);
+	modelDropdownCollator.compare(a.logicalName, b.logicalName);
 
-const groupModelOptionsByProvider = (options: UIChatOption[]): ProviderModelGroup[] => {
+const groupModelOptionsByProvider = (options: UIModelOption[]): ProviderModelGroup[] => {
 	const groupsByProvider = new Map<string, ProviderModelGroup>();
 
 	for (const option of options) {
@@ -71,9 +76,9 @@ const groupModelOptionsByProvider = (options: UIChatOption[]): ProviderModelGrou
 };
 
 interface ModelDropdownProps {
-	selectedModel: UIChatOption;
-	setSelectedModel: Dispatch<SetStateAction<UIChatOption>>;
-	allOptions: UIChatOption[];
+	selectedModel: UIModelOption;
+	setSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
+	allOptions: UIModelOption[];
 }
 
 export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: ModelDropdownProps) {
@@ -84,7 +89,7 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 	const open = useStoreState(menu, 'open');
 	const menuContentElement = useStoreState(menu, 'contentElement');
 	const [searchQuery, setSearchQuery] = useSearchableMenuState(open);
-	const isCurrent = (m: UIChatOption) => modelKey(m) === currentKey;
+	const isCurrent = (m: UIModelOption) => modelKey(m) === currentKey;
 
 	const displayedProviderGroups = useMemo(() => {
 		if (!isSearchQueryActive(searchQuery)) {
@@ -97,7 +102,7 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 			getFields: model => [
 				{ value: model.modelDisplayName, weight: 5 },
 				{ value: model.name, weight: 4 },
-				{ value: model.modelPresetID, weight: 3 },
+				{ value: model.logicalName, weight: 3 },
 				{ value: model.providerDisplayName, weight: 2 },
 				{ value: model.providerName, weight: 2 },
 			],
@@ -118,7 +123,7 @@ export function ModelDropdown({ selectedModel, setSelectedModel, allOptions }: M
 	const displayedModelCount = displayedProviderGroups.reduce((sum, group) => sum + group.options.length, 0);
 	const firstVisibleModel = displayedProviderGroups[0]?.options[0] ?? null;
 
-	const selectModel = (model: UIChatOption) => {
+	const selectModel = (model: UIModelOption) => {
 		setSelectedModel(model);
 		menu.hide();
 	};

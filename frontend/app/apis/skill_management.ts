@@ -1,7 +1,6 @@
 // oxlint-disable typescript/parameter-properties
 import type { ArtifactRef, MappedTarget, StoreArtifact } from '@/spec/artifact';
 import type { CollectionListItem, CollectionView } from '@/spec/collection';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type {
 	ArtifactRuntimeSkillListItem,
 	ArtifactSkillFilter,
@@ -44,13 +43,8 @@ import { mapWithConcurrency } from '@/lib/async_utils';
 import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type {
-	IModelPresetStoreAPI,
-	ISkillAggregateAPI,
-	ISkillRuntimeAPI,
-	ISkillStoreAPI,
-	IToolTargetResolver,
-} from '@/apis/interface';
+import type { ISkillAggregateAPI, ISkillRuntimeAPI, ISkillStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
 const SKILL_READ_CONCURRENCY = 4;
 
@@ -222,7 +216,7 @@ export class SkillManagementAPI {
 		private readonly store: ISkillStoreAPI,
 		private readonly aggregate: ISkillAggregateAPI,
 		private readonly tools: IToolTargetResolver,
-		private readonly modelPresetStore: IModelPresetStoreAPI
+		private readonly models: ModelManagementAPI
 	) {}
 
 	private readonly composerSkillsCatalog = createSharedAsyncCatalog<SkillListItem[]>(async () => {
@@ -781,8 +775,8 @@ export class SkillManagementAPI {
 		return this.tools.resolveMappedTool(target);
 	}
 
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {
-		return this.modelPresetStore.resolveMappedModelTarget(target);
+	resolveMappedModelTarget(target: MappedTarget): Promise<ModelManagementItem> {
+		return this.models.resolveMappedModelTarget(target);
 	}
 
 	private skillBundlesFromCollections(

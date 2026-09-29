@@ -2,7 +2,6 @@ import type { MCPProviderToolMapping, MCPToolAppRenderInfo, MCPToolSelection } f
 import type { ToolOutputUnion, ToolSelection, ToolStoreChoice, ToolStoreChoiceType } from '@/spec/tool';
 import type { WorkspaceConversationUsage } from '@/spec/workspace';
 
-export type ProviderName = string;
 export enum ProviderSDKType {
 	ProviderSDKTypeAnthropic = 'providerSDKTypeAnthropicMessages',
 	ProviderSDKTypeOpenAIChatCompletions = 'providerSDKTypeOpenAIChatCompletions',
@@ -10,6 +9,7 @@ export enum ProviderSDKType {
 	ProviderSDKTypeGoogleGenerateContent = 'providerSDKTypeGoogleGenerateContent',
 }
 
+/** @public */
 export const SDK_DISPLAY_NAME: Record<ProviderSDKType, string> = {
 	[ProviderSDKType.ProviderSDKTypeAnthropic]: 'Anthropic Messages API',
 	[ProviderSDKType.ProviderSDKTypeOpenAIChatCompletions]: 'OpenAI ChatCompletions API',
@@ -17,6 +17,7 @@ export const SDK_DISPLAY_NAME: Record<ProviderSDKType, string> = {
 	[ProviderSDKType.ProviderSDKTypeGoogleGenerateContent]: 'Google GenAI API',
 };
 
+/** @public */
 export const SDK_DEFAULTS: Record<
 	ProviderSDKType,
 	{ chatPath: string; apiKeyHeaderKey: string; defaultHeaders: Record<string, string> }

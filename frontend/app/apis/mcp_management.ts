@@ -51,7 +51,6 @@ import type {
 	MCPStoreServerInstallationView,
 	MCPToolCapability,
 } from '@/spec/mcp';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ResolvedToolView } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import { collectionListItemFromCollectionView } from '@/spec/collection';
@@ -73,13 +72,8 @@ import { getErrorMessage } from '@/lib/error_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type {
-	IMCPAggregateAPI,
-	IMCPRuntimeAPI,
-	IMCPStoreAPI,
-	IModelPresetStoreAPI,
-	IToolTargetResolver,
-} from '@/apis/interface';
+import type { IMCPAggregateAPI, IMCPRuntimeAPI, IMCPStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import type { ModelManagementAPI, ModelManagementItem } from '@/apis/model_management';
 
 const MANAGEMENT_PAGE_SIZE = 100;
 const MAX_MANAGEMENT_PAGE_HOPS = 10_000;
@@ -617,7 +611,7 @@ export class MCPManagementAPI {
 		private readonly aggregate: IMCPAggregateAPI,
 		private readonly runtime: IMCPRuntimeAPI,
 		private readonly tools: IToolTargetResolver,
-		private readonly modelPresetStore: IModelPresetStoreAPI
+		private readonly models: ModelManagementAPI
 	) {}
 
 	private readonly composerMCPDeclarationsCatalog = createSharedAsyncCatalog<MCPComposerDeclarations[]>(async () => {
@@ -1204,8 +1198,8 @@ export class MCPManagementAPI {
 		return this.tools.resolveMappedTool(target);
 	}
 
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef> {
-		return this.modelPresetStore.resolveMappedModelTarget(target);
+	resolveMappedModelTarget(target: MappedTarget): Promise<ModelManagementItem> {
+		return this.models.resolveMappedModelTarget(target);
 	}
 
 	private toBundleView(collection: CollectionListItem): MCPBundleView {

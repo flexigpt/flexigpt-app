@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -78,7 +79,7 @@ func NewMappedTarget(
 		Identifier: identifier,
 		Type:       declaration.TypeModel,
 		Name:       targetValue.Name,
-		Builtin:    false,
+		Builtin:    value.Model.Artifact.RootID == documentTopology.BuiltinRootID(),
 	}, nil
 }
 

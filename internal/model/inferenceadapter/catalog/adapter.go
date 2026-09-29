@@ -257,10 +257,9 @@ func providerDocumentFromInference(
 	}
 
 	return modelproviderv1.ProviderDocument{
-		Type:        modelproviderv1.ModelProviderType,
-		Name:        string(provider.Name),
-		DisplayName: provider.DisplayName,
-
+		Type:           modelproviderv1.ModelProviderType,
+		Name:           string(provider.Name),
+		DisplayName:    provider.DisplayName,
 		Adapter:        adapter,
 		Connection:     connection,
 		Authentication: authentication,
@@ -298,7 +297,6 @@ func modelDocumentFromInference(
 		Name:        string(modelName),
 		DisplayName: preset.DisplayName,
 		Labels:      labels,
-
 		Provider: declaration.ArtifactNameReference{
 			Name:  providerName,
 			Scope: declaration.LookupScopeBuiltin,

@@ -9,7 +9,6 @@ import (
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
-	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
@@ -19,17 +18,6 @@ const (
 	DefaultPageSize           = 12
 	ConversationSchemaVersion = "v1"
 )
-
-// ModelPresetRef identifies a model preset inside a provider namespace.
-// It is intended for internal helpers and JSON payloads, not HTTP path binding.
-type ModelPresetRef struct {
-	ProviderName  inferenceSpec.ProviderName `json:"providerName"`
-	ModelPresetID modelpreset.ModelPresetID  `json:"modelPresetID"`
-}
-
-func (r ModelPresetRef) IsZero() bool {
-	return r.ProviderName == "" || r.ModelPresetID == ""
-}
 
 // ConversationMessage represents a single *turn* in the conversation.
 //
@@ -44,8 +32,11 @@ type ConversationMessage struct {
 
 	// Default model configuration for this turn. This can be empty and would mean that model param have been carried
 	// over from previous messages. Same for model ref.
-	ModelParam     *inferenceSpec.ModelParam `json:"modelParam,omitempty"`
-	ModelPresetRef *ModelPresetRef           `json:"modelPresetRef,omitempty"`
+	ModelParam *inferenceSpec.ModelParam `json:"modelParam,omitempty"`
+
+	// ModelRef is the durable Artifact-backed model identity used by new
+	// conversations.
+	ModelRef *artifact.ArtifactRef `json:"modelRef,omitempty"`
 
 	// Canonical, lossless events for this turn, in the order they occurred.
 	//

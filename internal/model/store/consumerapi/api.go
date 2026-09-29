@@ -130,6 +130,17 @@ func (a *API) ListProviders(
 			Revision:    entry.Revision,
 			BuiltIn:     a.protection.IsProtectedRoot(entry.RootID),
 		}
+		overlay, found, err := a.overlays.GetProviderOverlay(
+			ctx,
+			entry.Ref(),
+		)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			item.CredentialConfigured = overlay.CredentialRef != ""
+			item.RuntimeOverlayRevision = overlay.Revision
+		}
 		if entry.Definition != nil {
 			item.DefinitionDigest = entry.Definition.Digest
 			item.Description = entry.Definition.Description

@@ -1,7 +1,4 @@
-import type { ProviderName } from '@/spec/inference';
-import type { ProviderPreset } from '@/spec/modelpreset';
-import type { AuthKeyMeta } from '@/spec/setting';
-import { AuthKeyTypeProvider } from '@/spec/setting';
+import type { ModelProviderListItem } from '@/spec/model';
 
 const DEFAULT_PROVIDER_NAME_HINTS = ['openai', 'anthropic', 'gemini', 'google', 'openrouter'];
 
@@ -9,46 +6,39 @@ function normaliseProviderText(value: string) {
 	return value.toLowerCase().replaceAll(/[^a-z0-9]/g, '');
 }
 
-function providerDisplayName(providerPresets: Record<ProviderName, ProviderPreset>, providerName: string) {
-	return providerPresets[providerName]?.displayName || providerName;
+function providerDisplayName(providers: ModelProviderListItem[], providerName: string) {
+	return providers.find(item => item.name === providerName)?.displayName || providerName;
 }
 
-export function getConfiguredProviderNames(authKeys: AuthKeyMeta[]) {
-	return authKeys
-		.filter(key => key.type === AuthKeyTypeProvider && key.nonEmpty)
-		.map(key => key.keyName)
-		.filter(Boolean);
+export function getConfiguredProviderNames(providers: ModelProviderListItem[]) {
+	return providers.filter(item => item.credentialConfigured).map(item => item.name);
 }
 
-export function pickDefaultProviderName(providerPresets: Record<ProviderName, ProviderPreset>) {
-	const entries = Object.entries(providerPresets);
-	if (entries.length === 0) {
+export function pickDefaultProviderName(providers: ModelProviderListItem[]) {
+	if (providers.length === 0) {
 		return null;
 	}
 
 	for (const hint of DEFAULT_PROVIDER_NAME_HINTS) {
-		const match = entries.find(([providerName, preset]) => {
-			const values = [providerName, preset.displayName ?? ''].map(v => normaliseProviderText(v));
+		const match = providers.find(item => {
+			const values = [item.name, item.displayName ?? ''].map(v => normaliseProviderText(v));
 			return values.some(value => value.includes(hint));
 		});
 
 		if (match) {
-			return match[0];
+			return match.name;
 		}
 	}
 
-	return entries[0][0];
+	return providers[0].name;
 }
 
-export function formatConfiguredProviderSummary(
-	configuredProviderNames: string[],
-	providerPresets: Record<ProviderName, ProviderPreset>
-) {
+export function formatConfiguredProviderSummary(configuredProviderNames: string[], providers: ModelProviderListItem[]) {
 	if (configuredProviderNames.length === 0) {
 		return '';
 	}
 
 	const [first, ...rest] = configuredProviderNames;
-	const firstName = providerDisplayName(providerPresets, first);
+	const firstName = providerDisplayName(providers, first);
 	return rest.length > 0 ? `${firstName} + ${rest.length} more` : firstName;
 }

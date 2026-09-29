@@ -14,16 +14,8 @@ export function DeleteAuthKey(arg1) {
   return window['go']['main']['AggregrateWrapper']['DeleteAuthKey'](arg1);
 }
 
-export function DeleteProviderPreset(arg1) {
-  return window['go']['main']['AggregrateWrapper']['DeleteProviderPreset'](arg1);
-}
-
-export function FetchCompletion(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['AggregrateWrapper']['FetchCompletion'](arg1, arg2, arg3, arg4, arg5, arg6);
-}
-
-export function PostProviderPreset(arg1) {
-  return window['go']['main']['AggregrateWrapper']['PostProviderPreset'](arg1);
+export function FetchCompletion(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['AggregrateWrapper']['FetchCompletion'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function SetAuthKey(arg1) {

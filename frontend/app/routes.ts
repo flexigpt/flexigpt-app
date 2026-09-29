@@ -10,7 +10,7 @@ export default [
 	route('tools', './tools/page.tsx'),
 	route('skills', './skills/page.tsx'),
 	route('workspaces', './workspaces/page.tsx'),
-	route('modelpresets', './modelpresets/page.tsx'),
+	route('models', './models/page.tsx'),
 	route('docs', './docs/page.tsx'),
 	route('settings', './settings/page.tsx'),
 ] satisfies RouteConfig;

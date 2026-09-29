@@ -592,3 +592,7 @@ export function normalizeStructuredDisplayObject<T extends object>(value: T): Re
 	const normalized = normalizeStructuredJSONStringDeep(value);
 	return isRecord(normalized) ? normalized : (value as Record<string, unknown>);
 }
+
+export function jsonEqual(left: unknown, right: unknown): boolean {
+	return JSON.stringify(left ?? null) === JSON.stringify(right ?? null);
+}

@@ -267,9 +267,8 @@ func (v ProviderOverlay) Validate() error {
 	// otherwise minimal synthetic declaration. The overlay shape can only
 	// carry fields that are already valid Provider declaration patches.
 	document := modelproviderv1.ProviderDocument{
-		Type: modelproviderv1.ModelProviderType,
-		Name: "overlay-provider",
-
+		Type:              modelproviderv1.ModelProviderType,
+		Name:              "overlay-provider",
 		Adapter:           "overlay.adapter",
 		Connection:        cloneRaw(v.Connection),
 		DefaultModel:      cloneReference(v.DefaultModel),
@@ -304,7 +303,6 @@ func (v ModelOverlay) Validate() error {
 	document := modelv1.ModelDocument{
 		Type: modelv1.ModelType,
 		Name: "overlay-model",
-
 		Provider: declaration.ArtifactNameReference{
 			Name: "overlay-provider",
 		},

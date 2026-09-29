@@ -2,13 +2,21 @@
 
 ## Status
 
-This is a proposed target architecture.
+This architecture is implemented for source-backed Provider and Model
+artifacts, compiled built-ins, independent lifecycle operations, runtime
+resolution, request patching, Model management UI, and Artifact-backed
+completion selection.
 
-The supplied code already has the required Artifact Store foundation, compiled built-in package lifecycle, protected built-in root, universal artifact enablement, and examples of external runtime adapters in Tool and MCP.
+The legacy `internal/modelpreset` implementation remains active exclusively
+for legacy consumers and the temporary Artifact fallback bridge. New Model
+management and completion workflows use `internal/model`.
 
-The legacy `internal/modelpreset` system remains unchanged during the first
-migration phases. The replacement Model Store is source-backed and must not
-import `inference-go` or legacy `modelpreset` packages.
+The following work remains intentionally pending and must not be reported as
+complete:
+
+- Explicit, dry-run-capable import of persisted legacy user data.
+- Generated-catalog runtime parity tests against the legacy catalog path.
+- A no-reverse-dependency test enforcing the Model Store boundary.
 
 ## 1. Goal
 
@@ -918,23 +926,25 @@ Do not place new artifact-backed types inside `internal/modelpreset`.
 
 | Work item                                              | Status in supplied code      | Required action                                 |
 | ------------------------------------------------------ | ---------------------------- | ----------------------------------------------- |
-| Artifact Store source-backed lifecycle                 | Available                    | Reuse unchanged                                 |
-| Protected built-in root and compiled catalog hydration | Available                    | Reuse unchanged                                 |
-| Universal artifact enablement                          | Available                    | Wrap for Model Provider and Model APIs          |
-| Generic external overlay pattern                       | Available through MCP design | Implement Model-specific overlay repository     |
-| Legacy ModelPresetStore                                | Existing and active          | Leave unchanged during migration                |
-| Legacy Artifact fallback                               | Existing                     | Keep only as transition bridge                  |
-| Placeholder `modelv1` declaration                      | Exists but insufficient      | Replace as breaking schema                      |
-| Provider artifact declaration                          | Missing                      | Implement `model.provider`                      |
-| Independent Model-to-Provider link                     | Missing                      | Implement in Model contract/domain              |
-| New Model Store facade                                 | Missing                      | Implement under `internal/model/store`          |
-| Inference catalog adapter                              | Missing                      | Implement outside Model Store core              |
-| Generated model built-ins                              | Missing                      | Implement using compiled package pattern        |
-| Model target mapper/aggregate                          | Missing                      | Implement analogous to Tool aggregate           |
-| Inference runtime adapter                              | Missing                      | Implement as outer dependency adapter           |
-| Built-in override policy                               | Missing                      | Implement settings-backed overlays              |
-| Legacy data migration                                  | Missing                      | Implement after new read/resolve path is stable |
-| Existing old code behavior                             | Working                      | Do not modify in initial phases                 |
+| Artifact Store source-backed lifecycle                 | Complete                     | Reused unchanged                                |
+| Protected built-in root and compiled catalog hydration | Complete                     | Reused unchanged                                |
+| Universal artifact enablement                          | Complete                     | Wrapped for Provider and Model APIs             |
+| Generic external overlay pattern                       | Complete                     | Model settings-backed overlay repository exists |
+| Legacy ModelPresetStore                                | Existing and active          | Retain only for legacy consumers                |
+| Legacy Artifact fallback                               | Existing                     | Retain only as transition bridge                |
+| Placeholder `modelv1` declaration                      | Complete                     | Replaced by Provider-linked schema              |
+| Provider artifact declaration                          | Complete                     | `model.provider` implemented                    |
+| Independent Model-to-Provider link                     | Complete                     | Provider references implemented                 |
+| New Model Store facade                                 | Complete                     | Implemented under `internal/model/store`        |
+| Inference catalog adapter                              | Complete                     | Implemented outside Model Store core            |
+| Generated model built-ins                              | Complete                     | Compiled independent packages                   |
+| Model target mapper/aggregate                          | Complete                     | Direct Artifact target mapping implemented      |
+| Inference runtime adapter                              | Complete                     | Runtime adapter and request patch implemented   |
+| Built-in override policy                               | Complete                     | Settings-backed overlays implemented            |
+| Frontend Model management and composer cutover         | Complete                     | Uses Artifact-backed Model identities           |
+| Legacy data migration                                  | Pending                      | Add explicit dry-run importer before retirement |
+| Catalog parity and dependency boundary tests           | Pending                      | Add before removing legacy fallback             |
+| Existing old code behavior                             | Preserved                    | Do not remove during coexistence                |
 
 ## Some implementation decisions
 

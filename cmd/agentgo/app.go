@@ -341,6 +341,7 @@ func (a *App) initManagers() {
 		artifactComposition.Sources,
 		artifactComposition.Discovery,
 		artifactComposition.Artifacts,
+		artifactComposition.Roots,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		artifactComposition.Topology,

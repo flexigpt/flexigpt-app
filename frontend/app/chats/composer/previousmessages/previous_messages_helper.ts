@@ -1,5 +1,5 @@
 import type { ConversationMessage } from '@/spec/conversation';
-import type { IncludePreviousMessages } from '@/spec/modelpreset';
+import type { IncludePreviousMessages } from '@/spec/model';
 import { InputKind, RoleEnum } from '@/spec/inference';
 
 function isInstructionMessage(message: ConversationMessage): boolean {

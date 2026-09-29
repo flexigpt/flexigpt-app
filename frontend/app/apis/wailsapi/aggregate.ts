@@ -1,7 +1,8 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ModelParam, ProviderName } from '@/spec/inference';
+import type { CompletionResponseBody, ModelParam } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
-import type { ModelPresetID, PostProviderPresetPayload } from '@/spec/modelpreset';
+import type { ModelRequestPatch } from '@/spec/model';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolSelection } from '@/spec/tool';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
@@ -21,9 +22,7 @@ import {
 	ApplyUnifiedDiff,
 	CancelCompletion,
 	DeleteAuthKey,
-	DeleteProviderPreset,
 	FetchCompletion,
-	PostProviderPreset,
 	SetAuthKey,
 } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
@@ -34,21 +33,6 @@ export class WailsAggregateAPI implements IAggregateAPI {
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
 		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
 		return requireWailsBody(resp as ApplyUnifiedDiffOut | null | undefined, 'ApplyUnifiedDiff');
-	}
-
-	async postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void> {
-		const r = {
-			ProviderName: requireNonBlankString(providerName, 'providerName'),
-			Body: payload as wailsSpec.PostProviderPresetRequestBody,
-		};
-		await PostProviderPreset(r as wailsSpec.PostProviderPresetRequest);
-	}
-
-	async deleteProviderPreset(providerName: ProviderName): Promise<void> {
-		const r = {
-			ProviderName: requireNonBlankString(providerName, 'providerName'),
-		};
-		await DeleteProviderPreset(r as wailsSpec.DeleteProviderPresetRequest);
 	}
 
 	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
@@ -74,8 +58,8 @@ export class WailsAggregateAPI implements IAggregateAPI {
 	// Implemented that in main App Wrapper than aiprovider go package.
 	// Wrapper redirects to providerSet after doing event handling
 	async fetchCompletion(
-		provider: ProviderName,
-		modelPresetID: ModelPresetID,
+		model: ArtifactRef,
+		requestPatch: ModelRequestPatch | undefined,
 		modelParams: ModelParam,
 		current: StoreConversationMessage,
 		history?: StoreConversationMessage[],
@@ -97,9 +81,9 @@ export class WailsAggregateAPI implements IAggregateAPI {
 		let thinkingCallbackId = '';
 		let abortHandler: (() => void) | undefined;
 		const body = {
-			modelParam: modelParams as wailsSpec.ModelParam,
-			current: current as wailsSpec.ConversationMessage,
 			history: (history ?? []) as wailsSpec.ConversationMessage[],
+			current: current as wailsSpec.ConversationMessage,
+			requestPatch: requestPatch,
 			toolSelections: (toolSelections ?? []) as wailsSpec.CompletionRequestBody['toolSelections'],
 			skillSessionID: skillSessionID ?? '',
 			...(mcpContext ? { mcpContext } : {}),
@@ -163,7 +147,7 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			}
 
 			completionStarted = true;
-			const responsePromise = FetchCompletion(provider, modelPresetID, body, textCallbackId, thinkingCallbackId, rid);
+			const responsePromise = FetchCompletion(model as never, body, textCallbackId, thinkingCallbackId, rid);
 			const resp = await Promise.race([responsePromise, abortPromise]);
 
 			if (resp === null || typeof resp !== 'object' || Array.isArray(resp)) {

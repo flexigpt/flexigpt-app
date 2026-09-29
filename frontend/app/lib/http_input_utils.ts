@@ -64,7 +64,7 @@ export function validateHTTPURLSecurity(raw: string, fieldLabel = 'URL'): string
 	}
 }
 
-export function validateHTTPHeaderName(name: string, fieldLabel = 'Header name'): string | undefined {
+function validateHTTPHeaderName(name: string, fieldLabel = 'Header name'): string | undefined {
 	const normalized = name.trim();
 	if (!normalized) {
 		return `${fieldLabel} is required.`;

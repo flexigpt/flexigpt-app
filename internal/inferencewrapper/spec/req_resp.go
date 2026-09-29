@@ -1,6 +1,8 @@
 package spec
 
 import (
+	"encoding/json"
+
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
@@ -52,6 +54,13 @@ type CompletionRequestBody struct {
 	//       * just Messages + Attachments and let the aggregator build
 	//         the InputUnion for this turn.
 	Current conversationSpec.ConversationMessage `json:"current"`
+
+	// RequestPatch is the final portable defaults layer. It has the shape:
+	//
+	// {"defaults": { ...model defaults patch... }, "clear": ["reasoning"]}
+	//
+	// It is applied after all Provider and Model source/overlay layers.
+	RequestPatch json.RawMessage `json:"requestPatch,omitempty"`
 
 	// ToolSelections is the set of mapped Tool targets that should be enabled
 	// for this call.

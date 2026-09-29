@@ -17,8 +17,8 @@ export function HomeAuthKeyModalIntro({ onNavigateAway }: { onNavigateAway: () =
 
 			<p className="text-base-content/70 text-xs">
 				Need local, Ollama, llama.cpp or a custom compatible endpoint? Configure it in{' '}
-				<Link to="/modelpresets/" className="link" onClick={onNavigateAway}>
-					Model Presets{' '}
+				<Link to="/models/" className="link" onClick={onNavigateAway}>
+					Models{' '}
 				</Link>{' '}
 				first.
 				<br />
@@ -33,17 +33,17 @@ export function HomeAuthKeyModalIntro({ onNavigateAway }: { onNavigateAway: () =
 }
 
 export function ProviderSetupStatus({
-	settingsLoaded,
+	providersLoaded,
 	hasUsableProviderKey,
 	providerSummary,
 	onAddKey,
 }: {
-	settingsLoaded: boolean;
+	providersLoaded: boolean;
 	hasUsableProviderKey: boolean;
 	providerSummary: string;
 	onAddKey: () => void;
 }) {
-	if (!settingsLoaded) {
+	if (!providersLoaded) {
 		return null;
 	}
 

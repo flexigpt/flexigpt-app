@@ -3,7 +3,7 @@ import { useCallback } from 'react';
 
 import type { Conversation, ConversationMessage } from '@/spec/conversation';
 import type { InferenceError, ModelParam, UIToolCall } from '@/spec/inference';
-import type { ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 import type { ToolSelection } from '@/spec/tool';
 import { RoleEnum, Status } from '@/spec/inference';
 
@@ -35,6 +35,7 @@ import {
 	initConversationMessage,
 	shouldPersistAssistantModelParam,
 } from '@/chats/conversation/hydration_helper';
+import { buildRequestPatch } from '@/models/lib/model_defaults';
 import { requiresComposerToolResponse } from '@/tools/lib/tool_call_utils';
 
 interface UseSendMessageArgs {
@@ -91,9 +92,18 @@ export function useSendMessage({
 	loadAssistantTurnForTab,
 }: UseSendMessageArgs) {
 	const updateStreamingMessage = useCallback(
-		async (tabId: string, updatedChatWithUserMessage: Conversation, options: UIChatOption, skillSessionID?: string) => {
+		async (
+			tabId: string,
+			updatedChatWithUserMessage: Conversation,
+			options: UIModelOption,
+			skillSessionID?: string
+		) => {
 			if (!tabExists(tabId)) {
 				return;
+			}
+
+			if (!options.model) {
+				throw new Error('Select an available Artifact-backed model before sending.');
 			}
 
 			const abortRef = getAbortRef(tabId);
@@ -185,10 +195,7 @@ export function useSendMessage({
 				additionalParametersRawJSON: options.additionalParametersRawJSON,
 			};
 
-			const effectiveModelPresetRef: ModelPresetRef = {
-				providerName: options.providerName,
-				modelPresetID: options.modelPresetID,
-			};
+			const effectiveModelRef = options.model;
 
 			const persistedAssistantModelParam = shouldPersistAssistantModelParam(
 				updatedChatWithUserMessage.messages,
@@ -207,8 +214,8 @@ export function useSendMessage({
 				}
 
 				const { responseMessage, rawResponse } = await HandleCompletion(
-					options.providerName,
-					options.modelPresetID,
+					effectiveModelRef,
+					buildRequestPatch(options),
 					inputParams,
 					effectiveCurrentUserMsg,
 					history,
@@ -299,7 +306,7 @@ export function useSendMessage({
 
 					const persistedAssistantMessage = applyAssistantPersistenceContext(
 						finalResponseMessage,
-						effectiveModelPresetRef,
+						effectiveModelRef,
 						persistedAssistantModelParam
 					);
 
@@ -334,7 +341,7 @@ export function useSendMessage({
 							preferStreamedText: true,
 							includeStreamedThinking: true,
 						}),
-						effectiveModelPresetRef,
+						effectiveModelRef,
 						persistedAssistantModelParam
 					);
 
@@ -383,7 +390,7 @@ export function useSendMessage({
 								terminalLine: '> Generation stopped before the API returned a final response.',
 								includeStreamedThinking: true,
 							}),
-							effectiveModelPresetRef,
+							effectiveModelRef,
 							persistedAssistantModelParam
 						);
 
@@ -422,7 +429,7 @@ export function useSendMessage({
 							preferStreamedText: true,
 							includeStreamedThinking: true,
 						}),
-						effectiveModelPresetRef,
+						effectiveModelRef,
 						persistedAssistantModelParam
 					);
 
@@ -492,7 +499,7 @@ export function useSendMessage({
 	);
 
 	const sendMessageForTab = useCallback(
-		async (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => {
+		async (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => {
 			const tab = tabsRef.current.find(t => t.tabId === tabId);
 			if (!tab) {
 				return;
@@ -512,18 +519,14 @@ export function useSendMessage({
 				return;
 			}
 
-			const sendOptions: UIChatOption = {
+			const sendOptions: UIModelOption = {
 				...options,
 				systemPrompt: payload.resolvedSystemPrompt?.trim() || '',
 			};
 			const editingId = tab.editingMessageId ?? undefined;
+			const modelRef = sendOptions.model;
 
-			const modelPresetRef: ModelPresetRef = {
-				providerName: sendOptions.providerName,
-				modelPresetID: sendOptions.modelPresetID,
-			};
-
-			const userMsg = buildUserConversationMessageFromEditor(payload, editingId, modelPresetRef);
+			const userMsg = buildUserConversationMessageFromEditor(payload, editingId, modelRef);
 
 			if (tab.editingMessageId) {
 				const idx = tab.conversation.messages.findIndex(message => message.id === tab.editingMessageId);

@@ -1,6 +1,6 @@
 import { memo, useCallback, useMemo } from 'react';
 
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 
 import type { ShortcutConfig } from '@/lib/keyboard_shortcuts';
 
@@ -17,7 +17,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	setInputRef: (tabId: string) => (inst: ComposerBoxHandle | null) => void;
 	getAbortRef: (tabId: string) => { current: AbortController | null };
 	shortcutConfig: ShortcutConfig;
-	sendMessage: (tabId: string, payload: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
+	sendMessage: (tabId: string, payload: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
 	cancelEditing: (tabId: string) => void;
 }) {
 	const {
@@ -36,7 +36,7 @@ export const TabInputPane = memo(function TabInputPane(props: {
 	const composerRef = useMemo(() => setInputRef(tabId), [setInputRef, tabId]);
 
 	const onSend = useCallback(
-		(payload: EditorSubmitPayload, options: UIChatOption) => sendMessage(tabId, payload, options),
+		(payload: EditorSubmitPayload, options: UIModelOption) => sendMessage(tabId, payload, options),
 		[sendMessage, tabId]
 	);
 	const onCancelEditing = useCallback(() => {

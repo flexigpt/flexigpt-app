@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { ConversationMessage } from '@/spec/conversation';
 import type {
 	CompletionResponseBody,
@@ -5,7 +6,6 @@ import type {
 	InferenceUsage,
 	ModelParam,
 	OutputUnion,
-	ProviderName,
 	ReasoningContent,
 	ToolCall,
 	ToolOutput,
@@ -15,7 +15,7 @@ import type {
 	WebSearchToolOutputItemUnion,
 } from '@/spec/inference';
 import type { MCPConversationContext, MCPProviderToolMapping, MCPRuntimeServerID, MCPToolSelection } from '@/spec/mcp';
-import type { ModelPresetID } from '@/spec/modelpreset';
+import type { ModelRequestPatch } from '@/spec/model';
 import type { ToolSelection, ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import { CitationKind, ContentItemKind, OutputKind, RoleEnum, Status, UIToolCallStatus } from '@/spec/inference';
 import { isMCPApprovalRule, isMCPAppVisibility, isMCPExecutionMode } from '@/spec/mcp';
@@ -24,7 +24,7 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { aggregateAPI } from '@/apis/baseapi';
+import { modelManagementAPI } from '@/apis/baseapi';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
@@ -36,8 +36,8 @@ import {
 } from '@/tools/lib/tool_output_utils';
 
 export async function HandleCompletion(
-	provider: ProviderName,
-	modelPresetID: ModelPresetID,
+	model: ArtifactRef,
+	requestPatch: ModelRequestPatch | undefined,
 	modelParams: ModelParam,
 	currentUserMsg: ConversationMessage,
 	history: ConversationMessage[],
@@ -57,10 +57,9 @@ export async function HandleCompletion(
 		(currentUserMsg.uiToolChoices ?? []).map(choice => [choice.choiceID, choice])
 	);
 
-	const resp = await aggregateAPI.fetchCompletion(
-		provider,
-		modelPresetID,
-		modelParams,
+	const resp = await modelManagementAPI.fetchCompletion(
+		model,
+		requestPatch,
 		currentUserMsg,
 		history,
 		toolSelections,

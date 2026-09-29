@@ -168,6 +168,42 @@ func cloneRawMessage(value json.RawMessage) json.RawMessage {
 	return append(json.RawMessage(nil), value...)
 }
 
+// ValidateDefaultsPatch validates one portable request/defaults patch using
+// the same schema and secret checks as a source-backed Model declaration.
+//
+// The runtime request layer intentionally accepts only the `defaults` shape.
+// It cannot change Model identity, Provider linkage, or providerModelID.
+func ValidateDefaultsPatch(raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return fmt.Errorf("model defaults patch: %w", err)
+	}
+
+	envelope := map[string]json.RawMessage{
+		"type":            json.RawMessage(`"model"`),
+		"name":            json.RawMessage(`"request-patch-model"`),
+		"provider":        json.RawMessage(`{"name":"request-patch-provider"}`),
+		"providerModelID": json.RawMessage(`"request-patch-model"`),
+		"defaults":        canonical,
+	}
+	encoded, err := json.Marshal(envelope)
+	if err != nil {
+		return err
+	}
+
+	if _, err := DecodeModelJSON(encoded); err != nil {
+		return fmt.Errorf("model defaults patch: %w", err)
+	}
+	return nil
+}
+
 func validatePatchObject(
 	label string,
 	raw json.RawMessage,

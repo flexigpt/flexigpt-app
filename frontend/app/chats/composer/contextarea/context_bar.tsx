@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FiSliders } from 'react-icons/fi';
 
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
 
 import { actionTriggerChipButtonClasses, ActionTriggerChipContent } from '@/components/action_trigger_chip';
@@ -123,7 +123,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 						? context.isHybridReasoningEnabled
 						: Boolean(context.selectedModel.reasoning)
 				}
-				onSave={(updatedModel: UIChatOption) => {
+				onSave={(updatedModel: UIModelOption) => {
 					context.applyAdvancedModel(updatedModel);
 				}}
 			/>

@@ -157,7 +157,9 @@
 			"enumMembers"
 		],
 		"ignore": [
-			"app/apis/wailsjs/**"
+			"app/apis/wailsjs/**",
+			"app/lib/**",
+			"app/spec/model.ts"
 		],
 		"ignoreBinaries": [],
 		"ignoreDependencies": [

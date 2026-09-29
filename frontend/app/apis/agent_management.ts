@@ -3,7 +3,6 @@ import type { AgentCapabilityOccurrence, AgentImportDestination, AgentResolution
 import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
 import type { CollectionListItem, CollectionView } from '@/spec/collection';
 import type { MCPConversationContext, MCPRuntimeServerID } from '@/spec/mcp';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { ArtifactSkillSummary, RuntimeSkillRenderResult, SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { AgentSkillUseMode, AgentTextInsert } from '@/spec/agent';
@@ -18,7 +17,8 @@ import { getErrorMessage } from '@/lib/error_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import type { IAgentStoreAPI, IModelPresetStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import type { IAgentStoreAPI, IToolTargetResolver } from '@/apis/interface';
+import type { ModelManagementAPI } from '@/apis/model_management';
 import { toolStoreChoiceFromSelection } from '@/apis/tool_management';
 
 import { toolIdentityKey } from '@/tools/lib/tool_identity_utils';
@@ -91,7 +91,7 @@ export interface PreparedAgentStarter {
 	agent: AgentView;
 	resolution: AgentResolution;
 
-	modelPresetRef?: ModelPresetRef;
+	modelRef?: ArtifactRef;
 	includeModelSystemPrompt?: boolean;
 
 	toolSelections: AgentPreparedToolSelection[];
@@ -117,10 +117,6 @@ export interface PreparedAgentStarter {
 
 function artifactRefKey(ref: ArtifactRef): string {
 	return `${ref.rootID}:${ref.artifactID}`;
-}
-
-function modelPresetRefKey(ref: ModelPresetRef): string {
-	return `${ref.providerName}/${ref.modelPresetID}`;
 }
 
 function mappedTargetLabel(target: MappedTarget): string {
@@ -242,7 +238,7 @@ export class AgentManagementAPI {
 	constructor(
 		private readonly agents: IAgentStoreAPI,
 		private readonly tools: IToolTargetResolver,
-		private readonly models: IModelPresetStoreAPI,
+		private readonly models: ModelManagementAPI,
 		private readonly mcp: AgentMCPRuntimeResolver,
 		private readonly skills: AgentSkillResolver
 	) {}
@@ -413,7 +409,7 @@ export class AgentManagementAPI {
 		const mcpServerIDs = new Set<MCPRuntimeServerID>();
 		const startingTextParts: string[] = [];
 
-		let modelPresetRef: ModelPresetRef | undefined;
+		let modelRef: ArtifactRef | undefined;
 		let includeModelSystemPrompt: boolean | undefined;
 
 		for (const occurrence of resolution.capabilities.occurrences ?? []) {
@@ -428,8 +424,8 @@ export class AgentManagementAPI {
 						issue(
 							issues,
 							'error',
-							'agent.recipe.model-mapped-target-missing',
-							'Resolved Agent Model is missing its mapped Model Preset target.',
+							'agent.recipe.model-target-missing',
+							'Resolved Agent Model is missing its mapped model target.',
 							occurrence.path
 						);
 						continue;
@@ -438,13 +434,14 @@ export class AgentManagementAPI {
 					try {
 						const resolvedModel = await this.models.resolveMappedModelTarget(occurrence.mapped);
 						const includeOverride = occurrence.includeSystemPrompt;
+						const resolvedRef = resolvedModel.list.ref;
 
-						if (modelPresetRef && modelPresetRefKey(modelPresetRef) !== modelPresetRefKey(resolvedModel)) {
+						if (modelRef && artifactRefKey(modelRef) !== artifactRefKey(resolvedRef)) {
 							issue(
 								issues,
 								'error',
 								'agent.recipe.multiple-models',
-								'An Agent starter recipe must resolve to exactly one Model Preset.',
+								'An Agent starter recipe must resolve to exactly one model.',
 								occurrence.path
 							);
 							continue;
@@ -465,7 +462,7 @@ export class AgentManagementAPI {
 							continue;
 						}
 
-						modelPresetRef = resolvedModel;
+						modelRef = resolvedRef;
 						includeModelSystemPrompt = includeOverride ?? includeModelSystemPrompt;
 					} catch (error) {
 						issue(
@@ -771,7 +768,7 @@ export class AgentManagementAPI {
 		return {
 			agent: resolution.agent,
 			resolution,
-			modelPresetRef,
+			modelRef,
 			includeModelSystemPrompt,
 			toolSelections: [...toolSelections.values()],
 			enabledSkillRefs: [...enabledSkillRefs.values()],

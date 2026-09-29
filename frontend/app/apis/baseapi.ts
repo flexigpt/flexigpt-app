@@ -12,7 +12,8 @@ import type {
 	IMCPAggregateAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
-	IModelPresetStoreAPI,
+	IModelAggregateAPI,
+	IModelStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
 	ISkillRuntimeAPI,
@@ -25,6 +26,7 @@ import type {
 } from '@/apis/interface';
 import { AgentManagementAPI } from '@/apis/agent_management';
 import { MCPManagementAPI } from '@/apis/mcp_management';
+import { ModelManagementAPI } from '@/apis/model_management';
 import { SkillManagementAPI } from '@/apis/skill_management';
 import { ToolManagementAPI } from '@/apis/tool_management';
 // oxlint-disable-next-line import/no-namespace
@@ -32,6 +34,8 @@ import * as wailsImpl from '@/apis/wailsapi';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
+import { WailsModelAggregateAPI } from '@/apis/wailsapi/model_aggregate';
+import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
 import { WailsSkillStoreAPI } from '@/apis/wailsapi/skill_store';
@@ -50,7 +54,9 @@ export let conversationStoreAPI: IConversationStoreAPI;
 export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 
-export let modelPresetStoreAPI: IModelPresetStoreAPI;
+let modelStoreAPI: IModelStoreAPI;
+let modelAggregateAPI: IModelAggregateAPI;
+export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
 let toolAggregateAPI: IToolAggregateAPI;
@@ -86,7 +92,9 @@ if (IS_WAILS_PLATFORM) {
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 
-	modelPresetStoreAPI = new wailsImpl.WailsModelPresetStoreAPI();
+	modelStoreAPI = new WailsModelStoreAPI();
+	modelAggregateAPI = new WailsModelAggregateAPI();
+	modelManagementAPI = new ModelManagementAPI(modelStoreAPI, modelAggregateAPI);
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
 
@@ -103,7 +111,7 @@ if (IS_WAILS_PLATFORM) {
 		skillStoreAPI,
 		skillAggregateAPI,
 		toolManagementAPI,
-		modelPresetStoreAPI
+		modelManagementAPI
 	);
 
 	mcpStoreAPI = new WailsMCPStoreAPI();
@@ -114,13 +122,13 @@ if (IS_WAILS_PLATFORM) {
 		mcpAggregateAPI,
 		mcpRuntimeAPI,
 		toolManagementAPI,
-		modelPresetStoreAPI
+		modelManagementAPI
 	);
 
 	agentManagementAPI = new AgentManagementAPI(
 		agentStoreAPI,
 		toolManagementAPI,
-		modelPresetStoreAPI,
+		modelManagementAPI,
 		mcpManagementAPI,
 		skillManagementAPI
 	);
@@ -131,7 +139,7 @@ if (IS_WAILS_PLATFORM) {
 		workspaceStoreAPI,
 		workspaceRuntimeAPI,
 		toolManagementAPI,
-		modelPresetStoreAPI
+		modelManagementAPI
 	);
 } else {
 	// Error for unsupported platforms

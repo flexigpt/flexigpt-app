@@ -3,7 +3,7 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import type { IncludePreviousMessages } from '@/spec/modelpreset';
+import type { IncludePreviousMessages } from '@/spec/model';
 
 import {
 	actionTriggerChipButtonClasses,

@@ -7,11 +7,11 @@ import { useTitleBarContent } from '@/hooks/use_title_bar';
 import {
 	agentManagementAPI,
 	mcpManagementAPI,
+	modelManagementAPI,
 	skillManagementAPI,
 	toolManagementAPI,
 	workspaceManagementAPI,
 } from '@/apis/baseapi';
-import { invalidateComposerModelCatalog } from '@/apis/model_management';
 
 import { PageFrame } from '@/components/page_frame';
 
@@ -71,7 +71,7 @@ export default function ChatsPage() {
 			agentManagementAPI.invalidateAgentCatalog();
 			mcpManagementAPI.invalidateComposerMCPDeclarations();
 			workspaceManagementAPI.invalidateComposerWorkspaceCatalog();
-			invalidateComposerModelCatalog();
+			modelManagementAPI.invalidateCatalog();
 		};
 	}, []);
 

@@ -1,42 +1,44 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
-import type { IncludePreviousMessages, ModelPresetRef, UIChatOption } from '@/spec/modelpreset';
+import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
-import { DefaultUIChatOptions } from '@/spec/modelpreset';
+import { DefaultUIModelOption } from '@/spec/model';
 
-import { getChatInputOptions } from '@/apis/model_management';
+import { modelManagementAPI } from '@/apis/baseapi';
 
 import {
 	getSupportedReasoningLevels,
-	sanitizeUIChatOptionByCapabilities,
+	sanitizeUIModelOptionByCapabilities,
 	supportsOutputVerbosity,
-} from '@/modelpresets/lib/capabilities_override';
+} from '@/models/lib/capabilities';
+import { modelRefEqual } from '@/models/lib/document';
 
 function hasOwn(value: object, key: string): boolean {
 	return Object.hasOwn(value, key);
 }
 
-function isHybridReasoningModel(model: UIChatOption): boolean {
+function isHybridReasoningModel(model: UIModelOption): boolean {
 	return model.reasoning?.type === ReasoningType.HybridWithTokens;
 }
 
-function pickUniqueModelOption(options: UIChatOption[]): UIChatOption | undefined {
+function pickUniqueModelOption(options: UIModelOption[]): UIModelOption | undefined {
 	return options.length === 1 ? options[0] : undefined;
 }
 
 function applyPersistedModelParam(
-	base: UIChatOption,
+	base: UIModelOption,
 	modelParam?: ModelParam,
 	options?: { preserveName?: boolean }
-): UIChatOption {
+): UIModelOption {
 	if (!modelParam) {
-		return sanitizeUIChatOptionByCapabilities(base);
+		return sanitizeUIModelOptionByCapabilities(base);
 	}
 
-	const next: UIChatOption = {
+	const next: UIModelOption = {
 		...base,
 		stream: modelParam.stream,
 		maxPromptLength: modelParam.maxPromptLength,
@@ -84,34 +86,21 @@ function applyPersistedModelParam(
 		delete next.additionalParametersRawJSON;
 	}
 
-	return sanitizeUIChatOptionByCapabilities(next);
+	return sanitizeUIModelOptionByCapabilities(next);
 }
 
 function findRestorableModelOption(
-	allOptions: UIChatOption[],
-	modelPresetRef?: ModelPresetRef,
+	allOptions: UIModelOption[],
+	modelRef?: ArtifactRef,
 	modelParam?: ModelParam
-): UIChatOption | undefined {
-	const providerName = modelPresetRef?.providerName?.trim();
-	const modelPresetID = modelPresetRef?.modelPresetID?.trim();
+): UIModelOption | undefined {
 	const modelName = modelParam?.name?.trim();
 
-	const providerOptions = providerName ? allOptions.filter(option => option.providerName === providerName) : allOptions;
-
-	if (providerName && modelPresetID) {
-		const direct = providerOptions.find(option => option.modelPresetID === modelPresetID);
+	if (modelRef) {
+		const direct = allOptions.find(option => modelRefEqual(option.model, modelRef));
 		if (direct) {
 			return direct;
 		}
-	}
-
-	if (providerName && modelName) {
-		const byName = pickUniqueModelOption(providerOptions.filter(option => option.name === modelName));
-		if (byName) {
-			return byName;
-		}
-
-		return pickUniqueModelOption(providerOptions.filter(option => option.modelDisplayName === modelName));
 	}
 
 	if (modelName) {
@@ -127,12 +116,12 @@ function findRestorableModelOption(
 }
 
 function resolveRestoredSelectedModel(
-	allOptions: UIChatOption[],
-	fallback: UIChatOption,
-	modelPresetRef?: ModelPresetRef,
+	allOptions: UIModelOption[],
+	fallback: UIModelOption,
+	modelRef?: ArtifactRef,
 	modelParam?: ModelParam
-): UIChatOption {
-	const resolved = findRestorableModelOption(allOptions, modelPresetRef, modelParam);
+): UIModelOption {
+	const resolved = findRestorableModelOption(allOptions, modelRef, modelParam);
 
 	if (resolved) {
 		return applyPersistedModelParam(resolved, modelParam, {
@@ -146,11 +135,11 @@ function resolveRestoredSelectedModel(
 }
 
 function buildChatOptions(
-	selectedModel: UIChatOption,
+	selectedModel: UIModelOption,
 	includePreviousMessages: IncludePreviousMessages,
 	isHybridReasoningEnabled: boolean
-): UIChatOption {
-	const base: UIChatOption = {
+): UIModelOption {
+	const base: UIModelOption = {
 		...selectedModel,
 		includePreviousMessages,
 	};
@@ -163,26 +152,26 @@ function buildChatOptions(
 		delete next.reasoning;
 
 		if (next.temperature === undefined) {
-			next.temperature = DefaultUIChatOptions.temperature;
+			next.temperature = DefaultUIModelOption.temperature;
 		}
 
-		return sanitizeUIChatOptionByCapabilities(next);
+		return sanitizeUIModelOptionByCapabilities(next);
 	}
 
-	return sanitizeUIChatOptionByCapabilities(base);
+	return sanitizeUIModelOptionByCapabilities(base);
 }
 
 export interface ComposerContextController {
-	chatOptions: UIChatOption;
+	chatOptions: UIModelOption;
 
-	selectedModel: UIChatOption;
-	allOptions: UIChatOption[];
+	selectedModel: UIModelOption;
+	allOptions: UIModelOption[];
 	modelOptionsLoaded: boolean;
 
 	isHybridReasoningEnabled: boolean;
 	includePreviousMessages: IncludePreviousMessages;
 
-	handleSetSelectedModel: Dispatch<SetStateAction<UIChatOption>>;
+	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
 	handleSetIsHybridReasoningEnabled: Dispatch<SetStateAction<boolean>>;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
 
@@ -191,32 +180,32 @@ export interface ComposerContextController {
 	setHybridTokens(tokens: number): void;
 	setOutputVerbosity(verbosity?: OutputVerbosity): void;
 
-	applyAdvancedModel(updatedModel: UIChatOption): void;
-	restoreConversationContext(context: RestorableConversationContext): UIChatOption | null;
-	resetForNewConversation(): UIChatOption;
+	applyAdvancedModel(updatedModel: UIModelOption): void;
+	restoreConversationContext(context: RestorableConversationContext): UIModelOption | null;
+	resetForNewConversation(): UIModelOption;
 
 	verbosityEnabled: boolean;
 	reasoningLevelOptions: ReasoningLevel[];
 }
 
 export function useComposerContextState(): ComposerContextController {
-	const [selectedModel, setSelectedModel] = useState(DefaultUIChatOptions);
-	const [allOptions, setAllOptions] = useState([DefaultUIChatOptions]);
+	const [selectedModel, setSelectedModel] = useState(DefaultUIModelOption);
+	const [allOptions, setAllOptions] = useState([DefaultUIModelOption]);
 	const [modelOptionsLoaded, setModelOptionsLoaded] = useState(false);
 	const [isHybridReasoningEnabled, setIsHybridReasoningEnabled] = useState(true);
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
-		DefaultUIChatOptions.includePreviousMessages
+		DefaultUIModelOption.includePreviousMessages
 	);
 
 	const selectedModelRef = useRef(selectedModel);
 	const allOptionsRef = useRef(allOptions);
-	const defaultModelRef = useRef(DefaultUIChatOptions);
+	const defaultModelRef = useRef(DefaultUIModelOption);
 	const hybridReasoningRef = useRef(isHybridReasoningEnabled);
 	const pendingRestoreRef = useRef<RestorableConversationContext | null>(null);
 
 	const applySelectedModel = useCallback(
 		(
-			update: SetStateAction<UIChatOption>,
+			update: SetStateAction<UIModelOption>,
 			options?: {
 				syncHybridReasoning?: boolean;
 			}
@@ -235,9 +224,9 @@ export function useComposerContextState(): ComposerContextController {
 		[]
 	);
 
-	const applyRestoredContext = useCallback((context: RestorableConversationContext, options: UIChatOption[]) => {
-		const fallback = defaultModelRef.current ?? options[0] ?? DefaultUIChatOptions;
-		const next = resolveRestoredSelectedModel(options, fallback, context.modelPresetRef, context.modelParam);
+	const applyRestoredContext = useCallback((context: RestorableConversationContext, options: UIModelOption[]) => {
+		const fallback = defaultModelRef.current ?? options[0] ?? DefaultUIModelOption;
+		const next = resolveRestoredSelectedModel(options, fallback, context.modelRef, context.modelParam);
 
 		selectedModelRef.current = next;
 		hybridReasoningRef.current = isHybridReasoningModel(next);
@@ -252,24 +241,25 @@ export function useComposerContextState(): ComposerContextController {
 	useEffect(() => {
 		let cancelled = false;
 
-		void getChatInputOptions()
+		void modelManagementAPI
+			.getCatalog()
 			.then(result => {
 				if (cancelled) {
 					return;
 				}
 
-				const nextDefault = sanitizeUIChatOptionByCapabilities(result.default);
+				const nextDefault = sanitizeUIModelOptionByCapabilities(result.defaultOption);
 
-				allOptionsRef.current = result.allOptions;
+				allOptionsRef.current = result.options;
 				defaultModelRef.current = nextDefault;
 
-				setAllOptions(result.allOptions);
+				setAllOptions(result.options);
 				setModelOptionsLoaded(true);
 
 				const pendingRestore = pendingRestoreRef.current;
 				if (pendingRestore) {
 					pendingRestoreRef.current = null;
-					applyRestoredContext(pendingRestore, result.allOptions);
+					applyRestoredContext(pendingRestore, result.options);
 					return;
 				}
 
@@ -292,7 +282,7 @@ export function useComposerContextState(): ComposerContextController {
 	}, [applyRestoredContext]);
 
 	const handleSetSelectedModel = useCallback(
-		(update: SetStateAction<UIChatOption>) => {
+		(update: SetStateAction<UIModelOption>) => {
 			applySelectedModel(update, {
 				syncHybridReasoning: true,
 			});
@@ -374,8 +364,8 @@ export function useComposerContextState(): ComposerContextController {
 	);
 
 	const applyAdvancedModel = useCallback(
-		(updated: UIChatOption) => {
-			applySelectedModel(sanitizeUIChatOptionByCapabilities(updated));
+		(updated: UIModelOption) => {
+			applySelectedModel(sanitizeUIModelOptionByCapabilities(updated));
 		},
 		[applySelectedModel]
 	);
@@ -398,8 +388,8 @@ export function useComposerContextState(): ComposerContextController {
 	const resetForNewConversation = useCallback(() => {
 		pendingRestoreRef.current = null;
 
-		const next = sanitizeUIChatOptionByCapabilities(
-			defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIChatOptions
+		const next = sanitizeUIModelOptionByCapabilities(
+			defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption
 		);
 
 		selectedModelRef.current = next;
@@ -434,7 +424,7 @@ export function useComposerContextState(): ComposerContextController {
 		applyAdvancedModel,
 		restoreConversationContext,
 		resetForNewConversation,
-		verbosityEnabled: supportsOutputVerbosity(selectedModel.capabilitiesOverride),
-		reasoningLevelOptions: getSupportedReasoningLevels(selectedModel.capabilitiesOverride),
+		verbosityEnabled: supportsOutputVerbosity(selectedModel.capabilities),
+		reasoningLevelOptions: getSupportedReasoningLevels(selectedModel.capabilities),
 	};
 }

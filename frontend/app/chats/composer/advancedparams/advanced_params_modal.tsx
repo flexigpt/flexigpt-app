@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
 import type { CacheControlKind, JSONSchemaParam, OutputParam } from '@/spec/inference';
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
@@ -15,7 +15,7 @@ import { ModalActions } from '@/components/modal/modal_actions';
 import { ModalDialog } from '@/components/modal/modal_dialog';
 import { ModalHeader } from '@/components/modal/modal_header';
 
-import type { CacheControlTTLSelection } from '@/modelpresets/lib/cache_control_utils';
+import type { CacheControlTTLSelection } from '@/models/lib/cache_control';
 import {
 	buildCacheControlFromForm,
 	buildCacheControlKindDropdownItems,
@@ -24,21 +24,21 @@ import {
 	getInitialCacheControlTTLSelection,
 	resolveSupportedCacheControlKinds,
 	resolveSupportedCacheControlTTLs,
-} from '@/modelpresets/lib/cache_control_utils';
+} from '@/models/lib/cache_control';
 import {
 	getEffectiveCacheCapabilities,
 	getStopSequencesPolicy,
 	getSupportedOutputFormats,
 	getTopLevelCacheControlCapabilities,
 	supportsReasoningSummaryStyle,
-} from '@/modelpresets/lib/capabilities_override';
+} from '@/models/lib/capabilities';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;
 	onClose: () => void;
-	currentModel: UIChatOption;
+	currentModel: UIModelOption;
 	effectiveReasoningEnabled?: boolean;
-	onSave: (updatedModel: UIChatOption) => void;
+	onSave: (updatedModel: UIModelOption) => void;
 }
 
 type OutputFormatChoice = 'default' | 'text' | 'jsonSchema';
@@ -104,7 +104,7 @@ function isPlainObject(v: any): boolean {
 }
 
 function getInitialOutputFormatChoice(
-	currentModel: UIChatOption,
+	currentModel: UIModelOption,
 	supportedOutputFormats: OutputFormatKind[] | undefined
 ): OutputFormatChoice {
 	const kind = currentModel.outputParam?.format?.kind;
@@ -123,7 +123,7 @@ function getInitialOutputFormatChoice(
 }
 
 function getInitialReasoningSummaryStyle(
-	currentModel: UIChatOption,
+	currentModel: UIModelOption,
 	summaryStyleSupported: boolean
 ): SummaryStyleChoice {
 	return summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : '';
@@ -152,8 +152,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 	const { requestClose } = useModalDialogController();
 	const maxPromptLengthInputRef = useRef<HTMLInputElement | null>(null);
 	const supportedOutputFormats = useMemo(
-		() => getSupportedOutputFormats(currentModel.capabilitiesOverride),
-		[currentModel.capabilitiesOverride]
+		() => getSupportedOutputFormats(currentModel.capabilities),
+		[currentModel.capabilities]
 	);
 
 	const outputFormatItems: Record<OutputFormatChoice, { isEnabled: boolean; displayName: string }> = useMemo(() => {
@@ -170,12 +170,12 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 	const reasoningEnabled = effectiveReasoningEnabled ?? !!currentModel.reasoning;
 
 	const effectiveCacheCapabilities = useMemo(
-		() => getEffectiveCacheCapabilities(currentModel.providerSDKType, currentModel.capabilitiesOverride),
-		[currentModel.capabilitiesOverride, currentModel.providerSDKType]
+		() => getEffectiveCacheCapabilities(currentModel.providerSDKType, currentModel.capabilities),
+		[currentModel.capabilities, currentModel.providerSDKType]
 	);
 	const topLevelCacheCapabilities = useMemo(
-		() => getTopLevelCacheControlCapabilities(currentModel.providerSDKType, currentModel.capabilitiesOverride),
-		[currentModel.capabilitiesOverride, currentModel.providerSDKType]
+		() => getTopLevelCacheControlCapabilities(currentModel.providerSDKType, currentModel.capabilities),
+		[currentModel.capabilities, currentModel.providerSDKType]
 	);
 	const supportedCacheKinds = useMemo(
 		() => resolveSupportedCacheControlKinds(topLevelCacheCapabilities?.supportedKinds, currentModel.cacheControl),
@@ -190,12 +190,9 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		topLevelCacheCapabilities?.supportsKey === true || Boolean(currentModel.cacheControl?.key?.trim());
 	const supportsAutomaticProviderCaching = effectiveCacheCapabilities?.supportsAutomaticCaching === true;
 
-	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilitiesOverride);
+	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilities);
 
-	const stopPolicy = useMemo(
-		() => getStopSequencesPolicy(currentModel.capabilitiesOverride),
-		[currentModel.capabilitiesOverride]
-	);
+	const stopPolicy = useMemo(() => getStopSequencesPolicy(currentModel.capabilities), [currentModel.capabilities]);
 
 	const stopSequencesDisabledBecauseReasoning = stopPolicy.disallowedWithReasoning && reasoningEnabled;
 
@@ -389,7 +386,6 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		const timeoutErr = validateNumberField('timeout', timeoutSec);
 
 		const stopErr = validateStopSequences(stopSequencesText);
-
 		const { nameErr, schemaErr } = validateJSONSchema(outputFormatChoice);
 
 		const nextCacheControl = buildCacheControlFromForm({
@@ -398,7 +394,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			supportedKinds: supportedCacheKinds,
 			ttlSelection: cacheControlTTL,
 			key: cacheControlKey,
-			supportsTTL: true,
+			supportsTTL: topLevelCacheCapabilities?.supportsTTL ?? true,
 			supportsKey: supportsCacheKey,
 		});
 
@@ -471,7 +467,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			} else {
 				r.summaryStyle = reasoningSummaryStyle;
 			}
-			return r as UIChatOption['reasoning'];
+			return r as UIModelOption['reasoning'];
 		})();
 
 		const nextStopSequences = (() => {
@@ -486,7 +482,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			return parsed ? parsed.slice(0, stopPolicy.maxSequences) : undefined;
 		})();
 
-		const updatedModel: UIChatOption = {
+		const updatedModel: UIModelOption = {
 			...currentModel,
 			stream,
 			maxPromptLength: parsePositiveIntAllowBlank(maxPromptLength) ?? currentModel.maxPromptLength,
@@ -917,7 +913,9 @@ export function AdvancedParamsModal({
 		return null;
 	}
 
-	const modelIdentity = `${currentModel.providerName}::${currentModel.modelPresetID}`;
+	const modelIdentity = currentModel.model
+		? `${currentModel.model.rootID}::${currentModel.model.artifactID}`
+		: `${currentModel.providerName}::${currentModel.logicalName}`;
 
 	return (
 		<ModalDialog isOpen={isOpen} onClose={onClose}>

@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -37,6 +38,14 @@ func (s *Service) ResolveRuntimeModel(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (inferenceadapter.RuntimeConfiguration, error) {
+	return s.ResolveRuntimeModelWithRequestPatch(ctx, ref, nil)
+}
+
+func (s *Service) ResolveRuntimeModelWithRequestPatch(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	requestPatch json.RawMessage,
+) (inferenceadapter.RuntimeConfiguration, error) {
 	if err := s.ready(ctx); err != nil {
 		return inferenceadapter.RuntimeConfiguration{}, err
 	}
@@ -45,7 +54,7 @@ func (s *Service) ResolveRuntimeModel(
 	if err != nil {
 		return inferenceadapter.RuntimeConfiguration{}, err
 	}
-	return s.runtime.Resolve(ctx, resolved)
+	return s.runtime.ResolveWithRequestPatch(ctx, resolved, requestPatch)
 }
 
 func (s *Service) MapModelTarget(

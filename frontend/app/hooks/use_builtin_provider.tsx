@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react';
 
-import type { ProviderName } from '@/spec/inference';
-import type { ProviderPreset } from '@/spec/modelpreset';
+import type { ModelProviderListItem } from '@/spec/model';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
-import { getAllProviderPresetsMap } from '@/apis/model_management';
+import { modelManagementAPI } from '@/apis/baseapi';
 
 let builtInAuthKeys: ReadonlySet<AuthKeyName> | null = null;
 let initPromise: Promise<void> | null = null;
@@ -16,22 +15,17 @@ export function initBuiltIns(): Promise<void> {
 	} // already started
 
 	initPromise = (async () => {
-		/* One single call to the remote/helper func */
-		const allPresets = await getAllProviderPresetsMap(true);
-		const builtIns = filterBuiltInPresets(allPresets);
+		const items = await modelManagementAPI.listProviders();
+		const builtIns = filterBuiltInProviders(items);
 
-		/* No need for a second fetch – just derive the key set now. */
-		builtInAuthKeys = Object.freeze(new Set(Object.keys(builtIns)));
+		builtInAuthKeys = Object.freeze(new Set(builtIns.map(item => item.name)));
 	})();
 
 	return initPromise;
 }
 
-function filterBuiltInPresets(presets: Record<ProviderName, ProviderPreset>): Record<ProviderName, ProviderPreset> {
-	return Object.fromEntries(Object.entries(presets).filter(([, p]) => p.isBuiltIn)) as Record<
-		ProviderName,
-		ProviderPreset
-	>;
+function filterBuiltInProviders(items: ModelProviderListItem[]): ModelProviderListItem[] {
+	return items.filter(item => item.builtIn);
 }
 
 function getBuiltInProviderAuthKeyNamesSync(): ReadonlySet<AuthKeyName> {

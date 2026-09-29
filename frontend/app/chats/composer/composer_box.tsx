@@ -5,7 +5,7 @@ import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { UIToolCall } from '@/spec/inference';
 import type { MCPAppModelContextUpdate } from '@/spec/mcp';
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolStoreChoice } from '@/spec/tool';
 import { SkillSessionSyncMode } from '@/spec/skill';
@@ -31,7 +31,7 @@ import { EditorArea } from '@/chats/composer/editor/editor_area';
 import { useAgentSystemPrompt } from '@/chats/composer/skills/use_agent_system_prompt';
 
 export interface ComposerBoxHandle {
-	getUIChatOptions(): UIChatOption;
+	getUIModelOption(): UIModelOption;
 	focus(): void;
 	resetEditor(): void;
 	resetForNewConversation(): Promise<void>;
@@ -63,7 +63,7 @@ export interface ComposerBoxHandle {
 }
 
 interface ComposerBoxProps {
-	onSend: (message: EditorSubmitPayload, options: UIChatOption) => Promise<void>;
+	onSend: (message: EditorSubmitPayload, options: UIModelOption) => Promise<void>;
 	isBusy: boolean;
 	isHydrating: boolean;
 	abortRef: RefObject<AbortController | null>;
@@ -154,7 +154,7 @@ export const ComposerBox = memo(
 		useImperativeHandle(
 			ref,
 			() => ({
-				getUIChatOptions: () => composerContext.chatOptions,
+				getUIModelOption: () => composerContext.chatOptions,
 				focus: () => editorAreaRef.current?.focus(),
 				resetEditor: () => editorAreaRef.current?.resetEditor(),
 				resetForNewConversation,

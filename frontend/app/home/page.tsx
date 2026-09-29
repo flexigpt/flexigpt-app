@@ -3,15 +3,12 @@ import { FiArrowRight, FiBookOpen, FiHome } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-import type { ProviderName } from '@/spec/inference';
-import type { ProviderPreset } from '@/spec/modelpreset';
-import type { AuthKeyMeta } from '@/spec/setting';
+import type { ModelProviderListItem } from '@/spec/model';
 
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
 import type { AgentCatalogOption } from '@/apis/agent_management';
-import { agentManagementAPI, settingstoreAPI } from '@/apis/baseapi';
-import { getAllProviderPresetsMap } from '@/apis/model_management';
+import { agentManagementAPI, modelManagementAPI } from '@/apis/baseapi';
 
 import { PageFrame } from '@/components/page_frame';
 
@@ -41,31 +38,29 @@ export default function HomePage() {
 		[]
 	);
 
-	const [authKeys, setAuthKeys] = useState<AuthKeyMeta[]>([]);
-	const [settingsLoadRequestId, setSettingsLoadRequestId] = useState(0);
-	const [settingsLoadedRequestId, setSettingsLoadedRequestId] = useState<number | null>(null);
-	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
+	const [providerItems, setProviderItems] = useState<ModelProviderListItem[]>([]);
+	const [providersLoaded, setProvidersLoaded] = useState(false);
+	const [providersReloadRequestId, setProvidersReloadRequestId] = useState(0);
 	const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
 	const [agentOptions, setAgentOptions] = useState<AgentCatalogOption[]>([]);
 	const [agentsLoading, setAgentsLoading] = useState(true);
 
-	const settingsLoaded = settingsLoadedRequestId === settingsLoadRequestId;
-
 	useEffect(() => {
 		let cancelled = false;
-		const requestId = settingsLoadRequestId;
+		// oxlint-disable-next-line react/set-state-in-effect
+		setProvidersLoaded(false);
 
 		void (async () => {
 			try {
-				const settings = await settingstoreAPI.getSettings();
+				const items = await modelManagementAPI.listProviders();
 				if (!cancelled) {
-					setAuthKeys(settings.authKeys);
+					setProviderItems(items);
 				}
 			} catch (err) {
-				console.error('Failed to load home auth-key setup state', err);
+				console.error('Failed to load model providers for home setup', err);
 			} finally {
 				if (!cancelled) {
-					setSettingsLoadedRequestId(requestId);
+					setProvidersLoaded(true);
 				}
 			}
 		})();
@@ -73,26 +68,7 @@ export default function HomePage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [settingsLoadRequestId]);
-
-	useEffect(() => {
-		let cancelled = false;
-
-		void (async () => {
-			try {
-				const providers = await getAllProviderPresetsMap(true);
-				if (!cancelled) {
-					setProviderPresets(providers);
-				}
-			} catch (err) {
-				console.error('Failed to load provider presets for home setup', err);
-			}
-		})();
-
-		return () => {
-			cancelled = true;
-		};
-	}, []);
+	}, [providersReloadRequestId]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -118,13 +94,13 @@ export default function HomePage() {
 		};
 	}, []);
 
-	const configuredProviderNames = useMemo(() => getConfiguredProviderNames(authKeys), [authKeys]);
+	const configuredProviderNames = useMemo(() => getConfiguredProviderNames(providerItems), [providerItems]);
 	const hasUsableProviderKey = configuredProviderNames.length > 0;
 	const providerSummary = useMemo(
-		() => formatConfiguredProviderSummary(configuredProviderNames, providerPresets),
-		[configuredProviderNames, providerPresets]
+		() => formatConfiguredProviderSummary(configuredProviderNames, providerItems),
+		[configuredProviderNames, providerItems]
 	);
-	const defaultProviderName = useMemo(() => pickDefaultProviderName(providerPresets), [providerPresets]);
+	const defaultProviderName = useMemo(() => pickDefaultProviderName(providerItems), [providerItems]);
 
 	const resolvedWorkflowStarters = useMemo(
 		() =>
@@ -148,7 +124,7 @@ export default function HomePage() {
 							icon={<img src="/icon.png" alt="FlexiGPT" width={64} height={64} />}
 						/>
 						<ProviderSetupStatus
-							settingsLoaded={settingsLoaded}
+							providersLoaded={providersLoaded}
 							hasUsableProviderKey={hasUsableProviderKey}
 							providerSummary={providerSummary}
 							onAddKey={() => {
@@ -208,7 +184,7 @@ export default function HomePage() {
 			<AddEditAuthKeyModal
 				isOpen={apiKeyModalOpen}
 				initial={null}
-				existing={authKeys}
+				existing={[]}
 				providerOnly={true}
 				defaultKeyName={defaultProviderName}
 				intro={
@@ -222,7 +198,7 @@ export default function HomePage() {
 					setApiKeyModalOpen(false);
 				}}
 				onChanged={() => {
-					setSettingsLoadRequestId(requestId => requestId + 1);
+					setProvidersReloadRequestId(requestId => requestId + 1);
 				}}
 			/>
 		</PageFrame>

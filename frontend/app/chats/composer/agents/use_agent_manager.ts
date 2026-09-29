@@ -1,7 +1,8 @@
+import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { UIChatOption } from '@/spec/modelpreset';
+import type { UIModelOption } from '@/spec/model';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
@@ -9,12 +10,13 @@ import type { AgentCatalogOption, AgentPreparedInstructionSource, PreparedAgentS
 import { agentManagementAPI } from '@/apis/baseapi';
 
 import type { AgentSystemPromptController } from '@/chats/composer/skills/use_agent_system_prompt';
+import { modelRefEqual } from '@/models/lib/document';
 
 interface AgentComposerContext {
-	selectedModel: UIChatOption;
-	allOptions: UIChatOption[];
+	selectedModel: UIModelOption;
+	allOptions: UIModelOption[];
 	modelOptionsLoaded: boolean;
-	handleSetSelectedModel: (next: UIChatOption) => void;
+	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
 }
 
 interface AgentRuntimeApplier {
@@ -212,16 +214,12 @@ export function useAgentManager(
 
 				let nextModel = context.selectedModel;
 
-				if (recipe.modelPresetRef) {
-					const resolvedModel = context.allOptions.find(
-						model =>
-							model.providerName === recipe.modelPresetRef?.providerName &&
-							model.modelPresetID === recipe.modelPresetRef?.modelPresetID
-					);
+				if (recipe.modelRef) {
+					const resolvedModel = context.allOptions.find(o => modelRefEqual(o.model, recipe.modelRef));
 
 					if (!resolvedModel) {
 						setActionError(
-							`Agent Model "${recipe.modelPresetRef.providerName}/${recipe.modelPresetRef.modelPresetID}" is not currently selectable in Composer.`
+							`Agent model "${recipe.modelRef.rootID}/${recipe.modelRef.artifactID}" is not currently selectable in Composer.`
 						);
 						return false;
 					}

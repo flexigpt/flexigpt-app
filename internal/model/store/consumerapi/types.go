@@ -112,6 +112,9 @@ type ProviderListItem struct {
 	Revision         uint64            `json:"revision"`
 	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
 	BuiltIn          bool              `json:"builtIn"`
+
+	CredentialConfigured   bool   `json:"credentialConfigured"`
+	RuntimeOverlayRevision uint64 `json:"runtimeOverlayRevision"`
 }
 
 type ModelListItem struct {

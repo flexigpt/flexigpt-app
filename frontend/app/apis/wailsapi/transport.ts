@@ -75,10 +75,6 @@ export function requireNonBlankString(value: unknown, field: string): string {
 	return value;
 }
 
-export function omitUndefined<T extends Record<string, unknown>>(value: T): Partial<T> {
-	return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined)) as Partial<T>;
-}
-
 export async function collectAllPages<T>(
 	fetchPage: (pageToken: string | undefined) => Promise<{ items: T[]; nextPageToken?: string }>,
 	maxPages = DEFAULT_MAX_PAGES

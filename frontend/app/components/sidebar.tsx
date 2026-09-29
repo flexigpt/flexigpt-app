@@ -123,11 +123,11 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
-								to="/modelpresets/"
+								to="/models/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
-								aria-label="Model Presets"
-								title="Model Presets"
+								aria-label="Models"
+								title="Models"
 							>
 								<FiSliders size={24} />
 							</Link>

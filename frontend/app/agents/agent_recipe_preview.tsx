@@ -77,7 +77,7 @@ export function AgentRecipePreview({ resolution }: AgentRecipePreviewProps) {
 			<div className="grid gap-3 md:grid-cols-2">
 				<ManagementItemCard
 					title="Model"
-					subtitle={recipe.modelPresetRef ? modelLabel || 'Selected model' : 'No Agent model selection'}
+					subtitle={recipe.modelRef ? modelLabel || 'Selected model' : 'No Agent model selection'}
 					metadata={
 						recipe.includeModelSystemPrompt !== undefined ? (
 							<MetadataPill label="Include model system prompt">

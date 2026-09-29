@@ -2,8 +2,7 @@ import type { ChangeEvent, ReactNode, SubmitEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
-import type { ProviderName } from '@/spec/inference';
-import type { ProviderPreset } from '@/spec/modelpreset';
+import type { ModelProviderListItem } from '@/spec/model';
 import type { AuthKeyMeta } from '@/spec/setting';
 import { AuthKeyTypeProvider } from '@/spec/setting';
 
@@ -11,8 +10,7 @@ import { omitManyKeys } from '@/lib/obj_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { aggregateAPI } from '@/apis/baseapi';
-import { getAllProviderPresetsMap } from '@/apis/model_management';
+import { aggregateAPI, modelManagementAPI } from '@/apis/baseapi';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -101,8 +99,8 @@ function AddEditAuthKeyModalContent({
 	const [errors, setErrors] = useState<FormErrors>({});
 	const [submitError, setSubmitError] = useState('');
 
-	/* raw provider presets fetched from backend */
-	const [providerPresets, setProviderPresets] = useState<Record<ProviderName, ProviderPreset>>({});
+	/* raw model providers fetched from backend */
+	const [providerItems, setProviderItems] = useState<ModelProviderListItem[]>([]);
 
 	const { requestClose, unmountingRef } = useModalDialogController();
 
@@ -115,16 +113,16 @@ function AddEditAuthKeyModalContent({
 		[existing]
 	);
 
-	/* provider presets still AVAILABLE for creating new key */
-	const availableProviderPresets = useMemo(() => {
-		// First-run/provider-only setup should allow selecting any provider preset.
+	/* model providers still AVAILABLE for creating new key */
+	const availableProviders = useMemo(() => {
+		// First-run/provider-only setup should allow selecting any provider.
 		// If a built-in empty auth-key metadata row already exists, submitting will update it.
 		// That is exactly what a novice user expects when choosing a provider and pasting a key.
 		if (providerOnly && !isEdit && !isPrefilled) {
-			return providerPresets;
+			return providerItems;
 		}
 
-		const allowed = new Set<ProviderName>();
+		const allowed = new Set<string>();
 
 		// allow the current provider name when editing OR when pre-filled
 		if (isEdit && initial?.type === AuthKeyTypeProvider) {
@@ -134,26 +132,19 @@ function AddEditAuthKeyModalContent({
 			allowed.add(prefill.keyName);
 		}
 
-		const out: Record<ProviderName, ProviderPreset> = {};
-		Object.entries(providerPresets).forEach(([name, preset]) => {
-			const providerName = name;
-			if (!usedProviderNames.has(name) || allowed.has(providerName)) {
-				out[providerName] = preset;
-			}
-		});
-		return out;
-	}, [providerOnly, providerPresets, usedProviderNames, isEdit, initial, isPrefilled, prefill]);
+		return providerItems.filter(item => !usedProviderNames.has(item.name) || allowed.has(item.name));
+	}, [providerOnly, providerItems, usedProviderNames, isEdit, initial, isPrefilled, prefill]);
 
 	/* dropdown items for provider-name selection (create-mode only) */
 	const providerDropdownItems = useMemo(() => {
-		const obj: Record<ProviderName, DropdownItem> = {};
-		Object.keys(availableProviderPresets).forEach(name => {
-			obj[name] = {
+		const obj: Record<string, DropdownItem> = {};
+		for (const item of availableProviders) {
+			obj[item.name] = {
 				isEnabled: true,
 			};
-		});
+		}
 		return obj;
-	}, [availableProviderPresets]);
+	}, [availableProviders]);
 
 	/* whether *no* provider is available to create a new key for */
 	const noProviderAvailable =
@@ -169,11 +160,11 @@ function AddEditAuthKeyModalContent({
 		return obj;
 	}, [existingTypes]);
 
-	const hasProviderPresets = Object.keys(providerPresets).length > 0;
+	const hasProviders = providerItems.length > 0;
 
-	/* fetch provider presets once needed */
+	/* fetch model providers once needed */
 	useEffect(() => {
-		if (formData.type !== AuthKeyTypeProvider || hasProviderPresets) {
+		if (formData.type !== AuthKeyTypeProvider || hasProviders) {
 			return;
 		}
 
@@ -181,19 +172,19 @@ function AddEditAuthKeyModalContent({
 
 		void (async () => {
 			try {
-				const prov = await getAllProviderPresetsMap(true);
+				const items = await modelManagementAPI.listProviders();
 				if (!cancelled) {
-					setProviderPresets(prov);
+					setProviderItems(items);
 				}
 			} catch (err) {
-				console.error('Failed fetching provider presets', err);
+				console.error('Failed fetching model providers', err);
 			}
 		})();
 
 		return () => {
 			cancelled = true;
 		};
-	}, [formData.type, hasProviderPresets]);
+	}, [formData.type, hasProviders]);
 
 	const checkDuplicate = useCallback(
 		(t: string, n: string) =>
@@ -308,7 +299,7 @@ function AddEditAuthKeyModalContent({
 		});
 	};
 
-	const handleKeyNameSelect = (k: ProviderName) => {
+	const handleKeyNameSelect = (k: string) => {
 		const nextState: FormData = { ...formData, keyName: k };
 		setFormData(nextState);
 		setErrors(prev => validateField('keyName', k, nextState, prev));
@@ -435,13 +426,13 @@ function AddEditAuthKeyModalContent({
 							>
 								{!isReadOnly && formData.type === AuthKeyTypeProvider ? (
 									Object.keys(providerDropdownItems).length > 0 ? (
-										<Dropdown<ProviderName>
+										<Dropdown<string>
 											dropdownItems={providerDropdownItems}
 											selectedKey={formData.keyName}
 											onChange={handleKeyNameSelect}
 											filterDisabled={false}
 											title="Select provider"
-											getDisplayName={k => availableProviderPresets[k].displayName || k}
+											getDisplayName={k => availableProviders.find(item => item.name === k)?.displayName || k}
 											inlineMenu
 											maxMenuHeight={220}
 										/>

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
@@ -246,6 +247,17 @@ func (a *RuntimeAdapter) Resolve(
 	ctx context.Context,
 	resolved modelConsumerAPI.ResolvedModel,
 ) (RuntimeConfiguration, error) {
+	return a.ResolveWithRequestPatch(ctx, resolved, nil)
+}
+
+// ResolveWithRequestPatch applies the final, caller-owned portable defaults
+// patch after adapter, Provider, Provider-overlay, Model, and Model-overlay
+// layers. The patch cannot modify source identity or credentials.
+func (a *RuntimeAdapter) ResolveWithRequestPatch(
+	ctx context.Context,
+	resolved modelConsumerAPI.ResolvedModel,
+	requestPatchRaw json.RawMessage,
+) (RuntimeConfiguration, error) {
 	if a == nil {
 		return RuntimeConfiguration{}, basespec.ErrClosed
 	}
@@ -259,6 +271,11 @@ func (a *RuntimeAdapter) Resolve(
 		return RuntimeConfiguration{}, err
 	}
 	if err := cryptoutil.ValidateDigest(resolved.Fingerprint); err != nil {
+		return RuntimeConfiguration{}, err
+	}
+
+	requestPatch, err := decodeRuntimeRequestPatch(requestPatchRaw)
+	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
 
@@ -322,11 +339,13 @@ func (a *RuntimeAdapter) Resolve(
 		resolved.ProviderOverlay.Defaults,
 		resolved.Model.Document.Defaults,
 		resolved.ModelOverlay.Defaults,
+		requestPatch.Defaults,
 	)
 	if err != nil {
 		return RuntimeConfiguration{}, err
 	}
 
+	// Adapter parameters replace atomically by layer.
 	for _, raw := range []json.RawMessage{
 		resolved.Provider.Document.AdapterParameters,
 		resolved.ProviderOverlay.AdapterParameters,
@@ -341,6 +360,20 @@ func (a *RuntimeAdapter) Resolve(
 			return RuntimeConfiguration{}, err
 		}
 		defaults["adapterParameters"] = value
+	}
+
+	if len(requestPatch.Defaults) != 0 {
+		requestDefaults, err := decodeObjectMap(requestPatch.Defaults)
+		if err != nil {
+			return RuntimeConfiguration{}, err
+		}
+		if adapterParameters, found := requestDefaults["adapterParameters"]; found {
+			defaults["adapterParameters"] = adapterParameters
+		}
+	}
+
+	for _, field := range requestPatch.Clear {
+		delete(defaults, field)
 	}
 
 	modelParam, err := modelParamFromDefaults(
@@ -366,10 +399,12 @@ func (a *RuntimeAdapter) Resolve(
 		ResolvedFingerprint cryptoutil.Digest `json:"resolvedFingerprint"`
 		AdapterVersion      string            `json:"adapterVersion"`
 		CredentialVersion   string            `json:"credentialVersion,omitempty"`
+		RequestPatch        cryptoutil.Digest `json:"requestPatch,omitempty"`
 	}{
 		ResolvedFingerprint: resolved.Fingerprint,
 		AdapterVersion:      definition.Version,
 		CredentialVersion:   credential.Version,
+		RequestPatch:        requestPatch.Digest,
 	})
 	if err != nil {
 		return RuntimeConfiguration{}, err
@@ -635,6 +670,79 @@ func decodeObject(
 		return err
 	}
 	return json.Unmarshal(canonical, target)
+}
+
+type runtimeRequestPatch struct {
+	Defaults  json.RawMessage   `json:"defaults,omitempty"`
+	Clear     []string          `json:"clear,omitempty"`
+	Canonical json.RawMessage   `json:"-"`
+	Digest    cryptoutil.Digest `json:"-"`
+}
+
+func decodeRuntimeRequestPatch(
+	raw json.RawMessage,
+) (runtimeRequestPatch, error) {
+	if len(raw) == 0 {
+		return runtimeRequestPatch{}, nil
+	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return runtimeRequestPatch{}, fmt.Errorf(
+			"model runtime request patch: %w",
+			err,
+		)
+	}
+
+	var output runtimeRequestPatch
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		canonical,
+		&output,
+		basespec.MaxDefinitionBodyBytes,
+	); err != nil {
+		return runtimeRequestPatch{}, fmt.Errorf(
+			"%w: decode Model runtime request patch: %w",
+			basespec.ErrInvalid,
+			err,
+		)
+	}
+	if err := modelv1.ValidateDefaultsPatch(output.Defaults); err != nil {
+		return runtimeRequestPatch{}, err
+	}
+
+	allowedClear := map[string]struct{}{
+		"adapterParameters": {},
+		"cacheControl":      {},
+		"output":            {},
+		"reasoning":         {},
+		"stopSequences":     {},
+		"temperature":       {},
+	}
+	seen := make(map[string]struct{}, len(output.Clear))
+	for _, field := range output.Clear {
+		if _, allowed := allowedClear[field]; !allowed {
+			return runtimeRequestPatch{}, fmt.Errorf(
+				"%w: unsupported Model runtime request clear field %q",
+				basespec.ErrInvalid,
+				field,
+			)
+		}
+		if _, duplicate := seen[field]; duplicate {
+			return runtimeRequestPatch{}, fmt.Errorf(
+				"%w: duplicate Model runtime request clear field %q",
+				basespec.ErrInvalid,
+				field,
+			)
+		}
+		seen[field] = struct{}{}
+	}
+
+	output.Canonical = canonical
+	output.Digest = cryptoutil.DigestBytes(canonical)
+	return output, nil
 }
 
 type defaultsWire struct {

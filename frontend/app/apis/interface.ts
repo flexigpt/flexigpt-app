@@ -40,7 +40,7 @@ import type {
 	UpdateCollectionRequest,
 } from '@/spec/collection';
 import type { ConversationSearchItem, StoreConversation, StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ModelParam, ProviderName, ToolChoice } from '@/spec/inference';
+import type { CompletionResponseBody, ToolChoice } from '@/spec/inference';
 import type {
 	InvokeMCPToolRequestBody,
 	ManagedMCPCreateRequest,
@@ -80,14 +80,19 @@ import type {
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
-	ModelPresetID,
-	ModelPresetRef,
-	PatchModelPresetPayload,
-	PatchProviderPresetPayload,
-	PostModelPresetPayload,
-	PostProviderPresetPayload,
-	ProviderPreset,
-} from '@/spec/modelpreset';
+	ManagedModelCreateRequest,
+	ManagedModelReplaceRequest,
+	ManagedModelResult,
+	ManagedProviderCreateRequest,
+	ManagedProviderReplaceRequest,
+	ManagedProviderResult,
+	ModelListItem,
+	ModelProviderListItem,
+	ModelProviderRuntimeOverlayView,
+	ModelProviderView,
+	ModelRequestPatch,
+	ModelView,
+} from '@/spec/model';
 import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	ArtifactSkillFilter,
@@ -165,35 +170,54 @@ export interface ISettingStoreAPI {
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
 }
 
-export interface IModelPresetStoreAPI {
-	getDefaultProvider(): Promise<ProviderName>;
+export interface IModelStoreAPI {
+	listModelProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]>;
 
-	patchDefaultProvider(providerName: ProviderName): Promise<void>;
+	listModels(rootID?: ArtifactRootID): Promise<ModelListItem[]>;
 
-	patchProviderPreset(providerName: ProviderName, payload: PatchProviderPresetPayload): Promise<void>;
+	getModelProvider(ref: ArtifactRef): Promise<ModelProviderView>;
 
-	postModelPreset(
-		providerName: ProviderName,
-		modelPresetID: ModelPresetID,
-		payload: PostModelPresetPayload
-	): Promise<void>;
+	getModel(ref: ArtifactRef): Promise<ModelView>;
 
-	patchModelPreset(
-		providerName: ProviderName,
-		modelPresetID: ModelPresetID,
-		payload: PatchModelPresetPayload
-	): Promise<void>;
+	createModelProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult>;
 
-	deleteModelPreset(providerName: ProviderName, modelPresetID: ModelPresetID): Promise<void>;
+	replaceModelProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult>;
 
-	listProviderPresets(
-		names?: ProviderName[],
-		includeDisabled?: boolean,
-		pageSize?: number,
-		pageToken?: string
-	): Promise<{ providers: ProviderPreset[]; nextPageToken?: string }>;
+	deleteModelProvider(ref: ArtifactRef, expectedRevision: number): Promise<void>;
 
-	resolveMappedModelTarget(target: MappedTarget): Promise<ModelPresetRef>;
+	createManagedModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult>;
+
+	replaceManagedModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult>;
+
+	deleteManagedModel(ref: ArtifactRef, expectedRevision: number): Promise<void>;
+
+	setModelProviderEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
+
+	setModelEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
+
+	setModelProviderCredential(
+		ref: ArtifactRef,
+		expectedOverlayRevision: number,
+		secret: string
+	): Promise<ModelProviderRuntimeOverlayView>;
+}
+
+export interface IModelAggregateAPI {
+	fetchCompletion(
+		model: ArtifactRef,
+		requestPatch: ModelRequestPatch | undefined,
+		current: StoreConversationMessage,
+		history?: StoreConversationMessage[],
+		toolSelections?: ToolSelection[],
+		mcpContext?: MCPConversationContext,
+		skillSessionID?: string,
+		requestID?: string,
+		signal?: AbortSignal,
+		onStreamTextData?: (text: string) => void,
+		onStreamThinkingData?: (thinking: string) => void
+	): Promise<CompletionResponseBody | undefined>;
+
+	cancelCompletion(requestID: string): Promise<void>;
 }
 
 export interface IToolRuntimeAPI {
@@ -473,29 +497,8 @@ export interface IAttachmentsDropAPI {
 
 export interface IAggregateAPI {
 	applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut>;
-
-	postProviderPreset(providerName: ProviderName, payload: PostProviderPresetPayload): Promise<void>;
-	deleteProviderPreset(providerName: ProviderName): Promise<void>;
-
 	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
 	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
-
-	fetchCompletion(
-		provider: ProviderName,
-		modelPresetID: ModelPresetID,
-		modelParams: ModelParam,
-		current: StoreConversationMessage,
-		history?: StoreConversationMessage[],
-		toolSelections?: ToolSelection[],
-		mcpContext?: MCPConversationContext,
-		skillSessionID?: string,
-		requestId?: string,
-		signal?: AbortSignal,
-		onStreamTextData?: (textData: string) => void,
-		onStreamThinkingData?: (thinkingData: string) => void
-	): Promise<CompletionResponseBody | undefined>;
-
-	cancelCompletion(requestId: string): Promise<void>;
 }
 
 export interface IMCPStoreAPI {

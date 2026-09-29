@@ -211,9 +211,10 @@ func (w *AggregrateWrapper) FetchCompletion(
 			w.completionCancelMux.Unlock()
 		}()
 
-		runtimeModel, err := w.modelAggregate.ResolveRuntimeModel(
+		runtimeModel, err := w.modelAggregate.ResolveRuntimeModelWithRequestPatch(
 			ctx,
 			model,
+			completionData.RequestPatch,
 		)
 		if err != nil {
 			return nil, err

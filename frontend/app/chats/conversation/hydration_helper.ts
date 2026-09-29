@@ -1,3 +1,4 @@
+import type { ArtifactRef } from '@/spec/artifact';
 import type { Attachment } from '@/spec/attachment';
 import type { Conversation, ConversationMessage, RestorableConversationContext } from '@/spec/conversation';
 import type {
@@ -11,7 +12,6 @@ import type {
 	UIToolOutput,
 } from '@/spec/inference';
 import type { MCPAppModelContextUpdate, MCPConversationContext } from '@/spec/mcp';
-import type { ModelPresetRef } from '@/spec/modelpreset';
 import type { SkillRef } from '@/spec/skill';
 import type { ToolSelectionIssue, ToolStoreChoice } from '@/spec/tool';
 import type { WorkspaceConversationSelection } from '@/spec/workspace';
@@ -142,13 +142,13 @@ function deriveWorkspaceSelectionFromMessages(
 	return undefined;
 }
 
-function findLastModelPresetRef(messages: ConversationMessage[]): ModelPresetRef | undefined {
+function findLastModelRef(messages: ConversationMessage[]): ArtifactRef | undefined {
 	for (let i = messages.length - 1; i >= 0; i -= 1) {
-		const ref = messages[i].modelPresetRef;
+		const ref = messages[i].modelRef;
 		if (!ref) {
 			continue;
 		}
-		if (!ref.providerName || !ref.modelPresetID) {
+		if (!ref.rootID || !ref.artifactID) {
 			continue;
 		}
 		return ref;
@@ -187,12 +187,12 @@ export function shouldPersistAssistantModelParam(messages: ConversationMessage[]
 
 export function applyAssistantPersistenceContext(
 	message: ConversationMessage,
-	modelPresetRef: ModelPresetRef,
+	modelRef: ArtifactRef,
 	modelParam?: ModelParam
 ): ConversationMessage {
 	const next = {
 		...message,
-		modelPresetRef,
+		modelRef,
 	} as ConversationMessage & { modelParam?: ModelParam };
 
 	if (modelParam) {
@@ -210,7 +210,7 @@ export function deriveRestorableConversationContextFromMessages(
 	const enabledSkillRefs = normalizeSkillRefs(deriveEnabledSkillRefsFromMessages(messages));
 	const activeSkillRefs = clampActiveSkillRefsToEnabled(enabledSkillRefs, deriveActiveSkillRefsFromMessages(messages));
 	return {
-		modelPresetRef: findLastModelPresetRef(messages),
+		modelRef: findLastModelRef(messages),
 		modelParam: findLastModelParam(messages),
 		toolChoices: deriveConversationToolsFromMessages(messages),
 		webSearchChoices: deriveWebSearchChoiceFromMessages(messages),
@@ -226,7 +226,7 @@ export function deriveRestorableConversationContextFromMessages(
 export function buildUserConversationMessageFromEditor(
 	payload: EditorSubmitPayload,
 	existingId?: string,
-	modelPresetRef?: ModelPresetRef
+	modelRef?: ArtifactRef
 ): ConversationMessage {
 	const now = new Date().toISOString();
 	const id = existingId ?? getUUIDv7();
@@ -301,7 +301,7 @@ export function buildUserConversationMessageFromEditor(
 		createdAt: now,
 		role: RoleEnum.User,
 		status: Status.None,
-		modelPresetRef,
+		modelRef,
 		inputs,
 		attachments,
 		toolSelections,
