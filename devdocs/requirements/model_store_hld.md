@@ -6,7 +6,9 @@ This is a proposed target architecture.
 
 The supplied code already has the required Artifact Store foundation, compiled built-in package lifecycle, protected built-in root, universal artifact enablement, and examples of external runtime adapters in Tool and MCP.
 
-The new model artifact domain is not implemented yet. The existing `internal/modelpreset` system remains unchanged during the first migration phases.
+The legacy `internal/modelpreset` system remains unchanged during the first
+migration phases. The replacement Model Store is source-backed and must not
+import `inference-go` or legacy `modelpreset` packages.
 
 ## 1. Goal
 
@@ -30,9 +32,10 @@ The resulting system must:
 
 The key design rule is:
 
-> Provider and Model are source-backed Artifact Store artifacts. Provider ownership of Model is represented only by an explicit Model-to-Provider reference, not by nesting, containment, or collection membership.
-
----
+Provider and Model are source-backed Artifact Store artifacts. Provider
+ownership of Model is represented only by an explicit Model-to-Provider
+reference, not by nesting, containment, or collection membership. A Provider
+may additionally hold a best-effort default Model reference.
 
 ## 2. Current state
 
@@ -609,8 +612,8 @@ Recommended policy:
 | Provider path/header override       | Yes, only adapter-approved non-secret fields    | Raw Authorization/API key header values |
 | Provider request defaults           | Yes, through Provider runtime overlay           | Changing adapter protocol               |
 | Model request defaults              | Yes, through Model runtime overlay              | Changing provider reference             |
+| Provider default Model              | Yes, as best-effort local metadata              | Hard foreign-key semantics              |
 | Model remote ID                     | No                                              | Must create a new Model artifact        |
-| Provider adapter ID                 | No                                              | Must create a new Provider artifact     |
 | Capability restrictions             | Yes                                             | Capability expansion in local overlay   |
 | Display name / labels / description | No in protected root                            | Source-definition mutation              |
 | Source package bytes                | No                                              | Protected installer only                |
@@ -624,15 +627,17 @@ Important behavior:
 - A built-in Provider overlay must never change its adapter identity.
 - Credentials are stored outside the Artifact Store Definition and outside generic Artifact `Data`.
 
-For protected built-ins, use a settings-backed Model overlay repository, similar to MCP overlays. It should contain only portable patch-like data and opaque credential references, never secret values.
+For protected built-ins, use the same settings-backed overlay persistence
+pattern as MCP. Artifact Store itself provides Artifact.Data for mutable
+Artifacts and universal enablement, but does not provide a generic typed
+protected-artifact overlay repository. Do not add a custom file-backed model
+overlay store.
 
 For normal user-owned artifacts:
 
 - The user can replace their source-backed Provider or Model declaration through managed package publication.
 - Runtime overlays remain useful for local credentials and per-install tuning.
 - Definitions remain source-owned, not patched through generic Artifact local data.
-
----
 
 ## 10. Model Store API shape
 
@@ -706,27 +711,21 @@ The UI may show dependency warnings, but the storage layer must not impose a pro
 
 ## 11. Default provider and default model selection
 
-Do not put `defaultModel` inside a Provider artifact.
-
-That would reintroduce ownership and coupling.
-
-Use a separate local settings record, for example:
+Provider `defaultModel` is a best-effort named relationship. The authored
+Provider declaration may carry a baseline default. A mutable Provider may
+override it through namespaced Artifact.Data. A protected built-in Provider
+may override it through its settings-backed overlay.
 
 ```text
-ModelSelectionSettings
-  defaultProvider: Provider target
-  defaultModel: Model target
+Provider default resolution:
+  mutable Artifact.Data override
+  -> protected settings overlay override
+  -> Provider declaration defaultModel
+  -> first enabled resolved linked Model
 ```
 
-This setting is application/user policy, not portable source definition.
-
-During migration:
-
-- Legacy `DefaultProvider` maps to `ModelSelectionSettings.defaultProvider`.
-- Legacy `DefaultModelPresetID` maps to `ModelSelectionSettings.defaultModel`.
-- The setting migration happens only after the target Provider and Model artifacts are resolvable.
-
----
+The global default Provider remains application selection policy. It is not
+part of Provider artifact ownership.
 
 ## 12. Runtime flow
 
@@ -936,20 +935,3 @@ Do not place new artifact-backed types inside `internal/modelpreset`.
 | Built-in override policy                               | Missing                      | Implement settings-backed overlays              |
 | Legacy data migration                                  | Missing                      | Implement after new read/resolve path is stable |
 | Existing old code behavior                             | Working                      | Do not modify in initial phases                 |
-
----
-
-## 16. Recommended first milestone
-
-The first implementation milestone should be intentionally narrow:
-
-- Add `model.provider` and replace the placeholder `model` schema.
-- Implement read-only Model Store resolution for Provider and Model artifacts.
-- Implement built-in catalog generation from `inference-go/modelpreset`.
-- Hydrate generated built-ins through the existing compiled catalog mechanism.
-- Add enable/disable for Provider and Model artifacts.
-- Add a minimal inference adapter that can resolve one built-in Provider/Model pair.
-- Add parity tests against the legacy catalog.
-- Do not migrate user presets, defaults, or existing aggregate paths yet.
-
-This creates a safe new vertical slice without changing the old system.
