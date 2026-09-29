@@ -31,10 +31,13 @@ type App struct {
 	settingStoreAPI       *SettingStoreWrapper
 	conversationStoreAPI  *ConversationCollectionWrapper
 	modelPresetStoreAPI   *ModelPresetStoreWrapper
+	modelStoreAPI         *ModelStoreWrapper
+	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
 	toolRuntimeAPI        *ToolRuntimeWrapper
 	toolAggregateAPI      *ToolAggregateWrapper
 	toolBuiltInInstaller  builtin.HydrationInstaller
+	modelBuiltInInstaller builtin.HydrationInstaller
 	agentStoreAPI         *AgentStoreWrapper
 	agentBuiltInInstaller builtin.HydrationInstaller
 	skillStoreAPI         *SkillStoreWrapper
@@ -122,6 +125,8 @@ func NewApp() *App {
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
 	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
+	app.modelStoreAPI = &ModelStoreWrapper{}
+	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
 	app.toolRuntimeAPI = &ToolRuntimeWrapper{}
 	app.toolAggregateAPI = &ToolAggregateWrapper{}
@@ -252,6 +257,17 @@ func (a *App) initManagers() {
 
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
+	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize settings store",
+			"directory", a.settingsDirPath,
+			"error", err,
+		)
+		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
+	}
+	slog.Info("settings store initialized", "directory", a.settingsDirPath)
+
 	err = InitToolRuntimeWrapper(a.toolRuntimeAPI)
 	if err != nil {
 		slog.Error(
@@ -318,6 +334,31 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Tool store, runtime, and aggregate initialized")
 
+	a.modelBuiltInInstaller, err = InitModelWrappers(
+		context.Background(),
+		a.modelStoreAPI,
+		a.modelAggregateAPI,
+		artifactComposition.Sources,
+		artifactComposition.Discovery,
+		artifactComposition.Artifacts,
+		artifactComposition.ManagedArtifacts,
+		artifactComposition.Protection,
+		artifactComposition.Topology,
+		a.settingStoreAPI.store,
+	)
+	if err != nil {
+		slog.Error(
+			"couldn't initialize artifact-backed Model Store",
+			"error",
+			err,
+		)
+		panic(
+			"failed to initialize managers: Model Store initialization failed\n" +
+				err.Error(),
+		)
+	}
+	slog.Info("artifact-backed Model Store and aggregate initialized")
+
 	fallbackProviders, err := artifactFallbackProviders(
 		a.modelPresetStoreAPI,
 	)
@@ -333,7 +374,10 @@ func (a *App) initManagers() {
 		)
 	}
 
-	targetMappers, err := artifactTargetMappers(a.toolAggregateAPI)
+	targetMappers, err := artifactTargetMappers(
+		a.toolAggregateAPI,
+		a.modelAggregateAPI,
+	)
 	if err != nil {
 		slog.Error(
 			"couldn't initialize Artifact target mappers",
@@ -451,17 +495,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill aggregate and runtime initialized")
 
-	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize settings store",
-			"directory", a.settingsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize managers: settings store initialization failed\n" + err.Error())
-	}
-	slog.Info("settings store initialized", "directory", a.settingsDirPath)
-
 	a.mcpBuiltInInstaller, err = InitMCPWrappers(
 		context.Background(),
 		a.mcpStoreAPI,
@@ -538,6 +571,7 @@ func (a *App) initManagers() {
 		context.Background(),
 		a.artifactStoreComposition.Topology,
 		a.toolBuiltInInstaller,
+		a.modelBuiltInInstaller,
 		a.skillBuiltInInstaller,
 		a.mcpBuiltInInstaller,
 		a.agentBuiltInInstaller,
@@ -590,7 +624,7 @@ func (a *App) initManagers() {
 
 	err = InitAggregrateWrapper(
 		a.aggregateAPI,
-		a.modelPresetStoreAPI.store,
+		a.modelAggregateAPI.service,
 		a.settingStoreAPI.store,
 		a.toolAggregateAPI.service,
 		a.skillAggregateAPI.service,
@@ -673,9 +707,16 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 	if a.toolRuntimeAPI != nil {
 		a.toolRuntimeAPI.close()
 	}
+	if a.modelAggregateAPI != nil {
+		a.modelAggregateAPI.close()
+	}
+	if a.modelStoreAPI != nil {
+		a.modelStoreAPI.close()
+	}
 	a.skillBuiltInInstaller = nil
 	a.mcpBuiltInInstaller = nil
 	a.agentBuiltInInstaller = nil
+	a.modelBuiltInInstaller = nil
 	a.toolBuiltInInstaller = nil
 	if a.artifactStoreComposition != nil {
 		if err := a.artifactStoreComposition.Close(); err != nil {

@@ -56,6 +56,13 @@ func (r *Resolver) ResolveModel(
 	return r.resolveTyped(ctx, ref, declaration.TypeModel)
 }
 
+func (r *Resolver) ResolveModelProvider(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (*ResolvedEntry, error) {
+	return r.resolveTyped(ctx, ref, declaration.TypeModelProvider)
+}
+
 func (r *Resolver) ResolveTool(
 	ctx context.Context,
 	ref artifact.ArtifactRef,

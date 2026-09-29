@@ -2,7 +2,9 @@ package modelv1
 
 import (
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -29,13 +31,21 @@ var ModelSchemaKey = schema.ArtifactKey(
 	ModelSchemaVersion,
 )
 
+// ModelDocument is a source-backed provider-specific model declaration.
+//
+// Defaults, capabilities, and adapterParameters deliberately remain portable
+// canonical JSON objects at the declaration boundary. The Model Store domain
+// owns their typed projection and layered merge semantics. This prevents the
+// declaration package from importing inference-go types while retaining the
+// full schema surface in model-v1.schema.json.
 type ModelDocument struct {
 	declaration.Header
 
-	Model           string   `json:"model"`
-	SystemPrompt    *string  `json:"systemPrompt,omitempty"`
-	Temperature     *float64 `json:"temperature,omitempty"`
-	MaxOutputTokens *int     `json:"maxOutputTokens,omitempty"`
+	Provider          declaration.ArtifactNameReference `json:"provider"`
+	ProviderModelID   string                            `json:"providerModelID"`
+	Defaults          json.RawMessage                   `json:"defaults,omitempty"`
+	Capabilities      json.RawMessage                   `json:"capabilities,omitempty"`
+	AdapterParameters json.RawMessage                   `json:"adapterParameters,omitempty"`
 }
 
 func ModelJSONSchema() []byte {
@@ -43,7 +53,18 @@ func ModelJSONSchema() []byte {
 }
 
 func DecodeModelJSON(raw []byte) (ModelDocument, error) {
-	return decodeModel(raw)
+	var value ModelDocument
+	if err := declaration.DecodeDocumentInto(
+		raw,
+		compiledModelSchema,
+		&value,
+	); err != nil {
+		return ModelDocument{}, err
+	}
+	if err := value.validateFields(); err != nil {
+		return ModelDocument{}, err
+	}
+	return value, nil
 }
 
 func DecodeModelEntry(
@@ -63,25 +84,14 @@ func DecodeModelEntry(
 	return value, nil
 }
 
-func decodeModel(
-	raw []byte,
-) (ModelDocument, error) {
-	var value ModelDocument
-	if err := declaration.DecodeDocumentInto(
-		raw,
-		compiledModelSchema,
-		&value,
-	); err != nil {
-		return ModelDocument{}, err
-	}
-	if err := value.validateFields(); err != nil {
-		return ModelDocument{}, err
-	}
-	return value, nil
-}
-
 func (v ModelDocument) Clone() (ModelDocument, error) {
-	return jsonutil.CloneJSON(v)
+	output := v
+	output.Header = v.Header.Clone()
+	output.Provider = v.Provider.Clone()
+	output.Defaults = cloneRawMessage(v.Defaults)
+	output.Capabilities = cloneRawMessage(v.Capabilities)
+	output.AdapterParameters = cloneRawMessage(v.AdapterParameters)
+	return output, nil
 }
 
 func (v ModelDocument) Canonicalize() (ModelDocument, error) {
@@ -103,14 +113,6 @@ func (v ModelDocument) CalculatedDigest() (
 }
 
 func (v ModelDocument) Validate() error {
-	return v.validate()
-}
-
-func (v ModelDocument) ValidateEntry() error {
-	return v.validate()
-}
-
-func (v ModelDocument) validate() error {
 	if err := declaration.ValidateDocument(
 		compiledModelSchema,
 		v,
@@ -120,6 +122,10 @@ func (v ModelDocument) validate() error {
 	return v.validateFields()
 }
 
+func (v ModelDocument) ValidateEntry() error {
+	return v.Validate()
+}
+
 func (v ModelDocument) validateFields() error {
 	if err := v.Header.Validate(declaration.HeaderValidation{
 		ExpectedType: ModelType,
@@ -127,28 +133,139 @@ func (v ModelDocument) validateFields() error {
 	}); err != nil {
 		return err
 	}
+	if v.Locator != nil {
+		return fmt.Errorf(
+			"%w: model declarations do not support locator",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := v.Provider.Validate(); err != nil {
+		return fmt.Errorf("model provider reference: %w", err)
+	}
 	if err := basespec.ValidateRequiredText(
-		"Model provider-qualified name",
-		v.Model,
+		"Model providerModelID",
+		v.ProviderModelID,
 		basespec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := declaration.ValidateOptionalContent(v.SystemPrompt); err != nil {
+	if err := validatePatchObject("Model defaults", v.Defaults); err != nil {
 		return err
 	}
-	if v.Temperature != nil &&
-		(*v.Temperature < 0 || *v.Temperature > 2) {
-		return fmt.Errorf(
-			"%w: Model temperature must be between 0 and 2",
-			basespec.ErrInvalid,
-		)
+	if err := validatePatchObject(
+		"Model capabilities",
+		v.Capabilities,
+	); err != nil {
+		return err
 	}
-	if v.MaxOutputTokens != nil && *v.MaxOutputTokens <= 0 {
-		return fmt.Errorf(
-			"%w: Model maxOutputTokens must be positive",
-			basespec.ErrInvalid,
-		)
+	return validateNoSecretObject(
+		"Model adapterParameters",
+		v.AdapterParameters,
+	)
+}
+
+func cloneRawMessage(value json.RawMessage) json.RawMessage {
+	return append(json.RawMessage(nil), value...)
+}
+
+func validatePatchObject(
+	label string,
+	raw json.RawMessage,
+) error {
+	if len(raw) == 0 {
+		return nil
+	}
+	_, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	return validateNoSecretObject(label, raw)
+}
+
+// validateNoSecretObject prevents common accidental credential persistence in
+// fields intentionally reserved for adapter-specific non-secret data.
+//
+// It is deliberately conservative. Credentials belong to a settings or secret
+// system and are represented here only through external opaque references.
+func validateNoSecretObject(
+	label string,
+	raw json.RawMessage,
+) error {
+	if len(raw) == 0 {
+		return nil
+	}
+
+	canonical, err := jsonutil.CanonicalizeObject(
+		raw,
+		basespec.MaxDefinitionBodyBytes,
+	)
+	if err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+
+	var value map[string]any
+	if err := json.Unmarshal(canonical, &value); err != nil {
+		return fmt.Errorf("%s: %w", label, err)
+	}
+	return rejectSecretValues(label, value)
+}
+
+func rejectSecretValues(
+	label string,
+	value any,
+) error {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if modelSecretKey(key) && child != nil {
+				return fmt.Errorf(
+					"%w: %s contains forbidden credential field %q",
+					basespec.ErrInvalid,
+					label,
+					key,
+				)
+			}
+			if err := rejectSecretValues(label, child); err != nil {
+				return err
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if err := rejectSecretValues(label, child); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
+}
+
+func modelSecretKey(value string) bool {
+	normalized := strings.NewReplacer(
+		"-",
+		"",
+		"_",
+		"",
+		".",
+		"",
+	).Replace(strings.ToLower(strings.TrimSpace(value)))
+
+	switch normalized {
+	case
+		"apikey",
+		"authorization",
+		"accesstoken",
+		"refreshtoken",
+		"clientsecret",
+		"password",
+		"credential",
+		"credentials",
+		"secret":
+		return true
+	default:
+		return strings.HasSuffix(normalized, "apikey") ||
+			strings.HasSuffix(normalized, "clientsecret")
+	}
 }

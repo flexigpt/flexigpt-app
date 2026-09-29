@@ -47,6 +47,8 @@ builtin:
         documentSets:
           - "collections"
           - "mcpConfigs"
+          - "modelProviders"
+          - "models"
           - "mcpPolicies"
           - "agents"
           - "skillPackages"

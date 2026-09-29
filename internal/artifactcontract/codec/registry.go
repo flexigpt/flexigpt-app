@@ -6,6 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
@@ -20,8 +21,9 @@ import (
 
 var orderedSchemaKeys = []schema.Key{
 	textv1.TextSchemaKey,
-	modelv1.ModelSchemaKey,
 	toolv1.ToolSchemaKey,
+	modelproviderv1.ModelProviderSchemaKey,
+	modelv1.ModelSchemaKey,
 	skillv1.SkillSchemaKey,
 	mcpv1.MCPSchemaKey,
 	mcppolicyv1.MCPPolicySchemaKey,
@@ -34,18 +36,19 @@ var orderedSchemaKeys = []schema.Key{
 }
 
 var schemaKeysByType = map[declaration.Type]schema.Key{
-	declaration.TypeText:      textv1.TextSchemaKey,
-	declaration.TypeModel:     modelv1.ModelSchemaKey,
-	declaration.TypeTool:      toolv1.ToolSchemaKey,
-	declaration.TypeSkill:     skillv1.SkillSchemaKey,
-	declaration.TypeMCP:       mcpv1.MCPSchemaKey,
-	declaration.TypeMCPPolicy: mcppolicyv1.MCPPolicySchemaKey,
-	declaration.TypePlugin:    pluginv1.PluginSchemaKey,
-	declaration.TypeAgent:     agentv1.AgentSchemaKey,
-	declaration.TypeTeam:      teamv1.TeamSchemaKey,
-	declaration.TypeLoop:      loopv1.LoopSchemaKey,
-	declaration.TypeWorkflow:  workflowv1.WorkflowSchemaKey,
-	declaration.TypeWorkspace: workspacev1.WorkspaceSchemaKey,
+	declaration.TypeText:          textv1.TextSchemaKey,
+	declaration.TypeModel:         modelv1.ModelSchemaKey,
+	declaration.TypeTool:          toolv1.ToolSchemaKey,
+	declaration.TypeModelProvider: modelproviderv1.ModelProviderSchemaKey,
+	declaration.TypeSkill:         skillv1.SkillSchemaKey,
+	declaration.TypeMCP:           mcpv1.MCPSchemaKey,
+	declaration.TypeMCPPolicy:     mcppolicyv1.MCPPolicySchemaKey,
+	declaration.TypePlugin:        pluginv1.PluginSchemaKey,
+	declaration.TypeAgent:         agentv1.AgentSchemaKey,
+	declaration.TypeTeam:          teamv1.TeamSchemaKey,
+	declaration.TypeLoop:          loopv1.LoopSchemaKey,
+	declaration.TypeWorkflow:      workflowv1.WorkflowSchemaKey,
+	declaration.TypeWorkspace:     workspacev1.WorkspaceSchemaKey,
 }
 
 func NewTextV1SchemaCodec() providerapi.SchemaCodec {
@@ -66,6 +69,13 @@ func NewModelV1SchemaCodec() providerapi.SchemaCodec {
 	return NewPassthrough(
 		modelv1.ModelSchemaKey,
 		modelv1.ModelJSONSchema(),
+	)
+}
+
+func NewModelProviderV1SchemaCodec() providerapi.SchemaCodec {
+	return NewPassthrough(
+		modelproviderv1.ModelProviderSchemaKey,
+		modelproviderv1.ModelProviderJSONSchema(),
 	)
 }
 
@@ -136,8 +146,9 @@ func AllSchemaCodecs() []providerapi.SchemaCodec {
 	return []providerapi.SchemaCodec{
 		NewTextV1SchemaCodec(),
 		NewModelV1SchemaCodec(),
-		NewToolV1SchemaCodec(),
+		NewModelProviderV1SchemaCodec(),
 		NewSkillV1SchemaCodec(),
+		NewToolV1SchemaCodec(),
 		NewMCPV1SchemaCodec(),
 		NewMCPPolicyV1SchemaCodec(),
 		NewPluginV1SchemaCodec(),

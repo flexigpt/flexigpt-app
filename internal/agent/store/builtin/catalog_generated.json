@@ -1,7 +1,7 @@
 {
   "format": "artifact-compiled-package-set/v1",
   "hydration": {
-    "fingerprint": "sha256:4b85bbdf4cb09ac5007a156a1e6291ea177d03d3b2ac9029ac597dc25cef8e10",
+    "fingerprint": "sha256:b8a664a2fd7122d7acdf408067e4a9674fb8bf5c0ba274ea45effe2f0f1e2c4a",
     "installerName": "agent.agent",
     "rootID": "0192c4c0-0000-7000-8000-000000000001",
     "sourceID": "0192c4c0-0001-7000-8000-000000000001"
@@ -532,7 +532,7 @@
           "size": 541
         }
       ],
-      "fingerprint": "sha256:a860fe56c4932397a5ffdfc1ad38590591540177bf4a6737e0688fe0b31df877"
+      "fingerprint": "sha256:5d859732b0708b9e99d01f531b37129d8e1e8169b3a90a48b0fa2b7f9b6447e4"
     },
     {
       "address": {
@@ -1674,7 +1674,7 @@
           "size": 2076
         }
       ],
-      "fingerprint": "sha256:3ba72b371b33590c2b57e393628047de6805ed30f3c26b4ed71836ec0e122bc8"
+      "fingerprint": "sha256:36643fb18d554bb1737125e63c852a0f64e150ef7d9f727a5f3105b2cfc881c9"
     },
     {
       "address": {
@@ -1906,7 +1906,7 @@
           "size": 2167
         }
       ],
-      "fingerprint": "sha256:a2fe7707065e1eca1b65e2e8c23fb850aca1e03b62ff8badc81353685eb01148"
+      "fingerprint": "sha256:6e074e6f3d3d84df7c60591e011d9d5e2b95945178b4edb6ed8e0e84041e4aa6"
     },
     {
       "address": {
@@ -3276,7 +3276,7 @@
           "size": 2130
         }
       ],
-      "fingerprint": "sha256:2868b88273530bfe9d035e5559df42cf412b1f749fc5ea30a43545e6bfa54b5f"
+      "fingerprint": "sha256:f25a31bd05d3040492a9e7ed528dccc02d047b21b29f94d77e5bb0eda7eafebf"
     },
     {
       "address": {
@@ -4204,7 +4204,7 @@
           "size": 2109
         }
       ],
-      "fingerprint": "sha256:2d03c2315907dd565f46970957bc522900d6a429b1225d038ef5e630eed944db"
+      "fingerprint": "sha256:623353efdc24deab50c647cc5b91185f5b7705b877091c3a898c9ec0a7cf1819"
     }
   ]
 }

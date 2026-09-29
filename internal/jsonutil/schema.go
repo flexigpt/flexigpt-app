@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 )
@@ -183,6 +184,7 @@ func ValidateJSONSchema(
 		)
 	}
 	if err := schema.Validate(instance); err != nil {
+		slog.Error("validation error", "json", instance)
 		return fmt.Errorf(
 			"%w: document does not satisfy JSON Schema: %w",
 			errInvalid,

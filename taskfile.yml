@@ -217,6 +217,14 @@ tasks:
       - pnpm run touch:tmp
       - task: go:coverage
 
+  test-all-go:
+    desc: Run all Go tests, including generated catalog consistency tests.
+    cmds:
+      - pnpm run touch:tmp
+      - task: go:coverage
+        vars:
+          GO_TEST_TAGS: "integration generated_catalog"
+
   test:
     desc: Run Go and frontend test suites.
     cmds:

@@ -24,9 +24,13 @@ const (
 	DocumentUseCanonicalJSON                           = "canonicalJSON"
 	DocumentUseMCPConfig                               = "mcpConfig"
 	DocumentUseSkillPackage                            = "skillPackage"
+	DocumentUseModelProviderPackage                    = "modelProviderPackage"
+	DocumentUseModelPackage                            = "modelPackage"
 	DocumentUseToolPackage                             = "toolPackage"
 	DocumentUseToolCollection                          = "toolCollection"
 	DocumentUseManagedCollection                       = "managedCollection"
+	DocumentUseManagedModelProvider                    = "managedModelProvider"
+	DocumentUseManagedModel                            = "managedModel"
 	DocumentUseAgentManagedCollection                  = "agentManagedCollection"
 	DocumentUseManagedAgent                            = "managedAgent"
 	DocumentUseManagedMCP                              = "managedMCP"
@@ -287,6 +291,22 @@ func DefaultToolPackageDocumentFile() basespec.Locator {
 
 func IsToolPackageDocument(locator basespec.Locator) bool {
 	return IsDocument(locator, DocumentUseToolPackage)
+}
+
+func ModelProviderDocumentFiles() []basespec.Locator {
+	return MustDocumentFiles(DocumentUseModelProviderPackage)
+}
+
+func ModelProviderDocumentFile() basespec.Locator {
+	return MustDefaultDocumentFile(DocumentUseModelProviderPackage)
+}
+
+func ModelDocumentFiles() []basespec.Locator {
+	return MustDocumentFiles(DocumentUseModelPackage)
+}
+
+func ModelDocumentFile() basespec.Locator {
+	return MustDefaultDocumentFile(DocumentUseModelPackage)
 }
 
 func AgentDeclarationDocumentFiles() []basespec.Locator {
@@ -1264,9 +1284,13 @@ func validateRequiredContractBindings(value contractTopology) error {
 		DocumentUseCanonicalJSON,
 		DocumentUseMCPConfig,
 		DocumentUseSkillPackage,
+		DocumentUseModelProviderPackage,
+		DocumentUseModelPackage,
 		DocumentUseToolPackage,
 		DocumentUseToolCollection,
 		DocumentUseManagedCollection,
+		DocumentUseManagedModelProvider,
+		DocumentUseManagedModel,
 		DocumentUseAgentManagedCollection,
 		DocumentUseManagedAgent,
 		DocumentUseManagedMCP,
@@ -1285,9 +1309,13 @@ func validateRequiredContractBindings(value contractTopology) error {
 	}
 	for _, use := range []string{
 		DocumentUseSkillPackage,
+		DocumentUseModelProviderPackage,
+		DocumentUseModelPackage,
 		DocumentUseToolPackage,
 		DocumentUseToolCollection,
 		DocumentUseManagedCollection,
+		DocumentUseManagedModelProvider,
+		DocumentUseManagedModel,
 		DocumentUseAgentManagedCollection,
 		DocumentUseManagedAgent,
 		DocumentUseManagedMCP,

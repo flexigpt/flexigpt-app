@@ -14,18 +14,19 @@ const SchemaVersionV1 = "v1"
 type Type string
 
 const (
-	TypeText      Type = "text"
-	TypeTool      Type = "tool"
-	TypeModel     Type = "model"
-	TypeSkill     Type = "skill"
-	TypeMCP       Type = "mcp"
-	TypeMCPPolicy Type = "mcp.policy"
-	TypePlugin    Type = "plugin"
-	TypeAgent     Type = "agent"
-	TypeTeam      Type = "team"
-	TypeLoop      Type = "loop"
-	TypeWorkflow  Type = "workflow"
-	TypeWorkspace Type = "workspace"
+	TypeText          Type = "text"
+	TypeModel         Type = "model"
+	TypeModelProvider Type = "model.provider"
+	TypeTool          Type = "tool"
+	TypeSkill         Type = "skill"
+	TypeMCP           Type = "mcp"
+	TypeMCPPolicy     Type = "mcp.policy"
+	TypePlugin        Type = "plugin"
+	TypeAgent         Type = "agent"
+	TypeTeam          Type = "team"
+	TypeLoop          Type = "loop"
+	TypeWorkflow      Type = "workflow"
+	TypeWorkspace     Type = "workspace"
 )
 
 type InsertTarget string
@@ -52,6 +53,7 @@ func Types() []Type {
 	return []Type{
 		TypeText,
 		TypeModel,
+		TypeModelProvider,
 		TypeTool,
 		TypeSkill,
 		TypeMCP,
@@ -69,6 +71,7 @@ func (t Type) Validate() error {
 	switch t {
 	case TypeText,
 		TypeModel,
+		TypeModelProvider,
 		TypeTool,
 		TypeSkill,
 		TypeMCP,

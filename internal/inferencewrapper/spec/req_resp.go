@@ -1,11 +1,9 @@
 package spec
 
 import (
-	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
@@ -44,10 +42,6 @@ type SetProviderAPIKeyRequest struct {
 type SetProviderAPIKeyResponse struct{}
 
 type CompletionRequestBody struct {
-	// Model configuration for this *call*. If nil, the aggregator can fall
-	// back to the last non-nil ModelParam from History.
-	ModelParam *inferenceSpec.ModelParam `json:"modelParam,omitempty"`
-
 	// Past turns of the conversation, already persisted.
 	History []conversationSpec.ConversationMessage `json:"history"`
 
@@ -73,8 +67,7 @@ type CompletionRequestBody struct {
 }
 
 type CompletionRequest struct {
-	Provider      inferenceSpec.ProviderName `path:"provider"      required:"true"`
-	ModelPresetID modelpreset.ModelPresetID  `path:"modelPresetID" required:"true"`
+	Runtime *RuntimeModel `json:"-"`
 
 	Body *CompletionRequestBody
 

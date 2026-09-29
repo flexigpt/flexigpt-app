@@ -5,10 +5,24 @@ description: General-purpose reasoning model.
 labels:
   category: reasoning
   provider: anthropic
-metadata:
-  acme.example/owner: platform
-model: anthropic/claude-sonnet
-systemPrompt: |
-  Be precise, grounded, and concise.
-temperature: 0.2
-maxOutputTokens: 12000
+
+provider:
+  name: anthropic
+
+providerModelID: claude-3-7-sonnet-latest
+
+defaults:
+  stream: true
+  maxPromptTokens: 200000
+  maxOutputTokens: 12000
+  temperature: 0.2
+  systemPrompt: |
+    Be precise, grounded, and concise.
+  timeoutMS: 60000
+  output:
+    verbosity: high
+    format:
+      kind: text
+
+adapterParameters:
+  modelRevision: "20250219"

@@ -1,0 +1,72 @@
+type: model.provider
+name: anthropic
+displayName: Anthropic
+description: Anthropic Messages API model provider.
+labels:
+  category: model-provider
+  provider: anthropic
+
+adapter: anthropic
+
+connection:
+  origin: https://api.anthropic.com
+  path: /v1/messages
+  headers:
+    set:
+      anthropic-version: "2023-06-01"
+      Accept: application/json
+
+# The actual key is supplied by external secret/settings configuration.
+# Do not add an apiKey, token, authorization, or secret value here.
+authentication:
+  mode: apiKeyHeader
+  headerName: x-api-key
+
+defaultModel:
+  name: reasoning
+
+defaults:
+  stream: true
+  maxPromptTokens: 200000
+  maxOutputTokens: 8192
+  temperature: 0.2
+  systemPrompt: |
+    Be precise, grounded, and concise.
+  timeoutMS: 60000
+  output:
+    verbosity: high
+    format:
+      kind: text
+
+capabilities:
+  modalitiesIn:
+    - textIn
+    - imageIn
+  modalitiesOut:
+    - textOut
+  reasoningCapabilities:
+    supportsReasoningConfig: true
+    supportedReasoningTypes:
+      - singleWithLevels
+    supportedReasoningLevels:
+      - low
+      - medium
+      - high
+  outputCapabilities:
+    supportedOutputFormats:
+      - text
+    supportsVerbosity: true
+  toolCapabilities:
+    supportedToolTypes:
+      - function
+    supportedToolPolicyModes:
+      - auto
+      - any
+      - tool
+      - none
+    supportsParallelToolCalls: true
+  paramDialect:
+    maxOutputTokensParamName: maxTokens
+
+adapterParameters:
+  apiVersion: "2023-06-01"

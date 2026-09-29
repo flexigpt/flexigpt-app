@@ -1,0 +1,556 @@
+{
+	"$schema": "https://json-schema.org/draft/2020-12/schema",
+	"$id": "https://schemas.flexigpt.site/artifact/model.provider/v1.json",
+	"title": "FlexiGPT Model Provider v1",
+	"type": "object",
+	"additionalProperties": false,
+	"required": ["type", "name", "adapter"],
+	"properties": {
+		"type": {
+			"const": "model.provider"
+		},
+		"name": {
+			"$ref": "#/$defs/name"
+		},
+		"displayName": {
+			"$ref": "#/$defs/displayName"
+		},
+		"description": {
+			"$ref": "#/$defs/description"
+		},
+		"labels": {
+			"$ref": "#/$defs/labels"
+		},
+		"adapter": {
+			"$ref": "#/$defs/adapter"
+		},
+		"connection": {
+			"$ref": "#/$defs/connection"
+		},
+		"authentication": {
+			"$ref": "#/$defs/authentication"
+		},
+		"defaultModel": {
+			"$ref": "#/$defs/reference"
+		},
+		"defaults": {
+			"$ref": "#/$defs/defaults"
+		},
+		"capabilities": {
+			"$ref": "#/$defs/capabilities"
+		},
+		"adapterParameters": {
+			"$ref": "#/$defs/jsonObject"
+		}
+	},
+	"$defs": {
+		"name": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 256
+		},
+		"displayName": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 1024
+		},
+		"description": {
+			"type": "string",
+			"maxLength": 16384
+		},
+		"labels": {
+			"type": "object",
+			"maxProperties": 64,
+			"additionalProperties": {
+				"type": "string",
+				"maxLength": 256
+			}
+		},
+		"adapter": {
+			"type": "string",
+			"minLength": 1,
+			"maxLength": 128,
+			"pattern": "^[a-z][A-Za-z0-9]*(?:[.-][a-z][A-Za-z0-9]*)*$"
+		},
+		"reference": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["name"],
+			"properties": {
+				"name": {
+					"$ref": "#/$defs/name"
+				},
+				"scope": {
+					"enum": ["builtin"]
+				}
+			}
+		},
+		"jsonObject": {
+			"type": "object",
+			"maxProperties": 4096,
+			"additionalProperties": true
+		},
+		"connection": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"origin": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 16384,
+					"format": "uri"
+				},
+				"path": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"headers": {
+					"$ref": "#/$defs/headerPatch"
+				}
+			}
+		},
+		"headerPatch": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"set": {
+					"type": "object",
+					"maxProperties": 4096,
+					"additionalProperties": {
+						"type": "string",
+						"maxLength": 16384
+					}
+				},
+				"remove": {
+					"type": "array",
+					"maxItems": 4096,
+					"uniqueItems": true,
+					"items": {
+						"type": "string",
+						"minLength": 1,
+						"maxLength": 16384
+					}
+				}
+			}
+		},
+		"authentication": {
+			"type": "object",
+			"additionalProperties": false,
+			"required": ["mode"],
+			"properties": {
+				"mode": {
+					"enum": ["none", "apiKeyHeader", "bearerToken"]
+				},
+				"headerName": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 256
+				},
+				"prefix": {
+					"type": "string",
+					"maxLength": 1024
+				}
+			}
+		},
+		"stringArray": {
+			"type": "array",
+			"maxItems": 4096,
+			"uniqueItems": true,
+			"items": {
+				"type": "string",
+				"minLength": 1,
+				"maxLength": 16384
+			}
+		},
+		"defaults": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"stream": {
+					"type": "boolean"
+				},
+				"maxPromptTokens": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"maxOutputTokens": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"temperature": {
+					"type": "number"
+				},
+				"systemPrompt": {
+					"type": "string",
+					"maxLength": 4194304
+				},
+				"timeoutMS": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"reasoning": {
+					"$ref": "#/$defs/reasoning"
+				},
+				"cacheControl": {
+					"$ref": "#/$defs/cacheControl"
+				},
+				"output": {
+					"$ref": "#/$defs/output"
+				},
+				"stopSequences": {
+					"$ref": "#/$defs/stringArray"
+				},
+				"adapterParameters": {
+					"$ref": "#/$defs/jsonObject"
+				}
+			}
+		},
+		"reasoning": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"type": {
+					"enum": ["hybridWithTokens", "singleWithLevels"]
+				},
+				"level": {
+					"enum": [
+						"",
+						"none",
+						"minimal",
+						"low",
+						"medium",
+						"high",
+						"xhigh",
+						"max"
+					]
+				},
+				"tokens": {
+					"type": "integer"
+				},
+				"summaryStyle": {
+					"enum": ["omitted", "auto", "concise", "detailed"]
+				},
+				"context": {
+					"enum": ["auto", "current_turn", "all_turns"]
+				},
+				"mode": {
+					"enum": ["standard", "pro"]
+				}
+			}
+		},
+		"cacheControl": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"enum": ["ephemeral"]
+				},
+				"ttl": {
+					"enum": ["5m", "1h", "24h", "in-memory"]
+				},
+				"key": {
+					"type": "string",
+					"maxLength": 16384
+				}
+			}
+		},
+		"output": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"verbosity": {
+					"enum": ["low", "medium", "high", "xhigh", "max"]
+				},
+				"format": {
+					"$ref": "#/$defs/outputFormat"
+				}
+			}
+		},
+		"outputFormat": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"kind": {
+					"enum": ["text", "jsonSchema"]
+				},
+				"jsonSchema": {
+					"$ref": "#/$defs/jsonSchema"
+				}
+			}
+		},
+		"jsonSchema": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"name": {
+					"type": "string",
+					"minLength": 1,
+					"maxLength": 64
+				},
+				"description": {
+					"type": "string",
+					"maxLength": 16384
+				},
+				"schema": {
+					"oneOf": [
+						{
+							"type": "object"
+						},
+						{
+							"type": "boolean"
+						}
+					]
+				},
+				"strict": {
+					"type": "boolean"
+				}
+			}
+		},
+		"capabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"modalitiesIn": {
+					"$ref": "#/$defs/modalitiesIn"
+				},
+				"modalitiesOut": {
+					"$ref": "#/$defs/modalitiesOut"
+				},
+				"reasoningCapabilities": {
+					"$ref": "#/$defs/reasoningCapabilities"
+				},
+				"stopSequenceCapabilities": {
+					"$ref": "#/$defs/stopSequenceCapabilities"
+				},
+				"outputCapabilities": {
+					"$ref": "#/$defs/outputCapabilities"
+				},
+				"toolCapabilities": {
+					"$ref": "#/$defs/toolCapabilities"
+				},
+				"cacheCapabilities": {
+					"$ref": "#/$defs/cacheCapabilities"
+				},
+				"paramDialect": {
+					"$ref": "#/$defs/paramDialect"
+				}
+			}
+		},
+		"modalitiesIn": {
+			"type": "array",
+			"maxItems": 5,
+			"uniqueItems": true,
+			"items": {
+				"enum": ["textIn", "imageIn", "fileIn", "audioIn", "videoIn"]
+			}
+		},
+		"modalitiesOut": {
+			"type": "array",
+			"maxItems": 5,
+			"uniqueItems": true,
+			"items": {
+				"enum": ["textOut", "imageOut", "fileOut", "audioOut", "videoOut"]
+			}
+		},
+		"reasoningCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"supportsReasoningConfig": {
+					"type": "boolean"
+				},
+				"supportedReasoningTypes": {
+					"type": "array",
+					"maxItems": 2,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["hybridWithTokens", "singleWithLevels"]
+					}
+				},
+				"supportedReasoningLevels": {
+					"type": "array",
+					"maxItems": 7,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+					}
+				},
+				"hybridTokenBudgetCapabilities": {
+					"$ref": "#/$defs/reasoningTokenBudgetCapabilities"
+				},
+				"supportsSummaryStyle": {
+					"type": "boolean"
+				},
+				"supportsReasoningContext": {
+					"type": "boolean"
+				},
+				"supportsReasoningMode": {
+					"type": "boolean"
+				},
+				"supportsEncryptedReasoningInput": {
+					"type": "boolean"
+				},
+				"temperatureDisallowedWhenEnabled": {
+					"type": "boolean"
+				}
+			}
+		},
+		"reasoningTokenBudgetCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"minAllowed": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"maxAllowed": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"zeroAllowed": {
+					"type": "boolean"
+				},
+				"minusOneAllowed": {
+					"type": "boolean"
+				}
+			}
+		},
+		"stopSequenceCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"isSupported": {
+					"type": "boolean"
+				},
+				"disallowedWithReasoning": {
+					"type": "boolean"
+				},
+				"maxSequences": {
+					"type": "integer",
+					"minimum": 0
+				}
+			}
+		},
+		"outputCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"supportedOutputFormats": {
+					"type": "array",
+					"maxItems": 2,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["text", "jsonSchema"]
+					}
+				},
+				"supportsVerbosity": {
+					"type": "boolean"
+				}
+			}
+		},
+		"toolCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"supportedToolTypes": {
+					"type": "array",
+					"maxItems": 3,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["function", "custom", "webSearch"]
+					}
+				},
+				"supportedToolPolicyModes": {
+					"type": "array",
+					"maxItems": 4,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["auto", "any", "tool", "none"]
+					}
+				},
+				"supportsParallelToolCalls": {
+					"type": "boolean"
+				},
+				"maxForcedTools": {
+					"type": "integer",
+					"minimum": 0
+				},
+				"supportedClientToolOutputFormats": {
+					"type": "array",
+					"maxItems": 2,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["string", "contentItemList"]
+					}
+				}
+			}
+		},
+		"cacheCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"supportsAutomaticCaching": {
+					"type": "boolean"
+				},
+				"topLevel": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				},
+				"inputOutputContent": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				},
+				"reasoningContent": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				},
+				"toolChoice": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				},
+				"toolCall": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				},
+				"toolOutput": {
+					"$ref": "#/$defs/cacheControlCapabilities"
+				}
+			}
+		},
+		"cacheControlCapabilities": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"supportsTTL": {
+					"type": "boolean"
+				},
+				"supportedKinds": {
+					"type": "array",
+					"maxItems": 1,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["ephemeral"]
+					}
+				},
+				"supportedTTLs": {
+					"type": "array",
+					"maxItems": 4,
+					"uniqueItems": true,
+					"items": {
+						"enum": ["5m", "1h", "24h", "in-memory"]
+					}
+				},
+				"supportsKey": {
+					"type": "boolean"
+				}
+			}
+		},
+		"paramDialect": {
+			"type": "object",
+			"additionalProperties": false,
+			"properties": {
+				"maxOutputTokensParamName": {
+					"enum": ["maxCompletionTokens", "maxTokens"]
+				},
+				"toolChoiceParamStyle": {
+					"enum": ["allowedTools", "requiredNamed"]
+				}
+			}
+		}
+	}
+}

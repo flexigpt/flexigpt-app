@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
@@ -41,12 +42,14 @@ func EnsureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installerapi.API,
 	tools builtin.HydrationInstaller,
+	models builtin.HydrationInstaller,
 	skills builtin.HydrationInstaller,
 	mcp builtin.HydrationInstaller,
 	agents builtin.HydrationInstaller,
 ) error {
 	if topologyAPI == nil ||
 		tools == nil ||
+		models == nil ||
 		skills == nil ||
 		mcp == nil ||
 		agents == nil {
@@ -64,6 +67,9 @@ func EnsureBuiltinArtifactTopology(
 		return err
 	}
 	if err := bootstrap.Register(tools); err != nil {
+		return err
+	}
+	if err := bootstrap.Register(models); err != nil {
 		return err
 	}
 	if err := bootstrap.Register(skills); err != nil {
@@ -168,13 +174,24 @@ func artifactFallbackProviders(
 }
 
 // artifactTargetMappers returns ArtifactRef-to-mapped-target adapters used by
-// Artifact consumers. Tool mapping belongs to the Tool aggregate because it
-// validates the Tool and its containing Tool Collection before mapping.
+// Artifact consumers. Tool and Model mapping belong to their aggregates
+// because they validate source-backed enablement and runtime availability
+// before mapping.
 func artifactTargetMappers(
 	tools *ToolAggregateWrapper,
+	models *ModelAggregateWrapper,
 ) (map[declaration.Type]resolve.ArtifactTargetMapper, error) {
-	if tools == nil {
-		return nil, errors.New("tool artifact target mapper aggregate is not initialized")
+	if tools == nil || models == nil {
+		return nil, errors.New("artifact target mapper aggregates are incomplete")
 	}
-	return tools.targetMappers()
+	toolMappers, err := tools.targetMappers()
+	if err != nil {
+		return nil, err
+	}
+	modelMappers, err := models.targetMappers()
+	if err != nil {
+		return nil, err
+	}
+	maps.Copy(toolMappers, modelMappers)
+	return toolMappers, nil
 }

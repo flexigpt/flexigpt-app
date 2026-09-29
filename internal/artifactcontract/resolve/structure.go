@@ -43,6 +43,7 @@ func (r *Resolver) resolveStructure(
 
 	switch node.Type {
 	case declaration.TypeText,
+		declaration.TypeModelProvider,
 		declaration.TypeModel,
 		declaration.TypeTool,
 		declaration.TypeMCPPolicy:

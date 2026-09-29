@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
@@ -216,6 +217,13 @@ func canonicalConcreteDocument(
 	switch entry.Header().Type {
 	case declaration.TypeText:
 		value, err := textv1.DecodeTextEntry(entry)
+		if err != nil {
+			return nil, err
+		}
+		return value.CanonicalJSON()
+
+	case declaration.TypeModelProvider:
+		value, err := modelproviderv1.DecodeModelProviderEntry(entry)
 		if err != nil {
 			return nil, err
 		}

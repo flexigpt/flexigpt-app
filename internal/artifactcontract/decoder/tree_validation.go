@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/loopv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
@@ -53,6 +54,10 @@ func validateEntryTree(
 
 	case declaration.TypeModel:
 		_, err := modelv1.DecodeModelEntry(entry)
+		return err
+
+	case declaration.TypeModelProvider:
+		_, err := modelproviderv1.DecodeModelProviderEntry(entry)
 		return err
 
 	case declaration.TypeSkill:

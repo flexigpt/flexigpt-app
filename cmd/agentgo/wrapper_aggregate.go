@@ -11,16 +11,15 @@ import (
 
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
-	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 	"github.com/flexigpt/llmtools-go/texttool"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
+	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -37,7 +36,7 @@ func init() {
 }
 
 type AggregrateWrapper struct {
-	modelPresetStore     *modelpresetStore.ModelPresetStore
+	modelAggregate       *modelAggregate.Service
 	settingStore         *settingStore.SettingStore
 	toolAggregateService *toolAggregate.Service
 	artifactSkills       *skillAggregate.Service
@@ -51,19 +50,19 @@ type AggregrateWrapper struct {
 
 func InitAggregrateWrapper(
 	agg *AggregrateWrapper,
-	mps *modelpresetStore.ModelPresetStore,
+	models *modelAggregate.Service,
 	ss *settingStore.SettingStore,
 	ts *toolAggregate.Service,
 	artifactSkills *skillAggregate.Service,
 	mr *mcpConnection.MCPRuntimeManager,
 	workspaceAPI workspaceConversation.WorkspaceSource,
 ) error {
-	if agg == nil || ts == nil || mps == nil || ss == nil || artifactSkills == nil || workspaceAPI == nil {
+	if agg == nil || ts == nil || models == nil || ss == nil || artifactSkills == nil || workspaceAPI == nil {
 		panic("initializing aggregate store wrapper on nil receivers")
 	}
 
 	agg.toolAggregateService = ts
-	agg.modelPresetStore = mps
+	agg.modelAggregate = models
 	agg.settingStore = ss
 	agg.artifactSkills = artifactSkills
 
@@ -84,7 +83,6 @@ func InitAggregrateWrapper(
 
 	p, err := inferencewrapper.NewProviderSetAPI(
 		agg.toolAggregateService,
-		agg.modelPresetStore,
 		agg.artifactSkills,
 		bridge,
 		workspaceBridge,
@@ -98,16 +96,6 @@ func InitAggregrateWrapper(
 	agg.providersetAPI = p
 	agg.completionCancels = map[string]context.CancelFunc{}
 	agg.preCanceled = map[string]time.Time{}
-
-	err = initProviderSetUsingSettingsAndPresets(
-		context.Background(),
-		agg.modelPresetStore,
-		agg.settingStore,
-		agg.providersetAPI,
-	)
-	if err != nil {
-		return err
-	}
 
 	agg.settingStore.SetDebugSettingsApplier(func(_ context.Context, cfg settingSpec.DebugSettings) error {
 		return applyDebugSettings(agg.providersetAPI, cfg)
@@ -131,68 +119,6 @@ func (w *AggregrateWrapper) ApplyUnifiedDiff(
 			return nil, errors.New("invalid arguments: nil request received")
 		}
 		return llmtoolsutil.ApplyUnifiedDiff(context.Background(), *req)
-	})
-}
-
-func (w *AggregrateWrapper) PostProviderPreset(
-	req *modelpresetSpec.PostProviderPresetRequest,
-) (*modelpresetSpec.PostProviderPresetResponse, error) {
-	return withRecoveryResp(func() (*modelpresetSpec.PostProviderPresetResponse, error) {
-		// First try to delete from provider apis, it is ok if it is not present.
-		_, _ = w.providersetAPI.DeleteProvider(
-			context.Background(),
-			&inferencewrapperSpec.DeleteProviderRequest{
-				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
-			},
-		)
-		// Then try to add in provider apis, need to skip adding to store if it cannot be added.
-		if _, err := w.providersetAPI.AddProvider(
-			context.Background(),
-			&inferencewrapperSpec.AddProviderRequest{
-				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
-				Body: &inferencewrapperSpec.AddProviderRequestBody{
-					SDKType:                  req.Body.SDKType,
-					Origin:                   req.Body.Origin,
-					ChatCompletionPathPrefix: req.Body.ChatCompletionPathPrefix,
-					APIKeyHeaderKey:          req.Body.APIKeyHeaderKey,
-					DefaultHeaders:           req.Body.DefaultHeaders,
-				},
-			},
-		); err != nil {
-			return nil, err
-		}
-		resp, err := w.modelPresetStore.PostProviderPreset(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
-	})
-}
-
-func (w *AggregrateWrapper) DeleteProviderPreset(
-	req *modelpresetSpec.DeleteProviderPresetRequest,
-) (*modelpresetSpec.DeleteProviderPresetResponse, error) {
-	return withRecoveryResp(func() (*modelpresetSpec.DeleteProviderPresetResponse, error) {
-		_, err := w.DeleteAuthKey(
-			&settingSpec.DeleteAuthKeyRequest{
-				Type:    settingSpec.AuthKeyTypeProvider,
-				KeyName: settingSpec.AuthKeyName(req.ProviderName),
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
-		_, _ = w.providersetAPI.DeleteProvider(
-			context.Background(),
-			&inferencewrapperSpec.DeleteProviderRequest{
-				Provider: inferenceSpec.ProviderName(string(req.ProviderName)),
-			},
-		)
-		resp, err := w.modelPresetStore.DeleteProviderPreset(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
 	})
 }
 
@@ -243,8 +169,7 @@ func (w *AggregrateWrapper) DeleteAuthKey(
 
 // FetchCompletion handles the completion request and streams data back to the frontend.
 func (w *AggregrateWrapper) FetchCompletion(
-	provider string,
-	modelPresetID string,
+	model artifact.ArtifactRef,
 	completionData *inferencewrapperSpec.CompletionRequestBody,
 	textCallbackID string,
 	thinkingCallbackID string,
@@ -286,10 +211,22 @@ func (w *AggregrateWrapper) FetchCompletion(
 			w.completionCancelMux.Unlock()
 		}()
 
+		runtimeModel, err := w.modelAggregate.ResolveRuntimeModel(
+			ctx,
+			model,
+		)
+		if err != nil {
+			return nil, err
+		}
+
 		req := &inferencewrapperSpec.CompletionRequest{
-			Provider:      inferenceSpec.ProviderName(provider),
-			ModelPresetID: modelpreset.ModelPresetID(modelPresetID),
-			Body:          completionData,
+			Runtime: &inferencewrapperSpec.RuntimeModel{
+				ProviderParam:            runtimeModel.ProviderParam,
+				ModelParam:               runtimeModel.ModelParam,
+				Capabilities:             runtimeModel.Capabilities,
+				ConfigurationFingerprint: runtimeModel.Fingerprint,
+			},
+			Body: completionData,
 		}
 
 		if textCallbackID != "" {
@@ -349,7 +286,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 						Message: err.Error(),
 					}
 				}
-				slog.Error("fetchCompletion failed", "provider", provider, "err", err)
+				slog.Error("fetchCompletion failed", "model", model, "err", err)
 				return resp, nil
 			}
 			// No response at all => infrastructure error.
@@ -410,157 +347,6 @@ func (w *AggregrateWrapper) prunePreCanceledLocked(now time.Time) {
 			delete(w.preCanceled, requestID)
 		}
 	}
-}
-
-func initProviderSetUsingSettingsAndPresets(
-	ctx context.Context,
-	mpw *modelpresetStore.ModelPresetStore,
-	s *settingStore.SettingStore,
-	p *inferencewrapper.ProviderSetAPI,
-) error {
-	allProviders, err := getAllProviderPresets(ctx, mpw)
-	if err != nil {
-		return err
-	}
-	keySecrets, err := getAllProviderSecrets(ctx, s)
-	if err != nil {
-		return err
-	}
-
-	if err := initProviders(ctx, p, allProviders, keySecrets); err != nil {
-		return err
-	}
-
-	slog.Info("initProviderSetUsingSettingsAndPresets completed",
-		"authKeys", len(keySecrets))
-
-	return nil
-}
-
-func getAllProviderPresets(
-	ctx context.Context,
-	mpw *modelpresetStore.ModelPresetStore,
-) ([]modelpresetSpec.ProviderPreset, error) {
-	const maxSafetyHops = 16
-
-	var (
-		all   []modelpresetSpec.ProviderPreset
-		token string
-		hops  int
-	)
-
-	for {
-		resp, err := mpw.ListProviderPresets(ctx, &modelpresetSpec.ListProviderPresetsRequest{
-			IncludeDisabled: true,
-			PageSize:        modelpresetSpec.MaxPageSize,
-			PageToken:       token,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if resp.Body == nil {
-			break
-		}
-		all = append(all, resp.Body.Providers...)
-
-		if resp.Body.NextPageToken == nil || *resp.Body.NextPageToken == "" {
-			break
-		}
-		if hops >= maxSafetyHops {
-			return nil, fmt.Errorf("pagination exceeded %d hops - aborting", maxSafetyHops)
-		}
-		token = *resp.Body.NextPageToken
-		hops++
-	}
-	return all, nil
-}
-
-// getAllProviderSecrets fetches every secret once and caches them in-mem.
-func getAllProviderSecrets(
-	ctx context.Context,
-	s *settingStore.SettingStore,
-) (map[string]string, error) {
-	resp, err := s.GetSettings(ctx, &settingSpec.GetSettingsRequest{})
-	if err != nil {
-		return nil, err
-	}
-	if resp.Body == nil {
-		return nil, errors.New("GetSettings: empty response body")
-	}
-
-	secrets := make(map[string]string, len(resp.Body.AuthKeys))
-	for _, meta := range resp.Body.AuthKeys {
-		if meta.Type != settingSpec.AuthKeyTypeProvider {
-			continue
-		}
-		secResp, err := s.GetAuthKey(ctx, &settingSpec.GetAuthKeyRequest{
-			Type:    meta.Type,
-			KeyName: meta.KeyName,
-		})
-		if err != nil {
-			return nil, err
-		}
-		if secResp.Body != nil && secResp.Body.Secret != "" {
-			secrets[string(meta.KeyName)] = secResp.Body.Secret
-		}
-	}
-	return secrets, nil
-}
-
-// BuildAddProviderRequests merges presets + secrets.
-// Only providers that have a (valid) preset are considered.  If a matching
-// secret exists its value is copied into the request.
-func initProviders(
-	ctx context.Context,
-	providerAPI *inferencewrapper.ProviderSetAPI,
-	providers []modelpresetSpec.ProviderPreset,
-	secrets map[string]string,
-) error {
-	providersAdded := 0
-	providersWithAPIKey := 0
-	for _, pp := range providers {
-		if pp.Name == "" || pp.Origin == "" {
-			slog.Warn("skipping provider with invalid preset", "name", pp.Name)
-			continue
-		}
-
-		body := &inferencewrapperSpec.AddProviderRequestBody{
-			SDKType:                  pp.SDKType,
-			Origin:                   pp.Origin,
-			ChatCompletionPathPrefix: pp.ChatCompletionPathPrefix,
-			APIKeyHeaderKey:          pp.APIKeyHeaderKey,
-			DefaultHeaders:           pp.DefaultHeaders,
-		}
-		r := &inferencewrapperSpec.AddProviderRequest{
-			Provider: inferenceSpec.ProviderName(string(pp.Name)),
-			Body:     body,
-		}
-		if _, err := providerAPI.AddProvider(ctx, r); err != nil {
-			return fmt.Errorf("add provider failed. name: %s, err: %w ", pp.Name, err)
-		}
-		providersAdded++
-		if secret, ok := secrets[string(pp.Name)]; ok {
-			_, err := providerAPI.SetProviderAPIKey(ctx, &inferencewrapperSpec.SetProviderAPIKeyRequest{
-				Provider: inferenceSpec.ProviderName(string(pp.Name)),
-				Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
-					APIKey: secret,
-				},
-			})
-			if err != nil {
-				return fmt.Errorf("set provider api key failed. name: %s, err: %w ", pp.Name, err)
-			}
-			providersWithAPIKey++
-		}
-	}
-
-	if providersAdded == 0 {
-		slog.Warn("no providers found - nothing to initialize")
-	}
-	if providersWithAPIKey == 0 {
-		slog.Warn("no providers with APIKey")
-	}
-
-	return nil
 }
 
 func applyDebugSettings(providerSet *inferencewrapper.ProviderSetAPI, cfg settingSpec.DebugSettings) error {

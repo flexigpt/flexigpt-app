@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"maps"
 	"slices"
 	"strings"
 
@@ -14,14 +13,11 @@ import (
 	"github.com/flexigpt/inference-go"
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/debugclient"
-	"github.com/flexigpt/inference-go/modelpreset"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
-	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -43,7 +39,6 @@ type ProviderSetAPI struct {
 	inner *inference.ProviderSetAPI
 
 	toolAggregate      *toolAggregate.Service
-	mpStore            *modelpresetStore.ModelPresetStore
 	artifactSkills     *skillAggregate.Service
 	mcpInferenceBridge *MCPInferenceBridge
 	workspaceBridge    *WorkspaceInferenceBridge
@@ -86,18 +81,16 @@ func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 //   - opts: functional options for configuring the wrapper (e.g. WithLogger, WithDebugConfig).
 func NewProviderSetAPI(
 	tools *toolAggregate.Service,
-	mps *modelpresetStore.ModelPresetStore,
 	artifactSkills *skillAggregate.Service,
 	mcpBridge *MCPInferenceBridge,
 	workspaceBridge *WorkspaceInferenceBridge,
 	opts ...ProviderSetOption,
 ) (*ProviderSetAPI, error) {
-	if tools == nil || mps == nil || artifactSkills == nil || mcpBridge == nil || workspaceBridge == nil {
+	if tools == nil || artifactSkills == nil || mcpBridge == nil || workspaceBridge == nil {
 		return nil, errors.New("inferencewrapper: missing input")
 	}
 	ps := &ProviderSetAPI{
 		toolAggregate:      tools,
-		mpStore:            mps,
 		artifactSkills:     artifactSkills,
 		mcpInferenceBridge: mcpBridge,
 		workspaceBridge:    workspaceBridge,
@@ -224,25 +217,15 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	if req == nil || req.Body == nil {
 		return nil, errors.New("got empty completion input")
 	}
-	if req.Provider == "" {
-		return nil, errors.New("missing provider")
+	if req.Runtime == nil {
+		return nil, errors.New("missing resolved runtime model")
 	}
-
-	if req.ModelPresetID == "" {
-		return nil, errors.New("missing modelPresetID")
+	if err := req.Runtime.Validate(); err != nil {
+		return nil, err
 	}
 
 	body := req.Body
-
-	// Resolve model param for this call (prefer explicit body.ModelParam,
-	// otherwise last non-nil ModelParam from history).
-	modelParam, err := ps.resolveModelParam(body)
-	if err != nil {
-		return nil, err
-	}
-	if modelParam.Name == "" {
-		return nil, errors.New("model name is required")
-	}
+	modelParam := req.Runtime.ModelParam
 
 	if len(body.Current.ToolChoices) > 0 {
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
@@ -250,16 +233,10 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 	ck := uuidutil.NewUUIDv7()
 
-	capabilityResolver, err := ps.newPresetCapabilityResolver(
-		ctx,
-		req.Provider,
-		req.ModelPresetID,
-		modelParam.Name,
+	capabilityResolver := capabilityoverride.NewCompletionKeyResolver(
 		ck,
+		&req.Runtime.Capabilities,
 	)
-	if err != nil {
-		return nil, err
-	}
 
 	// Flatten full conversation (history + current) into InputUnion list.
 	inputs, currentInputs, err := ps.buildInputs(ctx, body)
@@ -280,7 +257,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		body.Current.WorkspaceSelection,
 		body.Current.EnabledSkillRefs,
 	); err != nil {
-		//nolint:nilerr // Explicit.
 		return &spec.CompletionResponse{
 			Body: &spec.CompletionResponseBody{
 				InferenceResponse: &inferenceSpec.FetchCompletionResponse{
@@ -311,7 +287,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			}
 		}
 		if workspaceErr != nil {
-			//nolint:nilerr // Deliberate.
 			return &spec.CompletionResponse{
 				Body: &spec.CompletionResponseBody{
 					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
@@ -547,7 +522,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	infReq := &inferenceSpec.FetchCompletionRequest{
-		ModelParam:  *modelParam,
+		ModelParam:  modelParam,
 		Inputs:      inputs,
 		ToolChoices: toolChoices,
 	}
@@ -568,7 +543,22 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
-	b, err := ps.inner.FetchCompletion(ctx, req.Provider, infReq, opts)
+	runtimeProvider, release, err := ps.registerRuntimeProvider(
+		ctx,
+		*req.Runtime,
+		ck,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
+	b, err := ps.inner.FetchCompletion(
+		ctx,
+		runtimeProvider,
+		infReq,
+		opts,
+	)
 
 	// A nil or empty successful final payload is not a usable completion.
 	// Streaming may already have delivered visible text, so the frontend will
@@ -626,122 +616,6 @@ func workspaceUnavailableCompletionResponse(
 			WorkspaceUsage:        workspaceUsage,
 		},
 	}
-}
-
-func (ps *ProviderSetAPI) newPresetCapabilityResolver(
-	ctx context.Context,
-	provider inferenceSpec.ProviderName,
-	modelPresetID modelpreset.ModelPresetID,
-	requestModelName inferenceSpec.ModelName,
-	completionKey string,
-) (inferenceSpec.ModelCapabilityResolver, error) {
-	if ps == nil || ps.inner == nil {
-		return nil, errors.New("provider set is not initialized")
-	}
-	if provider == "" {
-		return nil, errors.New("provider is required for capability derivation")
-	}
-	if strings.TrimSpace(string(modelPresetID)) == "" {
-		return nil, errors.New("modelPresetID is required for capability derivation")
-	}
-	if ps.mpStore == nil {
-		return nil, errors.New("model preset store not configured on inference wrapper")
-	}
-
-	presp, err := ps.mpStore.GetModelPreset(ctx, &modelpresetSpec.GetModelPresetRequest{
-		ProviderName:    provider,
-		ModelPresetID:   modelPresetID,
-		IncludeDisabled: false,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if presp == nil || presp.Body == nil {
-		return nil, errors.New("GetModelPreset: empty response")
-	}
-
-	modelName := requestModelName
-	if modelName == "" {
-		modelName = presp.Body.Model.Name
-	}
-	if modelName == "" {
-		return nil, errors.New("cannot derive capabilities: model name is empty")
-	}
-
-	return ps.inner.NewPresetCapabilityResolver(
-		ctx,
-		provider,
-		inferenceProviderPresetFromApp(presp.Body.Provider),
-		inferenceModelPresetFromApp(presp.Body.Model, modelName),
-		completionKey,
-	)
-}
-
-func inferenceProviderPresetFromApp(pp modelpresetSpec.ProviderPreset) modelpreset.ProviderPreset {
-	return modelpreset.ProviderPreset{
-		Name:                     pp.Name,
-		DisplayName:              pp.DisplayName,
-		SDKType:                  pp.SDKType,
-		Origin:                   pp.Origin,
-		ChatCompletionPathPrefix: pp.ChatCompletionPathPrefix,
-		APIKeyHeaderKey:          pp.APIKeyHeaderKey,
-		DefaultHeaders:           maps.Clone(pp.DefaultHeaders),
-		CapabilitiesOverride:     capabilityoverride.CloneModelCapabilitiesOverride(pp.CapabilitiesOverride),
-	}
-}
-
-func inferenceModelPresetFromApp(
-	mp modelpresetSpec.ModelPreset,
-	modelName inferenceSpec.ModelName,
-) modelpreset.ModelPreset {
-	if modelName == "" {
-		modelName = mp.Name
-	}
-
-	return modelpreset.ModelPreset{
-		ID:          mp.ID,
-		Name:        modelName,
-		DisplayName: mp.DisplayName,
-		ModelParam: inferenceSpec.ModelParam{
-			Name: modelName,
-		},
-		CapabilitiesOverride: capabilityoverride.CloneModelCapabilitiesOverride(mp.CapabilitiesOverride),
-	}
-}
-
-// resolveModelParam chooses the effective ModelParam for this call.
-//
-// Priority:
-//  1. body.ModelParam if non-nil.
-//  2. Last non-nil History[i].ModelParam.
-//
-// If still empty, returns an error.
-func (ps *ProviderSetAPI) resolveModelParam(
-	body *spec.CompletionRequestBody,
-) (*inferenceSpec.ModelParam, error) {
-	var mp *inferenceSpec.ModelParam
-	defaultMaxPromptTokens := 8000
-	if body.ModelParam != nil {
-		mp = body.ModelParam
-	} else {
-		for _, v := range slices.Backward(body.History) {
-			if v.ModelParam != nil {
-				mp = v.ModelParam
-				break
-			}
-		}
-	}
-	if mp == nil {
-		return nil, errors.New("no valid modelparam found")
-	}
-
-	mpCopy := *mp
-
-	if mpCopy.MaxPromptLength == 0 {
-		mpCopy.MaxPromptLength = defaultMaxPromptTokens
-	}
-
-	return &mpCopy, nil
 }
 
 // buildInputs flattens History + Current into a single InputUnion slice.

@@ -22,6 +22,25 @@ documents:
       format: "json"
       decoderID: "artifact-declaration-json"
 
+  modelProviders:
+    - locator: "model-provider.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "model-provider.yml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "model-provider.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
+  models:
+    - locator: "model.yaml"
+      format: "yaml"
+      decoderID: "artifact-declaration-yaml"
+    - locator: "model.json"
+      format: "json"
+      decoderID: "artifact-declaration-json"
+
   agents:
     - locator: "agent.yaml"
       format: "yaml"
@@ -118,6 +137,28 @@ documentUses:
     documentSets:
       - "skillPackages"
     defaultLocator: "SKILL.md"
+
+  modelProviderPackage:
+    documentSets:
+      - "modelProviders"
+    defaultLocator: "model-provider.yaml"
+
+  modelPackage:
+    documentSets:
+      - "models"
+    defaultLocator: "model.yaml"
+
+  managedModelProvider:
+    documentSets:
+      - "modelProviders"
+    defaultLocator: "model-provider.yaml"
+    decoderID: "artifact-declaration-yaml"
+
+  managedModel:
+    documentSets:
+      - "models"
+    defaultLocator: "model.yaml"
+    decoderID: "artifact-declaration-yaml"
 
   toolPackage:
     documentSets:
@@ -280,6 +321,7 @@ discoveryUses:
 resolver:
   types:
     - type: "text"
+    - type: "model.provider"
     - type: "model"
       supportsSelectors: true
       supportsMappedFallbackTargets: true
