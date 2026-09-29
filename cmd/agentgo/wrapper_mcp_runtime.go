@@ -13,7 +13,6 @@ import (
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPGlobalSettingsView struct {
@@ -43,7 +42,7 @@ func withMCPRuntime[T any](
 	w *MCPRuntimeWrapper,
 	fn func() (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if err := w.ready(); err != nil {
 			return zero, err
@@ -56,7 +55,7 @@ func withMCPRuntimeError(
 	w *MCPRuntimeWrapper,
 	fn func() error,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if err := w.ready(); err != nil {
 			return err
 		}

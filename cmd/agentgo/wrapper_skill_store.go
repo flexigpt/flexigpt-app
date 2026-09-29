@@ -17,7 +17,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -95,7 +94,7 @@ func withSkillStore[T any](
 	w *SkillStoreWrapper,
 	fn func(*skillConsumerAPI.API) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed
@@ -124,7 +123,7 @@ func (w *SkillStoreWrapper) RefreshSkillSource(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}
@@ -150,7 +149,7 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 	[]skillConsumerAPI.SkillListItem,
 	error,
 ) {
-	return middleware.WithRecoveryResp(func() ([]skillConsumerAPI.SkillListItem, error) {
+	return withRecoveryResp(func() ([]skillConsumerAPI.SkillListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
 			return nil, basespec.ErrClosed
 		}
@@ -195,7 +194,7 @@ func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
 	[]collection.ListItem,
 	error,
 ) {
-	return middleware.WithRecoveryResp(func() ([]collection.ListItem, error) {
+	return withRecoveryResp(func() ([]collection.ListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
 			return nil, basespec.ErrClosed
 		}
@@ -296,7 +295,7 @@ func (w *SkillStoreWrapper) PurgeSkill(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}
@@ -311,7 +310,7 @@ func (w *SkillStoreWrapper) PurgeSkill(
 func (w *SkillStoreWrapper) CreateSkillCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
-	return middleware.WithRecoveryResp(
+	return withRecoveryResp(
 		func() (collection.CollectionView, error) {
 			if w == nil || w.api == nil {
 				return collection.CollectionView{}, basespec.ErrClosed
@@ -420,7 +419,7 @@ func (w *SkillStoreWrapper) RemoveSkillCollectionMember(
 func (w *SkillStoreWrapper) DeleteSkillCollection(
 	request collection.DeleteRequest,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}

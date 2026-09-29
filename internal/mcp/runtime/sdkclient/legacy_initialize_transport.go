@@ -16,8 +16,8 @@ const sdkMethodServerDiscover = "server/discover"
 // older MCP servers hang on unknown methods instead of returning method-not-
 // found, which makes Client.Connect wait until the whole connect timeout.
 //
-// This implementation suppresses only the outgoing server/discover call in
-// client middleware. That is important: do not wrap the transport connection
+// This implementation suppresses only the outgoing server/discover call in client middlewares.
+// That is important: do not wrap the transport connection
 // for this purpose. The streamable HTTP transport's concrete connection type
 // receives an SDK-internal sessionUpdated callback after initialize. Wrapping
 // it hides that private interface from the SDK, preventing protocol-version

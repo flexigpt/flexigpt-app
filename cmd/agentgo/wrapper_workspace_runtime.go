@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
 
@@ -17,7 +16,7 @@ func withWorkspaceRuntime[T any](
 	w *WorkspaceRuntimeWrapper,
 	fn func(*workspaceConsumerAPI.StoreAPI) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed

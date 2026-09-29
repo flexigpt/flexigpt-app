@@ -12,7 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPStoreWrapper struct {
@@ -25,7 +24,7 @@ func withMCPStore[T any](
 	w *MCPStoreWrapper,
 	fn func(*mcpConsumerAPI.API) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed
@@ -38,7 +37,7 @@ func withMCPStoreManagement[T any](
 	w *MCPStoreWrapper,
 	fn func(*mcpConsumerAPI.MCPListService) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.management == nil {
 			return zero, basespec.ErrClosed
@@ -168,7 +167,7 @@ func (w *MCPStoreWrapper) ResolveMCPArtifactCapabilities(
 func (w *MCPStoreWrapper) CreateMCPCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
-	return middleware.WithRecoveryResp(
+	return withRecoveryResp(
 		func() (collection.CollectionView, error) {
 			if w == nil || w.api == nil {
 				return collection.CollectionView{}, basespec.ErrClosed
@@ -289,7 +288,7 @@ func (w *MCPStoreWrapper) RemoveMCPCollectionMember(
 func (w *MCPStoreWrapper) DeleteMCPCollection(
 	request collection.DeleteRequest,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}

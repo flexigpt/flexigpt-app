@@ -17,8 +17,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/modelpreset/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
-	"github.com/flexigpt/flexigpt-app/internal/overlay"
 )
 
 type builtInProviderKey inferenceSpec.ProviderName

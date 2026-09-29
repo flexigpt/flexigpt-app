@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
@@ -63,7 +62,7 @@ func withToolStore[T any](
 	w *ToolStoreWrapper,
 	fn func(*toolConsumerAPI.API) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed

@@ -16,7 +16,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type AgentStoreWrapper struct {
@@ -87,7 +86,7 @@ func withAgentStore[T any](
 	w *AgentStoreWrapper,
 	fn func(*agentConsumerAPI.API) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed
@@ -335,7 +334,7 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}
@@ -409,7 +408,7 @@ func (w *AgentStoreWrapper) ExportAgent(
 func (w *AgentStoreWrapper) DeleteManagedAgent(
 	request agentConsumerAPI.ManagedAgentDeleteRequest,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}

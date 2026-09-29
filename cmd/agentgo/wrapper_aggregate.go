@@ -19,7 +19,6 @@ import (
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	modelpresetSpec "github.com/flexigpt/flexigpt-app/internal/modelpreset/spec"
 	modelpresetStore "github.com/flexigpt/flexigpt-app/internal/modelpreset/store"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
@@ -127,7 +126,7 @@ func SetWrappedProviderAppContext(w *AggregrateWrapper, ctx context.Context) {
 func (w *AggregrateWrapper) ApplyUnifiedDiff(
 	req *texttool.ApplyUnifiedDiffArgs,
 ) (*texttool.ApplyUnifiedDiffOut, error) {
-	return middleware.WithRecoveryResp(func() (*texttool.ApplyUnifiedDiffOut, error) {
+	return withRecoveryResp(func() (*texttool.ApplyUnifiedDiffOut, error) {
 		if req == nil {
 			return nil, errors.New("invalid arguments: nil request received")
 		}
@@ -138,7 +137,7 @@ func (w *AggregrateWrapper) ApplyUnifiedDiff(
 func (w *AggregrateWrapper) PostProviderPreset(
 	req *modelpresetSpec.PostProviderPresetRequest,
 ) (*modelpresetSpec.PostProviderPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*modelpresetSpec.PostProviderPresetResponse, error) {
+	return withRecoveryResp(func() (*modelpresetSpec.PostProviderPresetResponse, error) {
 		// First try to delete from provider apis, it is ok if it is not present.
 		_, _ = w.providersetAPI.DeleteProvider(
 			context.Background(),
@@ -173,7 +172,7 @@ func (w *AggregrateWrapper) PostProviderPreset(
 func (w *AggregrateWrapper) DeleteProviderPreset(
 	req *modelpresetSpec.DeleteProviderPresetRequest,
 ) (*modelpresetSpec.DeleteProviderPresetResponse, error) {
-	return middleware.WithRecoveryResp(func() (*modelpresetSpec.DeleteProviderPresetResponse, error) {
+	return withRecoveryResp(func() (*modelpresetSpec.DeleteProviderPresetResponse, error) {
 		_, err := w.DeleteAuthKey(
 			&settingSpec.DeleteAuthKeyRequest{
 				Type:    settingSpec.AuthKeyTypeProvider,
@@ -200,7 +199,7 @@ func (w *AggregrateWrapper) DeleteProviderPreset(
 func (w *AggregrateWrapper) SetAuthKey(
 	req *settingSpec.SetAuthKeyRequest,
 ) (*settingSpec.SetAuthKeyResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.SetAuthKeyResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.SetAuthKeyResponse, error) {
 		if req.Type == settingSpec.AuthKeyTypeProvider {
 			_, err := w.providersetAPI.SetProviderAPIKey(
 				context.Background(),
@@ -224,7 +223,7 @@ func (w *AggregrateWrapper) SetAuthKey(
 func (w *AggregrateWrapper) DeleteAuthKey(
 	req *settingSpec.DeleteAuthKeyRequest,
 ) (*settingSpec.DeleteAuthKeyResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.DeleteAuthKeyResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.DeleteAuthKeyResponse, error) {
 		resp, err := w.settingStore.DeleteAuthKey(context.Background(), req)
 		if err != nil {
 			return nil, err
@@ -251,7 +250,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 	thinkingCallbackID string,
 	requestID string,
 ) (*inferencewrapperSpec.CompletionResponse, error) {
-	return middleware.WithRecoveryResp(func() (*inferencewrapperSpec.CompletionResponse, error) {
+	return withRecoveryResp(func() (*inferencewrapperSpec.CompletionResponse, error) {
 		if requestID == "" {
 			return nil, errors.New("requestID is empty")
 		}

@@ -14,13 +14,12 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 func (a *App) OpenURLAsAttachment(
 	rawURL string,
 ) (att *attachment.Attachment, err error) {
-	return middleware.WithRecoveryResp(func() (*attachment.Attachment, error) {
+	return withRecoveryResp(func() (*attachment.Attachment, error) {
 		return attachment.BuildAttachmentForURL(rawURL)
 	})
 }
@@ -31,7 +30,7 @@ func (a *App) SaveFile(
 	contentBase64 string,
 	additionalFilters []attachment.FileFilter,
 ) error {
-	_, err := middleware.WithRecoveryResp(func() (struct{}, error) {
+	_, err := withRecoveryResp(func() (struct{}, error) {
 		return struct{}{}, a.saveFile(defaultFilename, contentBase64, additionalFilters)
 	})
 	return err
@@ -43,7 +42,7 @@ func (a *App) OpenMultipleFilesAsAttachments(
 	allowMultiple bool,
 	additionalFilters []attachment.FileFilter,
 ) (attachments []attachment.Attachment, err error) {
-	return middleware.WithRecoveryResp(func() ([]attachment.Attachment, error) {
+	return withRecoveryResp(func() ([]attachment.Attachment, error) {
 		return a.openMultipleFilesAsAttachments(allowMultiple, additionalFilters)
 	})
 }
@@ -51,7 +50,7 @@ func (a *App) OpenMultipleFilesAsAttachments(
 // PickDirectory opens a directory picker without walking the selected tree or
 // constructing attachment objects. Workspace setup uses this path-only API.
 func (a *App) PickDirectory() (path string, err error) {
-	return middleware.WithRecoveryResp(func() (string, error) {
+	return withRecoveryResp(func() (string, error) {
 		return a.pickDirectory()
 	})
 }
@@ -59,7 +58,7 @@ func (a *App) PickDirectory() (path string, err error) {
 // PickFiles opens a file picker without constructing attachment objects.
 // Workspace setup uses it when selecting explicit Context files.
 func (a *App) PickFiles(allowMultiple bool) (paths []string, err error) {
-	return middleware.WithRecoveryResp(func() ([]string, error) {
+	return withRecoveryResp(func() ([]string, error) {
 		return a.pickFiles(allowMultiple)
 	})
 }
@@ -67,13 +66,13 @@ func (a *App) PickFiles(allowMultiple bool) (paths []string, err error) {
 // OpenDirectoryAsAttachments opens a single directory pick dialog and then does WalkDirectoryWithFiles for fetching max
 // no of files.
 func (a *App) OpenDirectoryAsAttachments(maxFiles int) (*attachment.DirectoryAttachmentsResult, error) {
-	return middleware.WithRecoveryResp(func() (*attachment.DirectoryAttachmentsResult, error) {
+	return withRecoveryResp(func() (*attachment.DirectoryAttachmentsResult, error) {
 		return a.openDirectoryAsAttachments(maxFiles)
 	})
 }
 
 func (a *App) GetPathsAsAttachments(paths []string, maxFilesPerDir int) (*attachment.PathAttachmentsResult, error) {
-	return middleware.WithRecoveryResp(func() (*attachment.PathAttachmentsResult, error) {
+	return withRecoveryResp(func() (*attachment.PathAttachmentsResult, error) {
 		return a.getPathsAsAttachments(paths, maxFilesPerDir)
 	})
 }

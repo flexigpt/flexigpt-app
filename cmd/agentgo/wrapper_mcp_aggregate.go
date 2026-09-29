@@ -13,7 +13,6 @@ import (
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 )
 
 type MCPAggregateWrapper struct {
@@ -25,7 +24,7 @@ func withMCPAggregate[T any](
 	w *MCPAggregateWrapper,
 	fn func(*mcpAggregate.Service) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if err := w.ready(); err != nil {
 			return zero, err
@@ -38,7 +37,7 @@ func withMCPAggregateError(
 	w *MCPAggregateWrapper,
 	fn func(*mcpAggregate.Service) error,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if err := w.ready(); err != nil {
 			return err
 		}

@@ -9,7 +9,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 )
@@ -66,7 +65,7 @@ func withToolRuntime[T any](
 	w *ToolRuntimeWrapper,
 	fn func(*toolRuntime.Service) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.service == nil {
 			return zero, basespec.ErrClosed

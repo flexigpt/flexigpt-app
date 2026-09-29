@@ -10,7 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
@@ -50,7 +49,7 @@ func withToolAggregate[T any](
 	w *ToolAggregateWrapper,
 	fn func(*toolAggregate.Service) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if err := w.ready(); err != nil {
 			return zero, err

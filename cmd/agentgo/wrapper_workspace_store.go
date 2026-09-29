@@ -11,7 +11,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
@@ -72,7 +71,7 @@ func withWorkspaceStore[T any](
 	w *WorkspaceStoreWrapper,
 	fn func(*workspaceConsumerAPI.StoreAPI) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
 			return zero, basespec.ErrClosed
@@ -85,7 +84,7 @@ func withWorkspaceStoreError(
 	w *WorkspaceStoreWrapper,
 	fn func(*workspaceConsumerAPI.StoreAPI) error,
 ) error {
-	return middleware.WithRecovery(func() error {
+	return withRecovery(func() error {
 		if w == nil || w.api == nil {
 			return basespec.ErrClosed
 		}

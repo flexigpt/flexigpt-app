@@ -3,8 +3,6 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
-
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	settingStore "github.com/flexigpt/flexigpt-app/internal/setting/store"
 )
@@ -33,7 +31,7 @@ func InitSettingStoreWrapper(
 func (w *SettingStoreWrapper) SetAppTheme(
 	req *settingSpec.SetAppThemeRequest,
 ) (*settingSpec.SetAppThemeResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.SetAppThemeResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.SetAppThemeResponse, error) {
 		return w.store.SetAppTheme(context.Background(), req)
 	})
 }
@@ -41,7 +39,7 @@ func (w *SettingStoreWrapper) SetAppTheme(
 func (w *SettingStoreWrapper) SetDebugSettings(
 	req *settingSpec.SetDebugSettingsRequest,
 ) (*settingSpec.SetDebugSettingsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.SetDebugSettingsResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.SetDebugSettingsResponse, error) {
 		return w.store.SetDebugSettings(context.Background(), req)
 	})
 }
@@ -49,7 +47,7 @@ func (w *SettingStoreWrapper) SetDebugSettings(
 func (w *SettingStoreWrapper) GetSettings(
 	req *settingSpec.GetSettingsRequest,
 ) (*settingSpec.GetSettingsResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.GetSettingsResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.GetSettingsResponse, error) {
 		return w.store.GetSettings(context.Background(), req)
 	})
 }
@@ -57,7 +55,7 @@ func (w *SettingStoreWrapper) GetSettings(
 func (w *SettingStoreWrapper) GetAuthKey(
 	req *settingSpec.GetAuthKeyRequest,
 ) (*settingSpec.GetAuthKeyResponse, error) {
-	return middleware.WithRecoveryResp(func() (*settingSpec.GetAuthKeyResponse, error) {
+	return withRecoveryResp(func() (*settingSpec.GetAuthKeyResponse, error) {
 		return w.store.GetAuthKey(context.Background(), req)
 	})
 }

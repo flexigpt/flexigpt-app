@@ -1,4 +1,4 @@
-package middleware
+package main
 
 import (
 	"fmt"
@@ -7,9 +7,9 @@ import (
 	"strings"
 )
 
-// WithRecovery is a helper that recovers from any panic, logs the stack trace,
+// withRecovery is a helper that recovers from any panic, logs the stack trace,
 // and returns an error to the caller.
-func WithRecovery(fn func() error) (err error) {
+func withRecovery(fn func() error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Log the panic plus stack trace.
@@ -37,9 +37,9 @@ func WithRecovery(fn func() error) (err error) {
 	return err
 }
 
-// WithRecoveryResp is a helper that recovers from any panic, logs the stack trace,
+// withRecoveryResp is a helper that recovers from any panic, logs the stack trace,
 // and returns an error to the caller. T must match the response type of your function.
-func WithRecoveryResp[T any](fn func() (T, error)) (result T, err error) {
+func withRecoveryResp[T any](fn func() (T, error)) (result T, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			// Log the panic plus stack trace.

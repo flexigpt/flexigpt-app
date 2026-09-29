@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
 
@@ -20,7 +19,7 @@ func withSkillAggregate[T any](
 	w *SkillAggregateWrapper,
 	fn func(*skillAggregate.Service) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.service == nil {
 			return zero, basespec.ErrClosed

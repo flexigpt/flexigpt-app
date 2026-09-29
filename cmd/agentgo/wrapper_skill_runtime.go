@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/middleware"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
@@ -21,7 +20,7 @@ func withSkillRuntime[T any](
 	w *SkillRuntimeWrapper,
 	fn func(*skillRuntime.Service) (T, error),
 ) (T, error) {
-	return middleware.WithRecoveryResp(func() (T, error) {
+	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil {
 			return zero, basespec.ErrClosed
