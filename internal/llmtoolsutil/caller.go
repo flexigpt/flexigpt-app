@@ -4,10 +4,48 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"time"
 
 	"github.com/flexigpt/llmtools-go"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 )
+
+// defaultGoRegistry is a package-level global registry with a 5s timeout.
+// It is created during package initialization and panics on failure.
+var defaultGoRegistry *llmtools.Registry
+
+func init() {
+	defaultGoRegistry = mustNewGoRegistry(llmtools.WithDefaultCallTimeout(300 * time.Second))
+}
+
+// mustNewGoRegistry panics if NewGoRegistry fails.
+// This is useful for package-level initialization.
+func mustNewGoRegistry(opts ...llmtools.RegistryOption) *llmtools.Registry {
+	r, err := llmtools.NewBuiltinRegistry(opts...)
+	if err != nil {
+		panic(fmt.Errorf("failed to create default go registry: %w", err))
+	}
+	return r
+}
+
+func CallUsingDefaultGoRegistry(
+	ctx context.Context,
+	funcID string,
+	args json.RawMessage,
+	callOpts ...llmtools.CallOption,
+) ([]llmtoolsSpec.ToolOutputUnion, error) {
+	llmtoolsOutputs, err := defaultGoRegistry.Call(
+		ctx,
+		llmtoolsSpec.FuncID(funcID),
+		args,
+		callOpts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return fromLLMToolsOutputUnions(llmtoolsOutputs)
+}
 
 func CallUsingRegistry(
 	ctx context.Context,
@@ -20,24 +58,6 @@ func CallUsingRegistry(
 		return nil, errors.New("nil registry")
 	}
 	llmtoolsOutputs, err := reg.Call(
-		ctx,
-		llmtoolsSpec.FuncID(funcID),
-		args,
-		callOpts...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return fromLLMToolsOutputUnions(llmtoolsOutputs)
-}
-
-func CallUsingDefaultGoRegistry(
-	ctx context.Context,
-	funcID string,
-	args json.RawMessage,
-	callOpts ...llmtools.CallOption,
-) ([]llmtoolsSpec.ToolOutputUnion, error) {
-	llmtoolsOutputs, err := defaultGoRegistry.Call(
 		ctx,
 		llmtoolsSpec.FuncID(funcID),
 		args,
