@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/secretstore/keyringmapstore"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
@@ -70,6 +71,11 @@ func composeArtifactStore(
 		return nil, err
 	}
 
+	overlayNamespaces := append(
+		modelOverlay.Namespaces(),
+		mcpOverlay.Namespaces()...,
+	)
+
 	return compositionapi.Open(
 		ctx,
 		compositionapi.Config{
@@ -80,7 +86,7 @@ func composeArtifactStore(
 			Providers:                  providers,
 			ProtectedRootIDs:           documentTopology.ProtectedRootIDs(),
 			RetainedRoots:              documentTopology.RetainedRootDrafts(),
-			ProtectedOverlayNamespaces: modelOverlay.Namespaces(),
+			ProtectedOverlayNamespaces: overlayNamespaces,
 			SecretValues:               secretValues,
 		},
 	)

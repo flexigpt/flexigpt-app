@@ -1,13 +1,39 @@
 # Artifact-backed MCP secrets
 
 Artifact-backed MCP Server Definitions, MCP Collection source documents,
-Artifact local data, and runtime snapshots must never contain raw secret values.
-They contain only opaque Artifact-scoped secret references.
+Artifact local data, protected MCP overlays, and runtime snapshots never
+contain raw secret values.
 
-Secret values are stored through the existing Setting Store under the `mcp`
-auth-key namespace. OAuth access and refresh tokens are application-local
-secret values. They are never included in source documents, Definitions,
-Artifact data, conversation records, or general runtime projections.
+MCP installation data retains `mcpv1:` logical secret selectors. These
+selectors identify one declared MCP server input, OAuth credential slot, token
+slot, environment target, or HTTP header target.
+
+The selector is not the physical secret location.
+
+Artifact Store derives an Artifact-local secret binding from the selector:
+
+```text
+ArtifactRef + namespace "mcp.installation" + derived binding slot
+```
+
+Artifact Store SQLite stores:
+
+- The current opaque `secret.v1/...` ref.
+- SHA-256 metadata.
+- Binding revision.
+- Artifact ownership.
+- Cleanup state.
+
+Artifact Store's keyring-backed MapStore stores the encrypted secret value.
+
+The secret value is never included in:
+
+- MCP source declarations.
+- Artifact Definitions.
+- Artifact.Data.
+- Protected overlay payloads.
+- Settings MCP installation data.
+- MCP runtime status projections.
 
 ## Storage model
 
@@ -118,14 +144,14 @@ The official MCP Go SDK supports Client ID Metadata Document registration.
 
 Server config:
 
-    {
-      "transport": "streamableHTTP",
-      "streamableHTTP": {
-        "url": "https://example.com/mcp",
-        "authMode": "oauth",
-        "clientIDMetadataDocumentURL": "https://client.example.com/flexigpt-mcp-client.json"
-      }
-    }
+{
+"transport": "streamableHTTP",
+"streamableHTTP": {
+"url": "https://example.com/mcp",
+"authMode": "oauth",
+"clientIDMetadataDocumentURL": "https://client.example.com/flexigpt-mcp-client.json"
+}
+}
 
 If the authorization server does not support Client ID Metadata Documents and
 dynamic client registration is available, the SDK can fall back to DCR.
@@ -139,10 +165,10 @@ is present before accepting the secret for a server using
 
 Secret value:
 
-    {
-      "clientID": "service-client-id",
-      "clientSecret": "service-client-secret"
-    }
+{
+"clientID": "service-client-id",
+"clientSecret": "service-client-secret"
+}
 
 The SDK obtains access tokens using the standard client-credentials grant.
 

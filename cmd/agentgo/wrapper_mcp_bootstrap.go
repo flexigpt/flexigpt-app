@@ -41,6 +41,10 @@ func InitMCPWrappers(
 	resources compositionapi.ResourceAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
+	protectedOverlays compositionapi.ProtectedOverlayAPI,
+	secretBindings compositionapi.SecretBindingAPI,
+	secretRuntime compositionapi.SecretRuntimeAPI,
+	localState compositionapi.LocalStateMaintenanceAPI,
 	hydrator topology.CompiledHydrationCoordinator,
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
@@ -59,6 +63,10 @@ func InitMCPWrappers(
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
+		protectedOverlays == nil ||
+		secretBindings == nil ||
+		secretRuntime == nil ||
+		localState == nil ||
 		hydrator == nil ||
 		settingsStore == nil {
 		return nil, errors.New("MCP wrapper dependencies are incomplete")
@@ -68,11 +76,25 @@ func InitMCPWrappers(
 	if err != nil {
 		return nil, err
 	}
-	overlays, err := mcpOverlay.NewSettingsOverlayRepository(settings)
+	overlays, err := mcpOverlay.NewArtifactOverlayRepository(
+		mcpOverlay.ArtifactOverlayDependencies{
+			Artifacts:        artifacts,
+			Protection:       protection,
+			ProtectedOverlay: protectedOverlays,
+			LocalState:       localState,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	secrets := newSettingMCPSecretResolver(settingsStore)
+	secrets, err := newArtifactMCPSecretResolver(
+		artifacts,
+		secretBindings,
+		secretRuntime,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	storeAPI, err := mcpConsumerAPI.New(
 		sources,
@@ -105,7 +127,10 @@ func InitMCPWrappers(
 		return nil, err
 	}
 
-	m, err := mcpConsumerAPI.NewMCPListService(roots, catalogStore)
+	listService, err := mcpConsumerAPI.NewMCPListService(
+		roots,
+		catalogStore,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +231,16 @@ func InitMCPWrappers(
 		return cleanup(err)
 	}
 
-	builtIns, err := NewMCPBuiltInInstaller(hydrator, builtinCleanup, overlays)
+	builtIns, err := NewMCPBuiltInInstaller(
+		hydrator,
+		builtinCleanup,
+	)
 	if err != nil {
 		return cleanup(err)
 	}
 
 	storeWrapper.api = storeAPI
-	storeWrapper.management = m
+	storeWrapper.management = listService
 	storeWrapper.roots = roots
 
 	runtimeWrapper.runtime = runtimeManager
@@ -230,16 +258,16 @@ func InitMCPWrappers(
 func NewMCPBuiltInInstaller(
 	hydrator topology.CompiledHydrationCoordinator,
 	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
-	overlays mcpOverlay.RootPurger,
 ) (builtin.HydrationInstaller, error) {
-	if hydrator == nil || cleanup == nil || overlays == nil {
-		return nil, errors.New("MCP generated built-in installer dependencies are incomplete")
+	if hydrator == nil || cleanup == nil {
+		return nil, errors.New(
+			"MCP generated built-in installer dependencies are incomplete",
+		)
 	}
 	return mcpBuiltin.NewInstaller(
 		mcpBuiltin.InstallerDependencies{
 			Hydrator: hydrator,
 			Cleanup:  cleanup,
-			Overlays: overlays,
 		},
 	)
 }

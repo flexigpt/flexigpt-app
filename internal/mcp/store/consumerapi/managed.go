@@ -481,17 +481,8 @@ func (a *API) PurgeManagedMCP(
 			basespec.ErrConflict,
 		)
 	}
-	installation, err := mcpDomainServer.DecodeServerData(missing.Data)
-	if err != nil {
+	if err := a.overlays.PurgeServerLocalState(ctx, ref); err != nil {
 		return err
 	}
-	if err := a.cleanupServerSecretReferences(
-		ctx,
-		ref,
-		installation,
-	); err != nil {
-		return err
-	}
-
 	return a.artifacts.Purge(ctx, ref, missing.Revision)
 }

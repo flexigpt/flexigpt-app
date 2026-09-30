@@ -94,9 +94,11 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	refs := make([]artifact.ArtifactRef, 0)
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, entry := range entries {
-		if entry.Kind != mcpDomain.MCPArtifactKind {
+		if entry.State != artifact.StateAvailable ||
+			entry.Kind != mcpDomain.MCPArtifactKind {
 			continue
 		}
+
 		if _, found := directories[basespec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
 			continue
 		}

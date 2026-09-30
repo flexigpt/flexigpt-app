@@ -10,13 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
 type InstallerDependencies struct {
 	Hydrator topology.CompiledHydrationCoordinator
 	Cleanup  mcpConsumerAPI.BuiltinPackageCleanup
-	Overlays mcpOverlay.RootPurger
 }
 
 type Installer struct {
@@ -24,21 +22,18 @@ type Installer struct {
 }
 
 type lifecycle struct {
-	cleanup  mcpConsumerAPI.BuiltinPackageCleanup
-	overlays mcpOverlay.RootPurger
+	cleanup mcpConsumerAPI.BuiltinPackageCleanup
 }
 
 type lifecycleState struct {
-	rootPurged bool
-	servers    []artifact.ArtifactRef
+	servers []artifact.ArtifactRef
 }
 
 func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Hydrator == nil ||
-		dependencies.Cleanup == nil ||
-		dependencies.Overlays == nil {
+		dependencies.Cleanup == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP generated catalog installer dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -54,8 +49,7 @@ func NewInstaller(
 		set,
 		dependencies.Hydrator,
 		lifecycle{
-			cleanup:  dependencies.Cleanup,
-			overlays: dependencies.Overlays,
+			cleanup: dependencies.Cleanup,
 		},
 	)
 	if err != nil {
@@ -68,51 +62,17 @@ func (l lifecycle) PrepareCompiledHydration(
 	ctx context.Context,
 	plan topology.CompiledPackagePlan,
 ) (any, error) {
+	// Protected topology reset now removes overlays and queues secret cleanup
+	// inside Artifact Store. There is no external settings Root purge.
 	if !plan.TopologyCurrent {
-		if err := l.overlays.PurgeRoot(
-			ctx,
-			plan.Registration.Set.Hydration.RootID,
-		); err != nil {
-			return nil, err
-		}
-		return lifecycleState{rootPurged: true}, nil
+		return lifecycleState{}, nil
 	}
 
-	addresses := make(
-		[]source.ManagedPackageAddress,
-		0,
-		len(plan.Changed)+len(plan.Stale),
-	)
-	byScope := make(map[basespec.Locator]source.ManagedPackageAddress)
-	for _, packageValue := range plan.Registration.Set.Packages {
-		scope, err := packageValue.Address.Directory()
-		if err != nil {
-			return nil, err
-		}
-		byScope[scope] = packageValue.Address
+	addresses, err := addressesForPlan(plan)
+	if err != nil {
+		return nil, err
 	}
-	for _, scope := range plan.Changed {
-		address, found := byScope[scope]
-		if !found {
-			return nil, fmt.Errorf(
-				"%w: MCP generated package scope %q is unknown",
-				basespec.ErrInvalid,
-				scope,
-			)
-		}
-		addresses = append(addresses, address)
-	}
-	for _, stale := range plan.Stale {
-		address, err := source.ParseManagedPackageAddressDirectory(
-			stale.Key.Scope,
-		)
-		if err != nil {
-			return nil, err
-		}
-		addresses = append(addresses, address)
-	}
-
-	refs, err := l.cleanup.CaptureBuiltInPackageServers(
+	servers, err := l.cleanup.CaptureBuiltInPackageServers(
 		ctx,
 		plan.Registration.Set.Hydration.RootID,
 		plan.Registration.Set.Hydration.SourceID,
@@ -121,7 +81,7 @@ func (l lifecycle) PrepareCompiledHydration(
 	if err != nil {
 		return nil, err
 	}
-	return lifecycleState{servers: refs}, nil
+	return lifecycleState{servers: servers}, nil
 }
 
 func (l lifecycle) CompleteCompiledHydration(
@@ -136,11 +96,59 @@ func (l lifecycle) CompleteCompiledHydration(
 			basespec.ErrInvalid,
 		)
 	}
-	if value.rootPurged {
-		return nil
-	}
 	return l.cleanup.CleanupRemovedBuiltInPackageServers(
 		ctx,
 		value.servers,
 	)
+}
+
+func addressesForPlan(
+	plan topology.CompiledPackagePlan,
+) ([]source.ManagedPackageAddress, error) {
+	output := make(
+		[]source.ManagedPackageAddress,
+		0,
+		len(plan.Changed)+len(plan.Stale),
+	)
+	seen := make(map[source.ManagedPackageAddress]struct{})
+
+	byScope := make(map[basespec.Locator]source.ManagedPackageAddress)
+	for _, packageValue := range plan.Registration.Set.Packages {
+		scope, err := packageValue.Address.Directory()
+		if err != nil {
+			return nil, err
+		}
+		byScope[scope] = packageValue.Address
+	}
+
+	for _, scope := range plan.Changed {
+		address, found := byScope[scope]
+		if !found {
+			return nil, fmt.Errorf(
+				"%w: MCP generated package scope %q is unknown",
+				basespec.ErrInvalid,
+				scope,
+			)
+		}
+		if _, duplicate := seen[address]; duplicate {
+			continue
+		}
+		seen[address] = struct{}{}
+		output = append(output, address)
+	}
+
+	for _, stale := range plan.Stale {
+		address, err := source.ParseManagedPackageAddressDirectory(
+			stale.Key.Scope,
+		)
+		if err != nil {
+			return nil, err
+		}
+		if _, duplicate := seen[address]; duplicate {
+			continue
+		}
+		seen[address] = struct{}{}
+		output = append(output, address)
+	}
+	return output, nil
 }

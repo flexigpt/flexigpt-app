@@ -396,6 +396,7 @@ func (a *API) UpdateProtectedServerInstallation(
 	if err := a.overlays.PutServerOverlay(
 		ctx,
 		terminal,
+		material.Resource.Artifact.Revision,
 		expectedOverlayRevision,
 		next,
 	); err != nil {

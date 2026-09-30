@@ -8,6 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -124,6 +125,32 @@ func GetMCPSecretRefStorageKey(r MCPSecretRef) string {
 		string(digest),
 		cryptoutil.DigestSHA256Prefix,
 	)
+}
+
+// ArtifactBindingSlot maps one stable MCP logical secret selector into a
+// valid Artifact Store secret slot identifier.
+//
+// The resulting slot contains no source path, logical server name, plaintext
+// secret, or Settings storage key. The selector's canonical digest provides a
+// stable identity across runtime resolution and secret updates.
+func ArtifactBindingSlot(
+	ref MCPSecretRef,
+) (secret.Slot, error) {
+	storageKey := GetMCPSecretRefStorageKey(ref)
+	if storageKey == "" {
+		return "", fmt.Errorf(
+			"%w: could not derive MCP secret binding slot",
+			basespec.ErrInvalid,
+		)
+	}
+
+	slot := secret.Slot(
+		"mcpSecret" + strings.TrimPrefix(storageKey, SecretRefVersion+":"),
+	)
+	if err := slot.Validate(); err != nil {
+		return "", err
+	}
+	return slot, nil
 }
 
 func GetMCPSecretRefString(r MCPSecretRef) string {
