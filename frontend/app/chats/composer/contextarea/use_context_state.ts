@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
-import { ReasoningType } from '@/spec/inference';
 import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
+import { ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
 
-import { modelManagementAPI } from '@/apis/baseapi';
 import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
+import { modelManagementAPI } from '@/apis/baseapi';
 import { isModelCatalogUnavailableError } from '@/apis/model_management';
 
 import {

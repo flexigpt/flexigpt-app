@@ -238,7 +238,7 @@ export function CodeBlock({
 	return (
 		<>
 			<div ref={elementRef} className="app-bg-code my-4 overflow-hidden rounded-lg">
-				<div className="app-bg-code-header flex min-h-9 min-w-0 items-center justify-between gap-2 px-2 py-0.5">
+				<div className="app-bg-code-header flex min-h-8 min-w-0 items-center justify-between gap-2 px-2 py-0.5">
 					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs" title={headerTitle}>
 						<span
 							className={`inline-flex max-w-48 min-w-0 shrink-0 items-center gap-1 leading-none ${
@@ -267,17 +267,17 @@ export function CodeBlock({
 								language={language}
 								valueFetcher={fetchValue}
 								size={16}
-								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 							/>
 
 							<CopyButton
 								value={value}
-								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 								size={16}
 							/>
 							<button
 								type="button"
-								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 								onClick={handleToggleExpanded}
 								aria-expanded={isExpanded}
 								aria-controls={codeBodyId}

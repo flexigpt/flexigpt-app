@@ -447,7 +447,7 @@ export function MermaidDiagram({
 					containIntrinsicSize: 'auto 18rem',
 				}}
 			>
-				<div className="app-bg-code-header flex items-center justify-between px-4">
+				<div className="app-bg-code-header flex min-h-8 items-center justify-between px-2 py-0.5">
 					<span className="app-text-code text-xs">Mermaid Diagram</span>
 
 					<div className="flex items-center gap-2">
@@ -504,7 +504,7 @@ export function MermaidDiagram({
 								fileprefix="diagram"
 								isBinary={true}
 								language="mermaid"
-								className="btn btn-sm app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
 							/>
 						) : null}
 					</div>

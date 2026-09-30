@@ -22,7 +22,7 @@ function TableSurface({ children, className, style, onZoom, ...props }: TableSur
 
 	return (
 		<div className="relative min-w-0">
-			<div className="border-base-300 bg-base-200/40 absolute inset-x-0 top-0 z-10 flex h-10 items-center justify-end gap-1 border-b px-2">
+			<div className="border-base-300 bg-base-200/40 absolute inset-x-0 top-0 z-10 flex items-center justify-end gap-1 border-b px-2 py-0.5">
 				<button
 					type="button"
 					className="btn btn-ghost btn-xs"

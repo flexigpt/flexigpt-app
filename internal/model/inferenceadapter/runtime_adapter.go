@@ -46,7 +46,6 @@ type AdapterDefinition struct {
 	Path            string
 	APIKeyHeaderKey string
 	DefaultHeaders  map[string]string
-	DefaultDefaults map[string]any
 }
 
 func (d AdapterDefinition) Validate() error {
@@ -129,9 +128,7 @@ func NewRuntimeAdapter(
 		definition.DefaultHeaders = maps.Clone(
 			definition.DefaultHeaders,
 		)
-		definition.DefaultDefaults = maps.Clone(
-			definition.DefaultDefaults,
-		)
+
 		output.adapters[definition.ID] = definition
 	}
 	return output, nil
@@ -321,7 +318,6 @@ func (a *RuntimeAdapter) ResolveRuntime(
 	}
 
 	defaults, err := mergeDefaultLayers(
-		definition.DefaultDefaults,
 		resolved.Provider.Document.Defaults,
 		resolved.ProviderOverlay.Defaults,
 		resolved.Model.Document.Defaults,
@@ -530,13 +526,9 @@ func deleteHeaderFold(
 }
 
 func mergeDefaultLayers(
-	base map[string]any,
 	layers ...json.RawMessage,
 ) (map[string]any, error) {
-	output := maps.Clone(base)
-	if output == nil {
-		output = map[string]any{}
-	}
+	output := map[string]any{}
 
 	for _, raw := range layers {
 		if len(raw) == 0 {
