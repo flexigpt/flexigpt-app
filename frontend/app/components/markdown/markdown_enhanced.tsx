@@ -37,7 +37,7 @@ const strictSchema = {
 	},
 };
 
-const streamingRemarkPlugins: PluggableList = [remarkGfm, supersub, remarkGemoji];
+const streamingRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
 const richRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
 
 const rehypeKatexOptions = {
