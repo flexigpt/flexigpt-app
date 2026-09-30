@@ -7,12 +7,12 @@ import type {
 	IAggregateAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
+	ICompletionAPI,
 	IConversationStoreAPI,
 	ILogger,
 	IMCPAggregateAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
-	IModelAggregateAPI,
 	IModelStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
@@ -31,10 +31,10 @@ import { SkillManagementAPI } from '@/apis/skill_management';
 import { ToolManagementAPI } from '@/apis/tool_management';
 // oxlint-disable-next-line import/no-namespace
 import * as wailsImpl from '@/apis/wailsapi';
+import { WailsCompletionAPI } from '@/apis/wailsapi/completion';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
-import { WailsModelAggregateAPI } from '@/apis/wailsapi/model_aggregate';
 import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
@@ -55,7 +55,7 @@ export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
 
 let modelStoreAPI: IModelStoreAPI;
-let modelAggregateAPI: IModelAggregateAPI;
+export let completionAPI: ICompletionAPI;
 export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
@@ -91,10 +91,10 @@ if (IS_WAILS_PLATFORM) {
 	conversationStoreAPI = new wailsImpl.WailsConversationStoreAPI();
 	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
+	completionAPI = new WailsCompletionAPI();
 
 	modelStoreAPI = new WailsModelStoreAPI();
-	modelAggregateAPI = new WailsModelAggregateAPI();
-	modelManagementAPI = new ModelManagementAPI(modelStoreAPI, modelAggregateAPI);
+	modelManagementAPI = new ModelManagementAPI(modelStoreAPI);
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
 

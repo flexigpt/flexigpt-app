@@ -202,7 +202,7 @@ export interface IModelStoreAPI {
 	): Promise<ModelProviderRuntimeOverlayView>;
 }
 
-export interface IModelAggregateAPI {
+export interface ICompletionAPI {
 	fetchCompletion(
 		model: ArtifactRef,
 		requestPatch: ModelRequestPatch | undefined,

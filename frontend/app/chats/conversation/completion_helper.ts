@@ -24,7 +24,7 @@ import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 import { buildJSONOrTextCodeBlock } from '@/lib/jsonschema_utils';
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
-import { modelManagementAPI } from '@/apis/baseapi';
+import { completionAPI } from '@/apis/baseapi';
 
 import { isSkillsToolName } from '@/skills/lib/skill_identity_utils';
 import { collectToolCallsFromOutputs } from '@/tools/lib/tool_call_utils';
@@ -57,7 +57,7 @@ export async function HandleCompletion(
 		(currentUserMsg.uiToolChoices ?? []).map(choice => [choice.choiceID, choice])
 	);
 
-	const resp = await modelManagementAPI.fetchCompletion(
+	const resp = await completionAPI.fetchCompletion(
 		model,
 		requestPatch,
 		currentUserMsg,

@@ -1,33 +1,10 @@
-import type { ArtifactRef } from '@/spec/artifact';
-import type { StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ModelParam } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
-import type { ModelRequestPatch } from '@/spec/model';
 import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
-import type { ToolSelection } from '@/spec/tool';
 import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
-
-import { ensureMakeID } from '@/lib/uuid_utils';
 
 import type { IAggregateAPI } from '@/apis/interface';
 import type { texttool as texttoolSpec, spec as wailsSpec } from '@/apis/wailsjs/go/models';
-import {
-	createAbortError,
-	optionalWailsBody,
-	requireNonBlankString,
-	requireWailsBody,
-	throwIfAborted,
-} from '@/apis/wailsapi/transport';
-import {
-	ApplyUnifiedDiff,
-	CancelCompletion,
-	DeleteAuthKey,
-	FetchCompletion,
-	SetAuthKey,
-} from '@/apis/wailsjs/go/main/AggregrateWrapper';
-import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
-
-const activeCompletionRequestIDs = new Set<string>();
+import { requireWailsBody } from '@/apis/wailsapi/transport';
+import { ApplyUnifiedDiff, DeleteAuthKey, SetAuthKey } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 
 export class WailsAggregateAPI implements IAggregateAPI {
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
@@ -52,128 +29,5 @@ export class WailsAggregateAPI implements IAggregateAPI {
 			},
 		};
 		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
-	}
-
-	// Need an eventflow for getting completion.
-	// Implemented that in main App Wrapper than aiprovider go package.
-	// Wrapper redirects to providerSet after doing event handling
-	async fetchCompletion(
-		model: ArtifactRef,
-		requestPatch: ModelRequestPatch | undefined,
-		modelParams: ModelParam,
-		current: StoreConversationMessage,
-		history?: StoreConversationMessage[],
-		toolSelections?: ToolSelection[],
-		mcpContext?: MCPConversationContext,
-		skillSessionID?: string,
-		requestId?: string,
-		signal?: AbortSignal,
-		onStreamTextData?: (text: string) => void,
-		onStreamThinkingData?: (text: string) => void
-	): Promise<CompletionResponseBody | undefined> {
-		const rid = requireNonBlankString(ensureMakeID(requestId), 'requestId');
-
-		// Do not subscribe to events or invoke Go when the caller cancelled before
-		// the request reached this boundary.
-		throwIfAborted(signal);
-
-		let textCallbackId = '';
-		let thinkingCallbackId = '';
-		let abortHandler: (() => void) | undefined;
-		const body = {
-			history: (history ?? []) as wailsSpec.ConversationMessage[],
-			current: current as wailsSpec.ConversationMessage,
-			requestPatch: requestPatch,
-			toolSelections: (toolSelections ?? []) as wailsSpec.CompletionRequestBody['toolSelections'],
-			skillSessionID: skillSessionID ?? '',
-			...(mcpContext ? { mcpContext } : {}),
-		} as wailsSpec.CompletionRequestBody;
-
-		let completionStarted = false;
-		let abortHandled = false;
-
-		if (activeCompletionRequestIDs.has(rid)) {
-			throw new Error(`A completion with request ID ${rid} is already active.`);
-		}
-
-		activeCompletionRequestIDs.add(rid);
-
-		try {
-			/*
-			 * Event registration belongs inside the try block. If the second
-			 * registration or the bridge invocation throws synchronously, all
-			 * successfully registered events are still removed in finally.
-			 */
-			if (onStreamTextData) {
-				textCallbackId = `text-${rid}`;
-
-				EventsOn(textCallbackId, onStreamTextData);
-			}
-
-			if (onStreamThinkingData) {
-				thinkingCallbackId = `thinking-${rid}`;
-				EventsOn(thinkingCallbackId, onStreamThinkingData);
-			}
-
-			// oxlint-disable-next-line promise/param-names
-			const abortPromise = new Promise<never>((_, reject) => {
-				if (!signal) {
-					return;
-				}
-
-				abortHandler = () => {
-					if (abortHandled) {
-						return;
-					}
-
-					abortHandled = true;
-					if (completionStarted) {
-						void CancelCompletion(rid).catch(() => {});
-					}
-					reject(createAbortError());
-				};
-
-				signal.addEventListener('abort', abortHandler, { once: true });
-			});
-
-			// Catch an abort that happened after the initial check but before
-			// the listener above was installed.
-			if (signal?.aborted) {
-				abortHandler?.();
-			}
-
-			if (abortHandled) {
-				await abortPromise;
-			}
-
-			completionStarted = true;
-			const responsePromise = FetchCompletion(model as never, body, textCallbackId, thinkingCallbackId, rid);
-			const resp = await Promise.race([responsePromise, abortPromise]);
-
-			if (resp === null || typeof resp !== 'object' || Array.isArray(resp)) {
-				throw new TypeError('FetchCompletion returned an invalid response.');
-			}
-
-			const respBody = optionalWailsBody(resp.Body, 'FetchCompletion');
-			return respBody as CompletionResponseBody | undefined;
-		} finally {
-			if (signal && abortHandler) {
-				signal.removeEventListener('abort', abortHandler);
-			}
-
-			// Local event cleanup
-			if (textCallbackId) {
-				EventsOff(textCallbackId);
-			}
-			if (thinkingCallbackId) {
-				EventsOff(thinkingCallbackId);
-			}
-
-			activeCompletionRequestIDs.delete(rid);
-		}
-	}
-
-	async cancelCompletion(requestId: string): Promise<void> {
-		await CancelCompletion(requireNonBlankString(requestId, 'requestId'));
 	}
 }

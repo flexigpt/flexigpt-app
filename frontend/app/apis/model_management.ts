@@ -1,7 +1,4 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type { StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody } from '@/spec/inference';
-import type { MCPConversationContext } from '@/spec/mcp';
 import type {
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
@@ -13,18 +10,16 @@ import type {
 	ModelProviderDocument,
 	ModelProviderListItem,
 	ModelProviderView,
-	ModelRequestPatch,
 	ModelView,
 	UIModelOption,
 } from '@/spec/model';
-import type { ToolSelection } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
 import { ModelLookupScope } from '@/spec/model';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
+import type { IModelStoreAPI } from '@/apis/interface';
 
 import { mergeModelCapabilities, sanitizeUIModelOptionByCapabilities } from '@/models/lib/capabilities';
 import { modelRefEqual } from '@/models/lib/document';
@@ -139,9 +134,7 @@ export class ModelManagementAPI {
 
 	constructor(
 		// oxlint-disable-next-line typescript/parameter-properties
-		private readonly store: IModelStoreAPI,
-		// oxlint-disable-next-line typescript/parameter-properties
-		private readonly aggregate: IModelAggregateAPI
+		private readonly store: IModelStoreAPI
 	) {}
 
 	invalidateCatalog(): void {
@@ -291,38 +284,6 @@ export class ModelManagementAPI {
 		}
 
 		return matches[0];
-	}
-
-	fetchCompletion(
-		model: ArtifactRef,
-		requestPatch: ModelRequestPatch | undefined,
-		current: StoreConversationMessage,
-		history?: StoreConversationMessage[],
-		toolSelections?: ToolSelection[],
-		mcpContext?: MCPConversationContext,
-		skillSessionID?: string,
-		requestID?: string,
-		signal?: AbortSignal,
-		onStreamTextData?: (text: string) => void,
-		onStreamThinkingData?: (thinking: string) => void
-	): Promise<CompletionResponseBody | undefined> {
-		return this.aggregate.fetchCompletion(
-			model,
-			requestPatch,
-			current,
-			history,
-			toolSelections,
-			mcpContext,
-			skillSessionID,
-			requestID,
-			signal,
-			onStreamTextData,
-			onStreamThinkingData
-		);
-	}
-
-	cancelCompletion(requestID: string): Promise<void> {
-		return this.aggregate.cancelCompletion(requestID);
 	}
 
 	private async loadCatalog(): Promise<ModelCatalog> {

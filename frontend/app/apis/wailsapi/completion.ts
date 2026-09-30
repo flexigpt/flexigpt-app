@@ -5,7 +5,7 @@ import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelRequestPatch } from '@/spec/model';
 import type { ToolSelection } from '@/spec/tool';
 
-import type { IModelAggregateAPI } from '@/apis/interface';
+import type { ICompletionAPI } from '@/apis/interface';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { createAbortError, optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
 import { CancelCompletion, FetchCompletion } from '@/apis/wailsjs/go/main/AggregrateWrapper';
@@ -13,7 +13,7 @@ import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 const activeCompletionRequestIDs = new Set<string>();
 
-export class WailsModelAggregateAPI implements IModelAggregateAPI {
+export class WailsCompletionAPI implements ICompletionAPI {
 	async fetchCompletion(
 		model: ArtifactRef,
 		requestPatch: ModelRequestPatch | undefined,
