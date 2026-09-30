@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -93,10 +94,24 @@ func (a *API) ResolveModel(
 		return ResolvedModel{}, err
 	}
 
+	providerCredential, credentialFound, err := a.overlays.GetProviderCredential(
+		ctx,
+		provider.Artifact.Ref(),
+	)
+	if err != nil {
+		return ResolvedModel{}, err
+	}
+	var credential *secret.Binding
+	if credentialFound && providerCredential.Active() {
+		value := providerCredential.Clone()
+		credential = &value
+	}
+
 	fingerprint, err := resolvedFingerprint(
 		model,
 		provider,
 		providerOverlay,
+		credential,
 		modelOverlayValue,
 		adapter,
 	)
@@ -105,12 +120,13 @@ func (a *API) ResolveModel(
 	}
 
 	return ResolvedModel{
-		Model:           model,
-		Provider:        provider,
-		ProviderOverlay: providerOverlay.Clone(),
-		ModelOverlay:    modelOverlayValue.Clone(),
-		Adapter:         adapter,
-		Fingerprint:     fingerprint,
+		Model:              model,
+		Provider:           provider,
+		ProviderOverlay:    providerOverlay.Clone(),
+		ProviderCredential: credential,
+		ModelOverlay:       modelOverlayValue.Clone(),
+		Adapter:            adapter,
+		Fingerprint:        fingerprint,
 	}, nil
 }
 
@@ -228,33 +244,22 @@ func (a *API) ResolveProviderDefaultModel(
 	}
 	candidates := make([]candidate, 0, 3)
 
-	if a.protection.IsProtectedRoot(provider.Artifact.RootID) {
-		overlay, found, err := a.overlays.GetProviderOverlay(
-			ctx,
-			provider.Artifact.Ref(),
-		)
-		if err != nil {
-			return DefaultModelResolution{}, err
+	overlay, found, err := a.overlays.GetProviderOverlay(
+		ctx,
+		provider.Artifact.Ref(),
+	)
+	if err != nil {
+		return DefaultModelResolution{}, err
+	}
+	if found && overlay.DefaultModel != nil {
+		source := DefaultModelSourceMutableArtifactData
+		if a.protection.IsProtectedRoot(provider.Artifact.RootID) {
+			source = DefaultModelSourceProtectedOverlay
 		}
-		if found && overlay.DefaultModel != nil {
-			candidates = append(candidates, candidate{
-				reference: overlay.DefaultModel.Clone(),
-				source:    DefaultModelSourceProtectedOverlay,
-			})
-		}
-	} else {
-		value, found, err := readMutableProviderDefaultModel(
-			provider.Artifact.Data,
-		)
-		if err != nil {
-			return DefaultModelResolution{}, err
-		}
-		if found {
-			candidates = append(candidates, candidate{
-				reference: value,
-				source:    DefaultModelSourceMutableArtifactData,
-			})
-		}
+		candidates = append(candidates, candidate{
+			reference: overlay.DefaultModel.Clone(),
+			source:    source,
+		})
 	}
 
 	if provider.Document.DefaultModel != nil {
@@ -399,65 +404,74 @@ func bestEffortDefaultFailure(err error) bool {
 		errors.Is(err, basespec.ErrUnsupported)
 }
 
+type resolveModel struct {
+	Ref        artifact.ArtifactRef `json:"ref"`
+	Revision   uint64               `json:"revision"`
+	Definition cryptoutil.Digest    `json:"definition"`
+}
+
+type resolveProvider struct {
+	Ref        artifact.ArtifactRef `json:"ref"`
+	Revision   uint64               `json:"revision"`
+	Definition cryptoutil.Digest    `json:"definition"`
+}
+
+type resolveProviderOverlay struct {
+	Revision uint64 `json:"revision"`
+}
+
+type resolveProviderCredential struct {
+	Ref      string `json:"ref,omitempty"`
+	Revision uint64 `json:"revision,omitempty"`
+	SHA256   string `json:"sha256,omitempty"`
+}
+
+type resolveModelOverlay struct {
+	Revision uint64 `json:"revision"`
+}
+
 func resolvedFingerprint(
 	model modelDomain.Model,
 	provider modelDomain.Provider,
 	providerOverlay modelOverlay.ProviderOverlay,
+	providerCredential *secret.Binding,
 	modelOverlayValue modelOverlay.ModelOverlay,
 	adapter AdapterDescriptor,
 ) (cryptoutil.Digest, error) {
 	return cryptoutil.CanonicalDigest(struct {
-		Model struct {
-			Ref        artifact.ArtifactRef `json:"ref"`
-			Revision   uint64               `json:"revision"`
-			Definition cryptoutil.Digest    `json:"definition"`
-		} `json:"model"`
-
-		Provider struct {
-			Ref        artifact.ArtifactRef `json:"ref"`
-			Revision   uint64               `json:"revision"`
-			Definition cryptoutil.Digest    `json:"definition"`
-		} `json:"provider"`
-
-		ProviderOverlay struct {
-			Revision      uint64 `json:"revision"`
-			CredentialRef string `json:"credentialRef,omitempty"`
-		} `json:"providerOverlay"`
-
-		ModelOverlay struct {
-			Revision uint64 `json:"revision"`
-		} `json:"modelOverlay"`
-
-		Adapter AdapterDescriptor `json:"adapter"`
+		Model              resolveModel              `json:"model"`
+		Provider           resolveProvider           `json:"provider"`
+		ProviderOverlay    resolveProviderOverlay    `json:"providerOverlay"`
+		ProviderCredential resolveProviderCredential `json:"providerCredential"`
+		ModelOverlay       resolveModelOverlay       `json:"modelOverlay"`
+		Adapter            AdapterDescriptor         `json:"adapter"`
 	}{
-		Model: struct {
-			Ref        artifact.ArtifactRef `json:"ref"`
-			Revision   uint64               `json:"revision"`
-			Definition cryptoutil.Digest    `json:"definition"`
-		}{
+		Model: resolveModel{
 			Ref:        model.Artifact.Ref(),
 			Revision:   model.Artifact.Revision,
 			Definition: model.Definition.Digest,
 		},
-		Provider: struct {
-			Ref        artifact.ArtifactRef `json:"ref"`
-			Revision   uint64               `json:"revision"`
-			Definition cryptoutil.Digest    `json:"definition"`
-		}{
+
+		Provider: resolveProvider{
 			Ref:        provider.Artifact.Ref(),
 			Revision:   provider.Artifact.Revision,
 			Definition: provider.Definition.Digest,
 		},
-		ProviderOverlay: struct {
-			Revision      uint64 `json:"revision"`
-			CredentialRef string `json:"credentialRef,omitempty"`
-		}{
-			Revision:      providerOverlay.Revision,
-			CredentialRef: providerOverlay.CredentialRef,
+		ProviderOverlay: resolveProviderOverlay{
+			Revision: providerOverlay.Revision,
 		},
-		ModelOverlay: struct {
-			Revision uint64 `json:"revision"`
-		}{
+		ProviderCredential: func() resolveProviderCredential {
+			if providerCredential == nil ||
+				!providerCredential.Active() {
+				return resolveProviderCredential{}
+			}
+			return resolveProviderCredential{
+				Ref:      string(*providerCredential.Ref),
+				Revision: providerCredential.Revision,
+				SHA256:   providerCredential.SHA256,
+			}
+		}(),
+		ModelOverlay: resolveModelOverlay{
 			Revision: modelOverlayValue.Revision,
 		},
 		Adapter: adapter,

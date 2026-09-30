@@ -8,12 +8,14 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/artifactid"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/discovery"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/localstate"
 	managedartifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/managedartifact"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/refresh"
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/resource"
@@ -25,6 +27,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/source/managed"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/secretapi"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -40,6 +43,9 @@ type Config struct {
 	Clock                     clockutil.Clock
 	RootMutationPolicy        root.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
+
+	ProtectedOverlayNamespaces []overlay.Namespace
+	SecretValues               secretapi.ValueStore
 }
 
 type ManagedPackageResult struct {
@@ -58,6 +64,7 @@ type Components struct {
 
 	ManagedArtifacts *managedartifactimpl.Service
 	SourceRuntime    sourceimpl.Runtime
+	LocalState       *localstate.Service
 
 	metadata           *sqlite.Store
 	managedSources     *sourceimpl.Registry
@@ -68,6 +75,14 @@ func Open(
 	ctx context.Context,
 	config Config,
 ) (*Components, error) {
+	secretValuesTransferred := false
+	defer func() {
+		if !secretValuesTransferred &&
+			config.SecretValues != nil {
+			_ = config.SecretValues.Close()
+		}
+	}()
+
 	if config.BaseDirectory == "" {
 		return nil, fmt.Errorf(
 			"%w: artifact system base directory is empty",
@@ -221,10 +236,30 @@ func Open(
 		_ = metadata.Close()
 		return nil, err
 	}
+
+	localStateService, err := localstate.NewService(
+		metadata.LocalState(),
+		artifactRepository,
+		config.Clock,
+		config.RootMutationPolicy,
+		config.ProtectedOverlayNamespaces,
+		config.SecretValues,
+	)
+	if err != nil {
+		_ = metadata.Close()
+		return nil, err
+	}
+	if err := localStateService.RecoverPending(ctx); err != nil {
+		_ = localStateService.Close()
+		_ = metadata.Close()
+		return nil, err
+	}
+
 	discoveryEngine, err := discovery.NewEngine(
 		decoderRegistry,
 	)
 	if err != nil {
+		_ = localStateService.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -233,6 +268,7 @@ func Open(
 		config.ArtifactIDProvider,
 	)
 	if err != nil {
+		_ = localStateService.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -248,6 +284,7 @@ func Open(
 		config.RootMutationPolicy,
 	)
 	if err != nil {
+		_ = localStateService.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -259,6 +296,7 @@ func Open(
 		sourceRuntime,
 	)
 	if err != nil {
+		_ = localStateService.Close()
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -272,6 +310,7 @@ func Open(
 		ShareableSchemas:   shareableRegistry,
 		LocatorResolvers:   providerRegistry.LocatorResolvers(),
 		SourceRuntime:      sourceRuntime,
+		LocalState:         localStateService,
 		metadata:           metadata,
 		managedSources:     sourceRegistry,
 		rootMutationPolicy: config.RootMutationPolicy,
@@ -349,10 +388,12 @@ func Open(
 		},
 	)
 	if err != nil {
+		secretValuesTransferred = true
 		_ = components.Close()
 		return nil, err
 	}
 	components.ManagedArtifacts = managedArtifacts
+	secretValuesTransferred = true
 	return components, nil
 }
 
@@ -361,6 +402,12 @@ func (c *Components) Close() error {
 		return nil
 	}
 	var closeErrors []error
+	if c.LocalState != nil {
+		if err := c.LocalState.Close(); err != nil {
+			closeErrors = append(closeErrors, err)
+		}
+		c.LocalState = nil
+	}
 	if c.metadata != nil {
 		if err := c.metadata.Close(); err != nil {
 			closeErrors = append(closeErrors, err)

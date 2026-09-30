@@ -2,25 +2,14 @@ package consumerapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
+	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
-
-const (
-	providerDefaultModelDataNamespace = "flexigpt.site/model-provider-default-model-v1"
-	providerDefaultModelDataVersion   = "v1"
-)
-
-type providerDefaultModelData struct {
-	SchemaVersion string                            `json:"schemaVersion"`
-	DefaultModel  declaration.ArtifactNameReference `json:"defaultModel"`
-}
 
 func (a *API) SetMutableProviderDefaultModel(
 	ctx context.Context,
@@ -49,51 +38,49 @@ func (a *API) SetMutableProviderDefaultModel(
 	}
 	if a.protection.IsProtectedRoot(provider.Artifact.RootID) {
 		return ProviderView{}, fmt.Errorf(
-			"%w: protected Model Provider default belongs in a runtime overlay",
+			"%w: protected Model Provider default belongs in the protected runtime overlay API",
 			basespec.ErrProtected,
 		)
 	}
 
-	current, found, err := readMutableProviderDefaultModel(
-		provider.Artifact.Data,
-	)
+	current, found, err := a.overlays.GetProviderOverlay(ctx, ref)
 	if err != nil {
 		return ProviderView{}, err
 	}
-	if found && current == defaultModel {
-		return a.providerView(provider)
+	expectedOverlayRevision := uint64(0)
+	if found {
+		expectedOverlayRevision = current.Revision
+	}
+	if expectedOverlayRevision == ^uint64(0) {
+		return ProviderView{}, fmt.Errorf(
+			"%w: Model Provider overlay revision is exhausted",
+			basespec.ErrInvalid,
+		)
 	}
 
-	fields, err := artifact.DecodeDataObject(provider.Artifact.Data)
-	if err != nil {
-		return ProviderView{}, err
+	next := modelOverlay.ProviderOverlay{
+		SchemaVersion:     modelOverlay.OverlaySchemaVersion,
+		Revision:          expectedOverlayRevision + 1,
+		Connection:        cloneRaw(current.Connection),
+		Defaults:          cloneRaw(current.Defaults),
+		Capabilities:      cloneRaw(current.Capabilities),
+		DefaultModel:      &defaultModel,
+		AdapterParameters: cloneRaw(current.AdapterParameters),
 	}
-	payload, err := jsonutil.MarshalCanonicalObject(
-		providerDefaultModelData{
-			SchemaVersion: providerDefaultModelDataVersion,
-			DefaultModel:  defaultModel.Clone(),
-		},
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return ProviderView{}, err
-	}
-	fields[providerDefaultModelDataNamespace] = payload
-
-	data, err := artifact.EncodeDataObject(fields)
-	if err != nil {
-		return ProviderView{}, err
-	}
-	updated, err := a.artifacts.UpdateData(
+	if err := a.overlays.PutProviderOverlay(
 		ctx,
 		ref,
 		expectedArtifactRevision,
-		data,
-	)
-	if err != nil {
+		expectedOverlayRevision,
+		next,
+	); err != nil {
 		return ProviderView{}, err
 	}
 
+	updated, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return ProviderView{}, err
+	}
 	updatedProvider, err := modelDomain.DecodeProvider(
 		updated,
 		provider.Definition,
@@ -127,34 +114,42 @@ func (a *API) ClearMutableProviderDefaultModel(
 	}
 	if a.protection.IsProtectedRoot(provider.Artifact.RootID) {
 		return ProviderView{}, fmt.Errorf(
-			"%w: protected Model Provider default belongs in a runtime overlay",
+			"%w: protected Model Provider default belongs in the protected runtime overlay API",
 			basespec.ErrProtected,
 		)
 	}
 
-	fields, err := artifact.DecodeDataObject(provider.Artifact.Data)
+	current, found, err := a.overlays.GetProviderOverlay(ctx, ref)
 	if err != nil {
 		return ProviderView{}, err
 	}
-	if _, found := fields[providerDefaultModelDataNamespace]; !found {
+	if !found || current.DefaultModel == nil {
 		return a.providerView(provider)
 	}
-	delete(fields, providerDefaultModelDataNamespace)
-
-	data, err := artifact.EncodeDataObject(fields)
-	if err != nil {
-		return ProviderView{}, err
+	if current.Revision == ^uint64(0) {
+		return ProviderView{}, fmt.Errorf(
+			"%w: Model Provider overlay revision is exhausted",
+			basespec.ErrInvalid,
+		)
 	}
-	updated, err := a.artifacts.UpdateData(
+
+	next := current.Clone()
+	next.Revision++
+	next.DefaultModel = nil
+	if err := a.overlays.PutProviderOverlay(
 		ctx,
 		ref,
 		expectedArtifactRevision,
-		data,
-	)
-	if err != nil {
+		current.Revision,
+		next,
+	); err != nil {
 		return ProviderView{}, err
 	}
 
+	updated, err := a.artifacts.Get(ctx, ref)
+	if err != nil {
+		return ProviderView{}, err
+	}
 	updatedProvider, err := modelDomain.DecodeProvider(
 		updated,
 		provider.Definition,
@@ -163,41 +158,4 @@ func (a *API) ClearMutableProviderDefaultModel(
 		return ProviderView{}, err
 	}
 	return a.providerView(updatedProvider)
-}
-
-func readMutableProviderDefaultModel(
-	raw json.RawMessage,
-) (declaration.ArtifactNameReference, bool, error) {
-	fields, err := artifact.DecodeDataObject(raw)
-	if err != nil {
-		return declaration.ArtifactNameReference{}, false, err
-	}
-	payload, found := fields[providerDefaultModelDataNamespace]
-	if !found {
-		return declaration.ArtifactNameReference{}, false, nil
-	}
-
-	var value providerDefaultModelData
-	if err := jsonutil.DecodeCanonicalObjectExactInto(
-		payload,
-		&value,
-		basespec.MaxLocalDataBytes,
-	); err != nil {
-		return declaration.ArtifactNameReference{}, false, fmt.Errorf(
-			"%w: decode Model Provider default Model metadata: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	if value.SchemaVersion != providerDefaultModelDataVersion {
-		return declaration.ArtifactNameReference{}, false, fmt.Errorf(
-			"%w: unsupported Model Provider default Model metadata schema %q",
-			basespec.ErrInvalid,
-			value.SchemaVersion,
-		)
-	}
-	if err := value.DefaultModel.Validate(); err != nil {
-		return declaration.ArtifactNameReference{}, false, err
-	}
-	return value.DefaultModel.Clone(), true, nil
 }

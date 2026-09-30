@@ -3,14 +3,18 @@ package main
 import (
 	"context"
 	"io/fs"
+	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/secretstore/keyringmapstore"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
+	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
 )
@@ -55,6 +59,17 @@ func composeArtifactStore(
 		mcpProvider,
 	}
 
+	secretValues, err := keyringmapstore.New(
+		filepath.Join(
+			baseDirectory,
+			basespec.ArtifactStoreSecretValuesFileName,
+		),
+		keyringmapstore.Config{},
+	)
+	if err != nil {
+		return nil, err
+	}
+
 	return compositionapi.Open(
 		ctx,
 		compositionapi.Config{
@@ -62,9 +77,11 @@ func composeArtifactStore(
 			EmbeddedProviders: map[string]fs.FS{
 				defaultpolicy.ProviderKey: workspaceFS,
 			},
-			Providers:        providers,
-			ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
-			RetainedRoots:    documentTopology.RetainedRootDrafts(),
+			Providers:                  providers,
+			ProtectedRootIDs:           documentTopology.ProtectedRootIDs(),
+			RetainedRoots:              documentTopology.RetainedRootDrafts(),
+			ProtectedOverlayNamespaces: modelOverlay.Namespaces(),
+			SecretValues:               secretValues,
 		},
 	)
 }

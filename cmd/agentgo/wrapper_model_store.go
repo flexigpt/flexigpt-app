@@ -2,15 +2,9 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
-	"strings"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -19,573 +13,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
-)
-
-const (
-	modelSettingsIndexKey  = "model-runtime-v1:index"
-	modelSettingsNamespace = "model-runtime-v1"
-
-	//nolint:gosec // Enum.
-	modelCredentialPrefix = "modelcred.v1:"
 )
 
 type ModelStoreWrapper struct {
-	api         *modelConsumerAPI.API
-	management  *modelConsumerAPI.CatalogStore
-	credentials *modelCredentialResolver
-	roots       compositionapi.RootAPI
-	protection  compositionapi.ProtectionAPI
-}
-
-type modelAuthKeyStore interface {
-	GetAuthKey(
-		ctx context.Context,
-		req *settingSpec.GetAuthKeyRequest,
-	) (*settingSpec.GetAuthKeyResponse, error)
-
-	SetAuthKey(
-		ctx context.Context,
-		req *settingSpec.SetAuthKeyRequest,
-	) (*settingSpec.SetAuthKeyResponse, error)
-
-	DeleteAuthKey(
-		ctx context.Context,
-		req *settingSpec.DeleteAuthKeyRequest,
-	) (*settingSpec.DeleteAuthKeyResponse, error)
-}
-
-type modelSettingsIndex struct {
-	Keys map[string]string `json:"keys"`
-}
-
-// modelSettingsAdapter is structurally equivalent to MCP's settings overlay
-// adapter but uses a Model-owned logical namespace and Model-specific payload
-// validation in `modelOverlay.SettingsOverlayRepository`.
-type modelSettingsAdapter struct {
-	store modelAuthKeyStore
-	mu    sync.Mutex
-}
-
-func newModelSettingsAdapter(
-	store modelAuthKeyStore,
-) (*modelSettingsAdapter, error) {
-	if store == nil {
-		return nil, errors.New("model settings store is required")
-	}
-	return &modelSettingsAdapter{store: store}, nil
-}
-
-func (s *modelSettingsAdapter) GetModelRuntimeValue(
-	ctx context.Context,
-	key string,
-) (r json.RawMessage, found bool, err error) {
-	if err := validateModelSettingsKey(key); err != nil {
-		return nil, false, err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	return s.readLocked(ctx, key)
-}
-
-func (s *modelSettingsAdapter) PutModelRuntimeValue(
-	ctx context.Context,
-	key string,
-	expectedRevision uint64,
-	value json.RawMessage,
-) error {
-	if err := validateModelSettingsKey(key); err != nil {
-		return err
-	}
-	canonical, err := jsonutil.CanonicalizeObject(
-		value,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return err
-	}
-
-	nextRevision, err := modelSettingsRevision(canonical)
-	if err != nil {
-		return err
-	}
-	if nextRevision != expectedRevision+1 {
-		return fmt.Errorf(
-			"%w: invalid Model runtime overlay revision transition",
-			basespec.ErrInvalid,
-		)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	current, found, err := s.readLocked(ctx, key)
-	if err != nil {
-		return err
-	}
-	if found {
-		currentRevision, err := modelSettingsRevision(current)
-		if err != nil {
-			return err
-		}
-		if currentRevision != expectedRevision {
-			return basespec.ErrConflict
-		}
-	} else if expectedRevision != 0 {
-		return basespec.ErrConflict
-	}
-
-	index, err := s.readIndexLocked(ctx)
-	if err != nil {
-		return err
-	}
-	index.Keys[key] = modelSettingsStorageKey(key)
-	if err := s.writeIndexLocked(ctx, index); err != nil {
-		return err
-	}
-
-	return s.writeLocked(ctx, key, canonical)
-}
-
-func (s *modelSettingsAdapter) DeleteModelRuntimeValue(
-	ctx context.Context,
-	key string,
-	expectedRevision uint64,
-) error {
-	if err := validateModelSettingsKey(key); err != nil {
-		return err
-	}
-	if expectedRevision == 0 {
-		return fmt.Errorf(
-			"%w: expected Model runtime overlay revision is required",
-			basespec.ErrInvalid,
-		)
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	current, found, err := s.readLocked(ctx, key)
-	if err != nil {
-		return err
-	}
-	if !found {
-		return basespec.ErrConflict
-	}
-
-	currentRevision, err := modelSettingsRevision(current)
-	if err != nil {
-		return err
-	}
-	if currentRevision != expectedRevision {
-		return basespec.ErrConflict
-	}
-
-	if err := s.deleteLocked(ctx, key); err != nil {
-		return err
-	}
-	index, err := s.readIndexLocked(ctx)
-	if err != nil {
-		return err
-	}
-	delete(index.Keys, key)
-	return s.writeIndexLocked(ctx, index)
-}
-
-func (s *modelSettingsAdapter) DeleteModelRuntimePrefix(
-	ctx context.Context,
-	prefix string,
-) error {
-	if err := validateModelSettingsKey(prefix); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	index, err := s.readIndexLocked(ctx)
-	if err != nil {
-		return err
-	}
-
-	var result error
-	for key := range index.Keys {
-		if !strings.HasPrefix(key, prefix) {
-			continue
-		}
-		result = errors.Join(
-			result,
-			s.deleteLocked(ctx, key),
-		)
-		delete(index.Keys, key)
-	}
-	result = errors.Join(result, s.writeIndexLocked(ctx, index))
-	return result
-}
-
-const defaultProviderSettingsKey = "model.runtime.v1/default-provider"
-
-type storedDefaultProvider struct {
-	Provider *artifact.ArtifactRef `json:"provider,omitempty"`
-}
-
-func (s *modelSettingsAdapter) GetDefaultProvider(
-	ctx context.Context,
-) (*artifact.ArtifactRef, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	raw, found, err := s.readLocked(ctx, defaultProviderSettingsKey)
-	if err != nil || !found {
-		return nil, err
-	}
-	var value storedDefaultProvider
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return nil, err
-	}
-	return value.Provider, nil
-}
-
-func (s *modelSettingsAdapter) SetDefaultProvider(
-	ctx context.Context,
-	provider *artifact.ArtifactRef,
-) error {
-	raw, err := json.Marshal(storedDefaultProvider{Provider: provider})
-	if err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.writeLocked(ctx, defaultProviderSettingsKey, raw)
-}
-
-func (s *modelSettingsAdapter) readLocked(
-	ctx context.Context,
-	key string,
-) (c json.RawMessage, found bool, err error) {
-	response, err := s.store.GetAuthKey(
-		ctx,
-		&settingSpec.GetAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelSettingsStorageKey(key),
-			),
-		},
-	)
-	if err != nil {
-		if modelSettingMissing(err) {
-			return nil, false, nil
-		}
-		return nil, false, err
-	}
-	if response == nil || response.Body == nil || !response.Body.NonEmpty {
-		return nil, false, nil
-	}
-
-	raw, err := jsonutil.CanonicalizeObject(
-		[]byte(response.Body.Secret),
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, false, err
-	}
-	return raw, true, nil
-}
-
-func (s *modelSettingsAdapter) writeLocked(
-	ctx context.Context,
-	key string,
-	value json.RawMessage,
-) error {
-	_, err := s.store.SetAuthKey(
-		ctx,
-		&settingSpec.SetAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelSettingsStorageKey(key),
-			),
-			Body: &settingSpec.SetAuthKeyRequestBody{
-				Secret: string(value),
-			},
-		},
-	)
-	return err
-}
-
-func (s *modelSettingsAdapter) deleteLocked(
-	ctx context.Context,
-	key string,
-) error {
-	_, err := s.store.DeleteAuthKey(
-		ctx,
-		&settingSpec.DeleteAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelSettingsStorageKey(key),
-			),
-		},
-	)
-	if modelSettingMissing(err) {
-		return nil
-	}
-	return err
-}
-
-func (s *modelSettingsAdapter) readIndexLocked(
-	ctx context.Context,
-) (modelSettingsIndex, error) {
-	raw, found, err := s.readLocked(ctx, modelSettingsIndexKey)
-	if err != nil {
-		return modelSettingsIndex{}, err
-	}
-	if !found {
-		return modelSettingsIndex{
-			Keys: map[string]string{},
-		}, nil
-	}
-
-	var value modelSettingsIndex
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return modelSettingsIndex{}, err
-	}
-	if value.Keys == nil {
-		value.Keys = map[string]string{}
-	}
-	return value, nil
-}
-
-func (s *modelSettingsAdapter) writeIndexLocked(
-	ctx context.Context,
-	index modelSettingsIndex,
-) error {
-	raw, err := jsonutil.MarshalCanonicalObject(
-		index,
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return err
-	}
-	return s.writeLocked(ctx, modelSettingsIndexKey, raw)
-}
-
-func modelSettingsRevision(
-	raw json.RawMessage,
-) (uint64, error) {
-	var value struct {
-		Revision uint64 `json:"revision"`
-	}
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return 0, err
-	}
-	return value.Revision, nil
-}
-
-func modelSettingsStorageKey(
-	logical string,
-) string {
-	sum := sha256.Sum256([]byte(logical))
-	return modelSettingsNamespace + ":" + hex.EncodeToString(sum[:])
-}
-
-func validateModelSettingsKey(value string) error {
-	if strings.TrimSpace(value) == "" ||
-		strings.TrimSpace(value) != value ||
-		strings.ContainsRune(value, 0) {
-		return fmt.Errorf(
-			"%w: invalid Model settings key",
-			basespec.ErrInvalid,
-		)
-	}
-	return nil
-}
-
-func modelSettingMissing(err error) bool {
-	if err == nil {
-		return false
-	}
-	value := strings.ToLower(err.Error())
-	return strings.Contains(value, "not found") ||
-		strings.Contains(value, "does not exist")
-}
-
-type modelCredentialReference struct {
-	Provider artifact.ArtifactRef `json:"provider"`
-}
-
-type modelCredentialResolver struct {
-	store modelAuthKeyStore
-}
-
-func newModelCredentialResolver(
-	store modelAuthKeyStore,
-) (*modelCredentialResolver, error) {
-	if store == nil {
-		return nil, errors.New("model credential store is required")
-	}
-	return &modelCredentialResolver{store: store}, nil
-}
-
-func modelCredentialRef(
-	provider artifact.ArtifactRef,
-) (string, error) {
-	if err := provider.Validate(); err != nil {
-		return "", err
-	}
-	raw, err := jsonutil.MarshalCanonicalObject(
-		modelCredentialReference{
-			Provider: provider,
-		},
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return "", err
-	}
-	return modelCredentialPrefix +
-		base64.RawURLEncoding.EncodeToString(raw), nil
-}
-
-func parseModelCredentialRef(
-	value string,
-) (modelCredentialReference, error) {
-	if !strings.HasPrefix(value, modelCredentialPrefix) {
-		return modelCredentialReference{}, fmt.Errorf(
-			"%w: unsupported Model credential reference",
-			basespec.ErrInvalid,
-		)
-	}
-	raw, err := base64.RawURLEncoding.DecodeString(
-		strings.TrimPrefix(value, modelCredentialPrefix),
-	)
-	if err != nil {
-		return modelCredentialReference{}, err
-	}
-
-	var output modelCredentialReference
-	if err := jsonutil.DecodeCanonicalObjectExactInto(
-		raw,
-		&output,
-		basespec.MaxLocalDataBytes,
-	); err != nil {
-		return modelCredentialReference{}, err
-	}
-	if err := output.Provider.Validate(); err != nil {
-		return modelCredentialReference{}, err
-	}
-	return output, nil
-}
-
-func modelCredentialStorageKey(
-	value string,
-) string {
-	sum := sha256.Sum256([]byte(value))
-	return modelCredentialPrefix + hex.EncodeToString(sum[:])
-}
-
-func (r *modelCredentialResolver) ResolveModelCredential(
-	ctx context.Context,
-	ref string,
-) (inferenceadapter.Credential, error) {
-	if r == nil || r.store == nil {
-		return inferenceadapter.Credential{}, basespec.ErrClosed
-	}
-	if _, err := parseModelCredentialRef(ref); err != nil {
-		return inferenceadapter.Credential{}, err
-	}
-
-	response, err := r.store.GetAuthKey(
-		ctx,
-		&settingSpec.GetAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelCredentialStorageKey(ref),
-			),
-		},
-	)
-	if err != nil {
-		if modelSettingMissing(err) {
-			return inferenceadapter.Credential{}, fmt.Errorf(
-				"%w: Model credential is unavailable",
-				basespec.ErrReferenceUnresolved,
-			)
-		}
-		return inferenceadapter.Credential{}, err
-	}
-	if response == nil || response.Body == nil || !response.Body.NonEmpty {
-		return inferenceadapter.Credential{}, fmt.Errorf(
-			"%w: Model credential is unavailable",
-			basespec.ErrReferenceUnresolved,
-		)
-	}
-	return inferenceadapter.Credential{
-		APIKey:  response.Body.Secret,
-		Version: response.Body.SHA256,
-	}, nil
-}
-
-func (r *modelCredentialResolver) SetProviderCredential(
-	ctx context.Context,
-	provider artifact.ArtifactRef,
-	secret string,
-) (string, error) {
-	if r == nil || r.store == nil {
-		return "", basespec.ErrClosed
-	}
-	ref, err := modelCredentialRef(provider)
-	if err != nil {
-		return "", err
-	}
-
-	_, err = r.store.SetAuthKey(
-		ctx,
-		&settingSpec.SetAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelCredentialStorageKey(ref),
-			),
-			Body: &settingSpec.SetAuthKeyRequestBody{
-				Secret: secret,
-			},
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-	return ref, nil
-}
-
-func (r *modelCredentialResolver) DeleteProviderCredential(
-	ctx context.Context,
-	provider artifact.ArtifactRef,
-) error {
-	if r == nil || r.store == nil {
-		return basespec.ErrClosed
-	}
-	ref, err := modelCredentialRef(provider)
-	if err != nil {
-		return err
-	}
-	_, err = r.store.DeleteAuthKey(
-		ctx,
-		&settingSpec.DeleteAuthKeyRequest{
-			Type: settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(
-				modelCredentialStorageKey(ref),
-			),
-		},
-	)
-	if modelSettingMissing(err) {
-		return nil
-	}
-	return err
+	api        *modelConsumerAPI.API
+	management *modelConsumerAPI.CatalogStore
+	roots      compositionapi.RootAPI
+	protection compositionapi.ProtectionAPI
 }
 
 func InitModelWrappers(
@@ -598,6 +37,10 @@ func InitModelWrappers(
 	roots compositionapi.RootAPI,
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
+	protectedOverlays compositionapi.ProtectedOverlayAPI,
+	secretBindings compositionapi.SecretBindingAPI,
+	secretRuntime compositionapi.SecretRuntimeAPI,
+	localState compositionapi.LocalStateMaintenanceAPI,
 	hydrator topology.CompiledHydrationCoordinator,
 	settingsStore modelAuthKeyStore,
 ) (builtin.HydrationInstaller, error) {
@@ -610,20 +53,32 @@ func InitModelWrappers(
 		managedArtifacts == nil ||
 		roots == nil ||
 		protection == nil ||
+		protectedOverlays == nil ||
+		secretBindings == nil ||
+		secretRuntime == nil ||
+		localState == nil ||
 		hydrator == nil ||
 		settingsStore == nil {
 		return nil, errors.New("model wrapper dependencies are incomplete")
 	}
 
-	settings, err := newModelSettingsAdapter(settingsStore)
+	preferences, err := newModelDefaultProviderPreferences(settingsStore)
 	if err != nil {
 		return nil, err
 	}
-	overlays, err := modelOverlay.NewSettingsOverlayRepository(settings)
+	overlays, err := modelOverlay.NewArtifactOverlayRepository(
+		modelOverlay.ArtifactOverlayDependencies{
+			Artifacts:        artifacts,
+			Protection:       protection,
+			ProtectedOverlay: protectedOverlays,
+			Secrets:          secretBindings,
+			LocalState:       localState,
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	credentials, err := newModelCredentialResolver(settingsStore)
+	credentials, err := newArtifactModelCredentialResolver(secretRuntime)
 	if err != nil {
 		return nil, err
 	}
@@ -656,7 +111,7 @@ func InitModelWrappers(
 	aggregateService, err := modelAggregate.New(
 		management,
 		runtimeAdapter,
-		settings,
+		preferences,
 	)
 	if err != nil {
 		return nil, err
@@ -669,7 +124,6 @@ func InitModelWrappers(
 		modelBuiltin.InstallerDependencies{
 			Hydrator: hydrator,
 			Cleanup:  cleanup,
-			Overlays: overlays,
 		},
 	)
 	if err != nil {
@@ -678,7 +132,6 @@ func InitModelWrappers(
 
 	storeWrapper.api = api
 	storeWrapper.management = catalog
-	storeWrapper.credentials = credentials
 	storeWrapper.roots = roots
 	storeWrapper.protection = protection
 	aggregateWrapper.service = aggregateService
@@ -693,6 +146,7 @@ func (w *ModelStoreWrapper) ListModelProviders(
 	if w == nil || w.management == nil {
 		return nil, basespec.ErrClosed
 	}
+
 	ctx := context.Background()
 	roots, err := w.managementRootIDs(ctx, rootID)
 	if err != nil {
@@ -716,6 +170,7 @@ func (w *ModelStoreWrapper) ListModels(
 	if w == nil || w.management == nil {
 		return nil, basespec.ErrClosed
 	}
+
 	ctx := context.Background()
 	roots, err := w.managementRootIDs(ctx, rootID)
 	if err != nil {
@@ -751,18 +206,107 @@ func (w *ModelStoreWrapper) GetModel(
 	return w.api.GetModel(context.Background(), ref)
 }
 
+func (w *ModelStoreWrapper) GetModelProviderRuntimeOverlay(
+	ref artifact.ArtifactRef,
+) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
+	if w == nil || w.api == nil {
+		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
+	}
+	return w.api.GetProviderRuntimeOverlay(context.Background(), ref)
+}
+
+func (w *ModelStoreWrapper) UpdateModelProviderRuntimeOverlay(
+	request modelConsumerAPI.ProviderRuntimeOverlayUpdateRequest,
+) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
+	if w == nil || w.api == nil {
+		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
+	}
+	return w.api.UpdateProviderRuntimeOverlay(
+		context.Background(),
+		request,
+	)
+}
+
+func (w *ModelStoreWrapper) DeleteModelProviderRuntimeOverlay(
+	ref artifact.ArtifactRef,
+	expectedArtifactRevision uint64,
+	expectedOverlayRevision uint64,
+) error {
+	if w == nil || w.api == nil {
+		return basespec.ErrClosed
+	}
+	return w.api.DeleteProviderRuntimeOverlay(
+		context.Background(),
+		ref,
+		expectedArtifactRevision,
+		expectedOverlayRevision,
+	)
+}
+
+func (w *ModelStoreWrapper) GetManagedModelRuntimeOverlay(
+	ref artifact.ArtifactRef,
+) (modelConsumerAPI.ModelRuntimeOverlayView, error) {
+	if w == nil || w.api == nil {
+		return modelConsumerAPI.ModelRuntimeOverlayView{}, basespec.ErrClosed
+	}
+	return w.api.GetModelRuntimeOverlay(context.Background(), ref)
+}
+
+func (w *ModelStoreWrapper) UpdateManagedModelRuntimeOverlay(
+	request modelConsumerAPI.ModelRuntimeOverlayUpdateRequest,
+) (modelConsumerAPI.ModelRuntimeOverlayView, error) {
+	if w == nil || w.api == nil {
+		return modelConsumerAPI.ModelRuntimeOverlayView{}, basespec.ErrClosed
+	}
+	return w.api.UpdateModelRuntimeOverlay(
+		context.Background(),
+		request,
+	)
+}
+
+func (w *ModelStoreWrapper) DeleteManagedModelRuntimeOverlay(
+	ref artifact.ArtifactRef,
+	expectedArtifactRevision uint64,
+	expectedOverlayRevision uint64,
+) error {
+	if w == nil || w.api == nil {
+		return basespec.ErrClosed
+	}
+	return w.api.DeleteModelRuntimeOverlay(
+		context.Background(),
+		ref,
+		expectedArtifactRevision,
+		expectedOverlayRevision,
+	)
+}
+
+func (w *ModelStoreWrapper) SetModelProviderCredential(
+	request modelConsumerAPI.ProviderCredentialUpdateRequest,
+) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
+	if w == nil || w.api == nil {
+		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
+	}
+	return w.api.UpdateProviderCredential(
+		context.Background(),
+		request,
+	)
+}
+
 func (w *ModelStoreWrapper) CreateModelProvider(
 	request modelConsumerAPI.ManagedProviderCreateRequest,
 ) (modelConsumerAPI.ManagedProviderCreateResult, error) {
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ManagedProviderCreateResult{}, basespec.ErrClosed
 	}
-	rootID, err := w.writableManagementRoot(context.Background(), request.RootID)
+
+	rootID, err := w.writableManagementRoot(
+		context.Background(),
+		request.RootID,
+	)
 	if err != nil {
 		return modelConsumerAPI.ManagedProviderCreateResult{}, err
 	}
 	request.RootID = rootID
-
 	return w.api.CreateProvider(context.Background(), request)
 }
 
@@ -795,12 +339,15 @@ func (w *ModelStoreWrapper) CreateManagedModel(
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ManagedModelCreateResult{}, basespec.ErrClosed
 	}
-	rootID, err := w.writableManagementRoot(context.Background(), request.RootID)
+
+	rootID, err := w.writableManagementRoot(
+		context.Background(),
+		request.RootID,
+	)
 	if err != nil {
 		return modelConsumerAPI.ManagedModelCreateResult{}, err
 	}
 	request.RootID = rootID
-
 	return w.api.CreateModel(context.Background(), request)
 }
 
@@ -859,54 +406,6 @@ func (w *ModelStoreWrapper) SetModelEnabled(
 	)
 }
 
-func (w *ModelStoreWrapper) SetModelProviderCredential(
-	provider artifact.ArtifactRef,
-	expectedOverlayRevision uint64,
-	secret string,
-) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
-	if w == nil || w.api == nil || w.credentials == nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
-	}
-
-	ctx := context.Background()
-	current, err := w.api.GetProviderRuntimeOverlay(
-		ctx,
-		provider,
-	)
-	if err != nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-	}
-	if current.Revision != expectedOverlayRevision {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrConflict
-	}
-
-	ref := ""
-	if strings.TrimSpace(secret) == "" {
-		if err := w.credentials.DeleteProviderCredential(ctx, provider); err != nil {
-			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-		}
-	} else {
-		ref, err = w.credentials.SetProviderCredential(ctx, provider, secret)
-		if err != nil {
-			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-		}
-	}
-
-	return w.api.UpdateProviderRuntimeOverlay(
-		ctx,
-		modelConsumerAPI.ProviderRuntimeOverlayUpdateRequest{
-			Provider:          provider,
-			ExpectedRevision:  expectedOverlayRevision,
-			CredentialRef:     ref,
-			Connection:        current.Connection,
-			Defaults:          current.Defaults,
-			Capabilities:      current.Capabilities,
-			DefaultModel:      current.DefaultModel,
-			AdapterParameters: current.AdapterParameters,
-		},
-	)
-}
-
 func (w *ModelStoreWrapper) managementRootIDs(
 	ctx context.Context,
 	requested root.RootID,
@@ -962,7 +461,6 @@ func (w *ModelStoreWrapper) close() {
 	}
 	w.api = nil
 	w.management = nil
-	w.credentials = nil
 	w.roots = nil
 	w.protection = nil
 }

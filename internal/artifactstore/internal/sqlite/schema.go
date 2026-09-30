@@ -2,6 +2,63 @@ package sqlite
 
 const topologyPackageHydrationTable = "artifact_topology_package_hydrations"
 
+const localStateSchema = `
+CREATE TABLE IF NOT EXISTS artifact_protected_overlays (
+	root_id TEXT NOT NULL,
+	artifact_id TEXT NOT NULL REFERENCES artifact_artifacts(id) ON DELETE CASCADE,
+	namespace TEXT NOT NULL,
+	schema_version TEXT NOT NULL,
+	payload_json BLOB NOT NULL,
+	revision INTEGER NOT NULL CHECK (revision > 0),
+	created_at INTEGER NOT NULL,
+	modified_at INTEGER NOT NULL,
+	PRIMARY KEY (root_id, artifact_id, namespace)
+);
+
+CREATE TABLE IF NOT EXISTS artifact_secret_records (
+	ref TEXT PRIMARY KEY,
+	store_name TEXT NOT NULL,
+	sha256 TEXT NOT NULL,
+	state TEXT NOT NULL CHECK (
+		state IN ('pending', 'active', 'cleanup')
+	),
+	created_at INTEGER NOT NULL,
+	modified_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS artifact_secret_bindings (
+	root_id TEXT NOT NULL,
+	artifact_id TEXT NOT NULL REFERENCES artifact_artifacts(id) ON DELETE CASCADE,
+	namespace TEXT NOT NULL,
+	slot TEXT NOT NULL,
+	secret_ref TEXT REFERENCES artifact_secret_records(ref) ON DELETE RESTRICT,
+	revision INTEGER NOT NULL CHECK (revision > 0),
+	created_at INTEGER NOT NULL,
+	modified_at INTEGER NOT NULL,
+	PRIMARY KEY (root_id, artifact_id, namespace, slot)
+);
+
+CREATE TABLE IF NOT EXISTS artifact_secret_cleanup (
+	secret_ref TEXT PRIMARY KEY
+		REFERENCES artifact_secret_records(ref) ON DELETE CASCADE,
+	store_name TEXT NOT NULL,
+	attempts INTEGER NOT NULL CHECK (attempts >= 0),
+	last_error TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	modified_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_artifact_protected_overlays_artifact
+	ON artifact_protected_overlays(root_id, artifact_id);
+
+CREATE INDEX IF NOT EXISTS idx_artifact_secret_bindings_artifact
+	ON artifact_secret_bindings(root_id, artifact_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_artifact_secret_bindings_secret_ref
+	ON artifact_secret_bindings(secret_ref)
+	WHERE secret_ref IS NOT NULL;
+`
+
 const sqliteSchema = `
 CREATE TABLE artifact_store_v1 (
 	singleton INTEGER PRIMARY KEY CHECK (singleton = 1)
@@ -195,4 +252,4 @@ BEGIN
 		'artifact root purge requires no active children'
 	);
 END;
-`
+` + localStateSchema

@@ -35,6 +35,10 @@ var schemaV1RequiredTables = []string{
 	"artifact_source_refresh_state",
 	"artifact_definitions",
 	"artifact_artifacts",
+	"artifact_protected_overlays",
+	"artifact_secret_records",
+	"artifact_secret_bindings",
+	"artifact_secret_cleanup",
 }
 
 func Open(
@@ -118,6 +122,15 @@ func initializeSchema(
 			)`,
 		); err != nil {
 			return err
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			localStateSchema,
+		); err != nil {
+			return fmt.Errorf(
+				"initialize Artifact Store local-state extension schema: %w",
+				err,
+			)
 		}
 		if err := verifySchemaV1Tx(ctx, tx); err != nil {
 			return err

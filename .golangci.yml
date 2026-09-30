@@ -386,6 +386,7 @@ linters:
             - "github.com/flexigpt/mapstore-go"
             - "github.com/glebarez/go-sqlite"
             - "github.com/santhosh-tekuri/jsonschema/v6"
+            - "github.com/zalando/go-keyring"
 
     embeddedstructfieldcheck:
       # Checks that sync.Mutex and sync.RWMutex are not used as embedded fields.
@@ -451,6 +452,8 @@ linters:
           alias: documentTopology
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/(\w+)
           alias: ${1}impl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay
+          alias: artifactOverlay
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerapi
           alias: artifactConsumerAPI
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts

@@ -324,12 +324,12 @@ func (a *API) DeleteProvider(
 		)
 	}
 
-	// The settings overlay retains no source identity and must not be allowed
-	// to reactivate if the same package path is later republished. The external
-	// credential store owns eventual orphan-secret cleanup.
-	if err := a.purgeProviderOverlay(ctx, ref); err != nil {
+	// The Model local-state repository removes the mutable Data namespace,
+	// protected overlay when applicable, secret bindings, and queues physical
+	// secret cleanup through Artifact Store.
+	if err := a.purgeProviderLocalState(ctx, ref); err != nil {
 		return fmt.Errorf(
-			"model provider package was removed but runtime-overlay cleanup is pending: %w",
+			"model provider package was removed but local-state cleanup is pending: %w",
 			err,
 		)
 	}
@@ -639,9 +639,9 @@ func (a *API) DeleteModel(
 		)
 	}
 
-	if err := a.purgeModelOverlay(ctx, ref); err != nil {
+	if err := a.purgeModelLocalState(ctx, ref); err != nil {
 		return fmt.Errorf(
-			"model package was removed but runtime-overlay cleanup is pending: %w",
+			"model package was removed but local-state cleanup is pending: %w",
 			err,
 		)
 	}

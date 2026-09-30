@@ -283,5 +283,10 @@ func (c *Components) ResetTopologyHydration(
 			err,
 		)
 	}
+	if c.LocalState != nil {
+		_ = c.LocalState.DrainSecretGarbage(
+			context.WithoutCancel(ctx),
+		)
+	}
 	return nil
 }

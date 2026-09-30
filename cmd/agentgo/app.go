@@ -310,6 +310,10 @@ func (a *App) initManagers() {
 		artifactComposition.Roots,
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
+		artifactComposition.ProtectedOverlays,
+		artifactComposition.SecretBindings,
+		artifactComposition.SecretRuntime,
+		artifactComposition.LocalState,
 		artifactComposition.Topology,
 		a.settingStoreAPI.store,
 	)

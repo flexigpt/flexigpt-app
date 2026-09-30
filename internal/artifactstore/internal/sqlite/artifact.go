@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -442,6 +443,14 @@ func (s *Store) purgeArtifact(
 	}
 	defer func() { _ = tx.Rollback() }()
 	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
+		return err
+	}
+	if err := purgeArtifactLocalStateTx(
+		ctx,
+		tx,
+		ref,
+		time.Now().UTC(),
+	); err != nil {
 		return err
 	}
 	result, err := tx.ExecContext(

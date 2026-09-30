@@ -8,10 +8,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 )
 
@@ -268,6 +270,74 @@ type ManagedArtifactAPI interface {
 	Remove(
 		ctx context.Context,
 		request artifact.RemoveArtifactRequest,
+	) error
+}
+
+// ProtectedOverlayAPI owns non-secret local state for Artifacts in protected
+// Roots. Mutable Artifact local state continues to use Artifact.Data.
+type ProtectedOverlayAPI interface {
+	Get(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+		namespace overlay.Namespace,
+	) (overlay.Record, bool, error)
+
+	Put(
+		ctx context.Context,
+		request overlay.PutRequest,
+	) (overlay.Record, error)
+
+	// Delete removes the complete protected overlay and every secret binding
+	// below the same Artifact/namespace pair.
+	Delete(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+		namespace overlay.Namespace,
+		expectedArtifactRevision uint64,
+		expectedOverlayRevision uint64,
+	) error
+}
+
+// SecretBindingAPI manages Artifact-local secret references and public-safe
+// metadata. It never returns a plaintext secret value.
+type SecretBindingAPI interface {
+	GetBinding(
+		ctx context.Context,
+		key secret.BindingKey,
+	) (secret.Binding, bool, error)
+
+	ReplaceBinding(
+		ctx context.Context,
+		request secret.ReplaceBindingRequest,
+	) (secret.Binding, error)
+
+	ClearBinding(
+		ctx context.Context,
+		request secret.ClearBindingRequest,
+	) error
+}
+
+// SecretRuntimeAPI is the narrow trusted runtime capability used by Model,
+// MCP, and future runtime integrations. It must never be exposed through
+// transport-facing wrappers.
+type SecretRuntimeAPI interface {
+	ReadBinding(
+		ctx context.Context,
+		key secret.BindingKey,
+		expectedRef secret.Ref,
+	) (string, secret.Binding, error)
+}
+
+// LocalStateMaintenanceAPI is reserved for trusted lifecycle code such as
+// managed Artifact deletion and protected compiled-package reconciliation.
+type LocalStateMaintenanceAPI interface {
+	PurgeArtifactLocalState(
+		ctx context.Context,
+		ref artifact.ArtifactRef,
+	) error
+
+	DrainSecretGarbage(
+		ctx context.Context,
 	) error
 }
 

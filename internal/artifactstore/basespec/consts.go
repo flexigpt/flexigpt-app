@@ -16,6 +16,7 @@ const (
 	MaxVersionBytes          = 256
 	MaxSourceGenerationBytes = 1024
 	MaxLocatorBytes          = 4096
+	MaxSecretBytes           = 64 << 10
 
 	MaxLabels              = 64
 	MaxLabelValueBytes     = 256
@@ -46,13 +47,17 @@ const (
 	ArtifactStoreMetadataFileName      = "app.sqlite"
 	ArtifactStoreContentDirectoryName  = "content"
 	ArtifactStoreStagingDirectoryName  = "staging"
+	ArtifactStoreSecretDirectoryName   = "secrets"
+	ArtifactStoreSecretValuesFileName  = "secrets.json"
 	ArtifactStoreManifestTemporaryName = "store.json.tmp-"
 
 	ArtifactStoreFormat        = "flexigpt-artifactstore/v1"
 	ArtifactStoreContentLayout = "source-packages/v1"
 
-	ArtifactStoreDirectoryMode = 0o750
-	ArtifactStoreManifestMode  = 0o600
+	ArtifactStoreDirectoryMode       = 0o750
+	ArtifactStoreSecretDirectoryMode = 0o700
+	ArtifactStoreSecretFileMode      = 0o600
+	ArtifactStoreManifestMode        = 0o600
 
 	ManagedPackageTemporaryPrefix = "package-"
 	ManagedPackagePreviousPrefix  = "previous-package-"

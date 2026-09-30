@@ -11,6 +11,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
@@ -26,14 +27,15 @@ type Credential struct {
 	Version string
 }
 
-// CredentialResolver owns opaque credential-reference resolution.
+// CredentialResolver owns Artifact Store secret-binding resolution.
 //
-// Model Store stores only a CredentialRef. AgentGo composition provides the
-// resolver through its encrypted settings implementation.
+// Model Store resolves a Provider credential binding through Artifact Store.
+// The resolver receives public-safe binding metadata and returns a runtime-only
+// plaintext credential.
 type CredentialResolver interface {
 	ResolveModelCredential(
 		ctx context.Context,
-		ref string,
+		binding secret.Binding,
 	) (Credential, error)
 }
 
@@ -289,7 +291,8 @@ func (a *RuntimeAdapter) ResolveRuntime(
 	}
 
 	var credential Credential
-	if resolved.ProviderOverlay.CredentialRef != "" {
+	if resolved.ProviderCredential != nil &&
+		resolved.ProviderCredential.Active() {
 		if a.credentials == nil {
 			return RuntimeConfiguration{}, fmt.Errorf(
 				"%w: Model credential resolver is unavailable",
@@ -298,14 +301,14 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		}
 		credential, err = a.credentials.ResolveModelCredential(
 			ctx,
-			resolved.ProviderOverlay.CredentialRef,
+			resolved.ProviderCredential.Clone(),
 		)
 		if err != nil {
 			return RuntimeConfiguration{}, err
 		}
-		if strings.TrimSpace(credential.APIKey) == "" {
+		if credential.APIKey == "" {
 			return RuntimeConfiguration{}, fmt.Errorf(
-				"%w: Model credential reference resolved to an empty value",
+				"%w: Model credential binding resolved to an empty value",
 				basespec.ErrReferenceUnresolved,
 			)
 		}

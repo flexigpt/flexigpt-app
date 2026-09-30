@@ -229,6 +229,15 @@ func (s *Store) PurgeTopologyRoot(
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	if err := purgeRootLocalStateTx(
+		ctx,
+		tx,
+		rootID,
+		time.Now().UTC(),
+	); err != nil {
+		return err
+	}
+
 	statements := []string{
 		`DELETE FROM artifact_topology_package_hydrations WHERE root_id = ?`,
 		`DELETE FROM artifact_source_refresh_state WHERE root_id = ?`,

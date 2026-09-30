@@ -9,13 +9,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
-	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
 
 type InstallerDependencies struct {
 	Hydrator topology.CompiledHydrationCoordinator
 	Cleanup  modelConsumerAPI.BuiltinPackageCleanup
-	Overlays modelOverlay.RootPurger
 }
 
 type Installer struct {
@@ -23,8 +21,7 @@ type Installer struct {
 }
 
 type lifecycle struct {
-	cleanup  modelConsumerAPI.BuiltinPackageCleanup
-	overlays modelOverlay.RootPurger
+	cleanup modelConsumerAPI.BuiltinPackageCleanup
 }
 
 type lifecycleState struct {
@@ -36,8 +33,7 @@ func NewInstaller(
 	dependencies InstallerDependencies,
 ) (*Installer, error) {
 	if dependencies.Hydrator == nil ||
-		dependencies.Cleanup == nil ||
-		dependencies.Overlays == nil {
+		dependencies.Cleanup == nil {
 		return nil, fmt.Errorf(
 			"%w: Model generated catalog installer dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -53,8 +49,7 @@ func NewInstaller(
 		set,
 		dependencies.Hydrator,
 		lifecycle{
-			cleanup:  dependencies.Cleanup,
-			overlays: dependencies.Overlays,
+			cleanup: dependencies.Cleanup,
 		},
 	)
 	if err != nil {
@@ -67,15 +62,6 @@ func (l lifecycle) PrepareCompiledHydration(
 	ctx context.Context,
 	plan topology.CompiledPackagePlan,
 ) (any, error) {
-	if !plan.TopologyCurrent {
-		if err := l.overlays.PurgeRoot(
-			ctx,
-			plan.Registration.Set.Hydration.RootID,
-		); err != nil {
-			return nil, err
-		}
-	}
-
 	addresses, err := addressesForPlan(plan)
 	if err != nil {
 		return nil, err
@@ -130,7 +116,11 @@ func addressesForPlan(
 		byScope[scope] = packageValue.Address
 	}
 
-	output := make([]source.ManagedPackageAddress, 0, len(plan.Changed)+len(plan.Stale))
+	output := make(
+		[]source.ManagedPackageAddress,
+		0,
+		len(plan.Changed)+len(plan.Stale),
+	)
 	seen := make(map[source.ManagedPackageAddress]struct{})
 
 	for _, scope := range plan.Changed {

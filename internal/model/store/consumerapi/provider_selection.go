@@ -110,11 +110,14 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 		)
 	}
 
-	overlay, found, err := s.api.overlays.GetProviderOverlay(ctx, ref)
+	credential, found, err := s.api.overlays.GetProviderCredential(
+		ctx,
+		ref,
+	)
 	if err != nil {
 		return err
 	}
-	if !found || overlay.CredentialRef == "" {
+	if !found || !credential.Active() {
 		return fmt.Errorf(
 			"%w: Model Provider %q has no configured API key",
 			basespec.ErrReferenceUnresolved,

@@ -37,6 +37,8 @@ func (s *Store) Sources() *SourceRepository {
 	return &SourceRepository{store: s}
 }
 
+func (s *Store) LocalState() *LocalStateRepository { return &LocalStateRepository{store: s} }
+
 func (s *Store) Roots() *RootRepository {
 	return &RootRepository{store: s}
 }

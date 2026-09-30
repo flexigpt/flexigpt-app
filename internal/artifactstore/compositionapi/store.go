@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
@@ -15,16 +16,20 @@ import (
 )
 
 type Store struct {
-	Roots            RootAPI
-	Sources          SourceAPI
-	Discovery        DiscoveryAPI
-	Artifacts        ArtifactAPI
-	Resources        ResourceAPI
-	Schemas          SchemaAPI
-	ManagedArtifacts ManagedArtifactAPI
-	Protection       ProtectionAPI
-	Topology         installerapi.API
-	LocatorResolvers []providerapi.LocatorResolverFactory
+	Roots             RootAPI
+	Sources           SourceAPI
+	Discovery         DiscoveryAPI
+	Artifacts         ArtifactAPI
+	Resources         ResourceAPI
+	Schemas           SchemaAPI
+	ManagedArtifacts  ManagedArtifactAPI
+	ProtectedOverlays ProtectedOverlayAPI
+	SecretBindings    SecretBindingAPI
+	SecretRuntime     SecretRuntimeAPI
+	LocalState        LocalStateMaintenanceAPI
+	Protection        ProtectionAPI
+	Topology          installerapi.API
+	LocatorResolvers  []providerapi.LocatorResolverFactory
 
 	components *system.Components
 	closeOnce  sync.Once
@@ -98,6 +103,11 @@ func Open(
 				config.Providers...,
 			),
 			RootMutationPolicy: rootPolicy,
+			ProtectedOverlayNamespaces: append(
+				[]overlay.Namespace(nil),
+				config.ProtectedOverlayNamespaces...,
+			),
+			SecretValues: config.SecretValues,
 		},
 	)
 	if err != nil {
@@ -105,13 +115,17 @@ func Open(
 	}
 
 	output := &Store{
-		Roots:            components.Roots,
-		Sources:          components.Sources,
-		Discovery:        components.Refresh,
-		Artifacts:        components.Artifacts,
-		Resources:        components.Resources,
-		Schemas:          components.ShareableSchemas,
-		ManagedArtifacts: components.ManagedArtifacts,
+		Roots:             components.Roots,
+		Sources:           components.Sources,
+		Discovery:         components.Refresh,
+		Artifacts:         components.Artifacts,
+		Resources:         components.Resources,
+		Schemas:           components.ShareableSchemas,
+		ManagedArtifacts:  components.ManagedArtifacts,
+		ProtectedOverlays: components.LocalState,
+		SecretBindings:    components.LocalState,
+		SecretRuntime:     components.LocalState,
+		LocalState:        components.LocalState,
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},

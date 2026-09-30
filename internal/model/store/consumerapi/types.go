@@ -11,6 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -114,6 +115,8 @@ type ProviderListItem struct {
 	BuiltIn          bool              `json:"builtIn"`
 
 	CredentialConfigured   bool   `json:"credentialConfigured"`
+	CredentialRevision     uint64 `json:"credentialRevision"`
+	CredentialSHA256       string `json:"credentialSHA256,omitempty"`
 	RuntimeOverlayRevision uint64 `json:"runtimeOverlayRevision"`
 }
 
@@ -151,8 +154,11 @@ type ModelView struct {
 // is configured. The opaque credential reference remains internal runtime
 // material and is not a frontend API value.
 type ProviderRuntimeOverlayView struct {
+	ArtifactRevision     uint64                             `json:"artifactRevision"`
 	Revision             uint64                             `json:"revision"`
 	CredentialConfigured bool                               `json:"credentialConfigured"`
+	CredentialRevision   uint64                             `json:"credentialRevision"`
+	CredentialSHA256     string                             `json:"credentialSHA256,omitempty"`
 	Connection           json.RawMessage                    `json:"connection,omitempty"`
 	Defaults             json.RawMessage                    `json:"defaults,omitempty"`
 	Capabilities         json.RawMessage                    `json:"capabilities,omitempty"`
@@ -161,6 +167,7 @@ type ProviderRuntimeOverlayView struct {
 }
 
 type ModelRuntimeOverlayView struct {
+	ArtifactRevision  uint64          `json:"artifactRevision"`
 	Revision          uint64          `json:"revision"`
 	Defaults          json.RawMessage `json:"defaults,omitempty"`
 	Capabilities      json.RawMessage `json:"capabilities,omitempty"`
@@ -169,27 +176,31 @@ type ModelRuntimeOverlayView struct {
 
 // ProviderRuntimeOverlayUpdateRequest is complete replacement state for the
 // local Provider overlay. The caller must retain fields it wishes to preserve.
-//
-// DefaultModel is accepted only for protected Providers. Mutable Providers use
-// `SetMutableProviderDefaultModel` so the best-effort default relationship is
-// stored in namespaced Artifact.Data as required by the HLD.
 type ProviderRuntimeOverlayUpdateRequest struct {
-	Provider          artifact.ArtifactRef               `json:"provider"`
-	ExpectedRevision  uint64                             `json:"expectedRevision"`
-	CredentialRef     string                             `json:"credentialRef,omitempty"`
-	Connection        json.RawMessage                    `json:"connection,omitempty"`
-	Defaults          json.RawMessage                    `json:"defaults,omitempty"`
-	Capabilities      json.RawMessage                    `json:"capabilities,omitempty"`
-	DefaultModel      *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
-	AdapterParameters json.RawMessage                    `json:"adapterParameters,omitempty"`
+	Provider                 artifact.ArtifactRef               `json:"provider"`
+	ExpectedArtifactRevision uint64                             `json:"expectedArtifactRevision"`
+	ExpectedOverlayRevision  uint64                             `json:"expectedOverlayRevision"`
+	Connection               json.RawMessage                    `json:"connection,omitempty"`
+	Defaults                 json.RawMessage                    `json:"defaults,omitempty"`
+	Capabilities             json.RawMessage                    `json:"capabilities,omitempty"`
+	DefaultModel             *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
+	AdapterParameters        json.RawMessage                    `json:"adapterParameters,omitempty"`
 }
 
 type ModelRuntimeOverlayUpdateRequest struct {
-	Model             artifact.ArtifactRef `json:"model"`
-	ExpectedRevision  uint64               `json:"expectedRevision"`
-	Defaults          json.RawMessage      `json:"defaults,omitempty"`
-	Capabilities      json.RawMessage      `json:"capabilities,omitempty"`
-	AdapterParameters json.RawMessage      `json:"adapterParameters,omitempty"`
+	Model                    artifact.ArtifactRef `json:"model"`
+	ExpectedArtifactRevision uint64               `json:"expectedArtifactRevision"`
+	ExpectedOverlayRevision  uint64               `json:"expectedOverlayRevision"`
+	Defaults                 json.RawMessage      `json:"defaults,omitempty"`
+	Capabilities             json.RawMessage      `json:"capabilities,omitempty"`
+	AdapterParameters        json.RawMessage      `json:"adapterParameters,omitempty"`
+}
+
+type ProviderCredentialUpdateRequest struct {
+	Provider                 artifact.ArtifactRef `json:"provider"`
+	ExpectedArtifactRevision uint64               `json:"expectedArtifactRevision"`
+	ExpectedBindingRevision  uint64               `json:"expectedBindingRevision"`
+	Secret                   string               `json:"secret"`
 }
 
 // ResolvedModel is the internal source-backed Model Store resolution result.
@@ -203,8 +214,9 @@ type ResolvedModel struct {
 	Model    modelDomain.Model
 	Provider modelDomain.Provider
 
-	ProviderOverlay modelOverlay.ProviderOverlay
-	ModelOverlay    modelOverlay.ModelOverlay
+	ProviderOverlay    modelOverlay.ProviderOverlay
+	ProviderCredential *secret.Binding
+	ModelOverlay       modelOverlay.ModelOverlay
 
 	Adapter     AdapterDescriptor
 	Fingerprint cryptoutil.Digest

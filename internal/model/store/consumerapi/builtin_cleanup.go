@@ -100,10 +100,12 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	output := make([]BuiltinArtifactSnapshot, 0)
 	seen := make(map[artifact.ArtifactRef]struct{})
 	for _, entry := range entries {
-		if !modelBuiltinArtifactKind(entry.Kind) ||
+		if entry.State != artifact.StateAvailable ||
+			!modelBuiltinArtifactKind(entry.Kind) ||
 			!entryBelongsToPackageScope(entry, scopes) {
 			continue
 		}
+
 		if _, duplicate := seen[entry.Ref()]; duplicate {
 			continue
 		}
@@ -270,9 +272,9 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 
 	switch value.Kind {
 	case modelDomain.ModelProviderArtifactKind:
-		return c.api.purgeProviderOverlay(ctx, value.Ref)
+		return c.api.purgeProviderLocalState(ctx, value.Ref)
 	case modelDomain.ModelArtifactKind:
-		return c.api.purgeModelOverlay(ctx, value.Ref)
+		return c.api.purgeModelLocalState(ctx, value.Ref)
 	default:
 		return nil
 	}
