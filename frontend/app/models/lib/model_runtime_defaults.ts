@@ -126,11 +126,6 @@ export function parseStopSequences(raw: string): string[] {
 	return out;
 }
 
-export function parseOptionalStopSequences(raw: string): string[] | undefined {
-	const values = parseStopSequences(raw);
-	return values.length > 0 ? values : undefined;
-}
-
 function strictToSelection(value: boolean | undefined): StrictSelection {
 	if (value === true) {
 		return 'true';

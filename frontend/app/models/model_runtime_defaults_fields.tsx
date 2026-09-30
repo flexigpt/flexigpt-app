@@ -191,6 +191,10 @@ export function ModelRuntimeDefaultsFields({
 			isEnabled: supportsReasoningSummaryStyle(capabilities),
 			displayName: 'Detailed',
 		},
+		[ReasoningSummaryStyleValue.Omitted]: {
+			isEnabled: supportsReasoningSummaryStyle(capabilities),
+			displayName: 'Concise (legacy default)',
+		},
 	};
 	const strictItems: Record<StrictSelection, { isEnabled: boolean; displayName: string }> = {
 		[OPTIONAL_BOOLEAN_UNSET]: { isEnabled: true, displayName: 'Leave unset' },

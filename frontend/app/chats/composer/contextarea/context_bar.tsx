@@ -20,6 +20,7 @@ import { HybridReasoningCheckbox } from '@/chats/composer/reasoningparams/reason
 import { SingleReasoningDropdown } from '@/chats/composer/reasoningparams/reasoning_levels_dropdown';
 import { ReasoningTokensDropdown } from '@/chats/composer/reasoningparams/reasoning_tokens_dropdown';
 import { TemperatureDropdown } from '@/chats/composer/temperatures/temperature_dropdown';
+import { getHybridReasoningPreference } from '@/models/lib/request_preferences';
 
 interface ContextBarProps {
 	context: ComposerContextController;
@@ -64,6 +65,7 @@ function ModelSetupAction({
 
 export function ContextBar({ context, agent }: ContextBarProps) {
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+	const hybridPreference = getHybridReasoningPreference(context.selectedModel.requestPatch);
 
 	if (!context.hasRunnableModel) {
 		return (
@@ -89,6 +91,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 			{context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && (
 				<HybridReasoningCheckbox
 					isReasoningEnabled={context.isHybridReasoningEnabled}
+					preference={hybridPreference}
 					setIsReasoningEnabled={context.handleSetIsHybridReasoningEnabled}
 				/>
 			)}
@@ -96,14 +99,14 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 			{context.selectedModel.reasoning?.type === ReasoningType.HybridWithTokens ? (
 				context.isHybridReasoningEnabled ? (
 					<ReasoningTokensDropdown
-						tokens={context.selectedModel.reasoning.tokens}
+						tokens={context.selectedModel.requestPatch?.defaults?.reasoning?.tokens}
 						setTokens={t => {
 							context.setHybridTokens(t);
 						}}
 					/>
 				) : (
 					<TemperatureDropdown
-						temperature={context.selectedModel.temperature ?? 0.1}
+						temperature={context.selectedModel.requestPatch?.defaults?.temperature}
 						setTemperature={t => {
 							context.setTemperature(t);
 						}}
@@ -111,7 +114,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 				)
 			) : context.selectedModel.reasoning?.type === ReasoningType.SingleWithLevels ? (
 				<SingleReasoningDropdown
-					reasoningLevel={context.selectedModel.reasoning.level}
+					reasoningLevel={context.selectedModel.requestPatch?.defaults?.reasoning?.level || undefined}
 					setReasoningLevel={r => {
 						context.setReasoningLevel(r);
 					}}
@@ -119,7 +122,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 				/>
 			) : (
 				<TemperatureDropdown
-					temperature={context.selectedModel.temperature ?? 0.1}
+					temperature={context.selectedModel.requestPatch?.defaults?.temperature}
 					setTemperature={t => {
 						context.setTemperature(t);
 					}}
@@ -129,7 +132,7 @@ export function ContextBar({ context, agent }: ContextBarProps) {
 			{context.verbosityEnabled ? (
 				<OutputVerbosityDropdown
 					sdkType={context.selectedModel.providerSDKType}
-					verbosity={context.selectedModel.outputParam?.verbosity}
+					verbosity={context.selectedModel.requestPatch?.defaults?.output?.verbosity}
 					setVerbosity={o => {
 						context.setOutputVerbosity(o);
 					}}

@@ -358,10 +358,12 @@ export interface UIModelOption extends ModelParam {
 	capabilities?: ModelCapabilities;
 
 	/*
-	 * This is UI-only source baseline used to produce the final request patch.
-	 * It is not persisted into a Conversation.
+	 * Sparse, explicitly user-authored request preferences.
+	 *
+	 * The source/runtime ModelParam is display-only. It must never be diffed
+	 * against this value to infer user intent.
 	 */
-	sourceModelParam?: ModelParam;
+	requestPatch?: ModelRequestPatch;
 }
 
 export const DefaultUIModelOption: UIModelOption = {

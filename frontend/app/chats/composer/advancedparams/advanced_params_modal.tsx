@@ -2,9 +2,10 @@ import type { Dispatch, SetStateAction, SubmitEventHandler } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { FiAlertCircle, FiHelpCircle } from 'react-icons/fi';
 
-import type { CacheControlKind, JSONSchemaParam, OutputParam } from '@/spec/inference';
-import type { UIModelOption } from '@/spec/model';
+import type { CacheControlKind } from '@/spec/inference';
+import type { ModelOutputFormat, UIModelOption } from '@/spec/model';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
+import { ModelRequestClearField } from '@/spec/model';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
 import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
@@ -33,11 +34,13 @@ import {
 	getTopLevelCacheControlCapabilities,
 	supportsReasoningSummaryStyle,
 } from '@/models/lib/capabilities';
+import { parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
 import {
-	parseOptionalPositiveInteger,
-	parseOptionalStopSequences,
-	parseStopSequences,
-} from '@/models/lib/model_runtime_defaults';
+	clearRequestDefault,
+	editRequestDefaults,
+	inheritRequestDefault,
+	removeRequestClear,
+} from '@/models/lib/request_preferences';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;
@@ -49,21 +52,27 @@ interface AdvancedParamsModalProps {
 
 type OutputFormatChoice = 'default' | 'text' | 'jsonSchema';
 type SummaryStyleChoice = '' | ReasoningSummaryStyle;
+type StreamChoice = 'default' | 'enabled' | 'disabled';
+type CacheControlMode = 'default' | 'enabled' | 'disabled';
+type StrictChoice = '' | 'true' | 'false';
 
 type ErrorKey = 'maxPromptLength' | 'maxOutputLength' | 'timeout' | 'stopSequences' | 'jsonSchemaName' | 'jsonSchema';
 
 type AdvancedParamsModalInnerProps = Omit<AdvancedParamsModalProps, 'isOpen' | 'onClose'>;
 
-function getInitialOutputFormatChoice(
-	currentModel: UIModelOption,
-	supportedOutputFormats: OutputFormatKind[] | undefined
-): OutputFormatChoice {
-	const kind = currentModel.outputParam?.format?.kind;
-	const kindIsSupported = !supportedOutputFormats || (kind ? supportedOutputFormats.includes(kind) : true);
+const streamChoiceItems: Record<StreamChoice, { isEnabled: boolean; displayName: string }> = {
+	default: { isEnabled: true, displayName: 'Default' },
+	enabled: { isEnabled: true, displayName: 'Enabled' },
+	disabled: { isEnabled: true, displayName: 'Disabled' },
+};
 
-	if (!kindIsSupported) {
-		return 'default';
-	}
+const strictChoiceItems: Record<StrictChoice, { isEnabled: boolean; displayName: string }> = {
+	'': { isEnabled: true, displayName: 'Default' },
+	true: { isEnabled: true, displayName: 'Strict' },
+	false: { isEnabled: true, displayName: 'Non-strict' },
+};
+
+function getInitialOutputFormatChoice(kind: OutputFormatKind | undefined): OutputFormatChoice {
 	if (kind === OutputFormatKind.Text) {
 		return 'text';
 	}
@@ -73,11 +82,33 @@ function getInitialOutputFormatChoice(
 	return 'default';
 }
 
-function getInitialReasoningSummaryStyle(
-	currentModel: UIModelOption,
-	summaryStyleSupported: boolean
-): SummaryStyleChoice {
-	return summaryStyleSupported ? ((currentModel.reasoning?.summaryStyle as SummaryStyleChoice) ?? '') : '';
+function getInitialReasoningSummaryStyle(summaryStyle: ReasoningSummaryStyle | undefined): SummaryStyleChoice {
+	return summaryStyle ?? '';
+}
+
+function parseRequestStopSequences(raw: string): string[] | undefined {
+	const values = raw.split(/\r?\n/g).filter(value => value.length > 0);
+	return values.length > 0 ? values : undefined;
+}
+
+function strictChoiceFrom(value: boolean | undefined): StrictChoice {
+	if (value === true) {
+		return 'true';
+	}
+	if (value === false) {
+		return 'false';
+	}
+	return '';
+}
+
+function strictChoiceToValue(value: StrictChoice): boolean | undefined {
+	if (value === 'true') {
+		return true;
+	}
+	if (value === 'false') {
+		return false;
+	}
+	return undefined;
 }
 
 function HelpHint({ content }: { content: string }) {
@@ -102,6 +133,10 @@ const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'tim
 function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onSave }: AdvancedParamsModalInnerProps) {
 	const { requestClose } = useModalDialogController();
 	const maxPromptLengthInputRef = useRef<HTMLInputElement | null>(null);
+
+	const requestDefaults = currentModel.requestPatch?.defaults;
+	const requestClear = currentModel.requestPatch?.clear ?? [];
+
 	const supportedOutputFormats = useMemo(
 		() => getSupportedOutputFormats(currentModel.capabilities),
 		[currentModel.capabilities]
@@ -118,8 +153,6 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		};
 	}, [supportedOutputFormats]);
 
-	const reasoningEnabled = effectiveReasoningEnabled ?? !!currentModel.reasoning;
-
 	const effectiveCacheCapabilities = useMemo(
 		() => getEffectiveCacheCapabilities(currentModel.providerSDKType, currentModel.capabilities),
 		[currentModel.capabilities, currentModel.providerSDKType]
@@ -129,32 +162,43 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		[currentModel.capabilities, currentModel.providerSDKType]
 	);
 	const supportedCacheKinds = useMemo(
-		() => resolveSupportedCacheControlKinds(topLevelCacheCapabilities?.supportedKinds, currentModel.cacheControl),
-		[currentModel.cacheControl, topLevelCacheCapabilities?.supportedKinds]
+		() => resolveSupportedCacheControlKinds(topLevelCacheCapabilities?.supportedKinds, requestDefaults?.cacheControl),
+		[requestDefaults?.cacheControl, topLevelCacheCapabilities?.supportedKinds]
 	);
 	const supportedCacheTTLs = useMemo(
-		() => resolveSupportedCacheControlTTLs(topLevelCacheCapabilities?.supportedTTLs, currentModel.cacheControl),
-		[currentModel.cacheControl, topLevelCacheCapabilities?.supportedTTLs]
+		() => resolveSupportedCacheControlTTLs(topLevelCacheCapabilities?.supportedTTLs, requestDefaults?.cacheControl),
+		[requestDefaults?.cacheControl, topLevelCacheCapabilities?.supportedTTLs]
 	);
 	const supportsManualCacheControl = supportedCacheKinds.length > 0;
-	const supportsCacheKey =
-		topLevelCacheCapabilities?.supportsKey === true || Boolean(currentModel.cacheControl?.key?.trim());
+	const supportsCacheKey = topLevelCacheCapabilities?.supportsKey === true;
 	const supportsAutomaticProviderCaching = effectiveCacheCapabilities?.supportsAutomaticCaching === true;
 
 	const summaryStyleSupported = supportsReasoningSummaryStyle(currentModel.capabilities);
+	const reasoningEnabled =
+		!requestClear.includes(ModelRequestClearField.Reasoning) &&
+		(effectiveReasoningEnabled ?? Boolean(currentModel.reasoning));
 
 	const stopPolicy = useMemo(() => getStopSequencesPolicy(currentModel.capabilities), [currentModel.capabilities]);
-
 	const stopSequencesDisabledBecauseReasoning = stopPolicy.disallowedWithReasoning && reasoningEnabled;
 
 	const reasoningSummaryStyleItems: Record<SummaryStyleChoice, { isEnabled: boolean; displayName: string }> = useMemo(
 		() => ({
 			'': { isEnabled: true, displayName: 'Default' },
-			[ReasoningSummaryStyle.Auto]: { isEnabled: reasoningEnabled && summaryStyleSupported, displayName: 'Auto' },
-			[ReasoningSummaryStyle.Concise]: { isEnabled: reasoningEnabled && summaryStyleSupported, displayName: 'Concise' },
+			[ReasoningSummaryStyle.Auto]: {
+				isEnabled: reasoningEnabled && summaryStyleSupported,
+				displayName: 'Auto',
+			},
+			[ReasoningSummaryStyle.Concise]: {
+				isEnabled: reasoningEnabled && summaryStyleSupported,
+				displayName: 'Concise',
+			},
 			[ReasoningSummaryStyle.Detailed]: {
 				isEnabled: reasoningEnabled && summaryStyleSupported,
 				displayName: 'Detailed',
+			},
+			[ReasoningSummaryStyle.Omitted]: {
+				isEnabled: reasoningEnabled && summaryStyleSupported,
+				displayName: 'Concise (legacy default)',
 			},
 		}),
 		[reasoningEnabled, summaryStyleSupported]
@@ -168,46 +212,73 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		() => buildCacheControlTTLDropdownItems(supportedCacheTTLs),
 		[supportedCacheTTLs]
 	);
+	const cacheControlModeItems = useMemo<Record<CacheControlMode, { isEnabled: boolean; displayName: string }>>(
+		() => ({
+			default: { isEnabled: true, displayName: 'Default' },
+			enabled: { isEnabled: supportsManualCacheControl, displayName: 'Enabled' },
+			disabled: { isEnabled: true, displayName: 'Disabled' },
+		}),
+		[supportsManualCacheControl]
+	);
 
-	const initialJSONSchema = currentModel.outputParam?.format?.jsonSchemaParam;
+	const [streamChoice, setStreamChoice] = useState<StreamChoice>(() => {
+		if (requestDefaults?.stream === true) {
+			return 'enabled';
+		}
+		if (requestDefaults?.stream === false) {
+			return 'disabled';
+		}
+		return 'default';
+	});
 
-	const [stream, setStream] = useState(() => currentModel.stream);
-	const [maxPromptLength, setMaxPromptLength] = useState(() => String(currentModel.maxPromptLength));
-	const [maxOutputLength, setMaxOutputLength] = useState(() => String(currentModel.maxOutputLength));
-	const [timeoutSec, setTimeoutSec] = useState(() => String(currentModel.timeout));
-	const [cacheControlEnabled, setCacheControlEnabled] = useState(() => Boolean(currentModel.cacheControl));
+	const [maxPromptLength, setMaxPromptLength] = useState(() =>
+		requestDefaults?.maxPromptTokens === undefined ? '' : String(requestDefaults.maxPromptTokens)
+	);
+	const [maxOutputLength, setMaxOutputLength] = useState(() =>
+		requestDefaults?.maxOutputTokens === undefined ? '' : String(requestDefaults.maxOutputTokens)
+	);
+	const [timeoutSec, setTimeoutSec] = useState(() =>
+		requestDefaults?.timeoutMS === undefined ? '' : String(Math.ceil(requestDefaults.timeoutMS / 1000))
+	);
+
+	const [cacheControlMode, setCacheControlMode] = useState<CacheControlMode>(() => {
+		if (requestClear.includes(ModelRequestClearField.CacheControl)) {
+			return 'disabled';
+		}
+		return requestDefaults?.cacheControl ? 'enabled' : 'default';
+	});
 	const [cacheControlKind, setCacheControlKind] = useState<CacheControlKind | ''>(() =>
-		getInitialCacheControlKind(currentModel.cacheControl, supportedCacheKinds)
+		getInitialCacheControlKind(requestDefaults?.cacheControl, supportedCacheKinds)
 	);
 	const [cacheControlTTL, setCacheControlTTL] = useState<CacheControlTTLSelection>(() =>
-		getInitialCacheControlTTLSelection(currentModel.cacheControl, supportedCacheTTLs)
+		getInitialCacheControlTTLSelection(requestDefaults?.cacheControl, supportedCacheTTLs)
 	);
-	const [cacheControlKey, setCacheControlKey] = useState(() => currentModel.cacheControl?.key ?? '');
+	const [cacheControlKey, setCacheControlKey] = useState(() => requestDefaults?.cacheControl?.key ?? '');
 
 	const [reasoningSummaryStyle, setReasoningSummaryStyle] = useState<SummaryStyleChoice>(() =>
-		getInitialReasoningSummaryStyle(currentModel, summaryStyleSupported)
+		getInitialReasoningSummaryStyle(requestDefaults?.reasoning?.summaryStyle)
 	);
-
 	const [outputFormatChoice, setOutputFormatChoice] = useState<OutputFormatChoice>(() =>
-		getInitialOutputFormatChoice(currentModel, supportedOutputFormats)
+		getInitialOutputFormatChoice(requestDefaults?.output?.format?.kind)
 	);
 
-	const [jsonSchemaName, setJsonSchemaName] = useState(() => initialJSONSchema?.name ?? '');
-	const [jsonSchemaDescription, setJsonSchemaDescription] = useState(() => initialJSONSchema?.description ?? '');
-	const [jsonSchemaStrict, setJsonSchemaStrict] = useState(() => initialJSONSchema?.strict ?? true);
+	const requestJSONSchema = requestDefaults?.output?.format?.jsonSchema;
+	const [jsonSchemaName, setJsonSchemaName] = useState(() => requestJSONSchema?.name ?? '');
+	const [jsonSchemaDescription, setJsonSchemaDescription] = useState(() => requestJSONSchema?.description ?? '');
+	const [jsonSchemaStrict, setJsonSchemaStrict] = useState<StrictChoice>(() =>
+		strictChoiceFrom(requestJSONSchema?.strict)
+	);
 	const [jsonSchemaText, setJsonSchemaText] = useState(() =>
-		initialJSONSchema?.schema ? JSON.stringify(initialJSONSchema.schema, null, 2) : ''
+		requestJSONSchema?.schema ? JSON.stringify(requestJSONSchema.schema, null, 2) : ''
 	);
 
-	const [stopSequencesText, setStopSequencesText] = useState(() =>
-		(currentModel.stopSequences ?? []).slice(0, stopPolicy.maxSequences).join('\n')
-	);
-
+	const [stopSequencesText, setStopSequencesText] = useState(() => (requestDefaults?.stopSequences ?? []).join('\n'));
 	const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
 
 	useEffect(() => {
 		let raf1 = 0;
 		let raf2 = 0;
+
 		raf1 = window.requestAnimationFrame(() => {
 			raf2 = window.requestAnimationFrame(() => {
 				focusTextInputAtEnd(maxPromptLengthInputRef.current);
@@ -226,27 +297,26 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		setter: Dispatch<SetStateAction<string>>
 	) => {
 		setter(value);
-		setErrors(prev => ({ ...prev, [field]: validateNumberField(field, value) }));
+		setErrors(previous => ({
+			...previous,
+			[field]: validateNumberField(field, value),
+		}));
 	};
 
 	const validateStopSequences = (raw: string): string | undefined => {
-		if (!stopPolicy.isSupported) {
-			return undefined;
-		}
-		if (stopSequencesDisabledBecauseReasoning) {
+		if (!stopPolicy.isSupported || stopSequencesDisabledBecauseReasoning) {
 			return undefined;
 		}
 
-		const parsed = parseStopSequences(raw);
+		const parsed = parseRequestStopSequences(raw) ?? [];
 		if (parsed.length === 0) {
 			return undefined;
 		}
-
 		if (parsed.length > stopPolicy.maxSequences) {
 			return `Too many stop sequences (max ${stopPolicy.maxSequences}).`;
 		}
 
-		const tooLong = parsed.find(s => s.length > 256);
+		const tooLong = parsed.find(value => value.length > 256);
 		if (tooLong) {
 			return 'A stop sequence is too long (max 256 chars per line).';
 		}
@@ -260,25 +330,40 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		schemaTextValue: string = jsonSchemaText
 	) => {
 		if (choice !== 'jsonSchema') {
-			return { nameErr: undefined as string | undefined, schemaErr: undefined as string | undefined };
+			return {
+				nameErr: undefined as string | undefined,
+				schemaErr: undefined as string | undefined,
+			};
 		}
 
 		const name = nameValue.trim();
 		if (!name) {
-			return { nameErr: 'Schema name is required.', schemaErr: undefined };
+			return {
+				nameErr: 'Schema name is required.',
+				schemaErr: undefined,
+			};
 		}
 
 		const schemaRaw = schemaTextValue.trim();
 		if (!schemaRaw) {
-			return { nameErr: undefined, schemaErr: 'Schema JSON is required.' };
+			return {
+				nameErr: undefined,
+				schemaErr: 'Schema JSON is required.',
+			};
 		}
 
 		const parsed = tryParseJSONObject(schemaRaw, 'Schema JSON', MAX_JSON_SCHEMA_INPUT_CHARS);
 		if (!parsed.ok) {
-			return { nameErr: undefined, schemaErr: parsed.error };
+			return {
+				nameErr: undefined,
+				schemaErr: parsed.error,
+			};
 		}
 
-		return { nameErr: undefined, schemaErr: undefined };
+		return {
+			nameErr: undefined,
+			schemaErr: undefined,
+		};
 	};
 
 	const maybeRefreshJSONSchemaErrors = (nextChoice: OutputFormatChoice, nextName: string, nextSchemaText: string) => {
@@ -287,8 +372,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		}
 
 		const { nameErr, schemaErr } = validateJSONSchema(nextChoice, nextName, nextSchemaText);
-		setErrors(prev => ({
-			...prev,
+		setErrors(previous => ({
+			...previous,
 			jsonSchemaName: nameErr,
 			jsonSchema: schemaErr,
 		}));
@@ -300,8 +385,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		setOutputFormatChoice(choice);
 
 		if (choice !== 'jsonSchema') {
-			setErrors(prev => ({
-				...prev,
+			setErrors(previous => ({
+				...previous,
 				jsonSchemaName: undefined,
 				jsonSchema: undefined,
 			}));
@@ -321,25 +406,27 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		maybeRefreshJSONSchemaErrors(outputFormatChoice, jsonSchemaName, value);
 	};
 
-	const handleSubmit: SubmitEventHandler<HTMLFormElement> = e => {
-		e.preventDefault();
+	const handleSubmit: SubmitEventHandler<HTMLFormElement> = event => {
+		event.preventDefault();
 
 		const maxPromptErr = validateNumberField('maxPromptLength', maxPromptLength);
 		const maxOutputErr = validateNumberField('maxOutputLength', maxOutputLength);
 		const timeoutErr = validateNumberField('timeout', timeoutSec);
-
 		const stopErr = validateStopSequences(stopSequencesText);
 		const { nameErr, schemaErr } = validateJSONSchema(outputFormatChoice);
 
-		const nextCacheControl = buildCacheControlFromForm({
-			enabled: cacheControlEnabled,
-			kind: cacheControlKind,
-			supportedKinds: supportedCacheKinds,
-			ttlSelection: cacheControlTTL,
-			key: cacheControlKey,
-			supportsTTL: topLevelCacheCapabilities?.supportsTTL ?? true,
-			supportsKey: supportsCacheKey,
-		});
+		const nextCacheControl =
+			cacheControlMode === 'enabled'
+				? buildCacheControlFromForm({
+						enabled: true,
+						kind: cacheControlKind,
+						supportedKinds: supportedCacheKinds,
+						ttlSelection: cacheControlTTL,
+						key: cacheControlKey,
+						supportsTTL: topLevelCacheCapabilities?.supportsTTL ?? true,
+						supportsKey: supportsCacheKey,
+					})
+				: undefined;
 
 		const nextErrors: Partial<Record<ErrorKey, string>> = {
 			maxPromptLength: maxPromptErr,
@@ -355,84 +442,120 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			return;
 		}
 
-		const baseOutputParam: OutputParam | undefined = currentModel.outputParam
-			? { ...currentModel.outputParam }
-			: undefined;
+		let requestPatch = currentModel.requestPatch;
 
-		let nextFormat: OutputParam['format'] = undefined;
-
-		if (outputFormatChoice === 'text') {
-			if (outputFormatItems.text.isEnabled) {
-				nextFormat = { kind: OutputFormatKind.Text };
-			}
-		} else if (outputFormatChoice === 'jsonSchema') {
-			if (!outputFormatItems.jsonSchema.isEnabled) {
-				nextFormat = undefined;
+		requestPatch = editRequestDefaults(requestPatch, defaults => {
+			if (streamChoice === 'default') {
+				delete defaults.stream;
 			} else {
+				defaults.stream = streamChoice === 'enabled';
+			}
+
+			const promptTokens = parseOptionalPositiveInteger(maxPromptLength);
+			if (promptTokens === undefined) {
+				delete defaults.maxPromptTokens;
+			} else {
+				defaults.maxPromptTokens = promptTokens;
+			}
+
+			const outputTokens = parseOptionalPositiveInteger(maxOutputLength);
+			if (outputTokens === undefined) {
+				delete defaults.maxOutputTokens;
+			} else {
+				defaults.maxOutputTokens = outputTokens;
+			}
+
+			const timeoutSeconds = parseOptionalPositiveInteger(timeoutSec);
+			if (timeoutSeconds === undefined) {
+				delete defaults.timeoutMS;
+			} else {
+				defaults.timeoutMS = timeoutSeconds * 1000;
+			}
+
+			const reasoning = { ...defaults.reasoning };
+			if (!reasoningSummaryStyle) {
+				delete reasoning.summaryStyle;
+			} else {
+				reasoning.summaryStyle = reasoningSummaryStyle;
+			}
+			if (Object.keys(reasoning).length === 0) {
+				delete defaults.reasoning;
+			} else {
+				defaults.reasoning = reasoning;
+			}
+
+			const output = { ...defaults.output };
+
+			if (outputFormatChoice === 'default') {
+				delete output.format;
+			} else if (outputFormatChoice === 'text' && outputFormatItems.text.isEnabled) {
+				output.format = {
+					kind: OutputFormatKind.Text,
+				};
+			} else if (outputFormatChoice === 'jsonSchema' && outputFormatItems.jsonSchema.isEnabled) {
 				const parsedSchema = tryParseJSONObject(jsonSchemaText.trim(), 'Schema JSON', MAX_JSON_SCHEMA_INPUT_CHARS);
+				const strict = strictChoiceToValue(jsonSchemaStrict);
+
 				if (parsedSchema.ok) {
-					nextFormat = {
+					const format: ModelOutputFormat = {
 						kind: OutputFormatKind.JSONSchema,
-						jsonSchemaParam: {
+						jsonSchema: {
 							name: jsonSchemaName.trim(),
-							description: jsonSchemaDescription.trim() || undefined,
-							strict: jsonSchemaStrict,
+							...(jsonSchemaDescription.trim() ? { description: jsonSchemaDescription.trim() } : {}),
+							...(strict !== undefined ? { strict } : {}),
 							schema: parsedSchema.value,
-						} as JSONSchemaParam,
+						},
 					};
+					output.format = format;
 				}
 			}
+
+			if (Object.keys(output).length === 0) {
+				delete defaults.output;
+			} else {
+				defaults.output = output;
+			}
+
+			if (stopPolicy.isSupported && !stopSequencesDisabledBecauseReasoning) {
+				const stopSequences = parseRequestStopSequences(stopSequencesText);
+				if (!stopSequences) {
+					delete defaults.stopSequences;
+				} else {
+					defaults.stopSequences = stopSequences;
+				}
+			}
+		});
+
+		if (reasoningSummaryStyle) {
+			requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.Reasoning);
 		}
 
-		const mergedOutputParam: OutputParam | undefined = (() => {
-			const merged: OutputParam = { ...baseOutputParam };
+		if (outputFormatChoice !== 'default') {
+			requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.Output);
+		}
 
-			if (nextFormat === undefined) {
-				delete merged.format;
-			} else {
-				merged.format = nextFormat;
-			}
+		switch (cacheControlMode) {
+			case 'default':
+				requestPatch = inheritRequestDefault(requestPatch, ModelRequestClearField.CacheControl);
+				break;
 
-			const hasAny = !!merged.verbosity || !!merged.format;
-			return hasAny ? merged : undefined;
-		})();
+			case 'disabled':
+				requestPatch = clearRequestDefault(requestPatch, ModelRequestClearField.CacheControl);
+				break;
 
-		const mergedReasoning = (() => {
-			if (!currentModel.reasoning) {
-				return currentModel.reasoning;
-			}
-
-			const r = { ...currentModel.reasoning };
-			if (!reasoningSummaryStyle) {
-				delete r.summaryStyle;
-			} else {
-				r.summaryStyle = reasoningSummaryStyle;
-			}
-			return r as UIModelOption['reasoning'];
-		})();
-
-		const nextStopSequences = (() => {
-			if (!stopPolicy.isSupported) {
-				return undefined;
-			}
-			if (stopSequencesDisabledBecauseReasoning) {
-				return undefined;
-			}
-
-			const parsed = parseOptionalStopSequences(stopSequencesText);
-			return parsed?.slice(0, stopPolicy.maxSequences);
-		})();
+			case 'enabled':
+				if (nextCacheControl) {
+					requestPatch = editRequestDefaults(requestPatch, defaults => {
+						defaults.cacheControl = nextCacheControl;
+					});
+					requestPatch = removeRequestClear(requestPatch, ModelRequestClearField.CacheControl);
+				}
+				break;
+		}
 
 		const updatedModel: UIModelOption = {
 			...currentModel,
-			stream,
-			maxPromptLength: parseOptionalPositiveInteger(maxPromptLength) ?? currentModel.maxPromptLength,
-			maxOutputLength: parseOptionalPositiveInteger(maxOutputLength) ?? currentModel.maxOutputLength,
-			timeout: parseOptionalPositiveInteger(timeoutSec) ?? currentModel.timeout,
-			cacheControl: nextCacheControl,
-			reasoning: mergedReasoning,
-			outputParam: mergedOutputParam,
-			stopSequences: nextStopSequences,
+			requestPatch,
 		};
 
 		onSave(updatedModel);
@@ -450,19 +573,18 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 
 			<form onSubmit={handleSubmit} className="space-y-4 p-6">
 				<div className="grid grid-cols-12 items-center gap-2">
-					<label htmlFor="advanced-stream" className="label col-span-4 cursor-pointer">
+					<div className="label col-span-4">
 						<span className="text-sm">Streaming</span>
-						<HelpHint content="Stream data continuously." />
-					</label>
+						<HelpHint content="Default leaves streaming to the model/runtime configuration." />
+					</div>
 					<div className="col-span-8">
-						<input
-							id="advanced-stream"
-							type="checkbox"
-							checked={stream}
-							onChange={e => {
-								setStream(e.target.checked);
-							}}
-							className="toggle toggle-accent"
+						<Dropdown<StreamChoice>
+							dropdownItems={streamChoiceItems}
+							selectedKey={streamChoice}
+							onChange={setStreamChoice}
+							filterDisabled={false}
+							title="Select streaming preference"
+							getDisplayName={choice => streamChoiceItems[choice].displayName}
 						/>
 					</div>
 				</div>
@@ -470,7 +592,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				<div className="grid grid-cols-12 items-center gap-2">
 					<label htmlFor="advanced-max-prompt-length" className="label col-span-4">
 						<span className="text-sm">Max Prompt Tokens</span>
-						<HelpHint content="Maximum tokens for input prompt" />
+						<HelpHint content="Blank leaves this value to the model/runtime configuration." />
 					</label>
 					<div className="col-span-8">
 						<input
@@ -478,11 +600,11 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 							ref={maxPromptLengthInputRef}
 							type="text"
 							value={maxPromptLength}
-							onChange={e => {
-								updateField('maxPromptLength', e.target.value, setMaxPromptLength);
+							onChange={event => {
+								updateField('maxPromptLength', event.target.value, setMaxPromptLength);
 							}}
 							className={`input w-full rounded-xl ${errors.maxPromptLength ? 'input-error' : ''}`}
-							placeholder={`Default: ${currentModel.maxPromptLength}`}
+							placeholder="Default: model / SDK"
 							spellCheck="false"
 						/>
 						{errors.maxPromptLength && (
@@ -498,18 +620,18 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				<div className="grid grid-cols-12 items-center gap-2">
 					<label htmlFor="advanced-max-output-length" className="label col-span-4">
 						<span className="text-sm">Max Output Tokens</span>
-						<HelpHint content="Maximum tokens for model output" />
+						<HelpHint content="Blank leaves this value to the model/runtime configuration." />
 					</label>
 					<div className="col-span-8">
 						<input
 							id="advanced-max-output-length"
 							type="text"
 							value={maxOutputLength}
-							onChange={e => {
-								updateField('maxOutputLength', e.target.value, setMaxOutputLength);
+							onChange={event => {
+								updateField('maxOutputLength', event.target.value, setMaxOutputLength);
 							}}
 							className={`input w-full rounded-xl ${errors.maxOutputLength ? 'input-error' : ''}`}
-							placeholder={`Default: ${currentModel.maxOutputLength}`}
+							placeholder="Default: model / SDK"
 							spellCheck="false"
 						/>
 						{errors.maxOutputLength && (
@@ -525,18 +647,18 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				<div className="grid grid-cols-12 items-center gap-2">
 					<label htmlFor="advanced-timeout" className="label col-span-4">
 						<span className="text-sm">Timeout (s)</span>
-						<HelpHint content="Maximum time a request can take (seconds)" />
+						<HelpHint content="Blank leaves timeout selection to the model/runtime configuration." />
 					</label>
 					<div className="col-span-8">
 						<input
 							id="advanced-timeout"
 							type="text"
 							value={timeoutSec}
-							onChange={e => {
-								updateField('timeout', e.target.value, setTimeoutSec);
+							onChange={event => {
+								updateField('timeout', event.target.value, setTimeoutSec);
 							}}
 							className={`input w-full rounded-xl ${errors.timeout ? 'input-error' : ''}`}
-							placeholder={`Default: ${currentModel.timeout}`}
+							placeholder="Default: model / SDK"
 							spellCheck="false"
 						/>
 						{errors.timeout && (
@@ -555,8 +677,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						<HelpHint
 							content={
 								reasoningEnabled
-									? 'Controls whether the model produces a reasoning summary (when supported).'
-									: 'This model is currently using temperature mode (no reasoning params active).'
+									? 'Default leaves reasoning summary style to source configuration and the SDK.'
+									: 'Reasoning is not currently active for this model selection.'
 							}
 						/>
 					</div>
@@ -564,12 +686,10 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						<Dropdown<SummaryStyleChoice>
 							dropdownItems={reasoningSummaryStyleItems}
 							selectedKey={reasoningSummaryStyle}
-							onChange={k => {
-								setReasoningSummaryStyle(k);
-							}}
+							onChange={setReasoningSummaryStyle}
 							filterDisabled={false}
-							title="Select Reasoning Summary Style"
-							getDisplayName={k => reasoningSummaryStyleItems[k].displayName}
+							title="Select reasoning summary style"
+							getDisplayName={key => reasoningSummaryStyleItems[key].displayName}
 						/>
 					</div>
 				</div>
@@ -577,7 +697,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				<div className="grid grid-cols-12 items-center gap-2">
 					<div className="label col-span-4">
 						<span className="text-sm">Output Format</span>
-						<HelpHint content="Controls output formatting. Verbosity is set in the top bar." />
+						<HelpHint content="Default leaves output format to source configuration and the SDK." />
 					</div>
 					<div className="col-span-8">
 						<Dropdown<OutputFormatChoice>
@@ -585,8 +705,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 							selectedKey={outputFormatChoice}
 							onChange={handleOutputFormatChange}
 							filterDisabled={false}
-							title="Select Output Format"
-							getDisplayName={k => outputFormatItems[k].displayName}
+							title="Select output format"
+							getDisplayName={key => outputFormatItems[key].displayName}
 						/>
 					</div>
 				</div>
@@ -603,8 +723,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 									type="text"
 									className={`input w-full rounded-xl ${errors.jsonSchemaName ? 'input-error' : ''}`}
 									value={jsonSchemaName}
-									onChange={e => {
-										handleJsonSchemaNameChange(e.target.value);
+									onChange={event => {
+										handleJsonSchemaNameChange(event.target.value);
 									}}
 									placeholder="e.g. my_response"
 									spellCheck="false"
@@ -629,8 +749,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 									type="text"
 									className="input w-full rounded-xl"
 									value={jsonSchemaDescription}
-									onChange={e => {
-										setJsonSchemaDescription(e.target.value);
+									onChange={event => {
+										setJsonSchemaDescription(event.target.value);
 									}}
 									placeholder="Optional"
 									spellCheck="false"
@@ -639,18 +759,17 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						</div>
 
 						<div className="grid grid-cols-12 items-center gap-2">
-							<label htmlFor="advanced-json-schema-strict" className="label col-span-4 cursor-pointer">
+							<div className="label col-span-4">
 								<span className="text-sm">Strict</span>
-							</label>
+							</div>
 							<div className="col-span-8">
-								<input
-									id="advanced-json-schema-strict"
-									type="checkbox"
-									checked={jsonSchemaStrict}
-									onChange={e => {
-										setJsonSchemaStrict(e.target.checked);
-									}}
-									className="toggle toggle-accent"
+								<Dropdown<StrictChoice>
+									dropdownItems={strictChoiceItems}
+									selectedKey={jsonSchemaStrict}
+									onChange={setJsonSchemaStrict}
+									filterDisabled={false}
+									title="Select JSON Schema strictness"
+									getDisplayName={choice => strictChoiceItems[choice].displayName}
 								/>
 							</div>
 						</div>
@@ -665,8 +784,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 									className={`textarea w-full rounded-xl ${errors.jsonSchema ? 'textarea-error' : ''}`}
 									rows={8}
 									value={jsonSchemaText}
-									onChange={e => {
-										handleJsonSchemaTextChange(e.target.value);
+									onChange={event => {
+										handleJsonSchemaTextChange(event.target.value);
 									}}
 									placeholder={`{\n  "type": "object",\n  "properties": {\n    "answer": { "type": "string" }\n  },\n  "required": ["answer"]\n}`}
 									spellCheck="false"
@@ -688,22 +807,22 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 						<div className="grid grid-cols-12 items-center gap-2">
 							<div className="label col-span-4">
 								<span className="text-sm">Cache Control</span>
-								<HelpHint content="Top-level request cache control, when supported by the selected provider SDK." />
+								<HelpHint content="Default leaves cache behavior to source configuration and the provider." />
 							</div>
 							<div className="col-span-8">
 								{supportsManualCacheControl ? (
-									<input
-										aria-label="Cache Control"
-										type="checkbox"
-										checked={cacheControlEnabled}
-										onChange={e => {
-											const nextEnabled = e.target.checked;
-											setCacheControlEnabled(nextEnabled);
-											if (nextEnabled && !cacheControlKind) {
+									<Dropdown<CacheControlMode>
+										dropdownItems={cacheControlModeItems}
+										selectedKey={cacheControlMode}
+										onChange={mode => {
+											setCacheControlMode(mode);
+											if (mode === 'enabled' && !cacheControlKind) {
 												setCacheControlKind(supportedCacheKinds[0] ?? '');
 											}
 										}}
-										className="toggle toggle-accent"
+										filterDisabled={false}
+										title="Select cache-control preference"
+										getDisplayName={mode => cacheControlModeItems[mode].displayName}
 									/>
 								) : (
 									<span className="text-sm opacity-70">Manual top-level cache control is not available.</span>
@@ -716,7 +835,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 							</div>
 						</div>
 
-						{supportsManualCacheControl && cacheControlEnabled && (
+						{supportsManualCacheControl && cacheControlMode === 'enabled' && (
 							<>
 								<div className="grid grid-cols-12 items-center gap-2">
 									<div className="label col-span-4">
@@ -726,12 +845,10 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 										<Dropdown<CacheControlKind>
 											dropdownItems={cacheControlKindItems}
 											selectedKey={(cacheControlKind || supportedCacheKinds[0]) as CacheControlKind}
-											onChange={kind => {
-												setCacheControlKind(kind);
-											}}
+											onChange={setCacheControlKind}
 											filterDisabled={false}
-											title="Select Cache Kind"
-											getDisplayName={k => cacheControlKindItems[k].displayName}
+											title="Select cache kind"
+											getDisplayName={key => cacheControlKindItems[key].displayName}
 										/>
 									</div>
 								</div>
@@ -744,12 +861,10 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 										<Dropdown<CacheControlTTLSelection>
 											dropdownItems={cacheControlTTLItems}
 											selectedKey={cacheControlTTL}
-											onChange={ttl => {
-												setCacheControlTTL(ttl);
-											}}
+											onChange={setCacheControlTTL}
 											filterDisabled={false}
-											title="Select Cache TTL"
-											getDisplayName={k => cacheControlTTLItems[k].displayName}
+											title="Select cache TTL"
+											getDisplayName={key => cacheControlTTLItems[key].displayName}
 										/>
 									</div>
 								</div>
@@ -764,8 +879,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 												id="advanced-cache-key"
 												type="text"
 												value={cacheControlKey}
-												onChange={e => {
-													setCacheControlKey(e.target.value);
+												onChange={event => {
+													setCacheControlKey(event.target.value);
 												}}
 												className="input w-full rounded-xl"
 												placeholder="Optional request cache key"
@@ -786,8 +901,8 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 							<HelpHint
 								content={
 									stopSequencesDisabledBecauseReasoning
-										? 'Stop sequences are disabled when reasoning is enabled for this model.'
-										: `One per line. Empty = none. Max ${stopPolicy.maxSequences}.`
+										? 'Stop sequences are disabled while reasoning is active for this model/provider.'
+										: `One per line. Blank uses model / SDK defaults. Max ${stopPolicy.maxSequences}.`
 								}
 							/>
 						</label>
@@ -800,10 +915,13 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 								} ${stopSequencesDisabledBecauseReasoning ? 'cursor-not-allowed opacity-50' : ''}`}
 								rows={4}
 								value={stopSequencesText}
-								onChange={e => {
-									const v = e.target.value;
-									setStopSequencesText(v);
-									setErrors(prev => ({ ...prev, stopSequences: validateStopSequences(v) }));
+								onChange={event => {
+									const value = event.target.value;
+									setStopSequencesText(value);
+									setErrors(previous => ({
+										...previous,
+										stopSequences: validateStopSequences(value),
+									}));
 								}}
 								placeholder={'e.g.\n\nEND\n</final>'}
 								spellCheck="false"

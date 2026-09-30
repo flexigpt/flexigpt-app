@@ -2,8 +2,6 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import { DefaultModelParams } from '@/spec/inference';
-
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
@@ -12,13 +10,11 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
-const DEFAULT_TEMPERATURE = DefaultModelParams.temperature ?? 0.1;
-
-const defaultTemperatureOptions = [0.0, 0.1, 0.5, 1.0];
+const defaultTemperatureOptions: Array<number | undefined> = [undefined, 0.0, 0.1, 0.5, 1.0];
 
 interface TemperatureDropdownProps {
-	temperature: number;
-	setTemperature: (t: number) => void;
+	temperature?: number;
+	setTemperature: (t?: number) => void;
 }
 
 export function TemperatureDropdown({ temperature, setTemperature }: TemperatureDropdownProps) {
@@ -28,17 +24,16 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 	function clampTemperature(rawValue: string) {
 		const trimmed = rawValue.trim();
 		if (!trimmed) {
-			setTemperature(DEFAULT_TEMPERATURE);
+			setTemperature(undefined);
 			return;
 		}
 
 		const parsed = Number(trimmed);
-		if (!Number.isFinite(parsed)) {
-			setTemperature(DEFAULT_TEMPERATURE);
+		if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
 			return;
 		}
 
-		setTemperature(Math.max(0, Math.min(1, parsed)));
+		setTemperature(parsed);
 	}
 
 	return (
@@ -47,7 +42,7 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 				<HoverTip content="Set temperature" placement="top" wrapperElement="div" wrapperClassName="w-full">
 					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
-							label={`Temperature: ${temperature.toFixed(2)}`}
+							label={temperature === undefined ? 'Temperature: Default' : `Temperature: ${temperature.toFixed(2)}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
@@ -65,14 +60,14 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 				>
 					{defaultTemperatureOptions.map(tempVal => (
 						<MenuItem
-							key={tempVal}
+							key={tempVal ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
 							onClick={() => {
 								setTemperature(tempVal);
 							}}
 						>
-							<span>{tempVal.toFixed(1)}</span>
-							{temperature.toFixed(1) === tempVal.toFixed(1) ? <FiCheck /> : null}
+							<span>{tempVal === undefined ? 'Default' : tempVal.toFixed(1)}</span>
+							{temperature === tempVal ? <FiCheck /> : null}
 						</MenuItem>
 					))}
 
@@ -84,8 +79,8 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 							type="text"
 							name="temperature"
 							className="input input-xs w-full"
-							placeholder="Custom value (0.0 - 1.0)"
-							defaultValue={temperature.toString()}
+							placeholder="Default or custom value (0.0 - 1.0)"
+							defaultValue={temperature?.toString() ?? ''}
 							onBlur={e => {
 								clampTemperature(e.currentTarget.value);
 							}}

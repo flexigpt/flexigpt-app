@@ -1,9 +1,6 @@
 import type { CacheControl, ModelParam, OutputParam, ReasoningParam } from '@/spec/inference';
 import type { ModelDefaults, ModelOutputDefaults, ModelRequestPatch, UIModelOption } from '@/spec/model';
 import { DefaultModelParams } from '@/spec/inference';
-import { ModelRequestClearField } from '@/spec/model';
-
-import { jsonEqual } from '@/lib/jsonschema_utils';
 
 function mergeDefaults(
 	providerDefaults: ModelDefaults | undefined,
@@ -80,52 +77,6 @@ function outputParamFromDefaults(value: ModelOutputDefaults | undefined): Output
 	return output.format || output.verbosity ? output : undefined;
 }
 
-function outputDefaultsFromParam(value: OutputParam | undefined): ModelOutputDefaults | undefined {
-	if (!value) {
-		return undefined;
-	}
-
-	return {
-		...(value.verbosity !== undefined ? { verbosity: value.verbosity } : {}),
-		...(value.format
-			? {
-					format: {
-						kind: value.format.kind,
-						...(value.format.jsonSchemaParam
-							? {
-									jsonSchema: {
-										name: value.format.jsonSchemaParam.name,
-										description: value.format.jsonSchemaParam.description,
-										schema: value.format.jsonSchemaParam.schema,
-										strict: value.format.jsonSchemaParam.strict,
-									},
-								}
-							: {}),
-					},
-				}
-			: {}),
-	};
-}
-
-function parseAdapterParameters(value: string | undefined): Record<string, unknown> | undefined {
-	if (!value?.trim()) {
-		return undefined;
-	}
-
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(value);
-	} catch {
-		throw new Error('Additional adapter parameters must be valid JSON.');
-	}
-
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		throw new Error('Additional adapter parameters must be a JSON object.');
-	}
-
-	return parsed as Record<string, unknown>;
-}
-
 export function buildModelParamFromDefaults(
 	providerModelID: string,
 	providerDefaults: ModelDefaults | undefined,
@@ -158,75 +109,10 @@ export function buildModelParamFromDefaults(
 }
 
 export function buildRequestPatch(option: UIModelOption): ModelRequestPatch | undefined {
-	const source = option.sourceModelParam;
-	if (!source) {
+	const patch = option.requestPatch;
+	if (!patch || (!patch.defaults && (!patch.clear || patch.clear.length === 0))) {
 		return undefined;
 	}
 
-	const defaults: ModelDefaults = {};
-	const clear: ModelRequestClearField[] = [];
-
-	if (option.stream !== source.stream) {
-		defaults.stream = option.stream;
-	}
-	if (option.maxPromptLength !== source.maxPromptLength) {
-		defaults.maxPromptTokens = option.maxPromptLength;
-	}
-	if (option.maxOutputLength !== source.maxOutputLength) {
-		defaults.maxOutputTokens = option.maxOutputLength;
-	}
-	if (option.systemPrompt !== source.systemPrompt) {
-		defaults.systemPrompt = option.systemPrompt;
-	}
-	if (option.timeout !== source.timeout) {
-		defaults.timeoutMS = option.timeout * 1000;
-	}
-
-	if (option.temperature === undefined && source.temperature !== undefined) {
-		clear.push(ModelRequestClearField.Temperature);
-	} else if (option.temperature !== undefined && option.temperature !== source.temperature) {
-		defaults.temperature = option.temperature;
-	}
-
-	if (option.reasoning === undefined && source.reasoning !== undefined) {
-		clear.push(ModelRequestClearField.Reasoning);
-	} else if (option.reasoning !== undefined && !jsonEqual(option.reasoning, source.reasoning)) {
-		defaults.reasoning = option.reasoning;
-	}
-
-	if (option.cacheControl === undefined && source.cacheControl !== undefined) {
-		clear.push(ModelRequestClearField.CacheControl);
-	} else if (option.cacheControl !== undefined && !jsonEqual(option.cacheControl, source.cacheControl)) {
-		defaults.cacheControl = option.cacheControl;
-	}
-
-	if (option.outputParam === undefined && source.outputParam !== undefined) {
-		clear.push(ModelRequestClearField.Output);
-	} else if (option.outputParam !== undefined && !jsonEqual(option.outputParam, source.outputParam)) {
-		defaults.output = outputDefaultsFromParam(option.outputParam);
-	}
-
-	if (option.stopSequences === undefined && source.stopSequences !== undefined) {
-		clear.push(ModelRequestClearField.StopSequences);
-	} else if (option.stopSequences !== undefined && !jsonEqual(option.stopSequences, source.stopSequences)) {
-		defaults.stopSequences = option.stopSequences;
-	}
-
-	if (option.additionalParametersRawJSON === undefined && source.additionalParametersRawJSON !== undefined) {
-		clear.push(ModelRequestClearField.AdapterParameters);
-	} else if (option.additionalParametersRawJSON !== source.additionalParametersRawJSON) {
-		const adapterParameters = parseAdapterParameters(option.additionalParametersRawJSON);
-		if (adapterParameters) {
-			defaults.adapterParameters = adapterParameters;
-		}
-	}
-
-	if (Object.keys(defaults).length === 0 && clear.length === 0) {
-		return undefined;
-	}
-
-	return {
-		...(Object.keys(defaults).length > 0 ? { defaults } : {}),
-		...(clear.length > 0 ? { clear } : {}),
-	};
+	return structuredClone(patch);
 }

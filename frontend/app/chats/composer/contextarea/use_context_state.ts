@@ -12,12 +12,15 @@ import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
 import { isModelCatalogUnavailableError } from '@/apis/model_management';
 
-import {
-	getSupportedReasoningLevels,
-	sanitizeUIModelOptionByCapabilities,
-	supportsOutputVerbosity,
-} from '@/models/lib/capabilities';
+import { getSupportedReasoningLevels, supportsOutputVerbosity } from '@/models/lib/capabilities';
 import { modelRefEqual } from '@/models/lib/document';
+import {
+	setHybridReasoningPreference,
+	setHybridTokensPreference,
+	setOutputVerbosityPreference,
+	setReasoningLevelPreference,
+	setTemperaturePreference,
+} from '@/models/lib/request_preferences';
 
 function hasOwn(value: object, key: string): boolean {
 	return Object.hasOwn(value, key);
@@ -37,7 +40,7 @@ function applyPersistedModelParam(
 	options?: { preserveName?: boolean }
 ): UIModelOption {
 	if (!modelParam) {
-		return sanitizeUIModelOptionByCapabilities(base);
+		return base;
 	}
 
 	const next: UIModelOption = {
@@ -88,7 +91,7 @@ function applyPersistedModelParam(
 		delete next.additionalParametersRawJSON;
 	}
 
-	return sanitizeUIModelOptionByCapabilities(next);
+	return next;
 }
 
 function findRestorableModelOption(
@@ -138,29 +141,14 @@ function resolveRestoredSelectedModel(
 
 function buildChatOptions(
 	selectedModel: UIModelOption,
-	includePreviousMessages: IncludePreviousMessages,
-	isHybridReasoningEnabled: boolean
+	includePreviousMessages: IncludePreviousMessages
 ): UIModelOption {
 	const base: UIModelOption = {
 		...selectedModel,
 		includePreviousMessages,
 	};
 
-	if (selectedModel.reasoning?.type === ReasoningType.HybridWithTokens && !isHybridReasoningEnabled) {
-		const next = {
-			...base,
-		};
-
-		delete next.reasoning;
-
-		if (next.temperature === undefined) {
-			next.temperature = DefaultUIModelOption.temperature;
-		}
-
-		return sanitizeUIModelOptionByCapabilities(next);
-	}
-
-	return sanitizeUIModelOptionByCapabilities(base);
+	return base;
 }
 
 export interface ComposerContextController {
@@ -177,12 +165,12 @@ export interface ComposerContextController {
 	includePreviousMessages: IncludePreviousMessages;
 
 	handleSetSelectedModel: Dispatch<SetStateAction<UIModelOption>>;
-	handleSetIsHybridReasoningEnabled: Dispatch<SetStateAction<boolean>>;
+	handleSetIsHybridReasoningEnabled: (enabled?: boolean) => void;
 	setIncludePreviousMessages: Dispatch<SetStateAction<IncludePreviousMessages>>;
 
-	setTemperature(temp: number): void;
-	setReasoningLevel(level: ReasoningLevel): void;
-	setHybridTokens(tokens: number): void;
+	setTemperature(temp?: number): void;
+	setReasoningLevel(level?: ReasoningLevel): void;
+	setHybridTokens(tokens?: number): void;
 	setOutputVerbosity(verbosity?: OutputVerbosity): void;
 
 	applyAdvancedModel(updatedModel: UIModelOption): void;
@@ -257,7 +245,7 @@ export function useComposerContextState(): ComposerContextController {
 					return;
 				}
 
-				const nextDefault = sanitizeUIModelOptionByCapabilities(result.defaultOption);
+				const nextDefault = result.defaultOption;
 
 				allOptionsRef.current = result.options;
 				defaultModelRef.current = nextDefault;
@@ -318,18 +306,27 @@ export function useComposerContextState(): ComposerContextController {
 		[applySelectedModel]
 	);
 
-	const handleSetIsHybridReasoningEnabled = useCallback((update: SetStateAction<boolean>) => {
-		const next = typeof update === 'function' ? update(hybridReasoningRef.current) : update;
+	const handleSetIsHybridReasoningEnabled = useCallback(
+		(enabled?: boolean) => {
+			const fallback = isHybridReasoningModel(selectedModelRef.current);
+			const next = enabled ?? fallback;
 
-		hybridReasoningRef.current = next;
-		setIsHybridReasoningEnabled(next);
-	}, []);
-
-	const setTemperature = useCallback(
-		(temperature: number) => {
 			applySelectedModel(current => ({
 				...current,
-				temperature: Math.max(0, Math.min(1, temperature)),
+				requestPatch: setHybridReasoningPreference(current.requestPatch, enabled),
+			}));
+
+			hybridReasoningRef.current = next;
+			setIsHybridReasoningEnabled(next);
+		},
+		[applySelectedModel]
+	);
+
+	const setTemperature = useCallback(
+		(temperature?: number) => {
+			applySelectedModel(current => ({
+				...current,
+				requestPatch: setTemperaturePreference(current.requestPatch, temperature),
 			}));
 		},
 		[applySelectedModel]
@@ -344,10 +341,7 @@ export function useComposerContextState(): ComposerContextController {
 
 				return {
 					...current,
-					reasoning: {
-						...current.reasoning,
-						level,
-					},
+					requestPatch: setReasoningLevelPreference(current.requestPatch, level),
 				};
 			});
 		},
@@ -355,49 +349,28 @@ export function useComposerContextState(): ComposerContextController {
 	);
 
 	const setHybridTokens = useCallback(
-		(tokens: number) => {
-			applySelectedModel(current => {
-				if (current.reasoning?.type !== ReasoningType.HybridWithTokens) {
-					return current;
-				}
-
-				return {
-					...current,
-					reasoning: {
-						...current.reasoning,
-						tokens,
-					},
-				};
-			});
+		(tokens?: number) => {
+			applySelectedModel(current => ({
+				...current,
+				requestPatch: setHybridTokensPreference(current.requestPatch, tokens),
+			}));
 		},
 		[applySelectedModel]
 	);
 
 	const setOutputVerbosity = useCallback(
 		(verbosity?: OutputVerbosity) => {
-			applySelectedModel(current => {
-				const outputParam = {
-					...current.outputParam,
-				};
-
-				if (verbosity === undefined) {
-					delete outputParam.verbosity;
-				} else {
-					outputParam.verbosity = verbosity;
-				}
-
-				return {
-					...current,
-					outputParam: outputParam.verbosity || outputParam.format ? outputParam : undefined,
-				};
-			});
+			applySelectedModel(current => ({
+				...current,
+				requestPatch: setOutputVerbosityPreference(current.requestPatch, verbosity),
+			}));
 		},
 		[applySelectedModel]
 	);
 
 	const applyAdvancedModel = useCallback(
 		(updated: UIModelOption) => {
-			applySelectedModel(sanitizeUIModelOptionByCapabilities(updated));
+			applySelectedModel(updated);
 		},
 		[applySelectedModel]
 	);
@@ -420,9 +393,7 @@ export function useComposerContextState(): ComposerContextController {
 	const resetForNewConversation = useCallback(() => {
 		pendingRestoreRef.current = null;
 
-		const next = sanitizeUIModelOptionByCapabilities(
-			defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption
-		);
+		const next = defaultModelRef.current ?? allOptionsRef.current[0] ?? DefaultUIModelOption;
 
 		selectedModelRef.current = next;
 		hybridReasoningRef.current = isHybridReasoningModel(next);
@@ -435,8 +406,8 @@ export function useComposerContextState(): ComposerContextController {
 	}, []);
 
 	const chatOptions = useMemo(
-		() => buildChatOptions(selectedModel, includePreviousMessages, isHybridReasoningEnabled),
-		[includePreviousMessages, isHybridReasoningEnabled, selectedModel]
+		() => buildChatOptions(selectedModel, includePreviousMessages),
+		[includePreviousMessages, selectedModel]
 	);
 
 	return {

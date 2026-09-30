@@ -22,7 +22,7 @@ import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
 import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
 
-import { mergeModelCapabilities, sanitizeUIModelOptionByCapabilities } from '@/models/lib/capabilities';
+import { mergeModelCapabilities } from '@/models/lib/capabilities';
 import { modelRefEqual } from '@/models/lib/document';
 import { buildModelParamFromDefaults } from '@/models/lib/model_defaults';
 import { getProviderSDKType } from '@/models/lib/provider_sdk';
@@ -126,7 +126,7 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		item.view.document.defaults
 	);
 
-	return sanitizeUIModelOptionByCapabilities({
+	return {
 		...sourceModelParam,
 
 		model: item.list.ref,
@@ -140,8 +140,7 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		modelDisplayName: item.list.displayName || item.list.name,
 		includePreviousMessages: 'all',
 		capabilities: mergeModelCapabilities(item.provider.view.document.capabilities, item.view.document.capabilities),
-		sourceModelParam,
-	});
+	};
 }
 
 export class ModelManagementAPI {

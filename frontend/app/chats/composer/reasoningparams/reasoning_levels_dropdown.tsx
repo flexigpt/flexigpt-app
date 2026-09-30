@@ -15,9 +15,9 @@ import { HoverTip } from '@/components/hover_tip';
 import { COMPOSER_DEFAULT_REASONING_LEVELS, getReasoningLevelDisplayName } from '@/models/lib/model_option_labels';
 
 interface SingleReasoningDropdownProps {
-	reasoningLevel: ReasoningLevel;
+	reasoningLevel?: ReasoningLevel;
 	levelOptions?: ReasoningLevel[];
-	setReasoningLevel: (level: ReasoningLevel) => void;
+	setReasoningLevel: (level?: ReasoningLevel) => void;
 }
 
 export function SingleReasoningDropdown({
@@ -52,6 +52,16 @@ export function SingleReasoningDropdown({
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
+					<MenuItem
+						className={`${actionTriggerMenuItemClasses} justify-between`}
+						onClick={() => {
+							setReasoningLevel(undefined);
+						}}
+					>
+						<span>Default</span>
+						{reasoningLevel === undefined ? <FiCheck /> : null}
+					</MenuItem>
+
 					{options.map(level => (
 						<MenuItem
 							key={level}

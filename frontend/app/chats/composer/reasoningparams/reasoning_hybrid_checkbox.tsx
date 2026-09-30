@@ -12,10 +12,12 @@ import { HoverTip } from '@/components/hover_tip';
 
 export function HybridReasoningCheckbox({
 	isReasoningEnabled,
+	preference,
 	setIsReasoningEnabled,
 }: {
 	isReasoningEnabled: boolean;
-	setIsReasoningEnabled: (enabled: boolean) => void;
+	preference?: boolean;
+	setIsReasoningEnabled: (enabled?: boolean) => void;
 }) {
 	const menu = useMenuStore({ placement: 'top', focusLoop: true });
 	const open = useStoreState(menu, 'open');
@@ -32,7 +34,7 @@ export function HybridReasoningCheckbox({
 					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
 							label="Hybrid"
-							secondaryLabel={isReasoningEnabled ? 'On' : 'Off'}
+							secondaryLabel={preference === undefined ? 'Default' : isReasoningEnabled ? 'On' : 'Off'}
 							suffix={isReasoningEnabled ? <FiCheck size={14} className="shrink-0" /> : undefined}
 							open={open}
 							className="w-full justify-center"
@@ -53,11 +55,21 @@ export function HybridReasoningCheckbox({
 					<MenuItem
 						className={`${actionTriggerMenuItemClasses} justify-between`}
 						onClick={() => {
+							setIsReasoningEnabled(undefined);
+						}}
+					>
+						<span>Default</span>
+						{preference === undefined ? <FiCheck /> : null}
+					</MenuItem>
+
+					<MenuItem
+						className={`${actionTriggerMenuItemClasses} justify-between`}
+						onClick={() => {
 							setIsReasoningEnabled(true);
 						}}
 					>
 						<span>Enabled</span>
-						{isReasoningEnabled ? <FiCheck /> : null}
+						{preference === true ? <FiCheck /> : null}
 					</MenuItem>
 					<MenuItem
 						className={`${actionTriggerMenuItemClasses} justify-between`}
@@ -66,7 +78,7 @@ export function HybridReasoningCheckbox({
 						}}
 					>
 						<span>Disabled</span>
-						{!isReasoningEnabled ? <FiCheck /> : null}
+						{preference === false ? <FiCheck /> : null}
 					</MenuItem>
 				</Menu>
 			</div>

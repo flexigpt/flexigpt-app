@@ -12,11 +12,11 @@ import { HoverTip } from '@/components/hover_tip';
 
 import { DEFAULT_REASONING_TOKENS, parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
 
-const defaultTokenOptions = [DEFAULT_REASONING_TOKENS, 8192, 32000];
+const defaultTokenOptions: Array<number | undefined> = [undefined, DEFAULT_REASONING_TOKENS, 8192, 32000];
 
 interface ReasoningTokensDropdownProps {
-	tokens: number;
-	setTokens: (tokens: number) => void;
+	tokens?: number;
+	setTokens: (tokens?: number) => void;
 }
 
 export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDropdownProps) {
@@ -26,12 +26,15 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 
 	function clampTokens(rawValue: string) {
 		const parsed = parseOptionalPositiveInteger(rawValue);
-		const nextTokens =
-			parsed === undefined || Number.isNaN(parsed) || parsed < DEFAULT_REASONING_TOKENS
-				? DEFAULT_REASONING_TOKENS
-				: parsed;
+		if (parsed === undefined) {
+			setTokens(undefined);
+			return;
+		}
+		if (Number.isNaN(parsed) || parsed < DEFAULT_REASONING_TOKENS) {
+			return;
+		}
 
-		setTokens(nextTokens);
+		setTokens(parsed);
 	}
 
 	return (
@@ -40,7 +43,7 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 				<HoverTip content="Set effort tokens" placement="top" wrapperElement="div" wrapperClassName="w-full">
 					<MenuButton store={menu} className={`${actionTriggerChipButtonClasses} w-full flex-1 justify-center`}>
 						<ActionTriggerChipContent
-							label={`Effort tokens: ${tokens}`}
+							label={tokens === undefined ? 'Effort tokens: Default' : `Effort tokens: ${tokens}`}
 							open={open}
 							labelClassName="min-w-0 truncate text-center text-xs font-normal"
 							className="w-full justify-center"
@@ -58,13 +61,13 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 				>
 					{defaultTokenOptions.map(tk => (
 						<MenuItem
-							key={tk}
+							key={tk ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
 							onClick={() => {
 								setTokens(tk);
 							}}
 						>
-							<span>{tk}</span>
+							<span>{tk === undefined ? 'Default' : tk}</span>
 							{tokens === tk ? <FiCheck /> : null}
 						</MenuItem>
 					))}
@@ -76,8 +79,8 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 							data-disable-chat-shortcuts="true"
 							type="text"
 							className="input input-xs w-full"
-							placeholder={`Enter a custom integer ≥ ${DEFAULT_REASONING_TOKENS}`}
-							defaultValue={tokens.toString()}
+							placeholder={`Default or custom integer ≥ ${DEFAULT_REASONING_TOKENS}`}
+							defaultValue={tokens?.toString() ?? ''}
 							onBlur={e => {
 								clampTokens(e.currentTarget.value);
 							}}

@@ -92,6 +92,7 @@ export enum ReasoningSummaryStyle {
 	Auto = 'auto',
 	Concise = 'concise',
 	Detailed = 'detailed',
+	Omitted = 'omitted',
 }
 
 enum ReasoningContext {

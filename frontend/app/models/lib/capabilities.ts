@@ -1,14 +1,8 @@
 import type { OutputFormatKind, OutputVerbosity, ReasoningLevel, ReasoningSummaryStyle } from '@/spec/inference';
-import type {
-	ModelCacheCapabilities,
-	ModelCacheControlCapabilities,
-	ModelCapabilities,
-	UIModelOption,
-} from '@/spec/model';
+import type { ModelCacheCapabilities, ModelCacheControlCapabilities, ModelCapabilities } from '@/spec/model';
 import {
 	CacheControlKind as CacheControlKindValue,
 	CacheControlTTL as CacheControlTTLValue,
-	DefaultModelParams,
 	OutputFormatKind as OutputFormatKindValue,
 	OutputVerbosity as OutputVerbosityValue,
 	ReasoningLevel as ReasoningLevelValue,
@@ -297,113 +291,4 @@ export function getTopLevelCacheControlCapabilities(
 	capabilities: ModelCapabilities | undefined
 ): ModelCacheControlCapabilities | undefined {
 	return getEffectiveCacheCapabilities(sdkType, capabilities)?.topLevel;
-}
-
-export function sanitizeUIModelOptionByCapabilities(option: UIModelOption): UIModelOption {
-	const capabilities = option.capabilities;
-	const topLevelCacheCapabilities = getTopLevelCacheControlCapabilities(option.providerSDKType, capabilities);
-
-	if (!capabilities && !topLevelCacheCapabilities && !option.cacheControl) {
-		return option;
-	}
-
-	let next: UIModelOption = { ...option };
-	const supportedReasoningTypes = capabilities?.reasoningCapabilities?.supportedReasoningTypes;
-
-	if (supportedReasoningTypes && next.reasoning) {
-		const supportedTypes = new Set(
-			supportedReasoningTypes.filter(l => {
-				return isReasoningType(l);
-			})
-		);
-		if (supportedTypes.size > 0 && !supportedTypes.has(next.reasoning.type)) {
-			delete next.reasoning;
-		}
-	}
-
-	if (next.reasoning?.type === ReasoningType.SingleWithLevels) {
-		const supportedLevels = getSupportedReasoningLevels(capabilities);
-		if (!supportedLevels.includes(next.reasoning.level)) {
-			next = {
-				...next,
-				reasoning: {
-					...next.reasoning,
-					level: supportedLevels.includes(ReasoningLevelValue.Medium) ? ReasoningLevelValue.Medium : supportedLevels[0],
-				},
-			};
-		}
-	}
-
-	if (next.reasoning && capabilities?.reasoningCapabilities?.supportsSummaryStyle === false) {
-		next = {
-			...next,
-			reasoning: {
-				...next.reasoning,
-			},
-		};
-		delete next.reasoning?.summaryStyle;
-	}
-
-	if (next.reasoning && capabilities?.reasoningCapabilities?.temperatureDisallowedWhenEnabled) {
-		next = { ...next };
-		delete next.temperature;
-	}
-
-	if (!next.reasoning && next.temperature === undefined) {
-		next.temperature = DefaultModelParams.temperature;
-	}
-
-	if (capabilities?.outputCapabilities?.supportsVerbosity === false && next.outputParam?.verbosity) {
-		const output = { ...next.outputParam };
-		delete output.verbosity;
-		next.outputParam = output.format ? output : undefined;
-	}
-
-	const supportedFormats = getSupportedOutputFormats(capabilities);
-	if (supportedFormats && next.outputParam?.format?.kind && !supportedFormats.includes(next.outputParam.format.kind)) {
-		const output = { ...next.outputParam };
-		delete output.format;
-		next.outputParam = output.verbosity ? output : undefined;
-	}
-
-	const stopPolicy = getStopSequencesPolicy(capabilities);
-	if (!stopPolicy.isSupported || (stopPolicy.disallowedWithReasoning && next.reasoning)) {
-		delete next.stopSequences;
-	} else if (next.stopSequences && next.stopSequences.length > stopPolicy.maxSequences) {
-		next.stopSequences = next.stopSequences.slice(0, stopPolicy.maxSequences);
-	}
-
-	if (!topLevelCacheCapabilities) {
-		delete next.cacheControl;
-	} else if (next.cacheControl) {
-		const supportedKinds = topLevelCacheCapabilities.supportedKinds ?? [];
-		const supportedTTLs = topLevelCacheCapabilities.supportedTTLs ?? [];
-
-		if (supportedKinds.length > 0 && !supportedKinds.includes(next.cacheControl.kind)) {
-			next.cacheControl = {
-				...next.cacheControl,
-				kind: supportedKinds[0],
-			};
-		}
-
-		if (next.cacheControl.ttl && supportedTTLs.length > 0 && !supportedTTLs.includes(next.cacheControl.ttl)) {
-			const cacheControl = { ...next.cacheControl };
-			delete cacheControl.ttl;
-			next.cacheControl = cacheControl;
-		}
-
-		if (topLevelCacheCapabilities.supportsTTL === false && next.cacheControl.ttl) {
-			const cacheControl = { ...next.cacheControl };
-			delete cacheControl.ttl;
-			next.cacheControl = cacheControl;
-		}
-
-		if (topLevelCacheCapabilities.supportsKey !== true && next.cacheControl.key) {
-			const cacheControl = { ...next.cacheControl };
-			delete cacheControl.key;
-			next.cacheControl = cacheControl;
-		}
-	}
-
-	return next;
 }
