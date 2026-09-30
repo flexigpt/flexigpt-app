@@ -14,8 +14,8 @@ import {
 	wailsArrayOrEmpty,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
-import { ApplyUnifiedDiff } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import {
+	ApplyUnifiedDiff,
 	GetAppVersion,
 	GetPathsAsAttachments,
 	OpenDirectoryAsAttachments,

@@ -7,9 +7,9 @@ import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolSelection } from '@/spec/tool';
 
 import type { ICompletionAPI } from '@/apis/interface';
-import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
+import type { main as wailsMain, spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { createAbortError, optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
-import { CancelCompletion, DeleteAuthKey, FetchCompletion, SetAuthKey } from '@/apis/wailsjs/go/main/AggregrateWrapper';
+import { CancelCompletion, DeleteAuthKey, FetchCompletion, SetAuthKey } from '@/apis/wailsjs/go/main/CompletionWrapper';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 const activeCompletionRequestIDs = new Set<string>();
@@ -63,7 +63,7 @@ export class WailsCompletionAPI implements ICompletionAPI {
 			requestPatch,
 			...(mcpContext ? { mcpContext } : {}),
 			skillSessionID: skillSessionID ?? '',
-		} as unknown as wailsSpec.CompletionRequestBody;
+		} as wailsMain.CompletionRequestBody;
 
 		let textEventName = '';
 		let thinkingEventName = '';
@@ -116,7 +116,7 @@ export class WailsCompletionAPI implements ICompletionAPI {
 			completionStarted = true;
 
 			const response = await Promise.race([
-				FetchCompletion(model as never, requestBody, textEventName, thinkingEventName, id),
+				FetchCompletion(model, requestBody, textEventName, thinkingEventName, id),
 				abortPromise,
 			]);
 
