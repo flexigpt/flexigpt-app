@@ -49,7 +49,7 @@ func requireCompleteWorkspaceCapabilities(
 
 // workspaceArtifactRefs returns the available Artifact-backed capabilities of
 // one type. Mapped targets intentionally remain in CapabilityPlan.Occurrences
-// and are translated by ToolStore or ModelPresetStore consumers.
+// and are translated by ToolStore or ModelStore consumers.
 func workspaceArtifactRefs(
 	plan resolve.CapabilityPlan,
 	declarationType declaration.Type,

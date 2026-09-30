@@ -159,20 +159,6 @@ func EnsureUserArtifactBaselineCollections(
 	return result
 }
 
-// artifactFallbackProviders returns the fallback registrations that must be
-// supplied to every Artifact contract resolver used by application consumers.
-func artifactFallbackProviders(
-	models *ModelPresetStoreWrapper,
-) (map[declaration.Type]resolve.FallbackProvider, error) {
-	if models == nil || models.artifactFallback == nil {
-		return nil, errors.New("model Preset artifact fallback is not initialized")
-	}
-
-	return map[declaration.Type]resolve.FallbackProvider{
-		declaration.TypeModel: models.artifactFallback,
-	}, nil
-}
-
 // artifactTargetMappers returns ArtifactRef-to-mapped-target adapters used by
 // Artifact consumers. Tool and Model mapping belong to their aggregates
 // because they validate source-backed enablement and runtime availability

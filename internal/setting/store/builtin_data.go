@@ -3,7 +3,7 @@ package store
 import (
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/modelpreset/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
@@ -12,7 +12,7 @@ var BuiltInAuthKeys = func() map[spec.AuthKeyType][]spec.AuthKeyName {
 	m := map[spec.AuthKeyType][]spec.AuthKeyName{
 		spec.AuthKeyTypeProvider: {},
 	}
-	for _, p := range builtin.BuiltInProviderNames {
+	for _, p := range catalog.BuiltInProviderNames {
 		m[spec.AuthKeyTypeProvider] = append(
 			m[spec.AuthKeyTypeProvider],
 			spec.AuthKeyName(p),
@@ -34,7 +34,7 @@ var DefaultSettingsData = func() spec.SettingsSchema {
 		spec.AuthKeyTypeProvider: map[spec.AuthKeyName]spec.AuthKey{},
 		spec.AuthKeyTypeMCP:      map[spec.AuthKeyName]spec.AuthKey{},
 	}
-	for _, p := range builtin.BuiltInProviderNames {
+	for _, p := range catalog.BuiltInProviderNames {
 		ak[spec.AuthKeyTypeProvider][spec.AuthKeyName(p)] = spec.AuthKey{
 			Secret:   "",
 			SHA256:   computeSHA(""),

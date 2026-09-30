@@ -9,6 +9,8 @@ import (
 
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -30,7 +32,6 @@ type App struct {
 
 	settingStoreAPI       *SettingStoreWrapper
 	conversationStoreAPI  *ConversationCollectionWrapper
-	modelPresetStoreAPI   *ModelPresetStoreWrapper
 	modelStoreAPI         *ModelStoreWrapper
 	modelAggregateAPI     *ModelAggregateWrapper
 	toolStoreAPI          *ToolStoreWrapper
@@ -58,7 +59,6 @@ type App struct {
 
 	settingsDirPath      string
 	conversationsDirPath string
-	modelPresetsDirPath  string
 	artifactStoreDirPath string
 
 	artifactInitializationError error
@@ -88,10 +88,6 @@ func NewApp() *App {
 		app.dataBasePath,
 		storageName(documentTopology.ApplicationStorageConversationsDirectory),
 	)
-	app.modelPresetsDirPath = filepath.Join(
-		app.dataBasePath,
-		storageName(documentTopology.ApplicationStorageModelPresetsDirectory),
-	)
 	app.artifactStoreDirPath = filepath.Join(
 		app.dataBasePath,
 		storageName(
@@ -99,15 +95,12 @@ func NewApp() *App {
 		),
 	)
 
-	if app.settingsDirPath == "" || app.conversationsDirPath == "" ||
-		app.modelPresetsDirPath == "" ||
-		app.artifactStoreDirPath == "" {
+	if app.settingsDirPath == "" || app.conversationsDirPath == "" || app.artifactStoreDirPath == "" {
 		slog.Error(
 			"invalid app path configuration",
 			"artifactStoreDirPath", app.artifactStoreDirPath,
 			"settingsDirPath", app.settingsDirPath,
 			"conversationsDirPath", app.conversationsDirPath,
-			"modelPresetsDirPath", app.modelPresetsDirPath,
 		)
 		panic("failed to initialize app: invalid path configuration")
 	}
@@ -124,7 +117,6 @@ func NewApp() *App {
 	// Therefore, the pattern followed is to create a hollow struct in new and then init in startup.
 	app.settingStoreAPI = &SettingStoreWrapper{}
 	app.conversationStoreAPI = &ConversationCollectionWrapper{}
-	app.modelPresetStoreAPI = &ModelPresetStoreWrapper{}
 	app.modelStoreAPI = &ModelStoreWrapper{}
 	app.modelAggregateAPI = &ModelAggregateWrapper{}
 	app.toolStoreAPI = &ToolStoreWrapper{}
@@ -157,15 +149,6 @@ func NewApp() *App {
 		)
 		panic("failed to initialize app: could not create conversations directory")
 	}
-	if err := ensureAppPrivateDirectory(app.modelPresetsDirPath); err != nil {
-
-		slog.Error(
-			"failed to create model presets directory",
-			"model presets path", app.modelPresetsDirPath,
-			"error", err,
-		)
-		panic("failed to initialize app: could not create model presets directory")
-	}
 
 	if err := ensureAppPrivateDirectory(app.artifactStoreDirPath); err != nil {
 
@@ -182,7 +165,6 @@ func NewApp() *App {
 		"app data", app.dataBasePath,
 		"settingsDirPath", app.settingsDirPath,
 		"conversationsDirPath", app.conversationsDirPath,
-		"modelPresetsDirPath", app.modelPresetsDirPath,
 		"artifactStoreDirPath", app.artifactStoreDirPath,
 	)
 	return app
@@ -221,22 +203,6 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: conversation store initialization failed\n" + err.Error())
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
-
-	err = InitModelPresetStoreWrapper(
-		a.modelPresetStoreAPI,
-		a.modelPresetsDirPath,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize model presets store",
-			"dir",
-			a.modelPresetsDirPath,
-			"error",
-			err,
-		)
-		panic("failed to initialize managers: model presets store initialization failed\n" + err.Error())
-	}
-	slog.Info("model presets store initialized", "dir", a.modelPresetsDirPath)
 
 	artifactComposition, err := composeArtifactStore(
 		context.Background(),
@@ -360,21 +326,6 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Model Store and aggregate initialized")
 
-	fallbackProviders, err := artifactFallbackProviders(
-		a.modelPresetStoreAPI,
-	)
-	if err != nil {
-		slog.Error(
-			"couldn't initialize Artifact fallback providers",
-			"error",
-			err,
-		)
-		panic(
-			"failed to initialize managers: Artifact fallback providers failed\n" +
-				err.Error(),
-		)
-	}
-
 	targetMappers, err := artifactTargetMappers(
 		a.toolAggregateAPI,
 		a.modelAggregateAPI,
@@ -391,6 +342,7 @@ func (a *App) initManagers() {
 		)
 	}
 
+	fallbackProviders := map[declaration.Type]resolve.FallbackProvider{}
 	err = InitSkillStoreWrapper(
 		a.skillStoreAPI,
 		artifactComposition.Roots,
@@ -639,8 +591,6 @@ func (a *App) initManagers() {
 		)
 		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
 	}
-
-	slog.Info("aggregate initialized", "dir", a.modelPresetsDirPath)
 }
 
 // startup is called at application startup.
@@ -729,9 +679,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 		}
 		a.artifactStoreComposition = nil
 	}
-	if a.modelPresetStoreAPI != nil {
-		a.modelPresetStoreAPI.close()
-	}
+
 	if a.conversationStoreAPI != nil {
 		a.conversationStoreAPI.close()
 	}
