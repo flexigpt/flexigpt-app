@@ -42,6 +42,7 @@ func InitMCPWrappers(
 	managedArtifacts compositionapi.ManagedArtifactAPI,
 	protection compositionapi.ProtectionAPI,
 	protectedOverlays compositionapi.ProtectedOverlayAPI,
+	storeOverlays compositionapi.StoreOverlayAPI,
 	secretBindings compositionapi.SecretBindingAPI,
 	secretRuntime compositionapi.SecretRuntimeAPI,
 	localState compositionapi.LocalStateMaintenanceAPI,
@@ -49,7 +50,6 @@ func InitMCPWrappers(
 	locatorResolvers []providerapi.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
-	settingsStore mcpAuthKeyStore,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
@@ -64,15 +64,15 @@ func InitMCPWrappers(
 		managedArtifacts == nil ||
 		protection == nil ||
 		protectedOverlays == nil ||
+		storeOverlays == nil ||
 		secretBindings == nil ||
 		secretRuntime == nil ||
 		localState == nil ||
-		hydrator == nil ||
-		settingsStore == nil {
+		hydrator == nil {
 		return nil, errors.New("MCP wrapper dependencies are incomplete")
 	}
 
-	settings, err := newMCPSettingsAdapter(settingsStore)
+	settings, err := newMCPSettingsAdapter(storeOverlays)
 	if err != nil {
 		return nil, err
 	}

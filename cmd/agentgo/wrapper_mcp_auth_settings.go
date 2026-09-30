@@ -2,70 +2,55 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"strings"
-	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
+	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
-const (
-	mcpSettingsNamespace        = "mcp-settings-v1"
-	mcpGlobalSettingsLogicalKey = "mcp-settings-v1:global"
-)
+const mcpGlobalSettingsSchemaVersion = "v1"
 
-type mcpAuthKeyStore interface {
-	GetAuthKey(
-		ctx context.Context,
-		req *settingSpec.GetAuthKeyRequest,
-	) (*settingSpec.GetAuthKeyResponse, error)
-
-	SetAuthKey(
-		ctx context.Context,
-		req *settingSpec.SetAuthKeyRequest,
-	) (*settingSpec.SetAuthKeyResponse, error)
+type mcpGlobalSettingsPayload struct {
+	OAuthLoopbackListenAddr string `json:"oauthLoopbackListenAddr,omitempty"`
 }
 
 type mcpSettingsAdapter struct {
-	store mcpAuthKeyStore
-	mu    sync.Mutex
-}
-
-type mcpGlobalSettingsRecord struct {
-	Revision uint64                  `json:"revision"`
-	Settings mcpAuth.MCPAuthSettings `json:"settings"`
+	overlays compositionapi.StoreOverlayAPI
 }
 
 func newMCPSettingsAdapter(
-	store mcpAuthKeyStore,
+	overlays compositionapi.StoreOverlayAPI,
 ) (*mcpSettingsAdapter, error) {
-	if store == nil {
-		return nil, errors.New("MCP Setting Store is required")
+	if overlays == nil {
+		return nil, fmt.Errorf(
+			"%w: MCP global settings overlay store is required",
+			basespec.ErrInvalid,
+		)
 	}
-	return &mcpSettingsAdapter{store: store}, nil
+	return &mcpSettingsAdapter{
+		overlays: overlays,
+	}, nil
 }
 
 func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 	ctx context.Context,
 ) (mcpAuth.MCPAuthSettings, uint64, error) {
-	if s == nil || s.store == nil {
+	if s == nil || s.overlays == nil {
 		return mcpAuth.MCPAuthSettings{}, 0, basespec.ErrClosed
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	raw, found, err := s.readGlobalLocked(ctx)
+	record, found, err := s.overlays.GetStoreOverlay(
+		ctx,
+		mcpOverlay.GlobalSettingsNamespace,
+	)
 	if err != nil {
 		return mcpAuth.MCPAuthSettings{}, 0, err
 	}
@@ -73,16 +58,28 @@ func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 		return mcpAuth.MCPAuthSettings{}, 0, nil
 	}
 
-	var value mcpGlobalSettingsRecord
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return mcpAuth.MCPAuthSettings{}, 0, err
+	var payload mcpGlobalSettingsPayload
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		record.Payload,
+		&payload,
+		basespec.MaxLocalDataBytes,
+	); err != nil {
+		return mcpAuth.MCPAuthSettings{}, 0, fmt.Errorf(
+			"%w: decode MCP global settings overlay: %w",
+			basespec.ErrInvalid,
+			err,
+		)
 	}
 
-	normalized, err := normalizeMCPGlobalSettings(value.Settings)
+	settings, err := normalizeMCPGlobalSettings(
+		mcpAuth.MCPAuthSettings{
+			OAuthLoopbackListenAddr: payload.OAuthLoopbackListenAddr,
+		},
+	)
 	if err != nil {
 		return mcpAuth.MCPAuthSettings{}, 0, err
 	}
-	return normalized, value.Revision, nil
+	return settings, record.Revision, nil
 }
 
 func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
@@ -90,111 +87,38 @@ func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
 	expectedRevision uint64,
 	value mcpAuth.MCPAuthSettings,
 ) (uint64, error) {
-	if s == nil || s.store == nil {
+	if s == nil || s.overlays == nil {
 		return 0, basespec.ErrClosed
 	}
 
-	normalized, err := normalizeMCPGlobalSettings(value)
+	settings, err := normalizeMCPGlobalSettings(value)
 	if err != nil {
 		return 0, err
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	currentRaw, found, err := s.readGlobalLocked(ctx)
-	if err != nil {
-		return 0, err
-	}
-
-	currentRevision := uint64(0)
-	if found {
-		currentRevision, err = revisionOf(currentRaw)
-		if err != nil {
-			return 0, err
-		}
-	}
-	if currentRevision != expectedRevision {
-		return 0, basespec.ErrConflict
-	}
-
-	next := mcpGlobalSettingsRecord{
-		Revision: expectedRevision + 1,
-		Settings: normalized,
-	}
-	raw, err := jsonutil.MarshalCanonicalObject(
-		next,
+	payload, err := jsonutil.MarshalCanonicalObject(
+		mcpGlobalSettingsPayload{
+			OAuthLoopbackListenAddr: settings.OAuthLoopbackListenAddr,
+		},
 		basespec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return 0, err
 	}
 
-	_, err = s.store.SetAuthKey(
+	record, err := s.overlays.PutStoreOverlay(
 		ctx,
-		&settingSpec.SetAuthKeyRequest{
-			Type:    settingSpec.AuthKeyTypeMCP,
-			KeyName: settingSpec.AuthKeyName(mcpSettingsStorageKey(mcpGlobalSettingsLogicalKey)),
-			Body: &settingSpec.SetAuthKeyRequestBody{
-				Secret: string(raw),
-			},
+		artifactOverlay.StorePutRequest{
+			Namespace:        mcpOverlay.GlobalSettingsNamespace,
+			SchemaVersion:    mcpGlobalSettingsSchemaVersion,
+			Payload:          payload,
+			ExpectedRevision: expectedRevision,
 		},
 	)
 	if err != nil {
 		return 0, err
 	}
-	return next.Revision, nil
-}
-
-func (s *mcpSettingsAdapter) readGlobalLocked(
-	ctx context.Context,
-) (raw json.RawMessage, found bool, err error) {
-	response, err := s.store.GetAuthKey(
-		ctx,
-		&settingSpec.GetAuthKeyRequest{
-			Type:    settingSpec.AuthKeyTypeMCP,
-			KeyName: settingSpec.AuthKeyName(mcpSettingsStorageKey(mcpGlobalSettingsLogicalKey)),
-		},
-	)
-	if errors.Is(err, settingSpec.ErrAuthKeyNotFound) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	if response == nil ||
-		response.Body == nil ||
-		!response.Body.NonEmpty {
-		return nil, false, nil
-	}
-
-	raw, err = jsonutil.CanonicalizeObject(
-		[]byte(response.Body.Secret),
-		basespec.MaxLocalDataBytes,
-	)
-	if err != nil {
-		return nil, false, err
-	}
-	return raw, true, nil
-}
-
-func revisionOf(
-	raw json.RawMessage,
-) (uint64, error) {
-	var value mcpGlobalSettingsRecord
-	if err := json.Unmarshal(raw, &value); err != nil {
-		return 0, err
-	}
-	return value.Revision, nil
-}
-
-func mcpSettingsStorageKey(
-	logicalKey string,
-) string {
-	sum := sha256.Sum256(
-		[]byte(mcpSettingsNamespace + ":" + logicalKey),
-	)
-	return mcpSettingsNamespace + ":" + hex.EncodeToString(sum[:])
+	return record.Revision, nil
 }
 
 func normalizeMCPGlobalSettings(

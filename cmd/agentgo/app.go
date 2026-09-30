@@ -314,8 +314,8 @@ func (a *App) initManagers() {
 		artifactComposition.SecretBindings,
 		artifactComposition.SecretRuntime,
 		artifactComposition.LocalState,
+		artifactComposition.StoreOverlays,
 		artifactComposition.Topology,
-		a.settingStoreAPI.store,
 	)
 	if err != nil {
 		slog.Error(
@@ -465,6 +465,7 @@ func (a *App) initManagers() {
 		artifactComposition.ManagedArtifacts,
 		artifactComposition.Protection,
 		artifactComposition.ProtectedOverlays,
+		artifactComposition.StoreOverlays,
 		artifactComposition.SecretBindings,
 		artifactComposition.SecretRuntime,
 		artifactComposition.LocalState,
@@ -472,7 +473,6 @@ func (a *App) initManagers() {
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
 		targetMappers,
-		a.settingStoreAPI.store,
 	)
 	if err != nil {
 		slog.Error(

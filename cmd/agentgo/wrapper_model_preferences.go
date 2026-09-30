@@ -2,113 +2,84 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
+	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
 
-const (
-	modelPreferenceNamespace = "model-preferences-v1"
-	defaultProviderKey       = "default-provider"
-)
+const modelPreferenceSchemaVersion = "v1"
 
-type modelAuthKeyStore interface {
-	GetAuthKey(
-		ctx context.Context,
-		req *settingSpec.GetAuthKeyRequest,
-	) (*settingSpec.GetAuthKeyResponse, error)
-
-	SetAuthKey(
-		ctx context.Context,
-		req *settingSpec.SetAuthKeyRequest,
-	) (*settingSpec.SetAuthKeyResponse, error)
-}
-
-type storedDefaultProvider struct {
+type modelDefaultProviderPreferencePayload struct {
 	Provider *artifact.ArtifactRef `json:"provider,omitempty"`
 }
 
-// modelDefaultProviderPreferences is temporary Settings-backed preference
-// storage. It stores no credential, overlay, or Model runtime secret.
-type modelDefaultProviderPreferences struct {
-	store modelAuthKeyStore
+type artifactModelDefaultProviderPreferences struct {
+	overlays compositionapi.StoreOverlayAPI
 }
 
-func newModelDefaultProviderPreferences(
-	store modelAuthKeyStore,
-) (*modelDefaultProviderPreferences, error) {
-	if store == nil {
+func newArtifactModelDefaultProviderPreferences(
+	overlays compositionapi.StoreOverlayAPI,
+) (*artifactModelDefaultProviderPreferences, error) {
+	if overlays == nil {
 		return nil, fmt.Errorf(
-			"%w: Model default-provider preference store is required",
+			"%w: Model preference overlay store is required",
 			basespec.ErrInvalid,
 		)
 	}
-	return &modelDefaultProviderPreferences{
-		store: store,
+	return &artifactModelDefaultProviderPreferences{
+		overlays: overlays,
 	}, nil
 }
 
-func (s *modelDefaultProviderPreferences) GetDefaultProvider(
+func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 	ctx context.Context,
 ) (*artifact.ArtifactRef, error) {
-	if s == nil || s.store == nil {
+	if s == nil || s.overlays == nil {
 		return nil, basespec.ErrClosed
 	}
 
-	response, err := s.store.GetAuthKey(
+	record, found, err := s.overlays.GetStoreOverlay(
 		ctx,
-		&settingSpec.GetAuthKeyRequest{
-			Type:    settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(preferenceStorageKey(defaultProviderKey)),
-		},
+		modelOverlay.PreferencesNamespace,
 	)
-	if errors.Is(err, settingSpec.ErrAuthKeyNotFound) {
-		//nolint:nilnil // Ok.
-		return nil, nil
-	}
-	if err != nil {
+	if err != nil || !found {
 		return nil, err
 	}
-	if response == nil ||
-		response.Body == nil ||
-		!response.Body.NonEmpty {
-		//nolint:nilnil // Ok.
-		return nil, nil
-	}
 
-	var value storedDefaultProvider
-	if err := json.Unmarshal(
-		[]byte(response.Body.Secret),
-		&value,
+	var payload modelDefaultProviderPreferencePayload
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		record.Payload,
+		&payload,
+		basespec.MaxLocalDataBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
-			"%w: decode stored default Model Provider preference: %w",
+			"%w: decode Model default-provider preference: %w",
 			basespec.ErrInvalid,
 			err,
 		)
 	}
-	if value.Provider != nil {
-		if err := value.Provider.Validate(); err != nil {
-			return nil, err
-		}
-		copyValue := *value.Provider
-		return &copyValue, nil
+	if payload.Provider == nil {
+		//nolint:nilnil // Ok.
+		return nil, nil
 	}
-	//nolint:nilnil // Ok.
-	return nil, nil
+	if err := payload.Provider.Validate(); err != nil {
+		return nil, err
+	}
+
+	value := *payload.Provider
+	return &value, nil
 }
 
-func (s *modelDefaultProviderPreferences) SetDefaultProvider(
+func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 	ctx context.Context,
 	provider *artifact.ArtifactRef,
 ) error {
-	if s == nil || s.store == nil {
+	if s == nil || s.overlays == nil {
 		return basespec.ErrClosed
 	}
 	if provider != nil {
@@ -117,31 +88,48 @@ func (s *modelDefaultProviderPreferences) SetDefaultProvider(
 		}
 	}
 
-	raw, err := json.Marshal(storedDefaultProvider{
-		Provider: provider,
-	})
+	current, found, err := s.overlays.GetStoreOverlay(
+		ctx,
+		modelOverlay.PreferencesNamespace,
+	)
 	if err != nil {
 		return err
 	}
 
-	_, err = s.store.SetAuthKey(
+	if provider == nil {
+		if !found {
+			return nil
+		}
+		return s.overlays.DeleteStoreOverlay(
+			ctx,
+			modelOverlay.PreferencesNamespace,
+			current.Revision,
+		)
+	}
+
+	payload, err := jsonutil.MarshalCanonicalObject(
+		modelDefaultProviderPreferencePayload{
+			Provider: provider,
+		},
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return err
+	}
+
+	expectedRevision := uint64(0)
+	if found {
+		expectedRevision = current.Revision
+	}
+
+	_, err = s.overlays.PutStoreOverlay(
 		ctx,
-		&settingSpec.SetAuthKeyRequest{
-			Type:    settingSpec.AuthKeyTypeProvider,
-			KeyName: settingSpec.AuthKeyName(preferenceStorageKey(defaultProviderKey)),
-			Body: &settingSpec.SetAuthKeyRequestBody{
-				Secret: string(raw),
-			},
+		artifactOverlay.StorePutRequest{
+			Namespace:        modelOverlay.PreferencesNamespace,
+			SchemaVersion:    modelPreferenceSchemaVersion,
+			Payload:          payload,
+			ExpectedRevision: expectedRevision,
 		},
 	)
 	return err
-}
-
-func preferenceStorageKey(
-	logical string,
-) string {
-	sum := sha256.Sum256(
-		[]byte(modelPreferenceNamespace + ":" + logical),
-	)
-	return modelPreferenceNamespace + ":" + hex.EncodeToString(sum[:])
 }

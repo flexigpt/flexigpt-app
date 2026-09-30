@@ -41,8 +41,8 @@ func InitModelWrappers(
 	secretBindings compositionapi.SecretBindingAPI,
 	secretRuntime compositionapi.SecretRuntimeAPI,
 	localState compositionapi.LocalStateMaintenanceAPI,
+	storeOverlays compositionapi.StoreOverlayAPI,
 	hydrator topology.CompiledHydrationCoordinator,
-	settingsStore modelAuthKeyStore,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || aggregateWrapper == nil {
 		return nil, errors.New("model wrapper receivers are incomplete")
@@ -57,12 +57,12 @@ func InitModelWrappers(
 		secretBindings == nil ||
 		secretRuntime == nil ||
 		localState == nil ||
-		hydrator == nil ||
-		settingsStore == nil {
+		storeOverlays == nil ||
+		hydrator == nil {
 		return nil, errors.New("model wrapper dependencies are incomplete")
 	}
 
-	preferences, err := newModelDefaultProviderPreferences(settingsStore)
+	preferences, err := newArtifactModelDefaultProviderPreferences(storeOverlays)
 	if err != nil {
 		return nil, err
 	}

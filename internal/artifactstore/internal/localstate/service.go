@@ -35,7 +35,8 @@ type Service struct {
 	policy     root.RootPolicy
 	values     secretapi.ValueStore
 
-	namespaces map[overlay.Namespace]struct{}
+	namespaces      map[overlay.Namespace]struct{}
+	storeNamespaces map[overlay.Namespace]struct{}
 
 	closed    atomic.Bool
 	closeOnce sync.Once
@@ -48,6 +49,7 @@ func NewService(
 	timeClock clockutil.Clock,
 	policy root.RootPolicy,
 	namespaces []overlay.Namespace,
+	storeNamespaces []overlay.Namespace,
 	values secretapi.ValueStore,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
@@ -84,13 +86,36 @@ func NewService(
 		registered[namespace] = struct{}{}
 	}
 
+	storeRegistered := make(
+		map[overlay.Namespace]struct{},
+		len(storeNamespaces),
+	)
+	for index, namespace := range storeNamespaces {
+		if err := namespace.Validate(); err != nil {
+			return nil, fmt.Errorf(
+				"store overlay namespace %d: %w",
+				index,
+				err,
+			)
+		}
+		if _, duplicate := storeRegistered[namespace]; duplicate {
+			return nil, fmt.Errorf(
+				"%w: duplicate store overlay namespace %q",
+				basespec.ErrConflict,
+				namespace,
+			)
+		}
+		storeRegistered[namespace] = struct{}{}
+	}
+
 	return &Service{
-		repository: repository,
-		artifacts:  artifacts,
-		clock:      timeClock,
-		policy:     policy,
-		values:     values,
-		namespaces: registered,
+		repository:      repository,
+		artifacts:       artifacts,
+		clock:           timeClock,
+		policy:          policy,
+		values:          values,
+		namespaces:      registered,
+		storeNamespaces: storeRegistered,
 	}, nil
 }
 

@@ -45,6 +45,7 @@ type Config struct {
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 
 	ProtectedOverlayNamespaces []overlay.Namespace
+	StoreOverlayNamespaces     []overlay.Namespace
 	SecretValues               secretapi.ValueStore
 }
 
@@ -243,6 +244,7 @@ func Open(
 		config.Clock,
 		config.RootMutationPolicy,
 		config.ProtectedOverlayNamespaces,
+		config.StoreOverlayNamespaces,
 		config.SecretValues,
 	)
 	if err != nil {

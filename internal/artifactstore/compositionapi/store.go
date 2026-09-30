@@ -27,6 +27,7 @@ type Store struct {
 	SecretBindings    SecretBindingAPI
 	SecretRuntime     SecretRuntimeAPI
 	LocalState        LocalStateMaintenanceAPI
+	StoreOverlays     StoreOverlayAPI
 	Protection        ProtectionAPI
 	Topology          installerapi.API
 	LocatorResolvers  []providerapi.LocatorResolverFactory
@@ -107,6 +108,10 @@ func Open(
 				[]overlay.Namespace(nil),
 				config.ProtectedOverlayNamespaces...,
 			),
+			StoreOverlayNamespaces: append(
+				[]overlay.Namespace(nil),
+				config.StoreOverlayNamespaces...,
+			),
 			SecretValues: config.SecretValues,
 		},
 	)
@@ -126,6 +131,7 @@ func Open(
 		SecretBindings:    components.LocalState,
 		SecretRuntime:     components.LocalState,
 		LocalState:        components.LocalState,
+		StoreOverlays:     components.LocalState,
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},

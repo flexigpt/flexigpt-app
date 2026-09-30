@@ -12,11 +12,20 @@ import (
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-const InstallationNamespace artifactOverlay.Namespace = "mcp.installation"
+const (
+	InstallationNamespace   artifactOverlay.Namespace = "mcp.installation"
+	GlobalSettingsNamespace artifactOverlay.Namespace = "mcp.global"
+)
 
 func Namespaces() []artifactOverlay.Namespace {
 	return []artifactOverlay.Namespace{
 		InstallationNamespace,
+	}
+}
+
+func StoreNamespaces() []artifactOverlay.Namespace {
+	return []artifactOverlay.Namespace{
+		GlobalSettingsNamespace,
 	}
 }
 

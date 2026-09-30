@@ -26,6 +26,7 @@ const (
 
 	ProviderRuntimeNamespace artifactOverlay.Namespace = "model.provider.runtime"
 	ModelRuntimeNamespace    artifactOverlay.Namespace = "model.runtime"
+	PreferencesNamespace     artifactOverlay.Namespace = "model.preferences"
 
 	ProviderCredentialSlot secret.Slot = "apiKey"
 )
@@ -34,6 +35,12 @@ func Namespaces() []artifactOverlay.Namespace {
 	return []artifactOverlay.Namespace{
 		ProviderRuntimeNamespace,
 		ModelRuntimeNamespace,
+	}
+}
+
+func StoreNamespaces() []artifactOverlay.Namespace {
+	return []artifactOverlay.Namespace{
+		PreferencesNamespace,
 	}
 }
 

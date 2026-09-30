@@ -27,5 +27,6 @@ type Config struct {
 	RetainedRoots    []root.RootDraft
 
 	ProtectedOverlayNamespaces []overlay.Namespace
+	StoreOverlayNamespaces     []overlay.Namespace
 	SecretValues               secretapi.ValueStore
 }

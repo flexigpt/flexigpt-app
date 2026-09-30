@@ -42,6 +42,23 @@ type Repository interface {
 		namespace overlay.Namespace,
 	) (overlay.Record, bool, error)
 
+	GetStoreOverlay(
+		ctx context.Context,
+		namespace overlay.Namespace,
+	) (overlay.StoreRecord, bool, error)
+
+	PutStoreOverlay(
+		ctx context.Context,
+		request overlay.StorePutRequest,
+		now time.Time,
+	) (overlay.StoreRecord, error)
+
+	DeleteStoreOverlay(
+		ctx context.Context,
+		namespace overlay.Namespace,
+		expectedRevision uint64,
+	) error
+
 	PutOverlay(
 		ctx context.Context,
 		request overlay.PutRequest,

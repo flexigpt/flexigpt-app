@@ -36,6 +36,7 @@ var schemaV1RequiredTables = []string{
 	"artifact_definitions",
 	"artifact_artifacts",
 	"artifact_protected_overlays",
+	"artifact_store_overlays",
 	"artifact_secret_records",
 	"artifact_secret_bindings",
 	"artifact_secret_cleanup",

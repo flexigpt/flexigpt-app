@@ -298,6 +298,27 @@ type ProtectedOverlayAPI interface {
 	) error
 }
 
+// StoreOverlayAPI owns non-secret store-scoped local state. It is used for
+// application-local feature preferences that do not belong to one source-backed
+// Artifact, Root, Source, or Definition.
+type StoreOverlayAPI interface {
+	GetStoreOverlay(
+		ctx context.Context,
+		namespace overlay.Namespace,
+	) (overlay.StoreRecord, bool, error)
+
+	PutStoreOverlay(
+		ctx context.Context,
+		request overlay.StorePutRequest,
+	) (overlay.StoreRecord, error)
+
+	DeleteStoreOverlay(
+		ctx context.Context,
+		namespace overlay.Namespace,
+		expectedRevision uint64,
+	) error
+}
+
 // SecretBindingAPI manages Artifact-local secret references and public-safe
 // metadata. It never returns a plaintext secret value.
 type SecretBindingAPI interface {

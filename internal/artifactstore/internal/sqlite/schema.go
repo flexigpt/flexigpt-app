@@ -15,6 +15,15 @@ CREATE TABLE IF NOT EXISTS artifact_protected_overlays (
 	PRIMARY KEY (root_id, artifact_id, namespace)
 );
 
+CREATE TABLE IF NOT EXISTS artifact_store_overlays (
+	namespace TEXT PRIMARY KEY,
+	schema_version TEXT NOT NULL,
+	payload_json BLOB NOT NULL,
+	revision INTEGER NOT NULL CHECK (revision > 0),
+	created_at INTEGER NOT NULL,
+	modified_at INTEGER NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS artifact_secret_records (
 	ref TEXT PRIMARY KEY,
 	store_name TEXT NOT NULL,

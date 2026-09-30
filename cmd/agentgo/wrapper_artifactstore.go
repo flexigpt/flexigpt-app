@@ -71,9 +71,13 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	overlayNamespaces := append(
+	protectedOverlayNamespaces := append(
 		modelOverlay.Namespaces(),
 		mcpOverlay.Namespaces()...,
+	)
+	storeOverlayNamespaces := append(
+		modelOverlay.StoreNamespaces(),
+		mcpOverlay.StoreNamespaces()...,
 	)
 
 	return compositionapi.Open(
@@ -86,7 +90,8 @@ func composeArtifactStore(
 			Providers:                  providers,
 			ProtectedRootIDs:           documentTopology.ProtectedRootIDs(),
 			RetainedRoots:              documentTopology.RetainedRootDrafts(),
-			ProtectedOverlayNamespaces: overlayNamespaces,
+			ProtectedOverlayNamespaces: protectedOverlayNamespaces,
+			StoreOverlayNamespaces:     storeOverlayNamespaces,
 			SecretValues:               secretValues,
 		},
 	)
