@@ -2,6 +2,8 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
+import { DefaultModelParams } from '@/spec/inference';
+
 import {
 	actionTriggerChipButtonClasses,
 	ActionTriggerChipContent,
@@ -9,6 +11,8 @@ import {
 	actionTriggerMenuItemClasses,
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
+
+const DEFAULT_TEMPERATURE = DefaultModelParams.temperature ?? 0.1;
 
 const defaultTemperatureOptions = [0.0, 0.1, 0.5, 1.0];
 
@@ -22,12 +26,19 @@ export function TemperatureDropdown({ temperature, setTemperature }: Temperature
 	const open = useStoreState(menu, 'open');
 
 	function clampTemperature(rawValue: string) {
-		let val = Number(rawValue);
-		if (Number.isNaN(val)) {
-			val = 0.1;
+		const trimmed = rawValue.trim();
+		if (!trimmed) {
+			setTemperature(DEFAULT_TEMPERATURE);
+			return;
 		}
-		val = Math.max(0, Math.min(1, val));
-		setTemperature(val);
+
+		const parsed = Number(trimmed);
+		if (!Number.isFinite(parsed)) {
+			setTemperature(DEFAULT_TEMPERATURE);
+			return;
+		}
+
+		setTemperature(Math.max(0, Math.min(1, parsed)));
 	}
 
 	return (

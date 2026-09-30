@@ -1,4 +1,4 @@
-import type { OutputFormatKind, ReasoningLevel } from '@/spec/inference';
+import type { OutputFormatKind, OutputVerbosity, ReasoningLevel, ReasoningSummaryStyle } from '@/spec/inference';
 import type {
 	ModelCacheCapabilities,
 	ModelCacheControlCapabilities,
@@ -8,7 +8,12 @@ import type {
 import {
 	CacheControlKind as CacheControlKindValue,
 	CacheControlTTL as CacheControlTTLValue,
+	DefaultModelParams,
+	OutputFormatKind as OutputFormatKindValue,
+	OutputVerbosity as OutputVerbosityValue,
 	ReasoningLevel as ReasoningLevelValue,
+	ReasoningSummaryStyle as ReasoningSummaryStyleValue,
+	ReasoningType,
 } from '@/spec/inference';
 
 function pick<T>(modelValue: T | undefined, providerValue: T | undefined): T | undefined {
@@ -181,6 +186,26 @@ const orderedReasoningLevels: ReasoningLevel[] = [
 	ReasoningLevelValue.Max,
 ];
 
+export function isReasoningLevel(value: unknown): value is ReasoningLevel {
+	return typeof value === 'string' && (Object.values(ReasoningLevelValue) as string[]).includes(value);
+}
+
+export function isReasoningType(value: unknown): value is ReasoningType {
+	return typeof value === 'string' && (Object.values(ReasoningType) as string[]).includes(value);
+}
+
+export function isOutputFormatKind(value: unknown): value is OutputFormatKind {
+	return typeof value === 'string' && (Object.values(OutputFormatKindValue) as string[]).includes(value);
+}
+
+export function isOutputVerbosity(value: unknown): value is OutputVerbosity {
+	return typeof value === 'string' && (Object.values(OutputVerbosityValue) as string[]).includes(value);
+}
+
+export function isReasoningSummaryStyle(value: unknown): value is ReasoningSummaryStyle {
+	return typeof value === 'string' && (Object.values(ReasoningSummaryStyleValue) as string[]).includes(value);
+}
+
 export function getSupportedReasoningLevels(capabilities: ModelCapabilities | undefined): ReasoningLevel[] {
 	const configured = capabilities?.reasoningCapabilities?.supportedReasoningLevels;
 
@@ -188,8 +213,16 @@ export function getSupportedReasoningLevels(capabilities: ModelCapabilities | un
 		return [...orderedReasoningLevels];
 	}
 
-	const enabled = new Set(configured);
-	return orderedReasoningLevels.filter(level => enabled.has(level));
+	const enabled = new Set(
+		configured.filter(l => {
+			return isReasoningLevel(l);
+		})
+	);
+	const supported = orderedReasoningLevels.filter(level => enabled.has(level));
+
+	return supported.length > 0
+		? supported
+		: [ReasoningLevelValue.Low, ReasoningLevelValue.Medium, ReasoningLevelValue.High];
 }
 
 export function supportsReasoningSummaryStyle(capabilities: ModelCapabilities | undefined): boolean {
@@ -207,7 +240,10 @@ export function getSupportedOutputFormats(capabilities: ModelCapabilities | unde
 		return undefined;
 	}
 
-	return configured;
+	const supported = configured.filter(o => {
+		return isOutputFormatKind(o);
+	});
+	return supported.length > 0 ? supported : undefined;
 }
 
 export function getStopSequencesPolicy(capabilities: ModelCapabilities | undefined): {
@@ -243,7 +279,9 @@ function sdkBaseCacheCapabilities(sdkType: string): ModelCacheCapabilities | und
 				},
 			};
 		default:
-			return undefined;
+			return {
+				supportsAutomaticCaching: false,
+			};
 	}
 }
 
@@ -262,38 +300,109 @@ export function getTopLevelCacheControlCapabilities(
 }
 
 export function sanitizeUIModelOptionByCapabilities(option: UIModelOption): UIModelOption {
-	const next: UIModelOption = {
-		...option,
-	};
+	const capabilities = option.capabilities;
+	const topLevelCacheCapabilities = getTopLevelCacheControlCapabilities(option.providerSDKType, capabilities);
 
-	const supportedReasoning = next.capabilities?.reasoningCapabilities?.supportedReasoningTypes;
-
-	if (
-		next.reasoning &&
-		supportedReasoning &&
-		supportedReasoning.length > 0 &&
-		!supportedReasoning.includes(next.reasoning.type)
-	) {
-		delete next.reasoning;
+	if (!capabilities && !topLevelCacheCapabilities && !option.cacheControl) {
+		return option;
 	}
 
-	if (next.reasoning && next.capabilities?.reasoningCapabilities?.temperatureDisallowedWhenEnabled) {
+	let next: UIModelOption = { ...option };
+	const supportedReasoningTypes = capabilities?.reasoningCapabilities?.supportedReasoningTypes;
+
+	if (supportedReasoningTypes && next.reasoning) {
+		const supportedTypes = new Set(
+			supportedReasoningTypes.filter(l => {
+				return isReasoningType(l);
+			})
+		);
+		if (supportedTypes.size > 0 && !supportedTypes.has(next.reasoning.type)) {
+			delete next.reasoning;
+		}
+	}
+
+	if (next.reasoning?.type === ReasoningType.SingleWithLevels) {
+		const supportedLevels = getSupportedReasoningLevels(capabilities);
+		if (!supportedLevels.includes(next.reasoning.level)) {
+			next = {
+				...next,
+				reasoning: {
+					...next.reasoning,
+					level: supportedLevels.includes(ReasoningLevelValue.Medium) ? ReasoningLevelValue.Medium : supportedLevels[0],
+				},
+			};
+		}
+	}
+
+	if (next.reasoning && capabilities?.reasoningCapabilities?.supportsSummaryStyle === false) {
+		next = {
+			...next,
+			reasoning: {
+				...next.reasoning,
+			},
+		};
+		delete next.reasoning?.summaryStyle;
+	}
+
+	if (next.reasoning && capabilities?.reasoningCapabilities?.temperatureDisallowedWhenEnabled) {
+		next = { ...next };
 		delete next.temperature;
 	}
 
-	if (next.capabilities?.outputCapabilities?.supportsVerbosity === false && next.outputParam) {
-		const output = {
-			...next.outputParam,
-		};
+	if (!next.reasoning && next.temperature === undefined) {
+		next.temperature = DefaultModelParams.temperature;
+	}
+
+	if (capabilities?.outputCapabilities?.supportsVerbosity === false && next.outputParam?.verbosity) {
+		const output = { ...next.outputParam };
 		delete output.verbosity;
 		next.outputParam = output.format ? output : undefined;
 	}
 
-	const stopPolicy = getStopSequencesPolicy(next.capabilities);
+	const supportedFormats = getSupportedOutputFormats(capabilities);
+	if (supportedFormats && next.outputParam?.format?.kind && !supportedFormats.includes(next.outputParam.format.kind)) {
+		const output = { ...next.outputParam };
+		delete output.format;
+		next.outputParam = output.verbosity ? output : undefined;
+	}
+
+	const stopPolicy = getStopSequencesPolicy(capabilities);
 	if (!stopPolicy.isSupported || (stopPolicy.disallowedWithReasoning && next.reasoning)) {
 		delete next.stopSequences;
 	} else if (next.stopSequences && next.stopSequences.length > stopPolicy.maxSequences) {
 		next.stopSequences = next.stopSequences.slice(0, stopPolicy.maxSequences);
+	}
+
+	if (!topLevelCacheCapabilities) {
+		delete next.cacheControl;
+	} else if (next.cacheControl) {
+		const supportedKinds = topLevelCacheCapabilities.supportedKinds ?? [];
+		const supportedTTLs = topLevelCacheCapabilities.supportedTTLs ?? [];
+
+		if (supportedKinds.length > 0 && !supportedKinds.includes(next.cacheControl.kind)) {
+			next.cacheControl = {
+				...next.cacheControl,
+				kind: supportedKinds[0],
+			};
+		}
+
+		if (next.cacheControl.ttl && supportedTTLs.length > 0 && !supportedTTLs.includes(next.cacheControl.ttl)) {
+			const cacheControl = { ...next.cacheControl };
+			delete cacheControl.ttl;
+			next.cacheControl = cacheControl;
+		}
+
+		if (topLevelCacheCapabilities.supportsTTL === false && next.cacheControl.ttl) {
+			const cacheControl = { ...next.cacheControl };
+			delete cacheControl.ttl;
+			next.cacheControl = cacheControl;
+		}
+
+		if (topLevelCacheCapabilities.supportsKey !== true && next.cacheControl.key) {
+			const cacheControl = { ...next.cacheControl };
+			delete cacheControl.key;
+			next.cacheControl = cacheControl;
+		}
 	}
 
 	return next;

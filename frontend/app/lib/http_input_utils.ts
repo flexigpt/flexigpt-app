@@ -1,7 +1,20 @@
 const HTTP_HEADER_NAME_RE = /^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/;
 const HTTP_HEADER_CONTROL_CHAR_RE = /[\r\n\u0000]/;
 
+export interface HTTPHeaderPatch {
+	set?: Record<string, string>;
+	remove?: string[];
+}
+
+interface ParseHTTPHeaderPatchOptions {
+	rejectSensitive?: boolean;
+}
+
 const REDACTED_HTTP_VALUE = '[configured]';
+
+export function containsHTTPControlCharacters(value: string): boolean {
+	return HTTP_HEADER_CONTROL_CHAR_RE.test(value);
+}
 
 function isIPv4LoopbackHost(host: string): boolean {
 	const parts = host.split('.').map(Number);
@@ -64,7 +77,43 @@ export function validateHTTPURLSecurity(raw: string, fieldLabel = 'URL'): string
 	}
 }
 
-function validateHTTPHeaderName(name: string, fieldLabel = 'Header name'): string | undefined {
+/**
+ * Normalizes an origin-like user input while applying the same transport
+ * policy used for remote HTTP integrations.
+ *
+ * Model provider `connection.origin` is an origin, not a full endpoint URL.
+ * Paths belong in `connection.path`.
+ */
+export function normalizeHTTPOrigin(
+	raw: string,
+	fieldLabel = 'Connection origin'
+): { normalized?: string; error?: string } {
+	const trimmed = raw.trim();
+	if (!trimmed) {
+		return { error: `${fieldLabel} is required.` };
+	}
+
+	const candidate = /^[A-Za-z][A-Za-z0-9+.-]*:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`;
+	const securityError = validateHTTPURLSecurity(candidate, fieldLabel);
+	if (securityError) {
+		return { error: securityError };
+	}
+
+	try {
+		const parsed = new URL(candidate);
+		if (parsed.pathname !== '/' || parsed.search) {
+			return {
+				error: `${fieldLabel} must not include a path or query. Put the endpoint path in Connection.path.`,
+			};
+		}
+
+		return { normalized: parsed.origin };
+	} catch {
+		return { error: `${fieldLabel} must be valid.` };
+	}
+}
+
+export function validateHTTPHeaderName(name: string, fieldLabel = 'Header name'): string | undefined {
 	const normalized = name.trim();
 	if (!normalized) {
 		return `${fieldLabel} is required.`;
@@ -137,7 +186,7 @@ export function parseHTTPHeadersJSON(raw: string, label = 'Headers'): Record<str
 		}
 		seenHeaderNames.add(normalizedName);
 
-		if (HTTP_HEADER_CONTROL_CHAR_RE.test(value)) {
+		if (containsHTTPControlCharacters(value)) {
 			throw new Error(`${label} value for "${name}" must not contain CR, LF, or NUL.`);
 		}
 	}
@@ -145,7 +194,7 @@ export function parseHTTPHeadersJSON(raw: string, label = 'Headers'): Record<str
 	return headers;
 }
 
-function isSensitiveHTTPHeaderName(name: string): boolean {
+export function isSensitiveHTTPHeaderName(name: string): boolean {
 	const normalized = name.trim().toLowerCase();
 
 	if (SENSITIVE_HEADER_NAMES.has(normalized)) {
@@ -153,6 +202,104 @@ function isSensitiveHTTPHeaderName(name: string): boolean {
 	}
 
 	return /(?:^|[-_])(api[-_]?key|auth|authorization|cookie|secret|token)(?:$|[-_])/i.test(normalized);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+const normalize = (headers: Record<string, string> | undefined) =>
+	Object.fromEntries(
+		Object.entries(headers ?? {})
+			.map(([name, value]) => [name.trim().toLowerCase(), value] as const)
+			.toSorted(([leftName], [rightName]) => leftName.localeCompare(rightName))
+	);
+
+export function httpHeadersEqual(
+	left: Record<string, string> | undefined,
+	right: Record<string, string> | undefined
+): boolean {
+	return JSON.stringify(normalize(left)) === JSON.stringify(normalize(right));
+}
+
+export function parseHTTPHeaderPatch(
+	value: unknown,
+	label = 'Headers',
+	options: ParseHTTPHeaderPatchOptions = {}
+): HTTPHeaderPatch {
+	if (!isRecord(value)) {
+		throw new Error(`${label} must be a JSON object.`);
+	}
+
+	for (const key of Object.keys(value)) {
+		if (key !== 'set' && key !== 'remove') {
+			throw new Error(`${label} only supports "set" and "remove".`);
+		}
+	}
+
+	const result: HTTPHeaderPatch = {};
+	const seenNames = new Set<string>();
+
+	if (value.set !== undefined) {
+		if (!isRecord(value.set)) {
+			throw new Error(`${label}.set must be a JSON object of string values.`);
+		}
+
+		const set: Record<string, string> = {};
+		for (const [name, headerValue] of Object.entries(value.set)) {
+			const headerError = validateHTTPHeaderName(name, `${label} header "${name}"`);
+			if (headerError) {
+				throw new Error(headerError);
+			}
+			if (typeof headerValue !== 'string') {
+				throw new TypeError(`${label} value for "${name}" must be a string.`);
+			}
+			if (containsHTTPControlCharacters(headerValue)) {
+				throw new Error(`${label} value for "${name}" must not contain CR, LF, or NUL.`);
+			}
+			if (options.rejectSensitive && isSensitiveHTTPHeaderName(name)) {
+				throw new Error(
+					`${label} header "${name}" is sensitive. Store credentials in the provider credential control instead.`
+				);
+			}
+
+			const normalizedName = name.trim().toLowerCase();
+			if (seenNames.has(normalizedName)) {
+				throw new Error(`${label} contains duplicate header "${name}".`);
+			}
+
+			seenNames.add(normalizedName);
+			set[name.trim()] = headerValue;
+		}
+
+		result.set = set;
+	}
+
+	if (value.remove !== undefined) {
+		if (!Array.isArray(value.remove) || !value.remove.every(name => typeof name === 'string')) {
+			throw new Error(`${label}.remove must be an array of header names.`);
+		}
+
+		const remove: string[] = [];
+		for (const name of value.remove) {
+			const headerError = validateHTTPHeaderName(name, `${label} header "${name}"`);
+			if (headerError) {
+				throw new Error(headerError);
+			}
+
+			const normalizedName = name.trim().toLowerCase();
+			if (seenNames.has(normalizedName)) {
+				throw new Error(`${label} must not set and remove "${name}" in the same patch.`);
+			}
+
+			seenNames.add(normalizedName);
+			remove.push(name.trim());
+		}
+
+		result.remove = remove;
+	}
+
+	return result;
 }
 
 export function redactSensitiveHTTPHeaders(headers?: Record<string, string>): Record<string, string> | undefined {

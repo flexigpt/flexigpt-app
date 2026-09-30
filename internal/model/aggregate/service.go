@@ -2,27 +2,25 @@ package aggregate
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 
 type Service struct {
 	store   *modelConsumerAPI.ManagementStoreFacade
-	runtime *inferenceadapter.RuntimeAdapter
+	runtime RuntimeResolver
 }
 
 func New(
 	store *modelConsumerAPI.ManagementStoreFacade,
-	runtimeAdapter *inferenceadapter.RuntimeAdapter,
+	runtimeResolver RuntimeResolver,
 ) (*Service, error) {
-	if store == nil || runtimeAdapter == nil {
+	if store == nil || runtimeResolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Aggregate dependencies are incomplete",
 			basespec.ErrInvalid,
@@ -30,31 +28,54 @@ func New(
 	}
 	return &Service{
 		store:   store,
-		runtime: runtimeAdapter,
+		runtime: runtimeResolver,
 	}, nil
 }
 
 func (s *Service) ResolveRuntimeModel(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (inferenceadapter.RuntimeConfiguration, error) {
-	return s.ResolveRuntimeModelWithRequestPatch(ctx, ref, nil)
+) (RuntimeConfiguration, error) {
+	return s.ResolveRuntimeConfiguration(ctx, RuntimeModelRequest{
+		Model: ref,
+	})
 }
 
 func (s *Service) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	requestPatch json.RawMessage,
-) (inferenceadapter.RuntimeConfiguration, error) {
+	requestPatch *RuntimeRequestPatch,
+) (RuntimeConfiguration, error) {
+	return s.ResolveRuntimeConfiguration(ctx, RuntimeModelRequest{
+		Model:        ref,
+		RequestPatch: requestPatch,
+	})
+}
+
+// ResolveRuntimeConfiguration owns completion-time Model runtime resolution.
+// The Wails wrapper only supplies a typed request value and handles transport
+// concerns such as callbacks, cancellation, and event delivery.
+func (s *Service) ResolveRuntimeConfiguration(
+	ctx context.Context,
+	request RuntimeModelRequest,
+) (RuntimeConfiguration, error) {
 	if err := s.ready(ctx); err != nil {
-		return inferenceadapter.RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, err
+	}
+	if err := request.Validate(); err != nil {
+		return RuntimeConfiguration{}, err
+	}
+	resolved, err := s.store.ResolveModel(ctx, request.Model)
+	if err != nil {
+		return RuntimeConfiguration{}, err
 	}
 
-	resolved, err := s.store.ResolveModel(ctx, ref)
+	preparedRequestPatch, err := request.RequestPatch.Prepare()
 	if err != nil {
-		return inferenceadapter.RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, err
 	}
-	return s.runtime.ResolveWithRequestPatch(ctx, resolved, requestPatch)
+
+	return s.runtime.ResolveRuntime(ctx, resolved, preparedRequestPatch)
 }
 
 func (s *Service) MapModelTarget(
@@ -101,32 +122,36 @@ func (s *Service) MapArtifactTarget(
 func (s *Service) ResolveMappedRuntimeModel(
 	ctx context.Context,
 	target resolve.MappedTarget,
-) (inferenceadapter.RuntimeConfiguration, error) {
+) (RuntimeConfiguration, error) {
 	if err := s.ready(ctx); err != nil {
-		return inferenceadapter.RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, err
 	}
 
 	value, err := DecodeTarget(target)
 	if err != nil {
-		return inferenceadapter.RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, err
 	}
 
 	resolved, err := s.store.ResolveModel(ctx, value.ModelArtifact)
 	if err != nil {
-		return inferenceadapter.RuntimeConfiguration{}, err
+		return RuntimeConfiguration{}, err
 	}
 	if resolved.Model.Artifact.LogicalName != value.Name ||
 		resolved.Model.Definition.Digest != value.ModelDefinitionDigest ||
 		resolved.Provider.Artifact.Ref() != value.ProviderArtifact ||
 		resolved.Provider.Definition.Digest != value.ProviderDefinitionDigest ||
 		resolved.Fingerprint != value.ConfigurationFingerprint {
-		return inferenceadapter.RuntimeConfiguration{}, fmt.Errorf(
+		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: mapped Model target no longer matches current source-backed configuration",
 			basespec.ErrReferenceUnresolved,
 		)
 	}
 
-	return s.runtime.Resolve(ctx, resolved)
+	return s.runtime.ResolveRuntime(
+		ctx,
+		resolved,
+		PreparedRuntimeRequestPatch{},
+	)
 }
 
 func (s *Service) ready(ctx context.Context) error {

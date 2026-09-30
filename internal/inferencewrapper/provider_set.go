@@ -16,6 +16,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -214,7 +215,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	ctx context.Context,
 	req *spec.CompletionRequest,
 ) (*spec.CompletionResponse, error) {
-	if req == nil || req.Body == nil {
+	if req == nil {
 		return nil, errors.New("got empty completion input")
 	}
 	if req.Runtime == nil {
@@ -224,22 +225,21 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		return nil, err
 	}
 
-	body := req.Body
 	modelParam := req.Runtime.ModelParam
 
-	if len(body.Current.ToolChoices) > 0 {
+	if len(req.Current.ToolChoices) > 0 {
 		return nil, errors.New("prepopulated tool choices are not allowed in fetch completion, need tool store choices")
 	}
 
 	ck := uuidutil.NewUUIDv7()
-
+	currentMessage := req.Current
 	capabilityResolver := capabilityoverride.NewCompletionKeyResolver(
 		ck,
 		&req.Runtime.Capabilities,
 	)
 
 	// Flatten full conversation (history + current) into InputUnion list.
-	inputs, currentInputs, err := ps.buildInputs(ctx, body)
+	inputs, currentInputs, err := ps.buildInputs(ctx, req.History, currentMessage)
 	if err != nil {
 		return nil, err
 	}
@@ -254,8 +254,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	)
 
 	if err := validateArtifactSkillRefsForSelection(
-		body.Current.WorkspaceSelection,
-		body.Current.EnabledSkillRefs,
+		currentMessage.WorkspaceSelection,
+		currentMessage.EnabledSkillRefs,
 	); err != nil {
 		return &spec.CompletionResponse{
 			Body: &spec.CompletionResponseBody{
@@ -271,10 +271,10 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	var workspaceUsage *workspaceConversation.ConversationUsage
-	if body.Current.WorkspaceSelection != nil {
+	if currentMessage.WorkspaceSelection != nil {
 		hydrated, workspaceErr := ps.workspaceBridge.HydrateCompletion(
 			ctx,
-			body.Current.WorkspaceSelection,
+			currentMessage.WorkspaceSelection,
 		)
 		if hydrated != nil {
 			workspaceUsage = hydrated.Usage
@@ -311,11 +311,11 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 	}
 
-	mcpContext := body.MCPContext
+	mcpContext := req.MCPContext
 	if mcpContext == nil {
-		mcpContext = body.Current.MCPContext
+		mcpContext = currentMessage.MCPContext
 	}
-	if len(body.Current.MCPAppContextUpdates) != 0 {
+	if len(currentMessage.MCPAppContextUpdates) != 0 {
 		if mcpContext == nil {
 			return nil, errors.New(
 				"MCP App context updates require an MCP conversation context",
@@ -323,28 +323,28 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		}
 		if err := mcpConversation.ValidateMCPAppContextUpdatesForContext(
 			*mcpContext,
-			body.Current.MCPAppContextUpdates,
+			currentMessage.MCPAppContextUpdates,
 		); err != nil {
 			return nil, err
 		}
 	}
-	if appCtxInput := buildMCPAppContextInput(body.Current.MCPAppContextUpdates); appCtxInput != nil {
+	if appCtxInput := buildMCPAppContextInput(currentMessage.MCPAppContextUpdates); appCtxInput != nil {
 		inputs, currentInputs = prependCurrentInputs(inputs, currentInputs, *appCtxInput)
 	}
 	// Build tool choices for this call.
-	toolChoices, err := buildToolChoices(ctx, ps.toolAggregate, body.ToolSelections)
+	toolChoices, err := buildToolChoices(ctx, ps.toolAggregate, req.ToolSelections)
 	if err != nil {
 		return nil, err
 	}
 
-	enabledSkillRefs := body.Current.EnabledSkillRefs
+	enabledSkillRefs := currentMessage.EnabledSkillRefs
 	if workspaceUsage != nil {
 		enabledSkillRefs = filterWorkspaceSkillRefsToResolvedSelection(
 			enabledSkillRefs,
 			workspaceUsage,
 		)
 	}
-	skillSessionID := strings.TrimSpace(body.SkillSessionID)
+	skillSessionID := strings.TrimSpace(req.SkillSessionID)
 
 	// A Workspace selection is authoritative for which Root-scoped Skills may
 	// participate in this turn. If no runtime allow-list reaches Skill Runtime,
@@ -623,12 +623,13 @@ func workspaceUnavailableCompletionResponse(
 // If the caller hydrates it then there is a possibility of duplicates.
 func (ps *ProviderSetAPI) buildInputs(
 	ctx context.Context,
-	body *spec.CompletionRequestBody,
+	history []conversationSpec.ConversationMessage,
+	inCurrent conversationSpec.ConversationMessage,
 ) (all, current []inferenceSpec.InputUnion, err error) {
 	out := make([]inferenceSpec.InputUnion, 0)
 
 	// 1) History: replay stored unions exactly as they were.
-	for _, turn := range body.History {
+	for _, turn := range history {
 		// Inputs first, then Outputs, preserving stored order.
 
 		out = append(out, cloneInputUnionsForLocalMutation(turn.Inputs)...)
@@ -643,7 +644,7 @@ func (ps *ProviderSetAPI) buildInputs(
 		}
 	}
 
-	cur := body.Current
+	cur := inCurrent
 	if cur.Role != inferenceSpec.RoleUser {
 		return nil, nil, errors.New("current turn must have role=user")
 	}

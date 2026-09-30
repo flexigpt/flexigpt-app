@@ -489,6 +489,9 @@ const nodeRules: DummyRuleMap = {
 	'node/no-sync': 'off',
 };
 
+const jsxA11yRules: DummyRuleMap = {
+	'jsx-a11y/no-autofocus': 'off',
+};
 // oxlint-disable-next-line no-restricted-exports
 export default defineConfig({
 	categories: {
@@ -516,6 +519,7 @@ export default defineConfig({
 
 	rules: {
 		...baseRules,
+		...jsxA11yRules,
 		...nodeRules,
 		...promiseRules,
 		...eslintRules,

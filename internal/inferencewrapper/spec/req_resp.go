@@ -1,8 +1,6 @@
 package spec
 
 import (
-	"encoding/json"
-
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
@@ -43,42 +41,14 @@ type SetProviderAPIKeyRequest struct {
 
 type SetProviderAPIKeyResponse struct{}
 
-type CompletionRequestBody struct {
-	// Past turns of the conversation, already persisted.
-	History []conversationSpec.ConversationMessage `json:"history"`
-
-	// New user turn to complete. Must have Role=user. Typically will have:
-	//   - Attachments (ref attachments),
-	//   - either:
-	//       * pre-built InputUnion(s) in Inputs, or
-	//       * just Messages + Attachments and let the aggregator build
-	//         the InputUnion for this turn.
-	Current conversationSpec.ConversationMessage `json:"current"`
-
-	// RequestPatch is the final portable defaults layer. It has the shape:
-	//
-	// {"defaults": { ...model defaults patch... }, "clear": ["reasoning"]}
-	//
-	// It is applied after all Provider and Model source/overlay layers.
-	RequestPatch json.RawMessage `json:"requestPatch,omitempty"`
-
-	// ToolSelections is the set of mapped Tool targets that should be enabled
-	// for this call.
-	//
-	// The aggregator always hydrates ToolChoices from Tool Aggregate based on
-	// this slice. It does not infer tools from History[i].ToolChoices or
-	// Current.ToolChoices.
-	// (Those are persisted for UI/analytics only.)
-	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
-
-	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
-	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
-}
-
 type CompletionRequest struct {
 	Runtime *RuntimeModel `json:"-"`
 
-	Body *CompletionRequestBody
+	History        []conversationSpec.ConversationMessage  `json:"-"`
+	Current        conversationSpec.ConversationMessage    `json:"-"`
+	ToolSelections []toolAggregate.ToolSelection           `json:"-"`
+	MCPContext     *mcpConversation.MCPConversationContext `json:"-"`
+	SkillSessionID string                                  `json:"-"`
 
 	OnStreamText     func(text string) error     `json:"-"`
 	OnStreamThinking func(thinking string) error `json:"-"`

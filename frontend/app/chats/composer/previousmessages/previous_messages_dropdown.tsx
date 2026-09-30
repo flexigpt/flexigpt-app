@@ -46,8 +46,9 @@ function maybeParseCustomValue(rawValue: string): IncludePreviousMessages | unde
 	if (!trimmed) {
 		return undefined;
 	}
+
 	const parsed = Math.trunc(Number(trimmed));
-	if (Number.isNaN(parsed) || parsed < 0) {
+	if (!Number.isSafeInteger(parsed) || parsed < 0) {
 		return 0;
 	}
 

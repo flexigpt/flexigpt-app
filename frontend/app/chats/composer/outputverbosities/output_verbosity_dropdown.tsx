@@ -2,7 +2,8 @@ import { FiCheck } from 'react-icons/fi';
 
 import { Menu, MenuButton, MenuItem, useMenuStore, useStoreState } from '@ariakit/react';
 
-import { OutputVerbosity, ProviderSDKType } from '@/spec/inference';
+import type { OutputVerbosity } from '@/spec/inference';
+import { ProviderSDKType } from '@/spec/inference';
 
 import {
 	actionTriggerChipButtonClasses,
@@ -12,6 +13,8 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
+import { getOutputVerbosityDisplayName, OUTPUT_VERBOSITY_VALUES } from '@/models/lib/model_option_labels';
+
 interface OutputVerbosityDropdownProps {
 	sdkType: ProviderSDKType;
 	verbosity?: OutputVerbosity;
@@ -19,21 +22,13 @@ interface OutputVerbosityDropdownProps {
 	setVerbosity: (v?: OutputVerbosity) => void;
 }
 
-const VERBOSITY_OPTIONS: Array<{ label: string; value?: OutputVerbosity }> = [
-	{ label: 'Default', value: undefined },
-	{ label: 'Low', value: OutputVerbosity.Low },
-	{ label: 'Medium', value: OutputVerbosity.Medium },
-	{ label: 'High', value: OutputVerbosity.High },
-	{ label: 'XHigh', value: OutputVerbosity.XHigh },
-	{ label: 'Max', value: OutputVerbosity.Max },
-];
+const VERBOSITY_OPTIONS: Array<OutputVerbosity | undefined> = [undefined, ...OUTPUT_VERBOSITY_VALUES];
 
 function labelFor(v?: OutputVerbosity) {
-	const l = VERBOSITY_OPTIONS.find(o => o.value === v)?.label ?? '';
-	if (l === 'Default') {
+	if (v === undefined) {
 		return '';
 	}
-	return ': ' + l;
+	return `: ${getOutputVerbosityDisplayName(v)}`;
 }
 
 export function OutputVerbosityDropdown({
@@ -75,16 +70,16 @@ export function OutputVerbosityDropdown({
 					autoFocusOnShow
 					className={`${actionTriggerMenuCompactClasses} text-xs`}
 				>
-					{VERBOSITY_OPTIONS.map(opt => (
+					{VERBOSITY_OPTIONS.map(option => (
 						<MenuItem
-							key={opt.value ?? '__default__'}
+							key={option ?? '__default__'}
 							className={`${actionTriggerMenuItemClasses} justify-between`}
 							onClick={() => {
-								setVerbosity(opt.value);
+								setVerbosity(option);
 							}}
 						>
-							<span>{opt.label}</span>
-							{(verbosity ?? undefined) === (opt.value ?? undefined) ? <FiCheck /> : null}
+							<span>{getOutputVerbosityDisplayName(option)}</span>
+							{verbosity === option ? <FiCheck /> : null}
 						</MenuItem>
 					))}
 				</Menu>

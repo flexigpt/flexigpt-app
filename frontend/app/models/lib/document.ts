@@ -1,86 +1,81 @@
 import type { ArtifactRef } from '@/spec/artifact';
-import type {
-	ModelAdapterParameters,
-	ModelArtifactNameReference,
-	ModelCapabilities,
-	ModelDefaults,
-} from '@/spec/model';
+import type { ModelAuthentication, ModelConnection } from '@/spec/model';
+import { ModelAuthenticationMode } from '@/spec/model';
+
+import {
+	containsHTTPControlCharacters,
+	normalizeHTTPOrigin,
+	parseHTTPHeaderPatch,
+	validateHTTPHeaderName,
+} from '@/lib/http_input_utils';
+import { parseOptionalJSONObject } from '@/lib/jsonschema_utils';
 
 export function modelRefEqual(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
 	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
-export function formatJSON(value: unknown): string {
-	if (value === undefined || value === null) {
-		return '';
+export function parseProviderConnection(value: string): ModelConnection {
+	const connection = parseOptionalJSONObject<ModelConnection>(value, 'Connection');
+	if (!connection || typeof connection.origin !== 'string') {
+		throw new Error('Connection must include an origin.');
 	}
 
-	return JSON.stringify(value, null, 2);
+	const { normalized, error } = normalizeHTTPOrigin(connection.origin, 'Connection origin');
+	if (!normalized || error) {
+		throw new Error(error ?? 'Connection origin must be valid.');
+	}
+
+	const rawPath = connection.path;
+	if (rawPath !== undefined && typeof rawPath !== 'string') {
+		throw new Error('Connection path must be a string.');
+	}
+
+	const path = rawPath?.trim();
+	if (path && (!path.startsWith('/') || containsHTTPControlCharacters(path))) {
+		throw new Error('Connection path must start with "/" and must not contain control characters.');
+	}
+
+	const headers =
+		connection.headers === undefined
+			? undefined
+			: parseHTTPHeaderPatch(connection.headers, 'Connection headers', { rejectSensitive: true });
+
+	return {
+		...connection,
+		origin: normalized,
+		...(path ? { path } : {}),
+		...(headers ? { headers } : {}),
+	};
 }
 
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
-export function parseOptionalJSONObject<T extends object>(value: string, label: string): T | undefined {
-	const trimmed = value.trim();
-	if (!trimmed) {
-		return undefined;
+export function parseProviderAuthentication(value: string): ModelAuthentication {
+	const authentication = parseOptionalJSONObject<ModelAuthentication>(value, 'Authentication');
+	if (!authentication || typeof authentication.mode !== 'string') {
+		throw new Error('Authentication must include a mode.');
 	}
 
-	let parsed: unknown;
-	try {
-		parsed = JSON.parse(trimmed);
-	} catch {
-		throw new Error(`${label} must be valid JSON.`);
+	if (!Object.values(ModelAuthenticationMode).includes(authentication.mode)) {
+		throw new Error('Authentication mode is invalid.');
 	}
 
-	if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-		throw new Error(`${label} must be a JSON object.`);
-	}
-
-	return parsed as T;
-}
-
-export function parseOptionalLabels(value: string): Record<string, string> | undefined {
-	const parsed = parseOptionalJSONObject<Record<string, unknown>>(value, 'Labels');
-	if (!parsed) {
-		return undefined;
-	}
-
-	const labels: Record<string, string> = {};
-	for (const [key, item] of Object.entries(parsed)) {
-		if (typeof item !== 'string') {
-			throw new TypeError(`Label "${key}" must have a string value.`);
+	const headerName = authentication.headerName?.trim();
+	if (headerName) {
+		const headerError = validateHTTPHeaderName(headerName, 'Authentication header name');
+		if (headerError) {
+			throw new Error(headerError);
 		}
-		labels[key] = item;
 	}
 
-	return labels;
-}
-
-export function parseOptionalReference(value: string): ModelArtifactNameReference | undefined {
-	const parsed = parseOptionalJSONObject<ModelArtifactNameReference>(value, 'Default model reference');
-
-	if (!parsed) {
-		return undefined;
-	}
-	if (!parsed.name?.trim()) {
-		throw new Error('Default model reference requires a name.');
+	if (authentication.mode === ModelAuthenticationMode.APIKeyHeader && !headerName) {
+		throw new Error('API-key header authentication requires a headerName.');
 	}
 
-	return parsed;
-}
+	if (authentication.prefix !== undefined && containsHTTPControlCharacters(authentication.prefix)) {
+		throw new Error('Authentication prefix must not contain CR, LF, or NUL.');
+	}
 
-export function parseProviderDefaults(value: string): ModelDefaults | undefined {
-	return parseOptionalJSONObject<ModelDefaults>(value, 'Provider defaults');
-}
-
-export function parseModelDefaults(value: string): ModelDefaults | undefined {
-	return parseOptionalJSONObject<ModelDefaults>(value, 'Model defaults');
-}
-
-export function parseCapabilities(value: string): ModelCapabilities | undefined {
-	return parseOptionalJSONObject<ModelCapabilities>(value, 'Capabilities');
-}
-
-export function parseAdapterParameters(value: string): ModelAdapterParameters | undefined {
-	return parseOptionalJSONObject<ModelAdapterParameters>(value, 'Adapter parameters');
+	return {
+		...authentication,
+		...(headerName ? { headerName } : {}),
+	};
 }

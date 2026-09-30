@@ -1,6 +1,6 @@
 import type { ArtifactRef } from '@/spec/artifact';
 import type { StoreConversationMessage } from '@/spec/conversation';
-import type { CompletionResponseBody, ProviderSDKType } from '@/spec/inference';
+import type { CompletionResponseBody } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type {
 	ManagedModelCreateRequest,
@@ -19,7 +19,6 @@ import type {
 } from '@/spec/model';
 import type { ToolSelection } from '@/spec/tool';
 import { ArtifactState } from '@/spec/artifact';
-import { ProviderSDKType as ProviderSDKTypeValue } from '@/spec/inference';
 import { ModelLookupScope } from '@/spec/model';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
@@ -30,6 +29,7 @@ import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
 import { mergeModelCapabilities, sanitizeUIModelOptionByCapabilities } from '@/models/lib/capabilities';
 import { modelRefEqual } from '@/models/lib/document';
 import { buildModelParamFromDefaults } from '@/models/lib/model_defaults';
+import { getProviderSDKType } from '@/models/lib/provider_sdk';
 
 export interface ModelProviderManagementItem {
 	list: ModelProviderListItem;
@@ -41,7 +41,6 @@ export interface ModelManagementItem {
 	view: ModelView;
 	provider?: ModelProviderManagementItem;
 }
-
 export interface ModelManagementSnapshot {
 	providers: ModelProviderManagementItem[];
 	models: ModelManagementItem[];
@@ -50,19 +49,6 @@ export interface ModelManagementSnapshot {
 export interface ModelCatalog {
 	options: UIModelOption[];
 	defaultOption: UIModelOption;
-}
-
-function adapterSDKType(adapter: string): ProviderSDKType {
-	switch (adapter) {
-		case 'anthropic.messages':
-			return ProviderSDKTypeValue.ProviderSDKTypeAnthropic;
-		case 'openai.chatCompletions':
-			return ProviderSDKTypeValue.ProviderSDKTypeOpenAIChatCompletions;
-		case 'google.generateContent':
-			return ProviderSDKTypeValue.ProviderSDKTypeGoogleGenerateContent;
-		default:
-			return ProviderSDKTypeValue.ProviderSDKTypeOpenAIResponses;
-	}
 }
 
 function providerRequiresCredential(document: ModelProviderDocument): boolean {
@@ -139,7 +125,7 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		logicalName: item.list.name,
 		providerName: item.provider.view.document.name,
 		providerAdapter: item.provider.view.document.adapter,
-		providerSDKType: adapterSDKType(item.provider.view.document.adapter),
+		providerSDKType: getProviderSDKType(item.provider.view.document.adapter),
 		providerDisplayName: item.provider.list.displayName || item.provider.list.name,
 		modelDisplayName: item.list.displayName || item.list.name,
 		includePreviousMessages: 'all',

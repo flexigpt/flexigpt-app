@@ -2,36 +2,65 @@ import { useState } from 'react';
 import { FiChevronDown, FiChevronUp, FiEdit2, FiEye, FiKey, FiPlus, FiTrash2 } from 'react-icons/fi';
 
 import { ArtifactState } from '@/spec/artifact';
+import { ModelLookupScope } from '@/spec/model';
+
+import { getErrorMessage } from '@/lib/error_utils';
+
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import type { ModelManagementItem, ModelProviderManagementItem } from '@/apis/model_management';
 
+import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
+import { EnabledControl } from '@/components/managementui/enabled_control';
+import { ManagementBundleCard } from '@/components/managementui/management_bundle_card';
+import { ManagementEmptyState } from '@/components/managementui/management_empty_state';
+import { ManagementInfoGrid } from '@/components/managementui/management_info_grid';
+import { ManagementInfoRow } from '@/components/managementui/management_info_row';
+import { MetadataPill } from '@/components/managementui/metadata_pill';
+import { StatusBadge } from '@/components/managementui/status_badge';
+
+import { getProviderSDKOption } from '@/models/lib/provider_sdk';
 import { ModelCard } from '@/models/model_card';
 
 interface ModelProviderCardProps {
 	provider: ModelProviderManagementItem;
 	models: ModelManagementItem[];
-	busy: boolean;
 	onViewProvider: (provider: ModelProviderManagementItem) => void;
 	onEditProvider: (provider: ModelProviderManagementItem) => void;
-	onToggleProvider: (provider: ModelProviderManagementItem) => void;
+	onToggleProvider: (provider: ModelProviderManagementItem) => Promise<void>;
 	onDeleteProvider: (provider: ModelProviderManagementItem) => void;
 	onCredential: (provider: ModelProviderManagementItem) => void;
 	onAddModel: (provider: ModelProviderManagementItem) => void;
 	onViewModel: (model: ModelManagementItem) => void;
 	onEditModel: (model: ModelManagementItem) => void;
-	onToggleModel: (model: ModelManagementItem) => void;
+	onToggleModel: (model: ModelManagementItem) => Promise<void>;
 	onDeleteModel: (model: ModelManagementItem) => void;
-	onSetDefaultModel: (provider: ModelProviderManagementItem, model: ModelManagementItem) => void;
+	onSetDefaultModel: (provider: ModelProviderManagementItem, model: ModelManagementItem) => Promise<void>;
 }
 
-function providerDefaultName(provider: ModelProviderManagementItem): string | undefined {
-	return provider.view.document.defaultModel?.name;
+function providerDefaultModel(
+	provider: ModelProviderManagementItem,
+	models: ModelManagementItem[]
+): ModelManagementItem | undefined {
+	const reference = provider.view.document.defaultModel;
+	if (!reference) {
+		return undefined;
+	}
+
+	return models.find(model => {
+		if (model.view.document.name !== reference.name) {
+			return false;
+		}
+		if (reference.scope === ModelLookupScope.Builtin) {
+			return model.list.builtIn;
+		}
+		return !model.list.builtIn && model.list.ref.rootID === provider.list.ref.rootID;
+	});
 }
 
 export function ModelProviderCard({
 	provider,
 	models,
-	busy,
 	onViewProvider,
 	onEditProvider,
 	onToggleProvider,
@@ -44,142 +73,188 @@ export function ModelProviderCard({
 	onDeleteModel,
 	onSetDefaultModel,
 }: ModelProviderCardProps) {
+	const { isPending, runAction } = usePendingActions();
 	const [expanded, setExpanded] = useState(false);
+	const [showDenied, setShowDenied] = useState(false);
+	const [deniedMessage, setDeniedMessage] = useState('');
 	const mutable = !provider.list.builtIn;
 	const available = provider.list.state === ArtifactState.Available;
-	const defaultModelName = providerDefaultName(provider);
+	const defaultModel = providerDefaultModel(provider, models);
+	const defaultModelDisplayName = defaultModel?.list.displayName;
+	const canDelete = mutable && models.length === 0;
+	const toggleKey = 'provider-toggle';
+	const sdkOption = getProviderSDKOption(provider.view.document.adapter);
+
+	const showActionError = (message: string) => {
+		setDeniedMessage(message);
+		setShowDenied(true);
+	};
+
+	const runProviderAction = (key: string, action: () => Promise<void>, fallback: string) => {
+		void runAction(key, action).catch((error: unknown) => {
+			showActionError(getErrorMessage(error, fallback));
+		});
+	};
 
 	return (
-		<section className="bg-base-100 rounded-2xl p-4 shadow-sm">
-			<div className="flex flex-wrap items-center justify-between gap-3">
-				<div className="min-w-0">
-					<h2 className="truncate text-lg font-semibold">{provider.list.displayName}</h2>
-					<p className="truncate font-mono text-xs opacity-70">{provider.view.document.name}</p>
-				</div>
-
-				<div className="flex flex-wrap items-center gap-2">
-					<span className={`badge ${provider.list.enabled ? 'badge-success' : ''}`}>
-						{provider.list.enabled ? 'enabled' : 'disabled'}
-					</span>
-
-					<span className="badge">{provider.list.builtIn ? 'built-in' : 'custom'}</span>
-
-					<span className={`badge ${provider.list.credentialConfigured ? 'badge-success' : 'badge-warning'}`}>
-						{provider.list.credentialConfigured ? 'credential configured' : 'credential missing'}
-					</span>
-
+		<>
+			<ManagementBundleCard
+				title={provider.list.displayName || 'Provider'}
+				status={
+					<>
+						<StatusBadge tone={provider.list.enabled ? 'success' : 'neutral'}>
+							{provider.list.enabled ? 'Enabled' : 'Disabled'}
+						</StatusBadge>
+						<StatusBadge>{provider.list.builtIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						<StatusBadge tone={provider.list.credentialConfigured ? 'success' : 'warning'}>
+							{provider.list.credentialConfigured ? 'Credential configured' : 'Credential missing'}
+						</StatusBadge>
+						{!available ? <StatusBadge tone="warning">Unavailable</StatusBadge> : null}
+					</>
+				}
+				metadata={
+					<>
+						<MetadataPill label="SDK">{sdkOption?.displayName ?? 'Unsupported compatibility mode'}</MetadataPill>
+						<MetadataPill label="Models">{models.length}</MetadataPill>
+						<MetadataPill label="Default">{defaultModelDisplayName ?? 'None'}</MetadataPill>
+					</>
+				}
+				disclosure={
 					<button
 						type="button"
-						className="btn btn-xs"
-						disabled={busy}
-						onClick={() => {
-							onToggleProvider(provider);
-						}}
-					>
-						{provider.list.enabled ? 'Disable' : 'Enable'}
-					</button>
-
-					<button
-						type="button"
-						className="btn btn-xs"
-						disabled={busy}
-						onClick={() => {
-							onCredential(provider);
-						}}
-					>
-						<FiKey size={14} />
-						Credential
-					</button>
-
-					<button
-						type="button"
-						className="btn btn-xs"
-						disabled={busy}
-						onClick={() => {
-							if (mutable) {
-								onEditProvider(provider);
-								return;
-							}
-							onViewProvider(provider);
-						}}
-					>
-						{mutable ? <FiEdit2 size={14} /> : <FiEye size={14} />}
-						{mutable ? 'Edit' : 'View'}
-					</button>
-
-					<button
-						type="button"
-						className="btn btn-xs"
-						disabled={busy || !available}
-						onClick={() => {
-							onAddModel(provider);
-						}}
-					>
-						<FiPlus size={14} />
-						Add Model
-					</button>
-
-					{mutable ? (
-						<button
-							type="button"
-							className="btn btn-xs btn-error"
-							disabled={busy}
-							onClick={() => {
-								onDeleteProvider(provider);
-							}}
-						>
-							<FiTrash2 size={14} />
-							Delete
-						</button>
-					) : null}
-
-					<button
-						type="button"
-						className="btn btn-xs btn-ghost"
+						className="btn btn-sm btn-ghost rounded-xl"
 						aria-expanded={expanded}
 						onClick={() => {
 							setExpanded(value => !value);
 						}}
 					>
-						{models.length} models
-						{expanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+						<span>{models.length} models</span>
+						{expanded ? <FiChevronUp size={16} /> : <FiChevronDown size={16} />}
 					</button>
-				</div>
-			</div>
-
-			{expanded ? (
-				<div className="mt-4 space-y-3">
-					<div className="grid gap-2 text-sm md:grid-cols-2">
-						<div>
-							<span className="font-medium">Adapter: </span>
-							<span className="font-mono">{provider.view.document.adapter}</span>
-						</div>
-						<div>
-							<span className="font-medium">Default model: </span>
-							<span className="font-mono">{defaultModelName ?? 'none'}</span>
-						</div>
-					</div>
-
-					{models.map(model => (
-						<ModelCard
-							key={`${model.list.ref.rootID}:${model.list.ref.artifactID}`}
-							model={model}
-							provider={provider}
-							busy={busy}
-							isProviderDefault={model.view.document.name === defaultModelName}
-							onView={onViewModel}
-							onEdit={onEditModel}
-							onToggle={onToggleModel}
-							onDelete={onDeleteModel}
-							onSetDefault={m => {
-								onSetDefaultModel(provider, m);
+				}
+				actionLeading={
+					<EnabledControl
+						id={`provider-enabled-${provider.list.ref.rootID}-${provider.list.ref.artifactID}`}
+						checked={provider.list.enabled}
+						onChange={() => {
+							runProviderAction(toggleKey, () => onToggleProvider(provider), 'Failed changing provider availability.');
+						}}
+						disabled={isPending(toggleKey) || !available}
+						busy={isPending(toggleKey)}
+						compact={false}
+						title={!available ? 'This provider artifact is not available.' : undefined}
+					/>
+				}
+				actions={
+					<>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={isPending(toggleKey)}
+							onClick={() => {
+								onCredential(provider);
 							}}
-						/>
-					))}
+						>
+							<FiKey size={16} />
+							<span>{provider.list.credentialConfigured ? 'Manage Credential' : 'Set Credential'}</span>
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={isPending(toggleKey)}
+							onClick={() => {
+								if (mutable) {
+									onEditProvider(provider);
+									return;
+								}
+								onViewProvider(provider);
+							}}
+						>
+							{mutable ? <FiEdit2 size={16} /> : <FiEye size={16} />}
+							<span>{mutable ? 'Edit Provider' : 'View Provider'}</span>
+						</button>
+						<button
+							type="button"
+							className="btn btn-sm btn-ghost rounded-xl"
+							disabled={isPending(toggleKey) || !available || !provider.list.enabled}
+							title={
+								provider.list.builtIn ? 'Create a custom model that references this built-in provider.' : undefined
+							}
+							onClick={() => {
+								onAddModel(provider);
+							}}
+						>
+							<FiPlus size={16} />
+							<span>Add Model</span>
+						</button>
+						{mutable ? (
+							<button
+								type="button"
+								className="btn btn-sm btn-ghost rounded-xl"
+								disabled={isPending(toggleKey) || !canDelete}
+								title={!canDelete ? 'Remove all linked models before deleting this provider.' : 'Delete provider'}
+								onClick={() => {
+									onDeleteProvider(provider);
+								}}
+							>
+								<FiTrash2 size={16} />
+								<span>Delete Provider</span>
+							</button>
+						) : null}
+					</>
+				}
+			>
+				{expanded ? (
+					<div className="mt-4 space-y-5">
+						<ManagementInfoGrid>
+							<ManagementInfoRow label="SDK">
+								{sdkOption?.displayName ?? 'Unsupported compatibility mode'}
+							</ManagementInfoRow>
+							<ManagementInfoRow label="Origin">{provider.view.document.connection?.origin ?? '—'}</ManagementInfoRow>
+							<ManagementInfoRow label="Chat path">
+								{provider.view.document.connection?.path ?? 'Adapter default'}
+							</ManagementInfoRow>
+							<ManagementInfoRow label="Default model">
+								{defaultModelDisplayName ?? 'No default model'}
+							</ManagementInfoRow>
+						</ManagementInfoGrid>
 
-					{models.length === 0 ? <p className="text-sm opacity-70">No models are linked to this provider.</p> : null}
-				</div>
-			) : null}
-		</section>
+						<div className="divider my-0">Models</div>
+
+						{models.length > 0 ? (
+							<div className="space-y-3">
+								{models.map(model => (
+									<ModelCard
+										key={`${model.list.ref.rootID}:${model.list.ref.artifactID}`}
+										model={model}
+										provider={provider}
+										isProviderDefault={defaultModel?.list.ref.artifactID === model.list.ref.artifactID}
+										onView={onViewModel}
+										onEdit={onEditModel}
+										onToggle={onToggleModel}
+										onDelete={onDeleteModel}
+										onSetDefault={m => {
+											return onSetDefaultModel(provider, m);
+										}}
+										onActionError={showActionError}
+									/>
+								))}
+							</div>
+						) : (
+							<ManagementEmptyState>No models are linked to this provider.</ManagementEmptyState>
+						)}
+					</div>
+				) : null}
+			</ManagementBundleCard>
+
+			<ActionDeniedAlertModal
+				isOpen={showDenied}
+				onClose={() => {
+					setShowDenied(false);
+					setDeniedMessage('');
+				}}
+				message={deniedMessage}
+			/>
+		</>
 	);
 }

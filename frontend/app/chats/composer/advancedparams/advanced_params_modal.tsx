@@ -7,6 +7,7 @@ import type { UIModelOption } from '@/spec/model';
 import { OutputFormatKind, ReasoningSummaryStyle } from '@/spec/inference';
 
 import { focusTextInputAtEnd } from '@/lib/focus_input';
+import { MAX_JSON_SCHEMA_INPUT_CHARS, tryParseJSONObject } from '@/lib/jsonschema_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
@@ -32,6 +33,11 @@ import {
 	getTopLevelCacheControlCapabilities,
 	supportsReasoningSummaryStyle,
 } from '@/models/lib/capabilities';
+import {
+	parseOptionalPositiveInteger,
+	parseOptionalStopSequences,
+	parseStopSequences,
+} from '@/models/lib/model_runtime_defaults';
 
 interface AdvancedParamsModalProps {
 	isOpen: boolean;
@@ -44,64 +50,9 @@ interface AdvancedParamsModalProps {
 type OutputFormatChoice = 'default' | 'text' | 'jsonSchema';
 type SummaryStyleChoice = '' | ReasoningSummaryStyle;
 
-type ErrorKey =
-	| 'maxPromptLength'
-	| 'maxOutputLength'
-	| 'timeout'
-	| 'stopSequences'
-	| 'additionalParametersRawJSON'
-	| 'jsonSchemaName'
-	| 'jsonSchema';
+type ErrorKey = 'maxPromptLength' | 'maxOutputLength' | 'timeout' | 'stopSequences' | 'jsonSchemaName' | 'jsonSchema';
 
 type AdvancedParamsModalInnerProps = Omit<AdvancedParamsModalProps, 'isOpen' | 'onClose'>;
-
-const MAX_JSON_CHARS = 50_000;
-
-function parsePositiveIntAllowBlank(v: string): number | undefined {
-	const s = v.trim();
-	if (!s) {
-		return undefined;
-	}
-	const n = Number(s);
-	if (!Number.isFinite(n) || !Number.isInteger(n) || n <= 0) {
-		return Number.NaN;
-	}
-	return n;
-}
-
-function parseStopSequences(raw: string): string[] | undefined {
-	const lines = raw
-		.split(/\r?\n/g)
-		.map(s => s.trim())
-		.filter(Boolean);
-
-	if (lines.length === 0) {
-		return undefined;
-	}
-
-	const seen = new Set<string>();
-	const out: string[] = [];
-	for (const s of lines) {
-		if (seen.has(s)) {
-			continue;
-		}
-		seen.add(s);
-		out.push(s);
-	}
-	return out.length > 0 ? out : undefined;
-}
-
-function safeJSONParse(raw: string): { ok: boolean; value: any } {
-	try {
-		return { ok: true, value: JSON.parse(raw) };
-	} catch (e) {
-		return { ok: false, value: (e as Error)?.message ?? 'Invalid JSON' };
-	}
-}
-
-function isPlainObject(v: any): boolean {
-	return typeof v === 'object' && v !== null && !Array.isArray(v);
-}
 
 function getInitialOutputFormatChoice(
 	currentModel: UIModelOption,
@@ -138,7 +89,7 @@ function HelpHint({ content }: { content: string }) {
 }
 
 const validateNumberField = (field: 'maxPromptLength' | 'maxOutputLength' | 'timeout', value: string) => {
-	const n = parsePositiveIntAllowBlank(value);
+	const n = parseOptionalPositiveInteger(value);
 	if (n === undefined) {
 		return undefined;
 	}
@@ -287,7 +238,7 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 		}
 
 		const parsed = parseStopSequences(raw);
-		if (!parsed) {
+		if (parsed.length === 0) {
 			return undefined;
 		}
 
@@ -322,17 +273,9 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			return { nameErr: undefined, schemaErr: 'Schema JSON is required.' };
 		}
 
-		if (schemaRaw.length > MAX_JSON_CHARS) {
-			return { nameErr: undefined, schemaErr: `Schema JSON too large (max ${MAX_JSON_CHARS} chars).` };
-		}
-
-		const parsed = safeJSONParse(schemaRaw);
+		const parsed = tryParseJSONObject(schemaRaw, 'Schema JSON', MAX_JSON_SCHEMA_INPUT_CHARS);
 		if (!parsed.ok) {
-			return { nameErr: undefined, schemaErr: `Invalid schema JSON: ${parsed.value}` };
-		}
-
-		if (!isPlainObject(parsed.value)) {
-			return { nameErr: undefined, schemaErr: 'Schema must be a JSON object.' };
+			return { nameErr: undefined, schemaErr: parsed.error };
 		}
 
 		return { nameErr: undefined, schemaErr: undefined };
@@ -426,17 +369,15 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 			if (!outputFormatItems.jsonSchema.isEnabled) {
 				nextFormat = undefined;
 			} else {
-				const parsedSchema = safeJSONParse(jsonSchemaText.trim());
+				const parsedSchema = tryParseJSONObject(jsonSchemaText.trim(), 'Schema JSON', MAX_JSON_SCHEMA_INPUT_CHARS);
 				if (parsedSchema.ok) {
-					const schemaObj = parsedSchema.value as Record<string, any>;
-
 					nextFormat = {
 						kind: OutputFormatKind.JSONSchema,
 						jsonSchemaParam: {
 							name: jsonSchemaName.trim(),
 							description: jsonSchemaDescription.trim() || undefined,
 							strict: jsonSchemaStrict,
-							schema: schemaObj,
+							schema: parsedSchema.value,
 						} as JSONSchemaParam,
 					};
 				}
@@ -478,16 +419,16 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 				return undefined;
 			}
 
-			const parsed = parseStopSequences(stopSequencesText);
-			return parsed ? parsed.slice(0, stopPolicy.maxSequences) : undefined;
+			const parsed = parseOptionalStopSequences(stopSequencesText);
+			return parsed?.slice(0, stopPolicy.maxSequences);
 		})();
 
 		const updatedModel: UIModelOption = {
 			...currentModel,
 			stream,
-			maxPromptLength: parsePositiveIntAllowBlank(maxPromptLength) ?? currentModel.maxPromptLength,
-			maxOutputLength: parsePositiveIntAllowBlank(maxOutputLength) ?? currentModel.maxOutputLength,
-			timeout: parsePositiveIntAllowBlank(timeoutSec) ?? currentModel.timeout,
+			maxPromptLength: parseOptionalPositiveInteger(maxPromptLength) ?? currentModel.maxPromptLength,
+			maxOutputLength: parseOptionalPositiveInteger(maxOutputLength) ?? currentModel.maxOutputLength,
+			timeout: parseOptionalPositiveInteger(timeoutSec) ?? currentModel.timeout,
 			cacheControl: nextCacheControl,
 			reasoning: mergedReasoning,
 			outputParam: mergedOutputParam,

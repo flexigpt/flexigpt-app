@@ -8,7 +8,21 @@ type JSONValue = JSONPrimitive | JSONObject | JSONValue[];
 
 export type JSONRawString = string;
 
+export const MAX_JSON_SCHEMA_INPUT_CHARS = 50_000;
+
 type JSONObjectParseResult = { ok: true; value: Record<string, unknown> } | { ok: false; error: string };
+
+export function formatJSON(value: unknown): string {
+	if (value === undefined || value === null) {
+		return '';
+	}
+
+	try {
+		return JSON.stringify(value, null, 2);
+	} catch {
+		return '';
+	}
+}
 
 export function isJSONObject(value: unknown): value is JSONObject {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -18,7 +32,18 @@ export function getJSONObject(value: unknown): JSONObject | undefined {
 	return isJSONObject(value) ? value : undefined;
 }
 
-export function tryParseJSONObject(raw: string, fieldLabel = 'JSON schema body'): JSONObjectParseResult {
+export function tryParseJSONObject(
+	raw: string,
+	fieldLabel = 'JSON schema body',
+	maxChars?: number
+): JSONObjectParseResult {
+	if (maxChars !== undefined && raw.length > maxChars) {
+		return {
+			ok: false,
+			error: `${fieldLabel} must be at most ${maxChars.toLocaleString()} characters.`,
+		};
+	}
+
 	try {
 		const value = JSON.parse(raw);
 		if (!isJSONObject(value)) {
@@ -28,6 +53,21 @@ export function tryParseJSONObject(raw: string, fieldLabel = 'JSON schema body')
 	} catch {
 		return { ok: false, error: `${fieldLabel} must be valid JSON.` };
 	}
+}
+
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
+export function parseOptionalJSONObject<T extends object>(raw: string, fieldLabel: string): T | undefined {
+	const trimmed = raw.trim();
+	if (!trimmed) {
+		return undefined;
+	}
+
+	const parsed = tryParseJSONObject(trimmed, fieldLabel);
+	if (!parsed.ok) {
+		throw new Error(parsed.error);
+	}
+
+	return parsed.value as unknown as T;
 }
 
 function isStringArray(value: unknown): value is string[] {

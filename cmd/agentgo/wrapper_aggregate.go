@@ -15,9 +15,11 @@ import (
 	"github.com/flexigpt/llmtools-go/texttool"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
+	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
@@ -46,6 +48,35 @@ type AggregrateWrapper struct {
 	completionCancelMux sync.Mutex
 	completionCancels   map[string]context.CancelFunc
 	preCanceled         map[string]time.Time
+}
+
+type CompletionRequestBody struct {
+	// Past turns of the conversation, already persisted.
+	History []conversationSpec.ConversationMessage `json:"history"`
+
+	// New user turn to complete. Must have Role=user. Typically will have:
+	//   - Attachments (ref attachments),
+	//   - either:
+	//       * pre-built InputUnion(s) in Inputs, or
+	//       * just Messages + Attachments and let the aggregator build
+	//         the InputUnion for this turn.
+	Current conversationSpec.ConversationMessage `json:"current"`
+
+	// After all Provider and Model source and overlay layers. A nil value means
+	// that this completion has no request-level runtime override.
+	RequestPatch *modelAggregate.RuntimeRequestPatch `json:"requestPatch,omitempty"`
+
+	// ToolSelections is the set of mapped Tool targets that should be enabled
+	// for this call.
+	//
+	// The aggregator always hydrates ToolChoices from Tool Aggregate based on
+	// this slice. It does not infer tools from History[i].ToolChoices or
+	// Current.ToolChoices.
+	// (Those are persisted for UI/analytics only.)
+	ToolSelections []toolAggregate.ToolSelection `json:"toolSelections,omitempty"`
+
+	MCPContext     *mcpConversation.MCPConversationContext `json:"mcpContext,omitempty"`
+	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
 }
 
 func InitAggregrateWrapper(
@@ -170,7 +201,7 @@ func (w *AggregrateWrapper) DeleteAuthKey(
 // FetchCompletion handles the completion request and streams data back to the frontend.
 func (w *AggregrateWrapper) FetchCompletion(
 	model artifact.ArtifactRef,
-	completionData *inferencewrapperSpec.CompletionRequestBody,
+	completionData *CompletionRequestBody,
 	textCallbackID string,
 	thinkingCallbackID string,
 	requestID string,
@@ -181,6 +212,9 @@ func (w *AggregrateWrapper) FetchCompletion(
 		}
 		if w.appContext == nil {
 			return nil, errors.New("appContext is not set (call SetWrappedProviderAppContext during startup)")
+		}
+		if completionData == nil {
+			return nil, errors.New("completionData is nil")
 		}
 
 		ctx, cancel := context.WithCancel(w.appContext)
@@ -211,10 +245,12 @@ func (w *AggregrateWrapper) FetchCompletion(
 			w.completionCancelMux.Unlock()
 		}()
 
-		runtimeModel, err := w.modelAggregate.ResolveRuntimeModelWithRequestPatch(
+		runtimeModel, err := w.modelAggregate.ResolveRuntimeConfiguration(
 			ctx,
-			model,
-			completionData.RequestPatch,
+			modelAggregate.RuntimeModelRequest{
+				Model:        model,
+				RequestPatch: completionData.RequestPatch,
+			},
 		)
 		if err != nil {
 			return nil, err
@@ -227,7 +263,11 @@ func (w *AggregrateWrapper) FetchCompletion(
 				Capabilities:             runtimeModel.Capabilities,
 				ConfigurationFingerprint: runtimeModel.Fingerprint,
 			},
-			Body: completionData,
+			History:        completionData.History,
+			Current:        completionData.Current,
+			ToolSelections: completionData.ToolSelections,
+			MCPContext:     completionData.MCPContext,
+			SkillSessionID: completionData.SkillSessionID,
 		}
 
 		if textCallbackID != "" {

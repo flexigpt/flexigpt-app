@@ -10,7 +10,9 @@ import {
 } from '@/components/action_trigger_chip';
 import { HoverTip } from '@/components/hover_tip';
 
-const defaultTokenOptions = [1024, 8192, 32000];
+import { DEFAULT_REASONING_TOKENS, parseOptionalPositiveInteger } from '@/models/lib/model_runtime_defaults';
+
+const defaultTokenOptions = [DEFAULT_REASONING_TOKENS, 8192, 32000];
 
 interface ReasoningTokensDropdownProps {
 	tokens: number;
@@ -23,14 +25,13 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 	const open = useStoreState(menu, 'open');
 
 	function clampTokens(rawValue: string) {
-		let val = Math.trunc(Number(rawValue));
-		if (Number.isNaN(val)) {
-			val = 1024;
-		}
-		if (val < 1024) {
-			val = 1024;
-		}
-		setTokens(val);
+		const parsed = parseOptionalPositiveInteger(rawValue);
+		const nextTokens =
+			parsed === undefined || Number.isNaN(parsed) || parsed < DEFAULT_REASONING_TOKENS
+				? DEFAULT_REASONING_TOKENS
+				: parsed;
+
+		setTokens(nextTokens);
 	}
 
 	return (
@@ -69,13 +70,13 @@ export function ReasoningTokensDropdown({ tokens, setTokens }: ReasoningTokensDr
 					))}
 
 					<div className="border-neutral/20 mt-2 border-t pt-2 text-xs">
-						<div className="text-base-content/70 mb-1 text-xs">Custom (≥ 1024)</div>
+						<div className="text-base-content/70 mb-1 text-xs">Custom (≥ {DEFAULT_REASONING_TOKENS})</div>
 						<input
 							key={tokens}
 							data-disable-chat-shortcuts="true"
 							type="text"
 							className="input input-xs w-full"
-							placeholder="Enter a custom integer ≥ 1024"
+							placeholder={`Enter a custom integer ≥ ${DEFAULT_REASONING_TOKENS}`}
 							defaultValue={tokens.toString()}
 							onBlur={e => {
 								clampTokens(e.currentTarget.value);

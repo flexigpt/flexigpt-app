@@ -12,7 +12,7 @@ const CACHE_CONTROL_TTL_LABELS: Record<CacheControlTTL, string> = {
 	[CacheControlTTL.TTLInMemory]: 'In-memory',
 };
 
-const CACHE_CONTROL_TTL_PROVIDER_DEFAULT = '__provider_default__' as const;
+export const CACHE_CONTROL_TTL_PROVIDER_DEFAULT = '__provider_default__' as const;
 
 export type CacheControlTTLSelection = CacheControlTTL | typeof CACHE_CONTROL_TTL_PROVIDER_DEFAULT;
 

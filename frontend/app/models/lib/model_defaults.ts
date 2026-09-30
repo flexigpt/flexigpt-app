@@ -133,6 +133,8 @@ export function buildModelParamFromDefaults(
 ): ModelParam {
 	const defaults = mergeDefaults(providerDefaults, modelDefaults);
 	const timeoutMS = typeof defaults.timeoutMS === 'number' ? defaults.timeoutMS : DefaultModelParams.timeout * 1000;
+	const reasoning = defaults.reasoning as ReasoningParam | undefined;
+	const configuredTemperature = typeof defaults.temperature === 'number' ? defaults.temperature : undefined;
 
 	return {
 		name: providerModelID,
@@ -141,8 +143,8 @@ export function buildModelParamFromDefaults(
 			typeof defaults.maxPromptTokens === 'number' ? defaults.maxPromptTokens : DefaultModelParams.maxPromptLength,
 		maxOutputLength:
 			typeof defaults.maxOutputTokens === 'number' ? defaults.maxOutputTokens : DefaultModelParams.maxOutputLength,
-		temperature: typeof defaults.temperature === 'number' ? defaults.temperature : DefaultModelParams.temperature,
-		reasoning: defaults.reasoning as ReasoningParam | undefined,
+		temperature: configuredTemperature ?? (reasoning === undefined ? DefaultModelParams.temperature : undefined),
+		reasoning,
 		systemPrompt: typeof defaults.systemPrompt === 'string' ? defaults.systemPrompt : DefaultModelParams.systemPrompt,
 		timeout: Math.ceil(timeoutMS / 1000),
 		cacheControl: defaults.cacheControl as CacheControl | undefined,
