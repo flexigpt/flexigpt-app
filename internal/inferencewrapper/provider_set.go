@@ -11,7 +11,6 @@ import (
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
 	"github.com/flexigpt/inference-go"
-	"github.com/flexigpt/inference-go/capabilityoverride"
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
@@ -233,10 +232,25 @@ func (ps *ProviderSetAPI) FetchCompletion(
 
 	ck := uuidutil.NewUUIDv7()
 	currentMessage := req.Current
-	capabilityResolver := capabilityoverride.NewCompletionKeyResolver(
+	runtimeProvider, release, err := ps.registerRuntimeProvider(
+		ctx,
+		*req.Runtime,
 		ck,
-		&req.Runtime.Capabilities,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
+	capabilityResolver, err := ps.newRuntimeCapabilityResolver(
+		ctx,
+		runtimeProvider,
+		*req.Runtime,
+		ck,
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// Flatten full conversation (history + current) into InputUnion list.
 	inputs, currentInputs, err := ps.buildInputs(ctx, req.History, currentMessage)
@@ -542,16 +556,6 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			FlushChunkSize:      defaultFlushChunkSize,
 		}
 	}
-
-	runtimeProvider, release, err := ps.registerRuntimeProvider(
-		ctx,
-		*req.Runtime,
-		ck,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
 
 	b, err := ps.inner.FetchCompletion(
 		ctx,

@@ -4,12 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { RestorableConversationContext } from '@/spec/conversation';
 import type { ModelParam, OutputVerbosity, ReasoningLevel } from '@/spec/inference';
-import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
+import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
 import { DefaultUIModelOption } from '@/spec/model';
 
-import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
+import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { isModelCatalogUnavailableError } from '@/apis/model_management';
 
 import {
@@ -337,15 +337,19 @@ export function useComposerContextState(): ComposerContextController {
 
 	const setReasoningLevel = useCallback(
 		(level: ReasoningLevel) => {
-			applySelectedModel(current => ({
-				...current,
-				reasoning: {
-					type: ReasoningType.SingleWithLevels,
-					level,
-					tokens: current.reasoning?.tokens ?? 1024,
-					summaryStyle: current.reasoning?.summaryStyle,
-				},
-			}));
+			applySelectedModel(current => {
+				if (current.reasoning?.type !== ReasoningType.SingleWithLevels) {
+					return current;
+				}
+
+				return {
+					...current,
+					reasoning: {
+						...current.reasoning,
+						level,
+					},
+				};
+			});
 		},
 		[applySelectedModel]
 	);
@@ -370,7 +374,7 @@ export function useComposerContextState(): ComposerContextController {
 	);
 
 	const setOutputVerbosity = useCallback(
-		(verbosity: OutputVerbosity) => {
+		(verbosity?: OutputVerbosity) => {
 			applySelectedModel(current => {
 				const outputParam = {
 					...current.outputParam,

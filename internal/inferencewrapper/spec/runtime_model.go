@@ -3,6 +3,7 @@ package spec
 import (
 	"fmt"
 
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -16,10 +17,10 @@ import (
 // ProviderParam.APIKey is intentionally non-serialized. It exists only in
 // process memory for the duration of a completion.
 type RuntimeModel struct {
-	ProviderParam            inferenceSpec.ProviderParam     `json:"-"`
-	ModelParam               inferenceSpec.ModelParam        `json:"-"`
-	Capabilities             inferenceSpec.ModelCapabilities `json:"-"`
-	ConfigurationFingerprint cryptoutil.Digest               `json:"-"`
+	ProviderParam            inferenceSpec.ProviderParam                     `json:"-"`
+	ModelParam               inferenceSpec.ModelParam                        `json:"-"`
+	CapabilityOverrides      []*capabilityoverride.ModelCapabilitiesOverride `json:"-"`
+	ConfigurationFingerprint cryptoutil.Digest                               `json:"-"`
 }
 
 func (v RuntimeModel) Validate() error {

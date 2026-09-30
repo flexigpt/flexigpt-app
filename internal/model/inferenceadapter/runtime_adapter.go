@@ -41,13 +41,12 @@ type AdapterDefinition struct {
 	ID      string
 	Version string
 
-	SDKType          inferenceSpec.ProviderSDKType
-	Origin           string
-	Path             string
-	APIKeyHeaderKey  string
-	DefaultHeaders   map[string]string
-	DefaultDefaults  map[string]any
-	BaseCapabilities inferenceSpec.ModelCapabilities
+	SDKType         inferenceSpec.ProviderSDKType
+	Origin          string
+	Path            string
+	APIKeyHeaderKey string
+	DefaultHeaders  map[string]string
+	DefaultDefaults map[string]any
 }
 
 func (d AdapterDefinition) Validate() error {
@@ -139,21 +138,6 @@ func NewRuntimeAdapter(
 }
 
 func DefaultAdapterDefinitions() []AdapterDefinition {
-	defaults := map[string]any{
-		"stream":       true,
-		"temperature":  1.0,
-		"timeoutMS":    300000,
-		"systemPrompt": "",
-	}
-	baseCapabilities := inferenceSpec.ModelCapabilities{
-		ModalitiesIn: []inferenceSpec.Modality{
-			inferenceSpec.ModalityTextIn,
-		},
-		ModalitiesOut: []inferenceSpec.Modality{
-			inferenceSpec.ModalityTextOut,
-		},
-	}
-
 	return []AdapterDefinition{
 		{
 			ID:              "anthropic.messages",
@@ -167,8 +151,6 @@ func DefaultAdapterDefinitions() []AdapterDefinition {
 				inferenceSpec.DefaultAcceptHeaderKey:           inferenceSpec.DefaultContentTypeHeader,
 				inferenceSpec.DefaultAnthropicVersionHeaderKey: inferenceSpec.DefaultAnthropicVersionHeader,
 			},
-			DefaultDefaults:  maps.Clone(defaults),
-			BaseCapabilities: capabilityoverride.CloneModelCapabilities(baseCapabilities),
 		},
 		{
 			ID:              "openai.chatCompletions",
@@ -180,8 +162,6 @@ func DefaultAdapterDefinitions() []AdapterDefinition {
 			DefaultHeaders: map[string]string{
 				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
 			},
-			DefaultDefaults:  maps.Clone(defaults),
-			BaseCapabilities: capabilityoverride.CloneModelCapabilities(baseCapabilities),
 		},
 		{
 			ID:              "openai.responses",
@@ -193,8 +173,6 @@ func DefaultAdapterDefinitions() []AdapterDefinition {
 			DefaultHeaders: map[string]string{
 				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
 			},
-			DefaultDefaults:  maps.Clone(defaults),
-			BaseCapabilities: capabilityoverride.CloneModelCapabilities(baseCapabilities),
 		},
 		{
 			ID:              "google.generateContent",
@@ -206,8 +184,6 @@ func DefaultAdapterDefinitions() []AdapterDefinition {
 			DefaultHeaders: map[string]string{
 				inferenceSpec.DefaultContentTypeHeaderKey: inferenceSpec.DefaultContentTypeHeader,
 			},
-			DefaultDefaults:  maps.Clone(defaults),
-			BaseCapabilities: capabilityoverride.CloneModelCapabilities(baseCapabilities),
 		},
 	}
 }
@@ -384,8 +360,7 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		return RuntimeConfiguration{}, err
 	}
 
-	capabilities, err := deriveCapabilities(
-		definition.BaseCapabilities,
+	capabilityOverrides, err := collectCapabilityOverrides(
 		resolved.Provider.Document.Capabilities,
 		resolved.ProviderOverlay.Capabilities,
 		resolved.Model.Document.Capabilities,
@@ -420,9 +395,9 @@ func (a *RuntimeAdapter) ResolveRuntime(
 			APIKeyHeaderKey:          authentication.HeaderName,
 			DefaultHeaders:           connection.Headers,
 		},
-		ModelParam:   modelParam,
-		Capabilities: capabilities,
-		Fingerprint:  fingerprint,
+		ModelParam:          modelParam,
+		CapabilityOverrides: capabilityOverrides,
+		Fingerprint:         fingerprint,
 	}, nil
 }
 
@@ -735,10 +710,9 @@ func timeoutSeconds(milliseconds int) int {
 	return (milliseconds + 999) / 1000
 }
 
-func deriveCapabilities(
-	base inferenceSpec.ModelCapabilities,
+func collectCapabilityOverrides(
 	raws ...json.RawMessage,
-) (inferenceSpec.ModelCapabilities, error) {
+) ([]*capabilityoverride.ModelCapabilitiesOverride, error) {
 	overrides := make(
 		[]*capabilityoverride.ModelCapabilitiesOverride,
 		0,
@@ -753,18 +727,18 @@ func deriveCapabilities(
 			basespec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
-			return inferenceSpec.ModelCapabilities{}, err
+			return nil, err
 		}
 		var value capabilityoverride.ModelCapabilitiesOverride
 		if err := json.Unmarshal(canonical, &value); err != nil {
-			return inferenceSpec.ModelCapabilities{}, err
+			return nil, err
 		}
 		if err := capabilityoverride.ValidateModelCapabilitiesOverride(
 			&value,
 		); err != nil {
-			return inferenceSpec.ModelCapabilities{}, err
+			return nil, err
 		}
 		overrides = append(overrides, &value)
 	}
-	return capabilityoverride.DeriveModelCapabilities(base, overrides...), nil
+	return overrides, nil
 }

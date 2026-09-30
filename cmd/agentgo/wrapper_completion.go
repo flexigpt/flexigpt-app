@@ -247,7 +247,7 @@ func (w *CompletionWrapper) FetchCompletion(
 			Runtime: &inferencewrapperSpec.RuntimeModel{
 				ProviderParam:            runtimeModel.ProviderParam,
 				ModelParam:               runtimeModel.ModelParam,
-				Capabilities:             runtimeModel.Capabilities,
+				CapabilityOverrides:      runtimeModel.CapabilityOverrides,
 				ConfigurationFingerprint: runtimeModel.Fingerprint,
 			},
 			History:        completionData.History,

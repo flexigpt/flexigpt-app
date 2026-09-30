@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 
+	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
@@ -21,10 +22,10 @@ const runtimeRequestPatchDigestDomain = "flexigpt.model.runtime-request-patch/v1
 // RuntimeConfiguration is the fully resolved inference runtime configuration
 // for one source-backed Model.
 type RuntimeConfiguration struct {
-	ProviderParam inferenceSpec.ProviderParam
-	ModelParam    inferenceSpec.ModelParam
-	Capabilities  inferenceSpec.ModelCapabilities
-	Fingerprint   cryptoutil.Digest
+	ProviderParam       inferenceSpec.ProviderParam
+	ModelParam          inferenceSpec.ModelParam
+	CapabilityOverrides []*capabilityoverride.ModelCapabilitiesOverride
+	Fingerprint         cryptoutil.Digest
 }
 
 // RuntimeResolver is the runtime boundary owned by Model Aggregate.
@@ -188,10 +189,12 @@ func (p *RuntimeRequestPatch) Prepare() (
 				err,
 			)
 		}
-		canonicalDefaults = append([]byte(nil), canonical...)
+		if len(defaults) > 0 {
+			canonicalDefaults = append([]byte(nil), canonical...)
+		}
 	}
 
-	if p.Defaults == nil && len(c) == 0 {
+	if len(defaults) == 0 && len(c) == 0 {
 		return PreparedRuntimeRequestPatch{}, nil
 	}
 
