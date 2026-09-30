@@ -5,8 +5,6 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
-var DefaultBuiltInProvider = modelpreset.ProviderOpenAIResponses
-
 const (
 	ProviderNameAnthropic       = string(modelpreset.ProviderAnthropic)
 	ProviderNameDeepSeek        = string(modelpreset.ProviderDeepSeek)

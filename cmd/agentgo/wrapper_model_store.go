@@ -39,7 +39,6 @@ const (
 type ModelStoreWrapper struct {
 	api         *modelConsumerAPI.API
 	management  *modelConsumerAPI.CatalogStore
-	settings    *modelSettingsAdapter
 	credentials *modelCredentialResolver
 	roots       compositionapi.RootAPI
 	protection  compositionapi.ProtectionAPI
@@ -230,6 +229,43 @@ func (s *modelSettingsAdapter) DeleteModelRuntimePrefix(
 	}
 	result = errors.Join(result, s.writeIndexLocked(ctx, index))
 	return result
+}
+
+const defaultProviderSettingsKey = "model.runtime.v1/default-provider"
+
+type storedDefaultProvider struct {
+	Provider *artifact.ArtifactRef `json:"provider,omitempty"`
+}
+
+func (s *modelSettingsAdapter) GetDefaultProvider(
+	ctx context.Context,
+) (*artifact.ArtifactRef, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	raw, found, err := s.readLocked(ctx, defaultProviderSettingsKey)
+	if err != nil || !found {
+		return nil, err
+	}
+	var value storedDefaultProvider
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, err
+	}
+	return value.Provider, nil
+}
+
+func (s *modelSettingsAdapter) SetDefaultProvider(
+	ctx context.Context,
+	provider *artifact.ArtifactRef,
+) error {
+	raw, err := json.Marshal(storedDefaultProvider{Provider: provider})
+	if err != nil {
+		return err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.writeLocked(ctx, defaultProviderSettingsKey, raw)
 }
 
 func (s *modelSettingsAdapter) readLocked(
@@ -620,6 +656,7 @@ func InitModelWrappers(
 	aggregateService, err := modelAggregate.New(
 		management,
 		runtimeAdapter,
+		settings,
 	)
 	if err != nil {
 		return nil, err
@@ -641,7 +678,6 @@ func InitModelWrappers(
 
 	storeWrapper.api = api
 	storeWrapper.management = catalog
-	storeWrapper.settings = settings
 	storeWrapper.credentials = credentials
 	storeWrapper.roots = roots
 	storeWrapper.protection = protection
@@ -871,113 +907,6 @@ func (w *ModelStoreWrapper) SetModelProviderCredential(
 	)
 }
 
-type ModelSelectionView struct {
-	Revision     uint64                `json:"revision"`
-	DefaultModel *artifact.ArtifactRef `json:"defaultModel,omitempty"`
-}
-
-type ModelSelectionUpdateRequest struct {
-	ExpectedRevision uint64                `json:"expectedRevision"`
-	DefaultModel     *artifact.ArtifactRef `json:"defaultModel,omitempty"`
-}
-
-type storedModelSelection struct {
-	SchemaVersion string                `json:"schemaVersion"`
-	Revision      uint64                `json:"revision"`
-	DefaultModel  *artifact.ArtifactRef `json:"defaultModel,omitempty"`
-}
-
-const (
-	modelSelectionSettingsKey   = "model.runtime.v1/selection"
-	modelSelectionSchemaVersion = "v1"
-)
-
-func (w *ModelStoreWrapper) GetModelSelection() (ModelSelectionView, error) {
-	if w == nil || w.settings == nil {
-		return ModelSelectionView{}, basespec.ErrClosed
-	}
-
-	raw, found, err := w.settings.GetModelRuntimeValue(
-		context.Background(),
-		modelSelectionSettingsKey,
-	)
-	if err != nil {
-		return ModelSelectionView{}, err
-	}
-	if !found {
-		return ModelSelectionView{}, nil
-	}
-
-	var stored storedModelSelection
-	if err := jsonutil.DecodeCanonicalObjectExactInto(
-		raw,
-		&stored,
-		basespec.MaxLocalDataBytes,
-	); err != nil {
-		return ModelSelectionView{}, err
-	}
-	if stored.SchemaVersion != modelSelectionSchemaVersion || stored.Revision == 0 {
-		return ModelSelectionView{}, fmt.Errorf(
-			"%w: invalid Model selection settings",
-			basespec.ErrInvalid,
-		)
-	}
-	if stored.DefaultModel != nil {
-		if err := stored.DefaultModel.Validate(); err != nil {
-			return ModelSelectionView{}, err
-		}
-	}
-
-	return ModelSelectionView{
-		Revision:     stored.Revision,
-		DefaultModel: stored.DefaultModel,
-	}, nil
-}
-
-func (w *ModelStoreWrapper) UpdateModelSelection(
-	request ModelSelectionUpdateRequest,
-) (ModelSelectionView, error) {
-	if w == nil || w.api == nil || w.settings == nil {
-		return ModelSelectionView{}, basespec.ErrClosed
-	}
-
-	current, err := w.GetModelSelection()
-	if err != nil {
-		return ModelSelectionView{}, err
-	}
-	if request.ExpectedRevision != current.Revision {
-		return ModelSelectionView{}, basespec.ErrConflict
-	}
-	if request.DefaultModel != nil {
-		if _, err := w.api.GetModel(context.Background(), *request.DefaultModel); err != nil {
-			return ModelSelectionView{}, err
-		}
-	}
-
-	next := storedModelSelection{
-		SchemaVersion: modelSelectionSchemaVersion,
-		Revision:      current.Revision + 1,
-		DefaultModel:  request.DefaultModel,
-	}
-	raw, err := jsonutil.MarshalCanonicalObject(next, basespec.MaxLocalDataBytes)
-	if err != nil {
-		return ModelSelectionView{}, err
-	}
-	if err := w.settings.PutModelRuntimeValue(
-		context.Background(),
-		modelSelectionSettingsKey,
-		current.Revision,
-		raw,
-	); err != nil {
-		return ModelSelectionView{}, err
-	}
-
-	return ModelSelectionView{
-		Revision:     next.Revision,
-		DefaultModel: next.DefaultModel,
-	}, nil
-}
-
 func (w *ModelStoreWrapper) managementRootIDs(
 	ctx context.Context,
 	requested root.RootID,
@@ -1033,7 +962,6 @@ func (w *ModelStoreWrapper) close() {
 	}
 	w.api = nil
 	w.management = nil
-	w.settings = nil
 	w.credentials = nil
 	w.roots = nil
 	w.protection = nil

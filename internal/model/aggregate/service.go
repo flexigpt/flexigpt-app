@@ -12,23 +12,26 @@ import (
 )
 
 type Service struct {
-	store   *modelConsumerAPI.ManagementStoreFacade
-	runtime RuntimeResolver
+	store       *modelConsumerAPI.ManagementStoreFacade
+	runtime     RuntimeResolver
+	preferences DefaultProviderPreferences
 }
 
 func New(
 	store *modelConsumerAPI.ManagementStoreFacade,
 	runtimeResolver RuntimeResolver,
+	preferences DefaultProviderPreferences,
 ) (*Service, error) {
-	if store == nil || runtimeResolver == nil {
+	if store == nil || runtimeResolver == nil || preferences == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Aggregate dependencies are incomplete",
 			basespec.ErrInvalid,
 		)
 	}
 	return &Service{
-		store:   store,
-		runtime: runtimeResolver,
+		store:       store,
+		runtime:     runtimeResolver,
+		preferences: preferences,
 	}, nil
 }
 
@@ -155,7 +158,7 @@ func (s *Service) ResolveMappedRuntimeModel(
 }
 
 func (s *Service) ready(ctx context.Context) error {
-	if s == nil || s.store == nil || s.runtime == nil {
+	if s == nil || s.store == nil || s.runtime == nil || s.preferences == nil {
 		return basespec.ErrClosed
 	}
 	if ctx == nil {
