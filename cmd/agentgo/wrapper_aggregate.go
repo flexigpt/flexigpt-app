@@ -12,13 +12,11 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
-	"github.com/flexigpt/llmtools-go/texttool"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
-	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
@@ -140,17 +138,6 @@ func InitAggregrateWrapper(
 
 func SetWrappedProviderAppContext(w *AggregrateWrapper, ctx context.Context) {
 	w.appContext = ctx
-}
-
-func (w *AggregrateWrapper) ApplyUnifiedDiff(
-	req *texttool.ApplyUnifiedDiffArgs,
-) (*texttool.ApplyUnifiedDiffOut, error) {
-	return withRecoveryResp(func() (*texttool.ApplyUnifiedDiffOut, error) {
-		if req == nil {
-			return nil, errors.New("invalid arguments: nil request received")
-		}
-		return llmtoolsutil.ApplyUnifiedDiff(context.Background(), *req)
-	})
 }
 
 func (w *AggregrateWrapper) SetAuthKey(

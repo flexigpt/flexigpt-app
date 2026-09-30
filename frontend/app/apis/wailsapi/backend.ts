@@ -2,8 +2,10 @@
 import { sprintf } from 'sprintf-js';
 
 import type { Attachment, DirectoryAttachmentsResult, FileFilter, PathAttachmentsResult } from '@/spec/attachment';
+import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_diff';
 
 import type { IBackendAPI, ILogger } from '@/apis/interface';
+import type { texttool as texttoolSpec } from '@/apis/wailsjs/go/models';
 import {
 	requireNonBlankString,
 	requireWailsBody,
@@ -12,6 +14,7 @@ import {
 	wailsArrayOrEmpty,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
+import { ApplyUnifiedDiff } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import {
 	GetAppVersion,
 	GetPathsAsAttachments,
@@ -238,5 +241,10 @@ export class WailsBackendAPI implements IBackendAPI {
 	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
 		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
 		return requireWailsBody(pathResults as PathAttachmentsResult | null | undefined, 'GetPathsAsAttachments');
+	}
+
+	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {
+		const resp = await ApplyUnifiedDiff(args as texttoolSpec.ApplyUnifiedDiffArgs);
+		return requireWailsBody(resp as ApplyUnifiedDiffOut | null | undefined, 'ApplyUnifiedDiff');
 	}
 }

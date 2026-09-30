@@ -11,10 +11,22 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 
 	"github.com/flexigpt/llmtools-go/fstool"
+	"github.com/flexigpt/llmtools-go/texttool"
 
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
+
+func (a *App) ApplyUnifiedDiff(
+	req *texttool.ApplyUnifiedDiffArgs,
+) (*texttool.ApplyUnifiedDiffOut, error) {
+	return withRecoveryResp(func() (*texttool.ApplyUnifiedDiffOut, error) {
+		if req == nil {
+			return nil, errors.New("invalid arguments: nil request received")
+		}
+		return llmtoolsutil.ApplyUnifiedDiff(context.Background(), *req)
+	})
+}
 
 func (a *App) OpenURLAsAttachment(
 	rawURL string,

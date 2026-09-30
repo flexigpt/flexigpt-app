@@ -161,6 +161,8 @@ export interface IBackendAPI {
 	openMultipleFilesAsAttachments(allowMultiple: boolean, additionalFilters?: Array<FileFilter>): Promise<Attachment[]>;
 	openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult>;
 	getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult>;
+
+	applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut>;
 }
 
 export interface ISettingStoreAPI {
@@ -496,7 +498,6 @@ export interface IAttachmentsDropAPI {
 }
 
 export interface IAggregateAPI {
-	applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut>;
 	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
 	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
 }

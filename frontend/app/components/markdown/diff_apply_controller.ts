@@ -4,7 +4,7 @@ import type { ApplyUnifiedDiffDiagnostic } from '@/spec/unified_diff';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
-import { aggregateAPI } from '@/apis/baseapi';
+import { backendAPI } from '@/apis/baseapi';
 
 import type {
 	DiffApplyOutcome,
@@ -471,7 +471,7 @@ export function useDiffApplyController(
 						]
 					: undefined;
 
-				const output = await aggregateAPI.applyUnifiedDiff({
+				const output = await backendAPI.applyUnifiedDiff({
 					diffText,
 					dryRun: phase === 'dry-run',
 					strict: requestStrict,
