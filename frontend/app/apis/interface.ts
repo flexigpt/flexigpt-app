@@ -204,6 +204,19 @@ export interface IModelStoreAPI {
 	): Promise<ModelProviderRuntimeOverlayView>;
 }
 
+export interface IModelAggregateAPI {
+	/**
+	 * Returns the persisted Provider preference when it is available, otherwise
+	 * the backend's built-in or first-available Provider fallback.
+	 */
+	getDefaultModelProvider(): Promise<ArtifactRef | undefined>;
+
+	/** Provider undefined clears the explicit preference. */
+	setDefaultModelProvider(provider?: ArtifactRef): Promise<void>;
+
+	getModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef>;
+}
+
 export interface ICompletionAPI {
 	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
 	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;

@@ -146,9 +146,13 @@ export const ComposerBox = memo(
 		const handleSubmit = useCallback(
 			(payload: EditorSubmitPayload) => {
 				setAbortConfirmationRequested(false);
+				if (!composerContext.hasRunnableModel) {
+					return Promise.resolve();
+				}
+
 				return onSend(payload, composerContext.chatOptions);
 			},
-			[composerContext.chatOptions, onSend]
+			[composerContext.chatOptions, composerContext.hasRunnableModel, onSend]
 		);
 
 		useImperativeHandle(
@@ -240,7 +244,7 @@ export const ComposerBox = memo(
 				<EditorArea
 					ref={editorAreaRef}
 					isGenerating={isBusy}
-					isInputLocked={isBusy || isHydrating}
+					isInputLocked={isBusy || isHydrating || !composerContext.hasRunnableModel}
 					currentProviderSDKType={composerContext.chatOptions.providerSDKType}
 					shortcutConfig={shortcutConfig}
 					onSubmit={handleSubmit}

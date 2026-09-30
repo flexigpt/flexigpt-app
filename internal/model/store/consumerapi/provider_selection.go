@@ -3,6 +3,7 @@ package consumerapi
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
@@ -71,6 +72,56 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 		return nil, err
 	}
 	return firstAvailableProviderRef(entries), nil
+}
+
+// RequireSettableDefaultProvider verifies the current state required for an
+// explicit user default-provider selection. It intentionally does not resolve
+// a Model or decrypt a credential secret.
+//
+// A later Provider disablement or credential removal does not alter the saved
+// preference. Default-provider reads retain their normal fallback behavior.
+func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) error {
+	if s == nil || s.api == nil {
+		return basespec.ErrClosed
+	}
+	if err := s.api.ready(ctx); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+
+	record, err := s.api.requireKind(
+		ctx,
+		ref,
+		modelDomain.ModelProviderArtifactKind,
+	)
+	if err != nil {
+		return err
+	}
+	if record.State != artifact.StateAvailable || !record.Enabled {
+		return fmt.Errorf(
+			"%w: Model Provider %q must be enabled before it can be selected as default",
+			basespec.ErrReferenceUnresolved,
+			record.LogicalName,
+		)
+	}
+
+	overlay, found, err := s.api.overlays.GetProviderOverlay(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if !found || overlay.CredentialRef == "" {
+		return fmt.Errorf(
+			"%w: Model Provider %q has no configured API key",
+			basespec.ErrReferenceUnresolved,
+			record.LogicalName,
+		)
+	}
+	return nil
 }
 
 func firstAvailableProviderRef(

@@ -3,27 +3,29 @@ import { FiArrowRight, FiBookOpen, FiHome } from 'react-icons/fi';
 
 import { Link } from 'react-router';
 
-import type { ModelProviderListItem } from '@/spec/model';
-
 import { useTitleBarContent } from '@/hooks/use_title_bar';
 
 import type { AgentCatalogOption } from '@/apis/agent_management';
+import type { ModelManagementSnapshot } from '@/apis/model_management';
 import { agentManagementAPI, modelManagementAPI } from '@/apis/baseapi';
+import { isModelProviderRunnable, isModelRunnable } from '@/apis/model_management';
 
 import { PageFrame } from '@/components/page_frame';
 
+import type { ProviderSetupState } from '@/home/provider_setup_status_card';
 import { DocsCard } from '@/home/docs_card';
 import { docsStarters } from '@/home/docs_starter';
-import {
-	formatConfiguredProviderSummary,
-	getConfiguredProviderNames,
-	pickDefaultProviderName,
-} from '@/home/home_utils';
 import { PrimaryActionCard } from '@/home/nav_card';
-import { HomeAuthKeyModalIntro, ProviderSetupStatus } from '@/home/provider_setup_status_card';
+import { ProviderSetupStatus } from '@/home/provider_setup_status_card';
 import { workflowStarters } from '@/home/workflow_starter';
 import { WorkflowStarterCard } from '@/home/workflow_starter_card';
-import { AddEditAuthKeyModal } from '@/settings/authkey_add_edit_modal';
+
+function artifactRefsEqual(
+	left: { rootID: string; artifactID: string } | undefined,
+	right: { rootID: string; artifactID: string } | undefined
+): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
+}
 
 // oxlint-disable-next-line no-restricted-exports
 export default function HomePage() {
@@ -38,26 +40,30 @@ export default function HomePage() {
 		[]
 	);
 
-	const [providerItems, setProviderItems] = useState<ModelProviderListItem[]>([]);
+	const [modelSnapshot, setModelSnapshot] = useState<ModelManagementSnapshot | null>(null);
 	const [providersLoaded, setProvidersLoaded] = useState(false);
-	const [providersReloadRequestId, setProvidersReloadRequestId] = useState(0);
-	const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+	const [providersLoadFailed, setProvidersLoadFailed] = useState(false);
 	const [agentOptions, setAgentOptions] = useState<AgentCatalogOption[]>([]);
 	const [agentsLoading, setAgentsLoading] = useState(true);
 
 	useEffect(() => {
 		let cancelled = false;
-		// oxlint-disable-next-line react/set-state-in-effect
+		// oxlint-disable-next-line react/set-state-in-effect react-you-might-not-need-an-effect/no-initialize-state
 		setProvidersLoaded(false);
+		// oxlint-disable-next-line react-you-might-not-need-an-effect/no-initialize-state
+		setProvidersLoadFailed(false);
 
 		void (async () => {
 			try {
-				const items = await modelManagementAPI.listProviders();
+				const snapshot = await modelManagementAPI.loadSnapshot();
 				if (!cancelled) {
-					setProviderItems(items);
+					setModelSnapshot(snapshot);
 				}
 			} catch (err) {
 				console.error('Failed to load model providers for home setup', err);
+				if (!cancelled) {
+					setProvidersLoadFailed(true);
+				}
 			} finally {
 				if (!cancelled) {
 					setProvidersLoaded(true);
@@ -68,7 +74,7 @@ export default function HomePage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [providersReloadRequestId]);
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -94,13 +100,50 @@ export default function HomePage() {
 		};
 	}, []);
 
-	const configuredProviderNames = useMemo(() => getConfiguredProviderNames(providerItems), [providerItems]);
-	const hasUsableProviderKey = configuredProviderNames.length > 0;
-	const providerSummary = useMemo(
-		() => formatConfiguredProviderSummary(configuredProviderNames, providerItems),
-		[configuredProviderNames, providerItems]
-	);
-	const defaultProviderName = useMemo(() => pickDefaultProviderName(providerItems), [providerItems]);
+	const providerSetup = useMemo(() => {
+		if (!providersLoaded) {
+			return {
+				state: 'error' as ProviderSetupState,
+				providerSummary: '',
+			};
+		}
+
+		if (providersLoadFailed || !modelSnapshot) {
+			return {
+				state: 'error' as ProviderSetupState,
+				providerSummary: '',
+			};
+		}
+
+		const runnableProviders = modelSnapshot.providers.filter(isModelProviderRunnable);
+		if (runnableProviders.length === 0) {
+			return {
+				state:
+					modelSnapshot.providers.length === 0
+						? ('needs-provider' as ProviderSetupState)
+						: ('needs-credentials' as ProviderSetupState),
+				providerSummary: '',
+			};
+		}
+
+		const runnableModels = modelSnapshot.models.filter(isModelRunnable);
+		if (runnableModels.length === 0) {
+			return {
+				state: 'needs-model' as ProviderSetupState,
+				providerSummary: '',
+			};
+		}
+
+		const preferredModel = modelSnapshot.defaultProvider
+			? runnableModels.find(model => artifactRefsEqual(model.provider?.list.ref, modelSnapshot.defaultProvider))
+			: undefined;
+		const selectedProvider = preferredModel?.provider ?? runnableModels[0]?.provider;
+
+		return {
+			state: 'ready' as ProviderSetupState,
+			providerSummary: selectedProvider?.list.displayName || 'Provider',
+		};
+	}, [modelSnapshot, providersLoadFailed, providersLoaded]);
 
 	const resolvedWorkflowStarters = useMemo(
 		() =>
@@ -125,11 +168,8 @@ export default function HomePage() {
 						/>
 						<ProviderSetupStatus
 							providersLoaded={providersLoaded}
-							hasUsableProviderKey={hasUsableProviderKey}
-							providerSummary={providerSummary}
-							onAddKey={() => {
-								setApiKeyModalOpen(true);
-							}}
+							state={providerSetup.state}
+							providerSummary={providerSetup.providerSummary}
 						/>
 					</div>
 
@@ -180,27 +220,6 @@ export default function HomePage() {
 					</section>
 				</div>
 			</div>
-
-			<AddEditAuthKeyModal
-				isOpen={apiKeyModalOpen}
-				initial={null}
-				existing={[]}
-				providerOnly={true}
-				defaultKeyName={defaultProviderName}
-				intro={
-					<HomeAuthKeyModalIntro
-						onNavigateAway={() => {
-							setApiKeyModalOpen(false);
-						}}
-					/>
-				}
-				onClose={() => {
-					setApiKeyModalOpen(false);
-				}}
-				onChanged={() => {
-					setProvidersReloadRequestId(requestId => requestId + 1);
-				}}
-			/>
 		</PageFrame>
 	);
 }

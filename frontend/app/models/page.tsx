@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FiPlus, FiRefreshCw } from 'react-icons/fi';
 
+import type { ArtifactRef } from '@/spec/artifact';
 import { ArtifactState } from '@/spec/artifact';
 import { ModelLookupScope } from '@/spec/model';
+
+import { getErrorMessage } from '@/lib/error_utils';
+
+import { usePendingActions } from '@/hooks/use_pending_actions';
 
 import type {
 	ModelManagementItem,
@@ -20,6 +25,7 @@ import { PageFrame } from '@/components/page_frame';
 
 import type { ModelEditorSubmission } from '@/models/model_add_edit_modal';
 import type { ProviderEditorSubmission } from '@/models/model_provider_add_edit_modal';
+import { DefaultProviderControl } from '@/models/default_provider_control';
 import { ModelModalMode, ModelProviderModalMode, ProviderCredentialAction } from '@/models/lib/management_types';
 import { ModelAddEditModal } from '@/models/model_add_edit_modal';
 import { ModelProviderAddEditModal } from '@/models/model_provider_add_edit_modal';
@@ -46,6 +52,10 @@ type DeleteTarget =
 
 function providerKey(provider: ModelProviderManagementItem): string {
 	return `${provider.list.ref.rootID}\u0000${provider.list.ref.artifactID}`;
+}
+
+function artifactRefsEqual(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
+	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
 }
 
 function isProviderDefault(provider: ModelProviderManagementItem, model: ModelManagementItem): boolean {
@@ -75,6 +85,7 @@ export default function ModelsPage() {
 	const [deniedMessage, setDeniedMessage] = useState('');
 	const [showDenied, setShowDenied] = useState(false);
 
+	const { isPending: isDefaultProviderPending, runAction: runDefaultProviderAction } = usePendingActions();
 	const showDeniedMessage = useCallback((message: string) => {
 		setDeniedMessage(message);
 		setShowDenied(true);
@@ -284,6 +295,11 @@ export default function ModelsPage() {
 
 		try {
 			if (deleteTarget.kind === 'provider') {
+				if (artifactRefsEqual(snapshot?.defaultProvider, deleteTarget.provider.list.ref)) {
+					showDeniedMessage('Choose another default provider before deleting this provider.');
+					return;
+				}
+
 				const linkedModels = modelsByProvider.get(providerKey(deleteTarget.provider)) ?? [];
 				if (linkedModels.length > 0) {
 					showDeniedMessage('Remove all linked models before deleting this provider.');
@@ -351,12 +367,28 @@ export default function ModelsPage() {
 				<ManagementPageContent>
 					{error ? <div className="alert alert-error mb-4 rounded-xl">{error}</div> : null}
 
+					{snapshot ? (
+						<DefaultProviderControl
+							providers={snapshot.providers}
+							defaultProvider={snapshot.defaultProvider}
+							pending={isDefaultProviderPending('set-default-provider')}
+							onChange={provider => {
+								void runDefaultProviderAction('set-default-provider', () =>
+									run(() => modelManagementAPI.setDefaultModelProvider(provider.list.ref))
+								).catch((actionError: unknown) => {
+									showDeniedMessage(getErrorMessage(actionError, 'Failed changing default provider.'));
+								});
+							}}
+						/>
+					) : null}
+
 					<div className="space-y-4">
 						{snapshot?.providers.map(provider => (
 							<ModelProviderCard
 								key={providerKey(provider)}
 								provider={provider}
 								models={modelsByProvider.get(providerKey(provider)) ?? []}
+								isGlobalDefault={artifactRefsEqual(snapshot.defaultProvider, provider.list.ref)}
 								onViewProvider={p => {
 									setProviderDialog({
 										mode: ModelProviderModalMode.View,
@@ -369,10 +401,19 @@ export default function ModelsPage() {
 										provider: p,
 									});
 								}}
-								onToggleProvider={p =>
-									run(() => modelManagementAPI.setProviderEnabled(p.list.ref, p.list.revision, !p.list.enabled))
-								}
+								onToggleProvider={async p => {
+									if (artifactRefsEqual(snapshot?.defaultProvider, p.list.ref) && p.list.enabled) {
+										throw new Error('Choose another default provider before disabling this provider.');
+									}
+
+									await run(() => modelManagementAPI.setProviderEnabled(p.list.ref, p.list.revision, !p.list.enabled));
+								}}
 								onDeleteProvider={p => {
+									if (artifactRefsEqual(snapshot?.defaultProvider, p.list.ref)) {
+										showDeniedMessage('Choose another default provider before deleting this provider.');
+										return;
+									}
+
 									const linkedModels = modelsByProvider.get(providerKey(p)) ?? [];
 									if (linkedModels.length > 0) {
 										showDeniedMessage('Remove all linked models before deleting this provider.');

@@ -40,8 +40,9 @@ func (s *Service) GetDefaultModelProvider(
 	)
 }
 
-// SetDefaultModelProvider stores a loose preference. Nil clears it.
-// Fallbacks are never written back over the user's preference.
+// SetDefaultModelProvider stores a loose preference. An explicit non-nil
+// selection must currently be enabled and have a configured API key. Nil
+// clears the preference. Fallbacks are never written back over it.
 func (s *Service) SetDefaultModelProvider(
 	ctx context.Context,
 	provider *artifact.ArtifactRef,
@@ -50,7 +51,10 @@ func (s *Service) SetDefaultModelProvider(
 		return err
 	}
 	if provider != nil {
-		if err := provider.Validate(); err != nil {
+		if err := s.store.RequireSettableDefaultProvider(
+			ctx,
+			*provider,
+		); err != nil {
 			return err
 		}
 	}

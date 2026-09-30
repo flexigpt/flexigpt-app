@@ -1,3 +1,4 @@
+// oxlint-disable max-classes-per-file
 import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	ManagedModelCreateRequest,
@@ -19,7 +20,7 @@ import { ModelLookupScope } from '@/spec/model';
 import { mapWithConcurrency } from '@/lib/async_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
-import type { IModelStoreAPI } from '@/apis/interface';
+import type { IModelAggregateAPI, IModelStoreAPI } from '@/apis/interface';
 
 import { mergeModelCapabilities, sanitizeUIModelOptionByCapabilities } from '@/models/lib/capabilities';
 import { modelRefEqual } from '@/models/lib/document';
@@ -39,6 +40,7 @@ export interface ModelManagementItem {
 export interface ModelManagementSnapshot {
 	providers: ModelProviderManagementItem[];
 	models: ModelManagementItem[];
+	defaultProvider?: ArtifactRef;
 }
 
 export interface ModelCatalog {
@@ -46,8 +48,38 @@ export interface ModelCatalog {
 	defaultOption: UIModelOption;
 }
 
+export type ModelCatalogUnavailableReason = 'no-runnable-provider' | 'no-runnable-model';
+
+export class ModelCatalogUnavailableError extends Error {
+	// oxlint-disable-next-line typescript/parameter-properties
+	constructor(readonly reason: ModelCatalogUnavailableReason) {
+		super(
+			reason === 'no-runnable-provider'
+				? 'No enabled provider with configured credentials is available.'
+				: 'No enabled model is available for the configured providers.'
+		);
+		this.name = 'ModelCatalogUnavailableError';
+	}
+}
+
+export function isModelCatalogUnavailableError(error: unknown): error is ModelCatalogUnavailableError {
+	return error instanceof ModelCatalogUnavailableError;
+}
+
 function providerRequiresCredential(document: ModelProviderDocument): boolean {
 	return (document.authentication?.mode ?? ('apiKeyHeader' as string)) !== 'none';
+}
+
+export function isModelProviderRunnable(provider: ModelProviderManagementItem): boolean {
+	if (provider.list.state !== ArtifactState.Available || !provider.list.enabled) {
+		return false;
+	}
+
+	if (!providerRequiresCredential(provider.view.document)) {
+		return true;
+	}
+
+	return provider.list.credentialConfigured === true;
 }
 
 function resolveProvider(
@@ -67,7 +99,7 @@ function resolveProvider(
 	);
 }
 
-function modelIsRunnable(model: ModelManagementItem): boolean {
+export function isModelRunnable(model: ModelManagementItem): boolean {
 	if (!model.provider) {
 		return false;
 	}
@@ -76,28 +108,11 @@ function modelIsRunnable(model: ModelManagementItem): boolean {
 		return false;
 	}
 
-	if (model.provider.list.state !== ArtifactState.Available || !model.provider.list.enabled) {
-		return false;
-	}
-
-	if (!providerRequiresCredential(model.provider.view.document)) {
-		return true;
-	}
-
-	return model.provider.list.credentialConfigured === true;
+	return isModelProviderRunnable(model.provider);
 }
 
-function providerDefaultMatches(provider: ModelProviderManagementItem, model: ModelManagementItem): boolean {
-	const reference = provider.view.document.defaultModel;
-	if (!reference || reference.name !== model.view.document.name) {
-		return false;
-	}
-
-	if (reference.scope === ModelLookupScope.Builtin) {
-		return model.list.builtIn;
-	}
-
-	return model.list.ref.rootID === provider.list.ref.rootID;
+function optionUsesProvider(option: UIModelOption, provider: ArtifactRef): boolean {
+	return option.provider?.rootID === provider.rootID && option.provider?.artifactID === provider.artifactID;
 }
 
 function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
@@ -134,7 +149,9 @@ export class ModelManagementAPI {
 
 	constructor(
 		// oxlint-disable-next-line typescript/parameter-properties
-		private readonly store: IModelStoreAPI
+		private readonly store: IModelStoreAPI,
+		// oxlint-disable-next-line typescript/parameter-properties
+		private readonly aggregate: IModelAggregateAPI
 	) {}
 
 	invalidateCatalog(): void {
@@ -146,7 +163,11 @@ export class ModelManagementAPI {
 	}
 
 	async loadSnapshot(): Promise<ModelManagementSnapshot> {
-		const [providerList, modelList] = await Promise.all([this.store.listModelProviders(), this.store.listModels()]);
+		const [providerList, modelList, defaultProvider] = await Promise.all([
+			this.store.listModelProviders(),
+			this.store.listModels(),
+			this.aggregate.getDefaultModelProvider().catch(() => undefined),
+		]);
 
 		const providers = await mapWithConcurrency(providerList, 8, async list => ({
 			list,
@@ -166,6 +187,7 @@ export class ModelManagementAPI {
 		return {
 			providers,
 			models,
+			defaultProvider,
 		};
 	}
 
@@ -183,6 +205,27 @@ export class ModelManagementAPI {
 
 	getModel(ref: ArtifactRef): Promise<ModelView> {
 		return this.store.getModel(ref);
+	}
+
+	getDefaultModelProvider(): Promise<ArtifactRef | undefined> {
+		return this.aggregate.getDefaultModelProvider();
+	}
+
+	async setDefaultModelProvider(provider?: ArtifactRef): Promise<void> {
+		await this.aggregate.setDefaultModelProvider(provider);
+		this.invalidateCatalog();
+	}
+
+	getModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef> {
+		return this.aggregate.getModelProviderDefaultModel(provider);
+	}
+
+	private async tryGetModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef | undefined> {
+		try {
+			return await this.aggregate.getModelProviderDefaultModel(provider);
+		} catch {
+			return undefined;
+		}
 	}
 
 	async createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
@@ -288,9 +331,10 @@ export class ModelManagementAPI {
 
 	private async loadCatalog(): Promise<ModelCatalog> {
 		const snapshot = await this.loadSnapshot();
+		const defaultProvider = snapshot.defaultProvider;
 
 		const options = snapshot.models
-			.filter(modelIsRunnable)
+			.filter(isModelRunnable)
 			.map(m => {
 				return modelOptionFromItem(m);
 			})
@@ -310,21 +354,33 @@ export class ModelManagementAPI {
 				});
 			});
 
-		const providerDefault = options.find(option => {
-			const model = snapshot.models.find(candidate => modelRefEqual(candidate.list.ref, option.model));
-
-			return model?.provider ? providerDefaultMatches(model.provider, model) : false;
-		});
-
 		const fallback = options[0];
-
 		if (!fallback) {
-			throw new Error('No enabled runnable Model is configured. Configure a provider credential and enable a model.');
+			const hasRunnableProvider = snapshot.providers.some(isModelProviderRunnable);
+			throw new ModelCatalogUnavailableError(hasRunnableProvider ? 'no-runnable-model' : 'no-runnable-provider');
 		}
+
+		const defaultProviderOptions = defaultProvider
+			? options.filter(option => optionUsesProvider(option, defaultProvider))
+			: [];
+
+		// This performs Model resolution only when the selected Provider has at
+		// least one runnable UI option. The default-provider lookup itself is
+		// metadata-only and was already started in parallel with the snapshot.
+		const defaultProviderModel =
+			defaultProvider && defaultProviderOptions.length > 0
+				? await this.tryGetModelProviderDefaultModel(defaultProvider)
+				: undefined;
+
+		const defaultProviderOption = defaultProviderModel
+			? defaultProviderOptions.find(
+					option => option.model !== undefined && modelRefEqual(option.model, defaultProviderModel)
+				)
+			: undefined;
 
 		return {
 			options,
-			defaultOption: providerDefault ?? fallback,
+			defaultOption: defaultProviderOption ?? defaultProviderOptions[0] ?? fallback,
 		};
 	}
 }

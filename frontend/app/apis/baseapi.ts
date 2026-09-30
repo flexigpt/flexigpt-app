@@ -12,6 +12,7 @@ import type {
 	IMCPAggregateAPI,
 	IMCPRuntimeAPI,
 	IMCPStoreAPI,
+	IModelAggregateAPI,
 	IModelStoreAPI,
 	ISettingStoreAPI,
 	ISkillAggregateAPI,
@@ -34,6 +35,7 @@ import { WailsCompletionAPI } from '@/apis/wailsapi/completion';
 import { WailsMCPAggregateAPI } from '@/apis/wailsapi/mcp_aggregate';
 import { WailsMCPRuntimeAPI } from '@/apis/wailsapi/mcp_runtime';
 import { WailsMCPStoreAPI } from '@/apis/wailsapi/mcp_store';
+import { WailsModelAggregateAPI } from '@/apis/wailsapi/model_aggregate';
 import { WailsModelStoreAPI } from '@/apis/wailsapi/model_store';
 import { WailsSkillAggregateAPI } from '@/apis/wailsapi/skill_aggregate';
 import { WailsSkillRuntimeAPI } from '@/apis/wailsapi/skill_runtime';
@@ -54,6 +56,7 @@ export let settingstoreAPI: ISettingStoreAPI;
 export let completionAPI: ICompletionAPI;
 
 let modelStoreAPI: IModelStoreAPI;
+let modelAggregateAPI: IModelAggregateAPI;
 export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
@@ -91,7 +94,8 @@ if (IS_WAILS_PLATFORM) {
 	completionAPI = new WailsCompletionAPI();
 
 	modelStoreAPI = new WailsModelStoreAPI();
-	modelManagementAPI = new ModelManagementAPI(modelStoreAPI);
+	modelAggregateAPI = new WailsModelAggregateAPI();
+	modelManagementAPI = new ModelManagementAPI(modelStoreAPI, modelAggregateAPI);
 
 	agentStoreAPI = new wailsImpl.WailsAgentStoreAPI();
 

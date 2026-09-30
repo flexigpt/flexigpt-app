@@ -25,6 +25,7 @@ import { ModelCard } from '@/models/model_card';
 interface ModelProviderCardProps {
 	provider: ModelProviderManagementItem;
 	models: ModelManagementItem[];
+	isGlobalDefault: boolean;
 	onViewProvider: (provider: ModelProviderManagementItem) => void;
 	onEditProvider: (provider: ModelProviderManagementItem) => void;
 	onToggleProvider: (provider: ModelProviderManagementItem) => Promise<void>;
@@ -61,6 +62,7 @@ function providerDefaultModel(
 export function ModelProviderCard({
 	provider,
 	models,
+	isGlobalDefault,
 	onViewProvider,
 	onEditProvider,
 	onToggleProvider,
@@ -81,7 +83,7 @@ export function ModelProviderCard({
 	const available = provider.list.state === ArtifactState.Available;
 	const defaultModel = providerDefaultModel(provider, models);
 	const defaultModelDisplayName = defaultModel?.list.displayName;
-	const canDelete = mutable && models.length === 0;
+	const canDelete = mutable && models.length === 0 && !isGlobalDefault;
 	const toggleKey = 'provider-toggle';
 	const sdkOption = getProviderSDKOption(provider.view.document.adapter);
 
@@ -106,6 +108,7 @@ export function ModelProviderCard({
 							{provider.list.enabled ? 'Enabled' : 'Disabled'}
 						</StatusBadge>
 						<StatusBadge>{provider.list.builtIn ? 'Built-in' : 'Custom'}</StatusBadge>
+						{isGlobalDefault ? <StatusBadge tone="info">Default provider</StatusBadge> : null}
 						<StatusBadge tone={provider.list.credentialConfigured ? 'success' : 'warning'}>
 							{provider.list.credentialConfigured ? 'Credential configured' : 'Credential missing'}
 						</StatusBadge>
@@ -139,10 +142,16 @@ export function ModelProviderCard({
 						onChange={() => {
 							runProviderAction(toggleKey, () => onToggleProvider(provider), 'Failed changing provider availability.');
 						}}
-						disabled={isPending(toggleKey) || !available}
+						disabled={isPending(toggleKey) || !available || (isGlobalDefault && provider.list.enabled)}
 						busy={isPending(toggleKey)}
 						compact={false}
-						title={!available ? 'This provider artifact is not available.' : undefined}
+						title={
+							isGlobalDefault && provider.list.enabled
+								? 'Choose another default provider before disabling this provider.'
+								: !available
+									? 'This provider artifact is not available.'
+									: undefined
+						}
 					/>
 				}
 				actions={
@@ -192,7 +201,13 @@ export function ModelProviderCard({
 								type="button"
 								className="btn btn-sm btn-ghost rounded-xl"
 								disabled={isPending(toggleKey) || !canDelete}
-								title={!canDelete ? 'Remove all linked models before deleting this provider.' : 'Delete provider'}
+								title={
+									isGlobalDefault
+										? 'Choose another default provider before deleting this provider.'
+										: !canDelete
+											? 'Remove all linked models before deleting this provider.'
+											: 'Delete provider'
+								}
 								onClick={() => {
 									onDeleteProvider(provider);
 								}}

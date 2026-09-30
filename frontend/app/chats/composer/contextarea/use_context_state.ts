@@ -8,7 +8,9 @@ import type { IncludePreviousMessages, UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
 import { DefaultUIModelOption } from '@/spec/model';
 
+import type { ModelCatalogUnavailableReason } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
+import { isModelCatalogUnavailableError } from '@/apis/model_management';
 
 import {
 	getSupportedReasoningLevels,
@@ -167,6 +169,9 @@ export interface ComposerContextController {
 	selectedModel: UIModelOption;
 	allOptions: UIModelOption[];
 	modelOptionsLoaded: boolean;
+	hasRunnableModel: boolean;
+	modelCatalogUnavailableReason: ModelCatalogUnavailableReason | null;
+	modelCatalogError: string | null;
 
 	isHybridReasoningEnabled: boolean;
 	includePreviousMessages: IncludePreviousMessages;
@@ -190,8 +195,12 @@ export interface ComposerContextController {
 
 export function useComposerContextState(): ComposerContextController {
 	const [selectedModel, setSelectedModel] = useState(DefaultUIModelOption);
-	const [allOptions, setAllOptions] = useState([DefaultUIModelOption]);
+	const [allOptions, setAllOptions] = useState<UIModelOption[]>([]);
 	const [modelOptionsLoaded, setModelOptionsLoaded] = useState(false);
+	const [hasRunnableModel, setHasRunnableModel] = useState(false);
+	const [modelCatalogUnavailableReason, setModelCatalogUnavailableReason] =
+		useState<ModelCatalogUnavailableReason | null>(null);
+	const [modelCatalogError, setModelCatalogError] = useState<string | null>(null);
 	const [isHybridReasoningEnabled, setIsHybridReasoningEnabled] = useState(true);
 	const [includePreviousMessages, setIncludePreviousMessages] = useState<IncludePreviousMessages>(
 		DefaultUIModelOption.includePreviousMessages
@@ -255,6 +264,9 @@ export function useComposerContextState(): ComposerContextController {
 
 				setAllOptions(result.options);
 				setModelOptionsLoaded(true);
+				setHasRunnableModel(true);
+				setModelCatalogUnavailableReason(null);
+				setModelCatalogError(null);
 
 				const pendingRestore = pendingRestoreRef.current;
 				if (pendingRestore) {
@@ -273,6 +285,22 @@ export function useComposerContextState(): ComposerContextController {
 			.catch((error: unknown) => {
 				if (!cancelled) {
 					console.error('Failed to load Composer model options:', error);
+
+					allOptionsRef.current = [];
+					defaultModelRef.current = DefaultUIModelOption;
+					selectedModelRef.current = DefaultUIModelOption;
+					hybridReasoningRef.current = false;
+
+					setAllOptions([]);
+					setSelectedModel(DefaultUIModelOption);
+					setIsHybridReasoningEnabled(false);
+					setIncludePreviousMessages(DefaultUIModelOption.includePreviousMessages);
+					setModelOptionsLoaded(false);
+					setHasRunnableModel(false);
+					setModelCatalogUnavailableReason(isModelCatalogUnavailableError(error) ? error.reason : null);
+					setModelCatalogError(
+						isModelCatalogUnavailableError(error) ? null : 'Model configuration could not be loaded.'
+					);
 				}
 			});
 
@@ -412,6 +440,9 @@ export function useComposerContextState(): ComposerContextController {
 		selectedModel,
 		allOptions,
 		modelOptionsLoaded,
+		hasRunnableModel,
+		modelCatalogUnavailableReason,
+		modelCatalogError,
 		isHybridReasoningEnabled,
 		includePreviousMessages,
 		handleSetSelectedModel,

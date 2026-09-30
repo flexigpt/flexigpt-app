@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { FiSliders } from 'react-icons/fi';
+import { FiSettings, FiSliders } from 'react-icons/fi';
+
+import { Link } from 'react-router';
 
 import type { UIModelOption } from '@/spec/model';
 import { ReasoningType } from '@/spec/inference';
@@ -24,8 +26,55 @@ interface ContextBarProps {
 	agent: AgentManagerState;
 }
 
+function ModelSetupAction({
+	unavailableReason,
+	hasCatalogError,
+}: {
+	unavailableReason: ComposerContextController['modelCatalogUnavailableReason'];
+	hasCatalogError: boolean;
+}) {
+	const noProvider = unavailableReason === 'no-runnable-provider';
+	const noModel = unavailableReason === 'no-runnable-model';
+	const destination = noProvider ? '/settings/#auth-keys' : '/models/';
+	const label = noProvider ? 'No providers configured' : noModel ? 'No enabled model configured' : 'Models unavailable';
+	const description = noProvider
+		? 'Configure an enabled provider credential in Settings before sending a request.'
+		: noModel
+			? 'Enable or add a model in Models before sending a request.'
+			: hasCatalogError
+				? 'Open Models to review provider and model configuration.'
+				: 'Configure a provider and model before sending a request.';
+
+	return (
+		<div className="flex w-full justify-center">
+			<HoverTip content={description} placement="top" wrapperElement="div" wrapperClassName="w-full">
+				<Link to={destination} className={`${actionTriggerChipButtonClasses} w-full justify-center`}>
+					<ActionTriggerChipContent
+						icon={<FiSettings size={14} />}
+						label={label}
+						showChevron={false}
+						className="w-full justify-center"
+						labelClassName="min-w-0 truncate text-center text-xs font-normal"
+					/>
+				</Link>
+			</HoverTip>
+		</div>
+	);
+}
+
 export function ContextBar({ context, agent }: ContextBarProps) {
 	const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false);
+
+	if (!context.hasRunnableModel) {
+		return (
+			<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 p-1 xl:mx-4">
+				<ModelSetupAction
+					unavailableReason={context.modelCatalogUnavailableReason}
+					hasCatalogError={context.modelCatalogError !== null}
+				/>
+			</div>
+		);
+	}
 
 	return (
 		<div className="bg-base-200 mx-2 my-0 flex items-center justify-between gap-2 p-1 xl:mx-4">

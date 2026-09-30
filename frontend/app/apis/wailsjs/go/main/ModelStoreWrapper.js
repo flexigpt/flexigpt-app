@@ -26,10 +26,6 @@ export function GetModelProvider(arg1) {
   return window['go']['main']['ModelStoreWrapper']['GetModelProvider'](arg1);
 }
 
-export function GetModelSelection() {
-  return window['go']['main']['ModelStoreWrapper']['GetModelSelection']();
-}
-
 export function ListModelProviders(arg1) {
   return window['go']['main']['ModelStoreWrapper']['ListModelProviders'](arg1);
 }
@@ -56,8 +52,4 @@ export function SetModelProviderCredential(arg1, arg2, arg3) {
 
 export function SetModelProviderEnabled(arg1, arg2, arg3) {
   return window['go']['main']['ModelStoreWrapper']['SetModelProviderEnabled'](arg1, arg2, arg3);
-}
-
-export function UpdateModelSelection(arg1) {
-  return window['go']['main']['ModelStoreWrapper']['UpdateModelSelection'](arg1);
 }

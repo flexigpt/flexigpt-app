@@ -3,7 +3,8 @@
 ## Laundry list
 
 - [ ] check similar any json raw strings needed double decode in go 1.27.
-- [ ] reading scrolling tables inside md is problematic. try to build a word wrap and a zoom out with wordwrap, option to enable disable disable it and then full screen zoom for it.
+- [ ] reading scrolling tables inside md is problematic. try to build a word wrap and a zoom out with wordwrap, option to enable disable it and then full screen zoom for it. like mermaid zoom i.e show some icon for zooming over a hover and on click it can open as modal. in line we can show wordwrapped.
+- [ ] diffs inside a largish convo is sometimes showing blank ui in between when we scroll. sometimes with diffs i.e even in stable state (no streaming) but long enough conversation, we get large cpu usage. in streaming scrolling is worse.
 
 - Testing
   - [ ] test enhanced mcp apps.
