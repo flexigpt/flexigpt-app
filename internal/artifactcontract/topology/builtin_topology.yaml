@@ -1,10 +1,8 @@
 application:
   storage:
     dataDirectory: "flexigpt"
-    settingsDirectory: "settings_v1"
-    conversationsDirectory: "conversations_v1"
-    modelPresetsDirectory: "model_presets_v1"
-    toolsDirectory: "tools_v1"
+    settingsDirectory: "settings_v2"
+    conversationsDirectory: "conversations_v2"
     artifactStoreDirectory: "artifacts_v1"
     artifactStoreManifestFile: "store.json"
     artifactStoreMetadataFile: "app.sqlite"

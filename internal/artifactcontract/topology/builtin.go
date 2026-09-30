@@ -32,8 +32,6 @@ const (
 	ApplicationStorageDataDirectory              ApplicationStorageKey = "dataDirectory"
 	ApplicationStorageSettingsDirectory          ApplicationStorageKey = "settingsDirectory"
 	ApplicationStorageConversationsDirectory     ApplicationStorageKey = "conversationsDirectory"
-	ApplicationStorageModelPresetsDirectory      ApplicationStorageKey = "modelPresetsDirectory"
-	ApplicationStorageToolsDirectory             ApplicationStorageKey = "toolsDirectory"
 	ApplicationStorageArtifactStoreDirectory     ApplicationStorageKey = "artifactStoreDirectory"
 	ApplicationStorageArtifactStoreManifestFile  ApplicationStorageKey = "artifactStoreManifestFile"
 	ApplicationStorageArtifactStoreMetadataFile  ApplicationStorageKey = "artifactStoreMetadataFile"
@@ -591,8 +589,6 @@ func parseApplicationStorage(
 		ApplicationStorageDataDirectory,
 		ApplicationStorageSettingsDirectory,
 		ApplicationStorageConversationsDirectory,
-		ApplicationStorageModelPresetsDirectory,
-		ApplicationStorageToolsDirectory,
 		ApplicationStorageArtifactStoreDirectory,
 		ApplicationStorageArtifactStoreManifestFile,
 		ApplicationStorageArtifactStoreMetadataFile,
