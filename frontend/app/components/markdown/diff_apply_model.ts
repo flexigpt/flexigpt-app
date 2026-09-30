@@ -1105,38 +1105,35 @@ function joinInteractiveAbsolutePath(parts: AbsoluteInteractiveTargetPath, segme
 	return normalizeInteractiveTargetPath(suffix ? `${parts.root}/${suffix}` : parts.root);
 }
 
-function sameInteractivePathSegment(left: string, right: string, caseInsensitive: boolean): boolean {
-	return caseInsensitive ? left.toLowerCase() === right.toLowerCase() : left === right;
-}
-
 function findBestDirectoryAnchor(
 	candidateSegments: string[],
 	targetSegments: string[],
 	caseInsensitive: boolean
 ): DirectoryAnchor | undefined {
-	const maxLength = Math.min(candidateSegments.length, targetSegments.length);
+	const candidates = caseInsensitive ? candidateSegments.map(value => value.toLowerCase()) : candidateSegments;
+	const targets = caseInsensitive ? targetSegments.map(value => value.toLowerCase()) : targetSegments;
+	const lengths = new Uint32Array(candidates.length + 1);
+	let best: DirectoryAnchor | undefined;
 
-	for (let length = maxLength; length > 0; length -= 1) {
-		for (let targetIndex = 0; targetIndex <= targetSegments.length - length; targetIndex += 1) {
-			for (let candidateIndex = 0; candidateIndex <= candidateSegments.length - length; candidateIndex += 1) {
-				const matches = targetSegments
-					.slice(targetIndex, targetIndex + length)
-					.every((segment, offset) =>
-						sameInteractivePathSegment(segment, candidateSegments[candidateIndex + offset] ?? '', caseInsensitive)
-					);
-
-				if (matches) {
-					return {
-						candidateIndex,
-						targetIndex,
-						length,
-					};
-				}
+	for (let targetIndex = targets.length - 1; targetIndex >= 0; targetIndex -= 1) {
+		// Ascending candidate order preserves the previous row at index + 1.
+		for (let candidateIndex = 0; candidateIndex < candidates.length; candidateIndex += 1) {
+			const length = targets[targetIndex] === candidates[candidateIndex] ? lengths[candidateIndex + 1] + 1 : 0;
+			lengths[candidateIndex] = length;
+			if (
+				length > 0 &&
+				(!best ||
+					length > best.length ||
+					(length === best.length &&
+						(targetIndex < best.targetIndex ||
+							(targetIndex === best.targetIndex && candidateIndex < best.candidateIndex))))
+			) {
+				best = { candidateIndex, targetIndex, length };
 			}
 		}
 	}
 
-	return undefined;
+	return best;
 }
 
 function addRankedInteractiveTarget(

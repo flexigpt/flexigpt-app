@@ -151,11 +151,19 @@ export function useScrollRestore({
 	const messageScrollTopsRef = useRef<number[]>([]);
 	const messagePositionsDirtyRef = useRef(true);
 
-	const scrollTopByTabRef = useRef(new Map<string, number>());
+	const [initialPositions] = useState(() => {
+		const positions = new Map<string, number>();
+		for (const [tabId, top] of Object.entries(initialScrollTopByTab ?? {})) {
+			if (Number.isFinite(top)) {
+				positions.set(tabId, Math.max(0, top));
+			}
+		}
+		return positions;
+	});
+	const scrollTopByTabRef = useRef(initialPositions);
 	const autoFollowByTabRef = useRef(new Map<string, boolean>());
 	const shouldAutoFollowRef = useRef(true);
 
-	const seededScrollFromStorageRef = useRef(false);
 	const activeTabIsHydratingRef = useRef(activeTabIsHydrating);
 
 	const refreshMessageElementCache = useCallback(() => {
@@ -187,19 +195,6 @@ export function useScrollRestore({
 	const resizeObserverRafRef = useRef<number | null>(null);
 	const messageJumpTimerRef = useRef<number | null>(null);
 	const observedContentSizeRef = useRef<{ width: number; height: number } | null>(null);
-
-	useEffect(() => {
-		if (!seededScrollFromStorageRef.current) {
-			seededScrollFromStorageRef.current = true;
-			if (initialScrollTopByTab) {
-				for (const [tabId, top] of Object.entries(initialScrollTopByTab)) {
-					if (typeof top === 'number') {
-						scrollTopByTabRef.current.set(tabId, top);
-					}
-				}
-			}
-		}
-	}, [initialScrollTopByTab]);
 
 	const persistScrollPosition = useCallback((tabId: string, el: HTMLElement) => {
 		scrollTopByTabRef.current.set(tabId, el.scrollTop);
@@ -654,6 +649,7 @@ export function useScrollRestore({
 	const resetScrollToTop = useCallback(
 		(tabId: string) => {
 			scrollTopByTabRef.current.set(tabId, 0);
+			autoFollowByTabRef.current.set(tabId, false);
 
 			if (selectedTabIdRef.current !== tabId) {
 				return;

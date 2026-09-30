@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { FiGitPullRequest, FiInfo, FiLoader } from 'react-icons/fi';
 
+import type { ParsedInteractiveDiff } from '@/components/markdown/diff_apply_model';
 import { useDiffApplyController } from '@/components/markdown/diff_apply_controller';
 import { DiffApplyModal } from '@/components/markdown/diff_apply_modal';
 import { parseInteractiveDiff } from '@/components/markdown/diff_apply_model';
@@ -28,21 +29,13 @@ function getButtonClassName(tone: ButtonTone = 'neutral'): string {
 }
 
 interface DiffApplySessionProps {
-	language: string;
-	diffText: string;
+	parsed: ParsedInteractiveDiff;
 	candidatePaths?: string[];
 	workspaceRoots?: string[];
 }
 
-function DiffApplySession({ language, diffText, candidatePaths, workspaceRoots }: DiffApplySessionProps) {
-	/*
-	 * This memoization is required for correctness, not merely performance.
-	 *
-	 * The controller intentionally compares parsed file object identity to
-	 * reject stale requests. Re-parsing on every busy/state render creates new
-	 * file objects and makes a just-started review appear stale.
-	 */
-	const parsed = useMemo(() => parseInteractiveDiff(diffText, language), [diffText, language]);
+function DiffApplySession({ parsed, candidatePaths, workspaceRoots }: DiffApplySessionProps) {
+	// The explicitly created session owns parsed object identity.
 	const controller = useDiffApplyController(parsed, candidatePaths, workspaceRoots);
 
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -136,16 +129,35 @@ export function DiffApplyControl({
 	candidatePaths,
 	workspaceRoots,
 }: DiffApplyControlProps) {
+	const [session, setSession] = useState<{
+		language: string;
+		diffText: string;
+		parsed: ParsedInteractiveDiff;
+	} | null>(null);
+
 	if (isBusy) {
 		return null;
 	}
 
-	return (
-		<DiffApplySession
-			language={language}
-			diffText={diffText}
-			candidatePaths={candidatePaths}
-			workspaceRoots={workspaceRoots}
-		/>
-	);
+	if (!session || session.language !== language || session.diffText !== diffText) {
+		return (
+			<button
+				type="button"
+				className={getButtonClassName()}
+				title="Inspect this patch and enable backend review controls."
+				onClick={() => {
+					setSession({
+						language,
+						diffText,
+						parsed: parseInteractiveDiff(diffText, language),
+					});
+				}}
+			>
+				<FiGitPullRequest size={12} />
+				Inspect patch
+			</button>
+		);
+	}
+
+	return <DiffApplySession parsed={session.parsed} candidatePaths={candidatePaths} workspaceRoots={workspaceRoots} />;
 }

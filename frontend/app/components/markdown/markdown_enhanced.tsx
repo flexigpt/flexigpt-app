@@ -1,13 +1,12 @@
-// oxlint-disable react/no-unstable-nested-components
-/* oxlint-disable @typescript-eslint/no-unused-vars */
+// oxlint-disable unicorn/consistent-function-scoping func-name-matching
 import type { AnchorHTMLAttributes, HTMLAttributes, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
-import { memo, useMemo } from 'react';
+import { memo, useContext, useMemo } from 'react';
 import { FiExternalLink } from 'react-icons/fi';
 
 // oxlint-disable-next-line import/no-unassigned-import
 import 'katex/dist/katex.min.css';
 
-import type { ExtraProps } from 'react-markdown';
+import type { Components, ExtraProps } from 'react-markdown';
 
 import type { PluggableList } from 'unified';
 import Markdown from 'react-markdown';
@@ -23,16 +22,18 @@ import supersub from 'remark-supersub';
 import { backendAPI } from '@/apis/baseapi';
 
 import { remarkInlineCodeMath, sanitizeLaTeXOutsideFences } from '@/components/markdown/latex_utils';
-import { MarkdownCodeRenderer } from '@/components/markdown/markdown_code_renderer';
+import { MarkdownCodeRenderer, MarkdownPreRenderer } from '@/components/markdown/markdown_code_renderer';
 import { MarkdownCodeRendererContext } from '@/components/markdown/markdown_code_renderer_context';
 import { MdErrorBoundary } from '@/components/markdown/markdown_error_boundary';
+import { MarkdownPresentationContext } from '@/components/markdown/markdown_presentation_context';
+import { MarkdownTable } from '@/components/markdown/markdown_table';
 
 const strictSchema = {
 	...defaultSchema,
 	attributes: {
 		...defaultSchema.attributes,
 		code: [['className', /^language-./, /^math-./]],
-		input: defaultSchema.attributes?.input.filter(a => a !== 'value' && a !== 'checked'),
+		input: defaultSchema.attributes?.input.filter(a => a !== 'value'),
 	},
 };
 
@@ -77,6 +78,160 @@ interface EnhancedMarkdownProps {
 
 const isExternalHref = (href?: string) => !!href && /^(https?:)?\/\/|^mailto:|^tel:/i.test(href);
 
+const renderHeading = (
+	tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+	baseClassName: string,
+	options?: { hide?: boolean }
+) =>
+	function MarkdownHeading({ node: _node, children, className, id, ...rest }: CustomComponentProps) {
+		const { hideH1Title } = useContext(MarkdownPresentationContext);
+		if (options?.hide && hideH1Title) {
+			return id ? <div id={id} className="scroll-mt-4" aria-hidden="true" /> : null;
+		}
+
+		const HeadingTag = tag;
+
+		return (
+			<HeadingTag {...rest} id={id} className={`${baseClassName} scroll-mt-4 ${className ?? ''}`.trim()}>
+				{children}
+			</HeadingTag>
+		);
+	};
+
+function createMarkdownComponents(): Components {
+	return {
+		h1: renderHeading('h1', 'my-2 pt-2 text-xl font-bold', { hide: true }),
+		h2: renderHeading('h2', 'my-2 pt-2 text-lg font-bold'),
+		h3: renderHeading('h3', 'my-1 pt-2 text-base font-semibold'),
+		h4: renderHeading('h4', 'my-1 pt-1 text-sm font-semibold'),
+		h5: renderHeading('h5', 'my-1 pt-1 text-sm font-semibold'),
+		h6: renderHeading('h6', 'my-1 pt-1 text-xs font-semibold uppercase tracking-wide'),
+
+		ul: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<ul {...rest} className={`ml-4 list-disc py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
+				{children}
+			</ul>
+		),
+
+		ol: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<ol {...rest} className={`ml-4 list-decimal py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
+				{children}
+			</ol>
+		),
+
+		li: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<li {...rest} className={`p-0.5 ${className ?? ''}`} style={{ fontSize: 14 }}>
+				{children}
+			</li>
+		),
+
+		table: MarkdownTable,
+
+		thead: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<thead {...rest} className={`bg-base-300 ${className ?? ''}`}>
+				{children}
+			</thead>
+		),
+
+		tbody: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<tbody {...rest} className={className ?? ''}>
+				{children}
+			</tbody>
+		),
+
+		tr: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<tr {...rest} className={`border-t ${className ?? ''}`}>
+				{children}
+			</tr>
+		),
+
+		th: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<th {...rest} className={`px-3 py-2 text-left align-top ${className ?? ''}`}>
+				{children}
+			</th>
+		),
+
+		td: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<td {...rest} className={`px-3 py-2 align-top ${className ?? ''}`}>
+				{children}
+			</td>
+		),
+
+		p: function MarkdownParagraph({ node: _node, className, children, ...rest }: CustomComponentProps) {
+			const { align } = useContext(MarkdownPresentationContext);
+			return (
+				<p
+					{...rest}
+					className={`${className ?? ''} p-1 ${align} wrap-break-word`}
+					style={{ lineHeight: 1.5, fontSize: 14 }}
+				>
+					{children}
+				</p>
+			);
+		},
+
+		blockquote: ({ node: _node, children, className, ...rest }: CustomComponentProps) => (
+			<blockquote {...rest} className={`border-neutral/20 border-l-4 pl-4 italic ${className ?? ''}`}>
+				{children}
+			</blockquote>
+		),
+
+		a: function MarkdownLink({ node: _node, href, children, className, ...rest }: RefComponentProps) {
+			const { onLinkClick } = useContext(MarkdownPresentationContext);
+			const isExternal = isExternalHref(href);
+
+			return (
+				<a
+					{...rest}
+					href={href}
+					target={isExternal ? '_blank' : undefined}
+					rel={isExternal ? 'noopener noreferrer' : undefined}
+					className={`cursor-pointer text-blue-600 hover:text-blue-800 ${className ?? ''}`}
+					onClick={e => {
+						if (!href) {
+							e.preventDefault();
+							return;
+						}
+
+						const handled = onLinkClick?.(href, e);
+						if (handled) {
+							e.preventDefault();
+							return;
+						}
+
+						if (href.startsWith('#')) {
+							return;
+						}
+						e.preventDefault();
+						backendAPI.openURL(href);
+					}}
+				>
+					{children}
+					{isExternal && <FiExternalLink aria-hidden="true" size="0.9em" className="ml-1 inline align-[-0.1em]" />}
+				</a>
+			);
+		},
+
+		code: MarkdownCodeRenderer,
+		pre: MarkdownPreRenderer,
+	};
+}
+
+const markdownComponents = createMarkdownComponents();
+
+const MarkdownDocument = memo(function MarkdownDocument({ text, isBusy }: { text: string; isBusy: boolean }) {
+	return (
+		<Markdown
+			remarkPlugins={isBusy ? streamingRemarkPlugins : richRemarkPlugins}
+			rehypePlugins={isBusy ? streamingRehypePlugins : richRehypePlugins}
+			components={markdownComponents}
+			skipHtml={false}
+		>
+			{text}
+		</Markdown>
+	);
+});
+
 export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	text,
 	align = 'left',
@@ -88,165 +243,20 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	defaultCodeBlockExpanded = true,
 	onLinkClick,
 }: EnhancedMarkdownProps) {
-	const processedText = useMemo(() => {
-		return isBusy ? text : sanitizeLaTeXOutsideFences(text);
-	}, [isBusy, text]);
-
-	const remarkPlugins = isBusy ? streamingRemarkPlugins : richRemarkPlugins;
-	const rehypePlugins = isBusy ? streamingRehypePlugins : richRehypePlugins;
-
+	const processedText = useMemo(() => (isBusy ? text : sanitizeLaTeXOutsideFences(text)), [isBusy, text]);
+	const presentation = useMemo(() => ({ align, hideH1Title, onLinkClick }), [align, hideH1Title, onLinkClick]);
 	const codeRendererSettings = useMemo(
-		() => ({
-			isBusy,
-			hideMermaidCode,
-			diffCandidatePaths,
-			diffWorkspaceRoots,
-			defaultCodeBlockExpanded,
-		}),
+		() => ({ isBusy, hideMermaidCode, diffCandidatePaths, diffWorkspaceRoots, defaultCodeBlockExpanded }),
 		[defaultCodeBlockExpanded, diffCandidatePaths, diffWorkspaceRoots, hideMermaidCode, isBusy]
 	);
 
-	const components = useMemo(() => {
-		const renderHeading =
-			(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6', baseClassName: string, options?: { hide?: boolean }) =>
-			// oxlint-disable-next-line react/function-component-definition,react/display-name
-			({ node, children, className, id, ...rest }: CustomComponentProps) => {
-				if (options?.hide) {
-					return id ? <div id={id} className="scroll-mt-4" aria-hidden="true" /> : null;
-				}
-
-				const HeadingTag = tag;
-
-				return (
-					<HeadingTag {...rest} id={id} className={`${baseClassName} scroll-mt-4 ${className ?? ''}`.trim()}>
-						{children}
-					</HeadingTag>
-				);
-			};
-
-		return {
-			h1: renderHeading('h1', 'my-2 pt-2 text-xl font-bold', { hide: hideH1Title }),
-			h2: renderHeading('h2', 'my-2 pt-2 text-lg font-bold'),
-			h3: renderHeading('h3', 'my-1 pt-2 text-base font-semibold'),
-			h4: renderHeading('h4', 'my-1 pt-1 text-sm font-semibold'),
-			h5: renderHeading('h5', 'my-1 pt-1 text-sm font-semibold'),
-			h6: renderHeading('h6', 'my-1 pt-1 text-xs font-semibold uppercase tracking-wide'),
-
-			ul: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ul {...rest} className={`ml-4 list-disc py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
-					{children}
-				</ul>
-			),
-
-			ol: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<ol {...rest} className={`ml-4 list-decimal py-1.5 pl-2 ${className ?? ''}`} style={{ fontSize: 14 }}>
-					{children}
-				</ol>
-			),
-
-			li: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<li {...rest} className={`p-0.5 ${className ?? ''}`} style={{ fontSize: 14 }}>
-					{children}
-				</li>
-			),
-
-			table: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<div className="my-2 max-w-full overflow-x-auto p-2" style={{ contain: 'layout paint' }}>
-					<table {...rest} className={`min-w-max table-fixed ${className ?? ''}`}>
-						{children}
-					</table>
-				</div>
-			),
-
-			thead: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<thead {...rest} className={`bg-base-300 ${className ?? ''}`}>
-					{children}
-				</thead>
-			),
-
-			tbody: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<tbody {...rest} className={className ?? ''}>
-					{children}
-				</tbody>
-			),
-
-			tr: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<tr {...rest} className={`border-t ${className ?? ''}`}>
-					{children}
-				</tr>
-			),
-
-			th: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<th {...rest} className={`px-4 py-2 text-left ${className ?? ''}`}>
-					{children}
-				</th>
-			),
-
-			td: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<td {...rest} className={`px-4 py-2 ${className ?? ''}`}>
-					{children}
-				</td>
-			),
-
-			p: ({ node, className, children, ...rest }: CustomComponentProps) => (
-				<p
-					{...rest}
-					className={`${className ?? ''} p-1 ${align} wrap-break-word`}
-					style={{ lineHeight: 1.5, fontSize: 14 }}
-				>
-					{children}
-				</p>
-			),
-
-			blockquote: ({ node, children, className, ...rest }: CustomComponentProps) => (
-				<blockquote {...rest} className={`border-neutral/20 border-l-4 pl-4 italic ${className ?? ''}`}>
-					{children}
-				</blockquote>
-			),
-
-			a: ({ node, href, children, className, ...rest }: RefComponentProps) => {
-				const isExternal = isExternalHref(href);
-
-				return (
-					<a
-						{...rest}
-						href={href}
-						target={isExternal ? '_blank' : undefined}
-						rel={isExternal ? 'noopener noreferrer' : undefined}
-						className={`cursor-pointer text-blue-600 hover:text-blue-800 ${className ?? ''}`}
-						onClick={e => {
-							if (!href) {
-								e.preventDefault();
-								return;
-							}
-
-							const handled = onLinkClick?.(href, e);
-							if (handled) {
-								e.preventDefault();
-								return;
-							}
-
-							e.preventDefault();
-							backendAPI.openURL(href);
-						}}
-					>
-						{children}
-						{isExternal && <FiExternalLink aria-hidden="true" size="0.9em" className="ml-1 inline align-[-0.1em]" />}
-					</a>
-				);
-			},
-
-			code: MarkdownCodeRenderer,
-		};
-	}, [align, hideH1Title, onLinkClick]);
-
 	return (
 		<MdErrorBoundary source={processedText}>
-			<MarkdownCodeRendererContext.Provider value={codeRendererSettings}>
-				<Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components} skipHtml={false}>
-					{processedText}
-				</Markdown>
-			</MarkdownCodeRendererContext.Provider>
+			<MarkdownPresentationContext.Provider value={presentation}>
+				<MarkdownCodeRendererContext.Provider value={codeRendererSettings}>
+					<MarkdownDocument text={processedText} isBusy={isBusy} />
+				</MarkdownCodeRendererContext.Provider>
+			</MarkdownPresentationContext.Provider>
 		</MdErrorBoundary>
 	);
 });

@@ -148,7 +148,7 @@ export function useSendMessage({
 			updateTab(tabId, tab => ({
 				...tab,
 				isBusy: true,
-				conversation: { ...chatWithPlaceholder, messages: [...chatWithPlaceholder.messages] },
+				conversation: chatWithPlaceholder,
 			}));
 
 			if (selectedTabIdRef.current === tabId) {

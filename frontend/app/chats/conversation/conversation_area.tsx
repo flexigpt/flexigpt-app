@@ -1,4 +1,4 @@
-import type { ReactNode, Ref } from 'react';
+import type { ComponentProps, ReactNode, Ref } from 'react';
 import {
 	forwardRef,
 	memo,
@@ -39,7 +39,7 @@ const EMPTY_DIFF_CANDIDATE_PATHS = new Map<string, string[]>();
 const MAX_DIFF_CANDIDATE_PATHS = 1024;
 const RICH_RENDER_DEFER_MESSAGE_COUNT = 4;
 const RICH_RENDER_DEFER_TEXT_LENGTH = 4_000;
-const RICH_RENDER_BATCH_SIZE = 4;
+const RICH_RENDER_BATCH_SIZE = 1;
 const RICH_RENDER_IDLE_TIMEOUT_MS = 250;
 
 const DIFF_MARKDOWN_SIGNAL_PATTERN =
@@ -113,6 +113,9 @@ function getMountedInputPaneSignature(
 }
 
 function areConversationAreaPropsEqual(prev: ConversationAreaProps, next: ConversationAreaProps): boolean {
+	if (prev.tabs !== next.tabs || prev.mountedInputTabIds !== next.mountedInputTabIds) {
+		return false;
+	}
 	if (prev.selectedTabId !== next.selectedTabId) {
 		return false;
 	}
@@ -479,6 +482,23 @@ type MessageItemRenderer = (
 	diffCandidatePaths: string[] | undefined,
 	deferRichRendering: boolean
 ) => ReactNode;
+
+interface ConversationMessageRowProps extends Omit<ComponentProps<typeof ChatMessage>, 'onEdit'> {
+	tabId: string;
+	onEditMessage: (tabId: string, messageID: string) => void;
+}
+
+const ConversationMessageRow = memo(function ConversationMessageRow({
+	tabId,
+	onEditMessage,
+	...messageProps
+}: ConversationMessageRowProps) {
+	const messageID = messageProps.message.id;
+	const onEdit = useCallback(() => {
+		onEditMessage(tabId, messageID);
+	}, [messageID, onEditMessage, tabId]);
+	return <ChatMessage {...messageProps} onEdit={onEdit} />;
+});
 
 const ConversationMessageList = memo(function ConversationMessageList(props: {
 	messages: ConversationMessage[];
@@ -855,14 +875,13 @@ function ConversationAreaInner(
 
 			if (rowIsBusy) {
 				return (
-					<ChatMessage
+					<ConversationMessageRow
 						message={message}
 						isBusy={true}
 						isEditing={activeEditingMessageId === message.id}
 						deferRichRendering={deferRichRendering}
-						onEdit={() => {
-							beginEditMessageForTab(activeTabId, message.id);
-						}}
+						tabId={activeTabId}
+						onEditMessage={beginEditMessageForTab}
 						diffCandidatePaths={diffCandidatePaths}
 						streamSource={activeStreamSource}
 					/>
@@ -870,14 +889,13 @@ function ConversationAreaInner(
 			}
 
 			return (
-				<ChatMessage
+				<ConversationMessageRow
 					message={message}
 					isBusy={false}
 					isEditing={activeEditingMessageId === message.id}
 					deferRichRendering={deferRichRendering}
-					onEdit={() => {
-						beginEditMessageForTab(activeTabId, message.id);
-					}}
+					tabId={activeTabId}
+					onEditMessage={beginEditMessageForTab}
 					diffCandidatePaths={diffCandidatePaths}
 				/>
 			);

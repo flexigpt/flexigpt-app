@@ -5,8 +5,7 @@ const containsLatexRegex =
 const inlineLatex = /\\\(([\s\S]+?)\\\)/g;
 const blockLatex = /\\\[([\s\S]+?)\\\]/g;
 
-// oxlint-disable-next-line typescript/consistent-type-definitions
-type MarkdownAstNode = {
+interface MarkdownAstNode {
 	type?: string;
 	value?: unknown;
 	lang?: unknown;
@@ -19,7 +18,7 @@ type MarkdownAstNode = {
 		};
 		hChildren?: Array<{ type: 'text'; value: string }>;
 	};
-};
+}
 
 type RemarkTransformer = (tree: MarkdownAstNode) => void;
 

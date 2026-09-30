@@ -134,6 +134,7 @@ function OutcomeNotice({ label, outcome }: { label: string; outcome?: DiffApplyO
 
 function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: DiffApplyController }) {
 	const { file } = view;
+	const inputPrefix = useId();
 	const checkedCount = Object.keys(view.hunkOutcomes).length;
 	const readyCount = file.hunks.filter(hunk => view.hunkOutcomes[hunk.id]?.status === 'ready').length;
 	const unavailableCount = file.hunks.filter(hunk => {
@@ -188,8 +189,9 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 								className={`rounded-lg border p-3 ${isProblem ? 'border-error/30 bg-error/5' : 'border-base-300'}`}
 							>
 								{/* oxlint-disable-next-line jsx-a11y/label-has-associated-control */}
-								<label className="flex items-start gap-2 text-xs">
+								<label htmlFor={`${inputPrefix}-${index}`} className="flex items-start gap-2 text-xs">
 									<input
+										id={`${inputPrefix}-${index}`}
 										type="checkbox"
 										className="checkbox checkbox-xs mt-0.5"
 										checked={view.selectedHunkIDs.includes(hunk.id)}
@@ -205,9 +207,7 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 										<code className="mt-1 block break-all">{hunk.header}</code>
 									</span>
 								</label>
-
 								<OutcomeNotice label={`Hunk ${index + 1}`} outcome={outcome} />
-
 								{outcome?.diagnostics.length ? (
 									<div className="mt-2">
 										{renderDiagnosticsPanel({
@@ -216,7 +216,6 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 										})}
 									</div>
 								) : null}
-
 								<LazyPanel
 									className="mt-2"
 									summary="View hunk source"

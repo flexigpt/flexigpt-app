@@ -26,8 +26,19 @@ interface UseStreamingRuntimeArgs {
 }
 
 const BACKGROUND_STREAM_COMPACT_CHUNK_COUNT = 256;
-const STREAM_RENDER_FPS = 30;
+const STREAM_RENDER_FPS = 15;
 const STREAM_RENDER_INTERVAL_MS = 1000 / STREAM_RENDER_FPS;
+
+function getStreamRenderInterval(buffer: StreamBuffer): number {
+	const length = buffer.text.display.length + buffer.thinking.display.length;
+	if (length >= 128_000) {
+		return 250;
+	}
+	if (length >= 16_000) {
+		return 100;
+	}
+	return STREAM_RENDER_INTERVAL_MS;
+}
 
 function flushStreamChannel(channel: StreamChannelBuffer): void {
 	if (channel.chunks.length === 0) {
@@ -214,9 +225,13 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 
 	const publishStream = useCallback(
 		(tabId: string, force = false) => {
+			const buffer = getStreamBuffer(tabId);
+			if (!force && buffer.text.chunks.length === 0 && buffer.thinking.chunks.length === 0) {
+				return;
+			}
 			// Background tabs retain complete stream state, but they do not cause
 			// React work until shown again.
-			if (!force && selectedTabIdRef.current !== tabId) {
+			if (!force && (selectedTabIdRef.current !== tabId || document.visibilityState === 'hidden')) {
 				flushStreamForTab(tabId);
 				return;
 			}
@@ -225,14 +240,14 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 			getPublishSchedule(tabId).lastPublishedAt = getStreamClock();
 			emitStreamUpdate(tabId);
 		},
-		[emitStreamUpdate, flushStreamForTab, getPublishSchedule, selectedTabIdRef]
+		[emitStreamUpdate, flushStreamForTab, getPublishSchedule, getStreamBuffer, selectedTabIdRef]
 	);
 
 	const notifyStreamSoon = useCallback(
 		(tabId: string) => {
 			const buffer = getStreamBuffer(tabId);
 
-			if (selectedTabIdRef.current !== tabId) {
+			if (selectedTabIdRef.current !== tabId || document.visibilityState === 'hidden') {
 				cancelScheduledStreamPublish(tabId);
 
 				const pendingChunkCount = buffer.text.chunks.length + buffer.thinking.chunks.length;
@@ -255,7 +270,7 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 				schedule.frameID = window.requestAnimationFrame(frameTime => {
 					schedule.frameID = null;
 
-					const remaining = STREAM_RENDER_INTERVAL_MS - (frameTime - schedule.lastPublishedAt);
+					const remaining = getStreamRenderInterval(buffer) - (frameTime - schedule.lastPublishedAt);
 					if (remaining > 0) {
 						schedule.timerID = window.setTimeout(() => {
 							schedule.timerID = null;
@@ -269,7 +284,8 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 			};
 
 			const elapsed = getStreamClock() - schedule.lastPublishedAt;
-			if (elapsed >= STREAM_RENDER_INTERVAL_MS) {
+			const interval = getStreamRenderInterval(buffer);
+			if (elapsed >= interval) {
 				requestFrame();
 				return;
 			}
@@ -279,7 +295,7 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 					schedule.timerID = null;
 					requestFrame();
 				},
-				Math.ceil(STREAM_RENDER_INTERVAL_MS - elapsed)
+				Math.ceil(interval - elapsed)
 			);
 		},
 		[
@@ -301,6 +317,19 @@ export function useStreamingRuntime({ tabs, selectedTabId, selectedTabIdRef }: U
 		},
 		[cancelScheduledStreamPublish, publishStream]
 	);
+
+	useEffect(() => {
+		const handleVisibilityChange = () => {
+			const tabId = selectedTabIdRef.current;
+			if (document.visibilityState === 'visible' && tabId && streamBuffersRef.current.has(tabId)) {
+				notifyStreamNow(tabId);
+			}
+		};
+		document.addEventListener('visibilitychange', handleVisibilityChange);
+		return () => {
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
+		};
+	}, [notifyStreamNow, selectedTabIdRef]);
 
 	// A background stream may have buffered chunks without a publish. Make it
 	// visible synchronously when the user activates that tab.

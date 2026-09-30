@@ -123,6 +123,9 @@ export function ThinkingFence({
 			open={isOpen}
 			onToggle={e => {
 				const next = (e.currentTarget as HTMLDetailsElement).open;
+				if (next === isOpen) {
+					return;
+				}
 				if (!isControlled) {
 					setInternalOpen(next);
 				}
@@ -150,24 +153,26 @@ export function ThinkingFence({
 			</summary>
 
 			{/* body */}
-			<div
-				ref={bodyRef}
-				className={[
-					'overflow-y-auto px-2 py-1 text-xs wrap-break-word whitespace-pre-wrap',
-					!streaming ? maxHeightClass : '',
-				]
-					.filter(Boolean)
-					.join(' ')}
-				style={
-					streaming
-						? {
-								maxHeight: `${(effectiveMaxRows ?? 3) * 1.5 + 0.5}em`,
-							}
-						: undefined
-				}
-			>
-				{hasExplicitChildren ? children : (text ?? '')}
-			</div>
+			{isOpen ? (
+				<div
+					ref={bodyRef}
+					className={[
+						'overflow-y-auto px-2 py-1 text-xs wrap-break-word whitespace-pre-wrap',
+						!streaming ? maxHeightClass : '',
+					]
+						.filter(Boolean)
+						.join(' ')}
+					style={
+						streaming
+							? {
+									maxHeight: `${(effectiveMaxRows ?? 3) * 1.5 + 0.5}em`,
+								}
+							: undefined
+					}
+				>
+					{hasExplicitChildren ? children : (text ?? '')}
+				</div>
+			) : null}
 		</details>
 	);
 }

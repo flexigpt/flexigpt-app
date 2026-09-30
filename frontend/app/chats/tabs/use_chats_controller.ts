@@ -327,8 +327,12 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 				return;
 			}
 
+			const updated = updater(current[idx]);
+			if (updated === current[idx]) {
+				return;
+			}
 			const next = [...current];
-			next[idx] = updater(next[idx]);
+			next[idx] = updated;
 			normalizeAndCommitTabs(next);
 		},
 		[normalizeAndCommitTabs]
@@ -615,7 +619,7 @@ export function useChatsController({ conversationAreaRef, searchRef }: UseChatsC
 
 			updateTab(tabId, current => ({
 				...current,
-				conversation: { ...conversationToSave, messages: [...conversationToSave.messages] },
+				conversation: conversationToSave,
 				isLoaded: true,
 				isPersisted: true,
 				manualTitleLocked: titleWasExternallyChanged ? true : current.manualTitleLocked,

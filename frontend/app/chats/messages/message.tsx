@@ -43,6 +43,9 @@ function stringArraysEqual(left?: string[], right?: string[]): boolean {
 }
 
 function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
+	if (prev.onEdit !== next.onEdit) {
+		return false;
+	}
 	if (prev.isBusy !== next.isBusy) {
 		return false;
 	}
@@ -57,8 +60,8 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 	}
 
 	if (prev.message.uiDebugDetails !== next.message.uiDebugDetails) {
-		//
-		// We need to check details as parent is updating details in place for previous message
+		// Callers must replace changed message objects. A comparator cannot
+		// detect mutation when both props reference the same object.
 		return false;
 	}
 	if (prev.message.debugDetails !== next.message.debugDetails) {
@@ -75,9 +78,7 @@ function propsAreEqual(prev: ChatMessageProps, next: ChatMessageProps) {
 		return false;
 	}
 
-	// IMPORTANT: the markdown (and Mermaid) is driven by uiContent.
-	// If message objects are mutated in place, message reference may not change,
-	// so we must compare the actual content.
+	// Markdown and Mermaid are driven by uiContent.
 	if (prev.message.uiContent !== next.message.uiContent) {
 		return false;
 	}
@@ -154,7 +155,6 @@ export const ChatMessage = memo(function ChatMessage({
 	const handleToolOutputDetails = useCallback((output: UIToolOutput) => {
 		setToolDetailsState({ kind: 'output', output });
 	}, []);
-	const shouldRenderMarkdown = renderMarkdown && !deferRichRendering;
 
 	const bubbleExtra = [isBusy ? '' : 'shadow-lg', isEditing ? 'ring-2 ring-primary/70' : ''].filter(Boolean).join(' ');
 
@@ -252,7 +252,8 @@ export const ChatMessage = memo(function ChatMessage({
 								content={baseContent}
 								isBusy={isBusy}
 								align={align}
-								renderAsMarkdown={shouldRenderMarkdown}
+								renderAsMarkdown={renderMarkdown}
+								deferRichRendering={deferRichRendering}
 								diffCandidatePaths={diffCandidatePaths}
 								streamingText={isBusy ? streamSnapshot.text : undefined}
 							/>

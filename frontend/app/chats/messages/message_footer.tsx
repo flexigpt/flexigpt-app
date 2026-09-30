@@ -58,6 +58,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 }: MessageFooterAreaProps) {
 	const [isDetailsOpen, setIsDetailsOpen] = useState(false);
 
+	const copyContent = useMemo(() => (isBusy ? '' : stripCustomMDFences(cardCopyContent)), [cardCopyContent, isBusy]);
 	const hasDebugDetails = /\S/.test(messageDetails) || debugDetails !== undefined || errorDetails !== undefined;
 	const hasInlineHiddenReasoning = !bodyPresent && hasReasoningContent(reasoningContents);
 	const hasDetails = hasDebugDetails || hasInlineHiddenReasoning;
@@ -173,7 +174,7 @@ export const MessageFooterArea = memo(function MessageFooterArea({
 					{cardCopyContent !== '' && !isBusy && (
 						<HoverTip content="Copy message text" placement="top">
 							<CopyButton
-								value={stripCustomMDFences(cardCopyContent)}
+								value={copyContent}
 								className="btn btn-sm flex items-center border-none bg-transparent! p-0 shadow-none"
 								size={16}
 							/>

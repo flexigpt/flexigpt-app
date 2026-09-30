@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { memo } from 'react';
 import {
 	FiAlertTriangle,
 	FiChevronRight,
@@ -938,7 +939,7 @@ interface MessageAttachmentsBarProps {
  * Uses compact dropdown chips similar to the composer, but without
  * any remove / edit actions.
  */
-export function MessageAttachmentsBar({
+export const MessageAttachmentsBar = memo(function MessageAttachmentsBar({
 	attachments,
 	toolChoices,
 	toolSelectionIssues,
@@ -1073,4 +1074,4 @@ export function MessageAttachmentsBar({
 			{hasWebSearchCalls && <WebSearchCallsGroupChip calls={webSearchCalls} onCallDetails={onToolCallDetails} />}
 		</div>
 	);
-}
+});

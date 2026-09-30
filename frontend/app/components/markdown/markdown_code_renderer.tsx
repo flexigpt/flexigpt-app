@@ -1,6 +1,7 @@
+// oxlint-disable react/no-react-children
 import type { HTMLAttributes, ReactNode } from 'react';
 import type { ExtraProps } from 'react-markdown';
-import { useContext } from 'react';
+import { Children, isValidElement, useContext } from 'react';
 
 import { CustomMDLanguage } from '@/components/markdown/custom_md_utils';
 import { CodeBlock } from '@/components/markdown/markdown_code_block';
@@ -15,38 +16,44 @@ interface MarkdownCodeRendererProps extends HTMLAttributes<HTMLElement>, ExtraPr
 
 export function MarkdownCodeRenderer({
 	node: _node,
-	inline,
+	inline: _inline,
 	className,
 	children,
 	...props
 }: MarkdownCodeRendererProps) {
-	const settings = useContext(MarkdownCodeRendererContext);
+	return (
+		<code {...props} className={`bg-base-200 inline text-wrap wrap-break-word whitespace-pre-wrap ${className ?? ''}`}>
+			{children}
+		</code>
+	);
+}
 
-	if (inline || !className) {
-		return (
-			<code
-				{...props}
-				className={`bg-base-200 inline text-wrap wrap-break-word whitespace-pre-wrap ${className ?? ''}`}
-			>
-				{children}
-			</code>
-		);
+function getTextContent(children: ReactNode): string {
+	const parts: string[] = [];
+	Children.forEach(children, child => {
+		if (typeof child === 'string' || typeof child === 'number') {
+			parts.push(String(child));
+		} else if (isValidElement<{ children?: ReactNode }>(child)) {
+			parts.push(getTextContent(child.props.children));
+		}
+	});
+	return parts.join('');
+}
+
+export function MarkdownPreRenderer({ node: _node, children, ...props }: HTMLAttributes<HTMLPreElement> & ExtraProps) {
+	const settings = useContext(MarkdownCodeRendererContext);
+	const child = Children.toArray(children).find(value => isValidElement(value));
+
+	if (!isValidElement<{ className?: string; children?: ReactNode }>(child)) {
+		return <pre {...props}>{children}</pre>;
 	}
 
-	const match = /lang-(\w+)/.exec(className) || /language-(\w+)/.exec(className);
+	const className = child.props.className ?? '';
+	const match = /(?:language-|lang-)([^\s]+)/.exec(className);
 	const language = match?.[1] ?? 'text';
-
-	const raw =
-		typeof children === 'string'
-			? children
-			: Array.isArray(children)
-				? children.join('')
-				: children === null
-					? ''
-					: // oxlint-disable-next-line typescript/no-base-to-string
-						String(children);
-
-	const value = raw.replaceAll('\r\n', '\n').replace(/\n$/, '');
+	// react-markdown adds one terminal newline to a fenced code node.
+	// Do not otherwise rewrite patch line endings or whitespace here.
+	const value = getTextContent(child.props.children).replace(/\n$/, '');
 
 	if (language === (CustomMDLanguage.ThinkingSummary as string)) {
 		return (
