@@ -48,7 +48,7 @@ type App struct {
 	mcpRuntimeAPI         *MCPRuntimeWrapper
 	mcpAggregateAPI       *MCPAggregateWrapper
 	mcpBuiltInInstaller   builtin.HydrationInstaller
-	aggregateAPI          *AggregrateWrapper
+	completionAPI         *CompletionWrapper
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
@@ -137,7 +137,7 @@ func NewApp() *App {
 	app.mcpStoreAPI = &MCPStoreWrapper{}
 	app.mcpRuntimeAPI = &MCPRuntimeWrapper{}
 	app.mcpAggregateAPI = &MCPAggregateWrapper{}
-	app.aggregateAPI = &AggregrateWrapper{}
+	app.completionAPI = &CompletionWrapper{}
 	app.workspaceStoreAPI = &WorkspaceStoreWrapper{}
 	app.workspaceRuntimeAPI = &WorkspaceRuntimeWrapper{}
 
@@ -623,8 +623,8 @@ func (a *App) initManagers() {
 		)
 	}
 
-	err = InitAggregrateWrapper(
-		a.aggregateAPI,
+	err = InitCompletionWrapper(
+		a.completionAPI,
 		a.modelAggregateAPI.service,
 		a.settingStoreAPI.store,
 		a.toolAggregateAPI.service,
@@ -647,7 +647,7 @@ func (a *App) initManagers() {
 func (a *App) startup(ctx context.Context) { //nolint:all
 	a.ctx = ctx
 
-	SetWrappedProviderAppContext(a.aggregateAPI, a.ctx)
+	SetWrappedProviderAppContext(a.completionAPI, a.ctx)
 
 	// Load the frontend.
 	runtime.WindowShow(a.ctx)

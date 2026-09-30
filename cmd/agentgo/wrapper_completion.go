@@ -35,7 +35,7 @@ func init() {
 	appSlogLevelVar.Set(slog.LevelInfo)
 }
 
-type AggregrateWrapper struct {
+type CompletionWrapper struct {
 	modelAggregate       *modelAggregate.Service
 	settingStore         *settingStore.SettingStore
 	toolAggregateService *toolAggregate.Service
@@ -77,8 +77,8 @@ type CompletionRequestBody struct {
 	SkillSessionID string                                  `json:"skillSessionID,omitempty"`
 }
 
-func InitAggregrateWrapper(
-	agg *AggregrateWrapper,
+func InitCompletionWrapper(
+	agg *CompletionWrapper,
 	models *modelAggregate.Service,
 	ss *settingStore.SettingStore,
 	ts *toolAggregate.Service,
@@ -136,11 +136,11 @@ func InitAggregrateWrapper(
 	return nil
 }
 
-func SetWrappedProviderAppContext(w *AggregrateWrapper, ctx context.Context) {
+func SetWrappedProviderAppContext(w *CompletionWrapper, ctx context.Context) {
 	w.appContext = ctx
 }
 
-func (w *AggregrateWrapper) SetAuthKey(
+func (w *CompletionWrapper) SetAuthKey(
 	req *settingSpec.SetAuthKeyRequest,
 ) (*settingSpec.SetAuthKeyResponse, error) {
 	return withRecoveryResp(func() (*settingSpec.SetAuthKeyResponse, error) {
@@ -164,7 +164,7 @@ func (w *AggregrateWrapper) SetAuthKey(
 	})
 }
 
-func (w *AggregrateWrapper) DeleteAuthKey(
+func (w *CompletionWrapper) DeleteAuthKey(
 	req *settingSpec.DeleteAuthKeyRequest,
 ) (*settingSpec.DeleteAuthKeyResponse, error) {
 	return withRecoveryResp(func() (*settingSpec.DeleteAuthKeyResponse, error) {
@@ -186,7 +186,7 @@ func (w *AggregrateWrapper) DeleteAuthKey(
 }
 
 // FetchCompletion handles the completion request and streams data back to the frontend.
-func (w *AggregrateWrapper) FetchCompletion(
+func (w *CompletionWrapper) FetchCompletion(
 	model artifact.ArtifactRef,
 	completionData *CompletionRequestBody,
 	textCallbackID string,
@@ -325,7 +325,7 @@ func (w *AggregrateWrapper) FetchCompletion(
 	})
 }
 
-func (w *AggregrateWrapper) CancelCompletion(id string) (err error) {
+func (w *CompletionWrapper) CancelCompletion(id string) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("panic recovered",
@@ -359,7 +359,7 @@ func (w *AggregrateWrapper) CancelCompletion(id string) (err error) {
 	return nil
 }
 
-func (w *AggregrateWrapper) ensureCompletionStateLocked() {
+func (w *CompletionWrapper) ensureCompletionStateLocked() {
 	if w.completionCancels == nil {
 		w.completionCancels = map[string]context.CancelFunc{}
 	}
@@ -368,7 +368,7 @@ func (w *AggregrateWrapper) ensureCompletionStateLocked() {
 	}
 }
 
-func (w *AggregrateWrapper) prunePreCanceledLocked(now time.Time) {
+func (w *CompletionWrapper) prunePreCanceledLocked(now time.Time) {
 	cutoff := now.Add(-preCanceledRetention)
 	for requestID, canceledAt := range w.preCanceled {
 		if canceledAt.Before(cutoff) {

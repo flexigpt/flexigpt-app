@@ -82,7 +82,7 @@ func main() {
 		EnableDefaultContextMenu: true,
 		OnStartup: func(ctx context.Context) {
 			app.startup(ctx)
-			SetWrappedProviderAppContext(app.aggregateAPI, ctx)
+			SetWrappedProviderAppContext(app.completionAPI, ctx)
 		},
 
 		OnDomReady:      app.domReady,
@@ -113,7 +113,7 @@ func main() {
 			app.mcpStoreAPI,
 			app.mcpRuntimeAPI,
 			app.mcpAggregateAPI,
-			app.aggregateAPI,
+			app.completionAPI,
 			app.agentStoreAPI,
 		},
 
