@@ -13,18 +13,22 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
+	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type ModelStoreWrapper struct {
-	api        *modelConsumerAPI.API
-	management *modelConsumerAPI.CatalogStore
-	roots      compositionapi.RootAPI
-	protection compositionapi.ProtectionAPI
+	api                  *modelConsumerAPI.API
+	management           *modelConsumerAPI.CatalogStore
+	roots                compositionapi.RootAPI
+	protection           compositionapi.ProtectionAPI
+	inferenceProviderset *inferencewrapper.ProviderSetAPI
 }
 
 func InitModelWrappers(
@@ -138,6 +142,15 @@ func InitModelWrappers(
 
 	_ = ctx
 	return installer, nil
+}
+
+func (w *ModelStoreWrapper) SetInferenceProviderset(
+	value *inferencewrapper.ProviderSetAPI,
+) {
+	if w == nil {
+		return
+	}
+	w.inferenceProviderset = value
 }
 
 func (w *ModelStoreWrapper) ListModelProviders(
@@ -286,10 +299,50 @@ func (w *ModelStoreWrapper) SetModelProviderCredential(
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
 	}
-	return w.api.UpdateProviderCredential(
-		context.Background(),
-		request,
-	)
+	ctx := context.Background()
+	providerView, err := w.api.GetProvider(ctx, request.Provider)
+	if err != nil {
+		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+	}
+	providerName := inferenceSpec.ProviderName(providerView.Artifact.LogicalName)
+	isClear := request.Secret == ""
+	if !isClear {
+		if w.inferenceProviderset != nil {
+			_, err := w.inferenceProviderset.SetProviderAPIKey(
+				ctx,
+				&inferencewrapperSpec.SetProviderAPIKeyRequest{
+					Provider: providerName,
+					Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
+						APIKey: request.Secret,
+					},
+				},
+			)
+			if err != nil {
+				return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+			}
+		}
+		result, err := w.api.UpdateProviderCredential(ctx, request)
+		if err != nil {
+			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+		}
+		return result, nil
+	}
+	result, err := w.api.UpdateProviderCredential(ctx, request)
+	if err != nil {
+		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
+	}
+	if w.inferenceProviderset != nil {
+		_, _ = w.inferenceProviderset.SetProviderAPIKey(
+			ctx,
+			&inferencewrapperSpec.SetProviderAPIKeyRequest{
+				Provider: providerName,
+				Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
+					APIKey: "",
+				},
+			},
+		)
+	}
+	return result, nil
 }
 
 func (w *ModelStoreWrapper) CreateModelProvider(

@@ -599,6 +599,8 @@ func (a *App) initManagers() {
 		)
 		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
 	}
+
+	a.modelStoreAPI.SetInferenceProviderset(a.completionAPI.providersetAPI)
 }
 
 // startup is called at application startup.
