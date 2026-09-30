@@ -140,51 +140,6 @@ func SetWrappedProviderAppContext(w *CompletionWrapper, ctx context.Context) {
 	w.appContext = ctx
 }
 
-func (w *CompletionWrapper) SetAuthKey(
-	req *settingSpec.SetAuthKeyRequest,
-) (*settingSpec.SetAuthKeyResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.SetAuthKeyResponse, error) {
-		if req.Type == settingSpec.AuthKeyTypeProvider {
-			_, err := w.providersetAPI.SetProviderAPIKey(
-				context.Background(),
-				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferenceSpec.ProviderName(req.KeyName),
-					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: req.Body.Secret},
-				},
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-		resp, err := w.settingStore.SetAuthKey(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		return resp, nil
-	})
-}
-
-func (w *CompletionWrapper) DeleteAuthKey(
-	req *settingSpec.DeleteAuthKeyRequest,
-) (*settingSpec.DeleteAuthKeyResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.DeleteAuthKeyResponse, error) {
-		resp, err := w.settingStore.DeleteAuthKey(context.Background(), req)
-		if err != nil {
-			return nil, err
-		}
-		if req.Type == settingSpec.AuthKeyTypeProvider {
-			_, _ = w.providersetAPI.SetProviderAPIKey(
-				context.Background(),
-				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: inferenceSpec.ProviderName(req.KeyName),
-					Body:     &inferencewrapperSpec.SetProviderAPIKeyRequestBody{APIKey: ""},
-				},
-			)
-		}
-		return resp, nil
-	})
-}
-
 // FetchCompletion handles the completion request and streams data back to the frontend.
 func (w *CompletionWrapper) FetchCompletion(
 	model artifact.ArtifactRef,

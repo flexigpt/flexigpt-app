@@ -2,379 +2,276 @@ package store
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"sort"
-	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
-	"github.com/flexigpt/mapstore-go/keyringencdec"
 )
 
 type DebugSettingsApplier func(context.Context, spec.DebugSettings) error
 
 type SettingStore struct {
 	store                *mapstore.MapFileStore
-	encEncrypt           mapstore.IOEncoderDecoder
 	debugSettingsApplier DebugSettingsApplier
 }
 
-const (
-	keyringServiceName = "FlexiGPTKeyRingEncDec"
-	keyringUserName    = "user"
+func ErrClosed() error {
+	return basespecClosedError()
+}
 
-	settingKeyAuthKeys                = "authKeys"
-	settingKeySecret                  = "secret"
-	settingKeySHA256                  = "sha256"
-	settingKeyNonEmpty                = "nonEmpty"
-	settingKeyDebug                   = "debug"
-	settingKeySchemaVersion           = "schemaVersion"
-	settingKeyAppTheme                = "appTheme"
-	settingKeyLogLLMReqResp           = "logLLMReqResp"
-	settingKeyDisableContentStripping = "disableContentStripping"
-	settingKeyLogLevel                = "logLevel"
-	settingJSONKeyType                = "type"
-	settingJSONKeyName                = "name"
+const (
+	settingKeyDebug         = "debug"
+	settingKeySchemaVersion = "schemaVersion"
+	settingKeyAppTheme      = "appTheme"
 )
 
-func NewSettingStore(baseDir string) (*SettingStore, error) {
-	encoderDecoder, err := keyringencdec.NewEncryptedStringValueEncoderDecoder(keyringServiceName, keyringUserName)
+func NewSettingStore(
+	baseDir string,
+) (*SettingStore, error) {
+	defaultMap, err := jsonencdec.StructWithJSONTagsToMap(
+		DefaultSettingsData,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("could not get keyring encoder/decoder: %w", err)
-	}
-	st := &SettingStore{
-		encEncrypt: encoderDecoder,
-	}
-
-	defaultMap, err := jsonencdec.StructWithJSONTagsToMap(DefaultSettingsData)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal default settings: %w", err)
+		return nil, fmt.Errorf(
+			"cannot marshal default settings: %w",
+			err,
+		)
 	}
 
 	file := filepath.Join(baseDir, spec.SettingsFile)
-	fs, err := mapstore.NewMapFileStore(
+	fileStore, err := mapstore.NewMapFileStore(
 		file,
 		defaultMap,
 		jsonencdec.JSONEncoderDecoder{},
 		mapstore.WithCreateIfNotExists(true),
 		mapstore.WithFileAutoFlush(true),
-		mapstore.WithValueEncDecGetter(st.valueEncDecGetter),
 		mapstore.WithFileLogger(slog.Default()),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("file store init failed: %w", err)
+		return nil, fmt.Errorf(
+			"settings file store initialization failed: %w",
+			err,
+		)
 	}
 
-	st.store = fs
-	if err := st.Migrate(context.Background()); err != nil {
-		return nil, fmt.Errorf("settings migration failed: %w", err)
+	store := &SettingStore{
+		store: fileStore,
 	}
+	if err := store.Migrate(context.Background()); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf(
+			"settings initialization failed: %w",
+			err,
+		)
+	}
+
 	slog.Info("settings store ready", "file", file)
-	return st, nil
+	return store, nil
 }
 
 func (s *SettingStore) Close() error {
-	if s == nil {
+	if s == nil || s.store == nil {
 		return nil
 	}
-
-	if s.store != nil {
-		_ = s.store.Close()
-	}
-	return nil
+	return s.store.Close()
 }
 
-func (s *SettingStore) SetDebugSettingsApplier(applier DebugSettingsApplier) {
+func (s *SettingStore) SetDebugSettingsApplier(
+	applier DebugSettingsApplier,
+) {
 	if s == nil {
 		return
 	}
 	s.debugSettingsApplier = applier
 }
 
-func (s *SettingStore) ApplyCurrentDebugSettings(ctx context.Context, forceFetch bool) error {
+func (s *SettingStore) ApplyCurrentDebugSettings(
+	ctx context.Context,
+	forceFetch bool,
+) error {
 	if s == nil {
-		return nil
+		return basespecClosedError()
 	}
 
-	resp, err := s.GetSettings(ctx, &spec.GetSettingsRequest{ForceFetch: forceFetch})
+	response, err := s.GetSettings(
+		ctx,
+		&spec.GetSettingsRequest{
+			ForceFetch: forceFetch,
+		},
+	)
 	if err != nil {
 		return err
 	}
-	if resp == nil || resp.Body == nil {
+	if response == nil || response.Body == nil {
 		return errors.New("get settings: empty response body")
 	}
-	return s.applyDebugSettings(ctx, resp.Body.Debug)
+	return s.applyDebugSettings(ctx, response.Body.Debug)
 }
 
-// Migrate ensures the store is up-to-date with built-in data.
-// - Adds missing built-in auth keys as empty entries.
-// - Adds new settings sections/fields with defaults.
-// - Updates schemaVersion if changed.
-func (s *SettingStore) Migrate(ctx context.Context) error {
-	// Force re-read from disk to be safe during startup.
+// Migrate now normalizes only the non-secret Settings document.
+//
+// Auth-key migration is intentionally absent. Artifact Store owns Model and
+// MCP overlays, secret refs, SHA metadata, and encrypted secret values.
+func (s *SettingStore) Migrate(
+	ctx context.Context,
+) error {
+	if s == nil || s.store == nil {
+		return basespecClosedError()
+	}
+	if ctx == nil {
+		return errors.New("settings migration context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	raw, err := s.store.GetAll(true)
 	if err != nil {
-		return fmt.Errorf("migrate: read store: %w", err)
+		return fmt.Errorf("read settings: %w", err)
 	}
 
 	var schema spec.SettingsSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
-		return fmt.Errorf("migrate: decode: %w", err)
+		return fmt.Errorf("decode settings: %w", err)
 	}
 
-	ensureAuthKeyNamespaces(&schema)
-	if _, ok := schema.AuthKeys[spec.AuthKeyTypeMCP]; !ok {
-		if err := s.store.SetKey(
-			[]string{settingKeyAuthKeys, string(spec.AuthKeyTypeMCP)},
-			map[string]any{},
-		); err != nil {
-			return fmt.Errorf("migrate: ensure MCP auth namespace: %w", err)
-		}
-	}
-
-	addedBuiltInAuthKeys := 0
-	debugChanged := false
-
-	// Ensure the authKeys map and the required nested maps exist,
-	// by using SetKey to create them on demand, but check via the decoded schema.
-	for t, names := range BuiltInAuthKeys {
-		for _, name := range names {
-			exists := false
-			if schema.AuthKeys != nil {
-				if m, ok := schema.AuthKeys[t]; ok {
-					if _, ok := m[name]; ok {
-						exists = true
-					}
-				}
-			}
-			if exists {
-				continue
-			}
-
-			// Create an empty key: encrypted secret "", sha of "", nonEmpty false.
-			secret := ""
-			sha := computeSHA(secret)
-
-			if err := s.store.SetKey([]string{
-				settingKeyAuthKeys, string(t), string(name), settingKeySecret,
-			}, secret); err != nil {
-				return fmt.Errorf("settings migrate: set secret for %s/%s: %w", t, name, err)
-			}
-
-			if err := s.store.SetKey([]string{
-				settingKeyAuthKeys, string(t), string(name), settingKeySHA256,
-			}, sha); err != nil {
-				return fmt.Errorf("settings migrate: set sha256 for %s/%s: %w", t, name, err)
-			}
-
-			if err := s.store.SetKey([]string{
-				settingKeyAuthKeys, string(t), string(name), settingKeyNonEmpty,
-			}, false); err != nil {
-				return fmt.Errorf("settings migrate: set nonEmpty for %s/%s: %w", t, name, err)
-			}
-
-			addedBuiltInAuthKeys++
-		}
-	}
-
-	normalizedDebug, changed := normalizeDebugSettings(schema.Debug)
-	if changed {
-		val, err := jsonencdec.StructWithJSONTagsToMap(normalizedDebug)
+	normalizedDebug, debugChanged := normalizeDebugSettings(schema.Debug)
+	if debugChanged {
+		value, err := jsonencdec.StructWithJSONTagsToMap(normalizedDebug)
 		if err != nil {
-			return fmt.Errorf("migrate: encode debug settings: %w", err)
+			return fmt.Errorf(
+				"encode normalized debug settings: %w",
+				err,
+			)
 		}
-		if err := s.store.SetKey([]string{settingKeyDebug}, val); err != nil {
-			return fmt.Errorf("migrate: update debug settings: %w", err)
+		if err := s.store.SetKey(
+			[]string{settingKeyDebug},
+			value,
+		); err != nil {
+			return fmt.Errorf(
+				"persist normalized debug settings: %w",
+				err,
+			)
 		}
-		debugChanged = true
 	}
 
-	// Optionally bump schemaVersion if changed or missing.
 	if schema.SchemaVersion != spec.SchemaVersion {
-		if err := s.store.SetKey([]string{settingKeySchemaVersion}, spec.SchemaVersion); err != nil {
-			return fmt.Errorf("migrate: update schemaVersion: %w", err)
+		if err := s.store.SetKey(
+			[]string{settingKeySchemaVersion},
+			spec.SchemaVersion,
+		); err != nil {
+			return fmt.Errorf(
+				"persist settings schema version: %w",
+				err,
+			)
 		}
-	}
-
-	if addedBuiltInAuthKeys > 0 || debugChanged {
-		slog.Info(
-			"settings migration complete",
-			"addedBuiltInAuthKeys", addedBuiltInAuthKeys,
-			"debugChanged", debugChanged,
-		)
-	} else {
-		slog.Info("settings migration: no changes needed")
 	}
 
 	return nil
 }
 
-// SetAppTheme validates and persists a new theme.
 func (s *SettingStore) SetAppTheme(
 	_ context.Context,
-	req *spec.SetAppThemeRequest,
+	request *spec.SetAppThemeRequest,
 ) (*spec.SetAppThemeResponse, error) {
-	if req == nil || req.Body == nil {
+	if s == nil || s.store == nil {
+		return nil, basespecClosedError()
+	}
+	if request == nil || request.Body == nil {
 		return nil, spec.ErrInvalidArgument
 	}
 
-	theme := &spec.AppTheme{Type: req.Body.Type, Name: req.Body.Name}
-	if err := validateTheme(theme); err != nil {
+	theme := spec.AppTheme{
+		Type: request.Body.Type,
+		Name: request.Body.Name,
+	}
+	if err := validateTheme(&theme); err != nil {
 		return nil, err
 	}
 
-	val, _ := jsonencdec.StructWithJSONTagsToMap(theme)
-	if err := s.store.SetKey([]string{settingKeyAppTheme}, val); err != nil {
-		return nil, err
-	}
-
-	slog.Info("appTheme updated", "type", theme.Type, "name", theme.Name)
-	return &spec.SetAppThemeResponse{}, nil
-}
-
-// SetDebugSettings validates and persists runtime debug settings.
-func (s *SettingStore) SetDebugSettings(
-	ctx context.Context,
-	req *spec.SetDebugSettingsRequest,
-) (*spec.SetDebugSettingsResponse, error) {
-	if req == nil || req.Body == nil {
-		return nil, spec.ErrInvalidArgument
-	}
-
-	cfg := spec.DebugSettings{
-		LogLLMReqResp:           req.Body.LogLLMReqResp,
-		DisableContentStripping: req.Body.DisableContentStripping,
-		LogLevel:                req.Body.LogLevel,
-	}
-	if err := validateDebugSettings(&cfg); err != nil {
-		return nil, err
-	}
-
-	val, err := jsonencdec.StructWithJSONTagsToMap(cfg)
+	value, err := jsonencdec.StructWithJSONTagsToMap(theme)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.store.SetKey([]string{settingKeyDebug}, val); err != nil {
+	if err := s.store.SetKey(
+		[]string{settingKeyAppTheme},
+		value,
+	); err != nil {
 		return nil, err
 	}
-	if err := s.applyDebugSettings(ctx, cfg); err != nil {
-		return nil, fmt.Errorf("debug settings saved but runtime apply failed: %w", err)
+
+	slog.Info(
+		"app theme updated",
+		"type", theme.Type,
+		"name", theme.Name,
+	)
+	return &spec.SetAppThemeResponse{}, nil
+}
+
+func (s *SettingStore) SetDebugSettings(
+	ctx context.Context,
+	request *spec.SetDebugSettingsRequest,
+) (*spec.SetDebugSettingsResponse, error) {
+	if s == nil || s.store == nil {
+		return nil, basespecClosedError()
+	}
+	if request == nil || request.Body == nil {
+		return nil, spec.ErrInvalidArgument
+	}
+
+	settings := spec.DebugSettings{
+		LogLLMReqResp:           request.Body.LogLLMReqResp,
+		DisableContentStripping: request.Body.DisableContentStripping,
+		LogLevel:                request.Body.LogLevel,
+	}
+	if err := validateDebugSettings(&settings); err != nil {
+		return nil, err
+	}
+
+	value, err := jsonencdec.StructWithJSONTagsToMap(settings)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.store.SetKey(
+		[]string{settingKeyDebug},
+		value,
+	); err != nil {
+		return nil, err
+	}
+	if err := s.applyDebugSettings(ctx, settings); err != nil {
+		return nil, fmt.Errorf(
+			"debug settings saved but runtime apply failed: %w",
+			err,
+		)
 	}
 
 	slog.Info(
 		"debug settings updated",
-		"logLLMReqResp", cfg.LogLLMReqResp,
-		"disableContentStripping", cfg.DisableContentStripping,
-		"logLevel", cfg.LogLevel,
+		"logLLMReqResp", settings.LogLLMReqResp,
+		"disableContentStripping", settings.DisableContentStripping,
+		"logLevel", settings.LogLevel,
 	)
 	return &spec.SetDebugSettingsResponse{}, nil
 }
 
-// SetAuthKey inserts or updates one auth-key.
-func (s *SettingStore) SetAuthKey(
+func (s *SettingStore) GetSettings(
 	_ context.Context,
-	req *spec.SetAuthKeyRequest,
-) (*spec.SetAuthKeyResponse, error) {
-	if req == nil || req.Body == nil || req.Type == "" || req.KeyName == "" {
-		return nil, spec.ErrInvalidArgument
-	}
-	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
-	if err != nil {
-		return nil, err
+	request *spec.GetSettingsRequest,
+) (*spec.GetSettingsResponse, error) {
+	if s == nil || s.store == nil {
+		return nil, basespecClosedError()
 	}
 
-	nonEmptySecret := req.Body.Secret != ""
-
-	// Build AuthKey record.
-	newAk := spec.AuthKey{
-		Secret:   req.Body.Secret,
-		SHA256:   computeSHA(req.Body.Secret),
-		NonEmpty: nonEmptySecret,
+	forceFetch := false
+	if request != nil {
+		forceFetch = request.ForceFetch
 	}
 
-	// Persist secret (encrypted) then sha (plain).
-	secretPath := []string{settingKeyAuthKeys, string(t), string(keyName), settingKeySecret}
-
-	if err := s.store.SetKey(secretPath, newAk.Secret); err != nil {
-		return nil, err
-	}
-	shaPath := []string{settingKeyAuthKeys, string(t), string(keyName), settingKeySHA256}
-	if err := s.store.SetKey(shaPath, newAk.SHA256); err != nil {
-		return nil, err
-	}
-	nonEmptyPath := []string{
-		settingKeyAuthKeys,
-		string(t),
-		string(keyName),
-		settingKeyNonEmpty,
-	}
-	if err := s.store.SetKey(nonEmptyPath, newAk.NonEmpty); err != nil {
-		return nil, err
-	}
-
-	slog.Info("authKey set",
-		"type", t, "keyName", keyName,
-		"builtIn", isBuiltInKey(t, keyName))
-	return &spec.SetAuthKeyResponse{}, nil
-}
-
-// DeleteAuthKey removes a key unless it is marked built-in.
-func (s *SettingStore) DeleteAuthKey(
-	_ context.Context,
-	req *spec.DeleteAuthKeyRequest,
-) (*spec.DeleteAuthKeyResponse, error) {
-	if req == nil || req.Type == "" || req.KeyName == "" {
-		return nil, spec.ErrInvalidArgument
-	}
-	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
-	if err != nil {
-		return nil, err
-	}
-	if isBuiltInKey(t, keyName) {
-		return nil, spec.ErrBuiltInAuthKeyReadOnly
-	}
-
-	// Delete the key map entirely (secret + sha).
-	keyPath := []string{settingKeyAuthKeys, string(t), string(keyName)}
-	if err := s.store.DeleteKey(keyPath); err != nil {
-		return nil, err
-	}
-
-	// If the type map is now empty, delete it too.
-	raw, err := s.store.GetAll(false)
-	if err != nil {
-		return nil, err
-	}
-
-	if akRaw, ok := raw[settingKeyAuthKeys].(map[string]any); ok {
-		if typRaw, ok := akRaw[string(t)].(map[string]any); ok && len(typRaw) == 0 {
-			_ = s.store.DeleteKey([]string{settingKeyAuthKeys, string(t)})
-		}
-	}
-	slog.Info("authKey deleted", "type", t, "keyName", keyName)
-	return &spec.DeleteAuthKeyResponse{}, nil
-}
-
-// GetAuthKey returns the decrypted secret for one key.
-func (s *SettingStore) GetAuthKey(
-	_ context.Context,
-	req *spec.GetAuthKeyRequest,
-) (*spec.GetAuthKeyResponse, error) {
-	if req == nil || req.Type == "" || req.KeyName == "" {
-		return nil, spec.ErrInvalidArgument
-	}
-	t, keyName, err := normalizeAuthKeyRef(req.Type, req.KeyName)
-	if err != nil {
-		return nil, err
-	}
-
-	raw, err := s.store.GetAll(false)
+	raw, err := s.store.GetAll(forceFetch)
 	if err != nil {
 		return nil, err
 	}
@@ -383,118 +280,28 @@ func (s *SettingStore) GetAuthKey(
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return nil, err
 	}
+	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
 
-	typData, ok := schema.AuthKeys[t]
-	if !ok {
-		return nil, spec.ErrAuthKeyNotFound
-	}
-	ak, ok := typData[keyName]
-	if !ok {
-		return nil, spec.ErrAuthKeyNotFound
-	}
-
-	return &spec.GetAuthKeyResponse{
-		Body: &spec.GetAuthKeyResponseBody{
-			Secret:   ak.Secret,
-			SHA256:   ak.SHA256,
-			NonEmpty: ak.NonEmpty,
+	return &spec.GetSettingsResponse{
+		Body: &spec.GetSettingsResponseBody{
+			AppTheme: schema.AppTheme,
+			Debug:    schema.Debug,
 		},
 	}, nil
 }
 
-// GetSettings returns the current settings without secrets.
-func (s *SettingStore) GetSettings(
-	_ context.Context,
-	req *spec.GetSettingsRequest,
-) (*spec.GetSettingsResponse, error) {
-	force := false
-	if req != nil {
-		force = req.ForceFetch
-	}
-
-	raw, err := s.store.GetAll(force)
-	if err != nil {
-		return nil, err
-	}
-
-	var schema spec.SettingsSchema
-	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
-		return nil, err
-	}
-	ensureAuthKeyNamespaces(&schema)
-	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
-
-	// Convert to DTO (secrets stripped).
-	out := spec.GetSettingsResponse{
-		Body: &spec.GetSettingsResponseBody{
-			AppTheme: schema.AppTheme,
-			Debug:    schema.Debug,
-			AuthKeys: []spec.AuthKeyMeta{},
-		},
-	}
-	for t, m := range schema.AuthKeys {
-		for n, ak := range m {
-			out.Body.AuthKeys = append(out.Body.AuthKeys, spec.AuthKeyMeta{
-				Type:     t,
-				KeyName:  n,
-				SHA256:   ak.SHA256,
-				NonEmpty: ak.NonEmpty,
-			})
-		}
-	}
-
-	// Sort by Type, then by KeyName.
-	sort.Slice(out.Body.AuthKeys, func(i, j int) bool {
-		if out.Body.AuthKeys[i].Type == out.Body.AuthKeys[j].Type {
-			return out.Body.AuthKeys[i].KeyName < out.Body.AuthKeys[j].KeyName
-		}
-		return out.Body.AuthKeys[i].Type < out.Body.AuthKeys[j].Type
-	})
-
-	return &out, nil
-}
-
-// valueEncDecGetter returns the encoder/decoder to encrypt secrets.
-func (s *SettingStore) valueEncDecGetter(path []string) mapstore.IOEncoderDecoder {
-	// AuthKeys / <type> / <keyName> / secret.
-	if len(path) == 4 && path[0] == settingKeyAuthKeys && path[3] == settingKeySecret {
-		return s.encEncrypt
-	}
-	return nil
-}
-
-func (s *SettingStore) applyDebugSettings(ctx context.Context, cfg spec.DebugSettings) error {
+func (s *SettingStore) applyDebugSettings(
+	ctx context.Context,
+	settings spec.DebugSettings,
+) error {
 	if s == nil || s.debugSettingsApplier == nil {
 		return nil
 	}
-	return s.debugSettingsApplier(ctx, cfg)
+	return s.debugSettingsApplier(ctx, settings)
 }
 
-func ensureAuthKeyNamespaces(schema *spec.SettingsSchema) {
-	if schema.AuthKeys == nil {
-		schema.AuthKeys = spec.AuthKeysSchema{}
-	}
-	if _, ok := schema.AuthKeys[spec.AuthKeyTypeProvider]; !ok {
-		schema.AuthKeys[spec.AuthKeyTypeProvider] = map[spec.AuthKeyName]spec.AuthKey{}
-	}
-	if _, ok := schema.AuthKeys[spec.AuthKeyTypeMCP]; !ok {
-		schema.AuthKeys[spec.AuthKeyTypeMCP] = map[spec.AuthKeyName]spec.AuthKey{}
-	}
-}
-
-func normalizeAuthKeyRef(t spec.AuthKeyType, name spec.AuthKeyName) (spec.AuthKeyType, spec.AuthKeyName, error) {
-	t = spec.AuthKeyType(strings.TrimSpace(string(t)))
-	name = spec.AuthKeyName(strings.TrimSpace(string(name)))
-
-	if t == "" || name == "" {
-		return "", "", spec.ErrInvalidArgument
-	}
-
-	return t, name, nil
-}
-
-// computeSHA returns the hex SHA-256 of the given string.
-func computeSHA(in string) string {
-	sum := sha256.Sum256([]byte(in))
-	return hex.EncodeToString(sum[:])
+// basespecClosedError deliberately keeps Setting Store independent from
+// Artifact Store packages.
+func basespecClosedError() error {
+	return errors.New("settings store: closed")
 }

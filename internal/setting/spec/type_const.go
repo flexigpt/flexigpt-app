@@ -3,17 +3,14 @@ package spec
 import "errors"
 
 const (
-	SchemaVersion = "2026-03-27"
+	SchemaVersion = "2026-03-28"
 	SettingsFile  = "settings.json"
 )
 
 var (
-	ErrInvalidArgument        = errors.New("invalid argument")
-	ErrInvalidTheme           = errors.New("invalid app theme")
-	ErrInvalidAuthKey         = errors.New("invalid auth key")
-	ErrInvalidDebugSettings   = errors.New("invalid debug settings")
-	ErrAuthKeyNotFound        = errors.New("auth key not found")
-	ErrBuiltInAuthKeyReadOnly = errors.New("built-in auth key is read-only")
+	ErrInvalidArgument      = errors.New("invalid argument")
+	ErrInvalidTheme         = errors.New("invalid app theme")
+	ErrInvalidDebugSettings = errors.New("invalid debug settings")
 )
 
 type ThemeType string
@@ -51,31 +48,8 @@ type DebugSettings struct {
 	LogLevel                DebugLogLevel `json:"logLevel"`
 }
 
-// AuthKeyType groups keys (e.g. "provider", "github").
-type AuthKeyType string
-
-const (
-	AuthKeyTypeProvider AuthKeyType = "provider"
-	// AuthKeyTypeMCP is the dedicated namespace for MCP-related secrets.
-	// Use this for MCP transport auth tokens, headers, and env wiring.
-	AuthKeyTypeMCP AuthKeyType = "mcp"
-)
-
-// AuthKeyName is the unique key within its type.
-type AuthKeyName string
-
-// AuthKey holds an encrypted secret plus its SHA-256 hash.
-type AuthKey struct {
-	Secret   string `json:"secret"` // encrypted on disk
-	SHA256   string `json:"sha256"` // plain text
-	NonEmpty bool   `json:"nonEmpty"`
-}
-
-type AuthKeysSchema map[AuthKeyType]map[AuthKeyName]AuthKey
-
 type SettingsSchema struct {
-	SchemaVersion string         `json:"schemaVersion"`
-	AppTheme      AppTheme       `json:"appTheme"`
-	Debug         DebugSettings  `json:"debug"`
-	AuthKeys      AuthKeysSchema `json:"authKeys"`
+	SchemaVersion string        `json:"schemaVersion"`
+	AppTheme      AppTheme      `json:"appTheme"`
+	Debug         DebugSettings `json:"debug"`
 }

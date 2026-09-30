@@ -11,58 +11,63 @@ type SettingStoreWrapper struct {
 	store *settingStore.SettingStore
 }
 
-// InitSettingStoreWrapper boots the underlying store and remembers the pointer.
 func InitSettingStoreWrapper(
-	w *SettingStoreWrapper,
+	wrapper *SettingStoreWrapper,
 	baseDir string,
 ) error {
-	if w == nil {
-		panic("initialising SettingStoreWrapper with <nil> receivers")
+	if wrapper == nil {
+		panic("initialising SettingStoreWrapper with nil receiver")
 	}
-	ss, err := settingStore.NewSettingStore(baseDir)
+
+	store, err := settingStore.NewSettingStore(baseDir)
 	if err != nil {
 		return err
 	}
-	w.store = ss
-
+	wrapper.store = store
 	return nil
 }
 
 func (w *SettingStoreWrapper) SetAppTheme(
-	req *settingSpec.SetAppThemeRequest,
+	request *settingSpec.SetAppThemeRequest,
 ) (*settingSpec.SetAppThemeResponse, error) {
 	return withRecoveryResp(func() (*settingSpec.SetAppThemeResponse, error) {
-		return w.store.SetAppTheme(context.Background(), req)
+		if w == nil || w.store == nil {
+			return nil, settingStoreClosedError()
+		}
+		return w.store.SetAppTheme(context.Background(), request)
 	})
 }
 
 func (w *SettingStoreWrapper) SetDebugSettings(
-	req *settingSpec.SetDebugSettingsRequest,
+	request *settingSpec.SetDebugSettingsRequest,
 ) (*settingSpec.SetDebugSettingsResponse, error) {
 	return withRecoveryResp(func() (*settingSpec.SetDebugSettingsResponse, error) {
-		return w.store.SetDebugSettings(context.Background(), req)
+		if w == nil || w.store == nil {
+			return nil, settingStoreClosedError()
+		}
+		return w.store.SetDebugSettings(context.Background(), request)
 	})
 }
 
 func (w *SettingStoreWrapper) GetSettings(
-	req *settingSpec.GetSettingsRequest,
+	request *settingSpec.GetSettingsRequest,
 ) (*settingSpec.GetSettingsResponse, error) {
 	return withRecoveryResp(func() (*settingSpec.GetSettingsResponse, error) {
-		return w.store.GetSettings(context.Background(), req)
+		if w == nil || w.store == nil {
+			return nil, settingStoreClosedError()
+		}
+		return w.store.GetSettings(context.Background(), request)
 	})
 }
 
-func (w *SettingStoreWrapper) GetAuthKey(
-	req *settingSpec.GetAuthKeyRequest,
-) (*settingSpec.GetAuthKeyResponse, error) {
-	return withRecoveryResp(func() (*settingSpec.GetAuthKeyResponse, error) {
-		return w.store.GetAuthKey(context.Background(), req)
-	})
-}
-
-func (s *SettingStoreWrapper) close() {
-	if s == nil || s.store == nil {
+func (w *SettingStoreWrapper) close() {
+	if w == nil || w.store == nil {
 		return
 	}
-	s.store.Close()
+	_ = w.store.Close()
+	w.store = nil
+}
+
+func settingStoreClosedError() error {
+	return settingStore.ErrClosed()
 }
