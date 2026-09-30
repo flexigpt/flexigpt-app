@@ -4,7 +4,6 @@ import { setFrontendErrorLogger } from '@/lib/frontend_error_reporter';
 
 import type {
 	IAgentStoreAPI,
-	IAggregateAPI,
 	IAttachmentsDropAPI,
 	IBackendAPI,
 	ICompletionAPI,
@@ -51,11 +50,10 @@ export let log: ILogger;
 export let attachmentsDropAPI: IAttachmentsDropAPI;
 export let backendAPI: IBackendAPI;
 export let conversationStoreAPI: IConversationStoreAPI;
-export let aggregateAPI: IAggregateAPI;
 export let settingstoreAPI: ISettingStoreAPI;
+export let completionAPI: ICompletionAPI;
 
 let modelStoreAPI: IModelStoreAPI;
-export let completionAPI: ICompletionAPI;
 export let modelManagementAPI: ModelManagementAPI;
 
 let toolStoreAPI: IToolStoreAPI;
@@ -89,7 +87,6 @@ if (IS_WAILS_PLATFORM) {
 	attachmentsDropAPI = new wailsImpl.WailsAttachmentsDropAPI();
 	backendAPI = new wailsImpl.WailsBackendAPI();
 	conversationStoreAPI = new wailsImpl.WailsConversationStoreAPI();
-	aggregateAPI = new wailsImpl.WailsAggregateAPI();
 	settingstoreAPI = new wailsImpl.WailsSettingStoreAPI();
 	completionAPI = new WailsCompletionAPI();
 

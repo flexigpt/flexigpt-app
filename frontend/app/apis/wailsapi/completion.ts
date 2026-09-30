@@ -3,17 +3,37 @@ import type { StoreConversationMessage } from '@/spec/conversation';
 import type { CompletionResponseBody } from '@/spec/inference';
 import type { MCPConversationContext } from '@/spec/mcp';
 import type { ModelRequestPatch } from '@/spec/model';
+import type { AuthKeyName, AuthKeyType } from '@/spec/setting';
 import type { ToolSelection } from '@/spec/tool';
 
 import type { ICompletionAPI } from '@/apis/interface';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import { createAbortError, optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
-import { CancelCompletion, FetchCompletion } from '@/apis/wailsjs/go/main/AggregrateWrapper';
+import { CancelCompletion, DeleteAuthKey, FetchCompletion, SetAuthKey } from '@/apis/wailsjs/go/main/AggregrateWrapper';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
 const activeCompletionRequestIDs = new Set<string>();
 
 export class WailsCompletionAPI implements ICompletionAPI {
+	async deleteAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+		};
+		await DeleteAuthKey(r as wailsSpec.DeleteAuthKeyRequest);
+	}
+
+	async setAuthKey(type: AuthKeyType, keyName: AuthKeyName, secret: string): Promise<void> {
+		const r = {
+			Type: type,
+			KeyName: keyName,
+			Body: {
+				secret: secret,
+			},
+		};
+		await SetAuthKey(r as wailsSpec.SetAuthKeyRequest);
+	}
+
 	async fetchCompletion(
 		model: ArtifactRef,
 		requestPatch: ModelRequestPatch | undefined,

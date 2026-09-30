@@ -10,7 +10,7 @@ import { omitManyKeys } from '@/lib/obj_utils';
 
 import { useModalDialogController } from '@/hooks/use_dialog_controller';
 
-import { aggregateAPI, modelManagementAPI } from '@/apis/baseapi';
+import { completionAPI, modelManagementAPI } from '@/apis/baseapi';
 
 import type { DropdownItem } from '@/components/dropdown';
 import { Dropdown } from '@/components/dropdown';
@@ -333,7 +333,7 @@ function AddEditAuthKeyModalContent({
 		setSubmitError('');
 		setIsSubmitting(true);
 		try {
-			await aggregateAPI.setAuthKey(finalType, formData.keyName.trim(), formData.secret.trim());
+			await completionAPI.setAuthKey(finalType, formData.keyName.trim(), formData.secret.trim());
 
 			if (!unmountingRef.current) {
 				onChanged();

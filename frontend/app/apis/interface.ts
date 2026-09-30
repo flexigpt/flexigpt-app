@@ -205,6 +205,9 @@ export interface IModelStoreAPI {
 }
 
 export interface ICompletionAPI {
+	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
+	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
+
 	fetchCompletion(
 		model: ArtifactRef,
 		requestPatch: ModelRequestPatch | undefined,
@@ -495,11 +498,6 @@ export interface IAttachmentsDropAPI {
 	 * Useful to navigate to /chats and let pending drops flush.
 	 */
 	setNoTargetHandler(fn: ((payload: AttachmentsDroppedPayload) => void) | null): void;
-}
-
-export interface IAggregateAPI {
-	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
-	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
 }
 
 export interface IMCPStoreAPI {
