@@ -448,7 +448,7 @@ export function MermaidDiagram({
 				}}
 			>
 				<div className="app-bg-code-header flex items-center justify-between px-4">
-					<span className="app-text-code">Mermaid Diagram</span>
+					<span className="app-text-code text-xs">Mermaid Diagram</span>
 
 					<div className="flex items-center gap-2">
 						{showThemeToggle && (

@@ -331,7 +331,7 @@ export default function ModelsPage() {
 
 	return (
 		<PageFrame>
-			<div className="flex size-full flex-col overflow-auto">
+			<div className="flex size-full flex-col items-center overflow-auto">
 				<ManagementPageHeader
 					title="Models"
 					description="Manage Artifact-backed model providers, credentials, defaults, and models."
