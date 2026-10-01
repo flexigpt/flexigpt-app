@@ -35,17 +35,6 @@ func ensureStoreLayout(base string) error {
 		if err := removeStaleManifestTemporaryFiles(base); err != nil {
 			return err
 		}
-		entries, err := os.ReadDir(base)
-		if err != nil {
-			return err
-		}
-		if len(entries) != 0 {
-			return fmt.Errorf(
-				"%w: Artifact Store base directory is non-empty but has no %s",
-				basespec.ErrUnsupported,
-				basespec.ArtifactStoreManifestFileName,
-			)
-		}
 
 		raw, err = json.Marshal(storeManifest{
 			Format:        basespec.ArtifactStoreFormat,
