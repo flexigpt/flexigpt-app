@@ -1,5 +1,3 @@
-import { Link } from 'react-router';
-
 import type { ArtifactRef } from '@/spec/artifact';
 
 import type { ModelProviderManagementItem } from '@/apis/model_management';
@@ -72,7 +70,6 @@ export function DefaultProviderControl({
 			? DEFAULT_PROVIDER_UNAVAILABLE_KEY
 			: DEFAULT_PROVIDER_NONE_KEY;
 
-	const setupDestination = '/models/';
 	const setupLabel = providers.length === 0 ? 'Add a provider' : 'Configure provider API keys';
 
 	return (
@@ -102,23 +99,20 @@ export function DefaultProviderControl({
 			</div>
 
 			{eligibleProviders.length === 0 ? (
-				<div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-					<span className="text-warning">No enabled provider with a configured API key is available.</span>
-					<Link to={setupDestination} className="link">
-						{setupLabel}
-					</Link>
+				<div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+					<span className="text-error">No enabled provider with a configured API key is available. {setupLabel}</span>
 				</div>
 			) : null}
 
 			{defaultUnavailable ? (
-				<div className="text-warning mt-3 text-sm">
+				<div className="text-error mt-2 text-xs">
 					The backend default is no longer available. Select an enabled provider with configured credentials to replace
 					it.
 				</div>
 			) : null}
 
 			{defaultNotRunnable ? (
-				<div className="text-warning mt-3 text-sm">
+				<div className="text-error mt-2 text-xs">
 					The backend default is shown above, but it is not currently enabled and ready to send requests.
 				</div>
 			) : null}

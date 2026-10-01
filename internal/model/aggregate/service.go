@@ -2,6 +2,7 @@ package aggregate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
@@ -34,6 +35,77 @@ func New(
 		runtime:     runtimeResolver,
 		preferences: preferences,
 	}, nil
+}
+
+// InitializeProviderRuntime registers currently available, enabled Providers.
+// It resolves each Provider's current settings and credential through Model
+// Store and the runtime adapter, without resolving Models.
+//
+// Call once after catalog hydration and publisher binding, before serving
+// requests. Independent Provider failures are joined so others can initialize.
+func (s *Service) InitializeProviderRuntime(
+	ctx context.Context,
+	providers []modelConsumerAPI.ProviderListItem,
+) error {
+	if err := s.ready(ctx); err != nil {
+		return err
+	}
+	if _, err := s.providerRuntimePublisher(); err != nil {
+		return err
+	}
+
+	// Inference registration is keyed by logical name, not ArtifactRef. Do not
+	// silently choose one Root's settings or credentials for a colliding name.
+	candidates := make([]modelConsumerAPI.ProviderListItem, 0, len(providers))
+	seen := make(map[artifact.ArtifactRef]struct{}, len(providers))
+	names := make(map[basespec.LogicalName]int)
+	for _, provider := range providers {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if !provider.Enabled || provider.State != artifact.StateAvailable {
+			continue
+		}
+		if _, duplicate := seen[provider.Ref]; duplicate {
+			continue
+		}
+		seen[provider.Ref] = struct{}{}
+		names[provider.Name]++
+		candidates = append(candidates, provider)
+	}
+
+	var result error
+	for _, provider := range candidates {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(result, err)
+		}
+		if names[provider.Name] > 1 {
+			result = errors.Join(
+				result,
+				fmt.Errorf(
+					"%w: runtime Provider %q (%s/%s) has a duplicate logical name",
+					basespec.ErrIdentityConflict,
+					provider.Name,
+					provider.Ref.RootID,
+					provider.Ref.ArtifactID,
+				),
+			)
+			continue
+		}
+		if err := s.publishProviderRuntime(ctx, provider.Ref); err != nil {
+			result = errors.Join(
+				result,
+				fmt.Errorf(
+					"initialize runtime Provider %q (%s/%s): %w",
+					provider.Name,
+					provider.Ref.RootID,
+					provider.Ref.ArtifactID,
+					err,
+				),
+			)
+		}
+	}
+	return errors.Join(result, ctx.Err())
 }
 
 func (s *Service) ResolveRuntimeModel(

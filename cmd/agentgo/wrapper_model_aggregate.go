@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -158,6 +160,56 @@ func (w *ModelAggregateWrapper) targetMappers() (
 	return map[declaration.Type]resolve.ArtifactTargetMapper{
 		declaration.TypeModel: w.service,
 	}, nil
+}
+
+// initModelProviderRuntime restores the shared inference registry at startup.
+// Management Root selection includes built-ins and skips retired Roots.
+func initModelProviderRuntime(
+	ctx context.Context,
+	store *ModelStoreWrapper,
+	aggregate *ModelAggregateWrapper,
+) error {
+	if ctx == nil {
+		return fmt.Errorf(
+			"%w: Model Provider startup context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if store == nil || store.management == nil ||
+		aggregate == nil || aggregate.service == nil {
+		return basespec.ErrClosed
+	}
+
+	roots, err := store.managementRootIDs(ctx, "")
+	if err != nil {
+		return err
+	}
+
+	var (
+		providers []modelConsumerAPI.ProviderListItem
+		result    error
+	)
+	for _, rootID := range roots {
+		if err := ctx.Err(); err != nil {
+			return errors.Join(result, err)
+		}
+		values, err := store.management.ListProviders(ctx, rootID)
+		if err != nil {
+			result = errors.Join(
+				result,
+				fmt.Errorf("list Model Providers in Root %q: %w", rootID, err),
+			)
+			continue
+		}
+		providers = append(providers, values...)
+	}
+	return errors.Join(
+		result,
+		aggregate.service.InitializeProviderRuntime(ctx, providers),
+	)
 }
 
 func (w *ModelAggregateWrapper) close() {

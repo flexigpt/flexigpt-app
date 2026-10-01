@@ -617,6 +617,22 @@ func (a *App) initManagers() {
 				err.Error(),
 		)
 	}
+
+	// Hydration and publisher binding must finish before restoring Providers.
+	err = initModelProviderRuntime(
+		context.Background(),
+		a.modelStoreAPI,
+		a.modelAggregateAPI,
+	)
+	if err != nil {
+		slog.Error("couldn't initialize Model Provider runtime", "error", err)
+		a.artifactInitializationError = errors.Join(
+			a.artifactInitializationError,
+			err,
+		)
+	} else {
+		slog.Info("model Provider runtime initialized")
+	}
 }
 
 // startup is called at application startup.
