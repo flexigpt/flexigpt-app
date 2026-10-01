@@ -827,12 +827,14 @@ function AdvancedParamsModalInner({ currentModel, effectiveReasoningEnabled, onS
 								) : (
 									<span className="text-sm opacity-70">Manual top-level cache control is not available.</span>
 								)}
-								{supportsAutomaticProviderCaching && (
-									<div className="label">
-										<span className="opacity-70">This provider SDK also supports automatic caching behavior.</span>
-									</div>
-								)}
 							</div>
+							{supportsAutomaticProviderCaching && (
+								<div className="label">
+									<span className="text-xs opacity-70">
+										This provider SDK also supports automatic caching behavior.
+									</span>
+								</div>
+							)}
 						</div>
 
 						{supportsManualCacheControl && cacheControlMode === 'enabled' && (
