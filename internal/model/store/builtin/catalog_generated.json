@@ -3533,6 +3533,82 @@
     {
       "address": {
         "kind": "model",
+        "name": "anthropic-claude-sonnet-5-5",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ]
+                    }
+                  },
+                  "defaults": {
+                    "cacheControl": {
+                      "kind": "ephemeral",
+                      "ttl": "5m"
+                    },
+                    "maxOutputTokens": 128000,
+                    "maxPromptTokens": 1000000,
+                    "reasoning": {
+                      "level": "high",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "temperature": 1e-1,
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "Claude Sonnet 5.5",
+                  "name": "anthropic-claude-sonnet-5-5",
+                  "provider": {
+                    "name": "anthropic",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "claude-sonnet-5-5",
+                  "type": "model"
+                },
+                "digest": "sha256:1b0fcc9a801ba1f088c96f52bceb54994993441eff7f1ddce43a29c533fd1ceb",
+                "displayName": "Claude Sonnet 5.5",
+                "kind": "model",
+                "logicalName": "anthropic-claude-sonnet-5-5",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:eb20e2d0271f2b4a6e1f3f2d15a79f081ba448a8f4dfd8ac64f18b5c67d8ffbc",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/anthropic-claude-sonnet-5-5/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdfX0sImRlZmF1bHRzIjp7ImNhY2hlQ29udHJvbCI6eyJraW5kIjoiZXBoZW1lcmFsIiwidHRsIjoiNW0ifSwibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MWUtMSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJDbGF1ZGUgU29ubmV0IDUuNSIsIm5hbWUiOiJhbnRocm9waWMtY2xhdWRlLXNvbm5ldC01LTUiLCJwcm92aWRlciI6eyJuYW1lIjoiYW50aHJvcGljIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImNsYXVkZS1zb25uZXQtNS01IiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:eb20e2d0271f2b4a6e1f3f2d15a79f081ba448a8f4dfd8ac64f18b5c67d8ffbc",
+          "locator": "model.yaml",
+          "size": 578
+        }
+      ],
+      "fingerprint": "sha256:ab2018ff31bbd302032880ec7bcafc0058e3b1ceaf89848c8b56cce18431a84d"
+    },
+    {
+      "address": {
+        "kind": "model",
         "name": "anthropic-claude-sonnet-5",
         "version": "unversioned"
       },
@@ -3548,6 +3624,7 @@
                         "low",
                         "medium",
                         "high",
+                        "xhigh",
                         "max"
                       ],
                       "supportedReasoningTypes": [
@@ -3581,7 +3658,7 @@
                   "providerModelID": "claude-sonnet-5",
                   "type": "model"
                 },
-                "digest": "sha256:f6bfc11053590b005e3b026dbb56de69788c9c407313a583619c5b5053a07e40",
+                "digest": "sha256:81822061a8aae499f638a0cde40303aec57df364d56806ae5ac089934fd1d78e",
                 "displayName": "Claude Sonnet 5",
                 "kind": "model",
                 "logicalName": "anthropic-claude-sonnet-5",
@@ -3590,20 +3667,20 @@
               }
             }
           ],
-          "digest": "sha256:c2a0c295f3dd358cfa34cfa5c31bcc8887243804aaacea23025facbd1f9117d9",
+          "digest": "sha256:1c4e767501dfd789ae69eca8d17f68fdea8a10a990d16d03bed644c7ee6b58a4",
           "locator": "model.yaml"
         }
       ],
       "embeddedRoot": "model/anthropic-claude-sonnet-5/unversioned",
       "files": [
         {
-          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwibWF4Il0sInN1cHBvcnRlZFJlYXNvbmluZ1R5cGVzIjpbInNpbmdsZVdpdGhMZXZlbHMiXX19LCJkZWZhdWx0cyI6eyJjYWNoZUNvbnRyb2wiOnsia2luZCI6ImVwaGVtZXJhbCIsInR0bCI6IjVtIn0sIm1heE91dHB1dFRva2VucyI6MTI4MDAwLCJtYXhQcm9tcHRUb2tlbnMiOjEwMDAwMDAsInJlYXNvbmluZyI6eyJsZXZlbCI6ImhpZ2giLCJ0b2tlbnMiOjAsInR5cGUiOiJzaW5nbGVXaXRoTGV2ZWxzIn0sInN0cmVhbSI6dHJ1ZSwic3lzdGVtUHJvbXB0IjoiIiwidGVtcGVyYXR1cmUiOjFlLTEsInRpbWVvdXRNUyI6MTgwMDAwMH0sImRpc3BsYXlOYW1lIjoiQ2xhdWRlIFNvbm5ldCA1IiwibmFtZSI6ImFudGhyb3BpYy1jbGF1ZGUtc29ubmV0LTUiLCJwcm92aWRlciI6eyJuYW1lIjoiYW50aHJvcGljIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImNsYXVkZS1zb25uZXQtNSIsInR5cGUiOiJtb2RlbCJ9",
-          "digest": "sha256:c2a0c295f3dd358cfa34cfa5c31bcc8887243804aaacea23025facbd1f9117d9",
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdfX0sImRlZmF1bHRzIjp7ImNhY2hlQ29udHJvbCI6eyJraW5kIjoiZXBoZW1lcmFsIiwidHRsIjoiNW0ifSwibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MWUtMSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJDbGF1ZGUgU29ubmV0IDUiLCJuYW1lIjoiYW50aHJvcGljLWNsYXVkZS1zb25uZXQtNSIsInByb3ZpZGVyIjp7Im5hbWUiOiJhbnRocm9waWMiLCJzY29wZSI6ImJ1aWx0aW4ifSwicHJvdmlkZXJNb2RlbElEIjoiY2xhdWRlLXNvbm5ldC01IiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:1c4e767501dfd789ae69eca8d17f68fdea8a10a990d16d03bed644c7ee6b58a4",
           "locator": "model.yaml",
-          "size": 564
+          "size": 572
         }
       ],
-      "fingerprint": "sha256:35089ef6e7fd383a5745ed2974aa733544cc9fcd4e12e7c82b5c8c2f953fd639"
+      "fingerprint": "sha256:01b5cfb9fc68f71601d8280c9d490e2d09a420a2021156f65e88c6359d58b2ee"
     },
     {
       "address": {
@@ -11500,6 +11577,80 @@
         }
       ],
       "fingerprint": "sha256:26ba6828d94901d13e8def4a573119212fe84e0f49dbaefac4bf964f69638814"
+    },
+    {
+      "address": {
+        "kind": "model",
+        "name": "openairesponses-gpt-6.1-sol",
+        "version": "unversioned"
+      },
+      "documents": [
+        {
+          "artifacts": [
+            {
+              "definition": {
+                "body": {
+                  "capabilities": {
+                    "reasoningCapabilities": {
+                      "supportedReasoningLevels": [
+                        "low",
+                        "medium",
+                        "high",
+                        "xhigh",
+                        "max"
+                      ],
+                      "supportedReasoningTypes": [
+                        "singleWithLevels"
+                      ],
+                      "supportsSummaryStyle": true,
+                      "temperatureDisallowedWhenEnabled": true
+                    }
+                  },
+                  "defaults": {
+                    "maxOutputTokens": 128000,
+                    "maxPromptTokens": 1000000,
+                    "reasoning": {
+                      "level": "high",
+                      "tokens": 0,
+                      "type": "singleWithLevels"
+                    },
+                    "stream": true,
+                    "systemPrompt": "",
+                    "temperature": 1,
+                    "timeoutMS": 1800000
+                  },
+                  "displayName": "GPT 6.1 Sol",
+                  "name": "openairesponses-gpt-6.1-sol",
+                  "provider": {
+                    "name": "openairesponses",
+                    "scope": "builtin"
+                  },
+                  "providerModelID": "gpt-6.1-sol",
+                  "type": "model"
+                },
+                "digest": "sha256:9f0d1f05f8cd0008c00a5483396c37db47681a58103373ca02a92d186d350936",
+                "displayName": "GPT 6.1 Sol",
+                "kind": "model",
+                "logicalName": "openairesponses-gpt-6.1-sol",
+                "schemaID": "artifact.model.v1",
+                "schemaVersion": "v1"
+              }
+            }
+          ],
+          "digest": "sha256:803ac7214a6b0d1daf507d7703ec3c02e379afb84a2509ea70f79ee700248768",
+          "locator": "model.yaml"
+        }
+      ],
+      "embeddedRoot": "model/openairesponses-gpt-6.1-sol/unversioned",
+      "files": [
+        {
+          "content": "eyJjYXBhYmlsaXRpZXMiOnsicmVhc29uaW5nQ2FwYWJpbGl0aWVzIjp7InN1cHBvcnRlZFJlYXNvbmluZ0xldmVscyI6WyJsb3ciLCJtZWRpdW0iLCJoaWdoIiwieGhpZ2giLCJtYXgiXSwic3VwcG9ydGVkUmVhc29uaW5nVHlwZXMiOlsic2luZ2xlV2l0aExldmVscyJdLCJzdXBwb3J0c1N1bW1hcnlTdHlsZSI6dHJ1ZSwidGVtcGVyYXR1cmVEaXNhbGxvd2VkV2hlbkVuYWJsZWQiOnRydWV9fSwiZGVmYXVsdHMiOnsibWF4T3V0cHV0VG9rZW5zIjoxMjgwMDAsIm1heFByb21wdFRva2VucyI6MTAwMDAwMCwicmVhc29uaW5nIjp7ImxldmVsIjoiaGlnaCIsInRva2VucyI6MCwidHlwZSI6InNpbmdsZVdpdGhMZXZlbHMifSwic3RyZWFtIjp0cnVlLCJzeXN0ZW1Qcm9tcHQiOiIiLCJ0ZW1wZXJhdHVyZSI6MSwidGltZW91dE1TIjoxODAwMDAwfSwiZGlzcGxheU5hbWUiOiJHUFQgNi4xIFNvbCIsIm5hbWUiOiJvcGVuYWlyZXNwb25zZXMtZ3B0LTYuMS1zb2wiLCJwcm92aWRlciI6eyJuYW1lIjoib3BlbmFpcmVzcG9uc2VzIiwic2NvcGUiOiJidWlsdGluIn0sInByb3ZpZGVyTW9kZWxJRCI6ImdwdC02LjEtc29sIiwidHlwZSI6Im1vZGVsIn0=",
+          "digest": "sha256:803ac7214a6b0d1daf507d7703ec3c02e379afb84a2509ea70f79ee700248768",
+          "locator": "model.yaml",
+          "size": 590
+        }
+      ],
+      "fingerprint": "sha256:16dcbbd65b900265dc560617e951593569de958d3ea6f89d9457d82081510f01"
     },
     {
       "address": {

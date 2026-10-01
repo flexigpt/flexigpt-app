@@ -57,7 +57,7 @@ export const docsCategories: DocsCategory[] = [
 		id: 'context-and-setup',
 		title: 'Context and Reusable Setup',
 		summary:
-			'Use context in Chats, then maintain reusable Agents, Workspaces, connected services, tools, Skills, and models.',
+			'Use context in Chats, then maintain reusable Agents, Workspaces, connected services, built-in tools, Skills, and models.',
 		sections: [
 			{
 				id: 'composer-context',
@@ -88,7 +88,7 @@ export const docsCategories: DocsCategory[] = [
 				id: 'reusable-catalogs',
 				title: 'Reusable Setup',
 				summary:
-					'Choose the right page for Agents, Workspaces, tools, Skills, connected services, models, and settings.',
+					'Choose the right page for Agents, Workspaces, built-in tools, Skills, connected services, models, and title-bar settings.',
 				body: reusableCatalogsBody,
 			},
 		],
@@ -113,7 +113,7 @@ export const docsCategories: DocsCategory[] = [
 			{
 				id: 'local-llm-setup',
 				title: 'Local LLM Setup',
-				summary: 'Set up local model servers, provider forks, model presets, and local-only working habits.',
+				summary: 'Set up local model servers, provider forks, models, and local-only working habits.',
 				body: localLLMSetupBody,
 			},
 		],

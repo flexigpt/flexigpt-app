@@ -25,10 +25,10 @@ This page is the shortest path to a useful first request.
    - Hugging Face
    - OpenRouter
    - Any compatible local LLM server
-2. Open **Settings -> Auth Keys**. Add the provider key.
+2. Open **Models**. Add the provider key alongside the matching provider/model setup.
    - For local endpoints that only require a non-empty value, use a harmless placeholder key.
-3. Open **Model Presets**. Confirm the provider and at least one model preset are enabled, or copy/fork a built-in local provider preset and adjust it for your endpoint.
-4. Open **Chats**. Select a model preset. Type a small test request. Send.
+3. In **Models**, confirm the provider and at least one model are enabled, or copy/fork a built-in local provider and adjust it for your endpoint.
+4. Open **Chats**. Select a model. Type a small test request. Send.
 
 Good first test: `Reply with one sentence confirming the model is working.`
 
@@ -38,7 +38,7 @@ Once that works, attach source material or use a starter Agent.
 
 | If you want to...                       | Start here                                                                                                                                |
 | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Use a normal hosted model               | Add the key in **Settings**, enable the model in **Model Presets**, then use **Chats**.                                                   |
+| Use a normal hosted model               | Add the key and enable the model in **Models**, then use **Chats**.                                                                       |
 | Try many hosted models through one key  | Use OpenRouter. See [Providers and Models](/docs?doc=providers-and-models#openrouter).                                                    |
 | Use a local model server                | Start from a built-in local provider, copy/fork the provider first, then adjust models. See [Local LLM Setup](/docs?doc=local-llm-setup). |
 | Start from a known workflow             | Choose a home screen workflow card or an Agent in **Chats**.                                                                              |
@@ -98,7 +98,7 @@ In the message timeline you can usually:
 - Learn the main work surface: [Chat Workspace](/docs?doc=chat-workspace)
 - Learn how to add files, prompts, tools, skills, and web search: [Composer Context](/docs?doc=composer-context)
 - Learn how to use and manage reusable starting points: [Agents](/docs?doc=agents)
-- Learn how to maintain reusable tools, Skills, model presets, and settings: [Reusable Catalogs](/docs?doc=reusable-catalogs)
+- Learn how to maintain built-in tools, Skills, models, and title-bar settings: [Reusable Catalogs](/docs?doc=reusable-catalogs)
 - Configure providers and local models: [Providers and Models](/docs?doc=providers-and-models)
 - Try outcome-based tasks: [Everyday Recipes](/docs?doc=everyday-recipes)
 
@@ -106,10 +106,10 @@ In the message timeline you can usually:
 
 Check:
 
-- provider key exists in **Settings -> Auth Keys**
-- provider is enabled in **Model Presets**
-- model preset is enabled
-- model preset uses the correct provider/API type
+- provider auth key is configured in **Models**
+- provider is enabled in **Models**
+- model is enabled
+- model uses the correct provider/API type
 - custom endpoint origin includes `http://` or `https://`
 - local server is running, if using a local endpoint
 - current tool or web-search option is not blocked by missing required arguments

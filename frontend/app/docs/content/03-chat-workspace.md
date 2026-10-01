@@ -21,7 +21,7 @@ This page is about working in the chat workspace. For the details of attachments
 
 1. Open **Chats** or choose a home screen workflow card.
 2. Choose an Agent if you want a known workflow shape.
-3. Confirm the model preset and provider.
+3. Confirm the model and provider.
 4. Set **Previous user turns** intentionally.
 5. Add only the context the task needs.
 6. Send.
@@ -53,7 +53,7 @@ The request control bar sits above the editor and controls how the next turn run
 | Control                      | What it affects                                                                                                   |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | **Agent**                    | Loads a starter setup for model, instructions, opening text, tools, Skills, and connected services.               |
-| **Model**                    | Chooses the provider/model preset.                                                                                |
+| **Model**                    | Chooses the provider/model configuration.                                                                         |
 | **Temperature or reasoning** | Controls model style or reasoning behavior where supported.                                                       |
 | **Effort/verbosity**         | Controls output verbosity where supported.                                                                        |
 | **Previous user turns**      | Controls how much earlier user context is resent.                                                                 |
@@ -75,7 +75,7 @@ Use the [Agents](/docs?doc=agents) page to manage Collections, import or export 
 
 Depending on its contents, loading an Agent can:
 
-- select a model preset
+- select a model
 - add instructions to the chat
 - seed editable opening text when the composer is empty
 - make tools available to the model
@@ -170,10 +170,11 @@ Stay in Chats for active work.
 
 Leave Chats when maintaining reusable building blocks:
 
-| Goal                                       | Page          |
-| ------------------------------------------ | ------------- |
-| Import, export, enable, or manage an Agent | Agents        |
-| Add or maintain tool definitions           | Tools         |
-| Add or maintain skills                     | Skills        |
-| Change providers or model presets          | Model Presets |
-| Add provider keys or debug settings        | Settings      |
+| Goal                                       | Page                    |
+| ------------------------------------------ | ----------------------- |
+| Import, export, enable, or manage an Agent | Agents                  |
+| Browse available built-in Go tools         | Tools                   |
+| Add or maintain skills                     | Skills                  |
+| Change providers or models                 | Models                  |
+| Add provider auth keys                     | Models                  |
+| Change theme or logging/debug options      | Title-bar Settings menu |

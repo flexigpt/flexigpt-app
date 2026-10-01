@@ -2,24 +2,16 @@
 
 ## Laundry list
 
-- [ ] check similar any json raw strings needed double decode in go 1.27.
-- [x] reading scrolling tables inside md is problematic. try to build a word wrap and a zoom out with wordwrap, option to enable disable it and then full screen zoom for it. like mermaid zoom i.e show some icon for zooming over a hover and on click it can open as modal. in line we can show wordwrapped.
-- [x] diffs inside a largish convo is sometimes showing blank ui in between when we scroll. sometimes with diffs i.e even in stable state (no streaming) but long enough conversation, we get large cpu usage. in streaming scrolling is worse.
-
 - Testing
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.
   - [ ] test with some skill that has scripts too
+  - [ ] test workspace
+  - [ ] test all management pages again properly
 
 ## M-3
 
-- [x] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
-
-- [ ] Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, Tools, MCPs, Prompt templates etc.
-  - [ ] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts, tools etc.
-    - [ ] may be as a json import bundle or jsonc format
-    - [ ] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
-
+- [ ] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - [x] setup steps for local or custom models
   - recommended models

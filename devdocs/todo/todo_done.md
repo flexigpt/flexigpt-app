@@ -1103,3 +1103,16 @@
 - [x] mcp servers not loaded still in management page
 - [x] mcp oauth thing says no configuration client method sent in initialize.
 - [x] in thinking send in inference, make sure that the first message sent doesnt have encrypted thinking or any such input. same for tool output.
+
+- [x] check similar any json raw strings needed double decode in go 1.27.
+- [x] reading scrolling tables inside md is problematic. try to build a word wrap and a zoom out with wordwrap, option to enable disable it and then full screen zoom for it. like mermaid zoom i.e show some icon for zooming over a hover and on click it can open as modal. in line we can show wordwrapped.
+- [x] diffs inside a largish convo is sometimes showing blank ui in between when we scroll. sometimes with diffs i.e even in stable state (no streaming) but long enough conversation, we get large cpu usage. in streaming scrolling is worse.
+- [x] modelpresets to artifactstore
+- [x] settings as title bar item and not sidebar. authkeys in Models page only.
+
+- [x] a folder selection/input an be given in context bar to say that your current work folder is so and so, so that any claude.md or skills or anything can be selected and auto injected as a "Starter recipe"
+
+- [x] Workflow sharing: easier add via some files/schemas etc. Assistant presets, Model presets, Skills, MCPs, Prompt templates etc.
+  - [x] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts etc.
+    - [x] may be as a json import bundle or jsonc format
+    - [x] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.

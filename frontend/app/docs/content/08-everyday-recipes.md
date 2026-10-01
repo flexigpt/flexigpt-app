@@ -38,7 +38,7 @@ Suggested setup:
 - Home starter: **Develop a Feature**
 - Agent: **Spec Driven Development**
 - Context: repo path, changed files, issue text, requirements, screenshots, failing tests, or design notes
-- Tools: read/write/shell capable preset, with write and shell calls reviewed manually
+- Tools: relevant built-in Go tools, with any side-effecting calls reviewed manually
 - Previous user turns: usually `0` or `1`
 
 Steps:
@@ -92,7 +92,7 @@ Suggested setup:
 
 - Agent: **Reviewing Code**
 - Context: changed files, diff, PR description, tests, logs
-- Tools: read-only tools if useful
+- Tools: read-only built-in tools if useful
 - Previous user turns: small and intentional
 
 Equivalent prompt if starting from blank:
@@ -183,7 +183,7 @@ Use this when you want to compare answer quality, latency, reasoning style, or p
 
 Goal:
 
-- Run the same task through different model presets while keeping everything else the same.
+- Run the same task through different models while keeping everything else the same.
 
 Steps:
 
@@ -211,7 +211,7 @@ Keep constant:
 
 Change only:
 
-- model preset
+- selected model
 
 Equivalent prompt if starting from blank:
 
@@ -241,7 +241,7 @@ Before enabling tools broadly:
 - prefer manual review for new tools
 - inspect tool arguments
 - inspect tool outputs
-- keep auto-execute off for tools that write files, call network endpoints, or run shell/script commands
+- keep auto-execute off for tools that write files or have other external side effects
 - do not enable tools that are not needed
 - retry or discard failed tool calls before sending
 - treat tool error outputs as data you must choose to send deliberately

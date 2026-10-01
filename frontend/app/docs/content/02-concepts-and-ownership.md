@@ -8,7 +8,7 @@ This page gives the vocabulary and explains which page owns each part. Detailed 
 
 - [Mental model](#mental-model)
 - [Main terms](#main-terms)
-- [Agent versus model preset](#agent-versus-model-preset)
+- [Agent versus model](#agent-versus-model)
 - [Context and execution](#context-and-execution)
 - [History](#history)
 - [Built-in content and your content](#built-in-content-and-your-content)
@@ -21,7 +21,7 @@ A chat turn is assembled in layers:
 
 1. **Provider**
    - The API family or endpoint that receives the request.
-2. **Model preset**
+2. **Model**
    - The provider/model choice and request defaults.
 3. **Agent setup**
    - Optional starter workflow: model, instructions, opening text, tools, Skills, and connected services.
@@ -37,19 +37,19 @@ When a result changes, compare these layers one at a time.
 | Term                         | Meaning                                                                                                                                                                                            |
 | ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Provider**                 | The API family or endpoint FlexiGPT talks to, such as OpenAI, Anthropic, Google Gemini API, xAI, Mistral, Hugging Face, OpenRouter, a local runtime preset, or a compatible custom endpoint.       |
-| **Model preset**             | A saved provider/model choice with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.                 |
+| **Model**                    | A saved provider/model configuration with defaults such as model name, streaming, timeout, prompt/output limits, temperature, reasoning, output format, and provider-specific parameters.          |
 | **Agent**                    | A reusable starting setup that can apply a model choice, instructions, opening text, tools, Skills, and connected services.                                                                        |
 | **Instruction context**      | Durable system instruction context built from the selected model default and instruction-only skill sources. The model default comes first; selected sources are then combined in selection order. |
 | **Attachment**               | Message-scoped source material such as files, folders, images, PDFs, or URLs.                                                                                                                      |
-| **Tool**                     | A callable capability the model can request during a conversation.                                                                                                                                 |
+| **Tool**                     | A built-in Go capability the model can request during a conversation.                                                                                                                              |
 | **Skill**                    | A reusable workflow mode, including template-style skills and instruction-only skills that can seed drafts or shape behavior.                                                                      |
 | **MCP server**               | One configured MCP (Model context protocol) endpoint inside a bundle, including transport, auth, trust, setup, discovery, and runtime state.                                                       |
 | **MCP conversation context** | The selected MCP servers, tools, resources, resource templates, prompts, and arguments attached to the next request.                                                                               |
 | **Previous user turns**      | The history window for the next request.                                                                                                                                                           |
 
-## Agent versus model preset
+## Agent versus model
 
-Use a **model preset** when the question is:
+Use a **model** when the question is:
 
 > Which provider, model, and request parameters should run this turn?
 
@@ -96,7 +96,7 @@ If a conversation drifts, reduce **Previous user turns** before changing everyth
 FlexiGPT ships with built-in:
 
 - providers
-- model presets
+- models
 - tools
 - skills
 - MCP server catalogs
@@ -104,7 +104,7 @@ FlexiGPT ships with built-in:
 - docs
 
 Built-in content is generally read-only. You can usually enable or disable it, but not edit its definition directly.
-For local LLM providers, treat built-ins as starting points: copy/fork the provider preset first, adjust the endpoint and compatibility settings, then copy or add model presets under that provider.
+For local LLM providers, treat built-ins as starting points: copy/fork the provider first, adjust the endpoint and compatibility settings, then copy or add models under that provider.
 
 Your local content is stored locally and can be created, edited, deleted, and versioned depending on the page.
 
@@ -120,20 +120,20 @@ See [Agents](/docs?doc=agents#manage-agents) for the management flow.
 | Select MCP server context for a turn                                   | **Chats -> MCP**                |
 | Start from a reusable Agent workflow                                   | **Chats -> Agent menu**         |
 | Import, export, enable, or manage Agents                               | **Agents**                      |
-| Create or maintain tool definitions                                    | **Tools**                       |
+| Browse available built-in Go tools                                     | **Tools**                       |
 | Enable a tool for a conversation                                       | **Chats -> Tools** or an Agent  |
 | Create or maintain skill definitions                                   | **Skills**                      |
 | Enable skills for a conversation                                       | **Chats -> Skills** or an Agent |
 | Create or maintain MCP server catalogs                                 | **MCP Servers**                 |
-| Configure providers and model presets                                  | **Model Presets**               |
-| Add provider keys, theme, and debug settings                           | **Settings**                    |
+| Configure providers, models, and auth keys                             | **Models**                      |
+| Change theme or logging/debug options                                  | Title-bar **Settings** menu     |
 | Search and reopen old conversations                                    | **Chats**                       |
 
 ## Decision guide
 
 | If you want to...                   | Change...                          |
 | ----------------------------------- | ---------------------------------- |
-| Compare model quality               | only the model preset              |
+| Compare model quality               | only the selected model            |
 | Make answers follow a durable style | instruction-only skill source      |
 | Bring exact source material         | attachments                        |
 | Give the model execution ability    | tools                              |

@@ -1,6 +1,6 @@
 # Reusable Catalogs
 
-The pages outside **Chats** maintain reusable building blocks: Agents, tools, Skills, MCP server catalogs, model presets, and app settings.
+The pages outside **Chats** maintain reusable building blocks: Agents, built-in tools, Skills, MCP server catalogs, models, and title-bar settings.
 
 Use Chats to load an Agent and apply reusable setup to a conversation. Use the appropriate pages to inspect, enable, disable, or manage the reusable definitions they own.
 
@@ -10,21 +10,21 @@ Use Chats to load an Agent and apply reusable setup to a conversation. Use the a
 - [Agents](#agents)
 - [Tools](#tools)
 - [Skills](#skills)
-- [Model Presets](#model-presets)
-- [Settings](#settings)
+- [Models](#models)
+- [Title-bar Settings](#title-bar-settings)
 - [Built-in and custom content](#built-in-and-custom-content)
 - [Choosing the right page](#choosing-the-right-page)
 
 ## Catalog ownership
 
-| Goal                                                 | Page          |
-| ---------------------------------------------------- | ------------- |
-| Reuse a whole workflow setup                         | Agents        |
-| Create reusable workflow modes or skill-based drafts | Skills        |
-| Maintain callable capabilities                       | Tools         |
-| Create or maintain MCP server catalogs               | MCP Servers   |
-| Configure providers and models                       | Model Presets |
-| Add auth keys, change theme, or debug settings       | Settings      |
+| Goal                                                 | Page                        |
+| ---------------------------------------------------- | --------------------------- |
+| Reuse a whole workflow setup                         | Agents                      |
+| Create reusable workflow modes or skill-based drafts | Skills                      |
+| Browse available built-in Go capabilities            | Tools                       |
+| Create or maintain MCP server catalogs               | MCP Servers                 |
+| Configure providers, models, and auth keys           | Models                      |
+| Change theme or logging/debug options                | Title-bar **Settings** menu |
 
 ## Agents
 
@@ -36,11 +36,11 @@ After loading an Agent, you can still change the model, draft, instructions, Ski
 
 ## Tools
 
-The **Tools** page manages tool definitions. Runtime execution happens in Chats.
+The **Tools** page lists the built-in Go tool capabilities available in FlexiGPT. Runtime execution happens in Chats.
 
 From a user perspective:
 
-- the Tools page defines what can be selected
+- the Tools page shows the built-in capabilities that can be selected
 - the Chats composer decides which tools are available to a conversation or message
 - the model can then request tool calls
 - tool calls can be run manually or auto-executed if configured
@@ -53,7 +53,7 @@ Safety expectations:
 - inspect outputs before sending them back
 - remove tools not needed for the current workflow
 
-Some tool types are built-in or provider-bound. User-created tools may not cover every implementation type. Use the Tools page UI as the source of truth for current create/edit fields.
+The available tools are built-in Go implementations or provider-bound capabilities. FlexiGPT does not support user-created HTTP tools or arbitrary custom tool definitions. Use the Tools page as the source of truth for available tools and their arguments.
 
 ## Skills
 
@@ -74,15 +74,15 @@ Use skills when you want a reusable workflow mode, a template-style draft starte
 
 Use Agents to preload Skills for common workflows.
 
-## Model Presets
+## Models
 
-The **Model Presets** page owns provider and model setup.
+The **Models** page owns provider, model, and provider-auth setup.
 
 It controls:
 
-- default provider
+- default provider and provider auth keys
 - provider enablement
-- model preset enablement
+- model enablement
 - provider SDK/API compatibility type
 - provider origin and path
 - API key header name
@@ -90,13 +90,13 @@ It controls:
 - model parameters and capability overrides
 - default model per provider
 
-Use Model Presets when changing how requests run. Use Agents when changing the kind of workflow you want to start from.
+Use **Models** when changing how requests run or managing a provider key. Use Agents when changing the kind of workflow you want to start from.
 
 For local and self-hosted LLMs, the recommended customization order is:
 
-1. copy/fork an existing provider preset
+1. copy/fork an existing provider
 2. adjust provider-level settings
-3. then copy, add, or edit model presets under that provider
+3. then copy, add, or edit models under that provider
 
 Do provider first because the provider owns the shared endpoint contract:
 
@@ -107,26 +107,21 @@ Do provider first because the provider owns the shared endpoint contract:
 - default headers
 - provider-wide capability assumptions
 
-Built-in local providers such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM are useful defaults, but local server ports, paths, headers, model names, and feature support vary. Use **Add Provider -> Prefill from Existing -> Copy Existing Provider** to create your local fork instead of trying to edit a read-only built-in. Then use **Add Model Preset -> Copy Existing Preset** if an existing model preset is close to the model your server exposes.
+Built-in local providers such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM are useful defaults, but local server ports, paths, headers, model names, and feature support vary. In **Models**, copy the closest built-in provider, adjust its endpoint and compatibility settings, then add or copy a model under that provider.
 
 See [Local LLM Setup](/docs?doc=local-llm-setup) for a full local runtime setup flow.
 
-## Settings
+## Title-bar Settings
 
-The **Settings** page owns app-wide settings:
+The title-bar **Settings** menu controls theme and logging/debug options. It does not contain provider auth keys.
 
-- theme
-- auth keys
-- debug settings
-- settings export
-
-Provider secrets are stored through the OS keyring. Settings export does not expose raw provider secret values.
+Configure provider auth keys in **Models**, alongside the applicable provider/model setup. Provider secrets are stored through the OS keyring and are not shown as raw values.
 
 Be careful with debug options. Raw request/response logging can include prompts, attachments, tool outputs, and sensitive provider responses.
 
 ## Built-in and custom content
 
-Across model presets, tools, Skills, and Agents:
+Models, Skills, and Agents can include built-in and custom content:
 
 - built-in content ships with the app
 - custom content is stored locally
@@ -134,7 +129,9 @@ Across model presets, tools, Skills, and Agents:
 - built-in items can usually be enabled or disabled
 - custom entries can usually be edited/deleted according to that page’s rules
 
-Practical workflow:
+Tools are different: FlexiGPT exposes only built-in Go tools. They can be selected in Chats, but cannot be created, imported, or edited as custom tool definitions.
+
+For content that supports customization, a practical workflow is:
 
 1. start from built-in content
 2. inspect what it does
@@ -143,18 +140,19 @@ Practical workflow:
 
 ## Choosing the right page
 
-| If you want to...                                    | Go to...                              |
-| ---------------------------------------------------- | ------------------------------------- |
-| Start a reusable workflow                            | Chats -> Agent menu                   |
-| Inspect an Agent's setup                             | Agents                                |
-| Import, export, enable, or manage an Agent           | Agents                                |
-| Create reusable skill-based drafts or behavior rules | Skills                                |
-| Create or maintain tool definitions                  | Tools                                 |
-| Enable a tool in a chat                              | Chats -> Tools or an Agent            |
-| Create or maintain skill definitions                 | Skills                                |
-| Create or maintain MCP server catalogs               | MCP Servers                           |
-| Select MCP server context for a turn                 | Chats -> Composer -> MCP              |
-| Enable Skills in a chat                              | Chats -> Skills or an Agent           |
-| Add an API key                                       | Settings                              |
-| Add a local/custom provider                          | Model Presets                         |
-| Compare models                                       | Chats, changing only the model preset |
+| If you want to...                                    | Go to...                                |
+| ---------------------------------------------------- | --------------------------------------- |
+| Start a reusable workflow                            | Chats -> Agent menu                     |
+| Inspect an Agent's setup                             | Agents                                  |
+| Import, export, enable, or manage an Agent           | Agents                                  |
+| Create reusable skill-based drafts or behavior rules | Skills                                  |
+| Browse available built-in tools                      | Tools                                   |
+| Enable a tool in a chat                              | Chats -> Tools or an Agent              |
+| Create or maintain skill definitions                 | Skills                                  |
+| Create or maintain MCP server catalogs               | MCP Servers                             |
+| Select MCP server context for a turn                 | Chats -> Composer -> MCP                |
+| Enable Skills in a chat                              | Chats -> Skills or an Agent             |
+| Add an API key                                       | Models                                  |
+| Add a local/custom provider                          | Models                                  |
+| Change theme or logging/debug options                | Title-bar Settings menu                 |
+| Compare models                                       | Chats, changing only the selected model |

@@ -17,7 +17,7 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
 
 ## What are you doing?
 
-- Writing the whole LLM setup down as plain, versionable files: models, prompts, Agents, MCP servers, Skills, tools, files, and Workspace context. Open and spec driven, no provider or platform lock-in.
+- Writing the whole LLM setup down as plain, versionable files: models, prompts, Agents, MCP servers, Skills, files, and Workspace context along with built-in Go tools.
 - Assembling every request from that setup, with its exact input inspectable before it is sent. Nothing gets injected behind your back.
 - Controlling every action: you declare what runs automatically, what asks first, and what is never allowed. Pause automatic execution mid task, change input, resume as needed. Per tool, per Agent, per Workspace.
 - Keeping a record of each run - input, output, and what it changed - so it can be reviewed, diffed, and repeated.
@@ -43,11 +43,11 @@ FlexiGPT is a local-first BYOK AI workspace for power users and teams who need r
    - [Mistral AI](https://console.mistral.ai/home?profile_dialog=api-keys)
    - [OpenRouter](https://openrouter.ai/workspaces/default/keys)
    - [Hugging Face](https://huggingface.co/settings/tokens)
-2. Add the key in **Settings -> Auth Keys**.
+2. Open **Models** and add the key alongside the matching provider/model setup.
    - For local endpoints that require a non-empty key, add a harmless placeholder key for the local provider.
-3. Open **Model Presets**. Enable a built-in provider/model or fork a provider preset for your endpoint.
+3. In **Models**, enable a built-in provider/model or fork a provider for your endpoint.
 4. Open **Chats**.
-5. Choose a built-in Agent for a reusable starting setup, or choose a model preset directly.
+5. Choose a built-in Agent for a reusable starting setup, or choose a model directly.
 6. Attach files, folders, notes, PDFs, URLs, or code when the model needs source material.
 7. Optionally select a **Workspace** for recurring repository or folder context, or an already configured **MCP server** for connected tools, resources, or prompts.
 8. Send.
@@ -74,23 +74,23 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 
 ![Reusable Agents and workflow setup](images/assistants.png)
 
-![Local settings and provider auth keys](images/settings.png)
+![Title-bar settings for theme and logging](images/settings.png)
 
 [All images are here](./images/).
 
 ## Key features
 
-### Provider-independent model choices with built-in presets
+### Provider-independent model choices with built-in models
 
 - Built-in support for OpenAI, Anthropic, Google Gemini, xAI, Mistral, Hugging Face, OpenRouter, and local/self-hosted runtimes such as LocalAI, LM Studio, `llama.cpp`, Ollama, SGLang, and vLLM.
 - Custom endpoints across OpenAI Chat Completions, OpenAI Responses, Anthropic Messages, and Google GenerateContent-style APIs.
-- Curated built-in providers and model presets so you can start quickly without manually defining endpoints or defaults first.
-- Provider and model presets are configurable, so local users can copy/fork a built-in provider preset, adjust the endpoint, headers, compatibility type, and model defaults, then use the forked provider in Chats.
-- API keys are stored securely through the OS keyring, not in plain-text exported settings.
+- Curated built-in providers and models so you can start quickly without manually defining endpoints or defaults first.
+- Provider and model configuration is managed in **Models**, where local users can copy/fork a built-in provider, adjust the endpoint, headers, compatibility type, and model defaults, then use the forked provider in Chats.
+- API keys are entered in **Models** and stored securely through the OS keyring, not in plain-text exported settings.
 
 ### Repeatable AI workspace
 
-- One interface for chats, tabs, reusable Agents, Workspaces, MCP servers, model presets, attachments, tools, Skills, search, and exports.
+- One interface for chats, tabs, reusable Agents, Workspaces, MCP servers, models, attachments, tools, Skills, search, and exports.
 - Build repeatable workflows by combining Agents, Workspaces, model choices, attachments, tools, Skills, and connected services.
 - Skills can seed starter drafts, carry instruction-only behavior, or manage reusable workflow state.
 - Switch providers or models as you iterate.
@@ -103,6 +103,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Workspaces provide reusable repository or folder context without reattaching the same project material.
 - MCP servers can contribute selected tools, resources, resource templates, prompts, and instructions from configured local or remote services.
 - Tools can be attached per conversation or per message and configured for manual review or auto-execution.
+- Tool implementations are built-in Go tools. Custom HTTP tools are not supported.
 - When an eligible auto-execute tool is called, FlexiGPT can run it and submit the result back to the model.
 - Keep tools manual when you want tighter control over execution.
 
@@ -129,7 +130,7 @@ FlexiGPT does not proxy LLM calls through a FlexiGPT-hosted service. Requests go
 - Review code, diffs, and PRs for correctness, security, reliability, maintainability, and test gaps.
 - Investigate bugs from logs, stack traces, failing outputs, source files, and config.
 - Refactor code, design tests, implement tests, explore codebases, and review architecture with built-in software Agents.
-- Use read-only Agents for review/investigation and write/shell-capable Agents for implementation, with manual review for write and shell tools.
+- Use read-only Agents for review/investigation and manually review any built-in tool with write or other external side effects.
 
 ### Built-in product, research, and technical-writing workflows
 
@@ -172,7 +173,7 @@ Recipes:
 
 ## Built with
 
-- Data storage: `JSON` and `SQLite` files in the local filesystem.
+- Data storage: local artifact storage backed by `JSON` and `SQLite` files in the local filesystem.
 - [Go](https://go.dev/) backend.
 - [Wails](https://wails.io/) desktop application platform.
 - Official Go SDKs by [OpenAI](https://github.com/openai/openai-go), [Anthropic](https://github.com/anthropics/anthropic-sdk-go), and [Google GenAI](https://github.com/googleapis/go-genai).

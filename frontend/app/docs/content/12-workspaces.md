@@ -73,7 +73,7 @@ Examples:
 
 You can keep using the default setup, or add a Workspace file to the repository when you need a repeatable custom setup.
 
-A Workspace file can describe the local material and reusable tools that are useful for that project.
+A Workspace file can describe the local material and available built-in tools that are useful for that project.
 
 Use the **Workspaces** page to:
 

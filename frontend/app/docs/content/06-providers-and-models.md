@@ -24,13 +24,13 @@ This page covers hosted providers, custom endpoints, and local model setup.
 
 ## Usual setup path
 
-1. Open **Model Presets**.
-2. Enable or create a provider preset.
-3. Enable or create at least one model preset under that provider.
-4. Add the matching key in **Settings -> Auth Keys**.
+1. Open **Models**.
+2. Enable or create a provider.
+3. Enable or add at least one model under that provider.
+4. Add the matching key in **Models**, alongside that provider/model setup.
 5. Set default provider/model if desired.
 6. Open **Chats**.
-7. Select the model preset.
+7. Select the model.
 8. Send a tiny test prompt before using attachments or tools.
 
 Test prompt:
@@ -52,18 +52,18 @@ Built-in hosted providers can include:
 Steps:
 
 1. Create an API key in the provider console.
-2. Open **Settings -> Auth Keys**.
-3. Add or update the key for the matching provider.
-4. Open **Model Presets**.
+2. Open **Models**.
+3. Add or update the key alongside the matching provider/model setup.
+4. Stay in **Models**.
 5. Confirm the provider is enabled.
-6. Confirm the model preset is enabled.
+6. Confirm the model is enabled.
 7. Optionally set the provider/model as default.
 8. Open **Chats** and send a tiny prompt.
 
 If the model does not appear in Chats, check:
 
 - provider is enabled
-- model preset is enabled
+- model is enabled
 - auth key exists and is non-empty if required
 - provider SDK/API type is configured correctly
 - provider origin and path are correct
@@ -76,14 +76,14 @@ OpenRouter is useful when you want one endpoint that can route to many hosted mo
 Steps:
 
 1. Create an OpenRouter API key.
-2. Open **Settings -> Auth Keys**.
+2. Open **Models**.
 3. Add or update the key for the built-in OpenRouter provider.
-4. Open **Model Presets**.
+4. Stay in **Models**.
 5. Enable the OpenRouter provider.
-6. Enable the OpenRouter model preset you want.
+6. Enable the OpenRouter model you want.
 7. Set OpenRouter as default if desired.
 8. Open **Chats**.
-9. Select an OpenRouter model preset.
+9. Select an OpenRouter model.
 10. Send a tiny test prompt.
 
 Test prompt:
@@ -106,18 +106,18 @@ When comparing OpenRouter models, keep everything constant except the model pres
 
 ## Built-in local and self-hosted runtimes
 
-FlexiGPT includes built-in provider and model presets for common local or self-hosted runtimes:
+FlexiGPT includes built-in providers and models for common local or self-hosted runtimes:
 
-| Built-in provider | Default origin           | Compatibility style in the preset  | Typical use                                                |
-| ----------------- | ------------------------ | ---------------------------------- | ---------------------------------------------------------- |
-| LocalAI           | `http://127.0.0.1:8080`  | OpenAI Responses-compatible        | LocalAI or compatible local server                         |
-| LM Studio         | `http://127.0.0.1:1234`  | OpenAI Responses-compatible        | LM Studio local server                                     |
-| `llama.cpp`       | `http://127.0.0.1:8080`  | OpenAI Chat Completions-compatible | `llama-server` with compatible routes                      |
-| Ollama            | `http://127.0.0.1:11434` | Anthropic-compatible               | Ollama-compatible local route matching the built-in preset |
-| SGLang            | `http://127.0.0.1:30000` | OpenAI Responses-compatible        | Self-hosted SGLang endpoint                                |
-| vLLM              | `http://127.0.0.1:8000`  | OpenAI Responses-compatible        | Self-hosted vLLM endpoint                                  |
+| Built-in provider | Default origin           | Configured compatibility style     | Typical use                                               |
+| ----------------- | ------------------------ | ---------------------------------- | --------------------------------------------------------- |
+| LocalAI           | `http://127.0.0.1:8080`  | OpenAI Responses-compatible        | LocalAI or compatible local server                        |
+| LM Studio         | `http://127.0.0.1:1234`  | OpenAI Responses-compatible        | LM Studio local server                                    |
+| `llama.cpp`       | `http://127.0.0.1:8080`  | OpenAI Chat Completions-compatible | `llama-server` with compatible routes                     |
+| Ollama            | `http://127.0.0.1:11434` | Anthropic-compatible               | Ollama-compatible local route matching the built-in setup |
+| SGLang            | `http://127.0.0.1:30000` | OpenAI Responses-compatible        | Self-hosted SGLang endpoint                               |
+| vLLM              | `http://127.0.0.1:8000`  | OpenAI Responses-compatible        | Self-hosted vLLM endpoint                                 |
 
-These presets are defaults, not guarantees. Local runtime behavior varies by server version, launched model, command-line flags, routing layer, and hardware.
+These configurations are defaults, not guarantees. Local runtime behavior varies by server version, launched model, command-line flags, routing layer, and hardware.
 
 Use a built-in provider directly when your server matches the default origin, path, headers, and model names. Otherwise, copy/fork the provider first and edit the fork.
 
@@ -127,9 +127,9 @@ For a guided local setup, see [Local LLM Setup](/docs?doc=local-llm-setup).
 
 For local LLMs, prefer this order:
 
-1. fork/copy the provider preset
+1. fork/copy the provider
 2. edit provider settings
-3. then add or copy model presets under that provider
+3. then add or copy models under that provider
 
 Provider settings come first because they control the shared API contract:
 
@@ -142,16 +142,15 @@ Provider settings come first because they control the shared API contract:
 
 Recommended flow:
 
-1. Open **Model Presets**.
-2. Click **Add Provider**.
-3. Use **Prefill from Existing -> Copy Existing Provider**.
-4. Choose the closest built-in local provider, such as LM Studio, `llama.cpp`, Ollama, LocalAI, SGLang, or vLLM.
-5. Give the new provider a stable provider ID, such as `my-lmstudio` or `workstation-vllm`.
-6. Adjust origin, path, SDK type, headers, and API-key header for your server.
-7. Save and enable the provider.
-8. Add a placeholder auth key in **Settings -> Auth Keys** if the server requires one.
-9. Add, copy, or edit model presets under the forked provider.
-10. Select the forked model preset in **Chats** and send a tiny test prompt.
+1. Open **Models**.
+2. Create a provider by copying the closest built-in provider.
+3. Choose the closest built-in local provider.
+4. Give the new provider a stable provider ID, such as `my-lmstudio` or `workstation-vllm`.
+5. Adjust origin, path, SDK type, headers, and API-key header for your server.
+6. Save and enable the provider.
+7. Add a placeholder auth key in **Models** if the server requires one.
+8. Add, copy, or edit models under the forked provider.
+9. Select the forked model in **Chats** and send a tiny test prompt.
 
 Keep provider IDs stable after use. Chats, Agents, and saved model choices may depend on them.
 
@@ -172,7 +171,7 @@ When adding or forking a custom provider, check:
 - chat path matches the selected API type
 - API-key header name is correct
 - default headers are valid JSON if provided
-- at least one model preset exists under the provider
+- at least one model exists under the provider
 
 Keep provider IDs stable because chats, Agents, and saved model choices may depend on them.
 
@@ -193,15 +192,15 @@ Typical values:
 Steps:
 
 1. Start the local server.
-2. Open **Model Presets**.
+2. Open **Models**.
 3. Copy/fork the closest built-in local provider if one exists.
 4. Otherwise add a provider preset from scratch.
 5. Choose the SDK type that matches the server route.
 6. Set origin and chat path.
-7. Add a model preset with the local model name.
+7. Add a model with the local model name.
 8. Enable provider and model.
-9. Add a placeholder key in **Settings -> Auth Keys** if required.
-10. Open **Chats** and test.
+9. Add a placeholder key in **Models** if required.
+10. Open **Chats**, select the local model, and test.
 
 Test prompt:
 
@@ -269,7 +268,7 @@ If a workflow breaks after switching models, inspect:
 If the first request fails, check:
 
 - provider enabled
-- model preset enabled
+- model enabled
 - auth key exists and is non-empty if required
 - origin includes `http://` or `https://`
 - chat path matches SDK/API compatibility type
@@ -280,7 +279,7 @@ If the first request fails, check:
 
 If the request works but quality is weak, try:
 
-- stronger model preset
+- stronger model
 - higher prompt/output limits
 - fewer stale previous user turns
 - more focused attachments

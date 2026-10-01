@@ -95,7 +95,9 @@ Before sending sensitive or large context, check attachment modes.
 
 ## Tools
 
-Tools let the model ask FlexiGPT to run a capability.
+Tools let the model ask FlexiGPT to run a built-in capability.
+
+FlexiGPT exposes only built-in Go tools. It does not support user-created HTTP tools.
 
 Keep these states separate:
 
@@ -128,7 +130,7 @@ Manual tool flow:
 5. inspect the output
 6. send the output back if useful
 
-Use manual review first for new tools, network tools, file tools, shell/script tools, or any tool with execution risk.
+Use manual review first for an unfamiliar built-in tool or any tool whose arguments or side effects you have not verified.
 
 Auto-execute can run eligible trusted calls with less interruption. Use it only for trusted, low-risk workflows.
 

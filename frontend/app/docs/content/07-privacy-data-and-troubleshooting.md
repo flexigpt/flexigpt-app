@@ -38,7 +38,7 @@ The main trust decision happens when you choose a provider, model, compatible en
 Stored locally by default:
 
 - conversations and local history search data
-- model presets and provider metadata
+- models and provider metadata
 - Agent Collections and Agent files
 - Workspace setup
 - tool definitions
@@ -105,8 +105,8 @@ On-device capabilities include:
 The app also stores local data for:
 
 - settings metadata
-- provider and model presets
-- tool bundles and tool definitions
+- providers and models
+- built-in tool availability and related local configuration
 - Agent Collections and Agent files
 - Workspace setup
 - skill bundles and skills
@@ -115,7 +115,7 @@ The app also stores local data for:
 
 ### Bundled app data
 
-Built-in providers, model presets, tools, Skills, Agents, and docs ship with the app. Your local changes and your own entries are stored separately from bundled defaults.
+Built-in providers, models, tools, Skills, Agents, and docs ship with the app. Your local changes and your own entries are stored separately from bundled defaults.
 
 ## Storage locations
 
@@ -143,8 +143,7 @@ Or open PowerShell and run:
 Local data control surfaces include:
 
 - conversation export from the chat workspace
-- settings export from **Settings**
-- model preset export from **Model Presets**
+- model export from **Models**
 - manual backup by copying the `flexigpt` app-data folder while the app is closed
 - full reset by closing FlexiGPT and removing the local `flexigpt` app-data folder
 
@@ -167,20 +166,21 @@ URL attachments can cause content to be fetched and included in the model reques
 
 Tools and skills can add execution capability or runtime context.
 
+FlexiGPT exposes only built-in Go tools. It does not support user-defined HTTP tools.
+
 Safety points:
 
-- HTTP tools can call network endpoints
-- file-system tools can read or write local paths when exposed and selected
-- shell or script execution tools should be treated as high risk
+- inspect each built-in tool's description, arguments, and expected side effects before enabling it
+- use manual review for tools that can modify local data or perform external actions
 - skill-aware workflows can add skill session context and skill tool choices to the request
 - auto-execute should only be used for trusted tools and low-risk workflows
 - tool outputs can be sent back to the model in later turns
 
-Prefer manual tool review for new, imported, or user-created tools.
+Prefer manual tool review for unfamiliar built-in tools.
 
 ## Debug logs
 
-Debug settings can increase local logging.
+The title-bar **Settings** menu can increase local logging.
 
 Be careful with:
 
@@ -196,9 +196,9 @@ When raw request/response logging is enabled, logs can contain prompts, attachme
 
 Check:
 
-- provider key was added in **Settings**
-- selected provider is enabled in **Model Presets**
-- selected model preset is enabled
+- provider key was added in **Models**
+- selected provider is enabled in **Models**
+- selected model is enabled
 - custom endpoint origin/path are correct
 - local server is running, if applicable
 - current tool or web-search choice is not blocked by missing arguments or configuration
@@ -233,7 +233,7 @@ Use:
 - token usage
 - citations
 - tool details and outputs
-- debug settings only when needed
+- title-bar logging/debug controls only when needed
 
 ## Sensitive-work checklist
 
@@ -247,7 +247,7 @@ Before sending sensitive work:
 - avoid auto-execute for untrusted tools
 - keep raw debug logging off unless actively diagnosing a problem
 - for local-only work, confirm the provider origin points to a local endpoint you control
-- for local-only work, prefer a forked local provider preset with a clear provider ID and harmless placeholder key
+- for local-only work, prefer a forked local provider with a clear provider ID and harmless placeholder key
 - confirm local model servers, routers, or gateways are not proxying the request to a remote service
 - close FlexiGPT before copying or deleting the app-data folder
 - remember API key secrets live in the OS keyring, not only in app files

@@ -22,18 +22,18 @@ Prerequisites:
 
 - OpenRouter account
 - OpenRouter API key
-- OpenRouter provider/model preset enabled in FlexiGPT
+- OpenRouter provider/model enabled in FlexiGPT
 
 Steps:
 
 1. Create an API key in OpenRouter.
-2. Open **Settings -> Auth Keys**.
-3. Add or update the key for OpenRouter.
-4. Open **Model Presets**.
+2. Open **Models**.
+3. Add or update the key for OpenRouter alongside its provider/model setup.
+4. Stay in **Models**.
 5. Confirm the OpenRouter provider is enabled.
-6. Confirm the model preset you want is enabled.
+6. Confirm the model you want is enabled.
 7. Open **Chats**.
-8. Select an OpenRouter model preset.
+8. Select an OpenRouter model.
 9. Send a small test prompt.
 
 Test prompt:
@@ -61,8 +61,8 @@ Use this when you want inference to run through a local endpoint you control.
 Prerequisites:
 
 - local model server running
-- a built-in local provider preset that matches your server, or a forked provider preset pointing to your endpoint
-- provider/model preset enabled in FlexiGPT
+- a built-in local provider that matches your server, or a forked provider pointing to your endpoint
+- provider/model enabled in FlexiGPT
 
 Built-in local and self-hosted provider presets include:
 
@@ -73,25 +73,23 @@ Built-in local and self-hosted provider presets include:
 - SGLang
 - vLLM
 
-These built-ins are good starting points. Because local servers vary in URL, path, headers, API compatibility, model names, and capabilities, the safest durable setup is usually to fork/copy the provider first and then adjust models.
+These built-ins are good starting points. Because local servers vary in URL, path, headers, API compatibility, model names, and capabilities, the safest durable setup is usually to fork/copy the provider first and then add or adjust models.
 
 Steps:
 
 1. Start your local model server.
-2. Open **Model Presets**.
-3. Click **Add Provider**.
-4. Use **Prefill from Existing -> Copy Existing Provider**.
-5. Choose the closest built-in local provider.
-6. Give the forked provider a stable ID and display name.
-7. Adjust the provider origin, chat path, SDK/API compatibility type, API-key header, and default headers for your server.
-8. Save and enable the provider.
-9. Add a placeholder auth key if the provider configuration requires a non-empty key.
-10. Under the forked provider, add a model preset or use **Copy Existing Preset** from a close built-in model.
-11. Set the model name to the exact name or tag expected by your local server.
-12. Enable the model preset and optionally set it as default for that provider.
-13. Open **Chats**.
-14. Select the local model preset.
-15. Send a tiny test prompt.
+2. Open **Models**.
+3. Create a provider by copying the closest built-in local provider.
+4. Give the forked provider a stable ID and display name.
+5. Adjust the provider origin, chat path, SDK/API compatibility type, API-key header, and default headers for your server.
+6. Save and enable the provider.
+7. Add a placeholder auth key in **Models** if the provider requires a non-empty key.
+8. Under the forked provider, add a model or copy a close built-in model.
+9. Set the model name to the exact name or tag expected by your local server.
+10. Enable the model and optionally set it as default for that provider.
+11. Open **Chats**.
+12. Select the local model.
+13. Send a tiny test prompt.
 
 Test prompt:
 
@@ -182,7 +180,7 @@ Steps:
 1. Open **Chats**.
 2. Choose an Agent if a starting setup would help.
 3. Open the **Tools** picker in the composer bottom bar.
-4. Attach a read-oriented or low-risk tool.
+4. Select an available read-oriented or low-risk built-in Go tool.
 5. Keep auto-execute off for the first run.
 6. Ask the model to use the tool only if needed.
 7. When a tool call appears, inspect it.
@@ -201,11 +199,10 @@ Expected result:
 - the model may propose a tool call
 - you stay in control of whether it runs
 
-Creating a new tool:
+Available tools:
 
-- use the **Tools** page to create or maintain tool definitions
-- for first custom tools, prefer a simple HTTP-style tool with clear display name, narrow description, required args schema, safe timeout, predictable response, and manual review first
-- use the Tools page UI as the source of truth for current create/edit fields
+- FlexiGPT exposes only built-in Go tools. It does not provide a custom or HTTP-tool creation flow.
+- Use the **Tools** page as the source of truth for available tools, arguments, and execution behavior.
 
 ## Create your first skill-backed workflow
 
