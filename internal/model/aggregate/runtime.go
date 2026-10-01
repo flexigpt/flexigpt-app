@@ -38,6 +38,11 @@ type RuntimeResolver interface {
 		resolved modelConsumerAPI.ResolvedModel,
 		requestPatch PreparedRuntimeRequestPatch,
 	) (RuntimeConfiguration, error)
+
+	ResolveProviderRuntime(
+		ctx context.Context,
+		resolved modelConsumerAPI.ResolvedProvider,
+	) (inferenceSpec.ProviderParam, error)
 }
 
 // RuntimeModelRequest identifies the Model to resolve and the final portable

@@ -3,21 +3,27 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
+	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 )
+
+type MCPSettingsView struct {
+	Settings mcpAuth.MCPAuthSettings `json:"settings"`
+	Revision uint64                  `json:"revision"`
+}
 
 type MCPStoreWrapper struct {
 	api        *mcpConsumerAPI.API
 	management *mcpConsumerAPI.MCPListService
 	roots      compositionapi.RootAPI
+	settings   *mcpSettingsAdapter
 }
 
 func withMCPStore[T any](
@@ -66,42 +72,6 @@ func (w *MCPStoreWrapper) ListMCPPolicies(
 	})
 }
 
-func (w *MCPStoreWrapper) SetMCPServerEnabled(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (artifact.Artifact, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (artifact.Artifact, error) {
-			return api.SetServerEnabled(
-				context.Background(),
-				ref,
-				expectedRevision,
-				enabled,
-			)
-		},
-	)
-}
-
-func (w *MCPStoreWrapper) SetMCPPolicyEnabled(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (artifact.Artifact, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (artifact.Artifact, error) {
-			return api.SetPolicyEnabled(
-				context.Background(),
-				ref,
-				expectedRevision,
-				enabled,
-			)
-		},
-	)
-}
-
 func (w *MCPStoreWrapper) ListMCPCollectionsPage(
 	pageSize int,
 	pageToken string,
@@ -123,11 +93,55 @@ func (w *MCPStoreWrapper) ListMCPServersPage(
 	})
 }
 
-func (w *MCPStoreWrapper) GetMCPServerInstallation(
+func (w *MCPStoreWrapper) GetMCPSettings() (
+	MCPSettingsView,
+	error,
+) {
+	return withRecoveryResp(func() (MCPSettingsView, error) {
+		if w == nil || w.settings == nil {
+			return MCPSettingsView{}, basespec.ErrClosed
+		}
+		settings, revision, err := w.settings.getMCPSettings(
+			context.Background(),
+		)
+		if err != nil {
+			return MCPSettingsView{}, err
+		}
+		return MCPSettingsView{
+			Settings: settings,
+			Revision: revision,
+		}, nil
+	})
+}
+
+func (w *MCPStoreWrapper) SaveMCPSettings(
+	expectedRevision uint64,
+	settings mcpAuth.MCPAuthSettings,
+) (MCPSettingsView, error) {
+	return withRecoveryResp(func() (MCPSettingsView, error) {
+		if w == nil || w.settings == nil {
+			return MCPSettingsView{}, basespec.ErrClosed
+		}
+		if _, err := w.settings.putMCPSettings(
+			context.Background(),
+			expectedRevision,
+			settings,
+		); err != nil {
+			return MCPSettingsView{}, err
+		}
+		value, revision, err := w.settings.getMCPSettings(context.Background())
+		if err != nil {
+			return MCPSettingsView{}, err
+		}
+		return MCPSettingsView{Settings: value, Revision: revision}, nil
+	})
+}
+
+func (w *MCPStoreWrapper) GetMCPServerSecrets(
 	ref artifact.ArtifactRef,
-) (mcpConsumerAPI.ServerInstallationView, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ServerInstallationView, error) {
-		return api.GetServerInstallation(context.Background(), ref)
+) (mcpConsumerAPI.ServerSecretsView, error) {
+	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ServerSecretsView, error) {
+		return api.GetServerSecrets(context.Background(), ref)
 	})
 }
 
@@ -153,14 +167,6 @@ func (w *MCPStoreWrapper) GetMCPPolicy(
 ) (mcpConsumerAPI.PolicyView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.PolicyView, error) {
 		return api.GetMCPPolicy(context.Background(), ref)
-	})
-}
-
-func (w *MCPStoreWrapper) ResolveMCPArtifactCapabilities(
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (resolve.CapabilityPlan, error) {
-		return api.ResolveArtifactCapabilities(context.Background(), ref)
 	})
 }
 
@@ -223,14 +229,6 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 	)
 }
 
-func (w *MCPStoreWrapper) ResolveMCPCollection(
-	ref artifact.ArtifactRef,
-) (collection.CollectionCapabilityPlan, error) {
-	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionCapabilityPlan, error) {
-		return api.ResolveMCPCollection(context.Background(), ref)
-	})
-}
-
 func (w *MCPStoreWrapper) ListMCPCollections(
 	rootID root.RootID,
 ) ([]collection.ListItem, error) {
@@ -269,11 +267,11 @@ func (w *MCPStoreWrapper) AddMCPCollectionMember(
 	})
 }
 
-func (w *MCPStoreWrapper) AttachMCPArtifactToCollection(
+func (w *MCPStoreWrapper) AddMCPServerToCollection(
 	request collection.AddArtifactMemberRequest,
 ) (collection.CollectionView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
-		return api.AttachMCPArtifactToCollection(context.Background(), request)
+		return api.AddMCPServerToCollection(context.Background(), request)
 	})
 }
 
@@ -302,5 +300,6 @@ func (w *MCPStoreWrapper) close() {
 	}
 	w.api = nil
 	w.management = nil
+	w.settings = nil
 	w.roots = nil
 }

@@ -90,7 +90,7 @@ export function useMCPApproval() {
 			setIsResolving(true);
 
 			try {
-				const result = await mcpManagementAPI.resolveMCPApproval(active.request.approvalID, resolution);
+				const result = await mcpManagementAPI.resolveMCPToolApproval(active.request.approvalID, resolution);
 
 				if (activeApprovalRef.current !== active) {
 					return;
@@ -144,7 +144,7 @@ export function useMCPApproval() {
 
 			if (active) {
 				void mcpManagementAPI
-					.resolveMCPApproval(active.request.approvalID, MCPApprovalResolution.DenyOnce)
+					.resolveMCPToolApproval(active.request.approvalID, MCPApprovalResolution.DenyOnce)
 					.catch(() => undefined);
 				active.reject(new Error('MCP approval UI was closed.'));
 			}
@@ -153,7 +153,7 @@ export function useMCPApproval() {
 			const queued = queuedApprovalsRef.current.splice(0);
 			for (const item of queued) {
 				void mcpManagementAPI
-					.resolveMCPApproval(item.request.approvalID, MCPApprovalResolution.DenyOnce)
+					.resolveMCPToolApproval(item.request.approvalID, MCPApprovalResolution.DenyOnce)
 					.catch(() => undefined);
 				item.reject(new Error('MCP approval UI was closed.'));
 			}

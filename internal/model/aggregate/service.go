@@ -15,6 +15,7 @@ type Service struct {
 	store       *modelConsumerAPI.ManagementStoreFacade
 	runtime     RuntimeResolver
 	preferences DefaultProviderPreferences
+	providers   ProviderRuntimePublisher
 }
 
 func New(

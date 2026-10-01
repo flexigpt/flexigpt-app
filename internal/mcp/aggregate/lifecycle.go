@@ -19,17 +19,10 @@ type RuntimeInvalidator interface {
 
 type Lifecycle struct {
 	store interface {
-		UpdateServerInstallation(
+		SaveServerSettings(
 			ctx context.Context,
 			ref artifact.ArtifactRef,
-			expectedArtifactRevision uint64,
-			data mcpDomainServer.ServerData,
-		) (artifact.Artifact, error)
-
-		UpdateProtectedServerInstallation(
-			ctx context.Context,
-			ref artifact.ArtifactRef,
-			expectedOverlayRevision uint64,
+			expectedSettingsRevision uint64,
 			data mcpDomainServer.ServerData,
 		) error
 	}
@@ -38,17 +31,10 @@ type Lifecycle struct {
 
 func NewLifecycle(
 	store interface {
-		UpdateServerInstallation(
+		SaveServerSettings(
 			ctx context.Context,
 			ref artifact.ArtifactRef,
-			expectedArtifactRevision uint64,
-			data mcpDomainServer.ServerData,
-		) (artifact.Artifact, error)
-
-		UpdateProtectedServerInstallation(
-			ctx context.Context,
-			ref artifact.ArtifactRef,
-			expectedOverlayRevision uint64,
+			expectedSettingsRevision uint64,
 			data mcpDomainServer.ServerData,
 		) error
 	},
@@ -70,7 +56,7 @@ func (l *Lifecycle) InvalidateServer(
 	if l == nil || l.runtime == nil {
 		return mcpServer.ErrClosed
 	}
-	serverID, err := RuntimeServerIDForArtifact(ref)
+	serverID, err := runtimeServerIDForArtifact(ref)
 	if err != nil {
 		return err
 	}
@@ -111,36 +97,19 @@ func (l *Lifecycle) InvalidateServers(
 	return output
 }
 
-func (l *Lifecycle) UpdateServerInstallation(
+func (l *Lifecycle) SaveServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
-	data mcpDomainServer.ServerData,
-) (artifact.Artifact, error) {
-	if err := l.InvalidateServer(ctx, ref); err != nil {
-		return artifact.Artifact{}, err
-	}
-	return l.store.UpdateServerInstallation(
-		ctx,
-		ref,
-		expectedArtifactRevision,
-		data,
-	)
-}
-
-func (l *Lifecycle) UpdateProtectedServerInstallation(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedOverlayRevision uint64,
+	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) error {
 	if err := l.InvalidateServer(ctx, ref); err != nil {
 		return err
 	}
-	return l.store.UpdateProtectedServerInstallation(
+	return l.store.SaveServerSettings(
 		ctx,
 		ref,
-		expectedOverlayRevision,
+		expectedSettingsRevision,
 		data,
 	)
 }

@@ -342,24 +342,14 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		let cancelled = false;
 
 		void mcpManagementAPI
-			.artifactRefForRuntimeServerID(server)
-			.then(async artifact => {
+			.getMCPServerForRuntimeServer(server)
+			.then(resolved => {
 				if (cancelled) {
-					return null;
-				}
-				return {
-					artifact,
-					resolved: await mcpManagementAPI.inspectMCPServer(artifact),
-				};
-			})
-			.then(result => {
-				if (cancelled || !result) {
 					return;
 				}
 
-				const { artifact, resolved } = result;
-				setServerArtifact(artifact);
-				const nextPolicy = resolved.policy.body.appsPolicy;
+				setServerArtifact(resolved.ref);
+				const nextPolicy = resolved.policy?.body.appsPolicy;
 				if (!nextPolicy) {
 					setPolicyError('The server did not return an MCP Apps policy.');
 					return;

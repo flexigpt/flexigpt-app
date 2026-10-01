@@ -33,7 +33,7 @@ func (r *ArtifactServerResolver) ResolveMCPServer(
 		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed
 	}
 
-	ref, err := ArtifactRefForRuntimeServerID(serverID)
+	ref, err := artifactRefForRuntimeServerID(serverID)
 	if err != nil {
 		return mcpDomainServer.Resolved{}, err
 	}

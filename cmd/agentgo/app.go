@@ -64,7 +64,7 @@ type App struct {
 	artifactInitializationError error
 }
 
-func NewApp() *App {
+func newApp() *App {
 	if xdg.DataHome == "" {
 		slog.Error(
 			"could not resolve xdg data paths",
@@ -300,7 +300,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("artifact-backed Tool store, runtime, and aggregate initialized")
 
-	a.modelBuiltInInstaller, err = InitModelWrappers(
+	a.modelBuiltInInstaller, err = initModelWrappers(
 		context.Background(),
 		a.modelStoreAPI,
 		a.modelAggregateAPI,
@@ -452,7 +452,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("skill aggregate and runtime initialized")
 
-	a.mcpBuiltInInstaller, err = InitMCPWrappers(
+	a.mcpBuiltInInstaller, err = initMCPWrappers(
 		context.Background(),
 		a.mcpStoreAPI,
 		a.mcpRuntimeAPI,
@@ -510,7 +510,7 @@ func (a *App) initManagers() {
 		targetMappers,
 		mcpWorkspaceResolver,
 		func(ctx context.Context, rootID root.RootID) error {
-			return EnsureUserArtifactBaselineCollectionsForRoot(
+			return ensureUserArtifactBaselineCollectionsForRoot(
 				ctx,
 				rootID,
 				skillBaselineEnsurer,
@@ -528,7 +528,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("workspace consumer, runtime engine, and aggregate APIs initialized")
 
-	err = EnsureBuiltinArtifactTopology(
+	err = ensureBuiltinArtifactTopology(
 		context.Background(),
 		a.artifactStoreComposition.Topology,
 		a.toolBuiltInInstaller,
@@ -551,7 +551,7 @@ func (a *App) initManagers() {
 		slog.Info("shared built-in artifact topology initialized")
 	}
 
-	err = EnsureUserArtifactBaselineCollections(
+	err = ensureUserArtifactBaselineCollections(
 		context.Background(),
 		artifactComposition.Roots,
 		artifactComposition.Protection,
@@ -600,7 +600,23 @@ func (a *App) initManagers() {
 		panic("failed to initialize managers: aggregate initialization failed\n" + err.Error())
 	}
 
-	a.modelStoreAPI.SetInferenceProviderset(a.completionAPI.providersetAPI)
+	providerPublisher, err := newInferenceProviderRuntimePublisher(
+		a.completionAPI.providersetAPI,
+	)
+	if err != nil {
+		panic(
+			"failed to initialize managers: Model Provider runtime publisher failed\n" +
+				err.Error(),
+		)
+	}
+	if err := a.modelAggregateAPI.setProviderRuntimePublisher(
+		providerPublisher,
+	); err != nil {
+		panic(
+			"failed to initialize managers: Model Provider runtime publisher binding failed\n" +
+				err.Error(),
+		)
+	}
 }
 
 // startup is called at application startup.

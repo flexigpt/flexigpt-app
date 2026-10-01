@@ -4,28 +4,24 @@ import {consumerapi} from '../models';
 import {artifact} from '../models';
 import {root} from '../models';
 
-export function CreateManagedModel(arg1:consumerapi.ManagedModelCreateRequest):Promise<consumerapi.ManagedModelCreateResult>;
+export function CreateModel(arg1:consumerapi.ManagedModelCreateRequest):Promise<consumerapi.ManagedModelCreateResult>;
 
-export function CreateModelProvider(arg1:consumerapi.ManagedProviderCreateRequest):Promise<consumerapi.ManagedProviderCreateResult>;
-
-export function DeleteManagedModel(arg1:artifact.ArtifactRef,arg2:number):Promise<void>;
-
-export function DeleteModelProvider(arg1:artifact.ArtifactRef,arg2:number):Promise<void>;
+export function DeleteModel(arg1:artifact.ArtifactRef,arg2:number):Promise<void>;
 
 export function GetModel(arg1:artifact.ArtifactRef):Promise<consumerapi.ModelView>;
 
-export function GetModelProvider(arg1:artifact.ArtifactRef):Promise<consumerapi.ProviderView>;
+export function GetProvider(arg1:artifact.ArtifactRef):Promise<consumerapi.ProviderView>;
 
-export function ListModelProviders(arg1:root.RootID):Promise<Array<consumerapi.ProviderListItem>>;
+export function GetProviderAPIKeyStatus(arg1:artifact.ArtifactRef):Promise<consumerapi.ProviderAPIKeyStatus>;
 
 export function ListModels(arg1:root.RootID):Promise<Array<consumerapi.ModelListItem>>;
 
-export function ReplaceManagedModel(arg1:consumerapi.ManagedModelReplaceRequest):Promise<consumerapi.ManagedModelReplaceResult>;
+export function ListProviders(arg1:root.RootID):Promise<Array<consumerapi.ProviderListItem>>;
 
-export function ReplaceModelProvider(arg1:consumerapi.ManagedProviderReplaceRequest):Promise<consumerapi.ManagedProviderReplaceResult>;
+export function ResetModelSettings(arg1:artifact.ArtifactRef,arg2:number,arg3:number):Promise<consumerapi.ModelView>;
+
+export function SaveModelSettings(arg1:consumerapi.SaveModelSettingsRequest):Promise<consumerapi.ModelView>;
 
 export function SetModelEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
 
-export function SetModelProviderCredential(arg1:artifact.ArtifactRef,arg2:number,arg3:string):Promise<consumerapi.ProviderRuntimeOverlayView>;
-
-export function SetModelProviderEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
+export function UpdateModel(arg1:consumerapi.ManagedModelReplaceRequest):Promise<consumerapi.ManagedModelReplaceResult>;

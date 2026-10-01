@@ -1,9 +1,8 @@
-import type { ArtifactRef, ArtifactRootID, CapabilityPlan, StoreArtifact } from '@/spec/artifact';
+import type { ArtifactRef, ArtifactRootID } from '@/spec/artifact';
 import type {
 	AddArtifactMemberRequest,
 	AddMemberRequest,
 	ArtifactMembershipView,
-	CollectionCapabilityPlan,
 	CollectionListItem,
 	CollectionView,
 	CreateCollectionRequest,
@@ -14,14 +13,21 @@ import type {
 import type {
 	MCPEffectivePolicy,
 	MCPManagementPage,
+	MCPPolicyListItem,
 	MCPServerInstallationDataView,
 	MCPServerListItem,
+	MCPServerSecretsView,
+	MCPSettings,
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
-import { collectionListItemFromWails, mcpServerListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	collectionListItemFromWails,
+	mcpPolicyListItemFromWails,
+	mcpServerListItemFromWails,
+} from '@/apis/wailsapi/list_item_projection';
 import {
 	optionalWailsString,
 	requiredObject,
@@ -31,12 +37,13 @@ import {
 } from '@/apis/wailsapi/transport';
 import {
 	AddMCPCollectionMember,
-	AttachMCPArtifactToCollection,
+	AddMCPServerToCollection,
 	CreateMCPCollection,
 	DeleteMCPCollection,
 	GetMCPCollection,
 	GetMCPPolicy,
-	GetMCPServerInstallation,
+	GetMCPServerSecrets,
+	GetMCPSettings,
 	ListMCPCollectionMemberships,
 	ListMCPCollections,
 	ListMCPCollectionServers,
@@ -45,11 +52,8 @@ import {
 	ListMCPServers,
 	ListMCPServersPage,
 	RemoveMCPCollectionMember,
-	ResolveMCPArtifactCapabilities,
-	ResolveMCPCollection,
+	SaveMCPSettings,
 	SetMCPCollectionEnabled,
-	SetMCPPolicyEnabled,
-	SetMCPServerEnabled,
 	UpdateMCPCollection,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
 
@@ -97,10 +101,10 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async attachMCPArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
+	async addMCPServerToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
 		return requiredObject<CollectionView>(
-			await AttachMCPArtifactToCollection(request as Parameters<typeof AttachMCPArtifactToCollection>[0]),
-			'AttachMCPArtifactToCollection'
+			await AddMCPServerToCollection(request as Parameters<typeof AddMCPServerToCollection>[0]),
+			'AddMCPServerToCollection'
 		);
 	}
 
@@ -129,11 +133,19 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView> {
-		return installationViewFromWails(
-			await GetMCPServerInstallation(server as Parameters<typeof GetMCPServerInstallation>[0]),
-			'GetMCPServerInstallation'
+	async getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {
+		return requiredObject<MCPServerSecretsView>(
+			await GetMCPServerSecrets(server as Parameters<typeof GetMCPServerSecrets>[0]),
+			'GetMCPServerSecrets'
 		);
+	}
+
+	async getMCPSettings(): Promise<MCPSettings> {
+		const value = requiredObject<{ settings: { oauthLoopbackListenAddr?: string }; revision: number }>(
+			await GetMCPSettings(),
+			'GetMCPSettings'
+		);
+		return { revision: value.revision, oauthLoopbackListenAddr: value.settings.oauthLoopbackListenAddr };
 	}
 
 	async listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]> {
@@ -164,11 +176,11 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		};
 	}
 
-	async listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]> {
-		return wailsObjectArrayOrEmpty<StoreArtifact>(
+	async listMCPPolicies(rootID: ArtifactRootID): Promise<MCPPolicyListItem[]> {
+		return wailsObjectArrayOrEmpty(
 			await ListMCPPolicies(rootID as Parameters<typeof ListMCPPolicies>[0]),
 			'ListMCPPolicies'
-		);
+		).map((value, index) => mcpPolicyListItemFromWails(value, `ListMCPPolicies[${index}]`));
 	}
 
 	async listMCPServers(rootID: ArtifactRootID): Promise<MCPServerListItem[]> {
@@ -199,20 +211,6 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async resolveMCPArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
-			await ResolveMCPArtifactCapabilities(artifact as Parameters<typeof ResolveMCPArtifactCapabilities>[0]),
-			'ResolveMCPArtifactCapabilities'
-		);
-	}
-
-	async resolveMCPCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
-		return requiredObject<CollectionCapabilityPlan>(
-			await ResolveMCPCollection(collection as Parameters<typeof ResolveMCPCollection>[0]),
-			'ResolveMCPCollection'
-		);
-	}
-
 	async setMCPCollectionEnabled(
 		collection: ArtifactRef,
 		expectedRevision: number,
@@ -228,18 +226,15 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		);
 	}
 
-	async setMCPPolicyEnabled(policy: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return requiredObject<StoreArtifact>(
-			await SetMCPPolicyEnabled(policy as Parameters<typeof SetMCPPolicyEnabled>[0], expectedRevision, enabled),
-			'SetMCPPolicyEnabled'
+	async saveMCPSettings(
+		expectedRevision: number,
+		settings: { oauthLoopbackListenAddr?: string }
+	): Promise<MCPSettings> {
+		const value = requiredObject<{ settings: { oauthLoopbackListenAddr?: string }; revision: number }>(
+			await SaveMCPSettings(expectedRevision, settings as Parameters<typeof SaveMCPSettings>[1]),
+			'SaveMCPSettings'
 		);
-	}
-
-	async setMCPServerEnabled(server: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return requiredObject<StoreArtifact>(
-			await SetMCPServerEnabled(server as Parameters<typeof SetMCPServerEnabled>[0], expectedRevision, enabled),
-			'SetMCPServerEnabled'
-		);
+		return { revision: value.revision, oauthLoopbackListenAddr: value.settings.oauthLoopbackListenAddr };
 	}
 
 	async updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView> {

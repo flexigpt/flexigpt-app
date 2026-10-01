@@ -191,12 +191,6 @@ func (r *ArtifactOverlayRepository) DeleteProviderOverlay(
 		return basespec.ErrConflict
 	}
 
-	if err := r.clearCurrentProviderCredential(
-		ctx,
-		record,
-	); err != nil {
-		return err
-	}
 	return r.removeMutableData(
 		ctx,
 		record,
@@ -426,31 +420,6 @@ func (r *ArtifactOverlayRepository) purgeLocalState(
 		return nil
 	}
 	return r.removeMutableData(ctx, record, dataNamespace)
-}
-
-func (r *ArtifactOverlayRepository) clearCurrentProviderCredential(
-	ctx context.Context,
-	record artifact.Artifact,
-) error {
-	binding, found, err := r.GetProviderCredential(
-		ctx,
-		record.Ref(),
-	)
-	if err != nil {
-		return err
-	}
-	if !found || !binding.Active() {
-		return nil
-	}
-
-	return r.ClearProviderCredential(
-		ctx,
-		secret.ClearBindingRequest{
-			Key:                      ProviderCredentialBindingKey(record.Ref()),
-			ExpectedArtifactRevision: record.Revision,
-			ExpectedBindingRevision:  binding.Revision,
-		},
-	)
 }
 
 func (r *ArtifactOverlayRepository) artifact(

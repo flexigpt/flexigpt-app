@@ -114,20 +114,19 @@ function MCPServerDetailsModalContent({
 			const runtimeServerID = requireMCPRuntimeServerID(server);
 			const results = await Promise.allSettled([
 				collectAllPages(
-					pageToken => mcpManagementAPI.listMCPServerToolsPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					pageToken => mcpManagementAPI.listMCPServerTools(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
 					10_000
 				),
 				collectAllPages(
-					pageToken => mcpManagementAPI.listMCPServerResourcesPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					pageToken => mcpManagementAPI.listMCPServerResources(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
 					10_000
 				),
 				collectAllPages(
-					pageToken =>
-						mcpManagementAPI.listMCPServerResourceTemplatesPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					pageToken => mcpManagementAPI.listMCPServerResourceTemplates(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
 					10_000
 				),
 				collectAllPages(
-					pageToken => mcpManagementAPI.listMCPServerPromptsPage(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
+					pageToken => mcpManagementAPI.listMCPServerPrompts(runtimeServerID, DISCOVERY_PAGE_SIZE, pageToken),
 					10_000
 				),
 			]);

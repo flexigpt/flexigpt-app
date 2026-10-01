@@ -1,5 +1,5 @@
-import type { ArtifactRef, ArtifactState, CapabilityPlan, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
-import type { CollectionCapabilityPlan, CollectionListItem, CollectionView } from '@/spec/collection';
+import type { ArtifactRef, ArtifactState, StoreArtifact, StoreArtifactAddress } from '@/spec/artifact';
+import type { CollectionListItem, CollectionView } from '@/spec/collection';
 
 import type { JSONRawString } from '@/lib/jsonschema_utils';
 
@@ -13,7 +13,7 @@ type MCPTimestamp = string;
  * between Runtime calls but must not construct or parse them.
  */
 export type MCPRuntimeServerID = string;
-export type MCPRuntimeCatalogID = string;
+type MCPRuntimeCatalogID = string;
 
 export interface MCPManagementPage<T> {
 	items: T[];
@@ -54,8 +54,7 @@ export enum MCPSecretKind {
 	OAuthClientCredentials = 'oauthClientCredentials',
 	HTTPHeader = 'httpHeader',
 
-	// Runtime-managed only. PutMCPServerSecret and DeleteMCPServerSecret
-	// intentionally reject this value.
+	// Runtime-managed only. Put and Delete intentionally reject this value.
 	OAuthToken = 'oauthToken',
 }
 
@@ -183,7 +182,6 @@ export interface MCPPolicy {
 
 interface MCPInputBinding {
 	value?: string;
-	secretRef?: string;
 }
 
 export interface MCPServerData {
@@ -502,28 +500,6 @@ export interface MCPAuthHealth {
 	lastError?: string;
 }
 
-export interface MCPOAuthAuthorization {
-	server: MCPRuntimeServerID;
-	authorizationURL: string;
-	expiresAt?: MCPTimestamp;
-}
-
-export interface MCPGlobalSettings {
-	settings: MCPAuthSettings;
-	revision: number;
-	oauthRedirectURL?: string;
-	oauthLoopbackListenAddr?: string;
-	oauthRestartRequired: boolean;
-	oauthLoopbackReady: boolean;
-	oauthLoopbackError?: string;
-}
-
-export interface MCPSecretWriteResult {
-	secretRef: string;
-	sha256?: string;
-	nonEmpty: boolean;
-}
-
 export function isMCPAppVisibility(value: unknown): value is MCPAppVisibility {
 	return typeof value === 'string' && Object.values(MCPAppVisibility).includes(value as MCPAppVisibility);
 }
@@ -671,7 +647,65 @@ export interface MCPStorePolicyView {
 	builtIn: boolean;
 }
 
+/**
+ * Bridge-facing aggregate response. Components should use MCPServerView or
+ * MCPRuntimeServerView, both created by MCPManagementAPI.
+ */
+export interface MCPServerAggregateDetails {
+	settings: MCPStoreServerInstallationView;
+	policy: MCPEffectivePolicy;
+	authorization: MCPAuthHealth;
+	connection: MCPServerRuntimeSnapshot;
+}
+
+export interface MCPRuntimeServerView {
+	ref: ArtifactRef;
+	runtimeServerID: MCPRuntimeServerID;
+	policy: MCPEffectivePolicy;
+	authHealth: MCPAuthHealth;
+	runtime: MCPServerRuntimeSnapshot;
+}
+
+export interface MCPServerSetupView {
+	server: ArtifactRef;
+	displayName: string;
+	builtIn: boolean;
+	settingsRevision: number;
+	note?: string;
+	inputs: MCPSetupInputView[];
+}
+
+interface MCPServerSecretInput {
+	name: string;
+	label?: string;
+	description?: string;
+	required: boolean;
+	kind: MCPInputKind;
+	configured: boolean;
+}
+
+export interface MCPServerSecretsView {
+	inputs: MCPServerSecretInput[];
+}
+
+export interface MCPSettings {
+	revision: number;
+	oauthLoopbackListenAddr?: string;
+}
+
 export interface MCPServerListItem {
+	ref: ArtifactRef;
+	name: string;
+	displayName: string;
+	description?: string;
+	state: ArtifactState;
+	enabled: boolean;
+	revision: number;
+	definitionDigest?: string;
+	builtIn: boolean;
+}
+
+export interface MCPPolicyListItem {
 	ref: ArtifactRef;
 	name: string;
 	displayName: string;
@@ -726,27 +760,6 @@ export interface MCPAuthSettings {
 	oauthLoopbackListenAddr?: string;
 }
 
-export interface MCPCollectionManagementView {
-	collection: CollectionView;
-	capabilities: CollectionCapabilityPlan;
-}
-
-export interface MCPServerManagementView {
-	installation: MCPStoreServerInstallationView;
-	capabilities: CapabilityPlan;
-	runtimeServerID: MCPRuntimeServerID;
-	policy: MCPEffectivePolicy;
-	authHealth?: MCPAuthHealth;
-	runtime?: MCPServerRuntimeSnapshot;
-	authHealthError?: string;
-	runtimeError?: string;
-}
-
-export interface MCPPolicyManagementView {
-	policy: MCPStorePolicyView;
-	capabilities: CapabilityPlan;
-}
-
 export interface ManagedMCPReplaceRequest {
 	collection: ArtifactRef;
 	expectedCollectionRevision: number;
@@ -790,6 +803,8 @@ export interface MCPServerView {
 	policy?: MCPEffectivePolicy;
 	policyRef?: ArtifactRef;
 	loadError?: string;
+	authHealth?: MCPAuthHealth;
+	runtime?: MCPServerRuntimeSnapshot;
 }
 
 export interface MCPSetupSecretTarget {

@@ -36,11 +36,11 @@ function ProviderCredentialModalContent({
 	const actionItems: Record<CredentialAction, { isEnabled: boolean; displayName: string }> = {
 		replace: {
 			isEnabled: true,
-			displayName: provider.list.credentialConfigured ? 'Replace credential' : 'Set credential',
+			displayName: provider.apiKey.configured ? 'Replace API key' : 'Set API key',
 		},
 		remove: {
-			isEnabled: provider.list.credentialConfigured ?? false,
-			displayName: 'Remove credential',
+			isEnabled: provider.apiKey.configured,
+			displayName: 'Remove API key',
 		},
 	};
 
@@ -84,8 +84,8 @@ function ProviderCredentialModalContent({
 		<>
 			<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-xl rounded-2xl p-0">
 				<ModalHeader
-					title={`Credential for ${provider.list.displayName}`}
-					description="Credentials are write-only and are never shown after saving."
+					title={`API Key for ${provider.list.displayName}`}
+					description="API keys are write-only and are never shown after saving."
 					onClose={() => {
 						requestClose();
 					}}
@@ -102,7 +102,7 @@ function ProviderCredentialModalContent({
 						</div>
 					) : null}
 
-					{provider.list.credentialConfigured ? (
+					{provider.apiKey.configured ? (
 						<ModalField label="Action">
 							<Dropdown<CredentialAction>
 								dropdownItems={actionItems}
@@ -150,7 +150,7 @@ function ProviderCredentialModalContent({
 							Cancel
 						</button>
 						<button type="submit" className="btn btn-primary rounded-xl" disabled={saving}>
-							{saving ? 'Saving...' : action === 'remove' ? 'Remove Credential' : 'Save Credential'}
+							{saving ? 'Saving...' : action === 'remove' ? 'Remove API Key' : 'Save API Key'}
 						</button>
 					</ModalActions>
 				</form>
@@ -166,8 +166,8 @@ function ProviderCredentialModalContent({
 					await save('');
 				}}
 				confirmButtonText="Remove"
-				title="Remove Provider Credential"
-				message={`Remove the credential for “${provider.list.displayName}”? Requests using this provider will fail until a new credential is configured.`}
+				title="Remove Provider API Key"
+				message={`Remove the API key for “${provider.list.displayName}”? Requests using this provider will fail until a new API key is configured.`}
 			/>
 		</>
 	);
@@ -178,7 +178,7 @@ export function ProviderCredentialModal({ isOpen, provider, onClose, onSave }: P
 		return null;
 	}
 
-	const key = `${provider.list.ref.rootID}:${provider.list.ref.artifactID}:${provider.list.runtimeOverlayRevision ?? 0}`;
+	const key = `${provider.list.ref.rootID}:${provider.list.ref.artifactID}:${provider.apiKey.apiKeyRevision}`;
 
 	return (
 		<ModalDialog isOpen={isOpen} onClose={onClose} blockCancel>

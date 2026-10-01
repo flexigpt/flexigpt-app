@@ -5,19 +5,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
-	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type MCPAggregateWrapper struct {
-	service        *mcpAggregate.Service
-	serverResolver *mcpAggregate.ArtifactServerResolver
+	service *mcpAggregate.Service
 }
 
 func withMCPAggregate[T any](
@@ -45,90 +40,111 @@ func withMCPAggregateError(
 	})
 }
 
-func (w *MCPAggregateWrapper) RuntimeServerIDForArtifact(
+func (w *MCPAggregateWrapper) GetMCPServer(
 	ref artifact.ArtifactRef,
-) (mcpServer.ServerID, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (mcpServer.ServerID, error) {
-		return mcpAggregate.RuntimeServerIDForArtifact(ref)
-	})
+) (mcpAggregate.MCPServerDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
+			return service.GetMCPServer(context.Background(), ref)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) ArtifactRefForRuntimeServerID(
-	id mcpServer.ServerID,
-) (artifact.ArtifactRef, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (artifact.ArtifactRef, error) {
-		return mcpAggregate.ArtifactRefForRuntimeServerID(id)
-	})
+func (w *MCPAggregateWrapper) GetMCPServerForRuntimeServer(
+	server mcpServer.ServerID,
+) (mcpAggregate.MCPServerDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
+			return service.GetMCPServerForRuntimeServer(
+				context.Background(),
+				server,
+			)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) RootIDForRuntimeCatalogID(
-	id mcpServer.CatalogID,
-) (root.RootID, error) {
-	return withMCPAggregate(w, func(*mcpAggregate.Service) (root.RootID, error) {
-		return mcpAggregate.RootIDForRuntimeCatalogID(id)
-	})
-}
-
-func (w *MCPAggregateWrapper) UpdateMCPServerInstallation(
+func (w *MCPAggregateWrapper) SaveMCPServerSettings(
 	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
+	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
-) (artifact.Artifact, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (artifact.Artifact, error) {
-		return service.UpdateServerInstallation(
-			context.Background(),
-			ref,
-			expectedArtifactRevision,
-			data,
-		)
-	})
+) (mcpAggregate.MCPServerDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
+			return service.SaveMCPServerSettings(
+				context.Background(),
+				ref,
+				expectedSettingsRevision,
+				data,
+			)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) UpdateProtectedMCPServerInstallation(
+func (w *MCPAggregateWrapper) SetMCPServerSecret(
 	ref artifact.ArtifactRef,
-	expectedOverlayRevision uint64,
-	data mcpDomainServer.ServerData,
-) error {
-	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.UpdateProtectedServerInstallation(
-			context.Background(),
-			ref,
-			expectedOverlayRevision,
-			data,
-		)
-	})
+	input string,
+	value string,
+) (mcpAggregate.MCPServerDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
+			return service.SetMCPServerSecret(
+				context.Background(),
+				ref,
+				input,
+				value,
+			)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) GetMCPEffectivePolicy(
+func (w *MCPAggregateWrapper) ClearMCPServerSecret(
 	ref artifact.ArtifactRef,
-) (mcpPolicy.Effective, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpPolicy.Effective, error) {
-		return service.GetMCPEffectivePolicy(context.Background(), ref)
-	})
+	input string,
+) (mcpAggregate.MCPServerDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
+			return service.ClearMCPServerSecret(
+				context.Background(),
+				ref,
+				input,
+			)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) CreateManagedMCP(
+func (w *MCPAggregateWrapper) CreateMCPServer(
 	request mcpConsumerAPI.ManagedMCPCreateRequest,
 ) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
-		return service.CreateManagedMCP(context.Background(), request)
-	})
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
+			return service.CreateMCPServer(context.Background(), request)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) ReplaceManagedMCP(
+func (w *MCPAggregateWrapper) UpdateMCPServer(
 	request mcpConsumerAPI.ManagedMCPReplaceRequest,
 ) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
-		return service.ReplaceManagedMCP(context.Background(), request)
-	})
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
+			return service.UpdateMCPServer(context.Background(), request)
+		},
+	)
 }
 
-func (w *MCPAggregateWrapper) PurgeManagedMCP(
+func (w *MCPAggregateWrapper) DeleteMCPServer(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.PurgeManagedMCP(
+		return service.DeleteMCPServer(
 			context.Background(),
 			ref,
 			expectedRevision,
@@ -136,23 +152,23 @@ func (w *MCPAggregateWrapper) PurgeManagedMCP(
 	})
 }
 
-func (w *MCPAggregateWrapper) UpsertManagedMCPPolicy(
+func (w *MCPAggregateWrapper) SaveMCPPolicy(
 	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
 ) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
 	return withMCPAggregate(
 		w,
 		func(service *mcpAggregate.Service) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
-			return service.UpsertManagedMCPPolicy(context.Background(), request)
+			return service.SaveMCPPolicy(context.Background(), request)
 		},
 	)
 }
 
-func (w *MCPAggregateWrapper) PurgeManagedMCPPolicy(
+func (w *MCPAggregateWrapper) DeleteMCPPolicy(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.PurgeManagedMCPPolicy(
+		return service.DeleteMCPPolicy(
 			context.Background(),
 			ref,
 			expectedRevision,
@@ -160,48 +176,8 @@ func (w *MCPAggregateWrapper) PurgeManagedMCPPolicy(
 	})
 }
 
-func (w *MCPAggregateWrapper) PutMCPServerSecret(
-	ref artifact.ArtifactRef,
-	kind mcpDomainSecret.MCPSecretKind,
-	slot string,
-	value string,
-) (mcpAggregate.SecretWriteResult, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpAggregate.SecretWriteResult, error) {
-		return service.PutServerSecret(
-			context.Background(),
-			ref,
-			kind,
-			slot,
-			value,
-		)
-	})
-}
-
-func (w *MCPAggregateWrapper) DeleteMCPServerSecret(
-	ref artifact.ArtifactRef,
-	kind mcpDomainSecret.MCPSecretKind,
-	slot string,
-) error {
-	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
-		return service.DeleteServerSecret(
-			context.Background(),
-			ref,
-			kind,
-			slot,
-		)
-	})
-}
-
-func (w *MCPAggregateWrapper) GetMCPServerAuthHealth(
-	ref artifact.ArtifactRef,
-) (mcpAuth.MCPAuthHealth, error) {
-	return withMCPAggregate(w, func(service *mcpAggregate.Service) (mcpAuth.MCPAuthHealth, error) {
-		return service.GetServerAuthHealth(context.Background(), ref)
-	})
-}
-
 func (w *MCPAggregateWrapper) ready() error {
-	if w == nil || w.service == nil || w.serverResolver == nil {
+	if w == nil || w.service == nil {
 		return basespec.ErrClosed
 	}
 	return nil
@@ -212,5 +188,4 @@ func (w *MCPAggregateWrapper) close() {
 		return
 	}
 	w.service = nil
-	w.serverResolver = nil
 }

@@ -242,6 +242,33 @@ func (a *RuntimeAdapter) ResolveWithRequestPatch(
 	return a.ResolveRuntime(ctx, resolved, prepared)
 }
 
+// ResolveProviderRuntime resolves only the Provider portion of an installed
+// Provider. It intentionally allows a missing API key so provider lifecycle
+// propagation can register endpoint/header changes before a key is configured.
+func (a *RuntimeAdapter) ResolveProviderRuntime(
+	ctx context.Context,
+	resolved modelConsumerAPI.ResolvedProvider,
+) (inferenceSpec.ProviderParam, error) {
+	if a == nil {
+		return inferenceSpec.ProviderParam{}, basespec.ErrClosed
+	}
+	if ctx == nil {
+		return inferenceSpec.ProviderParam{}, fmt.Errorf(
+			"%w: Model Provider runtime resolution context is nil",
+			basespec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return inferenceSpec.ProviderParam{}, err
+	}
+
+	value, err := a.resolveProviderRuntime(ctx, resolved, false)
+	if err != nil {
+		return inferenceSpec.ProviderParam{}, err
+	}
+	return value.param, nil
+}
+
 // ResolveRuntime applies an aggregate-prepared portable defaults patch after
 // adapter, Provider, Provider-overlay, Model, and Model-overlay layers.
 func (a *RuntimeAdapter) ResolveRuntime(
@@ -265,59 +292,18 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		return RuntimeConfiguration{}, err
 	}
 
-	definition, found := a.adapters[resolved.Provider.Document.Adapter]
-	if !found {
-		return RuntimeConfiguration{}, fmt.Errorf(
-			"%w: Model adapter %q is not installed",
-			basespec.ErrUnsupported,
-			resolved.Provider.Document.Adapter,
-		)
-	}
-
-	connection, err := resolveConnection(
-		definition,
-		resolved.Provider.Document.Connection,
-		resolved.ProviderOverlay.Connection,
+	providerRuntime, err := a.resolveProviderRuntime(
+		ctx,
+		modelConsumerAPI.ResolvedProvider{
+			Provider:           resolved.Provider,
+			ProviderOverlay:    resolved.ProviderOverlay,
+			ProviderCredential: resolved.ProviderCredential,
+			Adapter:            resolved.Adapter,
+		},
+		true,
 	)
 	if err != nil {
 		return RuntimeConfiguration{}, err
-	}
-	authentication, err := decodeAuthentication(
-		resolved.Provider.Document.Authentication,
-		definition.APIKeyHeaderKey,
-	)
-	if err != nil {
-		return RuntimeConfiguration{}, err
-	}
-
-	var credential Credential
-	if resolved.ProviderCredential != nil &&
-		resolved.ProviderCredential.Active() {
-		if a.credentials == nil {
-			return RuntimeConfiguration{}, fmt.Errorf(
-				"%w: Model credential resolver is unavailable",
-				basespec.ErrReferenceUnresolved,
-			)
-		}
-		credential, err = a.credentials.ResolveModelCredential(
-			ctx,
-			resolved.ProviderCredential.Clone(),
-		)
-		if err != nil {
-			return RuntimeConfiguration{}, err
-		}
-		if credential.APIKey == "" {
-			return RuntimeConfiguration{}, fmt.Errorf(
-				"%w: Model credential binding resolved to an empty value",
-				basespec.ErrReferenceUnresolved,
-			)
-		}
-	} else if authentication.Mode != "none" {
-		return RuntimeConfiguration{}, fmt.Errorf(
-			"%w: Model Provider %q has no configured credential",
-			basespec.ErrReferenceUnresolved,
-			resolved.Provider.Artifact.LogicalName,
-		)
 	}
 
 	defaults, err := mergeDefaultLayers(
@@ -376,8 +362,8 @@ func (a *RuntimeAdapter) ResolveRuntime(
 		RequestPatch        cryptoutil.Digest `json:"requestPatch,omitempty"`
 	}{
 		ResolvedFingerprint: resolved.Fingerprint,
-		AdapterVersion:      definition.Version,
-		CredentialVersion:   credential.Version,
+		AdapterVersion:      providerRuntime.adapterVersion,
+		CredentialVersion:   providerRuntime.credentialVersion,
 		RequestPatch:        requestPatch.Digest(),
 	})
 	if err != nil {
@@ -385,8 +371,84 @@ func (a *RuntimeAdapter) ResolveRuntime(
 	}
 
 	return RuntimeConfiguration{
-		ProviderParam: inferenceSpec.ProviderParam{
-			Name:                     inferenceSpec.ProviderName(resolved.Provider.Artifact.LogicalName),
+		ProviderParam:       providerRuntime.param,
+		ModelParam:          modelParam,
+		CapabilityOverrides: capabilityOverrides,
+		Fingerprint:         fingerprint,
+	}, nil
+}
+
+type providerRuntimeConfiguration struct {
+	param             inferenceSpec.ProviderParam
+	adapterVersion    string
+	credentialVersion string
+}
+
+func (a *RuntimeAdapter) resolveProviderRuntime(
+	ctx context.Context,
+	resolved modelConsumerAPI.ResolvedProvider,
+	requireCredential bool,
+) (providerRuntimeConfiguration, error) {
+	definition, found := a.adapters[resolved.Provider.Document.Adapter]
+	if !found {
+		return providerRuntimeConfiguration{}, fmt.Errorf(
+			"%w: Model adapter %q is not installed",
+			basespec.ErrUnsupported,
+			resolved.Provider.Document.Adapter,
+		)
+	}
+
+	connection, err := resolveConnection(
+		definition,
+		resolved.Provider.Document.Connection,
+		resolved.ProviderOverlay.Connection,
+	)
+	if err != nil {
+		return providerRuntimeConfiguration{}, err
+	}
+	authentication, err := decodeAuthentication(
+		resolved.Provider.Document.Authentication,
+		definition.APIKeyHeaderKey,
+	)
+	if err != nil {
+		return providerRuntimeConfiguration{}, err
+	}
+
+	var credential Credential
+	if resolved.ProviderCredential != nil &&
+		resolved.ProviderCredential.Active() {
+		if a.credentials == nil {
+			return providerRuntimeConfiguration{}, fmt.Errorf(
+				"%w: Model credential resolver is unavailable",
+				basespec.ErrReferenceUnresolved,
+			)
+		}
+		credential, err = a.credentials.ResolveModelCredential(
+			ctx,
+			resolved.ProviderCredential.Clone(),
+		)
+		if err != nil {
+			return providerRuntimeConfiguration{}, err
+		}
+		if credential.APIKey == "" {
+			return providerRuntimeConfiguration{}, fmt.Errorf(
+				"%w: Model credential binding resolved to an empty value",
+				basespec.ErrReferenceUnresolved,
+			)
+		}
+	} else if requireCredential && authentication.Mode != "none" {
+		return providerRuntimeConfiguration{}, fmt.Errorf(
+			"%w: Model Provider %q has no configured credential",
+			basespec.ErrReferenceUnresolved,
+			resolved.Provider.Artifact.LogicalName,
+		)
+	}
+
+	return providerRuntimeConfiguration{
+		param: inferenceSpec.ProviderParam{
+			Name: inferenceSpec.ProviderName(
+				resolved.Provider.Artifact.LogicalName,
+			),
 			SDKType:                  definition.SDKType,
 			APIKey:                   credential.APIKey,
 			Origin:                   connection.Origin,
@@ -394,9 +456,8 @@ func (a *RuntimeAdapter) ResolveRuntime(
 			APIKeyHeaderKey:          authentication.HeaderName,
 			DefaultHeaders:           connection.Headers,
 		},
-		ModelParam:          modelParam,
-		CapabilityOverrides: capabilityOverrides,
-		Fingerprint:         fingerprint,
+		adapterVersion:    definition.Version,
+		credentialVersion: credential.Version,
 	}, nil
 }
 

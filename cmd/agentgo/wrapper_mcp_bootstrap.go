@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	MCPHostName    = "FlexiGPT"
-	MCPHostVersion = "dev"
+	mcpHostName    = "FlexiGPT"
+	mcpHostVersion = "dev"
 )
 
-func InitMCPWrappers(
+func initMCPWrappers(
 	ctx context.Context,
 	storeWrapper *MCPStoreWrapper,
 	runtimeWrapper *MCPRuntimeWrapper,
@@ -150,7 +150,7 @@ func InitMCPWrappers(
 		return nil, err
 	}
 
-	global, _, err := settings.GetMCPGlobalSettings(ctx)
+	global, _, err := settings.getMCPSettings(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -188,13 +188,13 @@ func InitMCPWrappers(
 		mcpAuth.WithOAuthRedirectURL(broker.RedirectURL()),
 		mcpAuth.WithOAuthTokenStore(tokenStore),
 		mcpAuth.WithClientInfo(
-			MCPHostName,
-			MCPHostVersion,
+			mcpHostName,
+			mcpHostVersion,
 		),
 	)
 	clientFactory, err := sdkclient.NewFactory(mcpServer.ClientInfo{
-		Name:    MCPHostName,
-		Version: MCPHostVersion,
+		Name:    mcpHostName,
+		Version: mcpHostVersion,
 	})
 	if err != nil {
 		return cleanup(err)
@@ -224,6 +224,7 @@ func InitMCPWrappers(
 		Servers:   serverResolver,
 		Source:    source,
 		Store:     managementStore,
+		Runtime:   runtimeManager,
 		Auth:      authManager,
 		Secrets:   secrets,
 	})
@@ -231,7 +232,7 @@ func InitMCPWrappers(
 		return cleanup(err)
 	}
 
-	builtIns, err := NewMCPBuiltInInstaller(
+	builtIns, err := newMCPBuiltInInstaller(
 		hydrator,
 		builtinCleanup,
 	)
@@ -242,20 +243,18 @@ func InitMCPWrappers(
 	storeWrapper.api = storeAPI
 	storeWrapper.management = listService
 	storeWrapper.roots = roots
+	storeWrapper.settings = settings
 
 	runtimeWrapper.runtime = runtimeManager
 	runtimeWrapper.toolBridge = toolBridge
 	runtimeWrapper.auth = authManager
-	runtimeWrapper.settings = settings
 	runtimeWrapper.oauthBroker = broker
-	runtimeWrapper.oauthLoopbackListenAddrAtStart = configuredLoopback
 
 	aggregateWrapper.service = service
-	aggregateWrapper.serverResolver = serverResolver
 	return builtIns, nil
 }
 
-func NewMCPBuiltInInstaller(
+func newMCPBuiltInInstaller(
 	hydrator topology.CompiledHydrationCoordinator,
 	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
 ) (builtin.HydrationInstaller, error) {

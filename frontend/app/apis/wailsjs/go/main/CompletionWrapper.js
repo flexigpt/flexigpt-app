@@ -6,14 +6,6 @@ export function CancelCompletion(arg1) {
   return window['go']['main']['CompletionWrapper']['CancelCompletion'](arg1);
 }
 
-export function DeleteAuthKey(arg1) {
-  return window['go']['main']['CompletionWrapper']['DeleteAuthKey'](arg1);
-}
-
 export function FetchCompletion(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['CompletionWrapper']['FetchCompletion'](arg1, arg2, arg3, arg4, arg5);
-}
-
-export function SetAuthKey(arg1) {
-  return window['go']['main']['CompletionWrapper']['SetAuthKey'](arg1);
 }

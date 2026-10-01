@@ -1,7 +1,7 @@
 import type { AgentView } from '@/spec/agent';
 import type { ArtifactRef } from '@/spec/artifact';
 import type { CollectionListItem } from '@/spec/collection';
-import type { MCPServerListItem } from '@/spec/mcp';
+import type { MCPPolicyListItem, MCPServerListItem } from '@/spec/mcp';
 import type { StoreSkillListItem } from '@/spec/skill';
 import type { ToolStoreListItem } from '@/spec/tool';
 import type { WorkspaceDirectoryListItem } from '@/spec/workspace';
@@ -77,6 +77,12 @@ export function storeSkillListItemFromWails(value: unknown, field: string): Stor
 }
 
 export function mcpServerListItemFromWails(value: unknown, field: string): MCPServerListItem {
+	const item = requiredObject<Record<string, unknown>>(value, field);
+
+	return artifactListFields(item, field);
+}
+
+export function mcpPolicyListItemFromWails(value: unknown, field: string): MCPPolicyListItem {
 	const item = requiredObject<Record<string, unknown>>(value, field);
 
 	return artifactListFields(item, field);

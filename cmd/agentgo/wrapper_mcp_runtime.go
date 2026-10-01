@@ -4,38 +4,23 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
-type MCPGlobalSettingsView struct {
-	Settings                mcpAuth.MCPAuthSettings `json:"settings"`
-	Revision                uint64                  `json:"revision"`
-	OAuthRedirectURL        string                  `json:"oauthRedirectURL,omitempty"`
-	OAuthLoopbackListenAddr string                  `json:"oauthLoopbackListenAddr,omitempty"`
-	OAuthRestartRequired    bool                    `json:"oauthRestartRequired"`
-	OAuthLoopbackReady      bool                    `json:"oauthLoopbackReady"`
-	OAuthLoopbackError      string                  `json:"oauthLoopbackError,omitempty"`
-}
-
-// MCPRuntimeWrapper exposes pure Runtime operations. Every server argument
-// remains an opaque runtime ServerID. ArtifactRef translation stays in the
-// MCP aggregate wrapper.
+// MCPRuntimeWrapper exposes only pure runtime operations. Store and aggregate
+// operations are intentionally exposed by their own wrappers.
 type MCPRuntimeWrapper struct {
 	runtime    *mcpConnection.MCPRuntimeManager
 	toolBridge *invocation.ToolBridge
 	auth       *mcpAuth.AuthManager
 
-	settings                       *mcpSettingsAdapter
-	oauthBroker                    *mcpAuth.OAuthLoopbackBroker
-	oauthLoopbackListenAddrAtStart string
+	oauthBroker *mcpAuth.OAuthLoopbackBroker
 }
 
 func withMCPRuntime[T any](
@@ -63,15 +48,9 @@ func withMCPRuntimeError(
 	})
 }
 
+// ConnectMCPServer starts the managed asynchronous connection flow. The
+// current connection state is returned by aggregate.GetMCPServer.
 func (w *MCPRuntimeWrapper) ConnectMCPServer(
-	server mcpServer.ServerID,
-) (*mcpServer.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
-		return w.runtime.Connect(context.Background(), server)
-	})
-}
-
-func (w *MCPRuntimeWrapper) StartMCPServerConnect(
 	server mcpServer.ServerID,
 ) (*mcpServer.MCPServerRuntimeSnapshot, error) {
 	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
@@ -95,93 +74,64 @@ func (w *MCPRuntimeWrapper) RefreshMCPServer(
 	})
 }
 
-func (w *MCPRuntimeWrapper) GetMCPServerStatus(
-	server mcpServer.ServerID,
-) (*mcpServer.MCPServerRuntimeSnapshot, error) {
-	return withMCPRuntime(w, func() (*mcpServer.MCPServerRuntimeSnapshot, error) {
-		return w.runtime.Status(context.Background(), server)
-	})
-}
-
 func (w *MCPRuntimeWrapper) ListMCPServerTools(
-	server mcpServer.ServerID,
-) ([]mcpServer.MCPToolCapability, error) {
-	return withMCPRuntime(w, func() ([]mcpServer.MCPToolCapability, error) {
-		return w.runtime.ListTools(context.Background(), server)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ListMCPServerToolsPage(
 	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
 ) (mcpConnection.MCPToolCapabilityPage, error) {
-	if err := w.ready(); err != nil {
-		return mcpConnection.MCPToolCapabilityPage{}, err
-	}
-	return w.runtime.ListToolsPage(context.Background(), server, pageSize, pageToken)
+	return withMCPRuntime(w, func() (mcpConnection.MCPToolCapabilityPage, error) {
+		return w.runtime.ListToolsPage(
+			context.Background(),
+			server,
+			pageSize,
+			pageToken,
+		)
+	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResources(
 	server mcpServer.ServerID,
-) ([]mcpServer.MCPResourceRef, error) {
-	return withMCPRuntime(w, func() ([]mcpServer.MCPResourceRef, error) {
-		return w.runtime.ListResources(context.Background(), server)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ListMCPServerResourcesPage(
-	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
 ) (mcpConnection.MCPResourcePage, error) {
-	if err := w.ready(); err != nil {
-		return mcpConnection.MCPResourcePage{}, err
-	}
-	return w.runtime.ListResourcesPage(context.Background(), server, pageSize, pageToken)
+	return withMCPRuntime(w, func() (mcpConnection.MCPResourcePage, error) {
+		return w.runtime.ListResourcesPage(
+			context.Background(),
+			server,
+			pageSize,
+			pageToken,
+		)
+	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplates(
 	server mcpServer.ServerID,
-) ([]mcpServer.MCPResourceTemplateRef, error) {
-	return withMCPRuntime(w, func() ([]mcpServer.MCPResourceTemplateRef, error) {
-		return w.runtime.ListResourceTemplates(context.Background(), server)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ListMCPServerResourceTemplatesPage(
-	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
 ) (mcpConnection.MCPResourceTemplatePage, error) {
-	if err := w.ready(); err != nil {
-		return mcpConnection.MCPResourceTemplatePage{}, err
-	}
-	return w.runtime.ListResourceTemplatesPage(
-		context.Background(),
-		server,
-		pageSize,
-		pageToken,
-	)
+	return withMCPRuntime(w, func() (mcpConnection.MCPResourceTemplatePage, error) {
+		return w.runtime.ListResourceTemplatesPage(
+			context.Background(),
+			server,
+			pageSize,
+			pageToken,
+		)
+	})
 }
 
 func (w *MCPRuntimeWrapper) ListMCPServerPrompts(
 	server mcpServer.ServerID,
-) ([]mcpServer.MCPPromptRef, error) {
-	return withMCPRuntime(w, func() ([]mcpServer.MCPPromptRef, error) {
-		return w.runtime.ListPrompts(context.Background(), server)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ListMCPServerPromptsPage(
-	server mcpServer.ServerID,
 	pageSize int,
 	pageToken string,
 ) (mcpConnection.MCPPromptPage, error) {
-	if err := w.ready(); err != nil {
-		return mcpConnection.MCPPromptPage{}, err
-	}
-	return w.runtime.ListPromptsPage(context.Background(), server, pageSize, pageToken)
+	return withMCPRuntime(w, func() (mcpConnection.MCPPromptPage, error) {
+		return w.runtime.ListPromptsPage(
+			context.Background(),
+			server,
+			pageSize,
+			pageToken,
+		)
+	})
 }
 
 func (w *MCPRuntimeWrapper) ReadMCPResource(
@@ -212,36 +162,31 @@ func (w *MCPRuntimeWrapper) CompleteMCPArgument(
 	})
 }
 
-func (w *MCPRuntimeWrapper) EvaluateMCPToolCall(
+func (w *MCPRuntimeWrapper) CheckMCPToolCall(
 	server mcpServer.ServerID,
 	request *mcpServer.InvokeMCPToolRequestBody,
 ) (*mcpServer.MCPApprovalEvaluation, error) {
 	return withMCPRuntime(w, func() (*mcpServer.MCPApprovalEvaluation, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf(
+				"%w: MCP tool request is required",
+				mcpServer.ErrMCPInvalidRuntimeRequest,
+			)
 		}
 		return w.toolBridge.Evaluate(context.Background(), server, *request)
 	})
 }
 
-func (w *MCPRuntimeWrapper) EvaluateMappedMCPToolCall(
-	mapping mcpConversation.MCPProviderToolMapping,
-	request *mcpServer.InvokeMCPToolRequestBody,
-) (*mcpServer.MCPApprovalEvaluation, error) {
-	return withMCPRuntime(w, func() (*mcpServer.MCPApprovalEvaluation, error) {
-		if request == nil {
-			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
-		}
-		return w.toolBridge.EvaluateMapped(context.Background(), mapping, *request)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ResolveMCPApproval(
+func (w *MCPRuntimeWrapper) ResolveMCPToolApproval(
 	approvalID string,
 	resolution mcpServer.MCPApprovalResolution,
 ) (mcpServer.MCPApprovalResolutionResult, error) {
 	return withMCPRuntime(w, func() (mcpServer.MCPApprovalResolutionResult, error) {
-		return w.toolBridge.ResolveApproval(context.Background(), approvalID, resolution)
+		return w.toolBridge.ResolveApproval(
+			context.Background(),
+			approvalID,
+			resolution,
+		)
 	})
 }
 
@@ -251,38 +196,16 @@ func (w *MCPRuntimeWrapper) InvokeMCPTool(
 ) (*mcpServer.InvokeMCPToolResponseBody, error) {
 	return withMCPRuntime(w, func() (*mcpServer.InvokeMCPToolResponseBody, error) {
 		if request == nil {
-			return nil, fmt.Errorf("%w: MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
+			return nil, fmt.Errorf(
+				"%w: MCP tool request is required",
+				mcpServer.ErrMCPInvalidRuntimeRequest,
+			)
 		}
 		return w.toolBridge.Invoke(context.Background(), server, *request)
 	})
 }
 
-func (w *MCPRuntimeWrapper) InvokeMappedMCPTool(
-	mapping mcpConversation.MCPProviderToolMapping,
-	request *mcpServer.InvokeMCPToolRequestBody,
-) (*mcpServer.InvokeMCPToolResponseBody, error) {
-	return withMCPRuntime(w, func() (*mcpServer.InvokeMCPToolResponseBody, error) {
-		if request == nil {
-			return nil, fmt.Errorf("%w: mapped MCP tool request is required", mcpServer.ErrMCPInvalidRuntimeRequest)
-		}
-		return w.toolBridge.InvokeMapped(context.Background(), mapping, *request)
-	})
-}
-
-func (w *MCPRuntimeWrapper) ListPendingMCPOAuthAuthorizations() (
-	[]mcpAuth.MCPOAuthAuthorization,
-	error,
-) {
-	return withMCPRuntime(w, func() ([]mcpAuth.MCPOAuthAuthorization, error) {
-		values := w.oauthBroker.Pending()
-		if values == nil {
-			values = []mcpAuth.MCPOAuthAuthorization{}
-		}
-		return values, nil
-	})
-}
-
-func (w *MCPRuntimeWrapper) CancelPendingMCPOAuthAuthorization(
+func (w *MCPRuntimeWrapper) CancelMCPServerAuthorization(
 	server mcpServer.ServerID,
 ) (bool, error) {
 	return withMCPRuntime(w, func() (bool, error) {
@@ -291,42 +214,16 @@ func (w *MCPRuntimeWrapper) CancelPendingMCPOAuthAuthorization(
 		}
 		cancelled := w.oauthBroker.Cancel(server)
 		if err := w.runtime.Disconnect(context.Background(), server); err != nil {
-			slog.Warn("cancel MCP OAuth runtime connection", "server", server, "error", err)
+			slog.Warn(
+				"cancel MCP OAuth runtime connection",
+				"server",
+				server,
+				"error",
+				err,
+			)
 		}
 		w.auth.ClearAuthStatus(server)
 		return cancelled, nil
-	})
-}
-
-func (w *MCPRuntimeWrapper) UpdateMCPGlobalSettings(
-	expectedRevision uint64,
-	settings mcpAuth.MCPAuthSettings,
-) (uint64, error) {
-	return withMCPRuntime(w, func() (uint64, error) {
-		return w.settings.PutMCPGlobalSettings(context.Background(), expectedRevision, settings)
-	})
-}
-
-func (w *MCPRuntimeWrapper) GetMCPGlobalSettings() (
-	MCPGlobalSettingsView,
-	error,
-) {
-	return withMCPRuntime(w, func() (MCPGlobalSettingsView, error) {
-		settings, revision, err := w.settings.GetMCPGlobalSettings(context.Background())
-		if err != nil {
-			return MCPGlobalSettingsView{}, err
-		}
-		view := MCPGlobalSettingsView{
-			Settings: settings,
-			Revision: revision,
-		}
-		view.OAuthRedirectURL = w.oauthBroker.RedirectURL()
-		view.OAuthLoopbackListenAddr = w.oauthBroker.ListenAddr()
-		view.OAuthLoopbackReady, view.OAuthLoopbackError = w.oauthBroker.Readiness()
-		view.OAuthRestartRequired =
-			strings.TrimSpace(settings.OAuthLoopbackListenAddr) !=
-				w.oauthLoopbackListenAddrAtStart
-		return view, nil
 	})
 }
 
@@ -335,7 +232,6 @@ func (w *MCPRuntimeWrapper) ready() error {
 		w.runtime == nil ||
 		w.toolBridge == nil ||
 		w.auth == nil ||
-		w.settings == nil ||
 		w.oauthBroker == nil {
 		return basespec.ErrClosed
 	}
@@ -346,17 +242,18 @@ func (w *MCPRuntimeWrapper) close() {
 	if w == nil {
 		return
 	}
+
 	runtimeManager := w.runtime
 	broker := w.oauthBroker
+
 	w.runtime = nil
 	w.toolBridge = nil
 	w.auth = nil
-	w.settings = nil
 	w.oauthBroker = nil
-	w.oauthLoopbackListenAddrAtStart = ""
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+
 	if runtimeManager != nil {
 		if err := runtimeManager.Close(ctx); err != nil {
 			slog.Error("close artifact-backed MCP runtime", "error", err)

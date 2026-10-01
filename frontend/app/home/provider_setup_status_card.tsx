@@ -22,12 +22,12 @@ export function ProviderSetupStatus({
 			<div className="text-base-content/60 mt-3 flex flex-wrap items-center justify-center gap-2 text-xs">
 				<span className="text-success inline-flex items-center gap-1">
 					<FiCheckCircle size={13} />
-					API key configured:
+					Provider ready:
 				</span>
 				<span>{providerSummary}</span>
 				<span className="opacity-50">·</span>
-				<Link to="/settings/#auth-keys" className="link-hover inline-flex items-center gap-1">
-					Manage keys &rarr;
+				<Link to="/models/" className="link-hover inline-flex items-center gap-1">
+					Manage providers &rarr;
 				</Link>
 			</div>
 		);
@@ -48,9 +48,9 @@ export function ProviderSetupStatus({
 					}
 				: state === 'needs-credentials'
 					? {
-							title: 'No providers configured',
-							description: 'Configure an enabled provider credential in Settings to start chatting.',
-							to: '/settings/#auth-keys',
+							title: 'No provider API key configured',
+							description: 'Configure an enabled provider API key in Models to start chatting.',
+							to: '/models/',
 						}
 					: {
 							title: 'Provider configuration unavailable',
@@ -81,7 +81,7 @@ export function ProviderSetupStatus({
 					{state === 'needs-credentials' ? (
 						<span className="text-base-content/60 mt-2 inline-flex items-center gap-1 text-xs">
 							<FiSettings size={12} />
-							Settings → Auth Keys
+							Models → Provider API Keys
 						</span>
 					) : null}
 				</div>

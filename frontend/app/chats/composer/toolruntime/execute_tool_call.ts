@@ -164,7 +164,7 @@ async function executeMCPToolCall(
 
 	let evaluation: MCPApprovalEvaluation;
 	try {
-		evaluation = await mcpManagementAPI.evaluateMCPToolCall(selection.server, req);
+		evaluation = await mcpManagementAPI.checkMCPToolCall(selection.server, req);
 	} catch (error) {
 		const message = error instanceof Error && error.message.trim() ? error.message : 'MCP approval evaluation failed.';
 		return {
@@ -231,7 +231,7 @@ async function executeMCPToolCall(
 							summary: evaluation.summary,
 							reason: evaluation.reason,
 						})
-					: await mcpManagementAPI.resolveMCPApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
+					: await mcpManagementAPI.resolveMCPToolApproval(evaluation.approvalID, MCPApprovalResolution.DenyOnce);
 		} catch (error) {
 			const message =
 				error instanceof Error && error.message.trim() ? error.message : 'MCP approval could not be resolved.';

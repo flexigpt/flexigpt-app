@@ -43,7 +43,7 @@ function providerDefaultModel(
 	provider: ModelProviderManagementItem,
 	models: ModelManagementItem[]
 ): ModelManagementItem | undefined {
-	const reference = provider.view.document.defaultModel;
+	const reference = provider.view.defaultModel;
 	if (!reference) {
 		return undefined;
 	}
@@ -109,8 +109,8 @@ export function ModelProviderCard({
 						</StatusBadge>
 						<StatusBadge>{provider.list.builtIn ? 'Built-in' : 'Custom'}</StatusBadge>
 						{isGlobalDefault ? <StatusBadge tone="info">Default provider</StatusBadge> : null}
-						<StatusBadge tone={provider.list.credentialConfigured ? 'success' : 'warning'}>
-							{provider.list.credentialConfigured ? 'Credential configured' : 'Credential missing'}
+						<StatusBadge tone={provider.apiKey.configured ? 'success' : 'warning'}>
+							{provider.apiKey.configured ? 'API key configured' : 'API key missing'}
 						</StatusBadge>
 						{!available ? <StatusBadge tone="warning">Unavailable</StatusBadge> : null}
 					</>
@@ -165,7 +165,7 @@ export function ModelProviderCard({
 							}}
 						>
 							<FiKey size={16} />
-							<span>{provider.list.credentialConfigured ? 'Manage Credential' : 'Set Credential'}</span>
+							<span>{provider.apiKey.configured ? 'Manage API Key' : 'Set API Key'}</span>
 						</button>
 						<button
 							type="button"

@@ -71,7 +71,6 @@ interface MCPBundleCardProps {
 	onLoadServers: () => Promise<void>;
 	onRefreshServers: () => Promise<void>;
 	onToggleBundleEnabled: (bundle: MCPBundleView, enabled: boolean) => Promise<void>;
-	onToggleServerEnabled: (bundle: MCPBundleView, server: MCPServerView, enabled: boolean) => Promise<void>;
 	onSaveServer: (bundle: MCPBundleView, server: MCPServerView | undefined, draft: MCPServerDraft) => Promise<void>;
 	onSaveSetup: (
 		server: MCPServerView,
@@ -109,7 +108,6 @@ export function MCPBundleCard({
 	onLoadServers,
 	onRefreshServers,
 	onToggleBundleEnabled,
-	onToggleServerEnabled,
 	onSaveServer,
 	onSaveSetup,
 	onDeleteServer,
@@ -352,30 +350,7 @@ export function MCPBundleCard({
 											{authHealth?.lastError ? <div className="text-error text-xs">{authHealth.lastError}</div> : null}
 										</div>
 
-										<ActionRow
-											leading={
-												<EnabledControl
-													id={`mcp-server-${artifactID}`}
-													checked={server.enabled}
-													disabled={!operational || !bundle.enabled}
-													busy={isPending(`${artifactID}:toggle`)}
-													title={
-														!operational
-															? 'The server installation is unavailable.'
-															: !bundle.enabled
-																? 'Enable the Collection before changing its server settings.'
-																: undefined
-													}
-													onChange={enabled => {
-														void runAction(`${artifactID}:toggle`, () =>
-															onToggleServerEnabled(bundle, server, enabled)
-														).catch((error: unknown) => {
-															showAlert(getErrorMessage(error, 'Failed to change MCP server state.'));
-														});
-													}}
-												/>
-											}
-										>
+										<ActionRow>
 											<button
 												type="button"
 												className="btn btn-sm btn-ghost rounded-xl"

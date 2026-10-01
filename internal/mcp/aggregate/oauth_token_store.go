@@ -81,7 +81,7 @@ func (s *OAuthTokenStore) DeleteOAuthToken(
 }
 
 func oauthTokenSecretRef(serverID mcpServer.ServerID) (string, error) {
-	ref, err := ArtifactRefForRuntimeServerID(serverID)
+	ref, err := artifactRefForRuntimeServerID(serverID)
 	if err != nil {
 		return "", err
 	}

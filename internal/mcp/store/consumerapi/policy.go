@@ -16,7 +16,7 @@ import (
 	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
 )
 
-func (a *API) UpsertManagedMCPPolicy(
+func (a *API) SaveMCPPolicy(
 	ctx context.Context,
 	request ManagedMCPPolicyUpsertRequest,
 ) (ManagedMCPPolicyUpsertResult, error) {
@@ -157,7 +157,7 @@ func (a *API) UpsertManagedMCPPolicy(
 	return result, nil
 }
 
-func (a *API) PurgeManagedMCPPolicy(
+func (a *API) DeleteMCPPolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,

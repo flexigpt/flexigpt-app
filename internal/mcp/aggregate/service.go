@@ -3,16 +3,12 @@ package aggregate
 import (
 	"context"
 	"errors"
-	"fmt"
-	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
@@ -25,8 +21,15 @@ type AuthState interface {
 	) mcpAuth.MCPAuthHealth
 }
 
-// SecretStore is deliberately narrow. Aggregate owns the mapping from runtime
-// identity to artifact-scoped secret identity; the app supplies persistence.
+type RuntimeStatusReader interface {
+	Status(
+		ctx context.Context,
+		server mcpServer.ServerID,
+	) (*mcpServer.MCPServerRuntimeSnapshot, error)
+}
+
+// SecretStore is deliberately narrow. Aggregate owns secret writes and
+// runtime invalidation while the application supplies persistence.
 type SecretStore interface {
 	ResolveSecret(ctx context.Context, ref string) (string, error)
 
@@ -44,6 +47,7 @@ type Dependencies struct {
 	Servers   *ArtifactServerResolver
 	Source    *RuntimeServerSource
 	Store     mcpConsumerAPI.ManagementStore
+	Runtime   RuntimeStatusReader
 	Auth      AuthState
 	Secrets   SecretStore
 }
@@ -53,14 +57,18 @@ type Service struct {
 	servers   *ArtifactServerResolver
 	source    *RuntimeServerSource
 	store     mcpConsumerAPI.ManagementStore
+	runtime   RuntimeStatusReader
 	auth      AuthState
 	secrets   SecretStore
 }
 
-type SecretWriteResult struct {
-	SecretRef string `json:"secretRef"`
-	SHA256    string `json:"sha256,omitempty"`
-	NonEmpty  bool   `json:"nonEmpty"`
+// MCPServerDetails is the one normal server read used by management callers.
+// It intentionally composes existing Store, policy, auth, and runtime views.
+type MCPServerDetails struct {
+	Settings      mcpConsumerAPI.ServerInstallationView `json:"settings"`
+	Policy        mcpPolicy.Effective                   `json:"policy"`
+	Authorization mcpAuth.MCPAuthHealth                 `json:"authorization"`
+	Connection    mcpServer.MCPServerRuntimeSnapshot    `json:"connection"`
 }
 
 func NewService(dependencies Dependencies) (*Service, error) {
@@ -68,6 +76,7 @@ func NewService(dependencies Dependencies) (*Service, error) {
 		dependencies.Servers == nil ||
 		dependencies.Source == nil ||
 		dependencies.Store == nil ||
+		dependencies.Runtime == nil ||
 		dependencies.Auth == nil ||
 		dependencies.Secrets == nil {
 		return nil, errors.New("MCP aggregate dependencies are incomplete")
@@ -78,216 +87,94 @@ func NewService(dependencies Dependencies) (*Service, error) {
 		servers:   dependencies.Servers,
 		source:    dependencies.Source,
 		store:     dependencies.Store,
+		runtime:   dependencies.Runtime,
 		auth:      dependencies.Auth,
 		secrets:   dependencies.Secrets,
 	}, nil
 }
 
-func (s *Service) InspectRuntimeConfig(
+func (s *Service) GetMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpServer.RuntimeConfig, mcpDomainServer.Resolved, error) {
+) (MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
-		return mcpServer.RuntimeConfig{}, mcpDomainServer.Resolved{}, err
+		return MCPServerDetails{}, err
 	}
-	return s.source.InspectRuntimeConfig(ctx, ref)
+
+	settings, err := s.store.GetServerSettings(ctx, ref)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	policy, err := s.store.GetServerEffectivePolicy(ctx, ref)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	authorization, err := s.serverAuthHealth(ctx, ref)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+
+	serverID, err := runtimeServerIDForArtifact(ref)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	connection, err := s.runtime.Status(ctx, serverID)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	if connection == nil {
+		return MCPServerDetails{}, mcpServer.ErrClosed
+	}
+
+	return MCPServerDetails{
+		Settings:      settings,
+		Policy:        policy,
+		Authorization: authorization,
+		Connection:    *connection,
+	}, nil
 }
 
-func (s *Service) UpdateServerInstallation(
+func (s *Service) GetMCPServerForRuntimeServer(
+	ctx context.Context,
+	serverID mcpServer.ServerID,
+) (MCPServerDetails, error) {
+	if err := s.ready(); err != nil {
+		return MCPServerDetails{}, err
+	}
+	ref, err := artifactRefForRuntimeServerID(serverID)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	return s.GetMCPServer(ctx, ref)
+}
+
+func (s *Service) SaveMCPServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
+	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
-) (artifact.Artifact, error) {
+) (MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
-		return artifact.Artifact{}, err
+		return MCPServerDetails{}, err
 	}
-	value, err := s.lifecycle.UpdateServerInstallation(
+	resolved, err := s.servers.InspectMCPServer(ctx, ref)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	data = retainServerSecretBindings(
+		resolved.Installation,
+		data,
+		resolved.Document,
+	)
+	return s.saveMCPServerSettings(
 		ctx,
 		ref,
-		expectedArtifactRevision,
+		expectedSettingsRevision,
 		data,
 	)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	s.clearServerAuthStatus(ref)
-	return value, nil
 }
 
-func (s *Service) UpdateProtectedServerInstallation(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedOverlayRevision uint64,
-	data mcpDomainServer.ServerData,
-) error {
-	if err := s.ready(); err != nil {
-		return err
-	}
-	if err := s.lifecycle.UpdateProtectedServerInstallation(
-		ctx,
-		ref,
-		expectedOverlayRevision,
-		data,
-	); err != nil {
-		return err
-	}
-	s.clearServerAuthStatus(ref)
-	return nil
-}
-
-func (s *Service) PutServerSecret(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	kind mcpDomainSecret.MCPSecretKind,
-	slot string,
-	value string,
-) (SecretWriteResult, error) {
-	if err := s.ready(); err != nil {
-		return SecretWriteResult{}, err
-	}
-	if kind == mcpDomainSecret.MCPSecretKindOAuthToken {
-		return SecretWriteResult{}, fmt.Errorf(
-			"%w: OAuth token secrets are runtime-managed",
-			mcpAuth.ErrMCPInvalidAuthRequest,
-		)
-	}
-
-	installation, err := s.store.GetServerInstallation(ctx, ref)
-	if err != nil {
-		return SecretWriteResult{}, err
-	}
-	if err := installation.Document.AcceptsSecretTarget(
-		kind,
-		slot,
-	); err != nil {
-		return SecretWriteResult{}, err
-	}
-
-	if kind == mcpDomainSecret.MCPSecretKindOAuthClientCredentials {
-		switch installation.Document.Configuration.Auth.Mode {
-		case mcpv1.HTTPAuthModeOAuth, mcpv1.HTTPAuthModeClientCredentials:
-		default:
-			return SecretWriteResult{}, fmt.Errorf(
-				"%w: MCP server does not declare OAuth client credentials",
-				mcpAuth.ErrMCPInvalidAuthRequest,
-			)
-		}
-		if err := mcpAuth.ValidateOAuthClientCredentialsSecret(
-			value,
-			installation.Document.OAuthClientSecretRequired(),
-		); err != nil {
-			return SecretWriteResult{}, err
-		}
-	}
-
-	if kind == mcpDomainSecret.MCPSecretKindHTTPHeader &&
-		(strings.TrimSpace(value) == "" || strings.ContainsAny(value, "\r\n\x00")) {
-		return SecretWriteResult{}, fmt.Errorf(
-			"%w: invalid HTTP header secret value",
-			mcpAuth.ErrMCPInvalidAuthRequest,
-		)
-	}
-
-	if err := s.lifecycle.InvalidateServer(ctx, ref); err != nil {
-		return SecretWriteResult{}, err
-	}
-	secretRef, err := mcpDomainSecret.NewMCPSecretRefString(ref, kind, slot)
-	if err != nil {
-		return SecretWriteResult{}, err
-	}
-	hash, nonEmpty, err := s.secrets.SetMCPSecret(ctx, secretRef, value)
-	if err != nil {
-		return SecretWriteResult{}, err
-	}
-	s.clearServerAuthStatus(ref)
-	return SecretWriteResult{
-		SecretRef: secretRef,
-		SHA256:    hash,
-		NonEmpty:  nonEmpty,
-	}, nil
-}
-
-func (s *Service) DeleteServerSecret(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	kind mcpDomainSecret.MCPSecretKind,
-	slot string,
-) error {
-	if err := s.ready(); err != nil {
-		return err
-	}
-	if kind == mcpDomainSecret.MCPSecretKindOAuthToken {
-		return fmt.Errorf(
-			"%w: OAuth token secrets are runtime-managed",
-			mcpAuth.ErrMCPInvalidAuthRequest,
-		)
-	}
-	installation, err := s.store.GetServerInstallation(ctx, ref)
-	if err != nil {
-		return err
-	}
-	if err := installation.Document.AcceptsSecretTarget(kind, slot); err != nil {
-		return err
-	}
-	if err := s.lifecycle.InvalidateServer(ctx, ref); err != nil {
-		return err
-	}
-	secretRef, err := mcpDomainSecret.NewMCPSecretRefString(ref, kind, slot)
-	if err != nil {
-		return err
-	}
-	if err := s.secrets.DeleteSecret(ctx, secretRef); err != nil {
-		return err
-	}
-	s.clearServerAuthStatus(ref)
-	return nil
-}
-
-func (s *Service) GetServerAuthHealth(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpAuth.MCPAuthHealth, error) {
-	if err := s.ready(); err != nil {
-		return mcpAuth.MCPAuthHealth{}, err
-	}
-
-	config, resolved, err := s.source.InspectRuntimeConfig(ctx, ref)
-	if err == nil {
-		return s.auth.BuildAuthHealth(ctx, config), nil
-	}
-	if resolved.Server != ref {
-		return mcpAuth.MCPAuthHealth{}, err
-	}
-
-	serverID, idErr := RuntimeServerIDForArtifact(ref)
-	if idErr != nil {
-		return mcpAuth.MCPAuthHealth{}, idErr
-	}
-	m, err := runtimeHTTPAuthMode(resolved.Document.Configuration.Auth.Mode)
-	if err != nil {
-		return mcpAuth.MCPAuthHealth{}, err
-	}
-	return mcpAuth.MCPAuthHealth{
-		Server:     serverID,
-		AuthMode:   m,
-		State:      mcpAuth.MCPAuthHealthStateNotConfigured,
-		Configured: false,
-		LastError:  "required MCP installation input is not configured",
-	}, nil
-}
-
-func (s *Service) GetMCPEffectivePolicy(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpPolicy.Effective, error) {
-	if err := s.ready(); err != nil {
-		return mcpPolicy.Effective{}, err
-	}
-	return s.store.GetMCPEffectivePolicy(ctx, ref)
-}
-
-func (s *Service) CreateManagedMCP(
+func (s *Service) CreateMCPServer(
 	ctx context.Context,
 	request mcpConsumerAPI.ManagedMCPCreateRequest,
 ) (mcpConsumerAPI.ManagedMCPCreateResult, error) {
@@ -295,7 +182,7 @@ func (s *Service) CreateManagedMCP(
 		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
 	}
 
-	result, err := s.store.CreateManagedMCP(ctx, request)
+	result, err := s.store.CreateMCPServer(ctx, request)
 	if err != nil {
 		return mcpConsumerAPI.ManagedMCPCreateResult{}, err
 	}
@@ -306,7 +193,7 @@ func (s *Service) CreateManagedMCP(
 	return result, nil
 }
 
-func (s *Service) ReplaceManagedMCP(
+func (s *Service) UpdateMCPServer(
 	ctx context.Context,
 	request mcpConsumerAPI.ManagedMCPReplaceRequest,
 ) (mcpConsumerAPI.ManagedMCPReplaceResult, error) {
@@ -317,10 +204,10 @@ func (s *Service) ReplaceManagedMCP(
 		return mcpConsumerAPI.ManagedMCPReplaceResult{}, err
 	}
 	s.clearServerAuthStatus(request.Artifact)
-	return s.store.ReplaceManagedMCP(ctx, request)
+	return s.store.UpdateMCPServer(ctx, request)
 }
 
-func (s *Service) PurgeManagedMCP(
+func (s *Service) DeleteMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
@@ -332,10 +219,10 @@ func (s *Service) PurgeManagedMCP(
 		return err
 	}
 	s.clearServerAuthStatus(ref)
-	return s.store.PurgeManagedMCP(ctx, ref, expectedRevision)
+	return s.store.DeleteMCPServer(ctx, ref, expectedRevision)
 }
 
-func (s *Service) UpsertManagedMCPPolicy(
+func (s *Service) SaveMCPPolicy(
 	ctx context.Context,
 	request mcpConsumerAPI.ManagedMCPPolicyUpsertRequest,
 ) (mcpConsumerAPI.ManagedMCPPolicyUpsertResult, error) {
@@ -360,10 +247,10 @@ func (s *Service) UpsertManagedMCPPolicy(
 	if err := s.lifecycle.InvalidateServers(ctx, affected); err != nil {
 		return mcpConsumerAPI.ManagedMCPPolicyUpsertResult{}, err
 	}
-	return s.store.UpsertManagedMCPPolicy(ctx, request)
+	return s.store.SaveMCPPolicy(ctx, request)
 }
 
-func (s *Service) PurgeManagedMCPPolicy(
+func (s *Service) DeleteMCPPolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
@@ -387,11 +274,88 @@ func (s *Service) PurgeManagedMCPPolicy(
 	if err := s.lifecycle.InvalidateServers(ctx, affected); err != nil {
 		return err
 	}
-	return s.store.PurgeManagedMCPPolicy(ctx, ref, expectedRevision)
+	return s.store.DeleteMCPPolicy(ctx, ref, expectedRevision)
+}
+
+func retainServerSecretBindings(
+	current mcpDomainServer.ServerData,
+	next mcpDomainServer.ServerData,
+	document mcpDomainServer.ServerDocument,
+) mcpDomainServer.ServerData {
+	output := next.Clone()
+	if output.Inputs == nil {
+		output.Inputs = map[string]mcpDomainServer.InputBinding{}
+	}
+
+	for name, declaration := range document.Configuration.Install.Inputs {
+		switch declaration.Kind {
+		case mcpDomainServer.InputSecret,
+			mcpDomainServer.InputOAuthClientCredentials:
+		default:
+			continue
+		}
+
+		if binding, found := current.Inputs[name]; found {
+			output.Inputs[name] = binding
+			continue
+		}
+		delete(output.Inputs, name)
+	}
+
+	return output
+}
+
+func (s *Service) saveMCPServerSettings(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedSettingsRevision uint64,
+	data mcpDomainServer.ServerData,
+) (MCPServerDetails, error) {
+	if err := s.lifecycle.SaveServerSettings(
+		ctx,
+		ref,
+		expectedSettingsRevision,
+		data,
+	); err != nil {
+		return MCPServerDetails{}, err
+	}
+	s.clearServerAuthStatus(ref)
+	return s.GetMCPServer(ctx, ref)
+}
+
+func (s *Service) serverAuthHealth(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (mcpAuth.MCPAuthHealth, error) {
+	config, resolved, err := s.source.InspectRuntimeConfig(ctx, ref)
+	if err == nil {
+		return s.auth.BuildAuthHealth(ctx, config), nil
+	}
+	if resolved.Server != ref {
+		return mcpAuth.MCPAuthHealth{}, err
+	}
+
+	serverID, idErr := runtimeServerIDForArtifact(ref)
+	if idErr != nil {
+		return mcpAuth.MCPAuthHealth{}, idErr
+	}
+	mode, modeErr := runtimeHTTPAuthMode(
+		resolved.Document.Configuration.Auth.Mode,
+	)
+	if modeErr != nil {
+		return mcpAuth.MCPAuthHealth{}, modeErr
+	}
+	return mcpAuth.MCPAuthHealth{
+		Server:     serverID,
+		AuthMode:   mode,
+		State:      mcpAuth.MCPAuthHealthStateNotConfigured,
+		Configured: false,
+		LastError:  "required MCP installation input is not configured",
+	}, nil
 }
 
 func (s *Service) clearServerAuthStatus(ref artifact.ArtifactRef) {
-	serverID, err := RuntimeServerIDForArtifact(ref)
+	serverID, err := runtimeServerIDForArtifact(ref)
 	if err == nil {
 		s.auth.ClearAuthStatus(serverID)
 	}
@@ -403,6 +367,7 @@ func (s *Service) ready() error {
 		s.servers == nil ||
 		s.source == nil ||
 		s.store == nil ||
+		s.runtime == nil ||
 		s.auth == nil ||
 		s.secrets == nil {
 		return mcpServer.ErrClosed

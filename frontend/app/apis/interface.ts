@@ -52,29 +52,26 @@ import type {
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
-	MCPAuthHealth,
 	MCPAuthSettings,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPConversationContext,
 	MCPDiscoveryPage,
-	MCPEffectivePolicy,
 	MCPGetPromptResponseBody,
-	MCPGlobalSettings,
 	MCPManagementPage,
-	MCPOAuthAuthorization,
+	MCPPolicyListItem,
 	MCPPromptRef,
-	MCPProviderToolMapping,
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
 	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
-	MCPSecretKind,
-	MCPSecretWriteResult,
+	MCPServerAggregateDetails,
 	MCPServerData,
 	MCPServerListItem,
 	MCPServerRuntimeSnapshot,
+	MCPServerSecretsView,
+	MCPSettings,
 	MCPStorePolicyView,
 	MCPStoreServerInstallationView,
 	MCPToolCapability,
@@ -88,12 +85,15 @@ import type {
 	ManagedProviderResult,
 	ModelListItem,
 	ModelProviderListItem,
-	ModelProviderRuntimeOverlayView,
 	ModelProviderView,
 	ModelRequestPatch,
 	ModelView,
+	ProviderAPIKeyStatus,
+	SaveModelSettingsRequest,
+	SaveProviderSettingsRequest,
+	SetProviderAPIKeyRequest,
 } from '@/spec/model';
-import type { AppTheme, AuthKey, AuthKeyName, AuthKeyType, DebugSettings, SettingsSchema } from '@/spec/setting';
+import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import type {
 	ArtifactSkillFilter,
 	ArtifactSkillSummary,
@@ -168,59 +168,70 @@ export interface IBackendAPI {
 export interface ISettingStoreAPI {
 	setAppTheme: (theme: AppTheme) => Promise<void>;
 	setDebugSettings: (settings: DebugSettings) => Promise<void>;
-	getAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<AuthKey>;
 	getSettings: (forceFetch?: boolean) => Promise<SettingsSchema>;
 }
 
 export interface IModelStoreAPI {
-	listModelProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]>;
+	listProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]>;
 
 	listModels(rootID?: ArtifactRootID): Promise<ModelListItem[]>;
 
-	getModelProvider(ref: ArtifactRef): Promise<ModelProviderView>;
+	getProvider(ref: ArtifactRef): Promise<ModelProviderView>;
 
 	getModel(ref: ArtifactRef): Promise<ModelView>;
 
-	createModelProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult>;
+	getProviderAPIKeyStatus(ref: ArtifactRef): Promise<ProviderAPIKeyStatus>;
 
-	replaceModelProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult>;
+	createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult>;
 
-	deleteModelProvider(ref: ArtifactRef, expectedRevision: number): Promise<void>;
+	updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult>;
 
-	createManagedModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult>;
+	deleteModel(ref: ArtifactRef, expectedRevision: number): Promise<void>;
 
-	replaceManagedModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult>;
-
-	deleteManagedModel(ref: ArtifactRef, expectedRevision: number): Promise<void>;
-
-	setModelProviderEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
+	saveModelSettings(request: SaveModelSettingsRequest): Promise<ModelView>;
 
 	setModelEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
 
-	setModelProviderCredential(
+	resetModelSettings(
 		ref: ArtifactRef,
-		expectedOverlayRevision: number,
-		secret: string
-	): Promise<ModelProviderRuntimeOverlayView>;
+		expectedModelRevision: number,
+		expectedSettingsRevision: number
+	): Promise<ModelView>;
 }
 
 export interface IModelAggregateAPI {
-	/**
-	 * Returns the persisted Provider preference when it is available, otherwise
-	 * the backend's built-in or first-available Provider fallback.
-	 */
-	getDefaultModelProvider(): Promise<ArtifactRef | undefined>;
+	getDefaultProvider(): Promise<ArtifactRef | undefined>;
 
-	/** Provider undefined clears the explicit preference. */
-	setDefaultModelProvider(provider?: ArtifactRef): Promise<void>;
+	setDefaultProvider(provider: ArtifactRef): Promise<void>;
 
-	getModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef>;
+	clearDefaultProvider(): Promise<void>;
+
+	createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult>;
+
+	updateProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult>;
+
+	deleteProvider(ref: ArtifactRef, expectedProviderRevision: number): Promise<void>;
+
+	setProviderEnabled(ref: ArtifactRef, expectedProviderRevision: number, enabled: boolean): Promise<StoreArtifact>;
+
+	saveProviderSettings(request: SaveProviderSettingsRequest): Promise<ModelProviderView>;
+
+	resetProviderSettings(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		expectedSettingsRevision: number
+	): Promise<ModelProviderView>;
+
+	setProviderAPIKey(request: SetProviderAPIKeyRequest): Promise<ProviderAPIKeyStatus>;
+
+	clearProviderAPIKey(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		expectedAPIKeyRevision: number
+	): Promise<ProviderAPIKeyStatus>;
 }
 
 export interface ICompletionAPI {
-	deleteAuthKey: (type: AuthKeyType, keyName: AuthKeyName) => Promise<void>;
-	setAuthKey: (type: AuthKeyType, keyName: AuthKeyName, secret: string) => Promise<void>;
-
 	fetchCompletion(
 		model: ArtifactRef,
 		requestPatch: ModelRequestPatch | undefined,
@@ -518,97 +529,55 @@ export interface IMCPStoreAPI {
 
 	removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView>;
 
-	attachMCPArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView>;
+	addMCPServerToCollection(request: AddArtifactMemberRequest): Promise<CollectionView>;
 
 	createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView>;
 
 	deleteMCPCollection(request: DeleteCollectionRequest): Promise<void>;
 
 	getMCPCollection(collection: ArtifactRef): Promise<CollectionView>;
-
 	getMCPPolicy(policy: ArtifactRef): Promise<MCPStorePolicyView>;
-
-	getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView>;
+	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView>;
+	getMCPSettings(): Promise<MCPSettings>;
 
 	listMCPCollectionServers(collection: ArtifactRef): Promise<
 		Array<{
 			installation: MCPStoreServerInstallationView;
-			policy: MCPEffectivePolicy;
 		}>
 	>;
 
 	listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]>;
-
 	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
-
-	listMCPPolicies(rootID: ArtifactRootID): Promise<StoreArtifact[]>;
-
+	listMCPPolicies(rootID: ArtifactRootID): Promise<MCPPolicyListItem[]>;
 	listMCPServers(rootID: ArtifactRootID): Promise<MCPServerListItem[]>;
-
 	listMCPCollectionsPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<CollectionListItem>>;
-
 	listMCPServersPage(pageSize: number, pageToken?: string): Promise<MCPManagementPage<MCPServerListItem>>;
 
-	resolveMCPArtifactCapabilities(artifact: ArtifactRef): Promise<CapabilityPlan>;
-
-	resolveMCPCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan>;
-
 	setMCPCollectionEnabled(collection: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<CollectionView>;
-
-	setMCPPolicyEnabled(policy: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
-
-	setMCPServerEnabled(server: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact>;
-
+	saveMCPSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<MCPSettings>;
 	updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView>;
 }
 
 export interface IMCPAggregateAPI {
-	getMCPEffectivePolicy(server: ArtifactRef): Promise<MCPEffectivePolicy>;
-
-	createManagedMCP(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
-
-	replaceManagedMCP(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult>;
-
-	purgeManagedMCP(server: ArtifactRef, expectedRevision: number): Promise<void>;
-
-	upsertManagedMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult>;
-
-	purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void>;
-
-	artifactRefForRuntimeServerID(server: MCPRuntimeServerID): Promise<ArtifactRef>;
-
-	deleteMCPServerSecret(server: ArtifactRef, kind: MCPSecretKind, slot: string): Promise<void>;
-
-	getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth>;
-
-	putMCPServerSecret(
+	getMCPServer(server: ArtifactRef): Promise<MCPServerAggregateDetails>;
+	getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPServerAggregateDetails>;
+	// Management projects this into MCPRuntimeServerView.
+	createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
+	updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult>;
+	deleteMCPServer(server: ArtifactRef, expectedRevision: number): Promise<void>;
+	saveMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult>;
+	deleteMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void>;
+	saveMCPServerSettings(
 		server: ArtifactRef,
-		kind: MCPSecretKind,
-		slot: string,
-		secret: string
-	): Promise<MCPSecretWriteResult>;
-
-	rootIDForRuntimeCatalogID(catalogID: string): Promise<ArtifactRootID>;
-
-	runtimeServerIDForArtifact(artifact: ArtifactRef): Promise<MCPRuntimeServerID>;
-
-	updateMCPServerInstallation(
-		server: ArtifactRef,
-		expectedArtifactRevision: number,
+		expectedSettingsRevision: number,
 		data: MCPServerData
-	): Promise<StoreArtifact>;
-
-	updateProtectedMCPServerInstallation(
-		server: ArtifactRef,
-		expectedOverlayRevision: number,
-
-		data: MCPServerData
-	): Promise<void>;
+	): Promise<MCPServerAggregateDetails>;
+	setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerAggregateDetails>;
+	clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerAggregateDetails>;
 }
 
 export interface IMCPRuntimeAPI {
-	cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean>;
-
+	cancelMCPServerAuthorization(server: MCPRuntimeServerID): Promise<boolean>;
 	completeMCPArgument(
 		server: MCPRuntimeServerID,
 		request: MCPCompleteArgumentRequestBody
@@ -618,72 +587,40 @@ export interface IMCPRuntimeAPI {
 
 	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void>;
 
-	evaluateMappedMCPToolCall(
-		mapping: MCPProviderToolMapping,
-		request: InvokeMCPToolRequestBody
-	): Promise<MCPApprovalEvaluation>;
-
-	evaluateMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
-
-	getMCPGlobalSettings(): Promise<MCPGlobalSettings>;
-
 	getMCPPrompt(
 		server: MCPRuntimeServerID,
 		promptName: string,
-
 		promptArguments: Record<string, string>
 	): Promise<MCPGetPromptResponseBody>;
 
-	getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
-
-	invokeMappedMCPTool(
-		mapping: MCPProviderToolMapping,
-		request: InvokeMCPToolRequestBody
-	): Promise<MCPRuntimeInvokeToolResponse>;
-
 	invokeMCPTool(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPRuntimeInvokeToolResponse>;
 
-	listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]>;
-
-	listMCPServerPromptsPage(
+	listMCPServerPrompts(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPPromptRef>>;
 
-	listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]>;
-
-	listMCPServerResourcesPage(
+	listMCPServerResources(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPResourceRef>>;
 
-	listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]>;
-
-	listMCPServerResourceTemplatesPage(
+	listMCPServerResourceTemplates(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPResourceTemplateRef>>;
 
-	listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]>;
-
-	listMCPServerToolsPage(
+	listMCPServerTools(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPToolCapability>>;
 
-	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]>;
-
 	readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody>;
-
 	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
-
-	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult>;
-
-	startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot>;
-
-	updateMCPGlobalSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<number>;
+	checkMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation>;
+	resolveMCPToolApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult>;
 }

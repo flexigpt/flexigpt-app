@@ -36,10 +36,10 @@ function ModelSetupAction({
 }) {
 	const noProvider = unavailableReason === 'no-runnable-provider';
 	const noModel = unavailableReason === 'no-runnable-model';
-	const destination = noProvider ? '/settings/#auth-keys' : '/models/';
+	const destination = '/models/';
 	const label = noProvider ? 'No providers configured' : noModel ? 'No enabled model configured' : 'Models unavailable';
 	const description = noProvider
-		? 'Configure an enabled provider credential in Settings before sending a request.'
+		? 'Configure an enabled provider API key in Models before sending a request.'
 		: noModel
 			? 'Enable or add a model in Models before sending a request.'
 			: hasCatalogError

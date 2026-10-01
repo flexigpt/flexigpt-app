@@ -40,7 +40,7 @@ func newMCPSettingsAdapter(
 	}, nil
 }
 
-func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
+func (s *mcpSettingsAdapter) getMCPSettings(
 	ctx context.Context,
 ) (mcpAuth.MCPAuthSettings, uint64, error) {
 	if s == nil || s.overlays == nil {
@@ -82,7 +82,7 @@ func (s *mcpSettingsAdapter) GetMCPGlobalSettings(
 	return settings, record.Revision, nil
 }
 
-func (s *mcpSettingsAdapter) PutMCPGlobalSettings(
+func (s *mcpSettingsAdapter) putMCPSettings(
 	ctx context.Context,
 	expectedRevision uint64,
 	value mcpAuth.MCPAuthSettings,

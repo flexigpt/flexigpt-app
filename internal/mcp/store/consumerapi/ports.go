@@ -100,11 +100,11 @@ func (s *ManagementStoreFacade) ResolveMCPServer(
 	return s.api.resolveMCPServer(ctx, ref)
 }
 
-func (s *ManagementStoreFacade) GetServerInstallation(
+func (s *ManagementStoreFacade) GetServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ServerInstallationView, error) {
-	return s.api.GetServerInstallation(ctx, ref)
+	return s.api.GetServerSettings(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) GetMCPPolicy(
@@ -114,11 +114,11 @@ func (s *ManagementStoreFacade) GetMCPPolicy(
 	return s.api.GetMCPPolicy(ctx, ref)
 }
 
-func (s *ManagementStoreFacade) GetMCPEffectivePolicy(
+func (s *ManagementStoreFacade) GetServerEffectivePolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (mcpPolicy.Effective, error) {
-	return s.api.GetMCPEffectivePolicy(ctx, ref)
+	return s.api.GetServerEffectivePolicy(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(
@@ -129,41 +129,41 @@ func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(
 	return s.api.ListMCPServersReferencingPolicy(ctx, rootID, policyName)
 }
 
-func (s *ManagementStoreFacade) CreateManagedMCP(
+func (s *ManagementStoreFacade) CreateMCPServer(
 	ctx context.Context,
 	request ManagedMCPCreateRequest,
 ) (ManagedMCPCreateResult, error) {
-	return s.api.CreateManagedMCP(ctx, request)
+	return s.api.CreateMCPServer(ctx, request)
 }
 
-func (s *ManagementStoreFacade) ReplaceManagedMCP(
+func (s *ManagementStoreFacade) UpdateMCPServer(
 	ctx context.Context,
 	request ManagedMCPReplaceRequest,
 ) (ManagedMCPReplaceResult, error) {
-	return s.api.ReplaceManagedMCP(ctx, request)
+	return s.api.UpdateMCPServer(ctx, request)
 }
 
-func (s *ManagementStoreFacade) PurgeManagedMCP(
+func (s *ManagementStoreFacade) DeleteMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	return s.api.PurgeManagedMCP(ctx, ref, expectedRevision)
+	return s.api.DeleteMCPServer(ctx, ref, expectedRevision)
 }
 
-func (s *ManagementStoreFacade) UpsertManagedMCPPolicy(
+func (s *ManagementStoreFacade) SaveMCPPolicy(
 	ctx context.Context,
 	request ManagedMCPPolicyUpsertRequest,
 ) (ManagedMCPPolicyUpsertResult, error) {
-	return s.api.UpsertManagedMCPPolicy(ctx, request)
+	return s.api.SaveMCPPolicy(ctx, request)
 }
 
-func (s *ManagementStoreFacade) PurgeManagedMCPPolicy(
+func (s *ManagementStoreFacade) DeleteMCPPolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
-	return s.api.PurgeManagedMCPPolicy(ctx, ref, expectedRevision)
+	return s.api.DeleteMCPPolicy(ctx, ref, expectedRevision)
 }
 
 // CatalogStore is the narrow cross-Root management query port consumed by

@@ -18,7 +18,6 @@ import { CustomThemeDark, CustomThemeLight, ThemeType } from '@/spec/setting';
 import { IS_WAILS_PLATFORM } from '@/lib/features';
 import { recordFrontendCrash, reportFrontendError } from '@/lib/frontend_error_reporter';
 
-import { initBuiltIns } from '@/hooks/use_builtin_provider';
 import { ensureWorker } from '@/hooks/use_highlight';
 import { getStartupThemeSync, initStartupTheme } from '@/hooks/use_startup_theme';
 import { GenericThemeProvider } from '@/hooks/use_theme_provider';
@@ -112,8 +111,8 @@ export async function clientLoader() {
 
 	// These are startup initializers. If one fails, log it but do not blank the app.
 	// If you later decide one of these is truly mandatory, rethrow that specific failure.
-	const results = await Promise.allSettled([initBuiltIns(), initStartupTheme()]);
-	const names = ['initBuiltIns', 'initStartupTheme'];
+	const results = await Promise.allSettled([initStartupTheme()]);
+	const names = ['initStartupTheme'];
 
 	results.forEach((result, index) => {
 		if (result.status === 'rejected') {

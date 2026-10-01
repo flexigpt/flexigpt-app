@@ -108,7 +108,7 @@ func (a *API) AddMCPCollectionMember(
 	return a.collections.AddMember(ctx, request)
 }
 
-func (a *API) AttachMCPArtifactToCollection(
+func (a *API) AddMCPServerToCollection(
 	ctx context.Context,
 	request collection.AddArtifactMemberRequest,
 ) (collection.CollectionView, error) {

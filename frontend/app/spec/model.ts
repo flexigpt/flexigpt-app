@@ -252,20 +252,38 @@ export interface ModelDocument {
 	adapterParameters?: ModelAdapterParameters;
 }
 
+export interface ModelProviderSettings {
+	revision: number;
+	connection?: ModelConnection;
+	defaults?: ModelDefaults;
+	capabilities?: ModelCapabilities;
+	defaultModel?: ModelArtifactNameReference;
+	adapterParameters?: ModelAdapterParameters;
+}
+
+export interface ModelSettings {
+	revision: number;
+	defaults?: ModelDefaults;
+	capabilities?: ModelCapabilities;
+	adapterParameters?: ModelAdapterParameters;
+}
+
+export interface ProviderAPIKeyStatus {
+	providerRevision: number;
+	apiKeyRevision: number;
+	configured: boolean;
+}
+
 export interface ModelProviderListItem {
 	ref: ArtifactRef;
 	name: string;
 	displayName: string;
 	description?: string;
 	adapter?: string;
-	defaultModel?: ModelArtifactNameReference;
 	state: ArtifactState;
 	enabled: boolean;
 	revision: number;
-	definitionDigest?: ArtifactDigest;
 	builtIn: boolean;
-	credentialConfigured?: boolean;
-	runtimeOverlayRevision?: number;
 }
 
 export interface ModelListItem {
@@ -278,7 +296,6 @@ export interface ModelListItem {
 	state: ArtifactState;
 	enabled: boolean;
 	revision: number;
-	definitionDigest?: ArtifactDigest;
 	builtIn: boolean;
 }
 
@@ -286,6 +303,8 @@ export interface ModelProviderView {
 	artifact: StoreArtifact;
 	definitionDigest: ArtifactDigest;
 	document: ModelProviderDocument;
+	settings: ModelProviderSettings;
+	defaultModel?: ModelArtifactNameReference;
 	builtIn: boolean;
 }
 
@@ -293,7 +312,35 @@ export interface ModelView {
 	artifact: StoreArtifact;
 	definitionDigest: ArtifactDigest;
 	document: ModelDocument;
+	settings: ModelSettings;
 	builtIn: boolean;
+}
+
+export interface SaveProviderSettingsRequest {
+	provider: ArtifactRef;
+	expectedProviderRevision: number;
+	expectedSettingsRevision: number;
+	connection?: ModelConnection;
+	defaults?: ModelDefaults;
+	capabilities?: ModelCapabilities;
+	defaultModel?: ModelArtifactNameReference;
+	adapterParameters?: ModelAdapterParameters;
+}
+
+export interface SaveModelSettingsRequest {
+	model: ArtifactRef;
+	expectedModelRevision: number;
+	expectedSettingsRevision: number;
+	defaults?: ModelDefaults;
+	capabilities?: ModelCapabilities;
+	adapterParameters?: ModelAdapterParameters;
+}
+
+export interface SetProviderAPIKeyRequest {
+	provider: ArtifactRef;
+	expectedProviderRevision: number;
+	expectedAPIKeyRevision: number;
+	apiKey: string;
 }
 
 export interface ManagedProviderCreateRequest {
@@ -330,11 +377,6 @@ export interface ManagedProviderResult {
 export interface ManagedModelResult {
 	artifact: StoreArtifact;
 	address: StoreArtifactAddress;
-}
-
-export interface ModelProviderRuntimeOverlayView {
-	revision: number;
-	credentialConfigured: boolean;
 }
 
 export interface ModelRequestPatch {

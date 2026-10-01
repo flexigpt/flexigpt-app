@@ -72,8 +72,8 @@ export function DefaultProviderControl({
 			? DEFAULT_PROVIDER_UNAVAILABLE_KEY
 			: DEFAULT_PROVIDER_NONE_KEY;
 
-	const setupDestination = providers.length === 0 ? '/models/' : '/settings/#auth-keys';
-	const setupLabel = providers.length === 0 ? 'Add a provider' : 'Configure provider credentials';
+	const setupDestination = '/models/';
+	const setupLabel = providers.length === 0 ? 'Add a provider' : 'Configure provider API keys';
 
 	return (
 		<div className="bg-base-100 mb-6 rounded-2xl px-4 py-3 shadow-lg">
@@ -103,7 +103,7 @@ export function DefaultProviderControl({
 
 			{eligibleProviders.length === 0 ? (
 				<div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-					<span className="text-warning">No enabled provider with configured credentials is available.</span>
+					<span className="text-warning">No enabled provider with a configured API key is available.</span>
 					<Link to={setupDestination} className="link">
 						{setupLabel}
 					</Link>

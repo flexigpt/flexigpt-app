@@ -14,7 +14,7 @@ import (
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
-func (a *API) CreateManagedMCP(
+func (a *API) CreateMCPServer(
 	ctx context.Context,
 	request ManagedMCPCreateRequest,
 ) (ManagedMCPCreateResult, error) {
@@ -134,11 +134,11 @@ func (a *API) CreateManagedMCP(
 	return result, nil
 }
 
-// ReplaceManagedMCP replaces one complete managed MCP package while retaining
+// UpdateMCPServer replaces one complete managed MCP package while retaining
 // its Artifact identity, managed package address, and direct Collection
 // membership. Existing installation data is preserved only when it remains
 // valid for the replacement server document.
-func (a *API) ReplaceManagedMCP(
+func (a *API) UpdateMCPServer(
 	ctx context.Context,
 	request ManagedMCPReplaceRequest,
 ) (ManagedMCPReplaceResult, error) {
@@ -396,7 +396,7 @@ func (a *API) ReplaceManagedMCP(
 	}, nil
 }
 
-func (a *API) PurgeManagedMCP(
+func (a *API) DeleteMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,

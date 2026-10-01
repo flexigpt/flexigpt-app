@@ -41,6 +41,16 @@ func (s *ManagementStoreFacade) ResolveModel(
 	return s.api.ResolveModel(ctx, ref)
 }
 
+func (s *ManagementStoreFacade) ResolveProvider(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (ResolvedProvider, error) {
+	if s == nil || s.api == nil {
+		return ResolvedProvider{}, basespec.ErrClosed
+	}
+	return s.api.ResolveProvider(ctx, ref)
+}
+
 func (s *ManagementStoreFacade) ResolveProviderDefaultModel(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -137,20 +147,57 @@ func (s *ManagementStoreFacade) SetModelEnabled(
 	return s.api.SetModelEnabled(ctx, ref, expectedRevision, enabled)
 }
 
-func (s *ManagementStoreFacade) SetMutableProviderDefaultModel(
+func (s *ManagementStoreFacade) SaveProviderSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
-	defaultModel declaration.ArtifactNameReference,
+	request SaveProviderSettingsRequest,
 ) (ProviderView, error) {
 	if s == nil || s.api == nil {
 		return ProviderView{}, basespec.ErrClosed
 	}
-	return s.api.SetMutableProviderDefaultModel(
+	return s.api.SaveProviderSettings(ctx, request)
+}
+
+func (s *ManagementStoreFacade) ResetProviderSettings(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedProviderRevision uint64,
+	expectedSettingsRevision uint64,
+) (ProviderView, error) {
+	if s == nil || s.api == nil {
+		return ProviderView{}, basespec.ErrClosed
+	}
+	return s.api.ResetProviderSettings(
 		ctx,
 		ref,
-		expectedArtifactRevision,
-		defaultModel,
+		expectedProviderRevision,
+		expectedSettingsRevision,
+	)
+}
+
+func (s *ManagementStoreFacade) SetProviderAPIKey(
+	ctx context.Context,
+	request SetProviderAPIKeyRequest,
+) (ProviderAPIKeyStatus, error) {
+	if s == nil || s.api == nil {
+		return ProviderAPIKeyStatus{}, basespec.ErrClosed
+	}
+	return s.api.SetProviderAPIKey(ctx, request)
+}
+
+func (s *ManagementStoreFacade) ClearProviderAPIKey(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedProviderRevision uint64,
+	expectedAPIKeyRevision uint64,
+) (ProviderAPIKeyStatus, error) {
+	if s == nil || s.api == nil {
+		return ProviderAPIKeyStatus{}, basespec.ErrClosed
+	}
+	return s.api.ClearProviderAPIKey(
+		ctx,
+		ref,
+		expectedProviderRevision,
+		expectedAPIKeyRevision,
 	)
 }
 

@@ -16,7 +16,7 @@ const (
 	artifactCatalogIDPrefix = "artifact-root:v1:"
 )
 
-func RuntimeServerIDForArtifact(
+func runtimeServerIDForArtifact(
 	ref artifact.ArtifactRef,
 ) (mcpServer.ServerID, error) {
 	if err := ref.Validate(); err != nil {
@@ -29,7 +29,7 @@ func RuntimeServerIDForArtifact(
 	), nil
 }
 
-func ArtifactRefForRuntimeServerID(
+func artifactRefForRuntimeServerID(
 	id mcpServer.ServerID,
 ) (artifact.ArtifactRef, error) {
 	if err := id.Validate(); err != nil {
@@ -65,33 +65,4 @@ func ArtifactRefForRuntimeServerID(
 		return artifact.ArtifactRef{}, err
 	}
 	return ref, nil
-}
-
-func RootIDForRuntimeCatalogID(
-	id mcpServer.CatalogID,
-) (root.RootID, error) {
-	if err := id.Validate(); err != nil {
-		return "", err
-	}
-	raw, found := strings.CutPrefix(string(id), artifactCatalogIDPrefix)
-	if !found {
-		return "", fmt.Errorf(
-			"%w: unsupported MCP runtime catalog ID",
-			basespec.ErrInvalid,
-		)
-	}
-	decoded, err := base64.RawURLEncoding.DecodeString(raw)
-	if err != nil {
-		return "", fmt.Errorf(
-			"%w: decode MCP runtime catalog ID: %w",
-			basespec.ErrInvalid,
-			err,
-		)
-	}
-	rootID := root.RootID(decoded)
-	if err := rootID.Validate(); err != nil {
-		return "", err
-	}
-
-	return rootID, nil
 }

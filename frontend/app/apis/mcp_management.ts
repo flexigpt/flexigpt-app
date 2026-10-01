@@ -1,10 +1,8 @@
 // oxlint-disable typescript/parameter-properties
-import type { ArtifactRef, ArtifactRootID, MappedTarget, StoreArtifact } from '@/spec/artifact';
+import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
 import type { CollectionListItem } from '@/spec/collection';
 import type {
 	InvokeMCPToolRequestBody,
-	ManagedMCPPolicyUpsertRequest,
-	ManagedMCPPolicyUpsertResult,
 	MCPApprovalEvaluation,
 	MCPApprovalResolution,
 	MCPApprovalResolutionResult,
@@ -13,42 +11,35 @@ import type {
 	MCPAuthHealthState,
 	MCPAuthSettings,
 	MCPBundleView,
-	MCPCollectionManagementView,
 	MCPCompleteArgumentRequestBody,
 	MCPCompletionResult,
 	MCPDiscoveryPage,
-	MCPEffectivePolicy,
 	MCPGetPromptResponseBody,
-	MCPGlobalSettings,
 	MCPHTTPAuthMode,
 	MCPHTTPSecretDraft,
-	MCPOAuthAuthorization,
 	MCPPolicy,
-	MCPPolicyManagementView,
 	MCPPromptRef,
-	MCPProviderToolMapping,
 	MCPReadResourceResponseBody,
 	MCPResourceRef,
 	MCPResourceTemplateRef,
-	MCPRuntimeCatalogID,
 	MCPRuntimeInvokeToolResponse,
 	MCPRuntimeServerID,
-	MCPSecretKind,
-	MCPSecretWriteResult,
+	MCPRuntimeServerView,
+	MCPServerAggregateDetails,
 	MCPServerData,
 	MCPServerDocument,
 	MCPServerDraft,
 	MCPServerInstallationDataView,
 	MCPServerListItem,
-	MCPServerManagementView,
 	MCPServerRuntimeSnapshot,
+	MCPServerSecretsView,
+	MCPServerSetupView,
 	MCPServerView,
+	MCPSettings,
 	MCPSetupInputView,
 	MCPSetupSecretTarget,
 	MCPSetupSubmissionValue,
 	MCPStdioSecretDraft,
-	MCPStorePolicyView,
-	MCPStoreServerInstallationView,
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type { ResolvedToolView } from '@/spec/tool';
@@ -61,14 +52,13 @@ import {
 	MCPExecutionMode,
 	MCPHTTPAuthMode as MCPHTTPAuthModeValue,
 	MCPInputKind as MCPInputKindValue,
-	MCPSecretKind as MCPSecretKindValue,
+	MCPSecretKind,
 	MCPServerType as MCPServerTypeValue,
 	MCPTransportType as MCPTransportTypeValue,
 	MCPTrustLevel as MCPTrustLevelValue,
 } from '@/spec/mcp';
 
 import { mapWithConcurrency } from '@/lib/async_utils';
-import { getErrorMessage } from '@/lib/error_utils';
 import { omitManyKeys } from '@/lib/obj_utils';
 import { createSharedAsyncCatalog } from '@/lib/shared_async_catalog';
 
@@ -92,15 +82,13 @@ interface MCPSecretTarget {
 
 interface PlannedSecretWrite {
 	inputName: string;
-	kind: MCPSecretKind;
-	slot: string;
 	secret: string;
 }
 
 interface ServerDocumentBuild {
 	document: MCPServerDocument;
 	secretWrites: PlannedSecretWrite[];
-	secretDeletes: MCPSecretTarget[];
+	secretDeletes: string[];
 }
 
 function cloneJSON<T>(value: T): T {
@@ -150,6 +138,10 @@ function sameSecretSlot(left: string, right: string): boolean {
 	return left.trim().toLocaleLowerCase() === right.trim().toLocaleLowerCase();
 }
 
+function secretTargetChanged(left: MCPSecretTarget | undefined, right: MCPSecretTarget): boolean {
+	return !left || left.kind !== right.kind || !sameSecretSlot(left.slot, right.slot);
+}
+
 function defaultPolicy(): MCPPolicy {
 	return {
 		trustLevel: MCPTrustLevelValue.Untrusted,
@@ -171,9 +163,8 @@ function defaultPolicy(): MCPPolicy {
 }
 
 /**
- * A read response never reveals secret refs. The backend treats omitted secret
- * bindings as retained bindings when installation data is updated. Only visible
- * text values and newly written secret refs are sent back to the backend.
+ * The aggregate retains existing secret bindings during a normal settings
+ * update. This payload therefore contains only non-secret values.
  */
 function writableServerData(installation?: MCPServerInstallationDataView): MCPServerData {
 	const inputs = Object.fromEntries(
@@ -186,6 +177,7 @@ function writableServerData(installation?: MCPServerInstallationDataView): MCPSe
 		schemaVersion: MCP_SCHEMA_VERSION,
 		selectedConnectionProfile: installation?.selectedConnectionProfile,
 		...(Object.keys(inputs).length > 0 ? { inputs } : {}),
+		...(installation?.additionalPolicies?.length ? { additionalPolicies: [...installation.additionalPolicies] } : {}),
 	};
 }
 
@@ -205,21 +197,18 @@ function findSecretTargets(document: MCPServerDocument): Map<string, MCPSecretTa
 			throw new Error(`Secret input "${inputName}" has more than one materialization target.`);
 		}
 
-		targets.set(inputName, {
-			kind,
-			slot,
-		});
+		targets.set(inputName, { kind, slot });
 	};
 
 	for (const [name, value] of Object.entries(document.mcpServer.env ?? {})) {
 		for (const inputName of placeholderNames(value)) {
-			register(inputName, MCPSecretKindValue.StdioEnv, name);
+			register(inputName, MCPSecretKind.StdioEnv, name);
 		}
 	}
 
 	for (const [name, value] of Object.entries(document.mcpServer.headers ?? {})) {
 		for (const inputName of placeholderNames(value)) {
-			register(inputName, MCPSecretKindValue.HTTPHeader, name);
+			register(inputName, MCPSecretKind.HTTPHeader, name);
 		}
 	}
 
@@ -235,10 +224,7 @@ function extractHeaderAffixes(value: string, inputName: string): { prefix: strin
 	const index = value.indexOf(placeholder);
 
 	if (index < 0) {
-		return {
-			prefix: '',
-			suffix: '',
-		};
+		return { prefix: '', suffix: '' };
 	}
 
 	return {
@@ -254,25 +240,20 @@ function buildServerDocument(
 ): ServerDocumentBuild {
 	const previous = existing?.document;
 	const previousInstallation = existing?.installation;
-	const previousData = writableServerData(previousInstallation);
 	const previousTargets = previous ? findSecretTargets(previous) : new Map<string, MCPSecretTarget>();
 	const previousOAuthInput = previous?.configuration.auth.clientCredentialsInput;
 	const previousInputs = cloneJSON(previous?.configuration.install.inputs ?? {});
-	const nextData = cloneJSON(previousData);
 	let nextInputs = previousInputs;
-	let nextBindings = cloneJSON(nextData.inputs ?? {});
-	const secretDeletes: MCPSecretTarget[] = [];
-
-	nextData.schemaVersion = MCP_SCHEMA_VERSION;
 
 	const controlledInputNames = new Set<string>([
 		...previousTargets.keys(),
 		...(previousOAuthInput ? [previousOAuthInput] : []),
 	]);
+	const retainedSecretInputs = new Set<string>();
+	const secretDeletes = new Set<string>();
 
 	for (const inputName of controlledInputNames) {
 		nextInputs = omitManyKeys(nextInputs, [inputName]);
-		nextBindings = omitManyKeys(nextBindings, [inputName]);
 	}
 
 	const reservedNames = new Set(Object.keys(nextInputs));
@@ -308,6 +289,10 @@ function buildServerDocument(
 					: uniqueInputName(normalizeInputName(`stdio_${envName}`), reservedNames);
 
 			reservedNames.add(inputName);
+			if (row.inputName) {
+				retainedSecretInputs.add(row.inputName);
+			}
+
 			nextInputs[inputName] = {
 				kind: MCPInputKindValue.Secret,
 				label: envName,
@@ -317,16 +302,22 @@ function buildServerDocument(
 
 			const oldTarget = row.inputName ? previousTargets.get(row.inputName) : undefined;
 			const oldBinding = row.inputName ? previousInstallation?.inputs?.[row.inputName] : undefined;
+			const nextTarget: MCPSecretTarget = {
+				kind: MCPSecretKind.StdioEnv,
+				slot: envName,
+			};
 
-			if (row.deleteExisting && oldBinding?.secretConfigured && oldTarget) {
-				secretDeletes.push(oldTarget);
+			if (
+				row.inputName &&
+				oldBinding?.secretConfigured &&
+				(row.deleteExisting || secretTargetChanged(oldTarget, nextTarget))
+			) {
+				secretDeletes.add(row.inputName);
 			}
 
 			if (row.secretValue) {
 				secretWrites.push({
 					inputName,
-					kind: MCPSecretKindValue.StdioEnv,
-					slot: envName,
 					secret: row.secretValue,
 				});
 			}
@@ -335,6 +326,7 @@ function buildServerDocument(
 
 	if (draft.transport === MCPTransportTypeValue.StreamableHTTP && draft.httpAuthMode === MCPHTTPAuthModeValue.APIKey) {
 		const apiKey = draft.httpAPIKey;
+
 		if (apiKey) {
 			const headerName = apiKey.headerName.trim();
 			const inputName =
@@ -343,6 +335,10 @@ function buildServerDocument(
 					: uniqueInputName(normalizeInputName(`http_${headerName}`), reservedNames);
 
 			reservedNames.add(inputName);
+			if (apiKey.inputName) {
+				retainedSecretInputs.add(apiKey.inputName);
+			}
+
 			nextInputs[inputName] = {
 				kind: MCPInputKindValue.Secret,
 				label: headerName,
@@ -352,16 +348,22 @@ function buildServerDocument(
 
 			const oldTarget = apiKey.inputName ? previousTargets.get(apiKey.inputName) : undefined;
 			const oldBinding = apiKey.inputName ? previousInstallation?.inputs?.[apiKey.inputName] : undefined;
+			const nextTarget: MCPSecretTarget = {
+				kind: MCPSecretKind.HTTPHeader,
+				slot: headerName,
+			};
 
-			if (apiKey.deleteExisting && oldBinding?.secretConfigured && oldTarget) {
-				secretDeletes.push(oldTarget);
+			if (
+				apiKey.inputName &&
+				oldBinding?.secretConfigured &&
+				(apiKey.deleteExisting || secretTargetChanged(oldTarget, nextTarget))
+			) {
+				secretDeletes.add(apiKey.inputName);
 			}
 
 			if (apiKey.secretValue) {
 				secretWrites.push({
 					inputName,
-					kind: MCPSecretKindValue.HTTPHeader,
-					slot: headerName,
 					secret: apiKey.secretValue,
 				});
 			}
@@ -388,6 +390,10 @@ function buildServerDocument(
 				: uniqueInputName('mcp_oauth_client_credentials', reservedNames);
 
 		reservedNames.add(inputName);
+		if (oauth.inputName) {
+			retainedSecretInputs.add(oauth.inputName);
+		}
+
 		nextInputs[inputName] = {
 			kind: MCPInputKindValue.OAuthClientCredentials,
 			label: 'OAuth client credentials',
@@ -397,21 +403,24 @@ function buildServerDocument(
 		auth.clientCredentialsInput = inputName;
 
 		const oldBinding = oauth.inputName ? previousInstallation?.inputs?.[oauth.inputName] : undefined;
-		if (oauth.deleteExisting && oldBinding?.secretConfigured) {
-			secretDeletes.push({ kind: MCPSecretKindValue.OAuthClientCredentials, slot: 'clientCredentials' });
+
+		if (oauth.inputName && oauth.deleteExisting && oldBinding?.secretConfigured) {
+			secretDeletes.add(oauth.inputName);
 		}
 
 		if (oauth.secretJSON.trim()) {
 			secretWrites.push({
 				inputName,
-				kind: MCPSecretKindValue.OAuthClientCredentials,
-				slot: 'clientCredentials',
 				secret: oauth.secretJSON.trim(),
 			});
 		}
 	}
 
-	nextData.inputs = nextBindings;
+	for (const inputName of controlledInputNames) {
+		if (!retainedSecretInputs.has(inputName)) {
+			secretDeletes.add(inputName);
+		}
+	}
 
 	return {
 		document: {
@@ -438,7 +447,7 @@ function buildServerDocument(
 			},
 		},
 		secretWrites,
-		secretDeletes,
+		secretDeletes: [...secretDeletes],
 	};
 }
 
@@ -474,25 +483,20 @@ export function requireMCPRuntimeServerID(server: MCPServerView): MCPRuntimeServ
 	return server.runtimeServerID;
 }
 
-export function serverSetupInputs(server: MCPServerView): MCPSetupInputView[] {
-	if (!server.document) {
-		return [];
-	}
-
-	const targets = findSecretTargets(server.document);
-	const inputs = server.document.configuration.install.inputs ?? {};
+function setupInputsFor(document: MCPServerDocument, installation: MCPServerInstallationDataView): MCPSetupInputView[] {
+	const targets = findSecretTargets(document);
+	const inputs = document.configuration.install.inputs ?? {};
 
 	return Object.entries(inputs)
 		.map(([name, declaration]) => {
 			const target: MCPSetupSecretTarget | undefined =
 				declaration.kind === MCPInputKindValue.OAuthClientCredentials
 					? {
-							kind: MCPSecretKindValue.OAuthClientCredentials,
+							kind: MCPSecretKind.OAuthClientCredentials,
 							slot: 'clientCredentials',
 						}
 					: targets.get(name);
-
-			const binding = inputBindingFor(server.installation, name);
+			const binding = inputBindingFor(installation, name);
 
 			return {
 				name,
@@ -503,6 +507,14 @@ export function serverSetupInputs(server: MCPServerView): MCPSetupInputView[] {
 			};
 		})
 		.toSorted((left, right) => left.name.localeCompare(right.name));
+}
+
+export function serverSetupInputs(server: MCPServerView): MCPSetupInputView[] {
+	if (!server.document) {
+		return [];
+	}
+
+	return setupInputsFor(server.document, server.installation ?? {});
 }
 
 export function getMCPServerSetupStatus(server: MCPServerView): {
@@ -532,6 +544,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 	const document = server?.document;
 	const policy = server?.policy?.body ?? defaultPolicy();
 	const targets = document ? findSecretTargets(document) : new Map<string, MCPSecretTarget>();
+
 	let stdioEnv = cloneJSON(document?.mcpServer.env ?? {});
 	let httpHeaders = cloneJSON(document?.mcpServer.headers ?? {});
 	const stdioSecrets: MCPStdioSecretDraft[] = [];
@@ -540,7 +553,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 	for (const [inputName, target] of targets) {
 		const binding = inputBindingFor(server?.installation, inputName);
 
-		if (target.kind === MCPSecretKindValue.StdioEnv) {
+		if (target.kind === MCPSecretKind.StdioEnv) {
 			stdioEnv = omitManyKeys(stdioEnv, [target.slot]);
 			stdioSecrets.push({
 				inputName,
@@ -555,6 +568,7 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 		const headerValue = httpHeaders[target.slot] ?? '';
 		const affixes = extractHeaderAffixes(headerValue, inputName);
 		httpHeaders = omitManyKeys(httpHeaders, [target.slot]);
+
 		httpAPIKey = {
 			inputName,
 			headerName: target.slot,
@@ -616,6 +630,7 @@ export class MCPManagementAPI {
 
 	private readonly composerMCPDeclarationsCatalog = createSharedAsyncCatalog<MCPComposerDeclarations[]>(async () => {
 		const bundles = await this.listMCPBundles();
+
 		return mapWithConcurrency(bundles, MCP_SERVER_MANAGEMENT_CONCURRENCY, async bundle => ({
 			bundle,
 			servers: await this.listMCPServers(bundle),
@@ -645,9 +660,7 @@ export class MCPManagementAPI {
 				if (left.builtIn !== right.builtIn) {
 					return left.builtIn ? -1 : 1;
 				}
-				return left.displayName.localeCompare(right.displayName, undefined, {
-					sensitivity: 'base',
-				});
+				return left.displayName.localeCompare(right.displayName, undefined, { sensitivity: 'base' });
 			});
 	}
 
@@ -655,23 +668,61 @@ export class MCPManagementAPI {
 		return this.toBundleView(collectionListItemFromCollectionView(await this.store.getMCPCollection(collection)));
 	}
 
+	async getMCPServer(server: ArtifactRef, bundle: ArtifactRef): Promise<MCPServerView> {
+		return this.toServerView(await this.aggregate.getMCPServer(server), bundle);
+	}
+
+	async getMCPRuntimeServerView(server: ArtifactRef): Promise<MCPRuntimeServerView> {
+		return this.toRuntimeServerView(await this.aggregate.getMCPServer(server));
+	}
+
+	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerView> {
+		return this.toRuntimeServerView(await this.aggregate.getMCPServerForRuntimeServer(server));
+	}
+
+	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {
+		return this.store.getMCPServerSecrets(server);
+	}
+
+	async getMCPServerSetup(server: ArtifactRef): Promise<MCPServerSetupView> {
+		const details = await this.aggregate.getMCPServer(server);
+		const settings = details.settings;
+
+		return {
+			server: {
+				rootID: settings.artifact.rootID,
+				artifactID: settings.artifact.id,
+			},
+			displayName: settings.document.displayName || settings.artifact.displayName || settings.document.logicalName,
+			builtIn: settings.builtIn,
+			settingsRevision: settings.installationRevision,
+			note: settings.document.configuration.install.note,
+			inputs: setupInputsFor(settings.document, settings.installation),
+		};
+	}
+
+	getMCPSettings(): Promise<MCPSettings> {
+		return this.store.getMCPSettings();
+	}
+
+	saveMCPSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<MCPSettings> {
+		return this.store.saveMCPSettings(expectedRevision, settings);
+	}
+
 	async listMCPServers(bundle: MCPBundleView): Promise<MCPServerView[]> {
 		const records = (await this.store.listMCPCollectionServers(bundle.ref)) ?? [];
-		const values = await mapWithConcurrency(records, MCP_SERVER_MANAGEMENT_CONCURRENCY, async record => {
-			const installation = record.installation;
-			const ref: ArtifactRef = {
-				rootID: installation.artifact.rootID,
-				artifactID: installation.artifact.id,
-			};
-			const runtimeServerID = await this.aggregate.runtimeServerIDForArtifact(ref);
 
-			return this.toServerView(installation, bundle.ref, record.policy, runtimeServerID);
+		const values = await mapWithConcurrency(records, MCP_SERVER_MANAGEMENT_CONCURRENCY, async record => {
+			const ref: ArtifactRef = {
+				rootID: record.installation.artifact.rootID,
+				artifactID: record.installation.artifact.id,
+			};
+
+			return this.toServerView(await this.aggregate.getMCPServer(ref), bundle.ref);
 		});
 
 		return values.toSorted((left, right) =>
-			serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, {
-				sensitivity: 'base',
-			})
+			serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, { sensitivity: 'base' })
 		);
 	}
 
@@ -682,7 +733,9 @@ export class MCPManagementAPI {
 			displayName,
 			description,
 		});
+
 		this.invalidateComposerMCPDeclarations();
+
 		return this.toBundleView(collectionListItemFromCollectionView(collection));
 	}
 
@@ -698,7 +751,7 @@ export class MCPManagementAPI {
 		const policyName = existing?.document?.configuration.policy?.name ?? draft.logicalName.trim();
 		const built = buildServerDocument(existing, draft, policyName);
 
-		const policy = await this.aggregate.upsertManagedMCPPolicy({
+		const policy = await this.aggregate.saveMCPPolicy({
 			collection: bundle.ref,
 			expectedCollectionRevision: bundle.collection.revision,
 			name: policyName,
@@ -712,8 +765,14 @@ export class MCPManagementAPI {
 			enabled: true,
 		});
 
+		if (existing) {
+			for (const input of built.secretDeletes) {
+				await this.aggregate.clearMCPServerSecret(existing.ref, input);
+			}
+		}
+
 		const result = existing
-			? await this.aggregate.replaceManagedMCP({
+			? await this.aggregate.updateMCPServer({
 					collection: bundle.ref,
 					expectedCollectionRevision: policy.collection.artifact.revision,
 					artifact: existing.ref,
@@ -721,7 +780,7 @@ export class MCPManagementAPI {
 					document: built.document,
 					enabled: draft.enabled,
 				})
-			: await this.aggregate.createManagedMCP({
+			: await this.aggregate.createMCPServer({
 					collection: bundle.ref,
 					expectedCollectionRevision: policy.collection.artifact.revision,
 					document: built.document,
@@ -733,47 +792,17 @@ export class MCPManagementAPI {
 			artifactID: result.artifact.id,
 		};
 
-		for (const target of built.secretDeletes) {
-			await this.aggregate.deleteMCPServerSecret(serverRef, target.kind, target.slot);
-		}
-
-		const installation = await this.store.getMCPServerInstallation(serverRef);
-		const nextData = writableServerData(installation.installation);
-		nextData.inputs = cloneJSON(nextData.inputs ?? {});
-		let installationChanged = false;
-
 		for (const write of built.secretWrites) {
-			const value = await this.aggregate.putMCPServerSecret(serverRef, write.kind, write.slot, write.secret);
-			nextData.inputs[write.inputName] = {
-				secretRef: value.secretRef,
-			};
-			installationChanged = true;
-		}
-
-		if (installationChanged) {
-			await this.aggregate.updateMCPServerInstallation(serverRef, installation.artifact.revision, nextData);
-		}
-
-		const refreshedBundle = await this.getMCPBundle(bundle.ref);
-		const refreshed = (await this.listMCPServers(refreshedBundle)).find(
-			value => artifactRefKey(value.ref) === artifactRefKey(serverRef)
-		);
-
-		if (!refreshed) {
-			throw new Error('MCP server was saved but could not be loaded afterward.');
+			await this.aggregate.setMCPServerSecret(serverRef, write.inputName, write.secret);
 		}
 
 		this.invalidateComposerMCPDeclarations();
-		return refreshed;
+
+		return this.getMCPServer(serverRef, bundle.ref);
 	}
 
 	async setMCPBundleEnabled(bundle: MCPBundleView, enabled: boolean): Promise<void> {
 		await this.store.setMCPCollectionEnabled(bundle.ref, bundle.collection.revision, enabled);
-		this.invalidateComposerMCPDeclarations();
-	}
-
-	async setMCPServerEnabled(server: MCPServerView, enabled: boolean): Promise<void> {
-		await this.store.setMCPServerEnabled(server.ref, server.artifact.revision, enabled);
 		this.invalidateComposerMCPDeclarations();
 	}
 
@@ -796,9 +825,11 @@ export class MCPManagementAPI {
 		});
 
 		const remaining = await this.store.listMCPCollectionMemberships(server.ref);
+
 		if (remaining.length === 0) {
-			await this.aggregate.purgeManagedMCP(server.ref, server.artifact.revision);
+			await this.aggregate.deleteMCPServer(server.ref, server.artifact.revision);
 		}
+
 		this.invalidateComposerMCPDeclarations();
 	}
 
@@ -812,22 +843,16 @@ export class MCPManagementAPI {
 			throw new Error('Remove all MCP servers before deleting this Collection.');
 		}
 
-		const management = await this.getMCPCollectionManagementView(bundle.ref);
-		const policyRefs = new Map<string, ArtifactRef>();
+		const policies = await this.store.listMCPPolicies(bundle.ref.rootID);
 
-		for (const occurrence of management.capabilities.occurrences) {
-			if (occurrence.type === 'mcp.policy' && occurrence.artifact) {
-				policyRefs.set(artifactRefKey(occurrence.artifact), occurrence.artifact);
-			}
-		}
-
-		for (const policyRef of policyRefs.values()) {
-			const memberships = await this.store.listMCPCollectionMemberships(policyRef);
+		for (const policy of policies) {
+			const memberships = await this.store.listMCPCollectionMemberships(policy.ref);
 			const membership = memberships.find(value => artifactRefKey(value.collection) === artifactRefKey(bundle.ref));
 
 			if (!membership) {
 				continue;
 			}
+
 			await this.store.removeMCPCollectionMember({
 				collection: membership.collection,
 				expectedRevision: membership.collectionRevision,
@@ -836,10 +861,12 @@ export class MCPManagementAPI {
 		}
 
 		const current = await this.store.getMCPCollection(bundle.ref);
+
 		await this.store.deleteMCPCollection({
 			collection: bundle.ref,
 			expectedRevision: current.artifact.revision,
 		});
+
 		this.invalidateComposerMCPDeclarations();
 	}
 
@@ -849,29 +876,41 @@ export class MCPManagementAPI {
 		reset: boolean
 	): Promise<void> {
 		const serverRef = 'ref' in server ? server.ref : server;
-		const latest = await this.store.getMCPServerInstallation(serverRef);
-		const nextData = writableServerData(latest.installation);
+		let latest = await this.aggregate.getMCPServer(serverRef);
+		const nextData = writableServerData(latest.settings.installation);
 		nextData.inputs = cloneJSON(nextData.inputs ?? {});
-		const inputs = latest.document.configuration.install.inputs ?? {};
-		const targets = findSecretTargets(latest.document);
-		let changed = false;
 
-		for (const [inputName, declaration] of Object.entries(inputs)) {
+		const declarations = latest.settings.document.configuration.install.inputs ?? {};
+		let settingsChanged = false;
+
+		for (const [inputName, declaration] of Object.entries(declarations)) {
+			if (declaration.kind !== MCPInputKindValue.Text && declaration.kind !== MCPInputKindValue.Path) {
+				continue;
+			}
+
 			const submitted = values[inputName];
 			const existing = nextData.inputs[inputName];
 
-			if (declaration.kind === MCPInputKindValue.Text || declaration.kind === MCPInputKindValue.Path) {
-				if (submitted?.value?.trim()) {
-					nextData.inputs[inputName] = {
-						value: submitted.value,
-					};
-					changed = true;
-				} else if (reset && existing?.value !== undefined) {
-					nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
-					changed = true;
-				}
-				continue;
+			if (submitted?.value?.trim()) {
+				nextData.inputs[inputName] = {
+					value: submitted.value,
+				};
+				settingsChanged = true;
+			} else if (reset && existing?.value !== undefined) {
+				nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
+				settingsChanged = true;
 			}
+		}
+
+		if (settingsChanged) {
+			latest = await this.aggregate.saveMCPServerSettings(serverRef, latest.settings.installationRevision, nextData);
+		}
+
+		const secrets = await this.store.getMCPServerSecrets(serverRef);
+		const secretByInput = new Map(secrets.inputs.map(input => [input.name, input] as const));
+
+		for (const [inputName, declaration] of Object.entries(declarations)) {
+			const submitted = values[inputName];
 
 			if (declaration.kind === MCPInputKindValue.OAuthClientCredentials) {
 				const hasClientID = Boolean(submitted?.clientID?.trim());
@@ -895,25 +934,11 @@ export class MCPManagementAPI {
 							: {}),
 					});
 
-					const result = await this.aggregate.putMCPServerSecret(
-						serverRef,
-						MCPSecretKindValue.OAuthClientCredentials,
-						'clientCredentials',
-						secret
-					);
-					nextData.inputs[inputName] = {
-						secretRef: result.secretRef,
-					};
-					changed = true;
-				} else if (reset && existing?.secretRef) {
-					await this.aggregate.deleteMCPServerSecret(
-						serverRef,
-						MCPSecretKindValue.OAuthClientCredentials,
-						'clientCredentials'
-					);
-					nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
-					changed = true;
+					latest = await this.aggregate.setMCPServerSecret(serverRef, inputName, secret);
+				} else if (reset && secretByInput.get(inputName)?.configured) {
+					latest = await this.aggregate.clearMCPServerSecret(serverRef, inputName);
 				}
+
 				continue;
 			}
 
@@ -921,156 +946,19 @@ export class MCPManagementAPI {
 				continue;
 			}
 
-			const target = targets.get(inputName);
-			if (!target) {
-				throw new Error(`Secret input "${inputName}" has no supported target.`);
-			}
-
 			if (submitted?.value) {
-				const result = await this.aggregate.putMCPServerSecret(serverRef, target.kind, target.slot, submitted.value);
-				nextData.inputs[inputName] = {
-					secretRef: result.secretRef,
-				};
-				changed = true;
-			} else if (reset && existing?.secretRef) {
-				await this.aggregate.deleteMCPServerSecret(serverRef, target.kind, target.slot);
-				nextData.inputs = omitManyKeys(nextData.inputs, [inputName]);
-				changed = true;
+				latest = await this.aggregate.setMCPServerSecret(serverRef, inputName, submitted.value);
+			} else if (reset && secretByInput.get(inputName)?.configured) {
+				latest = await this.aggregate.clearMCPServerSecret(serverRef, inputName);
 			}
 		}
 
-		if (!changed) {
-			return;
-		}
-
-		if (latest.builtIn) {
-			await this.aggregate.updateProtectedMCPServerInstallation(serverRef, latest.installationRevision, nextData);
-			this.invalidateComposerMCPDeclarations();
-			return;
-		}
-
-		await this.aggregate.updateMCPServerInstallation(serverRef, latest.artifact.revision, nextData);
+		void latest;
 		this.invalidateComposerMCPDeclarations();
-	}
-
-	async getMCPCollectionManagementView(collection: ArtifactRef): Promise<MCPCollectionManagementView> {
-		const [view, capabilities] = await Promise.all([
-			this.store.getMCPCollection(collection),
-			this.store.resolveMCPCollection(collection),
-		]);
-
-		return {
-			collection: view,
-			capabilities,
-		};
-	}
-
-	async getMCPServerManagementView(server: ArtifactRef): Promise<MCPServerManagementView> {
-		const [installation, capabilities, runtimeServerID, policy] = await Promise.all([
-			this.store.getMCPServerInstallation(server),
-			this.store.resolveMCPArtifactCapabilities(server),
-			this.aggregate.runtimeServerIDForArtifact(server),
-			this.aggregate.getMCPEffectivePolicy(server),
-		]);
-
-		const [authHealthResult, runtimeResult] = await Promise.allSettled([
-			this.aggregate.getMCPServerAuthHealth(server),
-			this.runtime.getMCPServerStatus(runtimeServerID),
-		]);
-
-		return {
-			installation,
-			capabilities,
-			runtimeServerID,
-			policy,
-			authHealth: authHealthResult.status === 'fulfilled' ? authHealthResult.value : undefined,
-			runtime: runtimeResult.status === 'fulfilled' ? runtimeResult.value : undefined,
-			authHealthError:
-				authHealthResult.status === 'rejected'
-					? getErrorMessage(authHealthResult.reason, 'MCP authorization health is unavailable.')
-					: undefined,
-			runtimeError:
-				runtimeResult.status === 'rejected'
-					? getErrorMessage(runtimeResult.reason, 'MCP runtime status is unavailable.')
-					: undefined,
-		};
-	}
-
-	inspectMCPServer(server: ArtifactRef): Promise<MCPServerManagementView> {
-		return this.getMCPServerManagementView(server);
-	}
-
-	async getMCPPolicyManagementView(policy: ArtifactRef): Promise<MCPPolicyManagementView> {
-		const [view, capabilities] = await Promise.all([
-			this.store.getMCPPolicy(policy),
-			this.store.resolveMCPArtifactCapabilities(policy),
-		]);
-
-		return {
-			policy: view,
-			capabilities,
-		};
-	}
-
-	artifactRefForRuntimeServerID(server: MCPRuntimeServerID): Promise<ArtifactRef> {
-		return this.aggregate.artifactRefForRuntimeServerID(server);
-	}
-
-	runtimeServerIDForArtifact(artifact: ArtifactRef): Promise<MCPRuntimeServerID> {
-		return this.aggregate.runtimeServerIDForArtifact(artifact);
-	}
-
-	rootIDForRuntimeCatalogID(catalogID: MCPRuntimeCatalogID): Promise<ArtifactRootID> {
-		return this.aggregate.rootIDForRuntimeCatalogID(catalogID);
-	}
-
-	getMCPEffectivePolicy(server: ArtifactRef): Promise<MCPEffectivePolicy> {
-		return this.aggregate.getMCPEffectivePolicy(server);
-	}
-
-	getMCPServerAuthHealth(server: ArtifactRef): Promise<MCPAuthHealth> {
-		return this.aggregate.getMCPServerAuthHealth(server);
-	}
-
-	getMCPServerInstallation(server: ArtifactRef): Promise<MCPStoreServerInstallationView> {
-		return this.store.getMCPServerInstallation(server);
-	}
-
-	getMCPPolicy(policy: ArtifactRef): Promise<MCPStorePolicyView> {
-		return this.store.getMCPPolicy(policy);
-	}
-
-	setMCPPolicyEnabled(policy: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return this.store.setMCPPolicyEnabled(policy, expectedRevision, enabled);
-	}
-
-	upsertManagedMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult> {
-		return this.aggregate.upsertManagedMCPPolicy(request);
-	}
-
-	purgeManagedMCPPolicy(policy: ArtifactRef, expectedRevision: number): Promise<void> {
-		return this.aggregate.purgeManagedMCPPolicy(policy, expectedRevision);
-	}
-
-	putMCPServerSecret(
-		server: ArtifactRef,
-		kind: MCPSecretKind,
-		slot: string,
-		secret: string
-	): Promise<MCPSecretWriteResult> {
-		return this.aggregate.putMCPServerSecret(server, kind, slot, secret);
-	}
-
-	deleteMCPServerSecret(server: ArtifactRef, kind: MCPSecretKind, slot: string): Promise<void> {
-		return this.aggregate.deleteMCPServerSecret(server, kind, slot);
 	}
 
 	connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
 		return this.runtime.connectMCPServer(server);
-	}
-
-	startMCPServerConnect(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return this.runtime.startMCPServerConnect(server);
 	}
 
 	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void> {
@@ -1081,56 +969,40 @@ export class MCPManagementAPI {
 		return this.runtime.refreshMCPServer(server);
 	}
 
-	getMCPServerStatus(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return this.runtime.getMCPServerStatus(server);
+	cancelMCPServerAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
+		return this.runtime.cancelMCPServerAuthorization(server);
 	}
 
-	listMCPServerTools(server: MCPRuntimeServerID): Promise<MCPToolCapability[]> {
-		return this.runtime.listMCPServerTools(server);
-	}
-
-	listMCPServerToolsPage(
+	listMCPServerTools(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPToolCapability>> {
-		return this.runtime.listMCPServerToolsPage(server, pageSize, pageToken);
+		return this.runtime.listMCPServerTools(server, pageSize, pageToken);
 	}
 
-	listMCPServerResources(server: MCPRuntimeServerID): Promise<MCPResourceRef[]> {
-		return this.runtime.listMCPServerResources(server);
-	}
-
-	listMCPServerResourcesPage(
+	listMCPServerResources(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPResourceRef>> {
-		return this.runtime.listMCPServerResourcesPage(server, pageSize, pageToken);
+		return this.runtime.listMCPServerResources(server, pageSize, pageToken);
 	}
 
-	listMCPServerResourceTemplates(server: MCPRuntimeServerID): Promise<MCPResourceTemplateRef[]> {
-		return this.runtime.listMCPServerResourceTemplates(server);
-	}
-
-	listMCPServerResourceTemplatesPage(
+	listMCPServerResourceTemplates(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPResourceTemplateRef>> {
-		return this.runtime.listMCPServerResourceTemplatesPage(server, pageSize, pageToken);
+		return this.runtime.listMCPServerResourceTemplates(server, pageSize, pageToken);
 	}
 
-	listMCPServerPrompts(server: MCPRuntimeServerID): Promise<MCPPromptRef[]> {
-		return this.runtime.listMCPServerPrompts(server);
-	}
-
-	listMCPServerPromptsPage(
+	listMCPServerPrompts(
 		server: MCPRuntimeServerID,
 		pageSize: number,
 		pageToken?: string
 	): Promise<MCPDiscoveryPage<MCPPromptRef>> {
-		return this.runtime.listMCPServerPromptsPage(server, pageSize, pageToken);
+		return this.runtime.listMCPServerPrompts(server, pageSize, pageToken);
 	}
 
 	readMCPResource(server: MCPRuntimeServerID, uri: string): Promise<MCPReadResourceResponseBody> {
@@ -1152,46 +1024,16 @@ export class MCPManagementAPI {
 		return this.runtime.completeMCPArgument(server, request);
 	}
 
-	evaluateMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation> {
-		return this.runtime.evaluateMCPToolCall(server, request);
+	checkMCPToolCall(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPApprovalEvaluation> {
+		return this.runtime.checkMCPToolCall(server, request);
 	}
 
-	evaluateMappedMCPToolCall(
-		mapping: MCPProviderToolMapping,
-		request: InvokeMCPToolRequestBody
-	): Promise<MCPApprovalEvaluation> {
-		return this.runtime.evaluateMappedMCPToolCall(mapping, request);
+	resolveMCPToolApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult> {
+		return this.runtime.resolveMCPToolApproval(approvalID, resolution);
 	}
 
 	invokeMCPTool(server: MCPRuntimeServerID, request: InvokeMCPToolRequestBody): Promise<MCPRuntimeInvokeToolResponse> {
 		return this.runtime.invokeMCPTool(server, request);
-	}
-
-	invokeMappedMCPTool(
-		mapping: MCPProviderToolMapping,
-		request: InvokeMCPToolRequestBody
-	): Promise<MCPRuntimeInvokeToolResponse> {
-		return this.runtime.invokeMappedMCPTool(mapping, request);
-	}
-
-	resolveMCPApproval(approvalID: string, resolution: MCPApprovalResolution): Promise<MCPApprovalResolutionResult> {
-		return this.runtime.resolveMCPApproval(approvalID, resolution);
-	}
-
-	listPendingMCPOAuthAuthorizations(): Promise<MCPOAuthAuthorization[]> {
-		return this.runtime.listPendingMCPOAuthAuthorizations();
-	}
-
-	cancelPendingMCPOAuthAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
-		return this.runtime.cancelPendingMCPOAuthAuthorization(server);
-	}
-
-	getMCPGlobalSettings(): Promise<MCPGlobalSettings> {
-		return this.runtime.getMCPGlobalSettings();
-	}
-
-	updateMCPGlobalSettings(expectedRevision: number, settings: MCPAuthSettings): Promise<number> {
-		return this.runtime.updateMCPGlobalSettings(expectedRevision, settings);
 	}
 
 	resolveMappedTool(target: MappedTarget): Promise<ResolvedToolView> {
@@ -1222,30 +1064,40 @@ export class MCPManagementAPI {
 		};
 	}
 
-	private toServerView(
-		installation: MCPStoreServerInstallationView,
-		bundle: ArtifactRef,
-		policy: MCPEffectivePolicy,
-		runtimeServerID: MCPRuntimeServerID
-	): MCPServerView {
+	private toRuntimeServerView(details: MCPServerAggregateDetails): MCPRuntimeServerView {
 		return {
 			ref: {
-				rootID: installation.artifact.rootID,
-				artifactID: installation.artifact.id,
+				rootID: details.settings.artifact.rootID,
+				artifactID: details.settings.artifact.id,
 			},
-			runtimeServerID,
-			artifact: installation.artifact,
+			runtimeServerID: details.connection.server,
+			policy: details.policy,
+			authHealth: details.authorization,
+			runtime: details.connection,
+		};
+	}
+
+	private toServerView(details: MCPServerAggregateDetails, bundle: ArtifactRef): MCPServerView {
+		const settings = details.settings;
+
+		return {
+			ref: {
+				rootID: settings.artifact.rootID,
+				artifactID: settings.artifact.id,
+			},
+			runtimeServerID: details.connection.server,
+			artifact: settings.artifact,
 			bundle,
-			logicalName: installation.document.logicalName,
-			displayName: installation.document.displayName || installation.artifact.displayName,
-			document: installation.document,
-			installation: installation.installation,
-			installationRevision: installation.installationRevision,
-			enabled: installation.artifact.enabled,
-			builtIn: installation.builtIn,
-			policy,
-			policyRef: undefined,
-			loadError: undefined,
+			logicalName: settings.document.logicalName,
+			displayName: settings.document.displayName || settings.artifact.displayName,
+			document: settings.document,
+			installation: settings.installation,
+			installationRevision: settings.installationRevision,
+			enabled: settings.artifact.enabled,
+			builtIn: settings.builtIn,
+			policy: details.policy,
+			authHealth: details.authorization,
+			runtime: details.connection,
 		};
 	}
 
@@ -1261,10 +1113,9 @@ export class MCPManagementAPI {
 
 		for (let hop = 0; hop < MAX_MANAGEMENT_PAGE_HOPS; hop += 1) {
 			const page = await load(pageToken);
-			const items = page?.items ?? [];
-			output.push(...items);
+			output.push(...(page.items ?? []));
 
-			if (!page?.nextPageToken) {
+			if (!page.nextPageToken) {
 				return output;
 			}
 			if (seenTokens.has(page.nextPageToken)) {

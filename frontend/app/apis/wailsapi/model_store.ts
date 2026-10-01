@@ -3,91 +3,79 @@ import type {
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
 	ManagedModelResult,
-	ManagedProviderCreateRequest,
-	ManagedProviderReplaceRequest,
-	ManagedProviderResult,
 	ModelListItem,
 	ModelProviderListItem,
-	ModelProviderRuntimeOverlayView,
 	ModelProviderView,
 	ModelView,
+	ProviderAPIKeyStatus,
+	SaveModelSettingsRequest,
 } from '@/spec/model';
 
 import type { IModelStoreAPI } from '@/apis/interface';
 import {
-	CreateManagedModel,
-	CreateModelProvider,
-	DeleteManagedModel,
-	DeleteModelProvider,
+	CreateModel,
+	DeleteModel,
 	GetModel,
-	GetModelProvider,
-	ListModelProviders,
+	GetProvider,
+	GetProviderAPIKeyStatus,
 	ListModels,
-	ReplaceManagedModel,
-	ReplaceModelProvider,
+	ListProviders,
+	ResetModelSettings,
+	SaveModelSettings,
 	SetModelEnabled,
-	SetModelProviderCredential,
-	SetModelProviderEnabled,
+	UpdateModel,
 } from '@/apis/wailsjs/go/main/ModelStoreWrapper';
 
 export class WailsModelStoreAPI implements IModelStoreAPI {
-	listModelProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]> {
-		return ListModelProviders((rootID ?? '') as never) as unknown as Promise<ModelProviderListItem[]>;
+	listProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]> {
+		return ListProviders((rootID ?? '') as never) as unknown as Promise<ModelProviderListItem[]>;
 	}
 
 	listModels(rootID?: ArtifactRootID): Promise<ModelListItem[]> {
 		return ListModels((rootID ?? '') as never) as unknown as Promise<ModelListItem[]>;
 	}
 
-	getModelProvider(ref: ArtifactRef): Promise<ModelProviderView> {
-		return GetModelProvider(ref as never) as unknown as Promise<ModelProviderView>;
+	getProvider(ref: ArtifactRef): Promise<ModelProviderView> {
+		return GetProvider(ref as never) as unknown as Promise<ModelProviderView>;
 	}
 
 	getModel(ref: ArtifactRef): Promise<ModelView> {
 		return GetModel(ref as never) as unknown as Promise<ModelView>;
 	}
 
-	createModelProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
-		return CreateModelProvider(request as never) as unknown as Promise<ManagedProviderResult>;
+	getProviderAPIKeyStatus(ref: ArtifactRef): Promise<ProviderAPIKeyStatus> {
+		return GetProviderAPIKeyStatus(ref as never) as unknown as Promise<ProviderAPIKeyStatus>;
 	}
 
-	replaceModelProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
-		return ReplaceModelProvider(request as never) as unknown as Promise<ManagedProviderResult>;
+	createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
+		return CreateModel(request as never) as unknown as Promise<ManagedModelResult>;
 	}
 
-	deleteModelProvider(ref: ArtifactRef, expectedRevision: number): Promise<void> {
-		return DeleteModelProvider(ref as never, expectedRevision);
+	updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
+		return UpdateModel(request as never) as unknown as Promise<ManagedModelResult>;
 	}
 
-	createManagedModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
-		return CreateManagedModel(request as never) as unknown as Promise<ManagedModelResult>;
+	deleteModel(ref: ArtifactRef, expectedRevision: number): Promise<void> {
+		return DeleteModel(ref as never, expectedRevision);
 	}
 
-	replaceManagedModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
-		return ReplaceManagedModel(request as never) as unknown as Promise<ManagedModelResult>;
+	saveModelSettings(request: SaveModelSettingsRequest): Promise<ModelView> {
+		return SaveModelSettings(request as never) as unknown as Promise<ModelView>;
 	}
 
-	deleteManagedModel(ref: ArtifactRef, expectedRevision: number): Promise<void> {
-		return DeleteManagedModel(ref as never, expectedRevision);
-	}
-
-	setModelProviderEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return SetModelProviderEnabled(ref as never, expectedRevision, enabled) as unknown as Promise<StoreArtifact>;
+	resetModelSettings(
+		ref: ArtifactRef,
+		expectedModelRevision: number,
+		expectedSettingsRevision: number
+	): Promise<ModelView> {
+		return ResetModelSettings(
+			ref as never,
+			expectedModelRevision,
+			expectedSettingsRevision
+		) as unknown as Promise<ModelView>;
 	}
 
 	setModelEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
 		return SetModelEnabled(ref as never, expectedRevision, enabled) as unknown as Promise<StoreArtifact>;
-	}
-
-	setModelProviderCredential(
-		ref: ArtifactRef,
-		expectedOverlayRevision: number,
-		secret: string
-	): Promise<ModelProviderRuntimeOverlayView> {
-		return SetModelProviderCredential(
-			ref as never,
-			expectedOverlayRevision,
-			secret
-		) as unknown as Promise<ModelProviderRuntimeOverlayView>;
 	}
 }

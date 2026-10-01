@@ -17,6 +17,21 @@ import (
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
 
+func (a *API) ResolveProvider(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+) (ResolvedProvider, error) {
+	if err := a.ready(ctx); err != nil {
+		return ResolvedProvider{}, err
+	}
+
+	provider, err := a.loadProvider(ctx, ref)
+	if err != nil {
+		return ResolvedProvider{}, err
+	}
+	return a.resolveProvider(ctx, provider)
+}
+
 func (a *API) ResolveModel(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
@@ -45,8 +60,48 @@ func (a *API) ResolveModel(
 	if err != nil {
 		return ResolvedModel{}, err
 	}
+
+	resolvedProvider, err := a.resolveProvider(ctx, provider)
+	if err != nil {
+		return ResolvedModel{}, err
+	}
+	modelOverlayValue, _, err := a.overlays.GetModelOverlay(
+		ctx,
+		model.Artifact.Ref(),
+	)
+	if err != nil {
+		return ResolvedModel{}, err
+	}
+
+	fingerprint, err := resolvedFingerprint(
+		model,
+		resolvedProvider.Provider,
+		resolvedProvider.ProviderOverlay,
+		resolvedProvider.ProviderCredential,
+		modelOverlayValue,
+		resolvedProvider.Adapter,
+	)
+	if err != nil {
+		return ResolvedModel{}, err
+	}
+
+	return ResolvedModel{
+		Model:              model,
+		Provider:           resolvedProvider.Provider,
+		ProviderOverlay:    resolvedProvider.ProviderOverlay.Clone(),
+		ProviderCredential: resolvedProvider.ProviderCredential,
+		ModelOverlay:       modelOverlayValue.Clone(),
+		Adapter:            resolvedProvider.Adapter,
+		Fingerprint:        fingerprint,
+	}, nil
+}
+
+func (a *API) resolveProvider(
+	ctx context.Context,
+	provider modelDomain.Provider,
+) (ResolvedProvider, error) {
 	if !provider.Artifact.Enabled {
-		return ResolvedModel{}, fmt.Errorf(
+		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider %q is disabled",
 			basespec.ErrReferenceUnresolved,
 			provider.Artifact.LogicalName,
@@ -58,20 +113,20 @@ func (a *API) ResolveModel(
 		provider.Document.Adapter,
 	)
 	if err != nil {
-		return ResolvedModel{}, err
+		return ResolvedProvider{}, err
 	}
 	if !found {
-		return ResolvedModel{}, fmt.Errorf(
+		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider adapter %q is not installed",
 			basespec.ErrUnsupported,
 			provider.Document.Adapter,
 		)
 	}
 	if err := adapter.Validate(); err != nil {
-		return ResolvedModel{}, err
+		return ResolvedProvider{}, err
 	}
 	if adapter.ID != provider.Document.Adapter {
-		return ResolvedModel{}, fmt.Errorf(
+		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model adapter registry returned %q for Provider adapter %q",
 			basespec.ErrInvalid,
 			adapter.ID,
@@ -84,49 +139,28 @@ func (a *API) ResolveModel(
 		provider.Artifact.Ref(),
 	)
 	if err != nil {
-		return ResolvedModel{}, err
-	}
-	modelOverlayValue, _, err := a.overlays.GetModelOverlay(
-		ctx,
-		model.Artifact.Ref(),
-	)
-	if err != nil {
-		return ResolvedModel{}, err
+		return ResolvedProvider{}, err
 	}
 
-	providerCredential, credentialFound, err := a.overlays.GetProviderCredential(
+	credential, found, err := a.overlays.GetProviderCredential(
 		ctx,
 		provider.Artifact.Ref(),
 	)
 	if err != nil {
-		return ResolvedModel{}, err
-	}
-	var credential *secret.Binding
-	if credentialFound && providerCredential.Active() {
-		value := providerCredential.Clone()
-		credential = &value
+		return ResolvedProvider{}, err
 	}
 
-	fingerprint, err := resolvedFingerprint(
-		model,
-		provider,
-		providerOverlay,
-		credential,
-		modelOverlayValue,
-		adapter,
-	)
-	if err != nil {
-		return ResolvedModel{}, err
+	var activeCredential *secret.Binding
+	if found && credential.Active() {
+		value := credential.Clone()
+		activeCredential = &value
 	}
 
-	return ResolvedModel{
-		Model:              model,
+	return ResolvedProvider{
 		Provider:           provider,
 		ProviderOverlay:    providerOverlay.Clone(),
-		ProviderCredential: credential,
-		ModelOverlay:       modelOverlayValue.Clone(),
+		ProviderCredential: activeCredential,
 		Adapter:            adapter,
-		Fingerprint:        fingerprint,
 	}, nil
 }
 

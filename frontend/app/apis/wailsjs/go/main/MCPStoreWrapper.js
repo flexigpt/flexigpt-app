@@ -6,8 +6,8 @@ export function AddMCPCollectionMember(arg1) {
   return window['go']['main']['MCPStoreWrapper']['AddMCPCollectionMember'](arg1);
 }
 
-export function AttachMCPArtifactToCollection(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['AttachMCPArtifactToCollection'](arg1);
+export function AddMCPServerToCollection(arg1) {
+  return window['go']['main']['MCPStoreWrapper']['AddMCPServerToCollection'](arg1);
 }
 
 export function CreateMCPCollection(arg1) {
@@ -26,8 +26,12 @@ export function GetMCPPolicy(arg1) {
   return window['go']['main']['MCPStoreWrapper']['GetMCPPolicy'](arg1);
 }
 
-export function GetMCPServerInstallation(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['GetMCPServerInstallation'](arg1);
+export function GetMCPServerSecrets(arg1) {
+  return window['go']['main']['MCPStoreWrapper']['GetMCPServerSecrets'](arg1);
+}
+
+export function GetMCPSettings() {
+  return window['go']['main']['MCPStoreWrapper']['GetMCPSettings']();
 }
 
 export function ListMCPCollectionMemberships(arg1) {
@@ -62,24 +66,12 @@ export function RemoveMCPCollectionMember(arg1) {
   return window['go']['main']['MCPStoreWrapper']['RemoveMCPCollectionMember'](arg1);
 }
 
-export function ResolveMCPArtifactCapabilities(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['ResolveMCPArtifactCapabilities'](arg1);
-}
-
-export function ResolveMCPCollection(arg1) {
-  return window['go']['main']['MCPStoreWrapper']['ResolveMCPCollection'](arg1);
+export function SaveMCPSettings(arg1, arg2) {
+  return window['go']['main']['MCPStoreWrapper']['SaveMCPSettings'](arg1, arg2);
 }
 
 export function SetMCPCollectionEnabled(arg1, arg2, arg3) {
   return window['go']['main']['MCPStoreWrapper']['SetMCPCollectionEnabled'](arg1, arg2, arg3);
-}
-
-export function SetMCPPolicyEnabled(arg1, arg2, arg3) {
-  return window['go']['main']['MCPStoreWrapper']['SetMCPPolicyEnabled'](arg1, arg2, arg3);
-}
-
-export function SetMCPServerEnabled(arg1, arg2, arg3) {
-  return window['go']['main']['MCPStoreWrapper']['SetMCPServerEnabled'](arg1, arg2, arg3);
 }
 
 export function UpdateMCPCollection(arg1) {

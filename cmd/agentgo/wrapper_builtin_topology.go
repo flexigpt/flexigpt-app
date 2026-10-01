@@ -38,7 +38,7 @@ type agentBaselineEnsurer interface {
 	) (collection.CollectionView, error)
 }
 
-func EnsureBuiltinArtifactTopology(
+func ensureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installerapi.API,
 	tools builtin.HydrationInstaller,
@@ -84,7 +84,7 @@ func EnsureBuiltinArtifactTopology(
 	return bootstrap.Ensure(ctx)
 }
 
-func EnsureUserArtifactBaselineCollectionsForRoot(
+func ensureUserArtifactBaselineCollectionsForRoot(
 	ctx context.Context,
 	rootID root.RootID,
 	skills skillBaselineEnsurer,
@@ -113,7 +113,7 @@ func EnsureUserArtifactBaselineCollectionsForRoot(
 	return result
 }
 
-func EnsureUserArtifactBaselineCollections(
+func ensureUserArtifactBaselineCollections(
 	ctx context.Context,
 	roots compositionapi.RootAPI,
 	protection compositionapi.ProtectionAPI,
@@ -136,7 +136,7 @@ func EnsureUserArtifactBaselineCollections(
 		if protection.IsProtectedRoot(value.ID) {
 			continue
 		}
-		if err := EnsureUserArtifactBaselineCollectionsForRoot(
+		if err := ensureUserArtifactBaselineCollectionsForRoot(
 			ctx,
 			value.ID,
 			skills,

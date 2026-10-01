@@ -75,6 +75,19 @@ type ServerInstallationView struct {
 	BuiltIn              bool   `json:"builtIn"`
 }
 
+type ServerSecretInputView struct {
+	Name        string                    `json:"name"`
+	Label       string                    `json:"label,omitempty"`
+	Description string                    `json:"description,omitempty"`
+	Required    bool                      `json:"required"`
+	Kind        mcpDomainServer.InputKind `json:"kind"`
+	Configured  bool                      `json:"configured"`
+}
+
+type ServerSecretsView struct {
+	Inputs []ServerSecretInputView `json:"inputs"`
+}
+
 func installationDataView(
 	value mcpDomainServer.ServerData,
 ) ServerInstallationDataView {
@@ -169,7 +182,7 @@ type ServerStore interface {
 		ref artifact.ArtifactRef,
 	) (mcpDomainServer.Resolved, error)
 
-	GetServerInstallation(
+	GetServerSettings(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (ServerInstallationView, error)
@@ -185,7 +198,7 @@ type ManagementStore interface {
 		ref artifact.ArtifactRef,
 	) (PolicyView, error)
 
-	GetMCPEffectivePolicy(
+	GetServerEffectivePolicy(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
 	) (mcpPolicy.Effective, error)
@@ -196,20 +209,20 @@ type ManagementStore interface {
 		policyName basespec.LogicalName,
 	) ([]artifact.ArtifactRef, error)
 
-	CreateManagedMCP(
+	CreateMCPServer(
 		ctx context.Context,
 		request ManagedMCPCreateRequest,
 	) (ManagedMCPCreateResult, error)
 
-	ReplaceManagedMCP(
+	UpdateMCPServer(
 		ctx context.Context,
 		request ManagedMCPReplaceRequest,
 	) (ManagedMCPReplaceResult, error)
 
-	PurgeManagedMCP(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
-	UpsertManagedMCPPolicy(
+	DeleteMCPServer(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
+	SaveMCPPolicy(
 		ctx context.Context,
 		request ManagedMCPPolicyUpsertRequest,
 	) (ManagedMCPPolicyUpsertResult, error)
-	PurgeManagedMCPPolicy(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
+	DeleteMCPPolicy(ctx context.Context, ref artifact.ArtifactRef, expectedRevision uint64) error
 }

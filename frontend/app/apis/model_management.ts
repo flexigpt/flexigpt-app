@@ -1,5 +1,6 @@
 // oxlint-disable max-classes-per-file
 import type { ArtifactRef } from '@/spec/artifact';
+import type { CacheControl } from '@/spec/inference';
 import type {
 	ManagedModelCreateRequest,
 	ManagedModelReplaceRequest,
@@ -7,11 +8,14 @@ import type {
 	ManagedProviderCreateRequest,
 	ManagedProviderReplaceRequest,
 	ManagedProviderResult,
+	ModelCapabilities,
+	ModelDefaults,
 	ModelListItem,
 	ModelProviderDocument,
 	ModelProviderListItem,
 	ModelProviderView,
 	ModelView,
+	ProviderAPIKeyStatus,
 	UIModelOption,
 } from '@/spec/model';
 import { ArtifactState } from '@/spec/artifact';
@@ -30,6 +34,7 @@ import { getProviderSDKType } from '@/models/lib/provider_sdk';
 export interface ModelProviderManagementItem {
 	list: ModelProviderListItem;
 	view: ModelProviderView;
+	apiKey: ProviderAPIKeyStatus;
 }
 
 export interface ModelManagementItem {
@@ -37,6 +42,7 @@ export interface ModelManagementItem {
 	view: ModelView;
 	provider?: ModelProviderManagementItem;
 }
+
 export interface ModelManagementSnapshot {
 	providers: ModelProviderManagementItem[];
 	models: ModelManagementItem[];
@@ -55,7 +61,7 @@ export class ModelCatalogUnavailableError extends Error {
 	constructor(readonly reason: ModelCatalogUnavailableReason) {
 		super(
 			reason === 'no-runnable-provider'
-				? 'No enabled provider with configured credentials is available.'
+				? 'No enabled provider with an API key is available.'
 				: 'No enabled model is available for the configured providers.'
 		);
 		this.name = 'ModelCatalogUnavailableError';
@@ -66,7 +72,7 @@ export function isModelCatalogUnavailableError(error: unknown): error is ModelCa
 	return error instanceof ModelCatalogUnavailableError;
 }
 
-function providerRequiresCredential(document: ModelProviderDocument): boolean {
+function providerRequiresAPIKey(document: ModelProviderDocument): boolean {
 	return (document.authentication?.mode ?? ('apiKeyHeader' as string)) !== 'none';
 }
 
@@ -75,11 +81,7 @@ export function isModelProviderRunnable(provider: ModelProviderManagementItem): 
 		return false;
 	}
 
-	if (!providerRequiresCredential(provider.view.document)) {
-		return true;
-	}
-
-	return provider.list.credentialConfigured === true;
+	return !providerRequiresAPIKey(provider.view.document) || provider.apiKey.configured;
 }
 
 function resolveProvider(
@@ -99,20 +101,104 @@ function resolveProvider(
 	);
 }
 
-export function isModelRunnable(model: ModelManagementItem): boolean {
-	if (!model.provider) {
-		return false;
-	}
-
-	if (model.list.state !== ArtifactState.Available || !model.list.enabled) {
-		return false;
-	}
-
-	return isModelProviderRunnable(model.provider);
+function providerDefaultModelReference(provider: ModelProviderManagementItem): ModelProviderView['defaultModel'] {
+	return provider.view.defaultModel ?? provider.view.settings.defaultModel ?? provider.view.document.defaultModel;
 }
 
-function optionUsesProvider(option: UIModelOption, provider: ArtifactRef): boolean {
-	return option.provider?.rootID === provider.rootID && option.provider?.artifactID === provider.artifactID;
+export function isProviderDefaultModel(provider: ModelProviderManagementItem, model: ModelManagementItem): boolean {
+	const reference = providerDefaultModelReference(provider);
+
+	if (!reference || reference.name !== model.view.document.name) {
+		return false;
+	}
+
+	if (reference.scope === ModelLookupScope.Builtin) {
+		return model.list.builtIn;
+	}
+
+	return !model.list.builtIn && model.list.ref.rootID === provider.list.ref.rootID;
+}
+
+function isModelProviderDefaultCandidate(provider: ModelProviderManagementItem, model: ModelManagementItem): boolean {
+	if (
+		provider.list.state !== ArtifactState.Available ||
+		!provider.list.enabled ||
+		model.list.state !== ArtifactState.Available ||
+		!model.list.enabled
+	) {
+		return false;
+	}
+
+	// A built-in Provider can only store a built-in-scoped default Model.
+	return !provider.list.builtIn || model.list.builtIn;
+}
+
+export function isModelRunnable(model: ModelManagementItem): boolean {
+	return (
+		model.list.state === ArtifactState.Available &&
+		model.list.enabled &&
+		model.provider !== undefined &&
+		isModelProviderRunnable(model.provider)
+	);
+}
+
+function mergeDefaults(base?: ModelDefaults, settings?: ModelDefaults): ModelDefaults | undefined {
+	if (!base && !settings) {
+		return undefined;
+	}
+
+	return {
+		...base,
+		...settings,
+		...(base?.reasoning || settings?.reasoning
+			? {
+					reasoning: {
+						...base?.reasoning,
+						...settings?.reasoning,
+					},
+				}
+			: {}),
+		...(base?.cacheControl || settings?.cacheControl
+			? {
+					cacheControl: {
+						...base?.cacheControl,
+						...settings?.cacheControl,
+					} as CacheControl,
+				}
+			: {}),
+		...(base?.output || settings?.output
+			? {
+					output: {
+						...base?.output,
+						...settings?.output,
+						...(base?.output?.format || settings?.output?.format
+							? {
+									format: {
+										...base?.output?.format,
+										...settings?.output?.format,
+									},
+								}
+							: {}),
+					},
+				}
+			: {}),
+	};
+}
+
+function effectiveProviderDefaults(provider: ModelProviderManagementItem): ModelDefaults | undefined {
+	return mergeDefaults(provider.view.document.defaults, provider.view.settings.defaults);
+}
+
+function effectiveModelDefaults(model: ModelManagementItem): ModelDefaults | undefined {
+	return mergeDefaults(model.view.document.defaults, model.view.settings.defaults);
+}
+
+function effectiveProviderCapabilities(provider: ModelProviderManagementItem): ModelCapabilities | undefined {
+	return mergeModelCapabilities(provider.view.document.capabilities, provider.view.settings.capabilities);
+}
+
+function effectiveModelCapabilities(model: ModelManagementItem): ModelCapabilities | undefined {
+	return mergeModelCapabilities(model.view.document.capabilities, model.view.settings.capabilities);
 }
 
 function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
@@ -120,18 +206,13 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		throw new Error(`Model ${item.list.name} has no resolved provider.`);
 	}
 
-	const sourceModelParam = buildModelParamFromDefaults(
-		item.view.document.providerModelID,
-		item.provider.view.document.defaults,
-		item.view.document.defaults
-	);
+	const providerDefaults = effectiveProviderDefaults(item.provider);
+	const modelDefaults = effectiveModelDefaults(item);
 
 	return {
-		...sourceModelParam,
-
+		...buildModelParamFromDefaults(item.view.document.providerModelID, providerDefaults, modelDefaults),
 		model: item.list.ref,
 		provider: item.provider.list.ref,
-
 		logicalName: item.list.name,
 		providerName: item.provider.view.document.name,
 		providerAdapter: item.provider.view.document.adapter,
@@ -139,7 +220,10 @@ function modelOptionFromItem(item: ModelManagementItem): UIModelOption {
 		providerDisplayName: item.provider.list.displayName || item.provider.list.name,
 		modelDisplayName: item.list.displayName || item.list.name,
 		includePreviousMessages: 'all',
-		capabilities: mergeModelCapabilities(item.provider.view.document.capabilities, item.view.document.capabilities),
+		capabilities: mergeModelCapabilities(
+			effectiveProviderCapabilities(item.provider),
+			effectiveModelCapabilities(item)
+		),
 	};
 }
 
@@ -163,15 +247,23 @@ export class ModelManagementAPI {
 
 	async loadSnapshot(): Promise<ModelManagementSnapshot> {
 		const [providerList, modelList, defaultProvider] = await Promise.all([
-			this.store.listModelProviders(),
+			this.store.listProviders(),
 			this.store.listModels(),
-			this.aggregate.getDefaultModelProvider().catch(() => undefined),
+			this.aggregate.getDefaultProvider().catch(() => undefined),
 		]);
 
-		const providers = await mapWithConcurrency(providerList, 8, async list => ({
-			list,
-			view: await this.store.getModelProvider(list.ref),
-		}));
+		const providers = await mapWithConcurrency(providerList, 8, async list => {
+			const [view, apiKey] = await Promise.all([
+				this.store.getProvider(list.ref),
+				this.store.getProviderAPIKeyStatus(list.ref),
+			]);
+
+			return {
+				list,
+				view,
+				apiKey,
+			};
+		});
 
 		const modelsWithoutProvider = await mapWithConcurrency(modelList, 8, async list => ({
 			list,
@@ -191,7 +283,7 @@ export class ModelManagementAPI {
 	}
 
 	listProviders(): Promise<ModelProviderListItem[]> {
-		return this.store.listModelProviders();
+		return this.store.listProviders();
 	}
 
 	listModels(): Promise<ModelListItem[]> {
@@ -199,98 +291,108 @@ export class ModelManagementAPI {
 	}
 
 	getProvider(ref: ArtifactRef): Promise<ModelProviderView> {
-		return this.store.getModelProvider(ref);
+		return this.store.getProvider(ref);
 	}
 
 	getModel(ref: ArtifactRef): Promise<ModelView> {
 		return this.store.getModel(ref);
 	}
 
-	getDefaultModelProvider(): Promise<ArtifactRef | undefined> {
-		return this.aggregate.getDefaultModelProvider();
+	getDefaultProvider(): Promise<ArtifactRef | undefined> {
+		return this.aggregate.getDefaultProvider();
 	}
 
-	async setDefaultModelProvider(provider?: ArtifactRef): Promise<void> {
-		await this.aggregate.setDefaultModelProvider(provider);
-		this.invalidateCatalog();
-	}
-
-	getModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef> {
-		return this.aggregate.getModelProviderDefaultModel(provider);
-	}
-
-	private async tryGetModelProviderDefaultModel(provider: ArtifactRef): Promise<ArtifactRef | undefined> {
-		try {
-			return await this.aggregate.getModelProviderDefaultModel(provider);
-		} catch {
-			return undefined;
+	async setDefaultProvider(provider?: ArtifactRef): Promise<void> {
+		if (provider) {
+			await this.aggregate.setDefaultProvider(provider);
+		} else {
+			await this.aggregate.clearDefaultProvider();
 		}
+		this.invalidateCatalog();
 	}
 
 	async createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
-		const result = await this.store.createModelProvider(request);
+		const result = await this.aggregate.createProvider(request);
 		this.invalidateCatalog();
 		return result;
 	}
 
-	async replaceProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
-		const result = await this.store.replaceModelProvider(request);
+	async updateProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
+		const result = await this.aggregate.updateProvider(request);
 		this.invalidateCatalog();
 		return result;
 	}
 
-	async deleteProvider(ref: ArtifactRef, expectedRevision: number): Promise<void> {
-		await this.store.deleteModelProvider(ref, expectedRevision);
+	async deleteProvider(ref: ArtifactRef, expectedProviderRevision: number): Promise<void> {
+		await this.aggregate.deleteProvider(ref, expectedProviderRevision);
 		this.invalidateCatalog();
 	}
 
-	async setProviderEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<void> {
-		await this.store.setModelProviderEnabled(ref, expectedRevision, enabled);
+	async setProviderEnabled(ref: ArtifactRef, expectedProviderRevision: number, enabled: boolean): Promise<void> {
+		await this.aggregate.setProviderEnabled(ref, expectedProviderRevision, enabled);
 		this.invalidateCatalog();
 	}
 
-	async setProviderCredential(ref: ArtifactRef, expectedOverlayRevision: number, secret: string): Promise<void> {
-		await this.store.setModelProviderCredential(ref, expectedOverlayRevision, secret);
+	async setProviderAPIKey(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		expectedAPIKeyRevision: number,
+		apiKey: string
+	): Promise<void> {
+		await this.aggregate.setProviderAPIKey({
+			provider: ref,
+			expectedProviderRevision,
+			expectedAPIKeyRevision,
+			apiKey,
+		});
+		this.invalidateCatalog();
+	}
+
+	async clearProviderAPIKey(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		expectedAPIKeyRevision: number
+	): Promise<void> {
+		await this.aggregate.clearProviderAPIKey(ref, expectedProviderRevision, expectedAPIKeyRevision);
 		this.invalidateCatalog();
 	}
 
 	async setProviderDefaultModel(provider: ModelProviderManagementItem, model: ModelManagementItem): Promise<void> {
-		if (provider.list.builtIn) {
-			throw new Error(
-				'Built-in provider defaults are source-owned. Select the generated default model or create a mutable provider.'
-			);
+		if (!isModelProviderDefaultCandidate(provider, model)) {
+			throw new Error('Enable compatible Provider and Model records before selecting a default model.');
 		}
 
-		const document: ModelProviderDocument = {
-			...structuredClone(provider.view.document),
+		const settings = provider.view.settings;
+		await this.aggregate.saveProviderSettings({
+			provider: provider.list.ref,
+			expectedProviderRevision: provider.view.artifact.revision,
+			expectedSettingsRevision: settings.revision,
+			connection: settings.connection,
+			defaults: settings.defaults,
+			capabilities: settings.capabilities,
+			adapterParameters: settings.adapterParameters,
 			defaultModel: {
 				name: model.view.document.name,
 				...(model.list.builtIn ? { scope: ModelLookupScope.Builtin } : {}),
 			},
-		};
-
-		await this.replaceProvider({
-			provider: provider.list.ref,
-			expectedArtifactRevision: provider.list.revision,
-			document,
-			enabled: provider.list.enabled,
 		});
+		this.invalidateCatalog();
 	}
 
 	async createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
-		const result = await this.store.createManagedModel(request);
+		const result = await this.store.createModel(request);
 		this.invalidateCatalog();
 		return result;
 	}
 
-	async replaceModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
-		const result = await this.store.replaceManagedModel(request);
+	async updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
+		const result = await this.store.updateModel(request);
 		this.invalidateCatalog();
 		return result;
 	}
 
 	async deleteModel(ref: ArtifactRef, expectedRevision: number): Promise<void> {
-		await this.store.deleteManagedModel(ref, expectedRevision);
+		await this.store.deleteModel(ref, expectedRevision);
 		this.invalidateCatalog();
 	}
 
@@ -320,18 +422,14 @@ export class ModelManagementAPI {
 		if (matches.length === 0) {
 			throw new Error(`Model target ${target.name} is unavailable.`);
 		}
-
 		if (matches.length > 1) {
 			throw new Error(`Model target ${target.name} is ambiguous.`);
 		}
-
 		return matches[0];
 	}
 
 	private async loadCatalog(): Promise<ModelCatalog> {
 		const snapshot = await this.loadSnapshot();
-		const defaultProvider = snapshot.defaultProvider;
-
 		const options = snapshot.models
 			.filter(isModelRunnable)
 			.map(m => {
@@ -359,27 +457,23 @@ export class ModelManagementAPI {
 			throw new ModelCatalogUnavailableError(hasRunnableProvider ? 'no-runnable-model' : 'no-runnable-provider');
 		}
 
-		const defaultProviderOptions = defaultProvider
-			? options.filter(option => optionUsesProvider(option, defaultProvider))
-			: [];
-
-		// This performs Model resolution only when the selected Provider has at
-		// least one runnable UI option. The default-provider lookup itself is
-		// metadata-only and was already started in parallel with the snapshot.
-		const defaultProviderModel =
-			defaultProvider && defaultProviderOptions.length > 0
-				? await this.tryGetModelProviderDefaultModel(defaultProvider)
-				: undefined;
-
-		const defaultProviderOption = defaultProviderModel
-			? defaultProviderOptions.find(
-					option => option.model !== undefined && modelRefEqual(option.model, defaultProviderModel)
+		const selectedProvider = snapshot.defaultProvider
+			? snapshot.providers.find(
+					provider =>
+						provider.list.ref.rootID === snapshot.defaultProvider?.rootID &&
+						provider.list.ref.artifactID === snapshot.defaultProvider?.artifactID
 				)
+			: undefined;
+		const selectedModel = selectedProvider
+			? snapshot.models.find(model => isProviderDefaultModel(selectedProvider, model))
+			: undefined;
+		const selectedOption = selectedModel
+			? options.find(option => modelRefEqual(option.model, selectedModel.list.ref))
 			: undefined;
 
 		return {
 			options,
-			defaultOption: defaultProviderOption ?? defaultProviderOptions[0] ?? fallback,
+			defaultOption: selectedOption ?? fallback,
 		};
 	}
 }

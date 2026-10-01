@@ -106,18 +106,10 @@ type ProviderListItem struct {
 	Description string               `json:"description,omitempty"`
 	Adapter     string               `json:"adapter,omitempty"`
 
-	DefaultModel *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
-
-	State            artifact.State    `json:"state"`
-	Enabled          bool              `json:"enabled"`
-	Revision         uint64            `json:"revision"`
-	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
-	BuiltIn          bool              `json:"builtIn"`
-
-	CredentialConfigured   bool   `json:"credentialConfigured"`
-	CredentialRevision     uint64 `json:"credentialRevision"`
-	CredentialSHA256       string `json:"credentialSHA256,omitempty"`
-	RuntimeOverlayRevision uint64 `json:"runtimeOverlayRevision"`
+	State    artifact.State `json:"state"`
+	Enabled  bool           `json:"enabled"`
+	Revision uint64         `json:"revision"`
+	BuiltIn  bool           `json:"builtIn"`
 }
 
 type ModelListItem struct {
@@ -129,57 +121,56 @@ type ModelListItem struct {
 	Provider        *declaration.ArtifactNameReference `json:"provider,omitempty"`
 	ProviderModelID string                             `json:"providerModelID,omitempty"`
 
-	State            artifact.State    `json:"state"`
-	Enabled          bool              `json:"enabled"`
-	Revision         uint64            `json:"revision"`
-	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
-	BuiltIn          bool              `json:"builtIn"`
+	State    artifact.State `json:"state"`
+	Enabled  bool           `json:"enabled"`
+	Revision uint64         `json:"revision"`
+	BuiltIn  bool           `json:"builtIn"`
 }
 
 type ProviderView struct {
-	Artifact         artifact.Artifact                `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest                `json:"definitionDigest"`
-	Document         modelproviderv1.ProviderDocument `json:"document"`
-	BuiltIn          bool                             `json:"builtIn"`
+	Artifact         artifact.Artifact                  `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest                  `json:"definitionDigest"`
+	Document         modelproviderv1.ProviderDocument   `json:"document"`
+	Settings         ProviderSettings                   `json:"settings"`
+	DefaultModel     *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
+	BuiltIn          bool                               `json:"builtIn"`
 }
 
 type ModelView struct {
 	Artifact         artifact.Artifact     `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest     `json:"definitionDigest"`
 	Document         modelv1.ModelDocument `json:"document"`
+	Settings         ModelSettings         `json:"settings"`
 	BuiltIn          bool                  `json:"builtIn"`
 }
 
-// ProviderRuntimeOverlayView intentionally exposes only whether a credential
-// is configured. The opaque credential reference remains internal runtime
-// material and is not a frontend API value.
-type ProviderRuntimeOverlayView struct {
-	ArtifactRevision     uint64                             `json:"artifactRevision"`
-	Revision             uint64                             `json:"revision"`
-	CredentialConfigured bool                               `json:"credentialConfigured"`
-	CredentialRevision   uint64                             `json:"credentialRevision"`
-	CredentialSHA256     string                             `json:"credentialSHA256,omitempty"`
-	Connection           json.RawMessage                    `json:"connection,omitempty"`
-	Defaults             json.RawMessage                    `json:"defaults,omitempty"`
-	Capabilities         json.RawMessage                    `json:"capabilities,omitempty"`
-	DefaultModel         *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
-	AdapterParameters    json.RawMessage                    `json:"adapterParameters,omitempty"`
+// ProviderSettings is the non-secret local Provider customization returned as
+// part of GetProvider. Revision is zero when the Provider has no saved local
+// settings.
+type ProviderSettings struct {
+	Revision          uint64                             `json:"revision"`
+	Connection        json.RawMessage                    `json:"connection,omitempty"`
+	Defaults          json.RawMessage                    `json:"defaults,omitempty"`
+	Capabilities      json.RawMessage                    `json:"capabilities,omitempty"`
+	DefaultModel      *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
+	AdapterParameters json.RawMessage                    `json:"adapterParameters,omitempty"`
 }
 
-type ModelRuntimeOverlayView struct {
-	ArtifactRevision  uint64          `json:"artifactRevision"`
+// ModelSettings is the non-secret local Model customization returned as part
+// of GetModel. Revision is zero when the Model has no saved local settings.
+type ModelSettings struct {
 	Revision          uint64          `json:"revision"`
 	Defaults          json.RawMessage `json:"defaults,omitempty"`
 	Capabilities      json.RawMessage `json:"capabilities,omitempty"`
 	AdapterParameters json.RawMessage `json:"adapterParameters,omitempty"`
 }
 
-// ProviderRuntimeOverlayUpdateRequest is complete replacement state for the
-// local Provider overlay. The caller must retain fields it wishes to preserve.
-type ProviderRuntimeOverlayUpdateRequest struct {
+// SaveProviderSettingsRequest is complete replacement state for local
+// Provider settings. Omitted fields inherit from the Provider declaration.
+type SaveProviderSettingsRequest struct {
 	Provider                 artifact.ArtifactRef               `json:"provider"`
-	ExpectedArtifactRevision uint64                             `json:"expectedArtifactRevision"`
-	ExpectedOverlayRevision  uint64                             `json:"expectedOverlayRevision"`
+	ExpectedProviderRevision uint64                             `json:"expectedProviderRevision"`
+	ExpectedSettingsRevision uint64                             `json:"expectedSettingsRevision"`
 	Connection               json.RawMessage                    `json:"connection,omitempty"`
 	Defaults                 json.RawMessage                    `json:"defaults,omitempty"`
 	Capabilities             json.RawMessage                    `json:"capabilities,omitempty"`
@@ -187,20 +178,40 @@ type ProviderRuntimeOverlayUpdateRequest struct {
 	AdapterParameters        json.RawMessage                    `json:"adapterParameters,omitempty"`
 }
 
-type ModelRuntimeOverlayUpdateRequest struct {
+// SaveModelSettingsRequest is complete replacement state for local Model
+// settings. Omitted fields inherit from the Model declaration.
+type SaveModelSettingsRequest struct {
 	Model                    artifact.ArtifactRef `json:"model"`
-	ExpectedArtifactRevision uint64               `json:"expectedArtifactRevision"`
-	ExpectedOverlayRevision  uint64               `json:"expectedOverlayRevision"`
+	ExpectedModelRevision    uint64               `json:"expectedModelRevision"`
+	ExpectedSettingsRevision uint64               `json:"expectedSettingsRevision"`
 	Defaults                 json.RawMessage      `json:"defaults,omitempty"`
 	Capabilities             json.RawMessage      `json:"capabilities,omitempty"`
 	AdapterParameters        json.RawMessage      `json:"adapterParameters,omitempty"`
 }
 
-type ProviderCredentialUpdateRequest struct {
+// ProviderAPIKeyStatus is the only readable API-key information. API key
+// plaintext and secret hashes are intentionally never exposed.
+type ProviderAPIKeyStatus struct {
+	ProviderRevision uint64 `json:"providerRevision"`
+	APIKeyRevision   uint64 `json:"apiKeyRevision"`
+	Configured       bool   `json:"configured"`
+}
+
+type SetProviderAPIKeyRequest struct {
 	Provider                 artifact.ArtifactRef `json:"provider"`
-	ExpectedArtifactRevision uint64               `json:"expectedArtifactRevision"`
-	ExpectedBindingRevision  uint64               `json:"expectedBindingRevision"`
-	Secret                   string               `json:"secret"`
+	ExpectedProviderRevision uint64               `json:"expectedProviderRevision"`
+	ExpectedAPIKeyRevision   uint64               `json:"expectedAPIKeyRevision"`
+	APIKey                   string               `json:"apiKey"`
+}
+
+// ResolvedProvider is the source-backed Provider runtime input. It contains
+// no plaintext secret. Runtime adapters resolve the secret only when they need
+// to build an in-memory inference ProviderParam.
+type ResolvedProvider struct {
+	Provider           modelDomain.Provider
+	ProviderOverlay    modelOverlay.ProviderOverlay
+	ProviderCredential *secret.Binding
+	Adapter            AdapterDescriptor
 }
 
 // ResolvedModel is the internal source-backed Model Store resolution result.

@@ -45,7 +45,8 @@ export function ModelCard({
 	const toggleKey = 'toggle';
 	const defaultKey = 'set-default';
 	const canChangeEnabled = available && providerEnabled && !(isProviderDefault && model.list.enabled);
-	const canSetDefault = !provider.list.builtIn && providerEnabled && available && model.list.enabled;
+	const canSetDefault =
+		providerEnabled && available && model.list.enabled && (!provider.list.builtIn || model.list.builtIn);
 
 	const runModelAction = (key: string, action: () => Promise<void>, fallback: string) => {
 		void runAction(key, action).catch((error: unknown) => {
@@ -126,7 +127,7 @@ export function ModelCard({
 					</button>
 				) : null}
 
-				{!isProviderDefault && !provider.list.builtIn ? (
+				{!isProviderDefault ? (
 					<button
 						type="button"
 						className="btn btn-sm btn-ghost rounded-xl"

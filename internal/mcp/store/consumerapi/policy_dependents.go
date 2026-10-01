@@ -14,10 +14,9 @@ import (
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
-// GetMCPEffectivePolicy returns the safe effective policy projection for one
-// Server Artifact. It deliberately returns no materialized connection values,
-// secrets, runtime headers, or environment data.
-func (a *API) GetMCPEffectivePolicy(
+// GetServerEffectivePolicy returns the effective policy for one MCP server.
+// It deliberately excludes materialized connection values and secrets.
+func (a *API) GetServerEffectivePolicy(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (mcpPolicy.Effective, error) {

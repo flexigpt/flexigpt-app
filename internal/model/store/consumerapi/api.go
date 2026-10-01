@@ -77,7 +77,7 @@ func (a *API) GetProvider(
 	if err != nil {
 		return ProviderView{}, err
 	}
-	return a.providerView(value)
+	return a.providerView(ctx, value)
 }
 
 func (a *API) GetModel(
@@ -88,7 +88,7 @@ func (a *API) GetModel(
 	if err != nil {
 		return ModelView{}, err
 	}
-	return a.modelView(value)
+	return a.modelView(ctx, value)
 }
 
 func (a *API) ListProviders(
@@ -131,32 +131,7 @@ func (a *API) ListProviders(
 			BuiltIn:     a.protection.IsProtectedRoot(entry.RootID),
 		}
 
-		overlay, found, err := a.overlays.GetProviderOverlay(
-			ctx,
-			entry.Ref(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			item.RuntimeOverlayRevision = overlay.Revision
-		}
-		credential, credentialFound, err := a.overlays.GetProviderCredential(
-			ctx,
-			entry.Ref(),
-		)
-		if err != nil {
-			return nil, err
-		}
-		if credentialFound {
-			item.CredentialConfigured = credential.Active()
-			item.CredentialRevision = credential.Revision
-			if credential.Active() {
-				item.CredentialSHA256 = credential.SHA256
-			}
-		}
 		if entry.Definition != nil {
-			item.DefinitionDigest = entry.Definition.Digest
 			item.Description = entry.Definition.Description
 		}
 		if entry.Document != nil {
@@ -171,9 +146,7 @@ func (a *API) ListProviders(
 				)
 			}
 			item.Adapter = document.Adapter
-			item.DefaultModel = cloneOptionalReference(
-				document.DefaultModel,
-			)
+
 		}
 		output = append(output, item)
 	}
@@ -228,7 +201,6 @@ func (a *API) ListModels(
 			BuiltIn:     a.protection.IsProtectedRoot(entry.RootID),
 		}
 		if entry.Definition != nil {
-			item.DefinitionDigest = entry.Definition.Digest
 			item.Description = entry.Definition.Description
 		}
 		if entry.Document != nil {
@@ -435,16 +407,29 @@ func (a *API) loadModel(
 }
 
 func (a *API) providerView(
+	ctx context.Context,
 	value modelDomain.Provider,
 ) (ProviderView, error) {
 	document, err := value.Document.Clone()
 	if err != nil {
 		return ProviderView{}, err
 	}
+	settings, err := a.providerSettings(ctx, value.Artifact.Ref())
+	if err != nil {
+		return ProviderView{}, err
+	}
+
+	defaultModel := cloneOptionalReference(document.DefaultModel)
+	if settings.DefaultModel != nil {
+		defaultModel = cloneOptionalReference(settings.DefaultModel)
+	}
+
 	return ProviderView{
 		Artifact:         value.Artifact.Clone(),
 		DefinitionDigest: value.Definition.Digest,
 		Document:         document,
+		Settings:         settings,
+		DefaultModel:     defaultModel,
 		BuiltIn: a.protection.IsProtectedRoot(
 			value.Artifact.RootID,
 		),
@@ -452,16 +437,23 @@ func (a *API) providerView(
 }
 
 func (a *API) modelView(
+	ctx context.Context,
 	value modelDomain.Model,
 ) (ModelView, error) {
 	document, err := value.Document.Clone()
 	if err != nil {
 		return ModelView{}, err
 	}
+	settings, err := a.modelSettings(ctx, value.Artifact.Ref())
+	if err != nil {
+		return ModelView{}, err
+	}
+
 	return ModelView{
 		Artifact:         value.Artifact.Clone(),
 		DefinitionDigest: value.Definition.Digest,
 		Document:         document,
+		Settings:         settings,
 		BuiltIn: a.protection.IsProtectedRoot(
 			value.Artifact.RootID,
 		),

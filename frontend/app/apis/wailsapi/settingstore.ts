@@ -1,24 +1,10 @@
-import type {
-	AppTheme,
-	AuthKey,
-	AuthKeyMeta,
-	AuthKeyName,
-	AuthKeyType,
-	DebugSettings,
-	SettingsSchema,
-} from '@/spec/setting';
+import type { AppTheme, DebugSettings, SettingsSchema } from '@/spec/setting';
 import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting';
 
 import type { ISettingStoreAPI } from '@/apis/interface';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
-import {
-	enumFromWails,
-	requireWailsBody,
-	requireWailsBoolean,
-	requireWailsString,
-	wailsObjectArrayOrEmpty,
-} from '@/apis/wailsapi/transport';
-import { GetAuthKey, GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
+import { enumFromWails, requireWailsBody, requireWailsBoolean, requireWailsString } from '@/apis/wailsapi/transport';
+import { GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 
 function booleanOrDefault(value: unknown, fallback: boolean, field: string): boolean {
 	if (value === null || value === undefined) {
@@ -48,20 +34,6 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 			},
 		} as wailsSpec.SetDebugSettingsRequest;
 		await SetDebugSettings(r);
-	}
-
-	async getAuthKey(type: AuthKeyType, keyName: AuthKeyName): Promise<AuthKey> {
-		const r = {
-			Type: type,
-			KeyName: keyName,
-		};
-		const resp = await GetAuthKey(r as wailsSpec.GetAuthKeyRequest);
-		const body = requireWailsBody(resp.Body, 'GetAuthKey');
-		return {
-			secret: requireWailsString(body.secret, 'GetAuthKey.secret'),
-			sha256: requireWailsString(body.sha256, 'GetAuthKey.sha256'),
-			nonEmpty: requireWailsBoolean(body.nonEmpty, 'GetAuthKey.nonEmpty'),
-		};
 	}
 
 	async getSettings(forceFetch?: boolean): Promise<SettingsSchema> {
@@ -95,7 +67,6 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 						? DEFAULT_DEBUG_SETTINGS.logLevel
 						: enumFromWails(debug.logLevel, DebugLogLevel, 'settings.debug.logLevel'),
 			},
-			authKeys: wailsObjectArrayOrEmpty<AuthKeyMeta>(body.authKeys, 'GetSettings.authKeys'),
 		};
 	}
 }

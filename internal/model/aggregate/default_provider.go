@@ -20,60 +20,53 @@ type DefaultProviderPreferences interface {
 	SetDefaultProvider(ctx context.Context, ref *artifact.ArtifactRef) error
 }
 
-// GetDefaultModelProvider returns the effective Provider without resolving
-// Models, credentials, capabilities, or runtime configuration.
-func (s *Service) GetDefaultModelProvider(
+// GetDefaultProvider returns the effective Provider without resolving Models,
+// credentials, capabilities, or runtime configuration.
+func (s *Service) GetDefaultProvider(
 	ctx context.Context,
 ) (*artifact.ArtifactRef, error) {
 	if err := s.ready(ctx); err != nil {
 		return nil, err
 	}
 
-	preferred, err := s.preferences.GetDefaultProvider(ctx)
+	value, err := s.preferences.GetDefaultProvider(ctx)
 	if err != nil {
 		return nil, err
 	}
 	return s.store.SelectDefaultProvider(
 		ctx,
-		preferred,
+		value,
 		baseDefaultProviderName,
 	)
 }
 
-// SetDefaultModelProvider stores a loose preference. An explicit non-nil
-// selection must currently be enabled and have a configured API key. Nil
-// clears the preference. Fallbacks are never written back over it.
-func (s *Service) SetDefaultModelProvider(
+// SetDefaultProvider stores a loose preference. The selected Provider must
+// currently be enabled and have a configured API key. Fallbacks are never
+// written back over the saved preference.
+func (s *Service) SetDefaultProvider(
 	ctx context.Context,
-	provider *artifact.ArtifactRef,
+	provider artifact.ArtifactRef,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err
 	}
-	if provider != nil {
-		if err := s.store.RequireSettableDefaultProvider(
-			ctx,
-			*provider,
-		); err != nil {
-			return err
-		}
+	if err := s.store.RequireSettableDefaultProvider(
+		ctx,
+		provider,
+	); err != nil {
+		return err
 	}
-	return s.preferences.SetDefaultProvider(ctx, provider)
+	value := provider
+	return s.preferences.SetDefaultProvider(ctx, &value)
 }
 
-// GetModelProviderDefaultModel is deliberately separate from Provider
-// selection. It uses the existing per-Provider default-Model resolution rules.
-func (s *Service) GetModelProviderDefaultModel(
+// ClearDefaultProvider removes the saved preference. The next
+// GetDefaultProvider call returns the normal fallback Provider.
+func (s *Service) ClearDefaultProvider(
 	ctx context.Context,
-	provider artifact.ArtifactRef,
-) (artifact.ArtifactRef, error) {
+) error {
 	if err := s.ready(ctx); err != nil {
-		return artifact.ArtifactRef{}, err
+		return err
 	}
-
-	value, err := s.store.ResolveProviderDefaultModel(ctx, provider)
-	if err != nil {
-		return artifact.ArtifactRef{}, err
-	}
-	return value.Resolved.Model.Artifact.Ref(), nil
+	return s.preferences.SetDefaultProvider(ctx, nil)
 }

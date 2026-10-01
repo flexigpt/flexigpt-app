@@ -105,7 +105,7 @@ func runtimeConfig(
 	resolved mcpDomainServer.Resolved,
 	input mcpDomainServer.MaterializedServer,
 ) (mcpServer.RuntimeConfig, error) {
-	serverID, err := RuntimeServerIDForArtifact(resolved.Server)
+	serverID, err := runtimeServerIDForArtifact(resolved.Server)
 	if err != nil {
 		return mcpServer.RuntimeConfig{}, err
 	}

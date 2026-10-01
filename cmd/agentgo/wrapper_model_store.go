@@ -13,25 +13,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
-	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
-	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
 
 type ModelStoreWrapper struct {
-	api                  *modelConsumerAPI.API
-	management           *modelConsumerAPI.CatalogStore
-	roots                compositionapi.RootAPI
-	protection           compositionapi.ProtectionAPI
-	inferenceProviderset *inferencewrapper.ProviderSetAPI
+	api        *modelConsumerAPI.API
+	management *modelConsumerAPI.CatalogStore
+	roots      compositionapi.RootAPI
+	protection compositionapi.ProtectionAPI
 }
 
-func InitModelWrappers(
+func initModelWrappers(
 	ctx context.Context,
 	storeWrapper *ModelStoreWrapper,
 	aggregateWrapper *ModelAggregateWrapper,
@@ -144,16 +140,7 @@ func InitModelWrappers(
 	return installer, nil
 }
 
-func (w *ModelStoreWrapper) SetInferenceProviderset(
-	value *inferencewrapper.ProviderSetAPI,
-) {
-	if w == nil {
-		return
-	}
-	w.inferenceProviderset = value
-}
-
-func (w *ModelStoreWrapper) ListModelProviders(
+func (w *ModelStoreWrapper) ListProviders(
 	rootID root.RootID,
 ) ([]modelConsumerAPI.ProviderListItem, error) {
 	if w == nil || w.management == nil {
@@ -201,7 +188,7 @@ func (w *ModelStoreWrapper) ListModels(
 	return output, nil
 }
 
-func (w *ModelStoreWrapper) GetModelProvider(
+func (w *ModelStoreWrapper) GetProvider(
 	ref artifact.ArtifactRef,
 ) (modelConsumerAPI.ProviderView, error) {
 	if w == nil || w.api == nil {
@@ -219,174 +206,41 @@ func (w *ModelStoreWrapper) GetModel(
 	return w.api.GetModel(context.Background(), ref)
 }
 
-func (w *ModelStoreWrapper) GetModelProviderRuntimeOverlay(
-	ref artifact.ArtifactRef,
-) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
+func (w *ModelStoreWrapper) SaveModelSettings(
+	request modelConsumerAPI.SaveModelSettingsRequest,
+) (modelConsumerAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
+		return modelConsumerAPI.ModelView{}, basespec.ErrClosed
 	}
-	return w.api.GetProviderRuntimeOverlay(context.Background(), ref)
+	return w.api.SaveModelSettings(context.Background(), request)
 }
 
-func (w *ModelStoreWrapper) UpdateModelProviderRuntimeOverlay(
-	request modelConsumerAPI.ProviderRuntimeOverlayUpdateRequest,
-) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
-	if w == nil || w.api == nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
-	}
-	return w.api.UpdateProviderRuntimeOverlay(
-		context.Background(),
-		request,
-	)
-}
-
-func (w *ModelStoreWrapper) DeleteModelProviderRuntimeOverlay(
+func (w *ModelStoreWrapper) ResetModelSettings(
 	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
-	expectedOverlayRevision uint64,
-) error {
+	expectedModelRevision uint64,
+	expectedSettingsRevision uint64,
+) (modelConsumerAPI.ModelView, error) {
 	if w == nil || w.api == nil {
-		return basespec.ErrClosed
+		return modelConsumerAPI.ModelView{}, basespec.ErrClosed
 	}
-	return w.api.DeleteProviderRuntimeOverlay(
+	return w.api.ResetModelSettings(
 		context.Background(),
 		ref,
-		expectedArtifactRevision,
-		expectedOverlayRevision,
+		expectedModelRevision,
+		expectedSettingsRevision,
 	)
 }
 
-func (w *ModelStoreWrapper) GetManagedModelRuntimeOverlay(
+func (w *ModelStoreWrapper) GetProviderAPIKeyStatus(
 	ref artifact.ArtifactRef,
-) (modelConsumerAPI.ModelRuntimeOverlayView, error) {
+) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.api == nil {
-		return modelConsumerAPI.ModelRuntimeOverlayView{}, basespec.ErrClosed
+		return modelConsumerAPI.ProviderAPIKeyStatus{}, basespec.ErrClosed
 	}
-	return w.api.GetModelRuntimeOverlay(context.Background(), ref)
+	return w.api.GetProviderAPIKeyStatus(context.Background(), ref)
 }
 
-func (w *ModelStoreWrapper) UpdateManagedModelRuntimeOverlay(
-	request modelConsumerAPI.ModelRuntimeOverlayUpdateRequest,
-) (modelConsumerAPI.ModelRuntimeOverlayView, error) {
-	if w == nil || w.api == nil {
-		return modelConsumerAPI.ModelRuntimeOverlayView{}, basespec.ErrClosed
-	}
-	return w.api.UpdateModelRuntimeOverlay(
-		context.Background(),
-		request,
-	)
-}
-
-func (w *ModelStoreWrapper) DeleteManagedModelRuntimeOverlay(
-	ref artifact.ArtifactRef,
-	expectedArtifactRevision uint64,
-	expectedOverlayRevision uint64,
-) error {
-	if w == nil || w.api == nil {
-		return basespec.ErrClosed
-	}
-	return w.api.DeleteModelRuntimeOverlay(
-		context.Background(),
-		ref,
-		expectedArtifactRevision,
-		expectedOverlayRevision,
-	)
-}
-
-func (w *ModelStoreWrapper) SetModelProviderCredential(
-	request modelConsumerAPI.ProviderCredentialUpdateRequest,
-) (modelConsumerAPI.ProviderRuntimeOverlayView, error) {
-	if w == nil || w.api == nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, basespec.ErrClosed
-	}
-	ctx := context.Background()
-	providerView, err := w.api.GetProvider(ctx, request.Provider)
-	if err != nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-	}
-	providerName := inferenceSpec.ProviderName(providerView.Artifact.LogicalName)
-	isClear := request.Secret == ""
-	if !isClear {
-		if w.inferenceProviderset != nil {
-			_, err := w.inferenceProviderset.SetProviderAPIKey(
-				ctx,
-				&inferencewrapperSpec.SetProviderAPIKeyRequest{
-					Provider: providerName,
-					Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
-						APIKey: request.Secret,
-					},
-				},
-			)
-			if err != nil {
-				return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-			}
-		}
-		result, err := w.api.UpdateProviderCredential(ctx, request)
-		if err != nil {
-			return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-		}
-		return result, nil
-	}
-	result, err := w.api.UpdateProviderCredential(ctx, request)
-	if err != nil {
-		return modelConsumerAPI.ProviderRuntimeOverlayView{}, err
-	}
-	if w.inferenceProviderset != nil {
-		_, _ = w.inferenceProviderset.SetProviderAPIKey(
-			ctx,
-			&inferencewrapperSpec.SetProviderAPIKeyRequest{
-				Provider: providerName,
-				Body: &inferencewrapperSpec.SetProviderAPIKeyRequestBody{
-					APIKey: "",
-				},
-			},
-		)
-	}
-	return result, nil
-}
-
-func (w *ModelStoreWrapper) CreateModelProvider(
-	request modelConsumerAPI.ManagedProviderCreateRequest,
-) (modelConsumerAPI.ManagedProviderCreateResult, error) {
-	if w == nil || w.api == nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, basespec.ErrClosed
-	}
-
-	rootID, err := w.writableManagementRoot(
-		context.Background(),
-		request.RootID,
-	)
-	if err != nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, err
-	}
-	request.RootID = rootID
-	return w.api.CreateProvider(context.Background(), request)
-}
-
-func (w *ModelStoreWrapper) ReplaceModelProvider(
-	request modelConsumerAPI.ManagedProviderReplaceRequest,
-) (modelConsumerAPI.ManagedProviderReplaceResult, error) {
-	if w == nil || w.api == nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, basespec.ErrClosed
-	}
-	return w.api.ReplaceProvider(context.Background(), request)
-}
-
-func (w *ModelStoreWrapper) DeleteModelProvider(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-) error {
-	if w == nil || w.api == nil {
-		return basespec.ErrClosed
-	}
-	return w.api.DeleteProvider(
-		context.Background(),
-		ref,
-		expectedRevision,
-	)
-}
-
-func (w *ModelStoreWrapper) CreateManagedModel(
+func (w *ModelStoreWrapper) CreateModel(
 	request modelConsumerAPI.ManagedModelCreateRequest,
 ) (modelConsumerAPI.ManagedModelCreateResult, error) {
 	if w == nil || w.api == nil {
@@ -404,7 +258,7 @@ func (w *ModelStoreWrapper) CreateManagedModel(
 	return w.api.CreateModel(context.Background(), request)
 }
 
-func (w *ModelStoreWrapper) ReplaceManagedModel(
+func (w *ModelStoreWrapper) UpdateModel(
 	request modelConsumerAPI.ManagedModelReplaceRequest,
 ) (modelConsumerAPI.ManagedModelReplaceResult, error) {
 	if w == nil || w.api == nil {
@@ -413,7 +267,7 @@ func (w *ModelStoreWrapper) ReplaceManagedModel(
 	return w.api.ReplaceModel(context.Background(), request)
 }
 
-func (w *ModelStoreWrapper) DeleteManagedModel(
+func (w *ModelStoreWrapper) DeleteModel(
 	ref artifact.ArtifactRef,
 	expectedRevision uint64,
 ) error {
@@ -424,22 +278,6 @@ func (w *ModelStoreWrapper) DeleteManagedModel(
 		context.Background(),
 		ref,
 		expectedRevision,
-	)
-}
-
-func (w *ModelStoreWrapper) SetModelProviderEnabled(
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (artifact.Artifact, error) {
-	if w == nil || w.api == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
-	}
-	return w.api.SetProviderEnabled(
-		context.Background(),
-		ref,
-		expectedRevision,
-		enabled,
 	)
 }
 

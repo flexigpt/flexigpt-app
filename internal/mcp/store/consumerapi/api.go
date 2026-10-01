@@ -133,58 +133,7 @@ func (a *API) ListPolicies(
 	return a.listPolicies(ctx, request)
 }
 
-// SetServerEnabled changes only generic Artifact metadata. It is valid for
-// both user-owned and protected built-in MCP Artifacts. Its interpretation is
-// owned by the caller. MCP Store does not use it to gate installation,
-// materialization, connection, or policy composition.
-func (a *API) SetServerEnabled(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (artifact.Artifact, error) {
-	if a == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
-	}
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if record.Kind != mcpDomain.MCPArtifactKind {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: Artifact is not an MCP Server",
-			basespec.ErrUnsupported,
-		)
-	}
-	return a.artifacts.SetEnabled(ctx, ref, expectedRevision, enabled)
-}
-
-// SetPolicyEnabled changes only generic Artifact metadata. Its interpretation
-// is owned by the caller. MCP policy composition remains independent from this
-// catalog state.
-func (a *API) SetPolicyEnabled(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-	expectedRevision uint64,
-	enabled bool,
-) (artifact.Artifact, error) {
-	if a == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
-	}
-	record, err := a.artifacts.Get(ctx, ref)
-	if err != nil {
-		return artifact.Artifact{}, err
-	}
-	if record.Kind != mcpDomain.MCPPolicyArtifactKind {
-		return artifact.Artifact{}, fmt.Errorf(
-			"%w: Artifact is not an MCP Policy",
-			basespec.ErrUnsupported,
-		)
-	}
-	return a.artifacts.SetEnabled(ctx, ref, expectedRevision, enabled)
-}
-
-func (a *API) GetServerInstallation(
+func (a *API) GetServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 ) (ServerInstallationView, error) {
@@ -199,6 +148,33 @@ func (a *API) GetServerInstallation(
 		InstallationRevision: material.InstallationWriteRevision,
 		BuiltIn:              material.BuiltIn,
 	}, nil
+}
+
+func (a *API) SaveServerSettings(
+	ctx context.Context,
+	ref artifact.ArtifactRef,
+	expectedSettingsRevision uint64,
+	data mcpDomainServer.ServerData,
+) error {
+	settings, err := a.GetServerSettings(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if settings.BuiltIn {
+		return a.saveBuiltInServerSettings(
+			ctx,
+			ref,
+			expectedSettingsRevision,
+			data,
+		)
+	}
+	_, err = a.saveMutableServerSettings(
+		ctx,
+		ref,
+		expectedSettingsRevision,
+		data,
+	)
+	return err
 }
 
 // ListMCPCollectionServers loads all currently available MCP servers reachable
@@ -275,7 +251,7 @@ func (a *API) GetMCPPolicy(
 	}, nil
 }
 
-func (a *API) UpdateServerInstallation(
+func (a *API) saveMutableServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedArtifactRevision uint64,
@@ -338,7 +314,7 @@ func (a *API) UpdateServerInstallation(
 	return updated, nil
 }
 
-func (a *API) UpdateProtectedServerInstallation(
+func (a *API) saveBuiltInServerSettings(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedOverlayRevision uint64,
@@ -409,18 +385,6 @@ func (a *API) UpdateProtectedServerInstallation(
 		data,
 		a.secretCleaner,
 	)
-}
-
-// ResolveArtifactCapabilities exposes the complete contract capability plan
-// for a declaration Artifact visible to the MCP consumer.
-func (a *API) ResolveArtifactCapabilities(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (resolve.CapabilityPlan, error) {
-	if a == nil || a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, basespec.ErrClosed
-	}
-	return a.declarationResolver.ResolveCapabilities(ctx, ref)
 }
 
 func (a *API) listMCPCollectionServers(

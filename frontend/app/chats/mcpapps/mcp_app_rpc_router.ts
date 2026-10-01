@@ -189,7 +189,7 @@ export class MCPAppRPCRouter {
 
 		// The opaque Runtime server ID identifies the app's connected server.
 		// The backend remains the final authority for policy enforcement.
-		const evaluation = await mcpManagementAPI.evaluateMCPToolCall(server, callReq);
+		const evaluation = await mcpManagementAPI.checkMCPToolCall(server, callReq);
 		if (!evaluation) {
 			return errorResp(req.id, JSONRPC_ERR_BLOCKED_BY_POLICY, 'MCP could not evaluate this tool call');
 		}

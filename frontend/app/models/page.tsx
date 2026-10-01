@@ -3,7 +3,6 @@ import { FiPlus, FiRefreshCw } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
 import { ArtifactState } from '@/spec/artifact';
-import { ModelLookupScope } from '@/spec/model';
 
 import { getErrorMessage } from '@/lib/error_utils';
 
@@ -15,6 +14,7 @@ import type {
 	ModelProviderManagementItem,
 } from '@/apis/model_management';
 import { modelManagementAPI } from '@/apis/baseapi';
+import { isProviderDefaultModel } from '@/apis/model_management';
 
 import { ActionDeniedAlertModal } from '@/components/action_denied_modal';
 import { DeleteConfirmationModal } from '@/components/delete_confirmation_modal';
@@ -56,19 +56,6 @@ function providerKey(provider: ModelProviderManagementItem): string {
 
 function artifactRefsEqual(left: ArtifactRef | undefined, right: ArtifactRef | undefined): boolean {
 	return left?.rootID === right?.rootID && left?.artifactID === right?.artifactID;
-}
-
-function isProviderDefault(provider: ModelProviderManagementItem, model: ModelManagementItem): boolean {
-	const reference = provider.view.document.defaultModel;
-	if (!reference || reference.name !== model.view.document.name) {
-		return false;
-	}
-
-	if (reference.scope === ModelLookupScope.Builtin) {
-		return model.list.builtIn;
-	}
-
-	return !model.list.builtIn && model.list.ref.rootID === provider.list.ref.rootID;
 }
 
 // oxlint-disable-next-line no-restricted-exports
@@ -173,15 +160,17 @@ export default function ModelsPage() {
 		try {
 			await run(async () => {
 				let credentialProviderRef = provider?.list.ref;
-				let credentialOverlayRevision = provider?.list.runtimeOverlayRevision ?? 0;
+				let credentialRevision = provider?.apiKey.apiKeyRevision ?? 0;
+				let providerRevision: number;
 
 				if (provider) {
-					await modelManagementAPI.replaceProvider({
+					const updated = await modelManagementAPI.updateProvider({
 						provider: provider.list.ref,
 						expectedArtifactRevision: provider.list.revision,
 						document: submission.document,
 						enabled: submission.enabled,
 					});
+					providerRevision = updated.artifact.revision;
 				} else {
 					const created = await modelManagementAPI.createProvider({
 						rootID: '',
@@ -193,15 +182,17 @@ export default function ModelsPage() {
 						rootID: created.artifact.rootID,
 						artifactID: created.artifact.id,
 					};
-					credentialOverlayRevision = 0;
+					providerRevision = created.artifact.revision;
+					credentialRevision = 0;
 				}
 				providerWasWritten = true;
 
 				if (submission.credentialAction !== ProviderCredentialAction.Unchanged && credentialProviderRef) {
-					await modelManagementAPI.setProviderCredential(
+					await modelManagementAPI.setProviderAPIKey(
 						credentialProviderRef,
-						credentialOverlayRevision,
-						submission.credentialAction === ProviderCredentialAction.Clear ? '' : submission.credential
+						providerRevision,
+						credentialRevision,
+						submission.credential
 					);
 				}
 			});
@@ -230,7 +221,7 @@ export default function ModelsPage() {
 		try {
 			await run(async () => {
 				if (model) {
-					await modelManagementAPI.replaceModel({
+					await modelManagementAPI.updateModel({
 						model: model.list.ref,
 						expectedArtifactRevision: model.list.revision,
 						document: submission.document,
@@ -245,20 +236,6 @@ export default function ModelsPage() {
 					enabled: submission.enabled,
 				});
 				modelWasCreated = true;
-
-				if (submission.enabled && !provider.list.builtIn && !provider.view.document.defaultModel) {
-					await modelManagementAPI.replaceProvider({
-						provider: provider.list.ref,
-						expectedArtifactRevision: provider.list.revision,
-						document: {
-							...provider.view.document,
-							defaultModel: {
-								name: submission.document.name,
-							},
-						},
-						enabled: provider.list.enabled,
-					});
-				}
 			});
 		} catch (submissionError) {
 			if (!modelWasCreated) {
@@ -280,10 +257,20 @@ export default function ModelsPage() {
 		}
 
 		await run(async () => {
-			await modelManagementAPI.setProviderCredential(
+			if (credential) {
+				await modelManagementAPI.setProviderAPIKey(
+					provider.list.ref,
+					provider.list.revision,
+					provider.apiKey.apiKeyRevision,
+					credential
+				);
+				return;
+			}
+
+			await modelManagementAPI.clearProviderAPIKey(
 				provider.list.ref,
-				provider.list.runtimeOverlayRevision ?? 0,
-				credential
+				provider.list.revision,
+				provider.apiKey.apiKeyRevision
 			);
 		});
 	};
@@ -311,7 +298,7 @@ export default function ModelsPage() {
 				);
 			} else {
 				const provider = deleteTarget.model.provider;
-				if (provider && isProviderDefault(provider, deleteTarget.model)) {
+				if (provider && isProviderDefaultModel(provider, deleteTarget.model)) {
 					showDeniedMessage('Choose another default model before deleting the current default model.');
 					return;
 				}
@@ -374,7 +361,7 @@ export default function ModelsPage() {
 							pending={isDefaultProviderPending('set-default-provider')}
 							onChange={provider => {
 								void runDefaultProviderAction('set-default-provider', () =>
-									run(() => modelManagementAPI.setDefaultModelProvider(provider.list.ref))
+									run(() => modelManagementAPI.setDefaultProvider(provider.list.ref))
 								).catch((actionError: unknown) => {
 									showDeniedMessage(getErrorMessage(actionError, 'Failed changing default provider.'));
 								});
@@ -448,7 +435,7 @@ export default function ModelsPage() {
 									});
 								}}
 								onToggleModel={async model => {
-									if (model.provider && model.list.enabled && isProviderDefault(model.provider, model)) {
+									if (model.provider && model.list.enabled && isProviderDefaultModel(model.provider, model)) {
 										throw new Error('Choose another default model before disabling this model.');
 									}
 
@@ -457,7 +444,7 @@ export default function ModelsPage() {
 									);
 								}}
 								onDeleteModel={model => {
-									if (model.provider && isProviderDefault(model.provider, model)) {
+									if (model.provider && isProviderDefaultModel(model.provider, model)) {
 										showDeniedMessage('Choose another default model before deleting the current default model.');
 										return;
 									}
@@ -465,9 +452,6 @@ export default function ModelsPage() {
 									setDeleteTarget({ kind: 'model', model });
 								}}
 								onSetDefaultModel={async (p, model) => {
-									if (p.list.builtIn) {
-										throw new Error('Built-in provider defaults are source-owned.');
-									}
 									if (!p.list.enabled || p.list.state !== ArtifactState.Available) {
 										throw new Error('Enable an available provider before choosing its default model.');
 									}

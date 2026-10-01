@@ -638,8 +638,8 @@ function ModelProviderAddEditModalContent({
 										});
 									}}
 									placeholder={
-										mode === ModelProviderModalMode.Edit && provider?.list.credentialConfigured
-											? 'Leave blank to keep the current credential'
+										mode === ModelProviderModalMode.Edit && provider?.apiKey.configured
+											? 'Leave blank to keep the current API key'
 											: ''
 									}
 									disabled={isSubmitting}

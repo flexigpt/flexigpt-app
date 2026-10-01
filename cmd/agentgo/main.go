@@ -30,7 +30,7 @@ func main() {
 	wailsProdLogLevel := logger.INFO
 
 	// Create an instance of the app structure.
-	app := NewApp()
+	app := newApp()
 	slogOpts := &slog.HandlerOptions{
 		Level: &appSlogLevelVar,
 	}

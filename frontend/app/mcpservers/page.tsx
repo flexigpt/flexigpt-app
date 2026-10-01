@@ -5,11 +5,10 @@ import type { ArtifactRef } from '@/spec/artifact';
 import type {
 	MCPAuthHealth,
 	MCPBundleView,
-	MCPGlobalSettings,
-	MCPOAuthAuthorization,
 	MCPServerDraft,
 	MCPServerRuntimeSnapshot,
 	MCPServerView,
+	MCPSettings,
 	MCPSetupSubmissionValue,
 } from '@/spec/mcp';
 import { MCPAuthHealthState, MCPHTTPAuthMode, MCPServerStatus } from '@/spec/mcp';
@@ -61,12 +60,7 @@ function getMatchingAuthHealth(server: MCPServerView, value: MCPAuthHealth | und
 		return undefined;
 	}
 
-	const runtimeServerID = server.runtimeServerID;
-	if (!runtimeServerID || value.server !== runtimeServerID) {
-		console.warn('Ignoring MCP auth health returned for another Artifact.', {
-			expected: runtimeServerID,
-			actual: value.server,
-		});
+	if (!server.runtimeServerID || value.server !== server.runtimeServerID) {
 		return undefined;
 	}
 
@@ -81,50 +75,17 @@ function getMatchingRuntimeSnapshot(
 		return undefined;
 	}
 
-	const runtimeServerID = server.runtimeServerID;
-	if (!runtimeServerID || value.server !== runtimeServerID) {
-		console.warn('Ignoring MCP runtime snapshot returned for another Artifact.', {
-			expected: runtimeServerID,
-			actual: value.server,
-		});
+	if (!server.runtimeServerID || value.server !== server.runtimeServerID) {
 		return undefined;
 	}
 
 	return value;
 }
 
-function pendingAuthForServer(
-	server: MCPServerView,
-	pending: MCPOAuthAuthorization[],
-	previous?: MCPAuthHealth
-): MCPAuthHealth | undefined {
-	const runtimeServerID = server.runtimeServerID;
-	if (!runtimeServerID) {
-		return previous;
-	}
-	const authorization = pending.find(item => item.server === runtimeServerID);
-
-	if (!authorization) {
-		return previous;
-	}
-
-	return {
-		...previous,
-		server: runtimeServerID,
-		authMode: MCPHTTPAuthMode.OAuth,
-		state: MCPAuthHealthState.AuthorizationPending,
-		configured: previous?.configured ?? true,
-		authorizationPending: true,
-		authorizationURL: authorization.authorizationURL,
-		authorizationExpiresAt: authorization.expiresAt,
-		lastError: undefined,
-	};
-}
-
 // oxlint-disable-next-line no-restricted-exports
 export default function MCPServersPage() {
 	const [bundles, setBundles] = useState<BundleData[]>([]);
-	const [settings, setSettings] = useState<MCPGlobalSettings>();
+	const [settings, setSettings] = useState<MCPSettings>();
 	const [isInitialLoading, setIsInitialLoading] = useState(true);
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [pageLoadError, setPageLoadError] = useState<unknown>();
@@ -140,47 +101,35 @@ export default function MCPServersPage() {
 	const mountedRef = useRef(false);
 	const loadIDRef = useRef(0);
 	const loadedOnceRef = useRef(false);
-	const bundleLoadEpochRef = useRef(0);
 	const bundlesRef = useRef<BundleData[]>([]);
 	const openedAuthorizationURLsRef = useRef(new Set<string>());
-	const pendingAuthorizationsRef = useRef<MCPOAuthAuthorization[]>([]);
-	const bundlePrefetchKeysRef = useRef(new Set<string>());
-	const bundleLoadInFlightRef = useRef(new Map<string, Promise<void>>());
+	const bundleLoadsRef = useRef(new Map<string, Promise<void>>());
 
 	useEffect(() => {
 		bundlesRef.current = bundles;
 	}, [bundles]);
 
 	useEffect(() => {
-		const prefetchedKeys = bundlePrefetchKeysRef.current;
-		const inFlightLoads = bundleLoadInFlightRef.current;
 		mountedRef.current = true;
 
 		return () => {
 			mountedRef.current = false;
 			loadIDRef.current += 1;
-			bundleLoadEpochRef.current += 1;
-			prefetchedKeys.clear();
-			inFlightLoads.clear();
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			bundleLoadsRef.current.clear();
 		};
 	}, []);
 
 	const readServerStatus = useCallback(
 		async (
-			servers: MCPServerView[],
-			knownPending?: MCPOAuthAuthorization[]
+			servers: MCPServerView[]
 		): Promise<{
 			runtimeByArtifactID: Record<string, MCPServerRuntimeSnapshot | undefined>;
 			authHealthByArtifactID: Record<string, MCPAuthHealth | undefined>;
 			readErrorsByArtifactID: Record<string, { runtime?: string; auth?: string } | undefined>;
 		}> => {
-			const pending =
-				knownPending ??
-				(await mcpManagementAPI.listPendingMCPOAuthAuthorizations().catch(() => [] as MCPOAuthAuthorization[]));
-
 			const entries = await mapWithConcurrency(servers, STATUS_READ_CONCURRENCY, async server => {
 				const key = server.ref.artifactID;
-				const runtimeServerID = server.runtimeServerID;
 
 				if (!server.enabled || !isServerOperational(server)) {
 					return {
@@ -191,49 +140,28 @@ export default function MCPServersPage() {
 					};
 				}
 
-				if (!runtimeServerID) {
+				try {
+					const refreshed = await mcpManagementAPI.getMCPServer(server.ref, server.bundle);
+
+					return {
+						key,
+						runtime: getMatchingRuntimeSnapshot(server, refreshed.runtime),
+						auth: getMatchingAuthHealth(server, refreshed.authHealth),
+						errors: undefined,
+					};
+				} catch (error) {
+					const message = getErrorMessage(error, 'MCP server state could not be loaded.');
+
 					return {
 						key,
 						runtime: undefined,
 						auth: undefined,
 						errors: {
-							runtime: 'MCP runtime server identity is unavailable.',
-							auth: 'MCP runtime server identity is unavailable.',
+							runtime: message,
+							auth: message,
 						},
 					};
 				}
-				const pendingAuthorization = pending.find(item => item.server === runtimeServerID);
-				const authRequest: Promise<MCPAuthHealth | undefined> = pendingAuthorization
-					? Promise.resolve(undefined)
-					: mcpManagementAPI.getMCPServerAuthHealth(server.ref);
-
-				const [runtimeResult, authResult] = await Promise.allSettled([
-					mcpManagementAPI.getMCPServerStatus(runtimeServerID),
-					authRequest,
-				]);
-
-				const errors: { runtime?: string; auth?: string } = {};
-
-				if (runtimeResult.status === 'rejected') {
-					errors.runtime = getErrorMessage(runtimeResult.reason, 'Runtime status request failed.');
-				}
-
-				if (authResult.status === 'rejected') {
-					errors.auth = getErrorMessage(authResult.reason, 'Authorization health request failed.');
-				}
-
-				const runtime =
-					runtimeResult.status === 'fulfilled' ? getMatchingRuntimeSnapshot(server, runtimeResult.value) : undefined;
-				const baseAuth =
-					authResult.status === 'fulfilled' ? getMatchingAuthHealth(server, authResult.value) : undefined;
-				const auth = pendingAuthForServer(server, pending, baseAuth);
-
-				return {
-					key,
-					runtime,
-					auth,
-					errors: Object.keys(errors).length > 0 ? errors : undefined,
-				};
 			});
 
 			return {
@@ -245,38 +173,50 @@ export default function MCPServersPage() {
 		[]
 	);
 
-	const loadBundleServerList = useCallback(async (bundle: MCPBundleView): Promise<BundleData> => {
-		try {
-			const servers = await mcpManagementAPI.listMCPServers(bundle);
+	const applyStatus = useCallback((bundleRef: ArtifactRef, statuses: Awaited<ReturnType<typeof readServerStatus>>) => {
+		setBundles(previous =>
+			previous.map(item => {
+				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
+					return item;
+				}
 
-			return {
-				bundle,
-				servers,
-				runtimeByArtifactID: {},
-				authHealthByArtifactID: {},
-				readErrorsByArtifactID: {},
-				serversLoaded: true,
-				isLoadingServers: false,
-			};
-		} catch (error) {
-			return {
-				bundle,
-				servers: [],
-				runtimeByArtifactID: {},
-				authHealthByArtifactID: {},
-				readErrorsByArtifactID: {},
-				serverLoadError: getErrorMessage(error, 'Failed to load servers for this MCP Bundle.'),
-				serversLoaded: false,
-				isLoadingServers: false,
-			};
-		}
+				return {
+					...item,
+					runtimeByArtifactID: {
+						...item.runtimeByArtifactID,
+						...statuses.runtimeByArtifactID,
+					},
+					authHealthByArtifactID: {
+						...item.authHealthByArtifactID,
+						...statuses.authHealthByArtifactID,
+					},
+					readErrorsByArtifactID: {
+						...item.readErrorsByArtifactID,
+						...statuses.readErrorsByArtifactID,
+					},
+				};
+			})
+		);
+	}, []);
+
+	const loadBundleServerList = useCallback(async (bundle: MCPBundleView): Promise<BundleData> => {
+		const servers = await mcpManagementAPI.listMCPServers(bundle);
+
+		return {
+			bundle,
+			servers,
+			runtimeByArtifactID: Object.fromEntries(servers.map(server => [server.ref.artifactID, server.runtime])),
+			authHealthByArtifactID: Object.fromEntries(servers.map(server => [server.ref.artifactID, server.authHealth])),
+			readErrorsByArtifactID: {},
+			serversLoaded: true,
+			isLoadingServers: false,
+		};
 	}, []);
 
 	const fetchAll = useCallback(async () => {
 		const requestID = loadIDRef.current + 1;
 		loadIDRef.current = requestID;
-		bundleLoadEpochRef.current += 1;
-		bundlePrefetchKeysRef.current.clear();
+
 		if (loadedOnceRef.current) {
 			setIsRefreshing(true);
 		} else {
@@ -286,34 +226,21 @@ export default function MCPServersPage() {
 		setPageLoadError(undefined);
 
 		try {
-			const [bundleResult, pendingResult, settingsResult] = await Promise.allSettled([
+			const [bundleResult, settingsResult] = await Promise.allSettled([
 				mcpManagementAPI.listMCPBundles(),
-				mcpManagementAPI.listPendingMCPOAuthAuthorizations(),
-				mcpManagementAPI.getMCPGlobalSettings(),
+				mcpManagementAPI.getMCPSettings(),
 			]);
 
 			if (bundleResult.status === 'rejected') {
 				throw bundleResult.reason;
 			}
 
-			const pending = pendingResult.status === 'fulfilled' ? (pendingResult.value ?? []) : [];
-			pendingAuthorizationsRef.current = pending;
-
-			const warningsNext = [
-				pendingResult.status === 'rejected'
-					? getErrorMessage(pendingResult.reason, 'Pending OAuth authorizations could not be loaded.')
-					: undefined,
-				settingsResult.status === 'rejected'
-					? getErrorMessage(settingsResult.reason, 'MCP OAuth settings could not be loaded.')
-					: undefined,
-			].filter((value): value is string => Boolean(value));
-
 			if (!mountedRef.current || loadIDRef.current !== requestID) {
 				return;
 			}
 
 			const incomingBundles = bundleResult.value ?? [];
-			const shells = incomingBundles.map(bundle => {
+			const nextBundles = incomingBundles.map(bundle => {
 				const existing = bundlesRef.current.find(
 					item => item.bundle.ref.rootID === bundle.ref.rootID && item.bundle.ref.artifactID === bundle.ref.artifactID
 				);
@@ -339,21 +266,27 @@ export default function MCPServersPage() {
 				} satisfies BundleData;
 			});
 
-			bundlesRef.current = shells;
-			setBundles(shells);
-			setWarnings(warningsNext);
-			loadedOnceRef.current = true;
-			setIsInitialLoading(false);
+			bundlesRef.current = nextBundles;
+			setBundles(nextBundles);
+
+			setWarnings(
+				settingsResult.status === 'rejected'
+					? [getErrorMessage(settingsResult.reason, 'MCP OAuth settings could not be loaded.')]
+					: []
+			);
+
 			if (settingsResult.status === 'fulfilled') {
 				setSettings(settingsResult.value);
 			}
+
+			loadedOnceRef.current = true;
 		} catch (error) {
 			if (!mountedRef.current || loadIDRef.current !== requestID) {
 				return;
 			}
 
 			setPageLoadError(error);
-			setAlertMessage(getErrorMessage(error, 'Failed to load MCP Bundles.'));
+			setAlertMessage(getErrorMessage(error, 'Failed to load MCP Collections.'));
 		} finally {
 			if (mountedRef.current && loadIDRef.current === requestID) {
 				setIsInitialLoading(false);
@@ -363,33 +296,27 @@ export default function MCPServersPage() {
 	}, []);
 
 	useEffect(() => {
-		void fetchAll().catch(() => undefined);
+		void fetchAll();
 	}, [fetchAll]);
 
 	const loadBundleServers = useCallback(
-		(bundleRef: MCPBundleView['ref'], waitForStatus = true): Promise<void> => {
-			const epoch = bundleLoadEpochRef.current;
-			const key = `${epoch}:${artifactKey(bundleRef)}`;
-			const inFlight = bundleLoadInFlightRef.current.get(key);
-			if (inFlight) {
-				return inFlight;
+		(bundleRef: ArtifactRef, refreshStatus = true): Promise<void> => {
+			const key = artifactKey(bundleRef);
+			const existingLoad = bundleLoadsRef.current.get(key);
+
+			if (existingLoad) {
+				return existingLoad;
 			}
 
-			let resolveServerListReady: () => void = () => undefined;
-			const serverListReady = new Promise<void>(resolve => {
-				resolveServerListReady = resolve;
-			});
-
-			const task = (async () => {
-				const existing = bundlesRef.current.find(
+			const load = (async () => {
+				const current = bundlesRef.current.find(
 					item => item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
 				);
-				if (!existing) {
+
+				if (!current) {
 					throw new Error('MCP Collection is no longer available.');
 				}
-				if (!mountedRef.current) {
-					return;
-				}
+
 				setBundles(previous =>
 					previous.map(item =>
 						item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
@@ -403,21 +330,13 @@ export default function MCPServersPage() {
 				);
 
 				try {
-					const pending = await mcpManagementAPI
-						.listPendingMCPOAuthAuthorizations()
-						.catch(() => pendingAuthorizationsRef.current);
-					pendingAuthorizationsRef.current = pending;
+					const bundle = await mcpManagementAPI.getMCPBundle(bundleRef);
+					const loaded = await loadBundleServerList(bundle);
 
-					const refreshedBundle = await mcpManagementAPI.getMCPBundle(bundleRef);
-					const loaded = await loadBundleServerList(refreshedBundle);
-
-					if (!mountedRef.current || bundleLoadEpochRef.current !== epoch) {
+					if (!mountedRef.current) {
 						return;
 					}
 
-					// Show durable server definitions immediately. Runtime and
-					// authorization state are enrichment and should not delay the
-					// collection contents appearing on screen.
 					setBundles(previous =>
 						previous.map(item =>
 							item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
@@ -426,182 +345,91 @@ export default function MCPServersPage() {
 						)
 					);
 
-					resolveServerListReady();
-
-					if (!loaded.serversLoaded || loaded.servers.length === 0) {
+					if (!refreshStatus || loaded.servers.length === 0) {
 						return;
 					}
 
-					const statuses = await readServerStatus(loaded.servers, pending).catch(() => undefined);
+					const statuses = await readServerStatus(loaded.servers);
 
-					if (!statuses || !mountedRef.current || bundleLoadEpochRef.current !== epoch) {
+					if (mountedRef.current) {
+						applyStatus(bundleRef, statuses);
+					}
+				} catch (error) {
+					if (!mountedRef.current) {
 						return;
 					}
 
 					setBundles(previous =>
-						previous.map(item => {
-							if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
-								return item;
-							}
-
-							// Preserve newer local actions such as Connect,
-							// Disconnect, or Refresh if they completed while
-							// this background status hydration was running.
-							return {
-								...item,
-								runtimeByArtifactID: {
-									...statuses.runtimeByArtifactID,
-									...item.runtimeByArtifactID,
-								},
-								authHealthByArtifactID: {
-									...statuses.authHealthByArtifactID,
-									...item.authHealthByArtifactID,
-								},
-								readErrorsByArtifactID: {
-									...statuses.readErrorsByArtifactID,
-									...item.readErrorsByArtifactID,
-								},
-							};
-						})
+						previous.map(item =>
+							item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
+								? {
+										...item,
+										servers: [],
+										runtimeByArtifactID: {},
+										authHealthByArtifactID: {},
+										readErrorsByArtifactID: {},
+										serversLoaded: false,
+										isLoadingServers: false,
+										serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Collection.'),
+									}
+								: item
+						)
 					);
-				} catch (error) {
-					if (mountedRef.current && bundleLoadEpochRef.current === epoch) {
-						setBundles(previous =>
-							previous.map(item =>
-								item.bundle.ref.rootID === bundleRef.rootID && item.bundle.ref.artifactID === bundleRef.artifactID
-									? {
-											...item,
-											servers: [],
-											runtimeByArtifactID: {},
-											authHealthByArtifactID: {},
-											readErrorsByArtifactID: {},
-											serversLoaded: false,
-											isLoadingServers: false,
-											serverLoadError: getErrorMessage(error, 'Failed to load MCP servers for this Collection.'),
-										}
-									: item
-							)
-						);
-					}
+
 					throw error;
-				} finally {
-					resolveServerListReady();
 				}
 			})();
 
-			bundleLoadInFlightRef.current.set(key, task);
-			const clear = () => {
-				if (bundleLoadInFlightRef.current.get(key) === task) {
-					bundleLoadInFlightRef.current.delete(key);
+			bundleLoadsRef.current.set(key, load);
+
+			void load.finally(() => {
+				if (bundleLoadsRef.current.get(key) === load) {
+					bundleLoadsRef.current.delete(key);
 				}
-			};
-			void task.then(clear, clear);
-			return waitForStatus ? task : serverListReady;
+			});
+
+			return load;
 		},
-		[loadBundleServerList, readServerStatus]
+		[applyStatus, loadBundleServerList, readServerStatus]
 	);
 
-	const refreshBundle = loadBundleServers;
-
 	useEffect(() => {
-		if (isInitialLoading || isRefreshing || pageLoadError || bundles.length === 0) {
+		if (isInitialLoading || isRefreshing || pageLoadError) {
 			return;
 		}
 
-		const epoch = bundleLoadEpochRef.current;
-		const scheduledKeys: string[] = [];
-		const targets: MCPBundleView['ref'][] = [];
+		const pending = bundles
+			.filter(bundle => !bundle.serversLoaded && !bundle.isLoadingServers && !bundle.serverLoadError)
+			.map(bundle => bundle.bundle.ref);
 
-		for (const bundleData of bundles) {
-			if (bundleData.serversLoaded || bundleData.isLoadingServers || bundleData.serverLoadError) {
-				continue;
-			}
-
-			const key = `${epoch}:${artifactKey(bundleData.bundle.ref)}`;
-
-			if (bundlePrefetchKeysRef.current.has(key)) {
-				continue;
-			}
-
-			bundlePrefetchKeysRef.current.add(key);
-			scheduledKeys.push(key);
-			targets.push(bundleData.bundle.ref);
-		}
-
-		if (targets.length === 0) {
+		if (pending.length === 0) {
 			return;
 		}
 
-		let started = false;
 		const timer = window.setTimeout(() => {
-			started = true;
-
-			void mapWithConcurrency(targets, BUNDLE_PREFETCH_CONCURRENCY, async bundleRef => {
-				if (bundleLoadEpochRef.current !== epoch) {
-					return;
-				}
-
-				// Automatic loading waits only for server definitions. Runtime
-				// and auth status continue enriching each card in the background.
-				await loadBundleServers(bundleRef, false).catch(() => undefined);
-			}).catch(() => undefined);
+			void mapWithConcurrency(pending, BUNDLE_PREFETCH_CONCURRENCY, ref => loadBundleServers(ref, false)).catch(
+				() => undefined
+			);
 		}, 0);
 
 		return () => {
 			window.clearTimeout(timer);
-
-			// React Strict Mode may clean up before the timer fires. Release
-			// those keys so the next effect invocation can schedule the work.
-			if (!started) {
-				for (const key of scheduledKeys) {
-					// oxlint-disable-next-line react-hooks/exhaustive-deps
-					bundlePrefetchKeysRef.current.delete(key);
-				}
-			}
 		};
 	}, [bundles, isInitialLoading, isRefreshing, loadBundleServers, pageLoadError]);
 
+	const refreshBundle = useCallback(
+		async (bundleRef: ArtifactRef) => {
+			await loadBundleServers(bundleRef, true);
+		},
+		[loadBundleServers]
+	);
+
 	const refreshSingleServer = useCallback(
 		async (server: MCPServerView) => {
-			const parent = bundlesRef.current.find(
-				item =>
-					item.bundle.ref.rootID === server.bundle.rootID && item.bundle.ref.artifactID === server.bundle.artifactID
-			);
-
-			if (!parent) {
-				throw new Error('MCP Collection is no longer available.');
-			}
-
-			const refreshed = await readServerStatus([server]);
-
-			setBundles(previous =>
-				previous.map(item => {
-					if (
-						item.bundle.ref.rootID !== server.bundle.rootID ||
-						item.bundle.ref.artifactID !== server.bundle.artifactID
-					) {
-						return item;
-					}
-
-					return {
-						...item,
-						runtimeByArtifactID: {
-							...item.runtimeByArtifactID,
-							[server.ref.artifactID]: refreshed.runtimeByArtifactID[server.ref.artifactID],
-						},
-						authHealthByArtifactID: {
-							...item.authHealthByArtifactID,
-							[server.ref.artifactID]: refreshed.authHealthByArtifactID[server.ref.artifactID],
-						},
-						readErrorsByArtifactID: {
-							...item.readErrorsByArtifactID,
-							[server.ref.artifactID]: refreshed.readErrorsByArtifactID[server.ref.artifactID],
-						},
-					};
-				})
-			);
+			const statuses = await readServerStatus([server]);
+			applyStatus(server.bundle, statuses);
 		},
-		[readServerStatus]
+		[applyStatus, readServerStatus]
 	);
 
 	const markServerConnecting = useCallback((server: MCPServerView) => {
@@ -620,6 +448,7 @@ export default function MCPServersPage() {
 				}
 
 				const current = item.runtimeByArtifactID[server.ref.artifactID];
+
 				return {
 					...item,
 					runtimeByArtifactID: {
@@ -675,7 +504,8 @@ export default function MCPServersPage() {
 			markServerConnecting(server);
 
 			try {
-				const snapshot = await mcpManagementAPI.startMCPServerConnect(runtimeServerID);
+				const snapshot = await mcpManagementAPI.connectMCPServer(runtimeServerID);
+
 				applyRuntimeSnapshot(server, snapshot);
 
 				if (snapshot.status === MCPServerStatus.Error) {
@@ -696,10 +526,11 @@ export default function MCPServersPage() {
 					bundle.servers
 						.filter(server => {
 							const runtime = bundle.runtimeByArtifactID[server.ref.artifactID];
-							const authHealth = bundle.authHealthByArtifactID[server.ref.artifactID];
+							const auth = bundle.authHealthByArtifactID[server.ref.artifactID];
+
 							return (
 								runtime?.status === MCPServerStatus.Connecting ||
-								authHealth?.state === MCPAuthHealthState.AuthorizationPending
+								auth?.state === MCPAuthHealthState.AuthorizationPending
 							);
 						})
 						.map(server => server.ref)
@@ -709,77 +540,32 @@ export default function MCPServersPage() {
 	);
 
 	useEffect(() => {
-		const servers = JSON.parse(connectionPollKey) as ArtifactRef[];
+		const refs = JSON.parse(connectionPollKey) as ArtifactRef[];
 
-		if (servers.length === 0) {
+		if (refs.length === 0) {
 			return;
 		}
 
 		let cancelled = false;
-		let polling = false;
-		let pollDelay = 300;
 		let timer: number | undefined;
 
 		const poll = async () => {
-			if (cancelled || polling) {
-				return;
-			}
-
-			polling = true;
-
 			try {
-				const pending = await mcpManagementAPI.listPendingMCPOAuthAuthorizations();
-
-				await mapWithConcurrency(servers, STATUS_READ_CONCURRENCY, async ref => {
+				await mapWithConcurrency(refs, STATUS_READ_CONCURRENCY, async ref => {
 					const bundle = bundlesRef.current.find(item =>
 						item.servers.some(server => artifactKey(server.ref) === artifactKey(ref))
 					);
 					const server = bundle?.servers.find(item => artifactKey(item.ref) === artifactKey(ref));
 
 					if (!cancelled && server) {
-						const statuses = await readServerStatus([server], pending);
-
-						setBundles(previous =>
-							previous.map(item => {
-								if (
-									item.bundle.ref.rootID !== server.bundle.rootID ||
-									item.bundle.ref.artifactID !== server.bundle.artifactID
-								) {
-									return item;
-								}
-
-								return {
-									...item,
-									runtimeByArtifactID: {
-										...item.runtimeByArtifactID,
-										[server.ref.artifactID]: statuses.runtimeByArtifactID[server.ref.artifactID],
-									},
-									authHealthByArtifactID: {
-										...item.authHealthByArtifactID,
-										[server.ref.artifactID]: statuses.authHealthByArtifactID[server.ref.artifactID],
-									},
-									readErrorsByArtifactID: {
-										...item.readErrorsByArtifactID,
-										[server.ref.artifactID]: statuses.readErrorsByArtifactID[server.ref.artifactID],
-									},
-								};
-							})
-						);
+						await refreshSingleServer(server);
 					}
 				});
-			} catch (error) {
-				console.error('MCP connection polling failed:', error);
+			} catch {
+				// Status refresh failure is reflected by the next aggregate read.
 			} finally {
-				polling = false;
-
 				if (!cancelled) {
-					pollDelay = Math.min(Math.round(pollDelay * 1.5), 2000);
-					timer = window.setTimeout(
-						() => {
-							void poll();
-						},
-						document.hidden ? 4000 : pollDelay
-					);
+					timer = window.setTimeout(() => void poll(), document.hidden ? 4000 : 1000);
 				}
 			}
 		};
@@ -792,7 +578,7 @@ export default function MCPServersPage() {
 				window.clearTimeout(timer);
 			}
 		};
-	}, [connectionPollKey, readServerStatus]);
+	}, [connectionPollKey, refreshSingleServer]);
 
 	const handleSaveBundle = useCallback(
 		async (logicalName: string, displayName: string, description?: string) => {
@@ -818,7 +604,7 @@ export default function MCPServersPage() {
 		[refreshBundle]
 	);
 
-	const patchBundleEnabled = useCallback((bundleRef: MCPBundleView['ref'], enabled: boolean) => {
+	const patchBundleEnabled = useCallback((bundleRef: ArtifactRef, enabled: boolean) => {
 		setBundles(previous =>
 			previous.map(item => {
 				if (item.bundle.ref.rootID !== bundleRef.rootID || item.bundle.ref.artifactID !== bundleRef.artifactID) {
@@ -840,57 +626,26 @@ export default function MCPServersPage() {
 		);
 	}, []);
 
-	const patchServerEnabled = useCallback((server: MCPServerView, enabled: boolean) => {
-		setBundles(previous =>
-			previous.map(item => {
-				if (
-					item.bundle.ref.rootID !== server.bundle.rootID ||
-					item.bundle.ref.artifactID !== server.bundle.artifactID
-				) {
-					return item;
-				}
-
-				return {
-					...item,
-					servers: item.servers.map(value =>
-						artifactKey(value.ref) === artifactKey(server.ref)
-							? {
-									...value,
-									enabled,
-									artifact: {
-										...value.artifact,
-										enabled,
-									},
-								}
-							: value
-					),
-				};
-			})
-		);
-	}, []);
-
 	const openAuthorizationURL = useCallback((server: ArtifactRef, url: string, once: boolean) => {
 		const key = `${artifactKey(server)}:${url}`;
+
 		if (once && openedAuthorizationURLsRef.current.has(key)) {
 			return;
 		}
-		openedAuthorizationURLsRef.current.add(key);
 
-		const reportFailure = () => {
-			openedAuthorizationURLsRef.current.delete(key);
-			if (mountedRef.current) {
-				setAlertMessage('The OAuth authorization page could not be opened.');
-			}
-		};
+		openedAuthorizationURLsRef.current.add(key);
 
 		try {
 			backendAPI.openURL(url);
 		} catch {
-			reportFailure();
+			openedAuthorizationURLsRef.current.delete(key);
+			if (mountedRef.current) {
+				setAlertMessage('The OAuth authorization page could not be opened.');
+			}
 		}
 	}, []);
 
-	const selectedOAuth = (() => {
+	const selectedOAuth = useMemo(() => {
 		if (!oauthTarget) {
 			return undefined;
 		}
@@ -906,20 +661,21 @@ export default function MCPServersPage() {
 				};
 			}
 		}
+
 		return undefined;
-	})();
+	}, [bundles, oauthTarget]);
 
 	useEffect(() => {
-		if (!oauthTarget?.openAutomatically) {
+		if (!oauthTarget?.openAutomatically || !selectedOAuth) {
 			return;
 		}
 
-		const authorizationURL = selectedOAuth?.authHealth?.authorizationURL?.trim();
-		if (!authorizationURL || !selectedOAuth) {
+		const url = selectedOAuth.authHealth?.authorizationURL?.trim();
+		if (!url) {
 			return;
 		}
 
-		openAuthorizationURL(selectedOAuth.server.ref, authorizationURL, true);
+		openAuthorizationURL(selectedOAuth.server.ref, url, true);
 	}, [oauthTarget, openAuthorizationURL, selectedOAuth]);
 
 	useEffect(() => {
@@ -1004,9 +760,7 @@ export default function MCPServersPage() {
 							serverLoadError={bundleData.serverLoadError}
 							isLoadingServers={bundleData.isLoadingServers}
 							serversLoaded={bundleData.serversLoaded}
-							onLoadServers={() => {
-								return loadBundleServers(bundleData.bundle.ref);
-							}}
+							onLoadServers={() => loadBundleServers(bundleData.bundle.ref)}
 							onRefreshServers={() => refreshBundle(bundleData.bundle.ref)}
 							onToggleBundleEnabled={async (bundle, enabled) => {
 								const previous = bundle.enabled;
@@ -1022,19 +776,6 @@ export default function MCPServersPage() {
 								if (bundleData.serversLoaded) {
 									await refreshBundle(bundle.ref);
 								}
-							}}
-							onToggleServerEnabled={async (bundle, server, enabled) => {
-								const previous = server.enabled;
-								patchServerEnabled(server, enabled);
-
-								try {
-									await mcpManagementAPI.setMCPServerEnabled(server, enabled);
-								} catch (error) {
-									patchServerEnabled(server, previous);
-									throw error;
-								}
-
-								await refreshBundle(bundle.ref);
 							}}
 							onSaveServer={handleSaveServer}
 							onSaveSetup={handleSaveSetup}
@@ -1052,7 +793,7 @@ export default function MCPServersPage() {
 								await refreshSingleServer(server);
 							}}
 							onCancelOAuth={async server => {
-								await mcpManagementAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(server));
+								await mcpManagementAPI.cancelMCPServerAuthorization(requireMCPRuntimeServerID(server));
 								await refreshSingleServer(server);
 							}}
 							onRequestOAuthAuthorization={server => {
@@ -1085,6 +826,7 @@ export default function MCPServersPage() {
 								item.bundle.ref.rootID === bundleToDelete.ref.rootID &&
 								item.bundle.ref.artifactID === bundleToDelete.ref.artifactID
 						);
+
 						if (!current?.serversLoaded || current.serverLoadError || current.servers.length > 0) {
 							setAlertMessage('Load the Collection and remove all currently available MCP servers before deleting it.');
 							return;
@@ -1097,7 +839,7 @@ export default function MCPServersPage() {
 							setBundleToDelete(null);
 							await fetchAll();
 						} catch (error) {
-							setAlertMessage(getErrorMessage(error, 'Failed to delete MCP Bundle.'));
+							setAlertMessage(getErrorMessage(error, 'Failed to delete MCP Collection.'));
 						} finally {
 							setIsDeletingBundle(false);
 						}
@@ -1121,21 +863,18 @@ export default function MCPServersPage() {
 
 				<MCPSettingsModal
 					isOpen={isSettingsOpen}
-					initialListenAddr={settings?.settings.oauthLoopbackListenAddr}
-					activeListenAddr={settings?.oauthLoopbackListenAddr}
-					oauthRedirectURL={settings?.oauthRedirectURL}
-					oauthRestartRequired={settings?.oauthRestartRequired}
-					oauthLoopbackReady={settings?.oauthLoopbackReady}
-					oauthLoopbackError={settings?.oauthLoopbackError}
+					initialListenAddr={settings?.oauthLoopbackListenAddr}
 					onClose={() => {
 						setIsSettingsOpen(false);
 					}}
 					onSubmit={async oauthLoopbackListenAddr => {
-						const current = settings ?? (await mcpManagementAPI.getMCPGlobalSettings());
-						await mcpManagementAPI.updateMCPGlobalSettings(current.revision, {
+						const current = settings ?? (await mcpManagementAPI.getMCPSettings());
+
+						const next = await mcpManagementAPI.saveMCPSettings(current.revision, {
 							oauthLoopbackListenAddr: oauthLoopbackListenAddr || undefined,
 						});
-						setSettings(await mcpManagementAPI.getMCPGlobalSettings());
+
+						setSettings(next);
 					}}
 				/>
 
@@ -1159,7 +898,7 @@ export default function MCPServersPage() {
 							return;
 						}
 
-						await mcpManagementAPI.cancelPendingMCPOAuthAuthorization(requireMCPRuntimeServerID(selectedOAuth.server));
+						await mcpManagementAPI.cancelMCPServerAuthorization(requireMCPRuntimeServerID(selectedOAuth.server));
 						await refreshSingleServer(selectedOAuth.server);
 						setOAuthTarget(null);
 					}}

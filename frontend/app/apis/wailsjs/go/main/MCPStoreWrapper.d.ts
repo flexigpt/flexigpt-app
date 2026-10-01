@@ -3,12 +3,13 @@
 import {collection} from '../models';
 import {artifact} from '../models';
 import {consumerapi} from '../models';
+import {main} from '../models';
 import {root} from '../models';
-import {resolve} from '../models';
+import {auth} from '../models';
 
 export function AddMCPCollectionMember(arg1:collection.AddMemberRequest):Promise<collection.CollectionView>;
 
-export function AttachMCPArtifactToCollection(arg1:collection.AddArtifactMemberRequest):Promise<collection.CollectionView>;
+export function AddMCPServerToCollection(arg1:collection.AddArtifactMemberRequest):Promise<collection.CollectionView>;
 
 export function CreateMCPCollection(arg1:collection.CreateRequest):Promise<collection.CollectionView>;
 
@@ -18,7 +19,9 @@ export function GetMCPCollection(arg1:artifact.ArtifactRef):Promise<collection.C
 
 export function GetMCPPolicy(arg1:artifact.ArtifactRef):Promise<consumerapi.PolicyView>;
 
-export function GetMCPServerInstallation(arg1:artifact.ArtifactRef):Promise<consumerapi.ServerInstallationView>;
+export function GetMCPServerSecrets(arg1:artifact.ArtifactRef):Promise<consumerapi.ServerSecretsView>;
+
+export function GetMCPSettings():Promise<main.MCPSettingsView>;
 
 export function ListMCPCollectionMemberships(arg1:artifact.ArtifactRef):Promise<Array<collection.ArtifactMembershipView>>;
 
@@ -36,14 +39,8 @@ export function ListMCPServersPage(arg1:number,arg2:string):Promise<consumerapi.
 
 export function RemoveMCPCollectionMember(arg1:collection.RemoveMemberRequest):Promise<collection.CollectionView>;
 
-export function ResolveMCPArtifactCapabilities(arg1:artifact.ArtifactRef):Promise<resolve.CapabilityPlan>;
-
-export function ResolveMCPCollection(arg1:artifact.ArtifactRef):Promise<collection.CollectionCapabilityPlan>;
+export function SaveMCPSettings(arg1:number,arg2:auth.MCPAuthSettings):Promise<main.MCPSettingsView>;
 
 export function SetMCPCollectionEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<collection.CollectionView>;
-
-export function SetMCPPolicyEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
-
-export function SetMCPServerEnabled(arg1:artifact.ArtifactRef,arg2:number,arg3:boolean):Promise<artifact.Artifact>;
 
 export function UpdateMCPCollection(arg1:collection.UpdateRequest):Promise<collection.CollectionView>;

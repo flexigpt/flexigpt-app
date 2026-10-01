@@ -1,9 +1,9 @@
 import type { SubmitEventHandler } from 'react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FiAlertCircle } from 'react-icons/fi';
 
 import type { ArtifactRef } from '@/spec/artifact';
-import type { MCPSetupSubmissionValue, MCPStoreServerInstallationView } from '@/spec/mcp';
+import type { MCPServerSetupView, MCPSetupSubmissionValue } from '@/spec/mcp';
 import { MCPInputKind } from '@/spec/mcp';
 
 import { throwIfAborted } from '@/lib/async_utils';
@@ -55,24 +55,18 @@ function inputKindLabel(kind: MCPInputKind): string {
 }
 
 function WorkspaceMCPSetupForm({
-	artifact,
+	setup,
 	displayName,
-	installation,
 	onClose,
 	onSaved,
 }: {
-	artifact: ArtifactRef;
+	setup: MCPServerSetupView;
 	displayName: string;
-	installation: MCPStoreServerInstallationView;
 	onClose: () => void;
 	onSaved?: () => void;
 }) {
-	const inputs = useMemo(
-		() => installation.document.configuration.install.inputs ?? {},
-		[installation.document.configuration.install.inputs]
-	);
 	const [rows, setRows] = useState<Record<string, InputRow>>(() =>
-		Object.fromEntries(Object.keys(inputs).map(name => [name, emptyRow()]))
+		Object.fromEntries(setup.inputs.map(input => [input.name, emptyRow()]))
 	);
 	const [reset, setReset] = useState(false);
 	const [submitError, setSubmitError] = useState('');
@@ -89,18 +83,16 @@ function WorkspaceMCPSetupForm({
 	};
 
 	const validate = (): string | undefined => {
-		for (const [name, declaration] of Object.entries(inputs)) {
-			const row = rows[name] ?? emptyRow();
-			const existing = installation.installation.inputs?.[name];
-			const label = declaration.label || name;
-
+		for (const input of setup.inputs) {
+			const row = rows[input.name] ?? emptyRow();
+			const label = input.declaration.label || input.name;
 			const configured =
 				!reset &&
-				(declaration.kind === MCPInputKind.Text || declaration.kind === MCPInputKind.Path
-					? Boolean(existing?.value?.trim() || declaration.default?.trim())
-					: Boolean(existing?.secretConfigured));
+				(input.declaration.kind === MCPInputKind.Text || input.declaration.kind === MCPInputKind.Path
+					? Boolean(input.boundValue?.trim() || input.declaration.default?.trim())
+					: input.secretConfigured);
 
-			if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
+			if (input.declaration.kind === MCPInputKind.OAuthClientCredentials) {
 				const hasClientID = Boolean(row.clientID.trim());
 				const hasClientSecret = Boolean(row.clientSecret.trim());
 
@@ -108,17 +100,17 @@ function WorkspaceMCPSetupForm({
 					if (!hasClientID) {
 						return `"${label}" requires a Client ID.`;
 					}
-					if (declaration.clientSecretRequired && !hasClientSecret) {
+					if (input.declaration.clientSecretRequired && !hasClientSecret) {
 						return `"${label}" requires a Client Secret when replacing its credentials.`;
 					}
-				} else if (declaration.required && !configured) {
+				} else if (input.declaration.required && !configured) {
 					return `"${label}" requires a Client ID.`;
 				}
 
 				continue;
 			}
 
-			if (!declaration.required || configured) {
+			if (!input.declaration.required || configured) {
 				continue;
 			}
 
@@ -130,14 +122,14 @@ function WorkspaceMCPSetupForm({
 		return undefined;
 	};
 
-	const submissionValues = (): Record<string, MCPSetupSubmissionValue> => {
-		return Object.fromEntries<MCPSetupSubmissionValue>(
-			Object.entries(inputs).map(([name, declaration]): readonly [string, MCPSetupSubmissionValue] => {
-				const row = rows[name] ?? emptyRow();
+	const buildSubmission = (): Record<string, MCPSetupSubmissionValue> =>
+		Object.fromEntries(
+			setup.inputs.map(input => {
+				const row = rows[input.name] ?? emptyRow();
 
-				if (declaration.kind === MCPInputKind.OAuthClientCredentials) {
+				if (input.declaration.kind === MCPInputKind.OAuthClientCredentials) {
 					return [
-						name,
+						input.name,
 						{
 							clientID: row.clientID,
 							clientSecret: row.clientSecret,
@@ -146,23 +138,20 @@ function WorkspaceMCPSetupForm({
 				}
 
 				return [
-					name,
+					input.name,
 					{
 						value: row.value,
 					},
 				];
 			})
-		);
-	};
+		) as Record<string, MCPSetupSubmissionValue>;
 
-	const save: SubmitEventHandler<HTMLFormElement> = event => {
+	const submit: SubmitEventHandler<HTMLFormElement> = event => {
 		event.preventDefault();
 
 		if (isSubmitting) {
 			return;
 		}
-
-		setSubmitError('');
 
 		const validationError = validate();
 		if (validationError) {
@@ -170,34 +159,36 @@ function WorkspaceMCPSetupForm({
 			return;
 		}
 
+		setSubmitError('');
 		setIsSubmitting(true);
 
-		void mcpManagementAPI.applyMCPServerSetup(artifact, submissionValues(), reset).then(
-			() => {
+		void mcpManagementAPI
+			.applyMCPServerSetup(setup.server, buildSubmission(), reset)
+			.then(
+				() => {
+					onSaved?.();
+					onClose();
+				},
+				(error: unknown) => {
+					setSubmitError(error instanceof Error ? error.message : 'MCP setup could not be saved.');
+				}
+			)
+			.finally(() => {
 				setIsSubmitting(false);
-				onSaved?.();
-				onClose();
-			},
-			(error: unknown) => {
-				setSubmitError(error instanceof Error ? error.message : 'MCP setup could not be saved.');
-				setIsSubmitting(false);
-			}
-		);
+			});
 	};
 
 	return (
 		<div className="modal-box bg-base-200 max-h-[85vh] w-[calc(100%-1rem)] max-w-3xl overflow-y-auto rounded-2xl p-0">
 			<ModalHeader
 				title={`Configure ${displayName}`}
-				description="Installation values are stored by MCP management. Secret values are never returned to Workspace or conversation state."
+				description="MCP settings and credentials are stored locally. Existing secret values are never displayed."
 				onClose={onClose}
 				closeDisabled={isSubmitting}
 			/>
 
-			<form className="space-y-4 p-4 sm:p-6" onSubmit={save}>
-				{installation.document.configuration.install.note ? (
-					<div className="bg-base-100 rounded-2xl p-3 text-sm">{installation.document.configuration.install.note}</div>
-				) : null}
+			<form className="space-y-4 p-4 sm:p-6" onSubmit={submit} aria-busy={isSubmitting}>
+				{setup.note ? <div className="bg-base-100 rounded-2xl p-3 text-sm">{setup.note}</div> : null}
 
 				{submitError ? (
 					<div className="alert alert-error rounded-2xl text-sm">
@@ -206,27 +197,26 @@ function WorkspaceMCPSetupForm({
 					</div>
 				) : null}
 
-				{Object.entries(inputs).map(([name, declaration]) => {
-					const row = rows[name] ?? emptyRow();
-					const binding = installation.installation.inputs?.[name];
-					const isOAuth = declaration.kind === MCPInputKind.OAuthClientCredentials;
-					const isSecret = isOAuth || declaration.kind === MCPInputKind.Secret;
+				{setup.inputs.map(input => {
+					const row = rows[input.name] ?? emptyRow();
+					const isOAuth = input.declaration.kind === MCPInputKind.OAuthClientCredentials;
+					const isSecret = isOAuth || input.declaration.kind === MCPInputKind.Secret;
 
 					return (
-						<div key={name} className="bg-base-100 rounded-2xl p-4">
+						<div key={input.name} className="bg-base-100 rounded-2xl p-4">
 							<div className="mb-3 flex items-start justify-between gap-3">
 								<div className="min-w-0">
 									<div className="font-semibold">
-										{declaration.label || name}
-										{declaration.required ? ' *' : ''}
+										{input.declaration.label || input.name}
+										{input.declaration.required ? ' *' : ''}
 									</div>
-									{declaration.label ? null : <div className="text-base-content/60 text-xs">{name}</div>}
+									{input.declaration.label ? null : <div className="text-base-content/60 text-xs">{input.name}</div>}
 								</div>
-								<span className="badge badge-ghost badge-xs">{inputKindLabel(declaration.kind)}</span>
+								<span className="badge badge-ghost badge-xs">{inputKindLabel(input.declaration.kind)}</span>
 							</div>
 
-							{declaration.description ? (
-								<p className="text-base-content/70 mb-3 text-xs">{declaration.description}</p>
+							{input.declaration.description ? (
+								<p className="text-base-content/70 mb-3 text-xs">{input.declaration.description}</p>
 							) : null}
 
 							{isOAuth ? (
@@ -239,7 +229,7 @@ function WorkspaceMCPSetupForm({
 										autoComplete="off"
 										placeholder="Client ID"
 										onChange={event => {
-											updateRow(name, {
+											updateRow(input.name, {
 												clientID: event.currentTarget.value,
 											});
 										}}
@@ -250,26 +240,26 @@ function WorkspaceMCPSetupForm({
 										value={row.clientSecret}
 										disabled={isSubmitting}
 										autoComplete="new-password"
-										placeholder={declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'}
+										placeholder={input.declaration.clientSecretRequired ? 'Client Secret' : 'Client Secret (optional)'}
 										onChange={event => {
-											updateRow(name, {
+											updateRow(input.name, {
 												clientSecret: event.currentTarget.value,
 											});
 										}}
 									/>
 								</div>
 							) : (
-								<ModalField label={isSecret ? 'Secret value' : 'Value'} htmlFor={`workspace-mcp-input-${name}`}>
+								<ModalField label={isSecret ? 'Secret value' : 'Value'} htmlFor={`workspace-mcp-input-${input.name}`}>
 									<input
-										id={`workspace-mcp-input-${name}`}
+										id={`workspace-mcp-input-${input.name}`}
 										type={isSecret ? 'password' : 'text'}
 										className="input w-full rounded-xl"
 										value={row.value}
 										disabled={isSubmitting}
 										autoComplete={isSecret ? 'new-password' : 'off'}
-										placeholder={declaration.placeholder || declaration.default}
+										placeholder={input.declaration.placeholder || input.declaration.default}
 										onChange={event => {
-											updateRow(name, {
+											updateRow(input.name, {
 												value: event.currentTarget.value,
 											});
 										}}
@@ -277,24 +267,26 @@ function WorkspaceMCPSetupForm({
 								</ModalField>
 							)}
 
-							{binding?.secretConfigured || binding?.value ? (
+							{input.secretConfigured || input.boundValue ? (
 								<div className="text-base-content/60 mt-2 text-xs">
 									Configured. Leave this field blank to preserve the existing value.
 								</div>
 							) : null}
 
-							{declaration.note ? <div className="text-base-content/60 mt-2 text-xs">{declaration.note}</div> : null}
+							{input.declaration.note ? (
+								<div className="text-base-content/60 mt-2 text-xs">{input.declaration.note}</div>
+							) : null}
 						</div>
 					);
 				})}
 
-				{Object.keys(inputs).length === 0 ? (
+				{setup.inputs.length === 0 ? (
 					<div className="text-base-content/60 rounded-2xl border border-dashed p-4 text-sm">
 						This MCP server does not declare installation inputs.
 					</div>
 				) : null}
 
-				{installation.builtIn ? (
+				{setup.builtIn ? (
 					<label className="label cursor-pointer justify-start gap-3">
 						<input
 							type="checkbox"
@@ -330,23 +322,23 @@ function WorkspaceMCPSetupModalSession({
 }: Omit<WorkspaceMCPSetupModalProps, 'isOpen' | 'artifact'> & {
 	artifact: ArtifactRef;
 }) {
-	const loadInstallation = useCallback(
-		async (signal: AbortSignal): Promise<MCPStoreServerInstallationView> => {
-			const installation = await mcpManagementAPI.getMCPServerInstallation(artifact);
+	const loadSetup = useCallback(
+		async (signal: AbortSignal): Promise<MCPServerSetupView> => {
+			const setup = await mcpManagementAPI.getMCPServerSetup(artifact);
 			throwIfAborted(signal);
-			return installation;
+			return setup;
 		},
 		[artifact]
 	);
 
 	const {
-		data: installation,
+		data: setup,
 		error,
 		isLoading,
 		isRefreshing,
 		reloadOrThrow,
-	} = useAsyncResource(loadInstallation, {
-		initialData: null as MCPStoreServerInstallationView | null,
+	} = useAsyncResource(loadSetup, {
+		initialData: null as MCPServerSetupView | null,
 	});
 
 	return (
@@ -363,16 +355,15 @@ function WorkspaceMCPSetupModalSession({
 						/>
 					</div>
 				</div>
-			) : isLoading || !installation ? (
+			) : isLoading || !setup ? (
 				<div className="modal-box bg-base-200 w-[calc(100%-1rem)] max-w-2xl rounded-2xl p-6">
 					<Loader text="Loading MCP setup requirements..." />
 				</div>
 			) : (
 				<WorkspaceMCPSetupForm
-					key={`${artifact.rootID}:${artifact.artifactID}:${installation.installationRevision}`}
-					artifact={artifact}
+					key={`${artifact.rootID}:${artifact.artifactID}:${setup.settingsRevision}`}
+					setup={setup}
 					displayName={displayName}
-					installation={installation}
 					onClose={onClose}
 					onSaved={onSaved}
 				/>

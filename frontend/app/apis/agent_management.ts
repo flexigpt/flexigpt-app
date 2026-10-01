@@ -28,7 +28,9 @@ type AgentStarterIssueSeverity = 'error' | 'warning';
 type AgentCollection = CollectionListItem | CollectionView;
 
 interface AgentMCPRuntimeResolver {
-	runtimeServerIDForArtifact(artifact: ArtifactRef): Promise<MCPRuntimeServerID>;
+	getMCPRuntimeServerView(artifact: ArtifactRef): Promise<{
+		runtimeServerID: MCPRuntimeServerID;
+	}>;
 }
 
 interface AgentSkillResolver {
@@ -663,7 +665,8 @@ export class AgentManagementAPI {
 					}
 
 					try {
-						mcpServerIDs.add(await this.mcp.runtimeServerIDForArtifact(occurrence.artifact));
+						const server = await this.mcp.getMCPRuntimeServerView(occurrence.artifact);
+						mcpServerIDs.add(server.runtimeServerID);
 					} catch (error) {
 						issue(
 							issues,
