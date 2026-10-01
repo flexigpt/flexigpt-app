@@ -7,6 +7,8 @@ import { useTitleBarSlots } from '@/hooks/use_title_bar';
 
 import { backendAPI } from '@/apis/baseapi';
 
+import { SettingsMenu } from '@/components/settings/settings_menu';
+
 interface TitleBarProps {
 	onToggleDrawer?: () => void;
 }
@@ -127,7 +129,9 @@ export function TitleBar({ onToggleDrawer }: TitleBarProps) {
 			<div className="app-drag flex items-center gap-2">
 				{slots.right ? <div className="">{slots.right}</div> : null}
 
-				<div className="app-no-drag flex items-center gap-1">
+				<div className="app-no-drag flex shrink-0 items-center gap-1">
+					<SettingsMenu />
+
 					<button
 						type="button"
 						className="btn btn-ghost btn-xs btn-circle shrink-0 p-0 opacity-80 hover:opacity-100"

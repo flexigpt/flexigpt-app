@@ -211,6 +211,12 @@ tasks:
     cmds:
       - task: go:fmt
 
+  fmt:
+    desc: Fix formatting errors.
+    cmds:
+      - pnpm -F frontend run fmt:fix
+      - task: go:fmt
+
   test-go:
     desc: Run Go tests and generate coverage output.
     cmds:

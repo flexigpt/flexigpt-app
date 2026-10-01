@@ -212,7 +212,9 @@ func (a *API) ListModels(
 					err,
 				)
 			}
-			provider := document.Provider.Clone()
+			provider := modelDomain.ArtifactNameReferenceFromDeclaration(
+				document.Provider,
+			)
 			item.Provider = &provider
 			item.ProviderModelID = document.ProviderModelID
 		}
@@ -249,7 +251,7 @@ func (a *API) ListModelsByProvider(
 	for _, value := range values {
 		if value.Provider == nil ||
 			value.Provider.Name != request.Provider.Name ||
-			value.Provider.Scope != request.Provider.Scope {
+			string(value.Provider.Scope) != string(request.Provider.Scope) {
 			continue
 		}
 		output = append(output, value)
@@ -410,7 +412,9 @@ func (a *API) providerView(
 	ctx context.Context,
 	value modelDomain.Provider,
 ) (ProviderView, error) {
-	document, err := value.Document.Clone()
+	document, err := modelDomain.ProviderDocumentFromDeclaration(
+		value.Document,
+	)
 	if err != nil {
 		return ProviderView{}, err
 	}
@@ -419,9 +423,9 @@ func (a *API) providerView(
 		return ProviderView{}, err
 	}
 
-	defaultModel := cloneOptionalReference(document.DefaultModel)
+	defaultModel := cloneOptionalModelReference(document.DefaultModel)
 	if settings.DefaultModel != nil {
-		defaultModel = cloneOptionalReference(settings.DefaultModel)
+		defaultModel = cloneOptionalModelReference(settings.DefaultModel)
 	}
 
 	return ProviderView{
@@ -440,7 +444,9 @@ func (a *API) modelView(
 	ctx context.Context,
 	value modelDomain.Model,
 ) (ModelView, error) {
-	document, err := value.Document.Clone()
+	document, err := modelDomain.ModelDocumentFromDeclaration(
+		value.Document,
+	)
 	if err != nil {
 		return ModelView{}, err
 	}

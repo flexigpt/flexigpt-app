@@ -11,6 +11,7 @@ import (
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 )
 
@@ -184,14 +185,17 @@ func (s *Service) InvokeSkillTool(
 		return nil, fmt.Errorf("%w: toolName required", ErrInvalidRequest)
 	}
 
-	arguments := strings.TrimSpace(req.Body.Args)
-	if arguments == "" {
-		arguments = "{}"
+	inArguments := strings.TrimSpace(req.Body.Args)
+	if inArguments == "" {
+		inArguments = "{}"
 	}
-	if len(arguments) > maxSkillToolArgsBytes {
+
+	if len(inArguments) > maxSkillToolArgsBytes {
 		return nil, fmt.Errorf("%w: args too large", ErrInvalidRequest)
 	}
-	if !json.Valid([]byte(arguments)) || arguments[0] != '{' {
+
+	rArgs, err := jsonutil.DecodeJSONStringRawInto[json.RawMessage](jsonutil.JSONRawString(inArguments))
+	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: args must be a JSON object",
 			ErrInvalidRequest,
@@ -234,7 +238,7 @@ func (s *Service) InvokeSkillTool(
 		ctx,
 		registry,
 		functionID,
-		json.RawMessage(arguments),
+		rArgs,
 	)
 	response := &InvokeSkillToolResponse{
 		Body: &InvokeSkillToolResponseBody{

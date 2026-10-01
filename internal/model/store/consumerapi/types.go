@@ -2,12 +2,9 @@ package consumerapi
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
@@ -118,7 +115,7 @@ type ModelListItem struct {
 	Name            basespec.LogicalName               `json:"name"`
 	DisplayName     string                             `json:"displayName"`
 	Description     string                             `json:"description,omitempty"`
-	Provider        *declaration.ArtifactNameReference `json:"provider,omitempty"`
+	Provider        *modelDomain.ArtifactNameReference `json:"provider,omitempty"`
 	ProviderModelID string                             `json:"providerModelID,omitempty"`
 
 	State    artifact.State `json:"state"`
@@ -127,42 +124,28 @@ type ModelListItem struct {
 	BuiltIn  bool           `json:"builtIn"`
 }
 
+// These aliases preserve the consumer API names while making the public
+// values Model-domain projections rather than persistence payloads.
+type (
+	ProviderSettings = modelDomain.ProviderSettings
+	ModelSettings    = modelDomain.ModelSettings
+)
+
 type ProviderView struct {
 	Artifact         artifact.Artifact                  `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest                  `json:"definitionDigest"`
-	Document         modelproviderv1.ProviderDocument   `json:"document"`
+	Document         modelDomain.ProviderDocument       `json:"document"`
 	Settings         ProviderSettings                   `json:"settings"`
-	DefaultModel     *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
+	DefaultModel     *modelDomain.ArtifactNameReference `json:"defaultModel,omitempty"`
 	BuiltIn          bool                               `json:"builtIn"`
 }
 
 type ModelView struct {
-	Artifact         artifact.Artifact     `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest     `json:"definitionDigest"`
-	Document         modelv1.ModelDocument `json:"document"`
-	Settings         ModelSettings         `json:"settings"`
-	BuiltIn          bool                  `json:"builtIn"`
-}
-
-// ProviderSettings is the non-secret local Provider customization returned as
-// part of GetProvider. Revision is zero when the Provider has no saved local
-// settings.
-type ProviderSettings struct {
-	Revision          uint64                             `json:"revision"`
-	Connection        json.RawMessage                    `json:"connection,omitempty"`
-	Defaults          json.RawMessage                    `json:"defaults,omitempty"`
-	Capabilities      json.RawMessage                    `json:"capabilities,omitempty"`
-	DefaultModel      *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
-	AdapterParameters json.RawMessage                    `json:"adapterParameters,omitempty"`
-}
-
-// ModelSettings is the non-secret local Model customization returned as part
-// of GetModel. Revision is zero when the Model has no saved local settings.
-type ModelSettings struct {
-	Revision          uint64          `json:"revision"`
-	Defaults          json.RawMessage `json:"defaults,omitempty"`
-	Capabilities      json.RawMessage `json:"capabilities,omitempty"`
-	AdapterParameters json.RawMessage `json:"adapterParameters,omitempty"`
+	Artifact         artifact.Artifact         `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	Document         modelDomain.ModelDocument `json:"document"`
+	Settings         ModelSettings             `json:"settings"`
+	BuiltIn          bool                      `json:"builtIn"`
 }
 
 // SaveProviderSettingsRequest is complete replacement state for local
@@ -171,22 +154,22 @@ type SaveProviderSettingsRequest struct {
 	Provider                 artifact.ArtifactRef               `json:"provider"`
 	ExpectedProviderRevision uint64                             `json:"expectedProviderRevision"`
 	ExpectedSettingsRevision uint64                             `json:"expectedSettingsRevision"`
-	Connection               json.RawMessage                    `json:"connection,omitempty"`
-	Defaults                 json.RawMessage                    `json:"defaults,omitempty"`
-	Capabilities             json.RawMessage                    `json:"capabilities,omitempty"`
-	DefaultModel             *declaration.ArtifactNameReference `json:"defaultModel,omitempty"`
-	AdapterParameters        json.RawMessage                    `json:"adapterParameters,omitempty"`
+	Connection               *modelDomain.ConnectionPatch       `json:"connection,omitempty"`
+	Defaults                 *modelDomain.DefaultsPatch         `json:"defaults,omitempty"`
+	Capabilities             *modelDomain.CapabilitiesPatch     `json:"capabilities,omitempty"`
+	DefaultModel             *modelDomain.ArtifactNameReference `json:"defaultModel,omitempty"`
+	AdapterParameters        *modelDomain.AdapterParameters     `json:"adapterParameters,omitempty"`
 }
 
 // SaveModelSettingsRequest is complete replacement state for local Model
 // settings. Omitted fields inherit from the Model declaration.
 type SaveModelSettingsRequest struct {
-	Model                    artifact.ArtifactRef `json:"model"`
-	ExpectedModelRevision    uint64               `json:"expectedModelRevision"`
-	ExpectedSettingsRevision uint64               `json:"expectedSettingsRevision"`
-	Defaults                 json.RawMessage      `json:"defaults,omitempty"`
-	Capabilities             json.RawMessage      `json:"capabilities,omitempty"`
-	AdapterParameters        json.RawMessage      `json:"adapterParameters,omitempty"`
+	Model                    artifact.ArtifactRef           `json:"model"`
+	ExpectedModelRevision    uint64                         `json:"expectedModelRevision"`
+	ExpectedSettingsRevision uint64                         `json:"expectedSettingsRevision"`
+	Defaults                 *modelDomain.DefaultsPatch     `json:"defaults,omitempty"`
+	Capabilities             *modelDomain.CapabilitiesPatch `json:"capabilities,omitempty"`
+	AdapterParameters        *modelDomain.AdapterParameters `json:"adapterParameters,omitempty"`
 }
 
 // ProviderAPIKeyStatus is the only readable API-key information. API key
@@ -248,9 +231,9 @@ type DefaultModelResolution struct {
 }
 
 type ManagedProviderCreateRequest struct {
-	RootID   root.RootID                      `json:"rootID"`
-	Document modelproviderv1.ProviderDocument `json:"document"`
-	Enabled  bool                             `json:"enabled"`
+	RootID   root.RootID                  `json:"rootID"`
+	Document modelDomain.ProviderDocument `json:"document"`
+	Enabled  bool                         `json:"enabled"`
 }
 
 type ManagedProviderCreateResult struct {
@@ -259,10 +242,10 @@ type ManagedProviderCreateResult struct {
 }
 
 type ManagedProviderReplaceRequest struct {
-	Provider                 artifact.ArtifactRef             `json:"provider"`
-	ExpectedArtifactRevision uint64                           `json:"expectedArtifactRevision"`
-	Document                 modelproviderv1.ProviderDocument `json:"document"`
-	Enabled                  bool                             `json:"enabled"`
+	Provider                 artifact.ArtifactRef         `json:"provider"`
+	ExpectedArtifactRevision uint64                       `json:"expectedArtifactRevision"`
+	Document                 modelDomain.ProviderDocument `json:"document"`
+	Enabled                  bool                         `json:"enabled"`
 }
 
 type ManagedProviderReplaceResult struct {
@@ -271,9 +254,9 @@ type ManagedProviderReplaceResult struct {
 }
 
 type ManagedModelCreateRequest struct {
-	RootID   root.RootID           `json:"rootID"`
-	Document modelv1.ModelDocument `json:"document"`
-	Enabled  bool                  `json:"enabled"`
+	RootID   root.RootID               `json:"rootID"`
+	Document modelDomain.ModelDocument `json:"document"`
+	Enabled  bool                      `json:"enabled"`
 }
 
 type ManagedModelCreateResult struct {
@@ -282,10 +265,10 @@ type ManagedModelCreateResult struct {
 }
 
 type ManagedModelReplaceRequest struct {
-	Model                    artifact.ArtifactRef  `json:"model"`
-	ExpectedArtifactRevision uint64                `json:"expectedArtifactRevision"`
-	Document                 modelv1.ModelDocument `json:"document"`
-	Enabled                  bool                  `json:"enabled"`
+	Model                    artifact.ArtifactRef      `json:"model"`
+	ExpectedArtifactRevision uint64                    `json:"expectedArtifactRevision"`
+	Document                 modelDomain.ModelDocument `json:"document"`
+	Enabled                  bool                      `json:"enabled"`
 }
 
 type ManagedModelReplaceResult struct {
@@ -293,18 +276,14 @@ type ManagedModelReplaceResult struct {
 	Address  artifact.ArtifactAddress `json:"address"`
 }
 
-func cloneOptionalReference(
-	value *declaration.ArtifactNameReference,
-) *declaration.ArtifactNameReference {
+func cloneOptionalModelReference(
+	value *modelDomain.ArtifactNameReference,
+) *modelDomain.ArtifactNameReference {
 	if value == nil {
 		return nil
 	}
 	output := value.Clone()
 	return &output
-}
-
-func cloneRaw(value json.RawMessage) json.RawMessage {
-	return append(json.RawMessage(nil), value...)
 }
 
 func validateExpectedArtifactRevision(value uint64) error {

@@ -2,11 +2,13 @@ package consumerapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
@@ -68,14 +70,47 @@ func (a *API) SaveProviderSettings(
 		)
 	}
 
+	connection, err := encodeOptionalObject(request.Connection)
+	if err != nil {
+		return ProviderView{}, fmt.Errorf(
+			"encode Model Provider settings connection: %w",
+			err,
+		)
+	}
+	defaults, err := encodeOptionalObject(request.Defaults)
+	if err != nil {
+		return ProviderView{}, fmt.Errorf(
+			"encode Model Provider settings defaults: %w",
+			err,
+		)
+	}
+	capabilities, err := encodeOptionalObject(request.Capabilities)
+	if err != nil {
+		return ProviderView{}, fmt.Errorf(
+			"encode Model Provider settings capabilities: %w",
+			err,
+		)
+	}
+	adapterParameters, err := encodeOptionalObject(
+		request.AdapterParameters,
+	)
+	if err != nil {
+		return ProviderView{}, fmt.Errorf(
+			"encode Model Provider settings adapter parameters: %w",
+			err,
+		)
+	}
+
 	value := modelOverlay.ProviderOverlay{
-		SchemaVersion:     modelOverlay.OverlaySchemaVersion,
-		Revision:          request.ExpectedSettingsRevision + 1,
-		Connection:        cloneRaw(request.Connection),
-		Defaults:          cloneRaw(request.Defaults),
-		Capabilities:      cloneRaw(request.Capabilities),
-		DefaultModel:      cloneOptionalReference(request.DefaultModel),
-		AdapterParameters: cloneRaw(request.AdapterParameters),
+		SchemaVersion: modelOverlay.OverlaySchemaVersion,
+		Revision:      request.ExpectedSettingsRevision + 1,
+		Connection:    connection,
+		Defaults:      defaults,
+		Capabilities:  capabilities,
+		DefaultModel: modelDomain.ArtifactNameReferenceToDeclaration(
+			request.DefaultModel,
+		),
+		AdapterParameters: adapterParameters,
 	}
 	if err := a.overlays.PutProviderOverlay(
 		ctx,
@@ -351,12 +386,36 @@ func (a *API) SaveModelSettings(
 		)
 	}
 
+	defaults, err := encodeOptionalObject(request.Defaults)
+	if err != nil {
+		return ModelView{}, fmt.Errorf(
+			"encode Model settings defaults: %w",
+			err,
+		)
+	}
+	capabilities, err := encodeOptionalObject(request.Capabilities)
+	if err != nil {
+		return ModelView{}, fmt.Errorf(
+			"encode Model settings capabilities: %w",
+			err,
+		)
+	}
+	adapterParameters, err := encodeOptionalObject(
+		request.AdapterParameters,
+	)
+	if err != nil {
+		return ModelView{}, fmt.Errorf(
+			"encode Model settings adapter parameters: %w",
+			err,
+		)
+	}
+
 	value := modelOverlay.ModelOverlay{
 		SchemaVersion:     modelOverlay.OverlaySchemaVersion,
 		Revision:          request.ExpectedSettingsRevision + 1,
-		Defaults:          cloneRaw(request.Defaults),
-		Capabilities:      cloneRaw(request.Capabilities),
-		AdapterParameters: cloneRaw(request.AdapterParameters),
+		Defaults:          defaults,
+		Capabilities:      capabilities,
+		AdapterParameters: adapterParameters,
 	}
 	if err := a.overlays.PutModelOverlay(
 		ctx,
@@ -422,13 +481,36 @@ func (a *API) providerSettings(
 		return ProviderSettings{}, nil
 	}
 
+	connection, err := decodeOptionalObject[modelDomain.ConnectionPatch](
+		value.Connection,
+	)
+	if err != nil {
+		return ProviderSettings{}, err
+	}
+	defaults, err := decodeOptionalObject[modelDomain.DefaultsPatch](
+		value.Defaults,
+	)
+	if err != nil {
+		return ProviderSettings{}, err
+	}
+	capabilities, err := decodeOptionalObject[modelDomain.CapabilitiesPatch](value.Capabilities)
+	if err != nil {
+		return ProviderSettings{}, err
+	}
+	adapterParameters, err := decodeOptionalObject[modelDomain.AdapterParameters](value.AdapterParameters)
+	if err != nil {
+		return ProviderSettings{}, err
+	}
+
 	return ProviderSettings{
-		Revision:          value.Revision,
-		Connection:        cloneRaw(value.Connection),
-		Defaults:          cloneRaw(value.Defaults),
-		Capabilities:      cloneRaw(value.Capabilities),
-		DefaultModel:      cloneOptionalReference(value.DefaultModel),
-		AdapterParameters: cloneRaw(value.AdapterParameters),
+		Revision:     value.Revision,
+		Connection:   connection,
+		Defaults:     defaults,
+		Capabilities: capabilities,
+		DefaultModel: modelDomain.ArtifactNameReferenceFromOptionalDeclaration(
+			value.DefaultModel,
+		),
+		AdapterParameters: adapterParameters,
 	}, nil
 }
 
@@ -444,12 +526,66 @@ func (a *API) modelSettings(
 		return ModelSettings{}, nil
 	}
 
+	defaults, err := decodeOptionalObject[modelDomain.DefaultsPatch](
+		value.Defaults,
+	)
+	if err != nil {
+		return ModelSettings{}, err
+	}
+	capabilities, err := decodeOptionalObject[modelDomain.CapabilitiesPatch](value.Capabilities)
+	if err != nil {
+		return ModelSettings{}, err
+	}
+	adapterParameters, err := decodeOptionalObject[modelDomain.AdapterParameters](value.AdapterParameters)
+	if err != nil {
+		return ModelSettings{}, err
+	}
+
 	return ModelSettings{
 		Revision:          value.Revision,
-		Defaults:          cloneRaw(value.Defaults),
-		Capabilities:      cloneRaw(value.Capabilities),
-		AdapterParameters: cloneRaw(value.AdapterParameters),
+		Defaults:          defaults,
+		Capabilities:      capabilities,
+		AdapterParameters: adapterParameters,
 	}, nil
+}
+
+func encodeOptionalObject[T any](
+	value *T,
+) (json.RawMessage, error) {
+	if value == nil {
+		return nil, nil
+	}
+
+	raw, err := jsonutil.MarshalCanonicalObject(
+		value,
+		basespec.MaxLocalDataBytes,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return raw, nil
+}
+
+func decodeOptionalObject[T any](
+	raw json.RawMessage,
+) (*T, error) {
+	if len(raw) == 0 {
+		//nolint:nilnil // Ok.
+		return nil, nil
+	}
+
+	var output T
+	if err := jsonutil.DecodeCanonicalObjectExactInto(
+		raw,
+		&output,
+		basespec.MaxLocalDataBytes,
+	); err != nil {
+		return nil, fmt.Errorf(
+			"decode typed Model local settings: %w",
+			err,
+		)
+	}
+	return &output, nil
 }
 
 func (a *API) purgeProviderLocalState(

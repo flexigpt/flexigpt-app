@@ -5,8 +5,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
@@ -40,7 +38,7 @@ func (a *API) CreateProvider(
 	if err != nil {
 		return ManagedProviderCreateResult{}, err
 	}
-	name := basespec.LogicalName(request.Document.Name)
+	name := request.Document.Name
 	address, err := modelDomain.ModelProviderPackageAddress(name)
 	if err != nil {
 		return ManagedProviderCreateResult{}, err
@@ -142,7 +140,7 @@ func (a *API) ReplaceProvider(
 			basespec.ErrUnsupported,
 		)
 	}
-	if request.Document.Name != string(current.LogicalName) {
+	if request.Document.Name != current.LogicalName {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model Provider logical name must remain %q",
 			basespec.ErrInvalid,
@@ -160,9 +158,7 @@ func (a *API) ReplaceProvider(
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
-	requestedAddress, err := modelDomain.ModelProviderPackageAddress(
-		basespec.LogicalName(request.Document.Name),
-	)
+	requestedAddress, err := modelDomain.ModelProviderPackageAddress(request.Document.Name)
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
@@ -357,7 +353,7 @@ func (a *API) CreateModel(
 	if err != nil {
 		return ManagedModelCreateResult{}, err
 	}
-	name := basespec.LogicalName(request.Document.Name)
+	name := request.Document.Name
 	address, err := modelDomain.ModelPackageAddress(name)
 	if err != nil {
 		return ManagedModelCreateResult{}, err
@@ -459,7 +455,7 @@ func (a *API) ReplaceModel(
 			basespec.ErrUnsupported,
 		)
 	}
-	if request.Document.Name != string(current.LogicalName) {
+	if request.Document.Name != current.LogicalName {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model logical name must remain %q",
 			basespec.ErrInvalid,
@@ -477,9 +473,7 @@ func (a *API) ReplaceModel(
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
-	requestedAddress, err := modelDomain.ModelPackageAddress(
-		basespec.LogicalName(request.Document.Name),
-	)
+	requestedAddress, err := modelDomain.ModelPackageAddress(request.Document.Name)
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
@@ -800,16 +794,17 @@ func (a *API) managedRecord(
 }
 
 func providerDefinition(
-	document modelproviderv1.ProviderDocument,
+	document modelDomain.ProviderDocument,
 ) (definition.Definition, []byte, error) {
-	if err := document.Validate(); err != nil {
-		return definition.Definition{}, nil, err
-	}
-	raw, err := document.CanonicalJSON()
+	declarationDocument, err := document.ToDeclaration()
 	if err != nil {
 		return definition.Definition{}, nil, err
 	}
-	entry, err := declaration.NewEntry(document)
+	raw, err := declarationDocument.CanonicalJSON()
+	if err != nil {
+		return definition.Definition{}, nil, err
+	}
+	entry, err := declaration.NewEntry(declarationDocument)
 	if err != nil {
 		return definition.Definition{}, nil, err
 	}
@@ -821,16 +816,17 @@ func providerDefinition(
 }
 
 func modelDefinition(
-	document modelv1.ModelDocument,
+	document modelDomain.ModelDocument,
 ) (definition.Definition, []byte, error) {
-	if err := document.Validate(); err != nil {
-		return definition.Definition{}, nil, err
-	}
-	raw, err := document.CanonicalJSON()
+	declarationDocument, err := document.ToDeclaration()
 	if err != nil {
 		return definition.Definition{}, nil, err
 	}
-	entry, err := declaration.NewEntry(document)
+	raw, err := declarationDocument.CanonicalJSON()
+	if err != nil {
+		return definition.Definition{}, nil, err
+	}
+	entry, err := declaration.NewEntry(declarationDocument)
 	if err != nil {
 		return definition.Definition{}, nil, err
 	}

@@ -152,143 +152,8 @@ export namespace aggregate {
 		    return a;
 		}
 	}
-	export class RuntimeJSONSchemaPatch {
-	    name?: string;
-	    description?: string;
-	    schema?: Record<string, any>;
-	    strict?: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new RuntimeJSONSchemaPatch(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.description = source["description"];
-	        this.schema = source["schema"];
-	        this.strict = source["strict"];
-	    }
-	}
-	export class RuntimeOutputFormatPatch {
-	    kind?: string;
-	    jsonSchema?: RuntimeJSONSchemaPatch;
-	
-	    static createFrom(source: any = {}) {
-	        return new RuntimeOutputFormatPatch(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.kind = source["kind"];
-	        this.jsonSchema = this.convertValues(source["jsonSchema"], RuntimeJSONSchemaPatch);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class RuntimeOutputPatch {
-	    verbosity?: string;
-	    format?: RuntimeOutputFormatPatch;
-	
-	    static createFrom(source: any = {}) {
-	        return new RuntimeOutputPatch(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.verbosity = source["verbosity"];
-	        this.format = this.convertValues(source["format"], RuntimeOutputFormatPatch);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class RuntimeDefaultsPatch {
-	    stream?: boolean;
-	    maxPromptTokens?: number;
-	    maxOutputTokens?: number;
-	    temperature?: number;
-	    systemPrompt?: string;
-	    timeoutMS?: number;
-	    reasoning?: spec.ReasoningParam;
-	    cacheControl?: spec.CacheControl;
-	    output?: RuntimeOutputPatch;
-	    stopSequences?: string[];
-	    adapterParameters?: Record<string, any>;
-	
-	    static createFrom(source: any = {}) {
-	        return new RuntimeDefaultsPatch(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.stream = source["stream"];
-	        this.maxPromptTokens = source["maxPromptTokens"];
-	        this.maxOutputTokens = source["maxOutputTokens"];
-	        this.temperature = source["temperature"];
-	        this.systemPrompt = source["systemPrompt"];
-	        this.timeoutMS = source["timeoutMS"];
-	        this.reasoning = this.convertValues(source["reasoning"], spec.ReasoningParam);
-	        this.cacheControl = this.convertValues(source["cacheControl"], spec.CacheControl);
-	        this.output = this.convertValues(source["output"], RuntimeOutputPatch);
-	        this.stopSequences = source["stopSequences"];
-	        this.adapterParameters = source["adapterParameters"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	
-	
-	
 	export class RuntimeRequestPatch {
-	    defaults?: RuntimeDefaultsPatch;
+	    defaults?: domain.DefaultsPatch;
 	    clear?: string[];
 	
 	    static createFrom(source: any = {}) {
@@ -297,7 +162,7 @@ export namespace aggregate {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.defaults = this.convertValues(source["defaults"], RuntimeDefaultsPatch);
+	        this.defaults = this.convertValues(source["defaults"], domain.DefaultsPatch);
 	        this.clear = source["clear"];
 	    }
 	
@@ -2497,7 +2362,7 @@ export namespace consumerapi {
 	}
 	export class ManagedModelCreateRequest {
 	    rootID: string;
-	    document: modelv1.ModelDocument;
+	    document: domain.ModelDocument;
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2507,7 +2372,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rootID = source["rootID"];
-	        this.document = this.convertValues(source["document"], modelv1.ModelDocument);
+	        this.document = this.convertValues(source["document"], domain.ModelDocument);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2564,7 +2429,7 @@ export namespace consumerapi {
 	export class ManagedModelReplaceRequest {
 	    model: artifact.ArtifactRef;
 	    expectedArtifactRevision: number;
-	    document: modelv1.ModelDocument;
+	    document: domain.ModelDocument;
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2575,7 +2440,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.model = this.convertValues(source["model"], artifact.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
-	        this.document = this.convertValues(source["document"], modelv1.ModelDocument);
+	        this.document = this.convertValues(source["document"], domain.ModelDocument);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2631,7 +2496,7 @@ export namespace consumerapi {
 	}
 	export class ManagedProviderCreateRequest {
 	    rootID: string;
-	    document: modelproviderv1.ProviderDocument;
+	    document: domain.ProviderDocument;
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2641,7 +2506,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rootID = source["rootID"];
-	        this.document = this.convertValues(source["document"], modelproviderv1.ProviderDocument);
+	        this.document = this.convertValues(source["document"], domain.ProviderDocument);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2698,7 +2563,7 @@ export namespace consumerapi {
 	export class ManagedProviderReplaceRequest {
 	    provider: artifact.ArtifactRef;
 	    expectedArtifactRevision: number;
-	    document: modelproviderv1.ProviderDocument;
+	    document: domain.ProviderDocument;
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2709,7 +2574,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.provider = this.convertValues(source["provider"], artifact.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
-	        this.document = this.convertValues(source["document"], modelproviderv1.ProviderDocument);
+	        this.document = this.convertValues(source["document"], domain.ProviderDocument);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2922,7 +2787,7 @@ export namespace consumerapi {
 	    name: string;
 	    displayName: string;
 	    description?: string;
-	    provider?: declaration.ArtifactNameReference;
+	    provider?: domain.ArtifactNameReference;
 	    providerModelID?: string;
 	    state: string;
 	    enabled: boolean;
@@ -2939,7 +2804,7 @@ export namespace consumerapi {
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
-	        this.provider = this.convertValues(source["provider"], declaration.ArtifactNameReference);
+	        this.provider = this.convertValues(source["provider"], domain.ArtifactNameReference);
 	        this.providerModelID = source["providerModelID"];
 	        this.state = source["state"];
 	        this.enabled = source["enabled"];
@@ -2965,29 +2830,11 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class ModelSettings {
-	    revision: number;
-	    defaults?: number[];
-	    capabilities?: number[];
-	    adapterParameters?: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelSettings(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.revision = source["revision"];
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
-	        this.adapterParameters = source["adapterParameters"];
-	    }
-	}
 	export class ModelView {
 	    artifact: artifact.Artifact;
 	    definitionDigest: string;
-	    document: modelv1.ModelDocument;
-	    settings: ModelSettings;
+	    document: domain.ModelDocument;
+	    settings: domain.ModelSettings;
 	    builtIn: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2998,8 +2845,8 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
 	        this.definitionDigest = source["definitionDigest"];
-	        this.document = this.convertValues(source["document"], modelv1.ModelDocument);
-	        this.settings = this.convertValues(source["settings"], ModelSettings);
+	        this.document = this.convertValues(source["document"], domain.ModelDocument);
+	        this.settings = this.convertValues(source["settings"], domain.ModelSettings);
 	        this.builtIn = source["builtIn"];
 	    }
 	
@@ -3163,52 +3010,12 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class ProviderSettings {
-	    revision: number;
-	    connection?: number[];
-	    defaults?: number[];
-	    capabilities?: number[];
-	    defaultModel?: declaration.ArtifactNameReference;
-	    adapterParameters?: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ProviderSettings(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.revision = source["revision"];
-	        this.connection = source["connection"];
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
-	        this.defaultModel = this.convertValues(source["defaultModel"], declaration.ArtifactNameReference);
-	        this.adapterParameters = source["adapterParameters"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ProviderView {
 	    artifact: artifact.Artifact;
 	    definitionDigest: string;
-	    document: modelproviderv1.ProviderDocument;
-	    settings: ProviderSettings;
-	    defaultModel?: declaration.ArtifactNameReference;
+	    document: domain.ProviderDocument;
+	    settings: domain.ProviderSettings;
+	    defaultModel?: domain.ArtifactNameReference;
 	    builtIn: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -3219,9 +3026,9 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
 	        this.definitionDigest = source["definitionDigest"];
-	        this.document = this.convertValues(source["document"], modelproviderv1.ProviderDocument);
-	        this.settings = this.convertValues(source["settings"], ProviderSettings);
-	        this.defaultModel = this.convertValues(source["defaultModel"], declaration.ArtifactNameReference);
+	        this.document = this.convertValues(source["document"], domain.ProviderDocument);
+	        this.settings = this.convertValues(source["settings"], domain.ProviderSettings);
+	        this.defaultModel = this.convertValues(source["defaultModel"], domain.ArtifactNameReference);
 	        this.builtIn = source["builtIn"];
 	    }
 	
@@ -3351,9 +3158,9 @@ export namespace consumerapi {
 	    model: artifact.ArtifactRef;
 	    expectedModelRevision: number;
 	    expectedSettingsRevision: number;
-	    defaults?: number[];
-	    capabilities?: number[];
-	    adapterParameters?: number[];
+	    defaults?: domain.DefaultsPatch;
+	    capabilities?: domain.CapabilitiesPatch;
+	    adapterParameters?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveModelSettingsRequest(source);
@@ -3364,8 +3171,8 @@ export namespace consumerapi {
 	        this.model = this.convertValues(source["model"], artifact.ArtifactRef);
 	        this.expectedModelRevision = source["expectedModelRevision"];
 	        this.expectedSettingsRevision = source["expectedSettingsRevision"];
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
+	        this.defaults = this.convertValues(source["defaults"], domain.DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], domain.CapabilitiesPatch);
 	        this.adapterParameters = source["adapterParameters"];
 	    }
 	
@@ -3391,11 +3198,11 @@ export namespace consumerapi {
 	    provider: artifact.ArtifactRef;
 	    expectedProviderRevision: number;
 	    expectedSettingsRevision: number;
-	    connection?: number[];
-	    defaults?: number[];
-	    capabilities?: number[];
-	    defaultModel?: declaration.ArtifactNameReference;
-	    adapterParameters?: number[];
+	    connection?: domain.ConnectionPatch;
+	    defaults?: domain.DefaultsPatch;
+	    capabilities?: domain.CapabilitiesPatch;
+	    defaultModel?: domain.ArtifactNameReference;
+	    adapterParameters?: Record<string, any>;
 	
 	    static createFrom(source: any = {}) {
 	        return new SaveProviderSettingsRequest(source);
@@ -3406,10 +3213,10 @@ export namespace consumerapi {
 	        this.provider = this.convertValues(source["provider"], artifact.ArtifactRef);
 	        this.expectedProviderRevision = source["expectedProviderRevision"];
 	        this.expectedSettingsRevision = source["expectedSettingsRevision"];
-	        this.connection = source["connection"];
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
-	        this.defaultModel = this.convertValues(source["defaultModel"], declaration.ArtifactNameReference);
+	        this.connection = this.convertValues(source["connection"], domain.ConnectionPatch);
+	        this.defaults = this.convertValues(source["defaults"], domain.DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], domain.CapabilitiesPatch);
+	        this.defaultModel = this.convertValues(source["defaultModel"], domain.ArtifactNameReference);
 	        this.adapterParameters = source["adapterParameters"];
 	    }
 	
@@ -4871,20 +4678,6 @@ export namespace conversation {
 
 export namespace declaration {
 	
-	export class ArtifactNameReference {
-	    name: string;
-	    scope?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ArtifactNameReference(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.name = source["name"];
-	        this.scope = source["scope"];
-	    }
-	}
 	export class Locator {
 	    kind?: string;
 	    path?: string;
@@ -5046,6 +4839,488 @@ export namespace document {
 
 export namespace domain {
 	
+	export class ArtifactNameReference {
+	    name: string;
+	    scope?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArtifactNameReference(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.scope = source["scope"];
+	    }
+	}
+	export class Authentication {
+	    mode: string;
+	    headerName?: string;
+	    prefix?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Authentication(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.headerName = source["headerName"];
+	        this.prefix = source["prefix"];
+	    }
+	}
+	export class CacheControlCapabilities {
+	    supportsTTL?: boolean;
+	    supportedKinds?: string[];
+	    supportedTTLs?: string[];
+	    supportsKey?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new CacheControlCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsTTL = source["supportsTTL"];
+	        this.supportedKinds = source["supportedKinds"];
+	        this.supportedTTLs = source["supportedTTLs"];
+	        this.supportsKey = source["supportsKey"];
+	    }
+	}
+	export class CacheCapabilities {
+	    supportsAutomaticCaching?: boolean;
+	    topLevel?: CacheControlCapabilities;
+	    inputOutputContent?: CacheControlCapabilities;
+	    reasoningContent?: CacheControlCapabilities;
+	    toolChoice?: CacheControlCapabilities;
+	    toolCall?: CacheControlCapabilities;
+	    toolOutput?: CacheControlCapabilities;
+	
+	    static createFrom(source: any = {}) {
+	        return new CacheCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsAutomaticCaching = source["supportsAutomaticCaching"];
+	        this.topLevel = this.convertValues(source["topLevel"], CacheControlCapabilities);
+	        this.inputOutputContent = this.convertValues(source["inputOutputContent"], CacheControlCapabilities);
+	        this.reasoningContent = this.convertValues(source["reasoningContent"], CacheControlCapabilities);
+	        this.toolChoice = this.convertValues(source["toolChoice"], CacheControlCapabilities);
+	        this.toolCall = this.convertValues(source["toolCall"], CacheControlCapabilities);
+	        this.toolOutput = this.convertValues(source["toolOutput"], CacheControlCapabilities);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CacheControl {
+	    kind?: string;
+	    ttl?: string;
+	    key?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CacheControl(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.ttl = source["ttl"];
+	        this.key = source["key"];
+	    }
+	}
+	
+	export class ParameterDialect {
+	    maxOutputTokensParamName?: string;
+	    toolChoiceParamStyle?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ParameterDialect(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.maxOutputTokensParamName = source["maxOutputTokensParamName"];
+	        this.toolChoiceParamStyle = source["toolChoiceParamStyle"];
+	    }
+	}
+	export class ToolCapabilities {
+	    supportedToolTypes?: string[];
+	    supportedToolPolicyModes?: string[];
+	    supportsParallelToolCalls?: boolean;
+	    maxForcedTools?: number;
+	    supportedClientToolOutputFormats?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ToolCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedToolTypes = source["supportedToolTypes"];
+	        this.supportedToolPolicyModes = source["supportedToolPolicyModes"];
+	        this.supportsParallelToolCalls = source["supportsParallelToolCalls"];
+	        this.maxForcedTools = source["maxForcedTools"];
+	        this.supportedClientToolOutputFormats = source["supportedClientToolOutputFormats"];
+	    }
+	}
+	export class OutputCapabilities {
+	    supportedOutputFormats?: string[];
+	    supportsVerbosity?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportedOutputFormats = source["supportedOutputFormats"];
+	        this.supportsVerbosity = source["supportsVerbosity"];
+	    }
+	}
+	export class StopSequenceCapabilities {
+	    isSupported?: boolean;
+	    disallowedWithReasoning?: boolean;
+	    maxSequences?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new StopSequenceCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.isSupported = source["isSupported"];
+	        this.disallowedWithReasoning = source["disallowedWithReasoning"];
+	        this.maxSequences = source["maxSequences"];
+	    }
+	}
+	export class ReasoningTokenBudgetCapabilities {
+	    minAllowed?: number;
+	    maxAllowed?: number;
+	    zeroAllowed?: boolean;
+	    minusOneAllowed?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningTokenBudgetCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.minAllowed = source["minAllowed"];
+	        this.maxAllowed = source["maxAllowed"];
+	        this.zeroAllowed = source["zeroAllowed"];
+	        this.minusOneAllowed = source["minusOneAllowed"];
+	    }
+	}
+	export class ReasoningCapabilities {
+	    supportsReasoningConfig?: boolean;
+	    supportedReasoningTypes?: string[];
+	    supportedReasoningLevels?: string[];
+	    hybridTokenBudgetCapabilities?: ReasoningTokenBudgetCapabilities;
+	    supportsSummaryStyle?: boolean;
+	    supportsReasoningContext?: boolean;
+	    supportsReasoningMode?: boolean;
+	    supportsEncryptedReasoningInput?: boolean;
+	    temperatureDisallowedWhenEnabled?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningCapabilities(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.supportsReasoningConfig = source["supportsReasoningConfig"];
+	        this.supportedReasoningTypes = source["supportedReasoningTypes"];
+	        this.supportedReasoningLevels = source["supportedReasoningLevels"];
+	        this.hybridTokenBudgetCapabilities = this.convertValues(source["hybridTokenBudgetCapabilities"], ReasoningTokenBudgetCapabilities);
+	        this.supportsSummaryStyle = source["supportsSummaryStyle"];
+	        this.supportsReasoningContext = source["supportsReasoningContext"];
+	        this.supportsReasoningMode = source["supportsReasoningMode"];
+	        this.supportsEncryptedReasoningInput = source["supportsEncryptedReasoningInput"];
+	        this.temperatureDisallowedWhenEnabled = source["temperatureDisallowedWhenEnabled"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class CapabilitiesPatch {
+	    modalitiesIn?: string[];
+	    modalitiesOut?: string[];
+	    reasoningCapabilities?: ReasoningCapabilities;
+	    stopSequenceCapabilities?: StopSequenceCapabilities;
+	    outputCapabilities?: OutputCapabilities;
+	    toolCapabilities?: ToolCapabilities;
+	    cacheCapabilities?: CacheCapabilities;
+	    paramDialect?: ParameterDialect;
+	
+	    static createFrom(source: any = {}) {
+	        return new CapabilitiesPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.modalitiesIn = source["modalitiesIn"];
+	        this.modalitiesOut = source["modalitiesOut"];
+	        this.reasoningCapabilities = this.convertValues(source["reasoningCapabilities"], ReasoningCapabilities);
+	        this.stopSequenceCapabilities = this.convertValues(source["stopSequenceCapabilities"], StopSequenceCapabilities);
+	        this.outputCapabilities = this.convertValues(source["outputCapabilities"], OutputCapabilities);
+	        this.toolCapabilities = this.convertValues(source["toolCapabilities"], ToolCapabilities);
+	        this.cacheCapabilities = this.convertValues(source["cacheCapabilities"], CacheCapabilities);
+	        this.paramDialect = this.convertValues(source["paramDialect"], ParameterDialect);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class HeaderPatch {
+	    set?: Record<string, string>;
+	    remove?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new HeaderPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.set = source["set"];
+	        this.remove = source["remove"];
+	    }
+	}
+	export class ConnectionPatch {
+	    origin?: string;
+	    path?: string;
+	    headers?: HeaderPatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new ConnectionPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.origin = source["origin"];
+	        this.path = source["path"];
+	        this.headers = this.convertValues(source["headers"], HeaderPatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OutputJSONSchemaPatch {
+	    name?: string;
+	    description?: string;
+	    schema?: any;
+	    strict?: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputJSONSchemaPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.name = source["name"];
+	        this.description = source["description"];
+	        this.schema = source["schema"];
+	        this.strict = source["strict"];
+	    }
+	}
+	export class OutputFormatPatch {
+	    kind?: string;
+	    jsonSchema?: OutputJSONSchemaPatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputFormatPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.kind = source["kind"];
+	        this.jsonSchema = this.convertValues(source["jsonSchema"], OutputJSONSchemaPatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class OutputPatch {
+	    verbosity?: string;
+	    format?: OutputFormatPatch;
+	
+	    static createFrom(source: any = {}) {
+	        return new OutputPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.verbosity = source["verbosity"];
+	        this.format = this.convertValues(source["format"], OutputFormatPatch);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ReasoningDefaults {
+	    type?: string;
+	    level?: string;
+	    tokens?: number;
+	    summaryStyle?: string;
+	    context?: string;
+	    mode?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ReasoningDefaults(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.level = source["level"];
+	        this.tokens = source["tokens"];
+	        this.summaryStyle = source["summaryStyle"];
+	        this.context = source["context"];
+	        this.mode = source["mode"];
+	    }
+	}
+	export class DefaultsPatch {
+	    stream?: boolean;
+	    maxPromptTokens?: number;
+	    maxOutputTokens?: number;
+	    temperature?: number;
+	    systemPrompt?: string;
+	    timeoutMS?: number;
+	    reasoning?: ReasoningDefaults;
+	    cacheControl?: CacheControl;
+	    output?: OutputPatch;
+	    stopSequences?: string[];
+	    adapterParameters?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new DefaultsPatch(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.stream = source["stream"];
+	        this.maxPromptTokens = source["maxPromptTokens"];
+	        this.maxOutputTokens = source["maxOutputTokens"];
+	        this.temperature = source["temperature"];
+	        this.systemPrompt = source["systemPrompt"];
+	        this.timeoutMS = source["timeoutMS"];
+	        this.reasoning = this.convertValues(source["reasoning"], ReasoningDefaults);
+	        this.cacheControl = this.convertValues(source["cacheControl"], CacheControl);
+	        this.output = this.convertValues(source["output"], OutputPatch);
+	        this.stopSequences = source["stopSequences"];
+	        this.adapterParameters = source["adapterParameters"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
 	export class ManagedSkillDocument {
 	    artifact: artifact.Artifact;
 	    document: document.SkillDocument;
@@ -5078,6 +5353,192 @@ export namespace domain {
 		    return a;
 		}
 	}
+	export class ModelDocument {
+	    type: string;
+	    name: string;
+	    displayName?: string;
+	    description?: string;
+	    labels?: Record<string, string>;
+	    provider: ArtifactNameReference;
+	    providerModelID: string;
+	    defaults?: DefaultsPatch;
+	    capabilities?: CapabilitiesPatch;
+	    adapterParameters?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelDocument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.labels = source["labels"];
+	        this.provider = this.convertValues(source["provider"], ArtifactNameReference);
+	        this.providerModelID = source["providerModelID"];
+	        this.defaults = this.convertValues(source["defaults"], DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], CapabilitiesPatch);
+	        this.adapterParameters = source["adapterParameters"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ModelSettings {
+	    revision: number;
+	    defaults?: DefaultsPatch;
+	    capabilities?: CapabilitiesPatch;
+	    adapterParameters?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ModelSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.revision = source["revision"];
+	        this.defaults = this.convertValues(source["defaults"], DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], CapabilitiesPatch);
+	        this.adapterParameters = source["adapterParameters"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
+	export class ProviderDocument {
+	    type: string;
+	    name: string;
+	    displayName?: string;
+	    description?: string;
+	    labels?: Record<string, string>;
+	    adapter: string;
+	    connection?: ConnectionPatch;
+	    authentication?: Authentication;
+	    defaultModel?: ArtifactNameReference;
+	    defaults?: DefaultsPatch;
+	    capabilities?: CapabilitiesPatch;
+	    adapterParameters?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProviderDocument(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.type = source["type"];
+	        this.name = source["name"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.labels = source["labels"];
+	        this.adapter = source["adapter"];
+	        this.connection = this.convertValues(source["connection"], ConnectionPatch);
+	        this.authentication = this.convertValues(source["authentication"], Authentication);
+	        this.defaultModel = this.convertValues(source["defaultModel"], ArtifactNameReference);
+	        this.defaults = this.convertValues(source["defaults"], DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], CapabilitiesPatch);
+	        this.adapterParameters = source["adapterParameters"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ProviderSettings {
+	    revision: number;
+	    connection?: ConnectionPatch;
+	    defaults?: DefaultsPatch;
+	    capabilities?: CapabilitiesPatch;
+	    defaultModel?: ArtifactNameReference;
+	    adapterParameters?: Record<string, any>;
+	
+	    static createFrom(source: any = {}) {
+	        return new ProviderSettings(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.revision = source["revision"];
+	        this.connection = this.convertValues(source["connection"], ConnectionPatch);
+	        this.defaults = this.convertValues(source["defaults"], DefaultsPatch);
+	        this.capabilities = this.convertValues(source["capabilities"], CapabilitiesPatch);
+	        this.defaultModel = this.convertValues(source["defaultModel"], ArtifactNameReference);
+	        this.adapterParameters = source["adapterParameters"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	
+	
+	
+	
 	export class WorkspaceView {
 	    artifact: artifact.Artifact;
 	    description?: string;
@@ -5236,124 +5697,6 @@ export namespace main {
 	        this.args = source["args"];
 	        this.timeoutMS = source["timeoutMS"];
 	    }
-	}
-
-}
-
-export namespace modelproviderv1 {
-	
-	export class ProviderDocument {
-	    type: string;
-	    name: string;
-	    displayName?: string;
-	    description?: string;
-	    labels?: Record<string, string>;
-	    locator?: declaration.Locator;
-	    metadata?: Record<string, Array<number>>;
-	    adapter: string;
-	    connection?: number[];
-	    authentication?: number[];
-	    defaultModel?: declaration.ArtifactNameReference;
-	    defaults?: number[];
-	    capabilities?: number[];
-	    adapterParameters?: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ProviderDocument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.labels = source["labels"];
-	        this.locator = this.convertValues(source["locator"], declaration.Locator);
-	        this.metadata = source["metadata"];
-	        this.adapter = source["adapter"];
-	        this.connection = source["connection"];
-	        this.authentication = source["authentication"];
-	        this.defaultModel = this.convertValues(source["defaultModel"], declaration.ArtifactNameReference);
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
-	        this.adapterParameters = source["adapterParameters"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
-export namespace modelv1 {
-	
-	export class ModelDocument {
-	    type: string;
-	    name: string;
-	    displayName?: string;
-	    description?: string;
-	    labels?: Record<string, string>;
-	    locator?: declaration.Locator;
-	    metadata?: Record<string, Array<number>>;
-	    provider: declaration.ArtifactNameReference;
-	    providerModelID: string;
-	    defaults?: number[];
-	    capabilities?: number[];
-	    adapterParameters?: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ModelDocument(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.type = source["type"];
-	        this.name = source["name"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.labels = source["labels"];
-	        this.locator = this.convertValues(source["locator"], declaration.Locator);
-	        this.metadata = source["metadata"];
-	        this.provider = this.convertValues(source["provider"], declaration.ArtifactNameReference);
-	        this.providerModelID = source["providerModelID"];
-	        this.defaults = source["defaults"];
-	        this.capabilities = source["capabilities"];
-	        this.adapterParameters = source["adapterParameters"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
 	}
 
 }

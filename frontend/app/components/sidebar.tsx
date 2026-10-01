@@ -7,7 +7,6 @@ import {
 	FiLayers,
 	FiMessageSquare,
 	FiServer,
-	FiSettings,
 	FiSliders,
 	FiTool,
 } from 'react-icons/fi';
@@ -123,17 +122,6 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
-								to="/models/"
-								className="flex size-12 items-center justify-center rounded-full p-0"
-								onClick={toggle}
-								aria-label="Models"
-								title="Models"
-							>
-								<FiSliders size={24} />
-							</Link>
-						</li>
-						<li className="mt-4">
-							<Link
 								to="/tools/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
@@ -145,15 +133,16 @@ export function Sidebar({ children }: SidebarProps) {
 						</li>
 						<li className="mt-4">
 							<Link
-								to="/settings/"
+								to="/models/"
 								className="flex size-12 items-center justify-center rounded-full p-0"
 								onClick={toggle}
-								aria-label="Settings"
-								title="Settings"
+								aria-label="Models"
+								title="Models"
 							>
-								<FiSettings size={24} />
+								<FiSliders size={24} />
 							</Link>
 						</li>
+
 						<li className="mt-4">
 							<Link
 								to="/docs/"

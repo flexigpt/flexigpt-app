@@ -12,6 +12,7 @@ import type {
 } from '@/spec/model';
 
 import type { IModelStoreAPI } from '@/apis/interface';
+import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CreateModel,
 	DeleteModel,
@@ -27,55 +28,82 @@ import {
 } from '@/apis/wailsjs/go/main/ModelStoreWrapper';
 
 export class WailsModelStoreAPI implements IModelStoreAPI {
-	listProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]> {
-		return ListProviders((rootID ?? '') as never) as unknown as Promise<ModelProviderListItem[]>;
+	async listProviders(rootID?: ArtifactRootID): Promise<ModelProviderListItem[]> {
+		return wailsObjectArrayOrEmpty<ModelProviderListItem>(
+			await ListProviders((rootID ?? '') as Parameters<typeof ListProviders>[0]),
+			'ListProviders'
+		);
 	}
 
-	listModels(rootID?: ArtifactRootID): Promise<ModelListItem[]> {
-		return ListModels((rootID ?? '') as never) as unknown as Promise<ModelListItem[]>;
+	async listModels(rootID?: ArtifactRootID): Promise<ModelListItem[]> {
+		return wailsObjectArrayOrEmpty<ModelListItem>(
+			await ListModels((rootID ?? '') as Parameters<typeof ListModels>[0]),
+			'ListModels'
+		);
 	}
 
-	getProvider(ref: ArtifactRef): Promise<ModelProviderView> {
-		return GetProvider(ref as never) as unknown as Promise<ModelProviderView>;
+	async getProvider(ref: ArtifactRef): Promise<ModelProviderView> {
+		return requiredObject<ModelProviderView>(
+			await GetProvider(ref as Parameters<typeof GetProvider>[0]),
+			'GetProvider'
+		);
 	}
 
-	getModel(ref: ArtifactRef): Promise<ModelView> {
-		return GetModel(ref as never) as unknown as Promise<ModelView>;
+	async getModel(ref: ArtifactRef): Promise<ModelView> {
+		return requiredObject<ModelView>(await GetModel(ref as Parameters<typeof GetModel>[0]), 'GetModel');
 	}
 
-	getProviderAPIKeyStatus(ref: ArtifactRef): Promise<ProviderAPIKeyStatus> {
-		return GetProviderAPIKeyStatus(ref as never) as unknown as Promise<ProviderAPIKeyStatus>;
+	async getProviderAPIKeyStatus(ref: ArtifactRef): Promise<ProviderAPIKeyStatus> {
+		return requiredObject<ProviderAPIKeyStatus>(
+			await GetProviderAPIKeyStatus(ref as Parameters<typeof GetProviderAPIKeyStatus>[0]),
+			'GetProviderAPIKeyStatus'
+		);
 	}
 
-	createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
-		return CreateModel(request as never) as unknown as Promise<ManagedModelResult>;
+	async createModel(request: ManagedModelCreateRequest): Promise<ManagedModelResult> {
+		return requiredObject<ManagedModelResult>(
+			await CreateModel(request as Parameters<typeof CreateModel>[0]),
+			'CreateModel'
+		);
 	}
 
-	updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
-		return UpdateModel(request as never) as unknown as Promise<ManagedModelResult>;
+	async updateModel(request: ManagedModelReplaceRequest): Promise<ManagedModelResult> {
+		return requiredObject<ManagedModelResult>(
+			await UpdateModel(request as Parameters<typeof UpdateModel>[0]),
+			'UpdateModel'
+		);
 	}
 
-	deleteModel(ref: ArtifactRef, expectedRevision: number): Promise<void> {
-		return DeleteModel(ref as never, expectedRevision);
+	async deleteModel(ref: ArtifactRef, expectedRevision: number): Promise<void> {
+		await DeleteModel(ref as Parameters<typeof DeleteModel>[0], expectedRevision);
 	}
 
-	saveModelSettings(request: SaveModelSettingsRequest): Promise<ModelView> {
-		return SaveModelSettings(request as never) as unknown as Promise<ModelView>;
+	async saveModelSettings(request: SaveModelSettingsRequest): Promise<ModelView> {
+		return requiredObject<ModelView>(
+			await SaveModelSettings(request as Parameters<typeof SaveModelSettings>[0]),
+			'SaveModelSettings'
+		);
 	}
 
-	resetModelSettings(
+	async resetModelSettings(
 		ref: ArtifactRef,
 		expectedModelRevision: number,
 		expectedSettingsRevision: number
 	): Promise<ModelView> {
-		return ResetModelSettings(
-			ref as never,
-			expectedModelRevision,
-			expectedSettingsRevision
-		) as unknown as Promise<ModelView>;
+		return requiredObject<ModelView>(
+			await ResetModelSettings(
+				ref as Parameters<typeof ResetModelSettings>[0],
+				expectedModelRevision,
+				expectedSettingsRevision
+			),
+			'ResetModelSettings'
+		);
 	}
 
-	setModelEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return SetModelEnabled(ref as never, expectedRevision, enabled) as unknown as Promise<StoreArtifact>;
+	async setModelEnabled(ref: ArtifactRef, expectedRevision: number, enabled: boolean): Promise<StoreArtifact> {
+		return requiredObject<StoreArtifact>(
+			await SetModelEnabled(ref as Parameters<typeof SetModelEnabled>[0], expectedRevision, enabled),
+			'SetModelEnabled'
+		);
 	}
 }

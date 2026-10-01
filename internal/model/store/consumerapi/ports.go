@@ -5,11 +5,10 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
 // ManagementStoreFacade is the aggregate-facing Model Store persistence port.
@@ -276,13 +275,13 @@ func (s *CatalogStore) ListModelsByProvider(
 }
 
 func ProviderDocumentForManagedAuthoring(
-	document modelproviderv1.ProviderDocument,
-) modelproviderv1.ProviderDocument {
+	document modelDomain.ProviderDocument,
+) modelDomain.ProviderDocument {
 	return document
 }
 
 func ModelDocumentForManagedAuthoring(
-	document modelv1.ModelDocument,
-) modelv1.ModelDocument {
+	document modelDomain.ModelDocument,
+) modelDomain.ModelDocument {
 	return document
 }

@@ -10,7 +10,7 @@ import type {
 } from '@/spec/model';
 
 import type { IModelAggregateAPI } from '@/apis/interface';
-import { requiredObject, requireWailsString } from '@/apis/wailsapi/transport';
+import { optionalWailsBody, requiredObject } from '@/apis/wailsapi/transport';
 import {
 	ClearDefaultProvider,
 	ClearProviderAPIKey,
@@ -25,81 +25,89 @@ import {
 	UpdateProvider,
 } from '@/apis/wailsjs/go/main/ModelAggregateWrapper';
 
-function artifactRefFromWails(value: unknown, operation: string): ArtifactRef {
-	const ref = requiredObject<Record<string, unknown>>(value, operation);
-
-	return {
-		rootID: requireWailsString(ref.rootID, `${operation}.rootID`),
-		artifactID: requireWailsString(ref.artifactID, `${operation}.artifactID`),
-	};
-}
-
-function optionalArtifactRefFromWails(value: unknown, operation: string): ArtifactRef | undefined {
-	if (value === null || value === undefined) {
-		return undefined;
-	}
-	return artifactRefFromWails(value, operation);
-}
-
 export class WailsModelAggregateAPI implements IModelAggregateAPI {
 	async getDefaultProvider(): Promise<ArtifactRef | undefined> {
-		const result = await GetDefaultProvider();
-		return optionalArtifactRefFromWails(result, 'GetDefaultProvider');
+		return optionalWailsBody<ArtifactRef>(await GetDefaultProvider(), 'GetDefaultProvider');
 	}
 
-	setDefaultProvider(provider: ArtifactRef): Promise<void> {
-		return SetDefaultProvider(provider as never);
+	async setDefaultProvider(provider: ArtifactRef): Promise<void> {
+		await SetDefaultProvider(provider as Parameters<typeof SetDefaultProvider>[0]);
 	}
 
-	clearDefaultProvider(): Promise<void> {
-		return ClearDefaultProvider();
+	async clearDefaultProvider(): Promise<void> {
+		await ClearDefaultProvider();
 	}
 
-	saveProviderSettings(request: SaveProviderSettingsRequest): Promise<ModelProviderView> {
-		return SaveProviderSettings(request as never) as unknown as Promise<ModelProviderView>;
+	async saveProviderSettings(request: SaveProviderSettingsRequest): Promise<ModelProviderView> {
+		return requiredObject<ModelProviderView>(
+			await SaveProviderSettings(request as Parameters<typeof SaveProviderSettings>[0]),
+			'SaveProviderSettings'
+		);
 	}
 
-	resetProviderSettings(
+	async resetProviderSettings(
 		ref: ArtifactRef,
 		expectedProviderRevision: number,
 		expectedSettingsRevision: number
 	): Promise<ModelProviderView> {
-		return ResetProviderSettings(
-			ref as never,
-			expectedProviderRevision,
-			expectedSettingsRevision
-		) as unknown as Promise<ModelProviderView>;
+		return requiredObject<ModelProviderView>(
+			await ResetProviderSettings(
+				ref as Parameters<typeof ResetProviderSettings>[0],
+				expectedProviderRevision,
+				expectedSettingsRevision
+			),
+			'ResetProviderSettings'
+		);
 	}
 
-	setProviderAPIKey(request: SetProviderAPIKeyRequest): Promise<ProviderAPIKeyStatus> {
-		return SetProviderAPIKey(request as never) as unknown as Promise<ProviderAPIKeyStatus>;
+	async setProviderAPIKey(request: SetProviderAPIKeyRequest): Promise<ProviderAPIKeyStatus> {
+		return requiredObject<ProviderAPIKeyStatus>(
+			await SetProviderAPIKey(request as Parameters<typeof SetProviderAPIKey>[0]),
+			'SetProviderAPIKey'
+		);
 	}
 
-	clearProviderAPIKey(
+	async clearProviderAPIKey(
 		ref: ArtifactRef,
 		expectedProviderRevision: number,
 		expectedAPIKeyRevision: number
 	): Promise<ProviderAPIKeyStatus> {
-		return ClearProviderAPIKey(
-			ref as never,
-			expectedProviderRevision,
-			expectedAPIKeyRevision
-		) as unknown as Promise<ProviderAPIKeyStatus>;
+		return requiredObject<ProviderAPIKeyStatus>(
+			await ClearProviderAPIKey(
+				ref as Parameters<typeof ClearProviderAPIKey>[0],
+				expectedProviderRevision,
+				expectedAPIKeyRevision
+			),
+			'ClearProviderAPIKey'
+		);
 	}
 
-	createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
-		return CreateProvider(request as never) as unknown as Promise<ManagedProviderResult>;
+	async createProvider(request: ManagedProviderCreateRequest): Promise<ManagedProviderResult> {
+		return requiredObject<ManagedProviderResult>(
+			await CreateProvider(request as Parameters<typeof CreateProvider>[0]),
+			'CreateProvider'
+		);
 	}
 
-	updateProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
-		return UpdateProvider(request as never) as unknown as Promise<ManagedProviderResult>;
+	async updateProvider(request: ManagedProviderReplaceRequest): Promise<ManagedProviderResult> {
+		return requiredObject<ManagedProviderResult>(
+			await UpdateProvider(request as Parameters<typeof UpdateProvider>[0]),
+			'UpdateProvider'
+		);
 	}
 
-	deleteProvider(ref: ArtifactRef, expectedProviderRevision: number): Promise<void> {
-		return DeleteProvider(ref as never, expectedProviderRevision);
+	async deleteProvider(ref: ArtifactRef, expectedProviderRevision: number): Promise<void> {
+		await DeleteProvider(ref as Parameters<typeof DeleteProvider>[0], expectedProviderRevision);
 	}
 
-	setProviderEnabled(ref: ArtifactRef, expectedProviderRevision: number, enabled: boolean): Promise<StoreArtifact> {
-		return SetProviderEnabled(ref as never, expectedProviderRevision, enabled) as unknown as Promise<StoreArtifact>;
+	async setProviderEnabled(
+		ref: ArtifactRef,
+		expectedProviderRevision: number,
+		enabled: boolean
+	): Promise<StoreArtifact> {
+		return requiredObject<StoreArtifact>(
+			await SetProviderEnabled(ref as Parameters<typeof SetProviderEnabled>[0], expectedProviderRevision, enabled),
+			'SetProviderEnabled'
+		);
 	}
 }

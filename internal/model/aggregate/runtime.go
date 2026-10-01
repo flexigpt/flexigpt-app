@@ -15,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
+	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
 const runtimeRequestPatchDigestDomain = "flexigpt.model.runtime-request-patch/v1"
@@ -66,46 +67,16 @@ type RuntimeRequestPatch struct {
 	Clear    []RuntimeDefaultField `json:"clear,omitempty"`
 }
 
-// RuntimeDefaultsPatch contains only portable Model defaults. Every scalar is
-// a pointer so omitted values are distinct from explicit zero values.
-type RuntimeDefaultsPatch struct {
-	Stream            *bool                         `json:"stream,omitempty"`
-	MaxPromptTokens   *int                          `json:"maxPromptTokens,omitempty"`
-	MaxOutputTokens   *int                          `json:"maxOutputTokens,omitempty"`
-	Temperature       *float64                      `json:"temperature,omitempty"`
-	SystemPrompt      *string                       `json:"systemPrompt,omitempty"`
-	TimeoutMS         *int                          `json:"timeoutMS,omitempty"`
-	Reasoning         *inferenceSpec.ReasoningParam `json:"reasoning,omitempty"`
-	CacheControl      *inferenceSpec.CacheControl   `json:"cacheControl,omitempty"`
-	Output            *RuntimeOutputPatch           `json:"output,omitempty"`
-	StopSequences     []string                      `json:"stopSequences,omitempty"`
-	AdapterParameters *RuntimeAdapterParameters     `json:"adapterParameters,omitempty"`
-}
-
-// RuntimeAdapterParameters is an object because adapter-specific parameter
-// names and values are owned by the selected inference adapter.
-type RuntimeAdapterParameters map[string]any
-
-type RuntimeOutputPatch struct {
-	Verbosity *inferenceSpec.OutputVerbosity `json:"verbosity,omitempty"`
-	Format    *RuntimeOutputFormatPatch      `json:"format,omitempty"`
-}
-
-type RuntimeOutputFormatPatch struct {
-	Kind       *inferenceSpec.OutputFormatKind `json:"kind,omitempty"`
-	JSONSchema *RuntimeJSONSchemaPatch         `json:"jsonSchema,omitempty"`
-}
-
-type RuntimeJSONSchemaPatch struct {
-	Name        *string            `json:"name,omitempty"`
-	Description *string            `json:"description,omitempty"`
-	Schema      *RuntimeJSONSchema `json:"schema,omitempty"`
-	Strict      *bool              `json:"strict,omitempty"`
-}
-
-// RuntimeJSONSchema remains an object because JSON Schema itself is an open
-// extensibility format. It is still an object value, never encoded JSON text.
-type RuntimeJSONSchema map[string]any
+// The request patch deliberately reuses the same typed portable defaults
+// shape exposed by Model declarations and settings.
+type (
+	RuntimeDefaultsPatch     = modelDomain.DefaultsPatch
+	RuntimeAdapterParameters = modelDomain.AdapterParameters
+	RuntimeOutputPatch       = modelDomain.OutputPatch
+	RuntimeOutputFormatPatch = modelDomain.OutputFormatPatch
+	RuntimeJSONSchemaPatch   = modelDomain.OutputJSONSchemaPatch
+	RuntimeJSONSchema        = modelDomain.JSONSchemaValue
+)
 
 type RuntimeDefaultField string
 
