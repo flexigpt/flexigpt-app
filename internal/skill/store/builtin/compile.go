@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
 )

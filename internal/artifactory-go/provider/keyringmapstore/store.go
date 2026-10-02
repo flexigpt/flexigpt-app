@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/mapstore-go/keyringencdec"
 
 	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/valuestore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -46,7 +46,7 @@ type Store struct {
 	encEncrypt mapstore.IOEncoderDecoder
 }
 
-var _ valuestore.ValueStore = (*Store)(nil)
+var _ value.ValueStore = (*Store)(nil)
 
 // New opens one MapStore secret file.
 //
@@ -134,7 +134,7 @@ func (*Store) Name() string {
 func (s *Store) Put(
 	ctx context.Context,
 	ref secret.Ref,
-	value string,
+	v string,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err
@@ -142,7 +142,7 @@ func (s *Store) Put(
 	if err := ref.Validate(); err != nil {
 		return err
 	}
-	if err := secret.ValidateValue(value); err != nil {
+	if err := secret.ValidateValue(v); err != nil {
 		return err
 	}
 
@@ -165,7 +165,7 @@ func (s *Store) Put(
 
 	if err := s.store.SetKey(
 		[]string{secretValuesKey, id},
-		value,
+		v,
 	); err != nil {
 		return fmt.Errorf(
 			"%w: persist Artifact Store secret: %w",
@@ -205,7 +205,7 @@ func (s *Store) Get(
 		)
 	}
 
-	value, ok := raw.(string)
+	v, ok := raw.(string)
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: Artifact Store secret ref %q is not a string",
@@ -213,10 +213,10 @@ func (s *Store) Get(
 			ref,
 		)
 	}
-	if err := secret.ValidateValue(value); err != nil {
+	if err := secret.ValidateValue(v); err != nil {
 		return "", err
 	}
-	return value, nil
+	return v, nil
 }
 
 // Delete is idempotent. It removes only the encrypted MapStore value for the

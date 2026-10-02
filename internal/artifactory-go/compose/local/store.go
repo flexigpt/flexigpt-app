@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/assembly"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"

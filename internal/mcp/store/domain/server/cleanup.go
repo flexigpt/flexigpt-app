@@ -128,26 +128,3 @@ func CleanupUnboundServerSecrets(
 	}
 	return errors.Join(output, cleaner.DeleteSecret(ctx, tokenRef))
 }
-
-// SecretReferences returns the unique opaque secret references held by local
-// server installation data. It never resolves or returns secret values.
-func (data ServerData) SecretReferences() ([]string, error) {
-	if err := data.Validate(); err != nil {
-		return nil, err
-	}
-
-	seen := make(map[string]struct{})
-	for _, binding := range data.Inputs {
-		if binding.SecretRef == "" {
-			continue
-		}
-		seen[binding.SecretRef] = struct{}{}
-	}
-
-	output := make([]string, 0, len(seen))
-	for value := range seen {
-		output = append(output, value)
-	}
-	sort.Strings(output)
-	return output, nil
-}

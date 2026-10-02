@@ -5,21 +5,6 @@ import (
 	"slices"
 )
 
-func (d ServerDocument) Clone() ServerDocument {
-	output := d
-	output.Labels = maps.Clone(d.Labels)
-	output.MCPServer = cloneCore(d.MCPServer)
-	output.Configuration = cloneConfiguration(d.Configuration)
-	if d.Include != nil {
-		value := *d.Include
-		value.Tools = slices.Clone(d.Include.Tools)
-		value.Resources = slices.Clone(d.Include.Resources)
-		value.Prompts = slices.Clone(d.Include.Prompts)
-		output.Include = &value
-	}
-	return output
-}
-
 func cloneConfiguration(input ServerConfiguration) ServerConfiguration {
 	output := input
 	output.Install.Inputs = maps.Clone(input.Install.Inputs)
@@ -64,15 +49,4 @@ func cloneStringPointer(value *string) *string {
 	}
 	output := *value
 	return &output
-}
-
-func (d ServerData) Clone() ServerData {
-	output := d
-	output.Inputs = maps.Clone(d.Inputs)
-	for name, binding := range output.Inputs {
-		binding.Value = cloneStringPointer(binding.Value)
-		output.Inputs[name] = binding
-	}
-	output.AdditionalPolicies = slices.Clone(d.AdditionalPolicies)
-	return output
 }

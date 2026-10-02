@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/localstate"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
@@ -23,7 +22,8 @@ import (
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/valuestore"
+	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
 	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -46,7 +46,7 @@ type Config struct {
 
 	ProtectedOverlayNamespaces []overlay.Namespace
 	StoreOverlayNamespaces     []overlay.Namespace
-	SecretValues               valuestore.ValueStore
+	SecretValues               value.ValueStore
 }
 
 type ManagedPackageResult struct {
@@ -65,7 +65,7 @@ type Components struct {
 
 	ManagedArtifacts *managedpackageimpl.Service
 	SourceRuntime    sourceimpl.Runtime
-	LocalState       *localstate.Service
+	LocalState       *secretimpl.Service
 
 	metadata           *sqlite.Store
 	managedSources     *sourceimpl.Registry
@@ -238,7 +238,7 @@ func Open(
 		return nil, err
 	}
 
-	localStateService, err := localstate.NewService(
+	localStateService, err := secretimpl.NewService(
 		metadata.LocalState(),
 		artifactRepository,
 		config.Clock,
@@ -441,27 +441,27 @@ func (c *Components) getManagedSourceState(
 	if err := ctx.Err(); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	value, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
+	v, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if !c.managedSources.SupportsManagedPackages(value.Kind) {
+	if !c.managedSources.SupportsManagedPackages(v.Kind) {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
 			spec.ErrUnsupported,
-			value.Kind,
+			v.Kind,
 		)
 	}
 	generation, err := sourceSnapshotGeneration(
 		ctx,
 		c.SourceRuntime,
-		value,
+		v,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
 	return ManagedPackageResult{
-		Source:     value.Summary(),
+		Source:     v.Summary(),
 		Generation: generation,
 	}, nil
 }
@@ -595,7 +595,7 @@ func (c *Components) publishManagedPackage(
 		return ManagedPackageResult{}, err
 	}
 
-	value, err := c.managedSource(
+	v, err := c.managedSource(
 		ctx,
 		rootID,
 		sourceID,
@@ -608,7 +608,7 @@ func (c *Components) publishManagedPackage(
 	beforeGeneration, err := sourceSnapshotGeneration(
 		ctx,
 		c.SourceRuntime,
-		value,
+		v,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
@@ -623,7 +623,7 @@ func (c *Components) publishManagedPackage(
 	// Collection updates provide their own compare-and-swap generation.
 	generation, err := c.managedSources.PublishPackage(
 		ctx,
-		value,
+		v,
 		publication,
 	)
 	if err != nil {
@@ -631,7 +631,7 @@ func (c *Components) publishManagedPackage(
 	}
 
 	result := ManagedPackageResult{
-		Source:     value.Summary(),
+		Source:     v.Summary(),
 		Generation: generation,
 	}
 	contentChanged := generation != beforeGeneration
@@ -681,7 +681,7 @@ func (c *Components) removeManagedPackage(
 		return ManagedPackageResult{}, err
 	}
 
-	value, err := c.managedSource(
+	v, err := c.managedSource(
 		ctx,
 		rootID,
 		sourceID,
@@ -694,7 +694,7 @@ func (c *Components) removeManagedPackage(
 	beforeGeneration, err := sourceSnapshotGeneration(
 		ctx,
 		c.SourceRuntime,
-		value,
+		v,
 	)
 	if err != nil {
 		return ManagedPackageResult{}, err
@@ -703,7 +703,7 @@ func (c *Components) removeManagedPackage(
 		exists, err := managedPackageExists(
 			ctx,
 			c.SourceRuntime,
-			value,
+			v,
 			address,
 		)
 		if err != nil {
@@ -732,20 +732,20 @@ func (c *Components) removeManagedPackage(
 
 	if err := c.managedSources.RemovePackage(
 		ctx,
-		value,
+		v,
 		address,
 		expectedGeneration,
 	); err != nil {
 		return ManagedPackageResult{}, err
 	}
 
-	generation, err := sourceSnapshotGeneration(ctx, c.SourceRuntime, value)
+	generation, err := sourceSnapshotGeneration(ctx, c.SourceRuntime, v)
 	if err != nil {
 		return ManagedPackageResult{}, err
 	}
 	if generation == beforeGeneration {
 		return ManagedPackageResult{
-			Source:     value.Summary(),
+			Source:     v.Summary(),
 			Generation: generation,
 		}, nil
 	}
@@ -768,10 +768,10 @@ func (c *Components) removeManagedPackage(
 func managedPackageExists(
 	ctx context.Context,
 	runtime sourceimpl.Runtime,
-	value source.Source,
+	v source.Source,
 	address source.ManagedPackageAddress,
 ) (bool, error) {
-	snapshot, err := runtime.Open(ctx, value)
+	snapshot, err := runtime.Open(ctx, v)
 	if err != nil {
 		return false, err
 	}
@@ -836,29 +836,29 @@ func (c *Components) managedSource(
 			spec.ErrInvalid,
 		)
 	}
-	value, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
+	v, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
 	if err != nil {
 		return source.Source{}, err
 	}
-	if value.Revision != expectedSourceRevision {
+	if v.Revision != expectedSourceRevision {
 		return source.Source{}, spec.ErrConflict
 	}
-	if !c.managedSources.SupportsManagedPackages(value.Kind) {
+	if !c.managedSources.SupportsManagedPackages(v.Kind) {
 		return source.Source{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
 			spec.ErrUnsupported,
-			value.Kind,
+			v.Kind,
 		)
 	}
-	return value, nil
+	return v, nil
 }
 
 func sourceSnapshotGeneration(
 	ctx context.Context,
 	runtime sourceimpl.Runtime,
-	value source.Source,
+	v source.Source,
 ) (string, error) {
-	snapshot, err := runtime.Open(ctx, value)
+	snapshot, err := runtime.Open(ctx, v)
 	if err != nil {
 		return "", err
 	}

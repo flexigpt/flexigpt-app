@@ -1,13 +1,18 @@
 package server
 
 import (
+	"fmt"
+	"maps"
 	"regexp"
+	"slices"
+	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
+	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
 
 var placeholderPattern = regexp.MustCompile(
@@ -135,6 +140,123 @@ func (d ServerDocument) OAuthClientSecretRequired() bool {
 	input := d.Configuration.Auth.ClientCredentialsInput
 	return input != "" &&
 		d.Configuration.Install.Inputs[input].ClientSecretRequired
+}
+
+func (d ServerDocument) Clone() ServerDocument {
+	output := d
+	output.Labels = maps.Clone(d.Labels)
+	output.MCPServer = cloneCore(d.MCPServer)
+	output.Configuration = cloneConfiguration(d.Configuration)
+	if d.Include != nil {
+		value := *d.Include
+		value.Tools = slices.Clone(d.Include.Tools)
+		value.Resources = slices.Clone(d.Include.Resources)
+		value.Prompts = slices.Clone(d.Include.Prompts)
+		output.Include = &value
+	}
+	return output
+}
+
+func (d ServerDocument) Validate() error {
+	if err := d.LogicalName.Validate(); err != nil {
+		return err
+	}
+	if err := d.LogicalVersion.Validate(true); err != nil {
+		return err
+	}
+	if err := spec.ValidateOptionalText(
+		"MCP server display name",
+		d.DisplayName,
+		spec.MaxDisplayNameBytes,
+	); err != nil {
+		return err
+	}
+	if err := spec.ValidateOptionalText(
+		"MCP server description",
+		d.Description,
+		spec.MaxDescriptionBytes,
+	); err != nil {
+		return err
+	}
+	if err := spec.ValidateLabels(
+		"MCP server",
+		d.Labels,
+	); err != nil {
+		return err
+	}
+	if err := validateInclude(d.Include); err != nil {
+		return err
+	}
+	return validateParts(
+		string(d.LogicalName),
+		d.MCPServer,
+		d.Configuration,
+	)
+}
+
+func (d ServerDocument) SecretInputTargets() (
+	map[string]SecretInputTarget,
+	error,
+) {
+	if err := d.Validate(); err != nil {
+		return nil, err
+	}
+	return secretInputTargets(d.MCPServer, d.Configuration)
+}
+
+func (d ServerDocument) AcceptsSecretTarget(
+	kind mcpDomainSecret.MCPSecretKind,
+	slot string,
+) error {
+	if err := d.Validate(); err != nil {
+		return err
+	}
+	normalizedSlot, err := kind.NormalizeSlot(slot)
+	if err != nil {
+		return err
+	}
+
+	switch kind {
+	case mcpDomainSecret.MCPSecretKindOAuthClientCredentials:
+		input := d.Configuration.Auth.ClientCredentialsInput
+		declaration, found := d.Configuration.Install.Inputs[input]
+		if input == "" ||
+			!found ||
+			declaration.Kind != InputOAuthClientCredentials {
+			return fmt.Errorf(
+				"%w: OAuth client credential target is not declared",
+				spec.ErrReferenceUnresolved,
+			)
+		}
+		return nil
+
+	case mcpDomainSecret.MCPSecretKindStdioEnv, mcpDomainSecret.MCPSecretKindHTTPHeader:
+		targets, err := d.SecretInputTargets()
+		if err != nil {
+			return err
+		}
+		for _, target := range targets {
+			expectedKind := mcpDomainSecret.MCPSecretKindStdioEnv
+			if target.Kind == SecretInputTargetHTTPHeader {
+				expectedKind = mcpDomainSecret.MCPSecretKindHTTPHeader
+			}
+			if expectedKind == kind &&
+				strings.EqualFold(target.Slot, normalizedSlot) {
+				return nil
+			}
+		}
+		return fmt.Errorf(
+			"%w: MCP secret target is not declared by the server",
+			spec.ErrReferenceUnresolved,
+		)
+
+	default:
+		return fmt.Errorf(
+			"%w: unsupported MCP secret kind %q",
+			spec.ErrInvalid,
+			kind,
+		)
+	}
 }
 
 type MaterializedServer struct {

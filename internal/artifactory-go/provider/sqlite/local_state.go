@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/localstate"
 	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )

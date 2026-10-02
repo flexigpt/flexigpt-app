@@ -15,7 +15,7 @@ import (
 
 func materializeValidated(
 	ctx context.Context,
-	server artifact.ArtifactRef,
+	_ artifact.ArtifactRef,
 	document ServerDocument,
 	data ServerData,
 	secrets SecretResolver,

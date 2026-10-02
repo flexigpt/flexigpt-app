@@ -460,6 +460,8 @@ linters:
           alias: ${1}
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/(\w+)/model
           alias: ${2}
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)
+          alias: ${1}Flow
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/model
           alias: ${1}
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model
@@ -541,6 +543,11 @@ linters:
       msg-style: "lowercased"
       # Doesnt support things like bundleID, can enable and just check for discovery, once in a while.
       # key-naming-case: "camel"
+
+    staticcheck:
+      checks:
+        - all
+        - "-SA1019"
 
     tagliatelle:
       case:

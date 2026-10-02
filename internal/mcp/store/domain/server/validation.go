@@ -9,153 +9,13 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
-
-	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
 
 var installationInputNamePattern = regexp.MustCompile(
 	`^[A-Za-z_][A-Za-z0-9_]*$`,
 )
-
-func (value ServerData) ValidateFor(
-	server artifact.ArtifactRef,
-	document ServerDocument,
-) error {
-	if err := server.Validate(); err != nil {
-		return err
-	}
-	if err := document.Validate(); err != nil {
-		return err
-	}
-	if err := value.Validate(); err != nil {
-		return err
-	}
-
-	secretTargets, err := document.SecretInputTargets()
-	if err != nil {
-		return err
-	}
-
-	if value.SelectedConnectionProfile != "" {
-		if _, found := document.Configuration.ConnectionProfiles[value.SelectedConnectionProfile]; !found {
-			return fmt.Errorf(
-				"%w: selected MCP connection profile %q does not exist",
-				spec.ErrReferenceUnresolved,
-				value.SelectedConnectionProfile,
-			)
-		}
-	}
-
-	for name, binding := range value.Inputs {
-		if !installationInputNamePattern.MatchString(name) {
-			return fmt.Errorf(
-				"%w: invalid MCP installation input name %q",
-				spec.ErrInvalid,
-				name,
-			)
-		}
-
-		declaration, declared := document.Configuration.Install.Inputs[name]
-		if !declared {
-			return fmt.Errorf(
-				"%w: MCP installation input %q is not declared by the server",
-				spec.ErrInvalid,
-				name,
-			)
-		}
-
-		switch declaration.Kind {
-		case InputText, InputPath:
-			if binding.SecretRef != "" {
-				return fmt.Errorf(
-					"%w: MCP input %q must use a local value, not a secret reference",
-					spec.ErrInvalid,
-					name,
-				)
-			}
-			if binding.Value == nil {
-				return fmt.Errorf(
-					"%w: MCP input %q requires a local value",
-					spec.ErrInvalid,
-					name,
-				)
-			}
-
-		case InputSecret:
-			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
-				return fmt.Errorf(
-					"%w: MCP secret input %q requires exactly one secret reference",
-					spec.ErrInvalid,
-					name,
-				)
-			}
-			target, found := secretTargets[name]
-			if !found {
-				return fmt.Errorf(
-					"%w: MCP secret input %q is not used by a permitted connection target",
-					spec.ErrInvalid,
-					name,
-				)
-			}
-			if err := target.matches(server, binding.SecretRef); err != nil {
-				return fmt.Errorf("MCP secret input %q: %w", name, err)
-			}
-
-		case InputOAuthClientCredentials:
-			if binding.Value != nil || strings.TrimSpace(binding.SecretRef) == "" {
-				return fmt.Errorf(
-					"%w: MCP OAuth client input %q requires exactly one secret reference",
-					spec.ErrInvalid,
-					name,
-				)
-			}
-			ref, err := mcpDomainSecret.ParseMCPSecretRef(binding.SecretRef)
-			if err != nil {
-				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)
-			}
-			if err := ref.Matches(
-				server,
-				mcpDomainSecret.MCPSecretKindOAuthClientCredentials,
-				"clientCredentials",
-			); err != nil {
-				return fmt.Errorf("MCP OAuth client input %q: %w", name, err)
-			}
-
-		default:
-			return fmt.Errorf(
-				"%w: MCP input %q has unsupported kind %q",
-				spec.ErrInvalid,
-				name,
-				declaration.Kind,
-			)
-		}
-	}
-
-	seen := make(map[artifact.ArtifactRef]struct{}, len(value.AdditionalPolicies))
-	for _, ref := range value.AdditionalPolicies {
-		if err := ref.Validate(); err != nil {
-			return err
-		}
-		if ref.RootID != server.RootID {
-			return fmt.Errorf(
-				"%w: additional MCP policy belongs to another Root",
-				spec.ErrInvalid,
-			)
-		}
-		if _, duplicate := seen[ref]; duplicate {
-			return fmt.Errorf(
-				"%w: duplicate additional MCP policy Artifact",
-				spec.ErrInvalid,
-			)
-		}
-		seen[ref] = struct{}{}
-	}
-
-	return nil
-}
 
 func (value MaterializedServer) Validate() error {
 	core := value.Core
@@ -258,43 +118,6 @@ func normalizeAuthentication(
 		value.Mode = mcpv1.HTTPAuthModeNone
 	}
 	return value
-}
-
-func (value ServerDocument) Validate() error {
-	if err := value.LogicalName.Validate(); err != nil {
-		return err
-	}
-	if err := value.LogicalVersion.Validate(true); err != nil {
-		return err
-	}
-	if err := spec.ValidateOptionalText(
-		"MCP server display name",
-		value.DisplayName,
-		spec.MaxDisplayNameBytes,
-	); err != nil {
-		return err
-	}
-	if err := spec.ValidateOptionalText(
-		"MCP server description",
-		value.Description,
-		spec.MaxDescriptionBytes,
-	); err != nil {
-		return err
-	}
-	if err := spec.ValidateLabels(
-		"MCP server",
-		value.Labels,
-	); err != nil {
-		return err
-	}
-	if err := validateInclude(value.Include); err != nil {
-		return err
-	}
-	return validateParts(
-		string(value.LogicalName),
-		value.MCPServer,
-		value.Configuration,
-	)
 }
 
 func validateParts(

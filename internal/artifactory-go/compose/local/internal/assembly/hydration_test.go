@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"

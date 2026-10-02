@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/valuestore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 )
 
 // Config contains application-composition inputs for one Artifact Store.
@@ -28,5 +28,5 @@ type Config struct {
 
 	ProtectedOverlayNamespaces []overlay.Namespace
 	StoreOverlayNamespaces     []overlay.Namespace
-	SecretValues               valuestore.ValueStore
+	SecretValues               value.ValueStore
 }
