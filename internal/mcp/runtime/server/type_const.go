@@ -74,9 +74,10 @@ type MCPServerCapabilitiesSummary struct {
 }
 
 type MCPServerRuntimeSnapshot struct {
-	Server  ServerID        `json:"server"`
-	Catalog CatalogID       `json:"catalog"`
-	Status  MCPServerStatus `json:"status"`
+	Server     ServerID        `json:"server"`
+	Catalog    CatalogID       `json:"catalog"`
+	Status     MCPServerStatus `json:"status"`
+	Generation uint64          `json:"generation"`
 
 	NegotiatedProtocolVersion string                        `json:"negotiatedProtocolVersion,omitempty"`
 	ServerInfo                *MCPImplementationInfo        `json:"serverInfo,omitempty"`

@@ -8,7 +8,6 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -76,29 +75,19 @@ func (s *RuntimeServerSource) ResolveServer(
 
 func (s *RuntimeServerSource) InspectRuntimeConfig(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpServer.RuntimeConfig, mcpDomainServer.Resolved, error) {
-	if s == nil || s.servers == nil {
-		return mcpServer.RuntimeConfig{},
-			mcpDomainServer.Resolved{},
-			mcpServer.ErrClosed
-	}
-	resolved, err := s.servers.InspectMCPServer(ctx, ref)
-	if err != nil {
-		return mcpServer.RuntimeConfig{}, mcpDomainServer.Resolved{}, err
+	resolved mcpDomainServer.Resolved,
+) (mcpServer.RuntimeConfig, error) {
+	if s == nil {
+		return mcpServer.RuntimeConfig{}, mcpServer.ErrClosed
 	}
 	materialized, err := resolved.MaterializeForInspection(
 		ctx,
 		s.environment,
 	)
 	if err != nil {
-		return mcpServer.RuntimeConfig{}, resolved, err
+		return mcpServer.RuntimeConfig{}, err
 	}
-	config, err := runtimeConfig(resolved, materialized)
-	if err != nil {
-		return mcpServer.RuntimeConfig{}, resolved, err
-	}
-	return config, resolved, nil
+	return runtimeConfig(resolved, materialized)
 }
 
 func runtimeConfig(

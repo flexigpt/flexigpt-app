@@ -31,6 +31,7 @@ import type {
 	MCPServerDraft,
 	MCPServerInstallationDataView,
 	MCPServerListItem,
+	MCPServerRuntimeDetails,
 	MCPServerRuntimeSnapshot,
 	MCPServerSecretsView,
 	MCPServerSetupView,
@@ -49,6 +50,7 @@ import {
 	MCP_SCHEMA_VERSION,
 	MCPApprovalRule,
 	MCPAuthHealthState as MCPAuthHealthStateValue,
+	MCPAuthState,
 	MCPExecutionMode,
 	MCPHTTPAuthMode as MCPHTTPAuthModeValue,
 	MCPInputKind as MCPInputKindValue,
@@ -69,6 +71,16 @@ const MANAGEMENT_PAGE_SIZE = 100;
 const MAX_MANAGEMENT_PAGE_HOPS = 10_000;
 const PLACEHOLDER_PATTERN = /\$\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const MCP_SERVER_MANAGEMENT_CONCURRENCY = 4;
+const MCP_RUNTIME_READ_FRESH_MS = 500;
+const MCP_RUNTIME_READ_BATCH_SIZE = 256;
+
+interface RuntimeRead {
+	server: MCPRuntimeServerID;
+	expiresAt: number;
+	promise: Promise<MCPRuntimeServerView>;
+	resolve: (value: MCPRuntimeServerView) => void;
+	reject: (error: unknown) => void;
+}
 
 export interface MCPComposerDeclarations {
 	bundle: MCPBundleView;
@@ -619,6 +631,19 @@ export function serverDraftFromView(server?: MCPServerView): MCPServerDraft {
 	};
 }
 
+const buildByArtifact = (declarations: MCPComposerDeclarations[]): Map<string, MCPServerView> => {
+	const byArtifact = new Map<string, MCPServerView>();
+	for (const { servers } of declarations) {
+		for (const server of servers) {
+			const key = artifactRefKey(server.ref);
+			if (!byArtifact.has(key) && server.runtimeServerID) {
+				byArtifact.set(key, server);
+			}
+		}
+	}
+	return byArtifact;
+};
+
 export class MCPManagementAPI {
 	constructor(
 		private readonly store: IMCPStoreAPI,
@@ -627,6 +652,11 @@ export class MCPManagementAPI {
 		private readonly tools: IToolTargetResolver,
 		private readonly models: ModelManagementAPI
 	) {}
+
+	private readonly runtimeReads = new Map<MCPRuntimeServerID, RuntimeRead>();
+	private queuedRuntimeReads: RuntimeRead[] = [];
+	private runtimeFlushScheduled = false;
+	private readonly connectionRequests = new Map<MCPRuntimeServerID, Promise<MCPServerRuntimeSnapshot>>();
 
 	private readonly composerMCPDeclarationsCatalog = createSharedAsyncCatalog<MCPComposerDeclarations[]>(async () => {
 		const bundles = await this.listMCPBundles();
@@ -643,6 +673,7 @@ export class MCPManagementAPI {
 
 	invalidateComposerMCPDeclarations(): void {
 		this.composerMCPDeclarationsCatalog.invalidate();
+		this.runtimeReads.clear();
 	}
 
 	async listMCPCollectionsForManagement(): Promise<CollectionListItem[]> {
@@ -672,12 +703,77 @@ export class MCPManagementAPI {
 		return this.toServerView(await this.aggregate.getMCPServer(server), bundle);
 	}
 
-	async getMCPRuntimeServerView(server: ArtifactRef): Promise<MCPRuntimeServerView> {
-		return this.toRuntimeServerView(await this.aggregate.getMCPServer(server));
+	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerView> {
+		const servers = await this.getMCPServersForRuntimeServers([server]);
+		if (servers !== null && servers !== undefined && servers.length > 0) {
+			return servers[0];
+		}
+		throw new Error('could not get servers');
 	}
 
-	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPRuntimeServerView> {
-		return this.toRuntimeServerView(await this.aggregate.getMCPServerForRuntimeServer(server));
+	getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPRuntimeServerView[]> {
+		const reads = [...new Set(servers)].map(server => {
+			const existing = this.runtimeReads.get(server);
+			if (existing && existing.expiresAt > Date.now()) {
+				return existing.promise;
+			}
+			let resolve!: RuntimeRead['resolve'];
+			let reject!: RuntimeRead['reject'];
+			// oxlint-disable-next-line promise/param-names
+			const promise = new Promise<MCPRuntimeServerView>((accept, decline) => {
+				resolve = accept;
+				reject = decline;
+			});
+			const read: RuntimeRead = {
+				server,
+				expiresAt: Number.POSITIVE_INFINITY,
+				promise,
+				resolve,
+				reject,
+			};
+			this.runtimeReads.set(server, read);
+			this.queuedRuntimeReads.push(read);
+			return promise;
+		});
+		if (this.queuedRuntimeReads.length > 0 && !this.runtimeFlushScheduled) {
+			this.runtimeFlushScheduled = true;
+			queueMicrotask(() => {
+				void this.flushRuntimeReads();
+			});
+		}
+		return Promise.all(reads);
+	}
+
+	private async flushRuntimeReads(): Promise<void> {
+		const reads = this.queuedRuntimeReads;
+		this.queuedRuntimeReads = [];
+		this.runtimeFlushScheduled = false;
+		for (let start = 0; start < reads.length; start += MCP_RUNTIME_READ_BATCH_SIZE) {
+			const batch = reads.slice(start, start + MCP_RUNTIME_READ_BATCH_SIZE);
+			try {
+				const details = await this.aggregate.getMCPServersForRuntimeServers(batch.map(read => read.server));
+				const values = new Map(details.map(value => [value.connection.server, this.toRuntimeServerView(value)]));
+				for (const read of batch) {
+					const value = values.get(read.server);
+					if (!value) {
+						if (this.runtimeReads.get(read.server) === read) {
+							this.runtimeReads.delete(read.server);
+						}
+						read.reject(new Error('MCP runtime response omitted a requested server.'));
+						continue;
+					}
+					read.expiresAt = Date.now() + MCP_RUNTIME_READ_FRESH_MS;
+					read.resolve(value);
+				}
+			} catch (error) {
+				for (const read of batch) {
+					if (this.runtimeReads.get(read.server) === read) {
+						this.runtimeReads.delete(read.server);
+					}
+					read.reject(error);
+				}
+			}
+		}
 	}
 
 	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {
@@ -710,20 +806,67 @@ export class MCPManagementAPI {
 	}
 
 	async listMCPServers(bundle: MCPBundleView): Promise<MCPServerView[]> {
-		const records = (await this.store.listMCPCollectionServers(bundle.ref)) ?? [];
-
-		const values = await mapWithConcurrency(records, MCP_SERVER_MANAGEMENT_CONCURRENCY, async record => {
-			const ref: ArtifactRef = {
-				rootID: record.installation.artifact.rootID,
-				artifactID: record.installation.artifact.id,
-			};
-
-			return this.toServerView(await this.aggregate.getMCPServer(ref), bundle.ref);
-		});
+		const records = await this.aggregate.listMCPCollectionServers(bundle.ref);
+		const values = records.map(record => this.toServerView(record, bundle.ref));
 
 		return values.toSorted((left, right) =>
 			serverDisplayName(left).localeCompare(serverDisplayName(right), undefined, { sensitivity: 'base' })
 		);
+	}
+
+	async resolveMCPRuntimeServerIDs(artifacts: ArtifactRef[]): Promise<Map<string, MCPRuntimeServerID>> {
+		if (artifacts.length === 0) {
+			return new Map();
+		}
+
+		let declarations = await this.listComposerMCPDeclarations(false);
+		let byArtifact = buildByArtifact(declarations);
+		const hasMissing = artifacts.some(ref => !byArtifact.get(artifactRefKey(ref))?.runtimeServerID);
+		if (hasMissing) {
+			declarations = await this.listComposerMCPDeclarations(true);
+			byArtifact = buildByArtifact(declarations);
+		}
+
+		const output = new Map<string, MCPRuntimeServerID>();
+		const stillMissing: string[] = [];
+		for (const ref of artifacts) {
+			const key = artifactRefKey(ref);
+			if (output.has(key)) {
+				continue;
+			}
+			const view = byArtifact.get(key);
+			if (view?.runtimeServerID) {
+				output.set(key, view.runtimeServerID);
+			} else if (!stillMissing.includes(key)) {
+				stillMissing.push(key);
+			}
+		}
+
+		if (stillMissing.length > 0) {
+			throw new Error(`MCP servers not found for artifact(s): ${stillMissing.join(', ')}.`);
+		}
+		return output;
+	}
+
+	async findComposerServerByRuntimeID(server: MCPRuntimeServerID): Promise<MCPServerView | undefined> {
+		const find = (declarations: MCPComposerDeclarations[]): MCPServerView | undefined => {
+			for (const { servers } of declarations) {
+				const found = servers.find(candidate => candidate.runtimeServerID === server);
+				if (found) {
+					return found;
+				}
+			}
+			return undefined;
+		};
+
+		const cached = await this.listComposerMCPDeclarations(false);
+		const hit = find(cached);
+		if (hit) {
+			return hit;
+		}
+
+		const refreshed = await this.listComposerMCPDeclarations(true);
+		return find(refreshed);
 	}
 
 	async createMCPBundle(logicalName: string, displayName: string, description?: string): Promise<MCPBundleView> {
@@ -958,19 +1101,38 @@ export class MCPManagementAPI {
 	}
 
 	connectMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return this.runtime.connectMCPServer(server);
+		const existing = this.connectionRequests.get(server);
+		if (existing) {
+			return existing;
+		}
+		const request = this.runtimeMutation(server, () => this.runtime.connectMCPServer(server)).finally(() => {
+			if (this.connectionRequests.get(server) === request) {
+				this.connectionRequests.delete(server);
+			}
+		});
+		this.connectionRequests.set(server, request);
+		return request;
 	}
 
 	disconnectMCPServer(server: MCPRuntimeServerID): Promise<void> {
-		return this.runtime.disconnectMCPServer(server);
+		return this.runtimeMutation(server, () => this.runtime.disconnectMCPServer(server));
 	}
 
 	refreshMCPServer(server: MCPRuntimeServerID): Promise<MCPServerRuntimeSnapshot> {
-		return this.runtime.refreshMCPServer(server);
+		return this.runtimeMutation(server, () => this.runtime.refreshMCPServer(server));
 	}
 
 	cancelMCPServerAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
-		return this.runtime.cancelMCPServerAuthorization(server);
+		return this.runtimeMutation(server, () => this.runtime.cancelMCPServerAuthorization(server));
+	}
+
+	private async runtimeMutation<T>(server: MCPRuntimeServerID, mutate: () => Promise<T>): Promise<T> {
+		this.runtimeReads.delete(server);
+		try {
+			return await mutate();
+		} finally {
+			this.runtimeReads.delete(server);
+		}
 	}
 
 	listMCPServerTools(
@@ -1064,15 +1226,12 @@ export class MCPManagementAPI {
 		};
 	}
 
-	private toRuntimeServerView(details: MCPServerAggregateDetails): MCPRuntimeServerView {
+	private toRuntimeServerView(details: MCPServerRuntimeDetails): MCPRuntimeServerView {
 		return {
-			ref: {
-				rootID: details.settings.artifact.rootID,
-				artifactID: details.settings.artifact.id,
-			},
+			ref: details.ref,
 			runtimeServerID: details.connection.server,
-			policy: details.policy,
-			authHealth: details.authorization,
+			authorization: details.authorization,
+			pendingAuthorization: details.pendingAuthorization,
 			runtime: details.connection,
 		};
 	}
@@ -1128,4 +1287,50 @@ export class MCPManagementAPI {
 
 		throw new Error(`MCP management pagination exceeded ${MAX_MANAGEMENT_PAGE_HOPS} pages.`);
 	}
+}
+
+// Configuration health is established by a verified detail read. Runtime
+// observations replace only its live authorization fields.
+export function getMCPRuntimeAuthHealth(
+	base: MCPAuthHealth | undefined,
+	view: MCPRuntimeServerView
+): MCPAuthHealth | undefined {
+	if (!base) {
+		return undefined;
+	}
+	const status = view.authorization;
+	const states: Record<MCPAuthState, MCPAuthHealthState> = {
+		[MCPAuthState.NotRequired]: MCPAuthHealthStateValue.NotRequired,
+		[MCPAuthState.Required]: MCPAuthHealthStateValue.AuthorizationNeeded,
+		[MCPAuthState.Authorized]: MCPAuthHealthStateValue.Authorized,
+		[MCPAuthState.Expired]: MCPAuthHealthStateValue.Expired,
+		[MCPAuthState.InsufficientScope]: MCPAuthHealthStateValue.InsufficientScope,
+		[MCPAuthState.Error]: MCPAuthHealthStateValue.Error,
+	};
+	let state = status
+		? states[status.state]
+		: base.state === MCPAuthHealthStateValue.AuthorizationPending
+			? MCPAuthHealthStateValue.AuthorizationNeeded
+			: base.state;
+	const expiresAt = status ? status.expiresAt : base.expiresAt;
+	if (state === MCPAuthHealthStateValue.Authorized && expiresAt && Date.parse(expiresAt) <= Date.now()) {
+		state = MCPAuthHealthStateValue.Expired;
+	}
+	const pending = view.pendingAuthorization;
+	return {
+		...base,
+		...(status
+			? {
+					authMode: status.authMode,
+					resource: status.resource,
+					scopes: status.scopes,
+					lastError: status.lastError,
+				}
+			: {}),
+		expiresAt,
+		state: pending ? MCPAuthHealthStateValue.AuthorizationPending : state,
+		authorizationPending: Boolean(pending),
+		authorizationURL: pending?.authorizationURL,
+		authorizationExpiresAt: pending?.expiresAt,
+	};
 }

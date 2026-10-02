@@ -177,17 +177,13 @@ func (a *API) SaveServerSettings(
 	return err
 }
 
-// ListMCPCollectionServers loads all currently available MCP servers reachable
-// from one MCP Collection. It is the list-screen bulk counterpart to
-// GetServerInstallation and GetMCPEffectivePolicy.
-//
-// The whole operation shares one verified Artifact Store source session. This
-// prevents the frontend from reopening and re-verifying the same managed
-// Source once per MCP card.
+// ListMCPCollectionServers resolves every available server once, sharing one
+// resource verification session across the collection and its dependencies.
+// Aggregate owns the public projection and runtime identities.
 func (a *API) ListMCPCollectionServers(
 	ctx context.Context,
 	collectionRef artifact.ArtifactRef,
-) ([]MCPCollectionServerView, error) {
+) ([]ServerRead, error) {
 	if a == nil ||
 		a.collections == nil ||
 		a.resources == nil ||
@@ -201,7 +197,7 @@ func (a *API) ListMCPCollectionServers(
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
 		a.resources,
-		func(sessionCtx context.Context) ([]MCPCollectionServerView, error) {
+		func(sessionCtx context.Context) ([]ServerRead, error) {
 			return a.listMCPCollectionServers(
 				sessionCtx,
 				collectionRef,
@@ -390,7 +386,7 @@ func (a *API) saveBuiltInServerSettings(
 func (a *API) listMCPCollectionServers(
 	ctx context.Context,
 	collectionRef artifact.ArtifactRef,
-) ([]MCPCollectionServerView, error) {
+) ([]ServerRead, error) {
 	if _, err := a.collections.Read(ctx, collectionRef); err != nil {
 		return nil, err
 	}
@@ -445,7 +441,7 @@ func (a *API) listMCPCollectionServers(
 		return ordered[left].ArtifactID < ordered[right].ArtifactID
 	})
 
-	output := make([]MCPCollectionServerView, 0, len(ordered))
+	output := make([]ServerRead, 0, len(ordered))
 	for _, ref := range ordered {
 		material, err := a.resolveServerMaterial(ctx, ref)
 		if err != nil {
@@ -456,12 +452,7 @@ func (a *API) listMCPCollectionServers(
 			)
 		}
 
-		policyValue, err := a.effectivePolicy(
-			ctx,
-			material.Resource.Artifact.Ref(),
-			material.Document,
-			material.Installation.AdditionalPolicies,
-		)
+		read, err := a.serverReadFromMaterial(ctx, material)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"resolve MCP Collection server policy %q: %w",
@@ -470,21 +461,12 @@ func (a *API) listMCPCollectionServers(
 			)
 		}
 
-		output = append(output, MCPCollectionServerView{
-			Installation: ServerInstallationView{
-				Artifact:             material.Resource.Artifact.Clone(),
-				Document:             material.Document,
-				Installation:         installationDataView(material.Installation),
-				InstallationRevision: material.InstallationWriteRevision,
-				BuiltIn:              material.BuiltIn,
-			},
-			Policy: policyValue,
-		})
+		output = append(output, read)
 	}
 
 	sort.Slice(output, func(left, right int) bool {
-		leftArtifact := output[left].Installation.Artifact
-		rightArtifact := output[right].Installation.Artifact
+		leftArtifact := output[left].Settings.Artifact
+		rightArtifact := output[right].Settings.Artifact
 		if leftArtifact.LogicalName != rightArtifact.LogicalName {
 			return leftArtifact.LogicalName < rightArtifact.LogicalName
 		}
@@ -505,13 +487,29 @@ type serverResolutionMaterial struct {
 func (a *API) resolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpDomainServer.Resolved, error) {
-	material, err := a.resolveServerMaterial(ctx, ref)
-	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+) (ServerRead, error) {
+	if a == nil || a.resources == nil {
+		return ServerRead{}, basespec.ErrClosed
 	}
+	return consumerutil.WithResourceVerificationSession(
+		ctx,
+		a.resources,
+		func(sessionCtx context.Context) (ServerRead, error) {
+			material, err := a.resolveServerMaterial(sessionCtx, ref)
+			if err != nil {
+				return ServerRead{}, err
+			}
+			return a.serverReadFromMaterial(sessionCtx, material)
+		},
+	)
+}
+
+func (a *API) serverReadFromMaterial(
+	ctx context.Context,
+	material serverResolutionMaterial,
+) (ServerRead, error) {
 	if material.Resource.Artifact.SourceContentDigest == nil {
-		return mcpDomainServer.Resolved{}, fmt.Errorf(
+		return ServerRead{}, fmt.Errorf(
 			"%w: MCP Server has no source content digest",
 			basespec.ErrDigestMismatch,
 		)
@@ -524,7 +522,7 @@ func (a *API) resolveMCPServer(
 		material.Installation.AdditionalPolicies,
 	)
 	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return ServerRead{}, err
 	}
 
 	version, err := cryptoutil.CanonicalDigest(struct {
@@ -545,7 +543,7 @@ func (a *API) resolveMCPServer(
 		PolicyDigest:         policyValue.Digest,
 	})
 	if err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return ServerRead{}, err
 	}
 
 	output := mcpDomainServer.Resolved{
@@ -562,9 +560,18 @@ func (a *API) resolveMCPServer(
 		Version:              version,
 	}
 	if err := output.Validate(); err != nil {
-		return mcpDomainServer.Resolved{}, err
+		return ServerRead{}, err
 	}
-	return output, nil
+	return ServerRead{
+		Settings: ServerInstallationView{
+			Artifact:             material.Resource.Artifact.Clone(),
+			Document:             material.Document,
+			Installation:         installationDataView(material.Installation),
+			InstallationRevision: material.InstallationWriteRevision,
+			BuiltIn:              material.BuiltIn,
+		},
+		Resolved: output,
+	}, nil
 }
 
 func (a *API) resolveServerMaterial(

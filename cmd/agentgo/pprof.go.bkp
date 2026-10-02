@@ -1,0 +1,18 @@
+//nolint:all // Ok.
+package main
+
+import (
+	"log"
+	"net/http"
+
+	// Side-effect import registers pprof endpoints
+	_ "net/http/pprof"
+)
+
+// go tool pprof -http=:8080 http://localhost:6060/debug/pprof/profile\?seconds\=10
+func startpprof() {
+	log.Println("Starting pprof server on http://localhost:6060")
+	if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+		log.Printf("pprof server error: %v", err)
+	}
+}

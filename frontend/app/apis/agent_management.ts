@@ -28,9 +28,7 @@ type AgentStarterIssueSeverity = 'error' | 'warning';
 type AgentCollection = CollectionListItem | CollectionView;
 
 interface AgentMCPRuntimeResolver {
-	getMCPRuntimeServerView(artifact: ArtifactRef): Promise<{
-		runtimeServerID: MCPRuntimeServerID;
-	}>;
+	resolveMCPRuntimeServerIDs(artifacts: ArtifactRef[]): Promise<Map<string, MCPRuntimeServerID>>;
 }
 
 interface AgentSkillResolver {
@@ -409,6 +407,7 @@ export class AgentManagementAPI {
 		const instructionSources = new Map<string, AgentPreparedInstructionSource>();
 		const textArtifacts = new Map<string, ArtifactRef>();
 		const mcpServerIDs = new Set<MCPRuntimeServerID>();
+		const mcpArtifactRefs: ArtifactRef[] = [];
 		const startingTextParts: string[] = [];
 
 		let modelRef: ArtifactRef | undefined;
@@ -663,19 +662,7 @@ export class AgentManagementAPI {
 						);
 						continue;
 					}
-
-					try {
-						const server = await this.mcp.getMCPRuntimeServerView(occurrence.artifact);
-						mcpServerIDs.add(server.runtimeServerID);
-					} catch (error) {
-						issue(
-							issues,
-							'error',
-							'agent.recipe.mcp-runtime-id-failed',
-							`Could not load MCP runtime identity: ${error instanceof Error ? error.message : 'unknown error'}`,
-							occurrence.path
-						);
-					}
+					mcpArtifactRefs.push(occurrence.artifact);
 					break;
 				}
 
@@ -752,6 +739,22 @@ export class AgentManagementAPI {
 						`Agent declaration type "${occurrence.type}" does not currently contribute to Composer state.`,
 						occurrence.path
 					);
+			}
+		}
+
+		if (mcpArtifactRefs.length > 0) {
+			try {
+				const resolved = await this.mcp.resolveMCPRuntimeServerIDs(mcpArtifactRefs);
+				for (const runtimeServerID of resolved.values()) {
+					mcpServerIDs.add(runtimeServerID);
+				}
+			} catch (error) {
+				issue(
+					issues,
+					'error',
+					'agent.recipe.mcp-runtime-id-failed',
+					`Could not load MCP runtime identities: ${error instanceof Error ? error.message : 'unknown error'}`
+				);
 			}
 		}
 

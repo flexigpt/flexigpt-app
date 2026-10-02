@@ -417,6 +417,18 @@ func (m *AuthManager) GetAuthStatus(
 	return cloneArtifactAuthStatus(status), true
 }
 
+func (m *AuthManager) PendingAuthorizations() []MCPOAuthAuthorization {
+	if m == nil {
+		return nil
+	}
+	if broker, ok := m.oauthBroker.(interface {
+		Pending() []MCPOAuthAuthorization
+	}); ok {
+		return broker.Pending()
+	}
+	return nil
+}
+
 func (m *AuthManager) configureAuthorizationCodeOAuth(
 	ctx context.Context,
 	config mcpServer.RuntimeConfig,

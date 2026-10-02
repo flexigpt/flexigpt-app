@@ -283,7 +283,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	ref
 ) {
 	const autoSubmitTrackerRef = useRef(createAutoSubmitTracker());
-	const mcp = useComposerMCP();
 	const lastSubmittedMCPContextRef = useRef<MCPConversationContext | undefined>(undefined);
 	const mcpApproval = useMCPApproval();
 	const resetAutoSubmitTracker = useCallback(() => {
@@ -314,6 +313,8 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const skillsMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const mcpMenu = useMenuStore({ placement: 'top', focusLoop: true });
 	const workspaceMenu = useMenuStore({ placement: 'top', focusLoop: true });
+	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
+	const mcp = useComposerMCP(mcpMenuOpen);
 	const templateButtonRef = useRef<HTMLButtonElement | null>(null);
 	const toolButtonRef = useRef<HTMLButtonElement | null>(null);
 	const attachmentButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -641,7 +642,6 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 	const toolMenuOpen = useStoreState(toolMenu, 'open');
 	const attachmentMenuOpen = useStoreState(attachmentMenu, 'open');
 	const skillsMenuOpen = useStoreState(skillsMenu, 'open');
-	const mcpMenuOpen = useStoreState(mcpMenu, 'open');
 	const workspaceMenuOpen = useStoreState(workspaceMenu, 'open');
 	const templateMenuEl = useStoreState(templateMenu, 'contentElement');
 	const toolMenuEl = useStoreState(toolMenu, 'contentElement');
@@ -1710,12 +1710,18 @@ export const EditorArea = forwardRef<EditorAreaHandle, EditorAreaProps>(function
 				setMCPAppContextUpdates(updates ?? []);
 			},
 			appendMCPAppContextUpdate: update => {
-				if (!mcp.ensureServerSelected(update.server)) {
-					setSubmitError('The MCP App context could not be added because its server is unavailable or disabled.');
-					return;
-				}
-
-				setMCPAppContextUpdates(prev => [...prev, update]);
+				void mcp
+					.ensureServerSelected(update.server)
+					.then(selected => {
+						if (!selected) {
+							setSubmitError('The MCP App context could not be added because its server is unavailable or disabled.');
+							return;
+						}
+						setMCPAppContextUpdates(prev => [...prev, update]);
+					})
+					.catch(() => {
+						setSubmitError('The MCP server catalog could not be loaded.');
+					});
 			},
 			clearMCPContext: () => {
 				mcp.clear();

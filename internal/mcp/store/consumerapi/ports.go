@@ -8,7 +8,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
@@ -38,7 +37,11 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 	if r == nil || r.api == nil {
 		return mcpDomainServer.Resolved{}, basespec.ErrClosed
 	}
-	return r.api.resolveMCPServer(ctx, ref)
+	read, err := r.api.resolveMCPServer(ctx, ref)
+	if err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+	return read.Resolved, nil
 }
 
 type BaselineEnsurer interface {
@@ -93,9 +96,9 @@ func NewManagementStore(
 func (s *ManagementStoreFacade) ResolveMCPServer(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpDomainServer.Resolved, error) {
+) (ServerRead, error) {
 	if s == nil || s.api == nil {
-		return mcpDomainServer.Resolved{}, basespec.ErrClosed
+		return ServerRead{}, basespec.ErrClosed
 	}
 	return s.api.resolveMCPServer(ctx, ref)
 }
@@ -114,11 +117,11 @@ func (s *ManagementStoreFacade) GetMCPPolicy(
 	return s.api.GetMCPPolicy(ctx, ref)
 }
 
-func (s *ManagementStoreFacade) GetServerEffectivePolicy(
+func (s *ManagementStoreFacade) ListMCPCollectionServers(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
-) (mcpPolicy.Effective, error) {
-	return s.api.GetServerEffectivePolicy(ctx, ref)
+) ([]ServerRead, error) {
+	return s.api.ListMCPCollectionServers(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(

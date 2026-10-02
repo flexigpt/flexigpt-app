@@ -482,6 +482,32 @@ export interface MCPAppModelContextUpdate {
 	rawArguments?: JSONRawString;
 }
 
+export enum MCPAuthState {
+	NotRequired = 'notRequired',
+	Required = 'required',
+	Authorized = 'authorized',
+	Expired = 'expired',
+	InsufficientScope = 'insufficientScope',
+	Error = 'error',
+}
+
+interface MCPAuthStatus {
+	server: MCPRuntimeServerID;
+	authMode: MCPHTTPAuthMode;
+	state: MCPAuthState;
+	scopes?: string[];
+	expiresAt?: MCPTimestamp;
+	lastError?: string;
+	authorizationServer?: string;
+	resource?: string;
+}
+
+interface MCPOAuthAuthorization {
+	server: MCPRuntimeServerID;
+	authorizationURL: string;
+	expiresAt?: MCPTimestamp;
+}
+
 export interface MCPAuthHealth {
 	server: MCPRuntimeServerID;
 	authMode: MCPHTTPAuthMode;
@@ -647,6 +673,12 @@ export interface MCPStorePolicyView {
 	builtIn: boolean;
 }
 
+interface MCPEffectivePolicy {
+	body: MCPPolicy;
+	conflicts?: Record<string, string>;
+	digest: string;
+}
+
 /**
  * Bridge-facing aggregate response. Components should use MCPServerView or
  * MCPRuntimeServerView, both created by MCPManagementAPI.
@@ -658,11 +690,18 @@ export interface MCPServerAggregateDetails {
 	connection: MCPServerRuntimeSnapshot;
 }
 
+export interface MCPServerRuntimeDetails {
+	ref: ArtifactRef;
+	connection: MCPServerRuntimeSnapshot;
+	authorization?: MCPAuthStatus;
+	pendingAuthorization?: MCPOAuthAuthorization;
+}
+
 export interface MCPRuntimeServerView {
 	ref: ArtifactRef;
 	runtimeServerID: MCPRuntimeServerID;
-	policy: MCPEffectivePolicy;
-	authHealth: MCPAuthHealth;
+	authorization?: MCPAuthStatus;
+	pendingAuthorization?: MCPOAuthAuthorization;
 	runtime: MCPServerRuntimeSnapshot;
 }
 
@@ -717,12 +756,6 @@ export interface MCPPolicyListItem {
 	builtIn: boolean;
 }
 
-export interface MCPEffectivePolicy {
-	body: MCPPolicy;
-	conflicts?: Record<string, string>;
-	digest: string;
-}
-
 interface MCPRuntimeImplementationInfo {
 	name?: string;
 	version?: string;
@@ -732,6 +765,7 @@ export interface MCPServerRuntimeSnapshot {
 	server: MCPRuntimeServerID;
 	catalog: MCPRuntimeCatalogID;
 	status: MCPServerStatus;
+	generation: number;
 	negotiatedProtocolVersion?: string;
 	serverInfo?: MCPRuntimeImplementationInfo;
 	serverCapabilities?: MCPServerCapabilitiesSummary;

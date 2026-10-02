@@ -145,23 +145,6 @@ func (w *MCPStoreWrapper) GetMCPServerSecrets(
 	})
 }
 
-func (w *MCPStoreWrapper) ListMCPCollectionServers(
-	collectionRef artifact.ArtifactRef,
-) ([]mcpConsumerAPI.MCPCollectionServerView, error) {
-	return withMCPStore(
-		w,
-		func(api *mcpConsumerAPI.API) (
-			[]mcpConsumerAPI.MCPCollectionServerView,
-			error,
-		) {
-			return api.ListMCPCollectionServers(
-				context.Background(),
-				collectionRef,
-			)
-		},
-	)
-}
-
 func (w *MCPStoreWrapper) GetMCPPolicy(
 	ref artifact.ArtifactRef,
 ) (mcpConsumerAPI.PolicyView, error) {

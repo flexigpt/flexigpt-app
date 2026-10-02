@@ -463,6 +463,7 @@ export default function MCPServersPage() {
 							resourceCount: current?.resourceCount ?? 0,
 							resourceTemplateCount: current?.resourceTemplateCount ?? 0,
 							promptCount: current?.promptCount ?? 0,
+							generation: current?.generation ?? 0,
 						},
 					},
 				};

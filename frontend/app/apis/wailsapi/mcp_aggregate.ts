@@ -9,17 +9,27 @@ import type {
 	MCPRuntimeServerID,
 	MCPServerAggregateDetails,
 	MCPServerData,
+	MCPServerInstallationDataView,
+	MCPServerRuntimeDetails,
+	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
-import { requiredObject } from '@/apis/wailsapi/transport';
+import {
+	optionalWailsString,
+	requiredObject,
+	requireWailsBoolean,
+	wailsObjectArrayOrEmpty,
+	wailsRecordOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	ClearMCPServerSecret,
 	CreateMCPServer,
 	DeleteMCPPolicy,
 	DeleteMCPServer,
 	GetMCPServer,
-	GetMCPServerForRuntimeServer,
+	GetMCPServersForRuntimeServers,
+	ListMCPCollectionServers,
 	SaveMCPPolicy,
 	SaveMCPServerSettings,
 	SetMCPServerSecret,
@@ -28,16 +38,20 @@ import {
 
 export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	async getMCPServer(server: ArtifactRef): Promise<MCPServerAggregateDetails> {
-		return requiredObject<MCPServerAggregateDetails>(
-			await GetMCPServer(server as Parameters<typeof GetMCPServer>[0]),
-			'GetMCPServer'
-		);
+		return serverDetailsFromWails(await GetMCPServer(server as Parameters<typeof GetMCPServer>[0]), 'GetMCPServer');
 	}
 
-	async getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPServerAggregateDetails> {
-		return requiredObject<MCPServerAggregateDetails>(
-			await GetMCPServerForRuntimeServer(server as Parameters<typeof GetMCPServerForRuntimeServer>[0]),
-			'GetMCPServerForRuntimeServer'
+	async listMCPCollectionServers(collection: ArtifactRef): Promise<MCPServerAggregateDetails[]> {
+		return wailsObjectArrayOrEmpty(
+			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
+			'ListMCPCollectionServers'
+		).map((value, index) => serverDetailsFromWails(value, `ListMCPCollectionServers[${index}]`));
+	}
+
+	async getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPServerRuntimeDetails[]> {
+		return wailsObjectArrayOrEmpty<MCPServerRuntimeDetails>(
+			await GetMCPServersForRuntimeServers(servers as Parameters<typeof GetMCPServersForRuntimeServers>[0]),
+			'GetMCPServersForRuntimeServers'
 		);
 	}
 
@@ -75,7 +89,7 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 		expectedSettingsRevision: number,
 		data: MCPServerData
 	): Promise<MCPServerAggregateDetails> {
-		return requiredObject<MCPServerAggregateDetails>(
+		return serverDetailsFromWails(
 			await SaveMCPServerSettings(
 				server as Parameters<typeof SaveMCPServerSettings>[0],
 				expectedSettingsRevision,
@@ -86,16 +100,60 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async setMCPServerSecret(server: ArtifactRef, input: string, secret: string): Promise<MCPServerAggregateDetails> {
-		return requiredObject<MCPServerAggregateDetails>(
+		return serverDetailsFromWails(
 			await SetMCPServerSecret(server as Parameters<typeof SetMCPServerSecret>[0], input, secret),
 			'SetMCPServerSecret'
 		);
 	}
 
 	async clearMCPServerSecret(server: ArtifactRef, input: string): Promise<MCPServerAggregateDetails> {
-		return requiredObject<MCPServerAggregateDetails>(
+		return serverDetailsFromWails(
 			await ClearMCPServerSecret(server as Parameters<typeof ClearMCPServerSecret>[0], input),
 			'ClearMCPServerSecret'
 		);
 	}
+}
+
+function serverDetailsFromWails(value: unknown, operation: string): MCPServerAggregateDetails {
+	const details = requiredObject<MCPServerAggregateDetails>(value, operation);
+	return {
+		...details,
+		settings: installationViewFromWails(details.settings, `${operation}.settings`),
+	};
+}
+
+function installationViewFromWails(value: unknown, operation: string): MCPStoreServerInstallationView {
+	const view = requiredObject<MCPStoreServerInstallationView>(value, operation);
+	const rawInstallation = requiredObject<Record<string, unknown>>(view.installation, `${operation}.installation`);
+	const rawInputs = wailsRecordOrEmpty(rawInstallation.inputs, `${operation}.installation.inputs`);
+	const inputs = Object.fromEntries(
+		Object.entries(rawInputs).map(([name, rawInput]) => {
+			const input = requiredObject<Record<string, unknown>>(rawInput, `${operation}.installation.inputs.${name}`);
+			return [
+				name,
+				{
+					value: optionalWailsString(input.value, `${operation}.installation.inputs.${name}.value`),
+					secretConfigured: requireWailsBoolean(
+						input.secretConfigured,
+						`${operation}.installation.inputs.${name}.secretConfigured`
+					),
+				},
+			] as const;
+		})
+	);
+
+	return {
+		...view,
+		installation: {
+			selectedConnectionProfile: optionalWailsString(
+				rawInstallation.selectedConnectionProfile,
+				`${operation}.installation.selectedConnectionProfile`
+			),
+			inputs,
+			additionalPolicies: wailsObjectArrayOrEmpty(
+				rawInstallation.additionalPolicies,
+				`${operation}.installation.additionalPolicies`
+			),
+		} satisfies MCPServerInstallationDataView,
+	};
 }

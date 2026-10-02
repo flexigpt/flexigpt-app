@@ -3,33 +3,14 @@ package consumerapi
 import (
 	"context"
 	"fmt"
-	"maps"
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerutil"
-	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
-
-// GetServerEffectivePolicy returns the effective policy for one MCP server.
-// It deliberately excludes materialized connection values and secrets.
-func (a *API) GetServerEffectivePolicy(
-	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (mcpPolicy.Effective, error) {
-	resolved, err := a.resolveMCPServer(ctx, ref)
-	if err != nil {
-		return mcpPolicy.Effective{}, err
-	}
-
-	output := resolved.Policy
-	output.Body = mcpPolicy.Clone(resolved.Policy.Body)
-	output.Conflicts = maps.Clone(resolved.Policy.Conflicts)
-	return output, nil
-}
 
 // ListMCPServersReferencingPolicy finds current Server Artifacts in one Root
 // whose direct Policy declaration or additional installation policy references

@@ -109,12 +109,11 @@ func installationDataView(
 	return output
 }
 
-// MCPCollectionServerView is the management-list projection for one available
-// MCP Server reachable from a Collection. It deliberately excludes secrets,
-// materialized connection values, runtime status, and discovery payloads.
-type MCPCollectionServerView struct {
-	Installation ServerInstallationView `json:"installation"`
-	Policy       mcpPolicy.Effective    `json:"policy"`
+// ServerRead is shared by aggregate projections. It is not a wire DTO:
+// Resolved contains installation-local references and must remain backend-only.
+type ServerRead struct {
+	Settings ServerInstallationView   `json:"-"`
+	Resolved mcpDomainServer.Resolved `json:"-"`
 }
 
 type PolicyView struct {
@@ -180,7 +179,7 @@ type ServerStore interface {
 	ResolveMCPServer(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
-	) (mcpDomainServer.Resolved, error)
+	) (ServerRead, error)
 
 	GetServerSettings(
 		ctx context.Context,
@@ -198,10 +197,10 @@ type ManagementStore interface {
 		ref artifact.ArtifactRef,
 	) (PolicyView, error)
 
-	GetServerEffectivePolicy(
+	ListMCPCollectionServers(
 		ctx context.Context,
 		ref artifact.ArtifactRef,
-	) (mcpPolicy.Effective, error)
+	) ([]ServerRead, error)
 
 	ListMCPServersReferencingPolicy(
 		ctx context.Context,

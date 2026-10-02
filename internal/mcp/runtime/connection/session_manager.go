@@ -813,11 +813,19 @@ func (m *MCPRuntimeManager) Refresh(
 	refreshCtx, cancel := withMCPRefreshTimeout(ctx)
 	defer cancel()
 
-	resolved, config, _, err := m.resolveForConnection(refreshCtx, ref)
+	// Refresh verifies source/version but does not create a new connection.
+	// Preparing authentication here creates an unused handler and can reset
+	// the authorization status of an already connected server.
+	resolved, err := m.source.ResolveServer(refreshCtx, ref)
 	if err != nil {
 		m.setErrorIfCurrent(ref, state.generation, err)
 		return nil, err
 	}
+	if err := resolved.Validate(); err != nil {
+		m.setErrorIfCurrent(ref, state.generation, err)
+		return nil, err
+	}
+	config := cloneRuntimeConfig(resolved.Config)
 	if resolved.Version != state.version {
 		_ = m.Invalidate(context.WithoutCancel(ctx), ref)
 		return nil, fmt.Errorf(
@@ -900,11 +908,17 @@ func (m *MCPRuntimeManager) Status(
 		return nil, err
 	}
 
-	state, found := m.session(ref)
-	if !found {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.closed {
+		return nil, mcpServer.ErrClosed
+	}
+	state := m.sessions[ref]
+	if state == nil {
 		return &MCPServerRuntimeSnapshot{
-			Server: ref,
-			Status: MCPServerStatusDisconnected,
+			Server:     ref,
+			Status:     MCPServerStatusDisconnected,
+			Generation: m.generations[ref],
 		}, nil
 	}
 
@@ -1055,8 +1069,10 @@ func (m *MCPRuntimeManager) resolveForConnection(
 func (m *MCPRuntimeManager) currentSnapshot(
 	ref mcpServer.ServerID,
 ) (MCPDiscoverySnapshot, error) {
-	state, found := m.session(ref)
-	if !found {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	state := m.sessions[ref]
+	if m.closed || state == nil {
 		return MCPDiscoverySnapshot{}, fmt.Errorf(
 			"%w: MCP server is not connected",
 			ErrMCPRuntimeNotReady,
@@ -1077,8 +1093,11 @@ func (m *MCPRuntimeManager) currentSnapshot(
 func (m *MCPRuntimeManager) readySession(
 	ref mcpServer.ServerID,
 ) (*sessionState, error) {
-	state, found := m.session(ref)
-	if !found ||
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	state := m.sessions[ref]
+	if m.closed ||
+		state == nil ||
 		state.status != MCPServerStatusReady ||
 		state.client == nil {
 		return nil, fmt.Errorf(
@@ -1086,7 +1105,10 @@ func (m *MCPRuntimeManager) readySession(
 			ErrMCPRuntimeNotReady,
 		)
 	}
-	return state, nil
+	// Internal read-only view. Published config and discovery payloads are
+	// replaced, not edited in place. Callers clone values they return.
+	value := *state
+	return &value, nil
 }
 
 func (m *MCPRuntimeManager) session(
@@ -1461,6 +1483,7 @@ func runtimeSnapshot(
 		Server:                    state.server,
 		Catalog:                   state.catalog,
 		Status:                    state.status,
+		Generation:                state.generation,
 		LastError:                 state.lastError,
 		NegotiatedProtocolVersion: snapshot.NegotiatedProtocolVersion,
 		ServerInfo:                cloneImplementationInfo(snapshot.ServerInfo),

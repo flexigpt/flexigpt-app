@@ -37,7 +37,11 @@ func (r *ArtifactServerResolver) ResolveMCPServer(
 	if err != nil {
 		return mcpDomainServer.Resolved{}, err
 	}
-	return r.store.ResolveMCPServer(ctx, ref)
+	read, err := r.store.ResolveMCPServer(ctx, ref)
+	if err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+	return read.Resolved, nil
 }
 
 func (r *ArtifactServerResolver) InspectMCPServer(
@@ -47,5 +51,9 @@ func (r *ArtifactServerResolver) InspectMCPServer(
 	if r == nil || r.store == nil {
 		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed
 	}
-	return r.store.ResolveMCPServer(ctx, ref)
+	read, err := r.store.ResolveMCPServer(ctx, ref)
+	if err != nil {
+		return mcpDomainServer.Resolved{}, err
+	}
+	return read.Resolved, nil
 }

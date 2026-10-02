@@ -61,6 +61,7 @@ export interface UseComposerMCPResult {
 	argumentsBlocked: boolean;
 
 	refreshAll: () => Promise<void>;
+	refreshRuntimeStates: () => Promise<void>;
 	refreshServer: (server: MCPRuntimeServerID) => Promise<void>;
 	ensureDiscoveryLoaded: (server: MCPRuntimeServerID) => Promise<void>;
 	prepareForSubmit: () => Promise<MCPConversationContext | undefined>;
@@ -71,7 +72,7 @@ export interface UseComposerMCPResult {
 	openAuthURL: (url: string) => void;
 
 	setServerSelected: (option: MCPComposerServerOption, selected: boolean) => void;
-	ensureServerSelected: (server: MCPRuntimeServerID) => boolean;
+	ensureServerSelected: (server: MCPRuntimeServerID) => Promise<boolean>;
 	setToolExposure: (server: MCPRuntimeServerID, exposure: MCPToolExposure) => void;
 	setIncludeServerInstructions: (server: MCPRuntimeServerID, include: boolean) => void;
 	toggleTool: (tool: MCPToolCapability, selected: boolean) => void;

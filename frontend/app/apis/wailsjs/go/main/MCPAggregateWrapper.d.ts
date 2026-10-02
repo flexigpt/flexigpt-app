@@ -15,7 +15,9 @@ export function DeleteMCPServer(arg1:artifact.ArtifactRef,arg2:number):Promise<v
 
 export function GetMCPServer(arg1:artifact.ArtifactRef):Promise<aggregate.MCPServerDetails>;
 
-export function GetMCPServerForRuntimeServer(arg1:server.ServerID):Promise<aggregate.MCPServerDetails>;
+export function GetMCPServersForRuntimeServers(arg1:Array<server.ServerID>):Promise<Array<aggregate.MCPServerRuntimeDetails>>;
+
+export function ListMCPCollectionServers(arg1:artifact.ArtifactRef):Promise<Array<aggregate.MCPServerDetails>>;
 
 export function SaveMCPPolicy(arg1:consumerapi.ManagedMCPPolicyUpsertRequest):Promise<consumerapi.ManagedMCPPolicyUpsertResult>;
 

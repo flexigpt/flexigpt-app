@@ -920,6 +920,13 @@ export function MCPBottomBarChip({
 	const [manualOAuthModalKey, setManualOAuthModalKey] = useState<string | null>(null);
 	const [dismissedOAuthKeys, setDismissedOAuthKeys] = useState<Set<string>>(() => new Set());
 
+	const refreshRuntimeStates = state.refreshRuntimeStates;
+	useEffect(() => {
+		if (open) {
+			void refreshRuntimeStates();
+		}
+	}, [open, refreshRuntimeStates]);
+
 	const enabledCount = state.selectedServerCount;
 	const hasAppContextUpdates = appContextUpdateCount > 0;
 	const hasBlockingArgs = state.argumentsBlocked;
@@ -1034,6 +1041,9 @@ export function MCPBottomBarChip({
 		}
 		return (
 			visibleOptions.find(option => {
+				if (option.runtime?.status !== MCPServerStatus.Connecting && !option.authHealth?.authorizationPending) {
+					return false;
+				}
 				if (!isOAuthModalRelevant(option)) {
 					return false;
 				}

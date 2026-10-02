@@ -342,14 +342,19 @@ function MCPAppViewContent({ instance, toolInput, toolResult, height = DEFAULT_A
 		let cancelled = false;
 
 		void mcpManagementAPI
-			.getMCPServerForRuntimeServer(server)
-			.then(resolved => {
+			.findComposerServerByRuntimeID(server)
+			.then(view => {
 				if (cancelled) {
 					return;
 				}
 
-				setServerArtifact(resolved.ref);
-				const nextPolicy = resolved.policy?.body.appsPolicy;
+				if (!view) {
+					setPolicyError('MCP server is not available in the composer catalog.');
+					return;
+				}
+
+				setServerArtifact(view.ref);
+				const nextPolicy = view.policy?.body.appsPolicy;
 				if (!nextPolicy) {
 					setPolicyError('The server did not return an MCP Apps policy.');
 					return;

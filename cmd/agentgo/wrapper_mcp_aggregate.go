@@ -51,16 +51,24 @@ func (w *MCPAggregateWrapper) GetMCPServer(
 	)
 }
 
-func (w *MCPAggregateWrapper) GetMCPServerForRuntimeServer(
-	server mcpServer.ServerID,
-) (mcpAggregate.MCPServerDetails, error) {
+func (w *MCPAggregateWrapper) ListMCPCollectionServers(
+	ref artifact.ArtifactRef,
+) ([]mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
 		w,
-		func(service *mcpAggregate.Service) (mcpAggregate.MCPServerDetails, error) {
-			return service.GetMCPServerForRuntimeServer(
-				context.Background(),
-				server,
-			)
+		func(service *mcpAggregate.Service) ([]mcpAggregate.MCPServerDetails, error) {
+			return service.ListMCPCollectionServers(context.Background(), ref)
+		},
+	)
+}
+
+func (w *MCPAggregateWrapper) GetMCPServersForRuntimeServers(
+	servers []mcpServer.ServerID,
+) ([]mcpAggregate.MCPServerRuntimeDetails, error) {
+	return withMCPAggregate(
+		w,
+		func(service *mcpAggregate.Service) ([]mcpAggregate.MCPServerRuntimeDetails, error) {
+			return service.GetMCPServersForRuntimeServers(context.Background(), servers)
 		},
 	)
 }

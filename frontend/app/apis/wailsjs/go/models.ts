@@ -116,6 +116,42 @@ export namespace aggregate {
 		    return a;
 		}
 	}
+	export class MCPServerRuntimeDetails {
+	    ref: artifact.ArtifactRef;
+	    connection: server.MCPServerRuntimeSnapshot;
+	    authorization?: auth.MCPAuthStatus;
+	    pendingAuthorization?: auth.MCPOAuthAuthorization;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPServerRuntimeDetails(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.connection = this.convertValues(source["connection"], server.MCPServerRuntimeSnapshot);
+	        this.authorization = this.convertValues(source["authorization"], auth.MCPAuthStatus);
+	        this.pendingAuthorization = this.convertValues(source["pendingAuthorization"], auth.MCPOAuthAuthorization);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ResolvedArtifactSkill {
 	    Artifact: artifact.ArtifactRef;
 	    Definition: provider.SkillDef;
@@ -727,6 +763,67 @@ export namespace auth {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.oauthLoopbackListenAddr = source["oauthLoopbackListenAddr"];
+	    }
+	}
+	export class MCPAuthStatus {
+	    server: string;
+	    authMode: string;
+	    state: string;
+	    scopes?: string[];
+	    // Go type: time
+	    expiresAt?: any;
+	    lastError?: string;
+	    authorizationServer?: string;
+	    resource?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPAuthStatus(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.server = source["server"];
+	        this.authMode = source["authMode"];
+	        this.state = source["state"];
+	        this.scopes = source["scopes"];
+	        this.expiresAt = this.convertValues(source["expiresAt"], null);
+	        this.lastError = source["lastError"];
+	        this.authorizationServer = source["authorizationServer"];
+	        this.resource = source["resource"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class MCPOAuthAuthorization {
+	    server: string;
+	    authorizationURL: string;
+	    expiresAt?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new MCPOAuthAuthorization(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.server = source["server"];
+	        this.authorizationURL = source["authorizationURL"];
+	        this.expiresAt = source["expiresAt"];
 	    }
 	}
 
@@ -2002,110 +2099,6 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
-	export class ServerInstallationDataView {
-	    selectedConnectionProfile?: string;
-	    inputs?: Record<string, InstallationInputView>;
-	    additionalPolicies?: artifact.ArtifactRef[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ServerInstallationDataView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.selectedConnectionProfile = source["selectedConnectionProfile"];
-	        this.inputs = this.convertValues(source["inputs"], InstallationInputView, true);
-	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], artifact.ArtifactRef);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ServerInstallationView {
-	    artifact: artifact.Artifact;
-	    document: server.ServerDocument;
-	    installation: ServerInstallationDataView;
-	    installationRevision: number;
-	    builtIn: boolean;
-	
-	    static createFrom(source: any = {}) {
-	        return new ServerInstallationView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.document = this.convertValues(source["document"], server.ServerDocument);
-	        this.installation = this.convertValues(source["installation"], ServerInstallationDataView);
-	        this.installationRevision = source["installationRevision"];
-	        this.builtIn = source["builtIn"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class MCPCollectionServerView {
-	    installation: ServerInstallationView;
-	    policy: policy.Effective;
-	
-	    static createFrom(source: any = {}) {
-	        return new MCPCollectionServerView(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.installation = this.convertValues(source["installation"], ServerInstallationView);
-	        this.policy = this.convertValues(source["policy"], policy.Effective);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class ManagedAgentDeleteRequest {
 	    agent: artifact.ArtifactRef;
 	    expectedRevision: number;
@@ -3238,8 +3231,78 @@ export namespace consumerapi {
 		    return a;
 		}
 	}
+	export class ServerInstallationDataView {
+	    selectedConnectionProfile?: string;
+	    inputs?: Record<string, InstallationInputView>;
+	    additionalPolicies?: artifact.ArtifactRef[];
 	
+	    static createFrom(source: any = {}) {
+	        return new ServerInstallationDataView(source);
+	    }
 	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.selectedConnectionProfile = source["selectedConnectionProfile"];
+	        this.inputs = this.convertValues(source["inputs"], InstallationInputView, true);
+	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], artifact.ArtifactRef);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ServerInstallationView {
+	    artifact: artifact.Artifact;
+	    document: server.ServerDocument;
+	    installation: ServerInstallationDataView;
+	    installationRevision: number;
+	    builtIn: boolean;
+	
+	    static createFrom(source: any = {}) {
+	        return new ServerInstallationView(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.document = this.convertValues(source["document"], server.ServerDocument);
+	        this.installation = this.convertValues(source["installation"], ServerInstallationDataView);
+	        this.installationRevision = source["installationRevision"];
+	        this.builtIn = source["builtIn"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class ServerListItem {
 	    ref: artifact.ArtifactRef;
 	    name: string;
@@ -7761,6 +7824,7 @@ export namespace server {
 	    server: string;
 	    catalog: string;
 	    status: string;
+	    generation: number;
 	    negotiatedProtocolVersion?: string;
 	    serverInfo?: MCPImplementationInfo;
 	    serverCapabilities?: MCPServerCapabilitiesSummary;
@@ -7783,6 +7847,7 @@ export namespace server {
 	        this.server = source["server"];
 	        this.catalog = source["catalog"];
 	        this.status = source["status"];
+	        this.generation = source["generation"];
 	        this.negotiatedProtocolVersion = source["negotiatedProtocolVersion"];
 	        this.serverInfo = this.convertValues(source["serverInfo"], MCPImplementationInfo);
 	        this.serverCapabilities = this.convertValues(source["serverCapabilities"], MCPServerCapabilitiesSummary);

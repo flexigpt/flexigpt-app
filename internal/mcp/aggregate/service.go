@@ -3,6 +3,7 @@ package aggregate
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -19,6 +20,12 @@ type AuthState interface {
 		ctx context.Context,
 		config mcpServer.RuntimeConfig,
 	) mcpAuth.MCPAuthHealth
+
+	GetAuthStatus(
+		server mcpServer.ServerID,
+	) (mcpAuth.MCPAuthStatus, bool)
+
+	PendingAuthorizations() []mcpAuth.MCPOAuthAuthorization
 }
 
 type RuntimeStatusReader interface {
@@ -71,6 +78,15 @@ type MCPServerDetails struct {
 	Connection    mcpServer.MCPServerRuntimeSnapshot    `json:"connection"`
 }
 
+// MCPServerRuntimeDetails contains only process-local runtime/auth observations.
+// Configuration health and effective policy belong to the verified detail read.
+type MCPServerRuntimeDetails struct {
+	Ref                  artifact.ArtifactRef               `json:"ref"`
+	Connection           mcpServer.MCPServerRuntimeSnapshot `json:"connection"`
+	Authorization        *mcpAuth.MCPAuthStatus             `json:"authorization,omitempty"`
+	PendingAuthorization *mcpAuth.MCPOAuthAuthorization     `json:"pendingAuthorization,omitempty"`
+}
+
 func NewService(dependencies Dependencies) (*Service, error) {
 	if dependencies.Lifecycle == nil ||
 		dependencies.Servers == nil ||
@@ -101,51 +117,88 @@ func (s *Service) GetMCPServer(
 		return MCPServerDetails{}, err
 	}
 
-	settings, err := s.store.GetServerSettings(ctx, ref)
+	read, err := s.store.ResolveMCPServer(ctx, ref)
 	if err != nil {
 		return MCPServerDetails{}, err
 	}
-	policy, err := s.store.GetServerEffectivePolicy(ctx, ref)
-	if err != nil {
-		return MCPServerDetails{}, err
-	}
-	authorization, err := s.serverAuthHealth(ctx, ref)
-	if err != nil {
-		return MCPServerDetails{}, err
-	}
-
-	serverID, err := runtimeServerIDForArtifact(ref)
-	if err != nil {
-		return MCPServerDetails{}, err
-	}
-	connection, err := s.runtime.Status(ctx, serverID)
-	if err != nil {
-		return MCPServerDetails{}, err
-	}
-	if connection == nil {
-		return MCPServerDetails{}, mcpServer.ErrClosed
-	}
-
-	return MCPServerDetails{
-		Settings:      settings,
-		Policy:        policy,
-		Authorization: authorization,
-		Connection:    *connection,
-	}, nil
+	return s.serverDetails(ctx, read)
 }
 
-func (s *Service) GetMCPServerForRuntimeServer(
+func (s *Service) ListMCPCollectionServers(
 	ctx context.Context,
-	serverID mcpServer.ServerID,
-) (MCPServerDetails, error) {
+	ref artifact.ArtifactRef,
+) ([]MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
-		return MCPServerDetails{}, err
+		return nil, err
 	}
-	ref, err := artifactRefForRuntimeServerID(serverID)
+	reads, err := s.store.ListMCPCollectionServers(ctx, ref)
 	if err != nil {
-		return MCPServerDetails{}, err
+		return nil, err
 	}
-	return s.GetMCPServer(ctx, ref)
+	output := make([]MCPServerDetails, 0, len(reads))
+	for _, read := range reads {
+		details, err := s.serverDetails(ctx, read)
+		if err != nil {
+			return nil, err
+		}
+		output = append(output, details)
+	}
+	return output, nil
+}
+
+func (s *Service) GetMCPServersForRuntimeServers(
+	ctx context.Context,
+	servers []mcpServer.ServerID,
+) ([]MCPServerRuntimeDetails, error) {
+	if err := s.ready(); err != nil {
+		return nil, err
+	}
+	if len(servers) > mcpServer.MaxMCPServerPageSize {
+		return nil, fmt.Errorf(
+			"%w: too many MCP runtime status requests",
+			mcpServer.ErrInvalid,
+		)
+	}
+	refs := make(map[mcpServer.ServerID]artifact.ArtifactRef, len(servers))
+	for _, server := range servers {
+		ref, err := artifactRefForRuntimeServerID(server)
+		if err != nil {
+			return nil, err
+		}
+		refs[server] = ref
+	}
+	pending := make(map[mcpServer.ServerID]mcpAuth.MCPOAuthAuthorization)
+	for _, value := range s.auth.PendingAuthorizations() {
+		pending[value.Server] = value
+	}
+
+	output := make([]MCPServerRuntimeDetails, 0, len(refs))
+	seen := make(map[mcpServer.ServerID]struct{}, len(refs))
+	for _, server := range servers {
+		if _, duplicate := seen[server]; duplicate {
+			continue
+		}
+		seen[server] = struct{}{}
+		connection, err := s.runtime.Status(ctx, server)
+		if err != nil {
+			return nil, err
+		}
+		if connection == nil {
+			return nil, mcpServer.ErrClosed
+		}
+		value := MCPServerRuntimeDetails{
+			Ref:        refs[server],
+			Connection: *connection,
+		}
+		if status, found := s.auth.GetAuthStatus(server); found {
+			value.Authorization = &status
+		}
+		if authorization, found := pending[server]; found {
+			value.PendingAuthorization = &authorization
+		}
+		output = append(output, value)
+	}
+	return output, nil
 }
 
 func (s *Service) SaveMCPServerSettings(
@@ -277,6 +330,35 @@ func (s *Service) DeleteMCPPolicy(
 	return s.store.DeleteMCPPolicy(ctx, ref, expectedRevision)
 }
 
+func (s *Service) serverDetails(
+	ctx context.Context,
+	read mcpConsumerAPI.ServerRead,
+) (MCPServerDetails, error) {
+	authorization, err := s.serverAuthHealth(ctx, read.Resolved)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+
+	serverID, err := runtimeServerIDForArtifact(read.Resolved.Server)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	connection, err := s.runtime.Status(ctx, serverID)
+	if err != nil {
+		return MCPServerDetails{}, err
+	}
+	if connection == nil {
+		return MCPServerDetails{}, mcpServer.ErrClosed
+	}
+
+	return MCPServerDetails{
+		Settings:      read.Settings,
+		Policy:        read.Resolved.Policy,
+		Authorization: authorization,
+		Connection:    *connection,
+	}, nil
+}
+
 func retainServerSecretBindings(
 	current mcpDomainServer.ServerData,
 	next mcpDomainServer.ServerData,
@@ -325,17 +407,17 @@ func (s *Service) saveMCPServerSettings(
 
 func (s *Service) serverAuthHealth(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	resolved mcpDomainServer.Resolved,
 ) (mcpAuth.MCPAuthHealth, error) {
-	config, resolved, err := s.source.InspectRuntimeConfig(ctx, ref)
+	config, err := s.source.InspectRuntimeConfig(ctx, resolved)
 	if err == nil {
 		return s.auth.BuildAuthHealth(ctx, config), nil
 	}
-	if resolved.Server != ref {
-		return mcpAuth.MCPAuthHealth{}, err
+	if ctx.Err() != nil {
+		return mcpAuth.MCPAuthHealth{}, ctx.Err()
 	}
 
-	serverID, idErr := runtimeServerIDForArtifact(ref)
+	serverID, idErr := runtimeServerIDForArtifact(resolved.Server)
 	if idErr != nil {
 		return mcpAuth.MCPAuthHealth{}, idErr
 	}

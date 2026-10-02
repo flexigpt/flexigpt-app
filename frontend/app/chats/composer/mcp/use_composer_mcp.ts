@@ -8,23 +8,17 @@ import type {
 	MCPResourceTemplateRef,
 	MCPResourceTemplateSelection,
 	MCPRuntimeServerID,
+	MCPRuntimeServerView,
 	MCPToolCapability,
 	MCPToolSelection,
 } from '@/spec/mcp';
-import {
-	MCPAuthHealthState,
-	MCPHTTPAuthMode,
-	MCPServerStatus,
-	MCPServerType,
-	MCPToolExposure,
-	MCPTransportType,
-} from '@/spec/mcp';
+import { MCPServerStatus, MCPServerType, MCPToolExposure, MCPTransportType } from '@/spec/mcp';
 
 import { getErrorMessage } from '@/lib/error_utils';
 import { areComparableValuesEqual, omitManyKeys } from '@/lib/obj_utils';
 
 import { backendAPI, mcpManagementAPI } from '@/apis/baseapi';
-import { getAuthMode, isServerOperational } from '@/apis/mcp_management';
+import { getMCPRuntimeAuthHealth, isServerOperational } from '@/apis/mcp_management';
 import { collectAllPages } from '@/apis/wailsapi/transport';
 
 import type {
@@ -80,21 +74,20 @@ function normalizeMCPDiscoveryList<T>(result: PromiseSettledResult<T[]>, label: 
 	return { items: value as T[] };
 }
 
-function sleep(ms: number): Promise<void> {
+function sleep(ms: number, signal: AbortSignal): Promise<void> {
 	return new Promise(resolve => {
-		window.setTimeout(resolve, ms);
+		if (signal.aborted) {
+			resolve();
+			return;
+		}
+		const finish = () => {
+			window.clearTimeout(timer);
+			signal.removeEventListener('abort', finish);
+			resolve();
+		};
+		const timer = window.setTimeout(finish, ms);
+		signal.addEventListener('abort', finish, { once: true });
 	});
-}
-
-function isOAuthServerOption(option: MCPComposerServerOption): boolean {
-	return getAuthMode(option.server) === MCPHTTPAuthMode.OAuth;
-}
-
-function hasPendingOAuthHealth(option: MCPComposerServerOption): boolean {
-	return (
-		option.authHealth?.state === MCPAuthHealthState.AuthorizationPending ||
-		Boolean(option.authHealth?.authorizationPending)
-	);
 }
 
 export function optionKey(option: MCPComposerServerOption): string {
@@ -189,10 +182,10 @@ function modelSelectableTools(tools: MCPToolCapability[]): MCPToolCapability[] {
 	return tools.filter(tool => isMCPToolModelSelectable(tool));
 }
 
-export function useComposerMCP(): UseComposerMCPResult {
+export function useComposerMCP(catalogRequested: boolean): UseComposerMCPResult {
 	const [options, setOptions] = useState<MCPComposerServerOption[]>([]);
 	const [selectedByServerKey, setSelectedByServerKey] = useState<Record<string, MCPComposerServerSelection>>({});
-	const [loading, setLoading] = useState(true);
+	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | undefined>();
 
 	const mountedRef = useRef(true);
@@ -200,20 +193,33 @@ export function useComposerMCP(): UseComposerMCPResult {
 	const selectedByServerKeyRef = useRef<Record<string, MCPComposerServerSelection>>({});
 	const discoveryPromisesRef = useRef(new Map<string, Promise<MCPDiscoveryLoadResult | undefined>>());
 	const connectionPromisesRef = useRef(new Map<string, Promise<void>>());
+	const connectionControllersRef = useRef(new Map<string, AbortController>());
+	const observedGenerationsRef = useRef(new Map<string, number>());
+	const discoveryVersionsRef = useRef(new Map<string, number>());
+	const statusRequestsRef = useRef(new Map<string, number>());
+	const lifetimeRef = useRef(0);
+	const catalogLoadedRef = useRef(false);
+	const catalogPromiseRef = useRef<Promise<void> | undefined>(undefined);
 
 	useEffect(() => {
 		mountedRef.current = true;
 
 		return () => {
 			mountedRef.current = false;
+			lifetimeRef.current += 1;
+			catalogPromiseRef.current = undefined;
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			for (const controller of connectionControllersRef.current.values()) {
+				controller.abort();
+			}
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			connectionControllersRef.current.clear();
+			// oxlint-disable-next-line react-hooks/exhaustive-deps
+			discoveryPromisesRef.current.clear();
 			// oxlint-disable-next-line react-hooks/exhaustive-deps
 			connectionPromisesRef.current.clear();
 		};
 	}, []);
-
-	useEffect(() => {
-		optionsRef.current = options;
-	}, [options]);
 
 	useEffect(() => {
 		selectedByServerKeyRef.current = selectedByServerKey;
@@ -232,75 +238,92 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const patchOption = useCallback((server: MCPRuntimeServerID, patch: Partial<MCPComposerServerOption>) => {
 		const key = mcpServerKey(server);
-
-		setOptions(previous => {
-			let changed = false;
-
-			const next = previous.map(option =>
-				optionKey(option) === key && hasOptionPatchChanges(option, patch)
-					? (() => {
-							changed = true;
-							return {
-								...option,
-								...patch,
-							};
-						})()
-					: option
-			);
-
-			if (!changed) {
-				return previous;
+		if (!mountedRef.current) {
+			return;
+		}
+		let changed = false;
+		const next = optionsRef.current.map(option => {
+			if (optionKey(option) !== key || !hasOptionPatchChanges(option, patch)) {
+				return option;
 			}
-
-			optionsRef.current = next;
-			return next;
+			changed = true;
+			return { ...option, ...patch };
 		});
-	}, []);
-
-	const loadDeclarationCatalog = useCallback(async (force = false) => {
-		setLoading(true);
-		setError(undefined);
-
-		try {
-			const declarations = await mcpManagementAPI.listComposerMCPDeclarations(force);
-
-			const values = declarations.flatMap(({ bundle, servers }) =>
-				servers.map(server => optionFromServer(bundle, server, server.runtime, server.authHealth))
-			);
-
-			const next = values.filter((value): value is MCPComposerServerOption => value !== undefined);
-
-			if (!mountedRef.current) {
-				return;
-			}
-
+		if (changed) {
 			optionsRef.current = next;
 			setOptions(next);
-		} catch (cause) {
-			if (!mountedRef.current) {
-				return;
-			}
-
-			setError(getErrorMessage(cause, 'Failed to load MCP servers.'));
-		} finally {
-			if (mountedRef.current) {
-				setLoading(false);
-			}
 		}
 	}, []);
 
+	const loadDeclarationCatalog = useCallback((force = false): Promise<void> => {
+		if (catalogPromiseRef.current) {
+			return catalogPromiseRef.current;
+		}
+		if (!force && catalogLoadedRef.current) {
+			return Promise.resolve();
+		}
+		const lifetime = lifetimeRef.current;
+		const promise = (async () => {
+			setLoading(true);
+			setError(undefined);
+			try {
+				const declarations = await mcpManagementAPI.listComposerMCPDeclarations(force);
+				if (!mountedRef.current || lifetime !== lifetimeRef.current) {
+					return;
+				}
+				const unique = new Map<string, MCPComposerServerOption>();
+				for (const { bundle, servers } of declarations) {
+					for (const server of servers) {
+						const option = optionFromServer(bundle, server, server.runtime, server.authHealth);
+						if (!option) {
+							continue;
+						}
+						const existing = unique.get(optionKey(option));
+						if (!existing || (!existing.bundle.enabled && option.bundle.enabled)) {
+							unique.set(optionKey(option), option);
+						}
+					}
+				}
+				for (const key of discoveryVersionsRef.current.keys()) {
+					discoveryVersionsRef.current.set(key, (discoveryVersionsRef.current.get(key) ?? 0) + 1);
+				}
+				discoveryPromisesRef.current.clear();
+				optionsRef.current = [...unique.values()];
+				catalogLoadedRef.current = true;
+				setOptions(optionsRef.current);
+			} catch (cause) {
+				if (mountedRef.current && lifetime === lifetimeRef.current) {
+					setError(getErrorMessage(cause, 'Failed to load MCP servers.'));
+				}
+			} finally {
+				if (mountedRef.current && lifetime === lifetimeRef.current) {
+					setLoading(false);
+				}
+			}
+		})().finally(() => {
+			if (catalogPromiseRef.current === promise) {
+				catalogPromiseRef.current = undefined;
+			}
+		});
+		catalogPromiseRef.current = promise;
+		return promise;
+	}, []);
+
 	const refreshAll = useCallback(() => loadDeclarationCatalog(true), [loadDeclarationCatalog]);
+	const hasSelections = Object.keys(selectedByServerKey).length > 0;
 
 	useEffect(() => {
-		void loadDeclarationCatalog(false);
-	}, [loadDeclarationCatalog]);
+		if (catalogRequested || hasSelections) {
+			void loadDeclarationCatalog();
+		}
+	}, [catalogRequested, hasSelections, loadDeclarationCatalog]);
 
 	const loadDiscoveryForServer = useCallback(
 		async (server: MCPRuntimeServerID, force = false): Promise<MCPDiscoveryLoadResult | undefined> => {
 			const key = mcpServerKey(server);
 			const current = optionsRef.current.find(option => optionKey(option) === key);
 
-			if (!current) {
+			if (!current || current.runtime?.status !== MCPServerStatus.Ready || !current.runtime.snapshotDigest) {
 				return undefined;
 			}
 
@@ -327,6 +350,21 @@ export function useComposerMCP(): UseComposerMCPResult {
 				discoveryError: undefined,
 			});
 
+			const lifetime = lifetimeRef.current;
+			const version = discoveryVersionsRef.current.get(key) ?? 0;
+			discoveryVersionsRef.current.set(key, version);
+			const generation = current.runtime.generation;
+			const digest = current.runtime.snapshotDigest;
+			const isCurrent = () => {
+				const latest = optionsRef.current.find(option => optionKey(option) === key);
+				return (
+					mountedRef.current &&
+					lifetime === lifetimeRef.current &&
+					version === discoveryVersionsRef.current.get(key) &&
+					latest?.runtime?.generation === generation &&
+					latest.runtime.snapshotDigest === digest
+				);
+			};
 			const promise = (async (): Promise<MCPDiscoveryLoadResult | undefined> => {
 				const [toolsResult, resourcesResult, resourceTemplatesResult, promptsResult] = await Promise.allSettled([
 					collectAllPages(
@@ -359,7 +397,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 					(message): message is string => typeof message === 'string' && message.length > 0
 				);
 
-				if (!mountedRef.current) {
+				if (!isCurrent()) {
 					return undefined;
 				}
 
@@ -375,7 +413,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 				commitSelectedByServerKey(previous => {
 					const selection = previous[key];
-					if (!selection || selection.toolExposure !== MCPToolExposure.All) {
+					if (errors.length > 0 || !selection || selection.toolExposure !== MCPToolExposure.All) {
 						return previous;
 					}
 
@@ -399,7 +437,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 						}
 					: undefined;
 			})().catch((cause: unknown) => {
-				if (!mountedRef.current) {
+				if (!isCurrent()) {
 					return undefined;
 				}
 
@@ -417,7 +455,9 @@ export function useComposerMCP(): UseComposerMCPResult {
 			try {
 				return await promise;
 			} finally {
-				discoveryPromisesRef.current.delete(key);
+				if (discoveryPromisesRef.current.get(key) === promise) {
+					discoveryPromisesRef.current.delete(key);
+				}
 			}
 		},
 		[commitSelectedByServerKey, patchOption]
@@ -445,39 +485,85 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 	}, [ensureDiscoveryLoaded, options, selectedServerKeys]);
 
-	const refreshServerStatus = useCallback(
-		async (server: MCPRuntimeServerID) => {
-			const previous = optionsRef.current.find(option => optionKey(option) === mcpServerKey(server));
-
-			if (!previous) {
-				return undefined;
+	const applyRuntimeView = useCallback(
+		(view: MCPRuntimeServerView) => {
+			const key = mcpServerKey(view.runtimeServerID);
+			const current = optionsRef.current.find(option => optionKey(option) === key);
+			if (!current || view.runtime.generation < (current.runtime?.generation ?? 0)) {
+				return;
 			}
-
-			const refreshed = await mcpManagementAPI.getMCPServer(previous.server.ref, previous.bundle.ref);
-
-			if (!mountedRef.current) {
-				return {
-					runtime: refreshed.runtime,
-					authHealth: refreshed.authHealth,
-				};
+			const changed =
+				current.runtime?.generation !== view.runtime.generation ||
+				current.runtime?.snapshotDigest !== view.runtime.snapshotDigest;
+			if (changed) {
+				discoveryVersionsRef.current.set(key, (discoveryVersionsRef.current.get(key) ?? 0) + 1);
+				discoveryPromisesRef.current.delete(key);
 			}
-
-			patchOption(server, {
-				server: refreshed,
-				runtime: refreshed.runtime,
-				authHealth: refreshed.authHealth,
+			patchOption(view.runtimeServerID, {
+				runtime: view.runtime,
+				authHealth: getMCPRuntimeAuthHealth(current.server.authHealth, view),
+				...(changed
+					? {
+							tools: [],
+							resources: [],
+							resourceTemplates: [],
+							prompts: [],
+							discoveryLoaded: false,
+							discoveryLoading: false,
+							discoveryError: undefined,
+						}
+					: {}),
 			});
-
-			return {
-				runtime: refreshed.runtime,
-				authHealth: refreshed.authHealth,
-			};
 		},
 		[patchOption]
 	);
 
+	const refreshStatuses = useCallback(
+		async (servers: MCPRuntimeServerID[]) => {
+			const lifetime = lifetimeRef.current;
+			const requests = new Map(
+				servers.map(server => {
+					const next = (statusRequestsRef.current.get(server) ?? 0) + 1;
+					statusRequestsRef.current.set(server, next);
+					return [server, next] as const;
+				})
+			);
+			const views = await mcpManagementAPI.getMCPServersForRuntimeServers(servers);
+			if (!mountedRef.current || lifetime !== lifetimeRef.current) {
+				return;
+			}
+			for (const view of views) {
+				if (statusRequestsRef.current.get(view.runtimeServerID) === requests.get(view.runtimeServerID)) {
+					applyRuntimeView(view);
+				}
+			}
+		},
+		[applyRuntimeView]
+	);
+
+	const refreshServerStatus = useCallback(
+		async (server: MCPRuntimeServerID) => {
+			await refreshStatuses([server]);
+			const option = optionsRef.current.find(value => optionKey(value) === mcpServerKey(server));
+			return option ? { runtime: option.runtime, authHealth: option.authHealth } : undefined;
+		},
+		[refreshStatuses]
+	);
+
+	const refreshRuntimeStates = useCallback(async () => {
+		const wasLoaded = catalogLoadedRef.current;
+		await loadDeclarationCatalog();
+		if (!mountedRef.current || !catalogLoadedRef.current || !wasLoaded) {
+			return;
+		}
+		await refreshStatuses(optionsRef.current.map(option => option.runtimeServerID)).catch(() => undefined);
+	}, [loadDeclarationCatalog, refreshStatuses]);
+
 	const refreshServer = useCallback(
 		async (server: MCPRuntimeServerID) => {
+			const key = mcpServerKey(server);
+			discoveryVersionsRef.current.set(key, (discoveryVersionsRef.current.get(key) ?? 0) + 1);
+			discoveryPromisesRef.current.delete(key);
 			patchOption(server, {
 				discoveryLoaded: false,
 				discoveryLoading: true,
@@ -509,7 +595,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 	);
 
 	const connectServer = useCallback(
-		(server: MCPRuntimeServerID): Promise<void> => {
+		(server: MCPRuntimeServerID, observeOnly = false): Promise<void> => {
 			const key = mcpServerKey(server);
 			const inFlight = connectionPromisesRef.current.get(key);
 
@@ -517,13 +603,33 @@ export function useComposerMCP(): UseComposerMCPResult {
 				return inFlight;
 			}
 
+			const controller = new AbortController();
+			const { signal } = controller;
+			connectionControllersRef.current.set(key, controller);
 			const promise = (async () => {
-				const current = optionsRef.current.find(option => optionKey(option) === key);
-
-				let runtime =
-					current?.runtime?.status === MCPServerStatus.Connecting
-						? current.runtime
-						: await mcpManagementAPI.connectMCPServer(server);
+				await refreshServerStatus(server);
+				if (signal.aborted || !mountedRef.current) {
+					return;
+				}
+				let runtime = optionsRef.current.find(option => optionKey(option) === key)?.runtime;
+				if (!runtime) {
+					throw new Error('MCP runtime state is unavailable.');
+				}
+				if (runtime.status === MCPServerStatus.Ready) {
+					await loadDiscoveryForServer(server);
+					return;
+				}
+				if (runtime.status !== MCPServerStatus.Connecting) {
+					if (observeOnly) {
+						return;
+					}
+					runtime = await mcpManagementAPI.connectMCPServer(server);
+				}
+				if (signal.aborted || !mountedRef.current) {
+					return;
+				}
+				const generation = runtime.generation;
+				observedGenerationsRef.current.set(key, generation);
 
 				if (mountedRef.current) {
 					patchOption(server, {
@@ -536,17 +642,23 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 				const deadline = Date.now() + MCP_CONNECTION_TIMEOUT_MS;
 
-				while (mountedRef.current && runtime.status === MCPServerStatus.Connecting) {
+				while (mountedRef.current && !signal.aborted && runtime.status === MCPServerStatus.Connecting) {
 					if (Date.now() >= deadline) {
 						throw new Error('Timed out waiting for the MCP server to connect.');
 					}
 
-					await sleep(MCP_CONNECTION_POLL_MS);
+					await sleep(MCP_CONNECTION_POLL_MS, signal);
+					if (signal.aborted || !mountedRef.current) {
+						return;
+					}
 					const refreshed = await refreshServerStatus(server).catch(() => undefined);
 					runtime = refreshed?.runtime ?? runtime;
+					if (runtime.generation !== generation) {
+						return;
+					}
 				}
 
-				if (!mountedRef.current) {
+				if (!mountedRef.current || signal.aborted) {
 					return;
 				}
 
@@ -568,39 +680,34 @@ export function useComposerMCP(): UseComposerMCPResult {
 				if (connectionPromisesRef.current.get(key) === promise) {
 					connectionPromisesRef.current.delete(key);
 				}
+				if (connectionControllersRef.current.get(key) === controller) {
+					connectionControllersRef.current.delete(key);
+				}
 			});
 		},
 		[loadDiscoveryForServer, patchOption, refreshServerStatus]
 	);
 
-	const refreshAuthorizationStates = useCallback(async () => {
-		const candidates = optionsRef.current.filter(
-			option => isOAuthServerOption(option) || hasPendingOAuthHealth(option)
-		);
-
-		await Promise.all(
-			candidates.map(async option => {
-				try {
-					const refreshed = await mcpManagementAPI.getMCPServer(option.server.ref, option.bundle.ref);
-
-					if (!mountedRef.current) {
-						return;
-					}
-
-					patchOption(option.runtimeServerID, {
-						server: refreshed,
-						runtime: refreshed.runtime,
-						authHealth: refreshed.authHealth,
-					});
-				} catch {
-					// Preserve the prior visible state and retry later.
-				}
-			})
-		);
-	}, [patchOption]);
+	useEffect(() => {
+		for (const option of options) {
+			const runtime = option.runtime;
+			const key = optionKey(option);
+			if (
+				runtime?.status !== MCPServerStatus.Connecting ||
+				connectionPromisesRef.current.has(key) ||
+				observedGenerationsRef.current.get(key) === runtime.generation
+			) {
+				continue;
+			}
+			observedGenerationsRef.current.set(key, runtime.generation);
+			void connectServer(option.runtimeServerID, true).catch(console.error);
+		}
+	}, [connectServer, options]);
 
 	const disconnectServer = useCallback(
 		async (server: MCPRuntimeServerID) => {
+			connectionControllersRef.current.get(mcpServerKey(server))?.abort();
+			statusRequestsRef.current.set(server, (statusRequestsRef.current.get(server) ?? 0) + 1);
 			await mcpManagementAPI.disconnectMCPServer(server);
 			await refreshServerStatus(server);
 		},
@@ -609,6 +716,8 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const cancelOAuth = useCallback(
 		async (server: MCPRuntimeServerID) => {
+			connectionControllersRef.current.get(mcpServerKey(server))?.abort();
+			statusRequestsRef.current.set(server, (statusRequestsRef.current.get(server) ?? 0) + 1);
 			await mcpManagementAPI.cancelMCPServerAuthorization(server);
 			await refreshServerStatus(server);
 		},
@@ -658,7 +767,11 @@ export function useComposerMCP(): UseComposerMCPResult {
 	);
 
 	const ensureServerSelected = useCallback(
-		(server: MCPRuntimeServerID): boolean => {
+		async (server: MCPRuntimeServerID): Promise<boolean> => {
+			await loadDeclarationCatalog();
+			if (!mountedRef.current || !catalogLoadedRef.current) {
+				return false;
+			}
 			const key = mcpServerKey(server);
 
 			if (selectedByServerKeyRef.current[key]) {
@@ -687,7 +800,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 			return true;
 		},
-		[commitSelectedByServerKey]
+		[commitSelectedByServerKey, loadDeclarationCatalog]
 	);
 
 	const setToolExposure = useCallback(
@@ -914,11 +1027,27 @@ export function useComposerMCP(): UseComposerMCPResult {
 
 	const prepareForSubmit = useCallback(async (): Promise<MCPConversationContext | undefined> => {
 		const currentSelections = selectedByServerKeyRef.current;
+		if (Object.keys(currentSelections).length === 0) {
+			return undefined;
+		}
+		await loadDeclarationCatalog();
+		if (!mountedRef.current || !catalogLoadedRef.current) {
+			throw new Error('MCP server declarations are unavailable.');
+		}
+		await refreshStatuses(Object.values(currentSelections).map(selection => selection.server));
 		const nextSelections: Record<string, MCPComposerServerSelection> = {};
 
 		for (const selection of Object.values(currentSelections)) {
 			const key = mcpServerKey(selection.server);
 			const option = optionsRef.current.find(item => optionKey(item) === key);
+			if (
+				!option ||
+				!option.bundle.enabled ||
+				!option.server.enabled ||
+				option.runtime?.status !== MCPServerStatus.Ready
+			) {
+				throw new Error(`Connect MCP server ${option?.server.displayName ?? selection.server} before sending.`);
+			}
 
 			let selectedTools = selection.selectedTools;
 
@@ -954,34 +1083,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		}
 
 		return mcpSelectionToContext(nextSelections);
-	}, [commitSelectedByServerKey, loadDiscoveryForServer]);
-
-	const shouldPollOAuthAuthorizations = useMemo(
-		() => options.some(option => isOAuthServerOption(option) || hasPendingOAuthHealth(option)),
-		[options]
-	);
-
-	useEffect(() => {
-		if (!shouldPollOAuthAuthorizations) {
-			return;
-		}
-
-		let cancelled = false;
-
-		const poll = () => {
-			if (!cancelled) {
-				void refreshAuthorizationStates();
-			}
-		};
-
-		poll();
-		const timer = window.setInterval(poll, 2000);
-
-		return () => {
-			cancelled = true;
-			window.clearInterval(timer);
-		};
-	}, [refreshAuthorizationStates, shouldPollOAuthAuthorizations]);
+	}, [commitSelectedByServerKey, loadDeclarationCatalog, loadDiscoveryForServer, refreshStatuses]);
 
 	const mcpContext = useMemo(() => mcpSelectionToContext(selectedByServerKey), [selectedByServerKey]);
 
@@ -1023,6 +1125,7 @@ export function useComposerMCP(): UseComposerMCPResult {
 		requiredArgumentMissingCount,
 		argumentsBlocked: requiredArgumentMissingCount > 0,
 		refreshAll,
+		refreshRuntimeStates,
 		refreshServer,
 		ensureDiscoveryLoaded,
 		prepareForSubmit,

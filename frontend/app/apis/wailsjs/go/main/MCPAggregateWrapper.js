@@ -22,8 +22,12 @@ export function GetMCPServer(arg1) {
   return window['go']['main']['MCPAggregateWrapper']['GetMCPServer'](arg1);
 }
 
-export function GetMCPServerForRuntimeServer(arg1) {
-  return window['go']['main']['MCPAggregateWrapper']['GetMCPServerForRuntimeServer'](arg1);
+export function GetMCPServersForRuntimeServers(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['GetMCPServersForRuntimeServers'](arg1);
+}
+
+export function ListMCPCollectionServers(arg1) {
+  return window['go']['main']['MCPAggregateWrapper']['ListMCPCollectionServers'](arg1);
 }
 
 export function SaveMCPPolicy(arg1) {

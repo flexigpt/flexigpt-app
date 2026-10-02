@@ -11,15 +11,12 @@ import type {
 	UpdateCollectionRequest,
 } from '@/spec/collection';
 import type {
-	MCPEffectivePolicy,
 	MCPManagementPage,
 	MCPPolicyListItem,
-	MCPServerInstallationDataView,
 	MCPServerListItem,
 	MCPServerSecretsView,
 	MCPSettings,
 	MCPStorePolicyView,
-	MCPStoreServerInstallationView,
 } from '@/spec/mcp';
 
 import type { IMCPStoreAPI } from '@/apis/interface';
@@ -28,13 +25,7 @@ import {
 	mcpPolicyListItemFromWails,
 	mcpServerListItemFromWails,
 } from '@/apis/wailsapi/list_item_projection';
-import {
-	optionalWailsString,
-	requiredObject,
-	requireWailsBoolean,
-	wailsObjectArrayOrEmpty,
-	wailsRecordOrEmpty,
-} from '@/apis/wailsapi/transport';
+import { optionalWailsString, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddMCPCollectionMember,
 	AddMCPServerToCollection,
@@ -46,7 +37,6 @@ import {
 	GetMCPSettings,
 	ListMCPCollectionMemberships,
 	ListMCPCollections,
-	ListMCPCollectionServers,
 	ListMCPCollectionsPage,
 	ListMCPPolicies,
 	ListMCPServers,
@@ -56,42 +46,6 @@ import {
 	SetMCPCollectionEnabled,
 	UpdateMCPCollection,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
-
-function installationViewFromWails(value: unknown, operation: string): MCPStoreServerInstallationView {
-	const view = requiredObject<MCPStoreServerInstallationView>(value, operation);
-	const rawInstallation = requiredObject<Record<string, unknown>>(view.installation, `${operation}.installation`);
-	const rawInputs = wailsRecordOrEmpty(rawInstallation.inputs, `${operation}.installation.inputs`);
-	const inputs = Object.fromEntries(
-		Object.entries(rawInputs).map(([name, rawInput]) => {
-			const input = requiredObject<Record<string, unknown>>(rawInput, `${operation}.installation.inputs.${name}`);
-			return [
-				name,
-				{
-					value: optionalWailsString(input.value, `${operation}.installation.inputs.${name}.value`),
-					secretConfigured: requireWailsBoolean(
-						input.secretConfigured,
-						`${operation}.installation.inputs.${name}.secretConfigured`
-					),
-				},
-			] as const;
-		})
-	);
-
-	return {
-		...view,
-		installation: {
-			selectedConnectionProfile: optionalWailsString(
-				rawInstallation.selectedConnectionProfile,
-				`${operation}.installation.selectedConnectionProfile`
-			),
-			inputs,
-			additionalPolicies: wailsObjectArrayOrEmpty(
-				rawInstallation.additionalPolicies,
-				`${operation}.installation.additionalPolicies`
-			),
-		} satisfies MCPServerInstallationDataView,
-	};
-}
 
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	async addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
@@ -242,27 +196,5 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
 			'UpdateMCPCollection'
 		);
-	}
-
-	async listMCPCollectionServers(collection: ArtifactRef): Promise<
-		Array<{
-			installation: MCPStoreServerInstallationView;
-			policy: MCPEffectivePolicy;
-		}>
-	> {
-		return wailsObjectArrayOrEmpty(
-			await ListMCPCollectionServers(collection as Parameters<typeof ListMCPCollectionServers>[0]),
-			'ListMCPCollectionServers'
-		).map((value, index) => {
-			const record = requiredObject<{
-				installation: MCPStoreServerInstallationView;
-				policy: MCPEffectivePolicy;
-			}>(value, `ListMCPCollectionServers[${index}]`);
-
-			return {
-				installation: installationViewFromWails(record.installation, `ListMCPCollectionServers[${index}].installation`),
-				policy: requiredObject<MCPEffectivePolicy>(record.policy, `ListMCPCollectionServers[${index}].policy`),
-			};
-		});
 	}
 }

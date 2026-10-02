@@ -69,11 +69,11 @@ import type {
 	MCPServerAggregateDetails,
 	MCPServerData,
 	MCPServerListItem,
+	MCPServerRuntimeDetails,
 	MCPServerRuntimeSnapshot,
 	MCPServerSecretsView,
 	MCPSettings,
 	MCPStorePolicyView,
-	MCPStoreServerInstallationView,
 	MCPToolCapability,
 } from '@/spec/mcp';
 import type {
@@ -540,12 +540,6 @@ export interface IMCPStoreAPI {
 	getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView>;
 	getMCPSettings(): Promise<MCPSettings>;
 
-	listMCPCollectionServers(collection: ArtifactRef): Promise<
-		Array<{
-			installation: MCPStoreServerInstallationView;
-		}>
-	>;
-
 	listMCPCollectionMemberships(artifact: ArtifactRef): Promise<ArtifactMembershipView[]>;
 	listMCPCollections(rootID: ArtifactRootID): Promise<CollectionListItem[]>;
 	listMCPPolicies(rootID: ArtifactRootID): Promise<MCPPolicyListItem[]>;
@@ -559,9 +553,11 @@ export interface IMCPStoreAPI {
 }
 
 export interface IMCPAggregateAPI {
+	listMCPCollectionServers(collection: ArtifactRef): Promise<MCPServerAggregateDetails[]>;
+
+	getMCPServersForRuntimeServers(servers: MCPRuntimeServerID[]): Promise<MCPServerRuntimeDetails[]>;
+
 	getMCPServer(server: ArtifactRef): Promise<MCPServerAggregateDetails>;
-	getMCPServerForRuntimeServer(server: MCPRuntimeServerID): Promise<MCPServerAggregateDetails>;
-	// Management projects this into MCPRuntimeServerView.
 	createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult>;
 	updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult>;
 	deleteMCPServer(server: ArtifactRef, expectedRevision: number): Promise<void>;

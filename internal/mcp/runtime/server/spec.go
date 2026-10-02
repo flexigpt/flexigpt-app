@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 	"unicode/utf8"
 
@@ -371,8 +370,12 @@ func validateHeaderName(name string) error {
 		return fmt.Errorf("%w: invalid MCP HTTP header name", ErrInvalid)
 	}
 	for _, character := range name {
-		if regexp.MustCompile(`^[A-Za-z0-9!#$%&'*+\-.^_` + "`" + `|~]$`).
-			MatchString(string(character)) {
+		if character >= 'A' && character <= 'Z' ||
+			character >= 'a' && character <= 'z' ||
+			character >= '0' && character <= '9' {
+			continue
+		}
+		if strings.ContainsRune("!#$%&'*+-.^_`|~", character) {
 			continue
 		}
 		return fmt.Errorf(
