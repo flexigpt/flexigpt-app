@@ -4,8 +4,8 @@ import { memo, useState } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
-const MAX_STREAMING_MARKDOWN_CHARACTERS = 16_000;
-const MAX_AUTOMATIC_MARKDOWN_CHARACTERS = 64_000;
+const MAX_STREAMING_MARKDOWN_CHARACTERS = 64_000;
+const MAX_AUTOMATIC_MARKDOWN_CHARACTERS = 128_000;
 const TEXT_CHUNK_CHARACTERS = 8192;
 
 const TextChunk = memo(function TextChunk({ value }: { value: string }) {
