@@ -3,7 +3,14 @@ import { DebugLogLevel, DEFAULT_DEBUG_SETTINGS, ThemeType } from '@/spec/setting
 
 import type { ISettingStoreAPI } from '@/apis/interface';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
-import { enumFromWails, requireWailsBody, requireWailsBoolean, requireWailsString } from '@/apis/wailsapi/transport';
+import {
+	enumFromWails,
+	optionalWailsBody,
+	requiredWailsResponseBody,
+	requireWailsBody,
+	requireWailsBoolean,
+	requireWailsString,
+} from '@/apis/wailsapi/transport';
 import { GetSettings, SetAppTheme, SetDebugSettings } from '@/apis/wailsjs/go/main/SettingStoreWrapper';
 
 function booleanOrDefault(value: unknown, fallback: boolean, field: string): boolean {
@@ -40,11 +47,12 @@ export class WailsSettingStoreAPI implements ISettingStoreAPI {
 		const r: wailsSpec.GetSettingsRequest = {
 			ForceFetch: !!forceFetch,
 		};
-		const resp = await GetSettings(r);
-		const body = requireWailsBody(resp.Body, 'GetSettings');
-		const appTheme = requireWailsBody(body.appTheme, 'GetSettings.appTheme');
-		const debug =
-			body.debug === null || body.debug === undefined ? undefined : requireWailsBody(body.debug, 'GetSettings.debug');
+		const body = requiredWailsResponseBody<{ appTheme: wailsSpec.AppTheme; debug?: wailsSpec.DebugSettings }>(
+			await GetSettings(r),
+			'GetSettings'
+		);
+		const appTheme = requireWailsBody<wailsSpec.AppTheme>(body.appTheme, 'GetSettings.appTheme');
+		const debug = optionalWailsBody<wailsSpec.DebugSettings>(body.debug, 'GetSettings.debug');
 
 		return {
 			appTheme: {

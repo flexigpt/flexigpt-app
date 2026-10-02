@@ -1,5 +1,4 @@
 import type { ArtifactRef, MappedTarget } from '@/spec/artifact';
-import type { CollectionView } from '@/spec/collection';
 import type { ToolChoice } from '@/spec/inference';
 import type { ResolvedToolView, ToolSelection } from '@/spec/tool';
 import type { InvokeToolResponse } from '@/spec/toolruntime';
@@ -8,6 +7,7 @@ import type { JSONRawString } from '@/lib/jsonschema_utils';
 
 import type { IToolAggregateAPI } from '@/apis/interface';
 import type { aggregate, main as wailsMain } from '@/apis/wailsjs/go/models';
+import { collectionViewFromWails } from '@/apis/wailsapi/list_item_projection';
 import { toolViewFromWails } from '@/apis/wailsapi/tool_store';
 import { rawJSONToWails, requiredObject } from '@/apis/wailsapi/transport';
 import {
@@ -22,7 +22,7 @@ function resolvedToolViewFromWails(value: unknown, operation: string): ResolvedT
 
 	return {
 		tool: toolViewFromWails(resolved.tool, `${operation}.tool`),
-		collection: requiredObject<CollectionView>(resolved.collection, `${operation}.collection`),
+		collection: collectionViewFromWails(resolved.collection, `${operation}.collection`),
 	};
 }
 

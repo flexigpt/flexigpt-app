@@ -7,7 +7,12 @@ import type { ToolSelection } from '@/spec/tool';
 
 import type { ICompletionAPI } from '@/apis/interface';
 import type { main as wailsMain } from '@/apis/wailsjs/go/models';
-import { createAbortError, optionalWailsBody, requireNonBlankString, throwIfAborted } from '@/apis/wailsapi/transport';
+import {
+	createAbortError,
+	optionalWailsResponseBody,
+	requireNonBlankString,
+	throwIfAborted,
+} from '@/apis/wailsapi/transport';
 import { CancelCompletion, FetchCompletion } from '@/apis/wailsjs/go/main/CompletionWrapper';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
@@ -100,7 +105,7 @@ export class WailsCompletionAPI implements ICompletionAPI {
 				abortPromise,
 			]);
 
-			return optionalWailsBody((response as { Body?: CompletionResponseBody }).Body, 'FetchCompletion');
+			return optionalWailsResponseBody<CompletionResponseBody>(response, 'FetchCompletion');
 		} finally {
 			if (signal && abortHandler) {
 				signal.removeEventListener('abort', abortHandler);

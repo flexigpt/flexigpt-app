@@ -1,6 +1,6 @@
 import type { AgentView } from '@/spec/agent';
-import type { ArtifactRef } from '@/spec/artifact';
-import type { CollectionListItem } from '@/spec/collection';
+import type { ArtifactRef, CapabilityPlan } from '@/spec/artifact';
+import type { CollectionCapabilityPlan, CollectionListItem, CollectionView } from '@/spec/collection';
 import type { MCPPolicyListItem, MCPServerListItem } from '@/spec/mcp';
 import type { StoreSkillListItem } from '@/spec/skill';
 import type { ToolStoreListItem } from '@/spec/tool';
@@ -14,6 +14,7 @@ import {
 	requireWailsBoolean,
 	requireWailsFiniteNumber,
 	requireWailsString,
+	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
 
 function artifactRefFromWails(value: unknown, field: string): ArtifactRef {
@@ -36,6 +37,54 @@ function artifactListFields(value: Record<string, unknown>, field: string) {
 		revision: requireWailsFiniteNumber(value.revision, `${field}.revision`),
 		definitionDigest: optionalWailsString(value.definitionDigest, `${field}.definitionDigest`),
 		builtIn: requireWailsBoolean(value.builtIn, `${field}.builtIn`),
+	};
+}
+
+export function collectionViewFromWails(value: unknown, operation: string): CollectionView {
+	const view = requiredObject<CollectionView>(value, operation);
+
+	return {
+		...view,
+		members: wailsObjectArrayOrEmpty<CollectionView['members'][number]>(view.members, `${operation}.members`),
+		entries: wailsObjectArrayOrEmpty<CollectionView['entries'][number]>(view.entries, `${operation}.entries`),
+	};
+}
+
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
+export function collectionResultFromWails<T extends { collection: CollectionView }>(
+	value: unknown,
+	operation: string
+): T {
+	const result = requiredObject<T>(value, operation);
+
+	return {
+		...result,
+		collection: collectionViewFromWails(result.collection, `${operation}.collection`),
+	} as T;
+}
+
+export function capabilityPlanFromWails(value: unknown, operation: string): CapabilityPlan {
+	const plan = requiredObject<CapabilityPlan>(value, operation);
+
+	return {
+		...plan,
+		occurrences: wailsObjectArrayOrEmpty<CapabilityPlan['occurrences'][number]>(
+			plan.occurrences,
+			`${operation}.occurrences`
+		),
+	};
+}
+
+export function collectionCapabilityPlanFromWails(value: unknown, operation: string): CollectionCapabilityPlan {
+	const plan = requiredObject<CollectionCapabilityPlan>(value, operation);
+
+	return {
+		...plan,
+		collection: collectionViewFromWails(plan.collection, `${operation}.collection`),
+		occurrences: wailsObjectArrayOrEmpty<CollectionCapabilityPlan['occurrences'][number]>(
+			plan.occurrences,
+			`${operation}.occurrences`
+		),
 	};
 }
 

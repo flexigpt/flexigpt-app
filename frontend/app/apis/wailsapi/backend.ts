@@ -7,6 +7,10 @@ import type { ApplyUnifiedDiffArgs, ApplyUnifiedDiffOut } from '@/spec/unified_d
 import type { IBackendAPI, ILogger } from '@/apis/interface';
 import type { texttool as texttoolSpec } from '@/apis/wailsjs/go/models';
 import {
+	directoryAttachmentsResultFromWails,
+	pathAttachmentsResultFromWails,
+} from '@/apis/wailsapi/attachment_projection';
+import {
 	requireNonBlankString,
 	requireWailsBody,
 	requireWailsBoolean,
@@ -234,13 +238,14 @@ export class WailsBackendAPI implements IBackendAPI {
 	}
 
 	async openDirectoryAsAttachments(maxFiles: number): Promise<DirectoryAttachmentsResult> {
-		const result = await OpenDirectoryAsAttachments(maxFiles);
-		return requireWailsBody(result as DirectoryAttachmentsResult | null | undefined, 'OpenDirectoryAsAttachments');
+		return directoryAttachmentsResultFromWails(
+			await OpenDirectoryAsAttachments(maxFiles),
+			'OpenDirectoryAsAttachments'
+		);
 	}
 
 	async getPathsAsAttachments(paths: string[], maxFilesPerDir: number): Promise<PathAttachmentsResult> {
-		const pathResults = await GetPathsAsAttachments(paths, maxFilesPerDir);
-		return requireWailsBody(pathResults as PathAttachmentsResult | null | undefined, 'GetPathsAsAttachments');
+		return pathAttachmentsResultFromWails(await GetPathsAsAttachments(paths, maxFilesPerDir), 'GetPathsAsAttachments');
 	}
 
 	async applyUnifiedDiff(args: ApplyUnifiedDiffArgs): Promise<ApplyUnifiedDiffOut> {

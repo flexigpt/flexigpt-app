@@ -4,7 +4,11 @@ import type { ToolImplementationView, ToolStoreListItem, ToolView } from '@/spec
 import { ToolImplType, ToolStoreChoiceType } from '@/spec/tool';
 
 import type { IToolStoreAPI } from '@/apis/interface';
-import { collectionListItemFromWails, toolStoreListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	collectionListItemFromWails,
+	collectionViewFromWails,
+	toolStoreListItemFromWails,
+} from '@/apis/wailsapi/list_item_projection';
 import {
 	enumFromWails,
 	jsonSchemaFromWails,
@@ -72,7 +76,7 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 	}
 
 	async getToolCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return requiredObject<CollectionView>(await GetToolCollection(collection), 'GetToolCollection');
+		return collectionViewFromWails(await GetToolCollection(collection), 'GetToolCollection');
 	}
 
 	async listCollectionTools(collection: ArtifactRef): Promise<ToolStoreListItem[]> {
@@ -94,7 +98,7 @@ export class WailsToolStoreAPI implements IToolStoreAPI {
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await SetToolCollectionEnabled(collection, expectedRevision, enabled),
 			'SetToolCollectionEnabled'
 		);

@@ -22,6 +22,7 @@ import type {
 import type { IMCPStoreAPI } from '@/apis/interface';
 import {
 	collectionListItemFromWails,
+	collectionViewFromWails,
 	mcpPolicyListItemFromWails,
 	mcpServerListItemFromWails,
 } from '@/apis/wailsapi/list_item_projection';
@@ -47,23 +48,32 @@ import {
 	UpdateMCPCollection,
 } from '@/apis/wailsjs/go/main/MCPStoreWrapper';
 
+function mcpServerSecretsViewFromWails(value: unknown, operation: string): MCPServerSecretsView {
+	const view = requiredObject<MCPServerSecretsView>(value, operation);
+
+	return {
+		...view,
+		inputs: wailsObjectArrayOrEmpty<MCPServerSecretsView['inputs'][number]>(view.inputs, `${operation}.inputs`),
+	};
+}
+
 export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	async addMCPCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await AddMCPCollectionMember(request as Parameters<typeof AddMCPCollectionMember>[0]),
 			'AddMCPCollectionMember'
 		);
 	}
 
 	async addMCPServerToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await AddMCPServerToCollection(request as Parameters<typeof AddMCPServerToCollection>[0]),
 			'AddMCPServerToCollection'
 		);
 	}
 
 	async createMCPCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await CreateMCPCollection(request as Parameters<typeof CreateMCPCollection>[0]),
 			'CreateMCPCollection'
 		);
@@ -74,7 +84,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async getMCPCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await GetMCPCollection(collection as Parameters<typeof GetMCPCollection>[0]),
 			'GetMCPCollection'
 		);
@@ -88,7 +98,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async getMCPServerSecrets(server: ArtifactRef): Promise<MCPServerSecretsView> {
-		return requiredObject<MCPServerSecretsView>(
+		return mcpServerSecretsViewFromWails(
 			await GetMCPServerSecrets(server as Parameters<typeof GetMCPServerSecrets>[0]),
 			'GetMCPServerSecrets'
 		);
@@ -159,7 +169,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async removeMCPCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await RemoveMCPCollectionMember(request as Parameters<typeof RemoveMCPCollectionMember>[0]),
 			'RemoveMCPCollectionMember'
 		);
@@ -170,7 +180,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await SetMCPCollectionEnabled(
 				collection as Parameters<typeof SetMCPCollectionEnabled>[0],
 				expectedRevision,
@@ -192,7 +202,7 @@ export class WailsMCPStoreAPI implements IMCPStoreAPI {
 	}
 
 	async updateMCPCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await UpdateMCPCollection(request as Parameters<typeof UpdateMCPCollection>[0]),
 			'UpdateMCPCollection'
 		);

@@ -13,7 +13,7 @@ import { WorkspaceDirectoryOrigin } from '@/spec/workspace';
 
 import type { IWorkspaceStoreAPI } from '@/apis/interface';
 import { workspaceDirectoryListItemFromWails } from '@/apis/wailsapi/list_item_projection';
-import { enumFromWails, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { enumFromWails, optionalWailsString, requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	GetWorkspaceDefaultPolicy,
 	GetWorkspaceDirectory,
@@ -28,12 +28,19 @@ import {
 
 function projectWorkspaceDirectory(value: unknown, operation: string): WorkspaceDirectoryView {
 	const directory = requiredObject<WorkspaceDirectoryView>(value, operation);
-	const workspaces = directory.workspaces as WorkspaceDirectoryWorkspace[];
+	const workspaces = wailsObjectArrayOrEmpty<WorkspaceDirectoryWorkspace>(
+		directory.workspaces,
+		`${operation}.workspaces`
+	);
+
 	for (const workspace of workspaces) {
 		workspace.origin = enumFromWails(workspace.origin, WorkspaceDirectoryOrigin, `${operation}.workspaces.origin`);
 	}
 
-	return directory;
+	return {
+		...directory,
+		workspaces,
+	};
 }
 
 export class WailsWorkspaceStoreAPI implements IWorkspaceStoreAPI {
@@ -60,6 +67,7 @@ export class WailsWorkspaceStoreAPI implements IWorkspaceStoreAPI {
 				(value, index): WorkspaceDirectoryListItem =>
 					workspaceDirectoryListItemFromWails(value, `ListWorkspaceDirectories.items[${index}]`)
 			),
+			nextCursor: optionalWailsString(page.nextCursor, 'ListWorkspaceDirectories.nextCursor') || undefined,
 		};
 	}
 

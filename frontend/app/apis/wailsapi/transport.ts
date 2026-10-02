@@ -110,7 +110,7 @@ export async function collectAllPages<T>(
 	throw new Error(`Pagination exceeded the ${maxPages}-page safety limit.`);
 }
 
-export function requiredRuntimeResponseBody<T extends object>(response: unknown, operation: string): T {
+export function requiredWailsResponseBody<T extends object>(response: unknown, operation: string): T {
 	const envelope = requiredObject<{ Body?: unknown }>(response, `${operation} response`);
 
 	return requiredObject<T>(envelope.Body, operation);
@@ -142,6 +142,12 @@ export function optionalWailsBody<T>(body: T | null | undefined, operation = 'Wa
 	}
 
 	return body;
+}
+
+export function optionalWailsResponseBody<T extends object>(response: unknown, operation: string): T | undefined {
+	const envelope = requiredObject<{ Body?: unknown }>(response, `${operation} response`);
+
+	return optionalWailsBody<T>(envelope.Body as T | null | undefined, operation);
 }
 
 export function wailsObjectArrayOrEmpty<T extends object = Record<string, unknown>>(

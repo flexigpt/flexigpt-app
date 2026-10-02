@@ -1,9 +1,10 @@
-import type { AttachmentsDroppedPayload, PathAttachmentsResult } from '@/spec/attachment';
+import type { AttachmentsDroppedPayload } from '@/spec/attachment';
 
 import { getUUIDv7 } from '@/lib/uuid_utils';
 
 import type { IAttachmentsDropAPI } from '@/apis/interface';
-import { requireWailsBody, requireWailsString, wailsArrayOrEmpty } from '@/apis/wailsapi/transport';
+import { pathAttachmentsResultFromWails } from '@/apis/wailsapi/attachment_projection';
+import { requireWailsString, wailsArrayOrEmpty } from '@/apis/wailsapi/transport';
 import { GetPathsAsAttachments } from '@/apis/wailsjs/go/main/App';
 import { EventsOff, EventsOn } from '@/apis/wailsjs/runtime/runtime';
 
@@ -30,17 +31,19 @@ async function handleFileDrop(x: number, y: number, paths: string[]) {
 			return;
 		}
 
-		const pathResults = await GetPathsAsAttachments(normalizedPaths, MAX_DIRECTORY_FILES_TO_SCAN);
-		const r = requireWailsBody(pathResults as PathAttachmentsResult | null | undefined, 'GetPathsAsAttachments');
+		const pathResults = pathAttachmentsResultFromWails(
+			await GetPathsAsAttachments(normalizedPaths, MAX_DIRECTORY_FILES_TO_SCAN),
+			'GetPathsAsAttachments'
+		);
 
 		const dropID = getUUIDv7();
 		const payload: AttachmentsDroppedPayload = {
 			dropID: dropID,
 			x: x,
 			y: y,
-			files: wailsArrayOrEmpty(r.fileAttachments, 'GetPathsAsAttachments.fileAttachments'),
-			directories: wailsArrayOrEmpty(r.dirAttachments, 'GetPathsAsAttachments.dirAttachments'),
-			errors: wailsArrayOrEmpty(r.errors, 'GetPathsAsAttachments.errors'),
+			files: pathResults.fileAttachments,
+			directories: pathResults.dirAttachments,
+			errors: pathResults.errors,
 			maxFilesPerDirectory: MAX_DIRECTORY_FILES_TO_SCAN,
 		};
 

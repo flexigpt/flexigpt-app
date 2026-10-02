@@ -21,7 +21,13 @@ import type {
 } from '@/spec/collection';
 
 import type { IAgentStoreAPI } from '@/apis/interface';
-import { agentViewFromWails, collectionListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	agentViewFromWails,
+	collectionCapabilityPlanFromWails,
+	collectionListItemFromWails,
+	collectionResultFromWails,
+	collectionViewFromWails,
+} from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	CommitAgentImport,
@@ -45,6 +51,28 @@ import {
 	SetAgentEnabled,
 	UpdateAgentCollection,
 } from '@/apis/wailsjs/go/main/AgentStoreWrapper';
+
+function agentCapabilityPlanFromWails(value: unknown, operation: string): AgentCapabilityPlan {
+	const plan = requiredObject<AgentCapabilityPlan>(value, operation);
+
+	return {
+		...plan,
+		occurrences: wailsObjectArrayOrEmpty<AgentCapabilityPlan['occurrences'][number]>(
+			plan.occurrences,
+			`${operation}.occurrences`
+		),
+	};
+}
+
+function agentResolutionFromWails(value: unknown, operation: string): AgentResolution {
+	const resolution = requiredObject<AgentResolution>(value, operation);
+
+	return {
+		...resolution,
+		agent: agentViewFromWails(resolution.agent, `${operation}.agent`),
+		capabilities: agentCapabilityPlanFromWails(resolution.capabilities, `${operation}.capabilities`),
+	};
+}
 
 export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	async listAgents(request: ListAgentsRequest): Promise<AgentView[]> {
@@ -71,14 +99,11 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	}
 
 	async resolveAgent(agent: ArtifactRef): Promise<AgentResolution> {
-		return requiredObject<AgentResolution>(
-			await ResolveAgent(agent as Parameters<typeof ResolveAgent>[0]),
-			'ResolveAgent'
-		);
+		return agentResolutionFromWails(await ResolveAgent(agent as Parameters<typeof ResolveAgent>[0]), 'ResolveAgent');
 	}
 
 	async resolveAgentCapabilities(agent: ArtifactRef): Promise<AgentCapabilityPlan> {
-		return requiredObject<AgentCapabilityPlan>(
+		return agentCapabilityPlanFromWails(
 			await ResolveAgentCapabilities(agent as Parameters<typeof ResolveAgentCapabilities>[0]),
 			'ResolveAgentCapabilities'
 		);
@@ -92,21 +117,21 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	}
 
 	async listAgentCollectionMembers(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
-		return requiredObject<CollectionCapabilityPlan>(
+		return collectionCapabilityPlanFromWails(
 			await ListAgentCollectionMembers(collection as Parameters<typeof ListAgentCollectionMembers>[0]),
 			'ListAgentCollectionMembers'
 		);
 	}
 
 	async createAgentCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await CreateAgentCollection(request as Parameters<typeof CreateAgentCollection>[0]),
 			'CreateAgentCollection'
 		);
 	}
 
 	async getAgentCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await GetAgentCollection(collection as Parameters<typeof GetAgentCollection>[0]),
 			'GetAgentCollection'
 		);
@@ -126,7 +151,7 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	}
 
 	async updateAgentCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await UpdateAgentCollection(request as Parameters<typeof UpdateAgentCollection>[0]),
 			'UpdateAgentCollection'
 		);
@@ -137,7 +162,7 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await SetAgentCollectionEnabled(
 				collection as Parameters<typeof SetAgentCollectionEnabled>[0],
 				expectedRevision,
@@ -166,10 +191,15 @@ export class WailsAgentStoreAPI implements IAgentStoreAPI {
 	}
 
 	async commitAgentImport(request: AgentImportCommitRequest): Promise<AgentImportCommitResult> {
-		return requiredObject<AgentImportCommitResult>(
+		const result = collectionResultFromWails<AgentImportCommitResult>(
 			await CommitAgentImport(request as Parameters<typeof CommitAgentImport>[0]),
 			'CommitAgentImport'
 		);
+
+		return {
+			...result,
+			agent: agentViewFromWails(result.agent, 'CommitAgentImport.agent'),
+		};
 	}
 
 	async exportAgent(agent: ArtifactRef): Promise<AgentExportResult> {

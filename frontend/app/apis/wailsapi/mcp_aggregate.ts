@@ -15,6 +15,7 @@ import type {
 } from '@/spec/mcp';
 
 import type { IMCPAggregateAPI } from '@/apis/interface';
+import { collectionResultFromWails } from '@/apis/wailsapi/list_item_projection';
 import {
 	optionalWailsString,
 	requiredObject,
@@ -56,14 +57,14 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async createMCPServer(request: ManagedMCPCreateRequest): Promise<ManagedMCPCreateResult> {
-		return requiredObject<ManagedMCPCreateResult>(
+		return collectionResultFromWails<ManagedMCPCreateResult>(
 			await CreateMCPServer(request as Parameters<typeof CreateMCPServer>[0]),
 			'CreateMCPServer'
 		);
 	}
 
 	async updateMCPServer(request: ManagedMCPReplaceRequest): Promise<ManagedMCPReplaceResult> {
-		return requiredObject<ManagedMCPReplaceResult>(
+		return collectionResultFromWails<ManagedMCPReplaceResult>(
 			await UpdateMCPServer(request as Parameters<typeof UpdateMCPServer>[0]),
 			'UpdateMCPServer'
 		);
@@ -74,7 +75,7 @@ export class WailsMCPAggregateAPI implements IMCPAggregateAPI {
 	}
 
 	async saveMCPPolicy(request: ManagedMCPPolicyUpsertRequest): Promise<ManagedMCPPolicyUpsertResult> {
-		return requiredObject<ManagedMCPPolicyUpsertResult>(
+		return collectionResultFromWails<ManagedMCPPolicyUpsertResult>(
 			await SaveMCPPolicy(request as Parameters<typeof SaveMCPPolicy>[0]),
 			'SaveMCPPolicy'
 		);

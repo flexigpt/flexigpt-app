@@ -3,9 +3,10 @@ import type { ConversationSearchItem, StoreConversation, StoreConversationMessag
 import type { IConversationStoreAPI } from '@/apis/interface';
 import type { spec as wailsSpec } from '@/apis/wailsjs/go/models';
 import {
-	optionalWailsBody,
+	optionalWailsResponseBody,
 	optionalWailsString,
-	requireWailsBody,
+	requiredObject,
+	requiredWailsResponseBody,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
 } from '@/apis/wailsapi/transport';
@@ -30,6 +31,15 @@ function searchItemsFromWails(
 		title: requireWailsString(value.sanatizedTitle, `${operation}[${index}].sanatizedTitle`),
 		modifiedAt: optionalWailsString(value.modifiedAt, `${operation}[${index}].modifiedAt`),
 	}));
+}
+
+function conversationFromWails(value: unknown, operation: string): StoreConversation {
+	const conversation = requiredObject<StoreConversation>(value, operation);
+
+	return {
+		...conversation,
+		messages: wailsObjectArrayOrEmpty<StoreConversationMessage>(conversation.messages, `${operation}.messages`),
+	};
 }
 
 export class WailsConversationStoreAPI implements IConversationStoreAPI {
@@ -60,26 +70,29 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 	}
 
 	async getConversation(id: string, title: string, forceFetch?: boolean): Promise<StoreConversation | null> {
-		const response = await GetConversation({
-			ID: id,
-			Title: title,
-			ForceFetch: forceFetch ?? false,
-		});
+		const body = optionalWailsResponseBody<StoreConversation>(
+			await GetConversation({
+				ID: id,
+				Title: title,
+				ForceFetch: forceFetch ?? false,
+			}),
+			'GetConversation'
+		);
 
-		const body = optionalWailsBody(response.Body, 'GetConversation');
-		return body === undefined ? null : (body as StoreConversation);
+		return body === undefined ? null : conversationFromWails(body, 'GetConversation');
 	}
 
 	async listConversations(
 		token?: string,
 		pageSize?: number
 	): Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }> {
-		const response = await ListConversations({
-			PageToken: token ?? '',
-			PageSize: pageSize ?? 20,
-		});
-
-		const body = requireWailsBody(response.Body, 'ListConversations');
+		const body = requiredWailsResponseBody<Record<string, unknown>>(
+			await ListConversations({
+				PageToken: token ?? '',
+				PageSize: pageSize ?? 20,
+			}),
+			'ListConversations'
+		);
 
 		return {
 			conversations: searchItemsFromWails(
@@ -98,13 +111,14 @@ export class WailsConversationStoreAPI implements IConversationStoreAPI {
 		token?: string,
 		pageSize?: number
 	): Promise<{ conversations: ConversationSearchItem[]; nextToken?: string }> {
-		const response = await SearchConversations({
-			Query: query,
-			PageToken: token ?? '',
-			PageSize: pageSize ?? 10,
-		});
-
-		const body = requireWailsBody(response.Body, 'SearchConversations');
+		const body = requiredWailsResponseBody<Record<string, unknown>>(
+			await SearchConversations({
+				Query: query,
+				PageToken: token ?? '',
+				PageSize: pageSize ?? 10,
+			}),
+			'SearchConversations'
+		);
 
 		return {
 			conversations: searchItemsFromWails(

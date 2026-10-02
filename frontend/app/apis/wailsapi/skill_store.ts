@@ -31,7 +31,14 @@ import type {
 } from '@/spec/skill';
 
 import type { ISkillStoreAPI } from '@/apis/interface';
-import { collectionListItemFromWails, storeSkillListItemFromWails } from '@/apis/wailsapi/list_item_projection';
+import {
+	capabilityPlanFromWails,
+	collectionCapabilityPlanFromWails,
+	collectionListItemFromWails,
+	collectionResultFromWails,
+	collectionViewFromWails,
+	storeSkillListItemFromWails,
+} from '@/apis/wailsapi/list_item_projection';
 import { requiredObject, wailsObjectArrayOrEmpty } from '@/apis/wailsapi/transport';
 import {
 	AddSkillCollectionMember,
@@ -62,7 +69,7 @@ import {
 
 export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	async addSkillCollectionMember(request: AddMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await AddSkillCollectionMember(request as Parameters<typeof AddSkillCollectionMember>[0]),
 			'AddSkillCollectionMember'
 		);
@@ -76,27 +83,28 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	}
 
 	async attachSkillArtifactToCollection(request: AddArtifactMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await AttachSkillArtifactToCollection(request as Parameters<typeof AttachSkillArtifactToCollection>[0]),
 			'AttachSkillArtifactToCollection'
 		);
 	}
 
 	async createManagedSkill(request: ManagedSkillCreateRequest): Promise<ManagedSkillCreateResult> {
-		return requiredObject<ManagedSkillCreateResult>(
+		return collectionResultFromWails<ManagedSkillCreateResult>(
 			await CreateManagedSkill(request as Parameters<typeof CreateManagedSkill>[0]),
 			'CreateManagedSkill'
 		);
 	}
 
 	async replaceManagedSkill(request: ManagedSkillReplaceRequest): Promise<ManagedSkillReplaceResult> {
-		const response = await ReplaceManagedSkill(request as Parameters<typeof ReplaceManagedSkill>[0]);
-
-		return requiredObject<ManagedSkillReplaceResult>(response, 'ReplaceManagedSkill');
+		return collectionResultFromWails<ManagedSkillReplaceResult>(
+			await ReplaceManagedSkill(request as Parameters<typeof ReplaceManagedSkill>[0]),
+			'ReplaceManagedSkill'
+		);
 	}
 
 	async createSkillCollection(request: CreateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await CreateSkillCollection(request as Parameters<typeof CreateSkillCollection>[0]),
 			'CreateSkillCollection'
 		);
@@ -118,7 +126,7 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	}
 
 	async getSkillCollection(collection: ArtifactRef): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await GetSkillCollection(collection as Parameters<typeof GetSkillCollection>[0]),
 			'GetSkillCollection'
 		);
@@ -175,21 +183,21 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	}
 
 	async removeSkillCollectionMember(request: RemoveMemberRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await RemoveSkillCollectionMember(request as Parameters<typeof RemoveSkillCollectionMember>[0]),
 			'RemoveSkillCollectionMember'
 		);
 	}
 
 	async resolveSkillCapabilities(skill: ArtifactRef): Promise<CapabilityPlan> {
-		return requiredObject<CapabilityPlan>(
+		return capabilityPlanFromWails(
 			await ResolveSkillCapabilities(skill as Parameters<typeof ResolveSkillCapabilities>[0]),
 			'ResolveSkillCapabilities'
 		);
 	}
 
 	async resolveSkillCollection(collection: ArtifactRef): Promise<CollectionCapabilityPlan> {
-		return requiredObject<CollectionCapabilityPlan>(
+		return collectionCapabilityPlanFromWails(
 			await ResolveSkillCollection(collection as Parameters<typeof ResolveSkillCollection>[0]),
 			'ResolveSkillCollection'
 		);
@@ -200,7 +208,7 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 		expectedRevision: number,
 		enabled: boolean
 	): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await SetSkillCollectionEnabled(
 				collection as Parameters<typeof SetSkillCollectionEnabled>[0],
 				expectedRevision,
@@ -218,7 +226,7 @@ export class WailsSkillStoreAPI implements ISkillStoreAPI {
 	}
 
 	async updateSkillCollection(request: UpdateCollectionRequest): Promise<CollectionView> {
-		return requiredObject<CollectionView>(
+		return collectionViewFromWails(
 			await UpdateSkillCollection(request as Parameters<typeof UpdateSkillCollection>[0]),
 			'UpdateSkillCollection'
 		);

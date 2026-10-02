@@ -18,7 +18,12 @@ import type {
 } from '@/spec/mcp';
 
 import type { IMCPRuntimeAPI } from '@/apis/interface';
-import { requiredObject, requireWailsBoolean } from '@/apis/wailsapi/transport';
+import {
+	optionalWailsString,
+	requiredObject,
+	requireWailsBoolean,
+	wailsObjectArrayOrEmpty,
+} from '@/apis/wailsapi/transport';
 import {
 	CancelMCPServerAuthorization,
 	CheckMCPToolCall,
@@ -35,6 +40,16 @@ import {
 	RefreshMCPServer,
 	ResolveMCPToolApproval,
 } from '@/apis/wailsjs/go/main/MCPRuntimeWrapper';
+
+function discoveryPageFromWails<T extends object>(value: unknown, operation: string): MCPDiscoveryPage<T> {
+	const page = requiredObject<MCPDiscoveryPage<T>>(value, operation);
+
+	return {
+		...page,
+		items: wailsObjectArrayOrEmpty<T>(page.items, `${operation}.items`),
+		nextPageToken: optionalWailsString(page.nextPageToken, `${operation}.nextPageToken`) || undefined,
+	};
+}
 
 export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 	async cancelMCPServerAuthorization(server: MCPRuntimeServerID): Promise<boolean> {
@@ -110,7 +125,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		pageSize: number,
 		pageToken = ''
 	): Promise<MCPDiscoveryPage<MCPPromptRef>> {
-		return requiredObject<MCPDiscoveryPage<MCPPromptRef>>(
+		return discoveryPageFromWails<MCPPromptRef>(
 			await ListMCPServerPrompts(server as Parameters<typeof ListMCPServerPrompts>[0], pageSize, pageToken),
 			'ListMCPServerPrompts'
 		);
@@ -121,7 +136,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		pageSize: number,
 		pageToken = ''
 	): Promise<MCPDiscoveryPage<MCPResourceRef>> {
-		return requiredObject<MCPDiscoveryPage<MCPResourceRef>>(
+		return discoveryPageFromWails<MCPResourceRef>(
 			await ListMCPServerResources(server as Parameters<typeof ListMCPServerResources>[0], pageSize, pageToken),
 			'ListMCPServerResources'
 		);
@@ -132,7 +147,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		pageSize: number,
 		pageToken = ''
 	): Promise<MCPDiscoveryPage<MCPResourceTemplateRef>> {
-		return requiredObject<MCPDiscoveryPage<MCPResourceTemplateRef>>(
+		return discoveryPageFromWails<MCPResourceTemplateRef>(
 			await ListMCPServerResourceTemplates(
 				server as Parameters<typeof ListMCPServerResourceTemplates>[0],
 				pageSize,
@@ -147,7 +162,7 @@ export class WailsMCPRuntimeAPI implements IMCPRuntimeAPI {
 		pageSize: number,
 		pageToken = ''
 	): Promise<MCPDiscoveryPage<MCPToolCapability>> {
-		return requiredObject<MCPDiscoveryPage<MCPToolCapability>>(
+		return discoveryPageFromWails<MCPToolCapability>(
 			await ListMCPServerTools(server as Parameters<typeof ListMCPServerTools>[0], pageSize, pageToken),
 			'ListMCPServerTools'
 		);
