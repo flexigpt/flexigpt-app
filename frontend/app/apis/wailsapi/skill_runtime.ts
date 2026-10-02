@@ -14,6 +14,7 @@ import type { JSONRawString } from '@/lib/jsonschema_utils';
 import type { ISkillRuntimeAPI } from '@/apis/interface';
 import {
 	requiredObject,
+	requiredRuntimeResponseBody,
 	requireNonBlankString,
 	requireWailsString,
 	wailsObjectArrayOrEmpty,
@@ -29,11 +30,21 @@ import {
 
 export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 	async createSkillSession(options: RuntimeSkillSessionOptions): Promise<RuntimeSkillSession> {
-		const response = await CreateSkillSession({
-			Body: options,
-		} as Parameters<typeof CreateSkillSession>[0]);
+		const response = requiredObject<{ Body?: unknown }>(
+			await CreateSkillSession({
+				Body: options,
+			} as Parameters<typeof CreateSkillSession>[0]),
+			'CreateSkillSession response'
+		);
+		const body = requiredObject<Record<string, unknown>>(response.Body, 'CreateSkillSession');
 
-		return requiredObject<RuntimeSkillSession>(response.Body, 'CreateSkillSession');
+		return {
+			sessionID: requireNonBlankString(body.sessionID, 'CreateSkillSession.sessionID'),
+			activeSkills: wailsObjectArrayOrEmpty<RuntimeSkillDefinition>(
+				body.activeSkills,
+				'CreateSkillSession.activeSkills'
+			),
+		};
 	}
 
 	async closeSkillSession(sessionID: string): Promise<void> {
@@ -52,8 +63,10 @@ export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 						},
 					};
 
-		const response = await GetSkillsPrompt(request as Parameters<typeof GetSkillsPrompt>[0]);
-		const body = requiredObject<{ prompt: unknown }>(response.Body, 'GetSkillsPrompt');
+		const body = requiredRuntimeResponseBody<{ prompt: unknown }>(
+			await GetSkillsPrompt(request as Parameters<typeof GetSkillsPrompt>[0]),
+			'GetSkillsPrompt'
+		);
 
 		return requireWailsString(body.prompt, 'GetSkillsPrompt.prompt');
 	}
@@ -68,8 +81,10 @@ export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 						},
 					};
 
-		const response = await ListSkills(request as Parameters<typeof ListSkills>[0]);
-		const body = requiredObject<{ skills?: RuntimeSkillRecord[] }>(response.Body, 'ListSkills');
+		const body = requiredRuntimeResponseBody<{ skills?: unknown }>(
+			await ListSkills(request as Parameters<typeof ListSkills>[0]),
+			'ListSkills'
+		);
 
 		return wailsObjectArrayOrEmpty<RuntimeSkillRecord>(body.skills, 'ListSkills.skills');
 	}
@@ -78,14 +93,15 @@ export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 		definition: RuntimeSkillDefinition,
 		args?: Record<string, string>
 	): Promise<RuntimeSkillRenderResult> {
-		const response = await RenderSkill({
-			Body: {
-				definition,
-				arguments: args,
-			},
-		} as Parameters<typeof RenderSkill>[0]);
-
-		return requiredObject<RuntimeSkillRenderResult>(response.Body, 'RenderSkill');
+		return requiredRuntimeResponseBody<RuntimeSkillRenderResult>(
+			await RenderSkill({
+				Body: {
+					definition,
+					arguments: args,
+				},
+			} as Parameters<typeof RenderSkill>[0]),
+			'RenderSkill'
+		);
 	}
 
 	async invokeSkillTool(sessionID: string, toolName: string, args?: JSONRawString): Promise<InvokeSkillToolResponse> {
@@ -97,6 +113,6 @@ export class WailsSkillRuntimeAPI implements ISkillRuntimeAPI {
 			},
 		} as Parameters<typeof InvokeSkillTool>[0]);
 
-		return requiredObject<InvokeSkillToolResponse>(response.Body, 'InvokeSkillTool');
+		return requiredRuntimeResponseBody<InvokeSkillToolResponse>(response, 'InvokeSkillTool');
 	}
 }

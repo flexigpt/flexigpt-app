@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unnecessary-type-parameters
 import type { JSONObject, JSONRawString } from '@/lib/jsonschema_utils';
 
 const DEFAULT_MAX_PAGES = 1_000;
@@ -109,7 +110,12 @@ export async function collectAllPages<T>(
 	throw new Error(`Pagination exceeded the ${maxPages}-page safety limit.`);
 }
 
-// oxlint-disable-next-line typescript/no-unnecessary-type-parameters
+export function requiredRuntimeResponseBody<T extends object>(response: unknown, operation: string): T {
+	const envelope = requiredObject<{ Body?: unknown }>(response, `${operation} response`);
+
+	return requiredObject<T>(envelope.Body, operation);
+}
+
 export function requiredObject<T extends object>(value: unknown, operation: string): T {
 	return requireWailsBody(value as T | null | undefined, operation);
 }
