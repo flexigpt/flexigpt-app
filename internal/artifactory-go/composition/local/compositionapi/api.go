@@ -4,17 +4,17 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type RootAPI interface {
@@ -156,7 +156,7 @@ type ArtifactAPI interface {
 		ctx context.Context,
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
-		logicalName basespec.LogicalName,
+		logicalName model.LogicalName,
 		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
@@ -221,14 +221,14 @@ type ResourceAPI interface {
 	ResolveVerifiedLocalPath(
 		ctx context.Context,
 		resolved resource.ResolvedArtifact,
-		localLocator basespec.Locator,
+		localLocator model.Locator,
 	) (string, error)
 
 	ReadSourceEntry(
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-		locator basespec.Locator,
+		locator model.Locator,
 		maximumBytes int64,
 	) (resource.VerifiedEntry, error)
 
@@ -236,14 +236,14 @@ type ResourceAPI interface {
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (source.Entry, error)
 
 	ReadSourceTree(
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-		base basespec.Locator,
+		base model.Locator,
 		include []string,
 		exclude []string,
 		maximumEntries int,

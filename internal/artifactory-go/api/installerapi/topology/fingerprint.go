@@ -1,8 +1,8 @@
 package topology
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -12,10 +12,10 @@ func HydrationFingerprint(
 	schemaVersion string,
 	declaration Declaration,
 ) (cryptoutil.Digest, error) {
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"topology hydration schema version",
 		schemaVersion,
-		basespec.MaxVersionBytes,
+		model.MaxVersionBytes,
 	); err != nil {
 		return "", err
 	}
@@ -36,9 +36,9 @@ func HydrationFingerprint(
 // Callers own validation and deterministic ordering of Expectations because
 // Artifact Store topology intentionally does not know domain expectation types.
 func PackageFingerprint(
-	packageRoot basespec.Locator,
+	packageRoot model.Locator,
 	address source.ManagedPackageAddress,
-	documentFile basespec.Locator,
+	documentFile model.Locator,
 	expectations any,
 	packageFiles []source.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
@@ -57,7 +57,7 @@ func PackageFingerprint(
 	}
 
 	type file struct {
-		Locator basespec.Locator  `json:"locator"`
+		Locator model.Locator     `json:"locator"`
 		Digest  cryptoutil.Digest `json:"digest"`
 		Size    int64             `json:"size"`
 	}
@@ -71,9 +71,9 @@ func PackageFingerprint(
 	}
 
 	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot  basespec.Locator             `json:"packageRoot"`
+		PackageRoot  model.Locator                `json:"packageRoot"`
 		Address      source.ManagedPackageAddress `json:"address"`
-		DocumentFile basespec.Locator             `json:"documentFile"`
+		DocumentFile model.Locator                `json:"documentFile"`
 		Expectations any                          `json:"expectations"`
 		Files        []file                       `json:"files"`
 	}{

@@ -6,15 +6,15 @@ import (
 	"maps"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type PackageHydrationKey struct {
 	InstallerName string
-	Scope         basespec.Locator
+	Scope         model.Locator
 }
 
 func (k PackageHydrationKey) Validate() error {
@@ -123,7 +123,7 @@ func NormalizePackageHydrations(
 		if _, duplicate := seen[value.Key]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate package hydration %q/%q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				value.Key.InstallerName,
 				value.Key.Scope,
 			)

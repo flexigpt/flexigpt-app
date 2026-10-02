@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
@@ -32,7 +32,7 @@ const (
 
 type preparedModel struct {
 	presetID modelpreset.ModelPresetID
-	name     basespec.LogicalName
+	name     model.LogicalName
 	preset   modelpreset.ModelPreset
 }
 
@@ -44,7 +44,7 @@ func PreparePackages(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Model catalog conversion context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -76,11 +76,11 @@ func PreparePackages(
 		map[inferenceSpec.ProviderName][]preparedModel,
 		len(catalog.Providers),
 	)
-	seenLogicalNames := make(map[basespec.LogicalName]string)
+	seenLogicalNames := make(map[model.LogicalName]string)
 
 	for _, providerName := range providerNames {
 		provider := catalog.Providers[providerName]
-		logicalProviderName := basespec.LogicalName(providerName)
+		logicalProviderName := model.LogicalName(providerName)
 		if err := logicalProviderName.Validate(); err != nil {
 			return nil, fmt.Errorf(
 				"generated Provider name %q: %w",
@@ -117,7 +117,7 @@ func PreparePackages(
 			if previous, duplicate := seenLogicalNames[name]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: generated Model name %q collides between %s and %s/%s",
-					basespec.ErrConflict,
+					model.ErrConflict,
 					name,
 					previous,
 					providerName,
@@ -143,7 +143,7 @@ func PreparePackages(
 		}
 
 		provider := catalog.Providers[providerName]
-		logicalProviderName := basespec.LogicalName(providerName)
+		logicalProviderName := model.LogicalName(providerName)
 		models := modelsByProvider[providerName]
 
 		defaultPresetID := defaultModelByProvider[providerName]
@@ -154,7 +154,7 @@ func PreparePackages(
 		if !found {
 			return nil, fmt.Errorf(
 				"%w: Provider %q default preset %q has no generated Model",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 				defaultPresetID,
 			)
@@ -211,7 +211,7 @@ func PreparePackages(
 
 func providerDocumentFromInference(
 	provider modelpreset.ProviderPreset,
-	defaultModelName basespec.LogicalName,
+	defaultModelName model.LogicalName,
 ) (modelproviderv1.ProviderDocument, error) {
 	adapter, err := adapterIDForSDKType(provider.SDKType)
 	if err != nil {
@@ -269,8 +269,8 @@ func providerDocumentFromInference(
 }
 
 func modelDocumentFromInference(
-	providerName basespec.LogicalName,
-	modelName basespec.LogicalName,
+	providerName model.LogicalName,
+	modelName model.LogicalName,
 	preset modelpreset.ModelPreset,
 	disabled bool,
 ) (modelv1.ModelDocument, error) {
@@ -322,7 +322,7 @@ func adapterIDForSDKType(
 	default:
 		return "", fmt.Errorf(
 			"%w: unsupported inference Provider SDK type %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value,
 		)
 	}
@@ -386,7 +386,7 @@ func canonicalDefaults(
 		strings.TrimSpace(*value.AdditionalParametersRawJSON) != "" {
 		raw, err := jsonutil.CanonicalizeObject(
 			[]byte(*value.AdditionalParametersRawJSON),
-			basespec.MaxDefinitionBodyBytes,
+			model.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return nil, fmt.Errorf(
@@ -442,7 +442,7 @@ func canonicalCapabilities(
 	}
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -453,7 +453,7 @@ func canonicalCapabilities(
 func canonicalObject(value any) (json.RawMessage, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		value,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -475,7 +475,7 @@ func timeoutMilliseconds(value int) int {
 func generatedNameForPreset(
 	values []preparedModel,
 	id modelpreset.ModelPresetID,
-) (basespec.LogicalName, bool) {
+) (model.LogicalName, bool) {
 	for _, value := range values {
 		if value.presetID == id {
 			return value.name, true
@@ -494,16 +494,16 @@ func modelDisabled(
 }
 
 func generatedModelLogicalName(
-	provider basespec.LogicalName,
+	provider model.LogicalName,
 	providerModelID string,
-) (basespec.LogicalName, error) {
+) (model.LogicalName, error) {
 	if err := provider.Validate(); err != nil {
 		return "", err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"generated Model providerModelID",
 		providerModelID,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return "", err
 	}
@@ -541,7 +541,7 @@ func generatedModelLogicalName(
 		normalized.String(),
 		".-_",
 	)
-	if value := basespec.LogicalName(candidate); value.Validate() == nil {
+	if value := model.LogicalName(candidate); value.Validate() == nil {
 		return value, nil
 	}
 
@@ -552,13 +552,13 @@ func generatedModelLogicalName(
 		cryptoutil.DigestSHA256Prefix,
 	)
 	suffix := "-model-" + digest[:16]
-	maximumPrefix := basespec.MaxLogicalNameBytes - len(suffix)
+	maximumPrefix := model.MaxLogicalNameBytes - len(suffix)
 	prefix := string(provider)
 	if len(prefix) > maximumPrefix {
 		prefix = prefix[:maximumPrefix]
 	}
 	prefix = strings.TrimRight(prefix, ".-_")
-	value := basespec.LogicalName(prefix + suffix)
+	value := model.LogicalName(prefix + suffix)
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
@@ -571,7 +571,7 @@ func validatePolicy(
 	if len(catalog.Providers) == 0 {
 		return fmt.Errorf(
 			"%w: inference Model catalog is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -580,14 +580,14 @@ func validatePolicy(
 		if !found {
 			return fmt.Errorf(
 				"%w: Provider %q has no application default Model policy",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 			)
 		}
 		if _, found := provider.ModelPresets[defaultID]; !found {
 			return fmt.Errorf(
 				"%w: Provider %q default Model %q is absent from inference catalog",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 				defaultID,
 			)
@@ -599,14 +599,14 @@ func validatePolicy(
 		if !found {
 			return fmt.Errorf(
 				"%w: application default Model policy references unknown Provider %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 			)
 		}
 		if _, found := provider.ModelPresets[defaultID]; !found {
 			return fmt.Errorf(
 				"%w: application default Model policy references unknown Model %q/%q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 				defaultID,
 			)
@@ -618,7 +618,7 @@ func validatePolicy(
 		if !found {
 			return fmt.Errorf(
 				"%w: disabled Model policy references unknown Provider %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 			)
 		}
@@ -626,7 +626,7 @@ func validatePolicy(
 			if _, found := provider.ModelPresets[modelID]; !found {
 				return fmt.Errorf(
 					"%w: disabled Model policy references unknown Model %q/%q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					providerName,
 					modelID,
 				)
@@ -638,7 +638,7 @@ func validatePolicy(
 		if _, found := catalog.Providers[providerName]; !found {
 			return fmt.Errorf(
 				"%w: static Provider header policy references unknown Provider %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				providerName,
 			)
 		}

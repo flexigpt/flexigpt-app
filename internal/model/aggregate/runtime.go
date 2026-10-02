@@ -10,8 +10,8 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
@@ -101,7 +101,7 @@ func (f RuntimeDefaultField) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Model runtime request clear field %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			f,
 		)
 	}
@@ -145,7 +145,7 @@ func (p *RuntimeRequestPatch) Prepare() (
 	if p.Defaults != nil {
 		canonical, err := jsonutil.MarshalCanonicalObject(
 			p.Defaults,
-			basespec.MaxDefinitionBodyBytes,
+			model.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return PreparedRuntimeRequestPatch{}, fmt.Errorf(
@@ -197,7 +197,7 @@ func normalizeRuntimeDefaultFields(
 		if _, duplicate := seen[field]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Model runtime request clear field %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				field,
 			)
 		}
@@ -235,7 +235,7 @@ func (p PreparedRuntimeRequestPatch) Apply(
 	if defaults == nil {
 		return fmt.Errorf(
 			"%w: effective Model defaults are nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ApplyRuntimeDefaults(defaults, p.defaults); err != nil {
@@ -256,7 +256,7 @@ func ApplyRuntimeDefaults(
 	if defaults == nil {
 		return fmt.Errorf(
 			"%w: effective Model defaults are nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -267,7 +267,7 @@ func ApplyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model defaults field %q must be an object",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					key,
 				)
 			}
@@ -279,7 +279,7 @@ func ApplyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model stopSequences must be an array",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 			if len(values) != 0 {

@@ -6,9 +6,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // EnsureProtectedTopology creates or verifies a declared protected Root and
@@ -19,7 +19,7 @@ func (c *Components) EnsureProtectedTopology(
 	declaration topology.Declaration,
 ) (topology.Installed, error) {
 	if c == nil || c.Roots == nil || c.Sources == nil {
-		return topology.Installed{}, basespec.ErrClosed
+		return topology.Installed{}, model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return topology.Installed{}, err
@@ -31,7 +31,7 @@ func (c *Components) EnsureProtectedTopology(
 		!c.rootMutationPolicy.IsProtectedRoot(declaration.Root.ID) {
 		return topology.Installed{}, fmt.Errorf(
 			"%w: declared Root %q is not protected by application policy",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			declaration.Root.ID,
 		)
 	}
@@ -53,7 +53,7 @@ func (c *Components) EnsureProtectedTopology(
 		if !protectedSourceIntentMatches(value, rootValue.ID, draft) {
 			return topology.Installed{}, fmt.Errorf(
 				"%w: protected Source %q declaration differs from stored topology",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				draft.ID,
 			)
 		}

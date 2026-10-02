@@ -3,7 +3,7 @@ package rootimpl
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 // SetRootPolicy supports multiple protected topology Roots and multiple

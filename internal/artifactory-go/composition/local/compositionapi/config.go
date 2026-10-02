@@ -5,8 +5,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/secretapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 // Config contains application-composition inputs for one Artifact Store.

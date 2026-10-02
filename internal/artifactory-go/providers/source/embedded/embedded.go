@@ -10,15 +10,15 @@ import (
 	"strings"
 
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Config struct {
-	ProviderKey string           `json:"providerKey"`
-	Root        basespec.Locator `json:"root"`
+	ProviderKey string        `json:"providerKey"`
+	Root        model.Locator `json:"root"`
 }
 
 type Adapter struct {
@@ -28,17 +28,17 @@ type Adapter struct {
 func New(providers map[string]fs.FS) (*Adapter, error) {
 	output := make(map[string]fs.FS, len(providers))
 	for key, provider := range providers {
-		if err := basespec.ValidateIdentifier(
+		if err := model.ValidateIdentifier(
 			"embedded provider key",
 			key,
-			basespec.MaxKindBytes,
+			model.MaxKindBytes,
 		); err != nil {
 			return nil, err
 		}
 		if provider == nil {
 			return nil, fmt.Errorf(
 				"%w: embedded provider %q is nil",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				key,
 			)
 		}
@@ -65,7 +65,7 @@ func (a *Adapter) NormalizeConfig(
 	if _, exists := a.providers[config.ProviderKey]; !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -83,7 +83,7 @@ func (a *Adapter) Open(
 	if value.Kind != source.SourceKindEmbeddedDirectory {
 		return nil, fmt.Errorf(
 			"%w: embedded adapter received source kind %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.Kind,
 		)
 	}
@@ -95,7 +95,7 @@ func (a *Adapter) Open(
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: embedded provider %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			config.ProviderKey,
 		)
 	}
@@ -116,7 +116,7 @@ func (a *Adapter) Open(
 }
 
 func decodeConfig(raw json.RawMessage) (Config, error) {
-	canonical, err := jsonutil.CanonicalizeObject(raw, basespec.MaxConfigBytes)
+	canonical, err := jsonutil.CanonicalizeObject(raw, model.MaxConfigBytes)
 	if err != nil {
 		return Config{}, err
 	}
@@ -125,18 +125,18 @@ func decodeConfig(raw json.RawMessage) (Config, error) {
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&config,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	); err != nil {
 		return Config{}, fmt.Errorf(
 			"%w: decode embedded source config: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
-	if err := basespec.ValidateIdentifier(
+	if err := model.ValidateIdentifier(
 		"embedded provider key",
 		config.ProviderKey,
-		basespec.MaxKindBytes,
+		model.MaxKindBytes,
 	); err != nil {
 		return Config{}, err
 	}
@@ -176,18 +176,18 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 			return nil
 		}
 		entries++
-		if entries > basespec.DefaultMaxEntries {
+		if entries > model.DefaultMaxEntries {
 			return fmt.Errorf(
 				"%w: embedded source exceeds %d entries",
-				basespec.ErrInvalid,
-				basespec.DefaultMaxEntries,
+				model.ErrInvalid,
+				model.DefaultMaxEntries,
 			)
 		}
-		if strings.Count(name, "/")+1 > basespec.DefaultMaxDepth {
+		if strings.Count(name, "/")+1 > model.DefaultMaxDepth {
 			return fmt.Errorf(
 				"%w: embedded source exceeds depth %d",
-				basespec.ErrInvalid,
-				basespec.DefaultMaxDepth,
+				model.ErrInvalid,
+				model.DefaultMaxDepth,
 			)
 		}
 		info, err := fs.Stat(provider, name)
@@ -201,10 +201,10 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if !info.Mode().IsRegular() {
 			return nil
 		}
-		if info.Size() < 0 || info.Size() > basespec.MaxScanBytes-totalBytes {
+		if info.Size() < 0 || info.Size() > model.MaxScanBytes-totalBytes {
 			return fmt.Errorf(
 				"%w: embedded source exceeds byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		totalBytes += info.Size()
@@ -226,7 +226,7 @@ func fingerprint(ctx context.Context, provider fs.FS) (string, error) {
 		if written != info.Size() {
 			return fmt.Errorf(
 				"%w: embedded source entry %q changed during fingerprinting",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				name,
 			)
 		}

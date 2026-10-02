@@ -5,15 +5,15 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DecoderRegistry struct {
 	decoders    []providerapi.Decoder
-	byID        map[basespec.DecoderID]providerapi.Decoder
+	byID        map[model.DecoderID]providerapi.Decoder
 	fingerprint cryptoutil.Digest
 }
 
@@ -21,27 +21,27 @@ func NewDecoderRegistry(
 	codecs []providerapi.SchemaCodec,
 	decoders ...providerapi.Decoder,
 ) (*DecoderRegistry, error) {
-	byID := make(map[basespec.DecoderID]providerapi.Decoder, len(decoders))
+	byID := make(map[model.DecoderID]providerapi.Decoder, len(decoders))
 	ordered := make([]providerapi.Decoder, 0, len(decoders))
 	for _, decoder := range decoders {
 		if decoder == nil {
-			return nil, fmt.Errorf("%w: decoder is nil", basespec.ErrInvalid)
+			return nil, fmt.Errorf("%w: decoder is nil", model.ErrInvalid)
 		}
 		id := decoder.ID()
 		if err := id.Validate(); err != nil {
 			return nil, err
 		}
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"decoder revision",
 			decoder.Revision(),
-			basespec.MaxVersionBytes,
+			model.MaxVersionBytes,
 		); err != nil {
 			return nil, err
 		}
 		if _, duplicate := byID[id]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate decoder %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				id,
 			)
 		}
@@ -66,7 +66,7 @@ func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 	if r == nil {
 		return "", fmt.Errorf(
 			"%w: decoder registry is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return r.fingerprint, nil
@@ -77,8 +77,8 @@ func registryFingerprint(
 	decoders []providerapi.Decoder,
 ) (cryptoutil.Digest, error) {
 	type descriptor struct {
-		ID       basespec.DecoderID `json:"id"`
-		Revision string             `json:"revision"`
+		ID       model.DecoderID `json:"id"`
+		Revision string          `json:"revision"`
 	}
 	values := make([]descriptor, 0, len(decoders))
 	for _, decoder := range decoders {
@@ -94,7 +94,7 @@ func registryFingerprint(
 	schemas := make([]schemaDescriptor, 0, len(codecs))
 	for _, codec := range codecs {
 		if codec == nil {
-			return "", fmt.Errorf("%w: nil schema codec", basespec.ErrInvalid)
+			return "", fmt.Errorf("%w: nil schema codec", model.ErrInvalid)
 		}
 		raw, err := jsonutil.Canonicalize(codec.JSONSchema())
 		if err != nil {
@@ -122,7 +122,7 @@ func registryFingerprint(
 		"format":   "artifact-decoder-registry/v1",
 		"decoders": values,
 		"schemas":  schemas,
-	}, basespec.MaxDefinitionBytes)
+	}, model.MaxDefinitionBytes)
 	if err != nil {
 		return "", err
 	}
@@ -130,7 +130,7 @@ func registryFingerprint(
 }
 
 func (r *DecoderRegistry) find(
-	id basespec.DecoderID,
+	id model.DecoderID,
 ) (providerapi.Decoder, bool) {
 	if r == nil {
 		return nil, false

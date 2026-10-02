@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 type privilegedContextKey struct{}
@@ -20,7 +20,7 @@ func RequirePrivileged(ctx context.Context) error {
 	if ctx == nil || !IsPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected topology installation requires trusted installer access",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 	return nil

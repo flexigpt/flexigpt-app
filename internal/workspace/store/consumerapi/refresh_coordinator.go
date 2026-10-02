@@ -10,8 +10,8 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type workspaceRefreshCoordinator struct {
@@ -137,7 +137,7 @@ func (c *workspaceRefreshCoordinator) RefreshSource(
 	target resolve.RefreshTarget,
 ) error {
 	if c == nil || c.discovery == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	_, err := c.discovery.RefreshSource(
 		ctx,
@@ -188,8 +188,8 @@ func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
 
 func localRefreshLocator(
 	locator declaration.Locator,
-	declarationLocator basespec.Locator,
-) (basespec.Locator, bool, error) {
+	declarationLocator model.Locator,
+) (model.Locator, bool, error) {
 	if err := locator.Validate(); err != nil {
 		return "", false, err
 	}
@@ -216,19 +216,19 @@ func localRefreshLocator(
 
 func locatedRefreshCandidates(
 	declarationType declaration.Type,
-	target basespec.Locator,
-) []basespec.Locator {
+	target model.Locator,
+) []model.Locator {
 	if declarationType != declaration.TypeSkill ||
 		documentTopology.IsSkillPackageDocument(target) {
-		return []basespec.Locator{target}
+		return []model.Locator{target}
 	}
 
-	output := []basespec.Locator{target}
-	seen := map[basespec.Locator]struct{}{
+	output := []model.Locator{target}
+	seen := map[model.Locator]struct{}{
 		target: {},
 	}
 	for _, skillDocument := range documentTopology.SkillPackageDocumentFiles() {
-		candidate := basespec.Locator(path.Join(
+		candidate := model.Locator(path.Join(
 			string(target),
 			string(skillDocument),
 		))

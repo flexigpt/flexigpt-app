@@ -9,9 +9,9 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -145,11 +145,11 @@ func managedSkillFiles(
 ) []source.ManagedPackageFile {
 	return []source.ManagedPackageFile{
 		{
-			Locator: basespec.Locator("SKILL.md"),
+			Locator: model.Locator("SKILL.md"),
 			Content: append([]byte(nil), document...),
 		},
 		{
-			Locator: basespec.Locator("references/checklist.md"),
+			Locator: model.Locator("references/checklist.md"),
 			Content: []byte(checklist),
 		},
 	}

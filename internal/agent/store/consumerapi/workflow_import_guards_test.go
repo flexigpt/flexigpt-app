@@ -9,7 +9,7 @@ import (
 
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -44,7 +44,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrInvalid)
+	requireErrorIs(t, err, model.ErrInvalid)
 
 	_, err = harness.api.CommitAgentImport(
 		t.Context(),
@@ -56,7 +56,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrConflict)
+	requireErrorIs(t, err, model.ErrConflict)
 
 	_, err = harness.api.SetAgentCollectionEnabled(
 		t.Context(),
@@ -74,7 +74,7 @@ func TestWorkflow_ManagedAgentImportRejectsTamperedAndStalePreparedPlans(
 			AcceptedConfirmationCodes: preview.RequiredConfirmationCodes,
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrConflict)
+	requireErrorIs(t, err, model.ErrConflict)
 
 	agents, err := harness.api.ListAgents(
 		t.Context(),
@@ -211,7 +211,7 @@ func TestWorkflow_ManagedAgentImportRequiresDeclaredConfirmation(
 			PreparedFingerprint: preview.PreparedFingerprint,
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrConflict)
+	requireErrorIs(t, err, model.ErrConflict)
 
 	committed, err := harness.api.CommitAgentImport(
 		t.Context(),
@@ -296,7 +296,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 			ExpectedRevision: enabled.Revision,
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrProtected)
+	requireErrorIs(t, err, model.ErrProtected)
 
 	_, err = harness.api.CreateAgentCollection(
 		t.Context(),
@@ -306,7 +306,7 @@ func TestWorkflow_ProtectedBuiltinAgentBoundaries(
 			DisplayName: "Protected Test Collection",
 		},
 	)
-	requireErrorIs(t, err, basespec.ErrProtected)
+	requireErrorIs(t, err, model.ErrProtected)
 }
 
 func newManagedImportFixture(
@@ -333,7 +333,7 @@ func newManagedImportFixture(
 		t.Context(),
 		collection.CreateRequest{
 			RootID:      documentTopology.UserRootID(),
-			Name:        basespec.LogicalName(collectionName),
+			Name:        model.LogicalName(collectionName),
 			DisplayName: "Managed Import Guard Collection",
 		},
 	)

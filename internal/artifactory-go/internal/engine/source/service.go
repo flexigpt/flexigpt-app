@@ -8,9 +8,9 @@ import (
 	"fmt"
 
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -40,7 +40,7 @@ func NewService(
 	if repository == nil || registry == nil || roots == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: source service dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -72,7 +72,7 @@ func (s *Service) Ensure(
 	if ctx == nil {
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: Source ensure context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -90,10 +90,10 @@ func (s *Service) Ensure(
 	if err := draft.Kind.Validate(); err != nil {
 		return source.Summary{}, false, err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return source.Summary{}, false, err
 	}
@@ -109,7 +109,7 @@ func (s *Service) Ensure(
 	if !found {
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			draft.Kind,
 		)
 	}
@@ -119,7 +119,7 @@ func (s *Service) Ensure(
 	}
 	normalizedConfig, err = jsonutil.CanonicalizeObject(
 		normalizedConfig,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	)
 	if err != nil {
 		return source.Summary{}, false, err
@@ -137,7 +137,7 @@ func (s *Service) Ensure(
 		if existing.RetiredAt != nil {
 			return source.Summary{}, false, fmt.Errorf(
 				"%w: Source %q is retired",
-				basespec.ErrRetired,
+				model.ErrRetired,
 				existing.ID,
 			)
 		}
@@ -150,14 +150,14 @@ func (s *Service) Ensure(
 		) {
 			return source.Summary{}, false, fmt.Errorf(
 				"%w: Source storage key %q identifies another physical Source",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				draft.StorageKey,
 			)
 		}
 		return existing.Summary(), false, nil
 	}
-	if !errors.Is(err, basespec.ErrSourceNotFound) &&
-		!errors.Is(err, basespec.ErrNotFound) {
+	if !errors.Is(err, model.ErrSourceNotFound) &&
+		!errors.Is(err, model.ErrNotFound) {
 		return source.Summary{}, false, err
 	}
 
@@ -178,7 +178,7 @@ func (s *Service) CreateWithStatus(
 	if ctx == nil {
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: source creation context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -203,10 +203,10 @@ func (s *Service) CreateWithStatus(
 	if err := draft.Kind.Validate(); err != nil {
 		return source.Summary{}, false, err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return source.Summary{}, false, err
 	}
@@ -214,7 +214,7 @@ func (s *Service) CreateWithStatus(
 	if !exists {
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			draft.Kind,
 		)
 	}
@@ -224,10 +224,10 @@ func (s *Service) CreateWithStatus(
 	}
 	config, err = jsonutil.CanonicalizeObject(
 		config,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	)
 	if err != nil {
-		return source.Summary{}, false, fmt.Errorf("%w: source config: %w", basespec.ErrInvalid, err)
+		return source.Summary{}, false, fmt.Errorf("%w: source config: %w", model.ErrInvalid, err)
 	}
 
 	discovery := draft.Discovery.Normalized()
@@ -268,12 +268,12 @@ func (s *Service) CreateWithStatus(
 		}
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			draft.ID,
 		)
 
-	case !errors.Is(lookupErr, basespec.ErrSourceNotFound) &&
-		!errors.Is(lookupErr, basespec.ErrNotFound):
+	case !errors.Is(lookupErr, model.ErrSourceNotFound) &&
+		!errors.Is(lookupErr, model.ErrNotFound):
 		return source.Summary{}, false, lookupErr
 	}
 
@@ -305,7 +305,7 @@ func (s *Service) CreateWithStatus(
 	if createErr == nil {
 		return value.Summary(), true, nil
 	}
-	if !errors.Is(createErr, basespec.ErrConflict) {
+	if !errors.Is(createErr, model.ErrConflict) {
 		// A repository commit error can be ambiguous. Do not remove the
 		// bootstrapped directory after attempting metadata publication:
 		// the Source row may already be durable and must never point to
@@ -319,8 +319,8 @@ func (s *Service) CreateWithStatus(
 		// that ID collision into an unrelated Source-not-found response. This
 		// is a known non-commit outcome, so an empty managed Source directory
 		// created for this failed attempt can be safely compensated.
-		if errors.Is(lookupErr, basespec.ErrSourceNotFound) ||
-			errors.Is(lookupErr, basespec.ErrNotFound) {
+		if errors.Is(lookupErr, model.ErrSourceNotFound) ||
+			errors.Is(lookupErr, model.ErrNotFound) {
 			return source.Summary{}, false, cleanupBootstrap(createErr)
 		}
 
@@ -332,7 +332,7 @@ func (s *Service) CreateWithStatus(
 	if !sourceCreationIntentMatches(existing, value) {
 		return source.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			draft.ID,
 		)
 	}
@@ -357,7 +357,7 @@ func sourceCreationIntentMatches(
 func sameEnsuredSource(
 	existing source.Source,
 	rootID root.RootID,
-	rootStorageKey basespec.StorageKey,
+	rootStorageKey model.StorageKey,
 	draft source.Draft,
 	normalizedConfig json.RawMessage,
 ) bool {
@@ -422,7 +422,7 @@ func (s *Service) Update(
 	if update.ExpectedRevision == 0 {
 		return source.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
@@ -432,7 +432,7 @@ func (s *Service) Update(
 	if current.Revision != update.ExpectedRevision {
 		return source.Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			id,
 		)
 	}
@@ -441,7 +441,7 @@ func (s *Service) Update(
 	if !exists {
 		return source.Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			current.Kind,
 		)
 	}
@@ -457,7 +457,7 @@ func (s *Service) Update(
 		}
 		normalized, err = jsonutil.CanonicalizeObject(
 			normalized,
-			basespec.MaxConfigBytes,
+			model.MaxConfigBytes,
 		)
 		if err != nil {
 			return source.Summary{}, err
@@ -491,7 +491,7 @@ func (s *Service) Update(
 	}
 
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
+		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", model.ErrInvalid)
 	}
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
@@ -522,7 +522,7 @@ func (s *Service) Retire(
 	if expectedRevision == 0 {
 		return source.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
@@ -532,12 +532,12 @@ func (s *Service) Retire(
 	if current.Revision != expectedRevision {
 		return source.Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			id,
 		)
 	}
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
+		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", model.ErrInvalid)
 	}
 	now := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
@@ -566,7 +566,7 @@ func (s *Service) Discard(
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: source discard context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -584,7 +584,7 @@ func (s *Service) Discard(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -593,7 +593,7 @@ func (s *Service) Discard(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	cleanupContext := context.WithoutCancel(ctx)
@@ -626,7 +626,7 @@ func (s *Service) Purge(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := rootID.Validate(); err != nil {
@@ -653,7 +653,7 @@ func (s *Service) MarkContentChanged(
 	if ctx == nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: source content-change context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -668,7 +668,7 @@ func (s *Service) MarkContentChanged(
 	if expectedRevision == 0 {
 		return source.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -677,10 +677,10 @@ func (s *Service) MarkContentChanged(
 		return source.Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return source.Summary{}, basespec.ErrConflict
+		return source.Summary{}, model.ErrConflict
 	}
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", basespec.ErrInvalid)
+		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", model.ErrInvalid)
 	}
 
 	next := current.Clone()

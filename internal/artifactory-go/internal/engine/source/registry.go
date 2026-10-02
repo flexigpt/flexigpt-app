@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type Registry struct {
@@ -20,7 +20,7 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 
 	for _, adapter := range adapters {
 		if adapter == nil {
-			return nil, fmt.Errorf("%w: source adapter is nil", basespec.ErrInvalid)
+			return nil, fmt.Errorf("%w: source adapter is nil", model.ErrInvalid)
 		}
 		kind := adapter.Kind()
 		if err := kind.Validate(); err != nil {
@@ -29,7 +29,7 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 		if _, exists := values[kind]; exists {
 			return nil, fmt.Errorf(
 				"%w: duplicate source adapter %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				kind,
 			)
 		}
@@ -45,7 +45,7 @@ func (r *Registry) Open(
 	value source.Source,
 ) (Snapshot, error) {
 	if ctx == nil {
-		return nil, basespec.ErrInvalid
+		return nil, model.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (r *Registry) Open(
 	if !exists {
 		return nil, fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -105,10 +105,10 @@ func (r *Registry) SupportsManagedPackages(
 func (r *Registry) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	if ctx == nil {
-		return "", basespec.ErrInvalid
+		return "", model.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -123,7 +123,7 @@ func (r *Registry) ResolveLocalPath(
 	if !exists {
 		return "", fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -131,7 +131,7 @@ func (r *Registry) ResolveLocalPath(
 	if !supported {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no native filesystem path",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -154,7 +154,7 @@ func (r *Registry) PublishPackage(
 	if ctx == nil {
 		return "", fmt.Errorf(
 			"%w: managed Source publication context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -172,7 +172,7 @@ func (r *Registry) PublishPackage(
 	if !exists {
 		return "", fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -180,7 +180,7 @@ func (r *Registry) PublishPackage(
 	if !supported {
 		return "", fmt.Errorf(
 			"%w: source kind %q is not writable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -192,10 +192,10 @@ func (r *Registry) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := basespec.ValidateSourceGeneration(generation); err != nil {
+	if err := model.ValidateSourceGeneration(generation); err != nil {
 		return "", fmt.Errorf(
 			"%w: managed Source writer returned an invalid generation: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -211,7 +211,7 @@ func (r *Registry) RemovePackage(
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: managed Source removal context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -223,7 +223,7 @@ func (r *Registry) RemovePackage(
 	if err := address.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateSourceGeneration(
+	if err := model.ValidateSourceGeneration(
 		expectedGeneration,
 	); err != nil {
 		return err
@@ -233,7 +233,7 @@ func (r *Registry) RemovePackage(
 	if !exists {
 		return fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -241,7 +241,7 @@ func (r *Registry) RemovePackage(
 	if !supported {
 		return fmt.Errorf(
 			"%w: source kind %q is not writable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -258,15 +258,15 @@ func (r *Registry) RemovePackage(
 // exposed by source.Service.
 func (r *Registry) RemoveManagedRoot(
 	ctx context.Context,
-	rootStorageKey basespec.StorageKey,
+	rootStorageKey model.StorageKey,
 ) error {
 	if r == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: managed root removal context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {

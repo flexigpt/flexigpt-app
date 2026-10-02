@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -112,12 +112,12 @@ func (a *API) ensureDefaultAgentCollectionRoot(
 	ctx context.Context,
 ) (root.RootID, error) {
 	if a == nil || a.roots == nil {
-		return "", basespec.ErrClosed
+		return "", model.ErrClosed
 	}
 	if ctx == nil {
 		return "", fmt.Errorf(
 			"%w: default Agent Collection Root context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -134,7 +134,7 @@ func (a *API) ensureDefaultAgentCollectionRoot(
 	if value.ID != documentTopology.UserRootID() {
 		return "", fmt.Errorf(
 			"%w: default Agent Collection Root has unexpected ID %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.ID,
 		)
 	}
@@ -145,12 +145,12 @@ func (a *API) managementRoots(
 	ctx context.Context,
 ) ([]root.Root, error) {
 	if a == nil || a.roots == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent management Root list context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {

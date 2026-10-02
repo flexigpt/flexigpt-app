@@ -4,12 +4,12 @@ import (
 	"context"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -77,7 +77,7 @@ func (r *SourceRepository) Get(
 func (r *SourceRepository) FindByStorageKey(
 	ctx context.Context,
 	rootID root.RootID,
-	storageKey basespec.StorageKey,
+	storageKey model.StorageKey,
 ) (source.Source, error) {
 	return r.store.findSourceByStorageKey(ctx, rootID, storageKey)
 }
@@ -229,7 +229,7 @@ func (r *ArtifactRepository) FindCatalogByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
+	logicalName model.LogicalName,
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	return r.store.findArtifactCatalogByIdentity(
@@ -252,7 +252,7 @@ func (r *ArtifactRepository) FindByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
+	logicalName model.LogicalName,
 ) ([]artifact.Artifact, error) {
 	return r.store.findArtifactsByIdentity(
 		ctx,

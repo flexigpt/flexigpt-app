@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -211,7 +211,7 @@ func (s *Store) findArtifactCatalogByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
+	logicalName model.LogicalName,
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if err := rootID.Validate(); err != nil {
@@ -285,7 +285,7 @@ func (s *Store) getArtifactsByReferences(
 		if len(values) != end-start {
 			return nil, fmt.Errorf(
 				"%w: one or more requested Artifacts are unavailable",
-				basespec.ErrArtifactNotFound,
+				model.ErrArtifactNotFound,
 			)
 		}
 		output = append(output, values...)
@@ -405,12 +405,12 @@ func scanArtifactCatalogEntry(
 		RootID: root.RootID(rootID),
 		Binding: artifact.SourceBinding{
 			SourceID:           source.SourceID(sourceID),
-			Locator:            basespec.Locator(locator),
-			SubresourceLocator: basespec.SubresourceLocator(subresource),
+			Locator:            model.Locator(locator),
+			SubresourceLocator: model.SubresourceLocator(subresource),
 		},
 		Kind:           artifact.ArtifactKind(kind),
-		LogicalName:    basespec.LogicalName(logicalName),
-		LogicalVersion: basespec.LogicalVersion(logicalVersion),
+		LogicalName:    model.LogicalName(logicalName),
+		LogicalVersion: model.LogicalVersion(logicalVersion),
 		DisplayName:    displayName,
 		State:          artifact.State(state),
 		Enabled:        enabled != 0,
@@ -418,7 +418,7 @@ func scanArtifactCatalogEntry(
 		Source: catalog.SourceMetadata{
 			ID:         source.SourceID(sourceID),
 			Kind:       source.SourceKind(sourceKind),
-			StorageKey: basespec.StorageKey(sourceStorageKey),
+			StorageKey: model.StorageKey(sourceStorageKey),
 			Enabled:    sourceEnabled != 0,
 		},
 	}

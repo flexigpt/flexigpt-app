@@ -6,10 +6,10 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type editableManagedAgent struct {
@@ -27,12 +27,12 @@ func (a *API) DeleteManagedAgent(
 	request ManagedAgentDeleteRequest,
 ) error {
 	if a == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Agent Artifact revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -73,7 +73,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 	rootRef artifact.ArtifactRef,
 ) error {
 	if a == nil || a.artifacts == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	records, err := a.artifacts.ListBySource(
@@ -98,7 +98,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 		if record.State != artifact.StateMissing {
 			return fmt.Errorf(
 				"%w: removed managed Agent package Artifact %q is not missing",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				record.ID,
 			)
 		}
@@ -111,7 +111,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 	if !rootFound {
 		return fmt.Errorf(
 			"%w: removed managed Agent Artifact %q was not found",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			rootRef.ArtifactID,
 		)
 	}
@@ -147,7 +147,7 @@ func (a *API) loadManagedAgent(
 	requireCurrentSource bool,
 ) (editableManagedAgent, error) {
 	if a == nil {
-		return editableManagedAgent{}, basespec.ErrClosed
+		return editableManagedAgent{}, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return editableManagedAgent{}, err
@@ -158,25 +158,25 @@ func (a *API) loadManagedAgent(
 		return editableManagedAgent{}, err
 	}
 	if expectedRevision != 0 && record.Revision != expectedRevision {
-		return editableManagedAgent{}, basespec.ErrConflict
+		return editableManagedAgent{}, model.ErrConflict
 	}
 	if record.State != artifact.StateAvailable {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.LogicalVersion != "" {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent Artifact has an unexpected logical version",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: contained Agent declarations are not exportable managed Agents",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if err := a.requireMutable(ctx, record.RootID, false); err != nil {
@@ -195,13 +195,13 @@ func (a *API) loadManagedAgent(
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent is not backed by the managed Agent Source",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if requireCurrentSource && !sourceValue.Enabled {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent Source is disabled",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -214,7 +214,7 @@ func (a *API) loadManagedAgent(
 	if address.Name != record.LogicalName {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent package name differs from Artifact identity",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -231,7 +231,7 @@ func (a *API) loadManagedAgent(
 		if !inspection.IsCurrent() {
 			return editableManagedAgent{}, fmt.Errorf(
 				"%w: managed Agent Source requires refresh",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 			)
 		}
 		generation = inspection.State.SourceGeneration
@@ -249,7 +249,7 @@ func (a *API) loadManagedAgent(
 		document.Locator != nil {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: managed Agent declaration is not a concrete matching Agent",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

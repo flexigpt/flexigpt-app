@@ -12,8 +12,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type snapshot struct {
@@ -29,7 +29,7 @@ func (s *snapshot) Generation() string {
 
 func (s *snapshot) Stat(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return source.Entry{}, err
@@ -37,7 +37,7 @@ func (s *snapshot) Stat(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -49,7 +49,7 @@ func (s *snapshot) Stat(
 	if errors.Is(err, os.ErrNotExist) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -61,7 +61,7 @@ func (s *snapshot) Stat(
 
 func (s *snapshot) ReadDir(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) ([]source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -81,7 +81,7 @@ func (s *snapshot) ReadDir(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source directory %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -124,14 +124,14 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 	values := make([]os.DirEntry, 0)
 	for {
 		batch, readErr := directory.ReadDir(directoryReadBatchSize)
-		if len(batch) > basespec.MaxDiscoveryEntries-len(values) {
+		if len(batch) > model.MaxDiscoveryEntries-len(values) {
 			closeErr := directory.Close()
 			return nil, errors.Join(
 				fmt.Errorf(
 					"%w: source directory %q exceeds %d entries",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					location,
-					basespec.MaxDiscoveryEntries,
+					model.MaxDiscoveryEntries,
 				),
 				closeErr,
 			)
@@ -153,7 +153,7 @@ func readDirectoryEntries(location string) ([]os.DirEntry, error) {
 
 func (s *snapshot) Open(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func (s *snapshot) Open(
 	if s.traversalPolicy.excludesLocator(string(locator)) {
 		return nil, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -173,7 +173,7 @@ func (s *snapshot) Open(
 	if errors.Is(err, os.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: source file %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -188,7 +188,7 @@ func (s *snapshot) Open(
 		return nil, errors.Join(
 			fmt.Errorf(
 				"%w: source locator %q is not a regular file",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				locator,
 			),
 			file.Close(),
@@ -208,7 +208,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if current != s.generation {
 		return fmt.Errorf(
 			"%w: filesystem source changed during discovery",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return nil
@@ -221,19 +221,19 @@ func (s *snapshot) Close() error {
 
 func (s *snapshot) ensureOpen(ctx context.Context) error {
 	if s == nil || s.closed.Load() {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return ctx.Err()
 }
 
 func (s *snapshot) resolve(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
 
 func (s *snapshot) resolveDirectory(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	return resolveWithinRoot(s.root, locator)
 }
@@ -242,7 +242,7 @@ func (s *snapshot) resolveDirectory(
 // root using normal native filesystem path semantics.
 func resolveNativePath(
 	root string,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	rootInfo, err := os.Stat(root)
 	if err != nil {
@@ -251,14 +251,14 @@ func resolveNativePath(
 	if !rootInfo.IsDir() {
 		return "", fmt.Errorf(
 			"%w: filesystem source root is not a directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	p, err := resolveWithinRoot(root, locator)
 	if errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -268,7 +268,7 @@ func resolveNativePath(
 	if _, err := os.Stat(p); errors.Is(err, os.ErrNotExist) {
 		return "", fmt.Errorf(
 			"%w: source locator %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	} else if err != nil {
@@ -279,7 +279,7 @@ func resolveNativePath(
 
 func resolveWithinRoot(
 	root string,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	if err := locator.Validate(true); err != nil {
 		return "", err
@@ -298,7 +298,7 @@ func resolveWithinRoot(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: locator %q escapes source root",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 		)
 	}
@@ -307,7 +307,7 @@ func resolveWithinRoot(
 }
 
 func entryFromInfo(
-	locator basespec.Locator,
+	locator model.Locator,
 	info os.FileInfo,
 ) source.Entry {
 	name := info.Name()
@@ -327,18 +327,18 @@ func entryFromInfo(
 }
 
 func joinLocator(
-	parent basespec.Locator,
+	parent model.Locator,
 	name string,
-) (basespec.Locator, error) {
+) (model.Locator, error) {
 	if name == "" || strings.ContainsAny(name, `/\:`) {
 		return "", fmt.Errorf(
 			"%w: invalid source entry name %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			name,
 		)
 	}
 	if parent == "." {
-		return basespec.Locator(name), nil
+		return model.Locator(name), nil
 	}
-	return basespec.Locator(string(parent) + "/" + name), nil
+	return model.Locator(string(parent) + "/" + name), nil
 }

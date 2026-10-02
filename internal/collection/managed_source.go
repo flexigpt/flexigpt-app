@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // EnsureManagedDeclarationDiscovery ensures that one managed declaration
@@ -21,11 +21,11 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	locator basespec.Locator,
-	requiredDecoder basespec.DecoderID,
+	locator model.Locator,
+	requiredDecoder model.DecoderID,
 ) (source.Summary, error) {
 	if a == nil {
-		return source.Summary{}, basespec.ErrClosed
+		return source.Summary{}, model.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return source.Summary{}, err
@@ -73,7 +73,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 		next.DecoderHints = append(next.DecoderHints, source.DecoderHint{
 			Locator:    locator,
 			Recursive:  false,
-			DecoderIDs: []basespec.DecoderID{requiredDecoder},
+			DecoderIDs: []model.DecoderID{requiredDecoder},
 		})
 	}
 

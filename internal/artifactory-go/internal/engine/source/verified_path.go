@@ -7,9 +7,9 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -40,7 +40,7 @@ func NewVerificationSession(
 	if ctx == nil {
 		return nil, nil, fmt.Errorf(
 			"%w: source verification session context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -49,7 +49,7 @@ func NewVerificationSession(
 	if verificationSessionFromContext(ctx) != nil {
 		return nil, nil, fmt.Errorf(
 			"%w: source verification session already exists",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -115,8 +115,8 @@ func ResolveVerifiedLocalPath(
 	ctx context.Context,
 	runtime Runtime,
 	value source.Source,
-	verifiedLocator basespec.Locator,
-	localLocator basespec.Locator,
+	verifiedLocator model.Locator,
+	localLocator model.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
@@ -124,7 +124,7 @@ func ResolveVerifiedLocalPath(
 	if ctx == nil {
 		return "", fmt.Errorf(
 			"%w: verified source path context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -133,7 +133,7 @@ func ResolveVerifiedLocalPath(
 	if runtime == nil {
 		return "", fmt.Errorf(
 			"%w: verified source path runtime is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := value.Validate(); err != nil {
@@ -145,16 +145,16 @@ func ResolveVerifiedLocalPath(
 	if err := localLocator.Validate(true); err != nil {
 		return "", err
 	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := model.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return "", err
 	}
 	if err := cryptoutil.ValidateDigest(expectedDigest); err != nil {
 		return "", err
 	}
-	if maximumBytes <= 0 || maximumBytes > basespec.MaxCandidateBytes {
+	if maximumBytes <= 0 || maximumBytes > model.MaxCandidateBytes {
 		return "", fmt.Errorf(
 			"%w: verified source path byte limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -162,7 +162,7 @@ func ResolveVerifiedLocalPath(
 	if !supported || !localPaths.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no trusted native path",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -198,7 +198,7 @@ func (s *VerificationSession) verify(
 	ctx context.Context,
 	runtime Runtime,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
@@ -214,7 +214,7 @@ func (s *VerificationSession) verify(
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	snapshot, found := s.snapshots[key]
@@ -227,7 +227,7 @@ func (s *VerificationSession) verify(
 			return errors.Join(
 				fmt.Errorf(
 					"%w: source generation changed since it was observed",
-					basespec.ErrConflict,
+					model.ErrConflict,
 				),
 				opened.Close(),
 			)
@@ -260,7 +260,7 @@ func verificationSessionFromContext(
 func readSnapshotLocator(
 	ctx context.Context,
 	snapshot Snapshot,
-	locator basespec.Locator,
+	locator model.Locator,
 	maximumBytes int64,
 ) ([]byte, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -270,14 +270,14 @@ func readSnapshotLocator(
 	if err := entry.Validate(); err != nil {
 		return nil, fmt.Errorf(
 			"%w: source snapshot returned an invalid entry: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
 	if entry.Locator != locator {
 		return nil, fmt.Errorf(
 			"%w: source snapshot stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -288,7 +288,7 @@ func readSnapshotLocator(
 func verifySnapshotEntry(
 	ctx context.Context,
 	snapshot Snapshot,
-	locator basespec.Locator,
+	locator model.Locator,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
 ) error {
@@ -304,7 +304,7 @@ func verifySnapshotEntry(
 	if cryptoutil.DigestBytes(content) != expectedDigest {
 		return fmt.Errorf(
 			"%w: Source content for %q changed since refresh",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			locator,
 		)
 	}

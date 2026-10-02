@@ -9,11 +9,11 @@ import (
 	"sync"
 
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -57,13 +57,13 @@ func (s *Service) BeginVerificationSession(
 		return nil, nil, err
 	}
 	if s == nil {
-		return nil, nil, basespec.ErrClosed
+		return nil, nil, model.ErrClosed
 	}
 	if existing := verificationSessionFromContext(ctx); existing != nil {
 		if existing.service != s {
 			return nil, nil, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -90,7 +90,7 @@ func (s *verificationSession) Close(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: resource verification session close context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -134,7 +134,7 @@ func (s *verificationSession) Close(ctx context.Context) error {
 				current.Revision != value.source.Revision) {
 			currentErr = fmt.Errorf(
 				"%w: Artifact Source %q changed during batch",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 				key.sourceID,
 			)
 		}
@@ -167,14 +167,14 @@ func (s *verificationSession) withSource(
 	fn func(*verificationSessionSource) error,
 ) error {
 	if s == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.closed {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	value, err := s.sourceLocked(ctx, key)
@@ -210,14 +210,14 @@ func (s *verificationSession) sourceLocked(
 	if !value.Enabled {
 		return nil, fmt.Errorf(
 			"%w: Artifact Source %q is disabled",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.ID,
 		)
 	}
 	if !inspection.IsCurrent() {
 		return nil, fmt.Errorf(
 			"%w: Artifact Source %q changed during batch setup",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 			value.ID,
 		)
 	}
@@ -230,7 +230,7 @@ func (s *verificationSession) sourceLocked(
 		return nil, errors.Join(
 			fmt.Errorf(
 				"%w: Artifact Source %q changed during batch setup",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 				value.ID,
 			),
 			snapshot.Close(),
@@ -249,7 +249,7 @@ func (s *verificationSession) sourceLocked(
 func readVerificationSessionEntry(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
-	locator basespec.Locator,
+	locator model.Locator,
 	maximumBytes int64,
 ) ([]byte, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -262,7 +262,7 @@ func readVerificationSessionEntry(
 	if entry.Locator != locator {
 		return nil, fmt.Errorf(
 			"%w: Source snapshot stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -284,7 +284,7 @@ func (s *Service) resolveArtifactInSession(
 		record.SourceContentDigest == nil {
 		return resource.ResolvedArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not currently available",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -313,7 +313,7 @@ func (s *Service) resolveArtifactInSession(
 				ctx,
 				current.snapshot,
 				record.Binding.Locator,
-				basespec.MaxCandidateBytes,
+				model.MaxCandidateBytes,
 			)
 			if err != nil {
 				return err
@@ -322,7 +322,7 @@ func (s *Service) resolveArtifactInSession(
 				*record.SourceContentDigest {
 				return fmt.Errorf(
 					"%w: Source content for %q changed since refresh",
-					basespec.ErrConflict,
+					model.ErrConflict,
 					record.Binding.Locator,
 				)
 			}
@@ -353,7 +353,7 @@ func (s *Service) readSourceEntryInSession(
 	session *verificationSession,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	locator basespec.Locator,
+	locator model.Locator,
 	maximumBytes int64,
 ) (resource.VerifiedEntry, error) {
 	var output resource.VerifiedEntry
@@ -397,13 +397,13 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 	ctx context.Context,
 	session *verificationSession,
 	resolved resource.ResolvedArtifact,
-	localLocator basespec.Locator,
+	localLocator model.Locator,
 ) (string, error) {
 	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
 	if !supported || !localPaths.SupportsLocalPath(resolved.Source.Kind) {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no trusted native path",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			resolved.Source.Kind,
 		)
 	}
@@ -422,7 +422,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 					resolved.RefreshState.SourceGeneration {
 				return fmt.Errorf(
 					"%w: Source changed after Artifact resolution",
-					basespec.ErrRefreshRequired,
+					model.ErrRefreshRequired,
 				)
 			}
 
@@ -430,7 +430,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 				ctx,
 				current.snapshot,
 				resolved.Artifact.Binding.Locator,
-				basespec.MaxCandidateBytes,
+				model.MaxCandidateBytes,
 			)
 			if err != nil {
 				return err
@@ -439,7 +439,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 				*resolved.Artifact.SourceContentDigest {
 				return fmt.Errorf(
 					"%w: Source content for %q changed since refresh",
-					basespec.ErrConflict,
+					model.ErrConflict,
 					resolved.Artifact.Binding.Locator,
 				)
 			}

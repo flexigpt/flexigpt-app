@@ -11,7 +11,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
@@ -24,10 +24,10 @@ type ToolSelection struct {
 }
 
 func (s ToolSelection) Validate() error {
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Tool choice ID",
 		s.ChoiceID,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -76,7 +76,7 @@ func (s *Service) HydrateInferenceToolChoice(
 	default:
 		return inferenceSpec.ToolChoice{}, fmt.Errorf(
 			"%w: Tool implementation %q is unsupported",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			document.Implementation.Kind,
 		)
 	}
@@ -96,7 +96,7 @@ func (s *Service) HydrateInferenceToolChoices(
 		if _, duplicate := seen[selection.ChoiceID]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool choice %q is repeated",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 				selection.ChoiceID,
 			)
 		}
@@ -161,7 +161,7 @@ func hydrateSDKToolChoice(
 	default:
 		return inferenceSpec.ToolChoice{}, fmt.Errorf(
 			"%w: SDK Tool type %q is unsupported",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			document.Implementation.SDKToolType,
 		)
 	}
@@ -174,7 +174,7 @@ func toolArguments(
 	if bytes.Equal(raw, []byte("false")) {
 		return nil, fmt.Errorf(
 			"%w: false Tool inputSchema cannot be advertised as inference arguments",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if len(raw) == 0 ||
@@ -186,7 +186,7 @@ func toolArguments(
 	if err := json.Unmarshal(raw, &output); err != nil {
 		return nil, fmt.Errorf(
 			"%w: Tool inputSchema must project to an object",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if output == nil {

@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
@@ -29,7 +29,7 @@ func NewArtifactOverlayRepository(
 		dependencies.LocalState == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Artifact overlay dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -93,11 +93,11 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: MCP server is not in a protected Root",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	payload, err := encodeProtectedServerOverlay(value)
@@ -122,7 +122,7 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 	if stored.Revision != value.Revision {
 		return fmt.Errorf(
 			"%w: MCP protected overlay revision changed unexpectedly",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return nil
@@ -141,11 +141,11 @@ func (r *ArtifactOverlayRepository) DeleteServerOverlay(
 	if !r.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: MCP server is not in a protected Root",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	return r.protectedOverlay.Delete(
@@ -162,7 +162,7 @@ func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 	ref artifact.ArtifactRef,
 ) error {
 	if r == nil || r.localState == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return r.localState.PurgeArtifactLocalState(ctx, ref)
 }
@@ -176,7 +176,7 @@ func (r *ArtifactOverlayRepository) artifact(
 		r.protection == nil ||
 		r.protectedOverlay == nil ||
 		r.localState == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
+		return artifact.Artifact{}, model.ErrClosed
 	}
 	return r.artifacts.Get(ctx, ref)
 }
@@ -192,7 +192,7 @@ func encodeProtectedServerOverlay(
 		serverOverlayPayload{
 			ServerData: value.ServerData.Clone(),
 		},
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	)
 }
 
@@ -203,11 +203,11 @@ func decodeProtectedServerOverlay(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	); err != nil {
 		return ServerOverlay{}, fmt.Errorf(
 			"%w: decode protected MCP installation overlay: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -232,7 +232,7 @@ func validateOverlayTransition(
 		next != expected+1 {
 		return fmt.Errorf(
 			"%w: invalid MCP installation overlay revision transition",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil

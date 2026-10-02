@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
@@ -24,7 +24,7 @@ func NewCatalogSource(
 	if router == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill router is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &CatalogSource{router: router}, nil
@@ -37,7 +37,7 @@ func (s *CatalogSource) Skills(
 	if s == nil || s.router == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill catalog source is unavailable",
-			basespec.ErrClosed,
+			model.ErrClosed,
 		)
 	}
 	rootID, err := RootCatalogIDRoot(catalogID)
@@ -80,7 +80,7 @@ func RootCatalogIDRoot(
 	if !found {
 		return "", fmt.Errorf(
 			"%w: unsupported Skill catalog ID %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			catalogID,
 		)
 	}

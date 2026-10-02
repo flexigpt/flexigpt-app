@@ -8,11 +8,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 )
 
-const TextMarkdownDecoderID basespec.DecoderID = "text-markdown"
+const TextMarkdownDecoderID model.DecoderID = "text-markdown"
 
 type TextDecoder struct{}
 
@@ -20,7 +20,7 @@ func NewTextDecoder() *TextDecoder {
 	return &TextDecoder{}
 }
 
-func (*TextDecoder) ID() basespec.DecoderID {
+func (*TextDecoder) ID() model.DecoderID {
 	return TextMarkdownDecoderID
 }
 
@@ -80,20 +80,20 @@ func (*TextDecoder) Decode(
 	return []providerapi.Decoded{{Definition: value}}, nil
 }
 
-func isTextCandidate(locator basespec.Locator) bool {
+func isTextCandidate(locator model.Locator) bool {
 	return documentTopology.IsTextMarkdownDocument(locator)
 }
 
-func isDefaultTextFile(locator basespec.Locator) bool {
+func isDefaultTextFile(locator model.Locator) bool {
 	return documentTopology.IsDefaultTextMarkdownDocument(locator)
 }
 
-func isInstructionFile(locator basespec.Locator) bool {
+func isInstructionFile(locator model.Locator) bool {
 	return documentTopology.IsInstructionMarkdownDocument(locator)
 }
 
 func textDiagnostics(
-	locator basespec.Locator,
+	locator model.Locator,
 	err error,
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{

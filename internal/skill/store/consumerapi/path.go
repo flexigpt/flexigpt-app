@@ -10,9 +10,9 @@ import (
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -25,7 +25,7 @@ func (a *API) AddSkillPath(
 	request SkillPathRegistration,
 ) (SkillPathRegistrationResult, error) {
 	if a == nil {
-		return SkillPathRegistrationResult{}, basespec.ErrClosed
+		return SkillPathRegistrationResult{}, model.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
 		return SkillPathRegistrationResult{}, err
@@ -39,10 +39,10 @@ func (a *API) AddSkillPath(
 	if displayName == "" {
 		displayName = "Skill source " + filepath.Base(rootPath)
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Skill Source display name",
 		displayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
@@ -99,7 +99,7 @@ func (a *API) AddSkillPath(
 	if record.State != artifact.StateAvailable {
 		return SkillPathRegistrationResult{}, fmt.Errorf(
 			"%w: Skill path did not produce an available Artifact",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	if record.Enabled != request.Enabled {
@@ -126,11 +126,11 @@ func (a *API) AddSkillPath(
 
 func normalizeSkillPath(
 	raw string,
-) (string, basespec.Locator, error) {
+) (string, model.Locator, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
 		return "", "", fmt.Errorf(
 			"%w: Skill path is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(raw)
@@ -151,24 +151,24 @@ func normalizeSkillPath(
 	}
 	if !info.Mode().IsRegular() ||
 		!skillDomain.IsSkillDefinitionFile(
-			basespec.Locator(filepath.Base(absolute)),
+			model.Locator(filepath.Base(absolute)),
 		) {
 		return "", "", fmt.Errorf(
 			"%w: Skill path must identify a Skill directory or configured Skill document",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return filepath.Dir(absolute),
-		basespec.Locator(filepath.Base(absolute)),
+		model.Locator(filepath.Base(absolute)),
 		nil
 }
 
 func findSkillDefinitionPath(
 	directory string,
-) (string, basespec.Locator, error) {
+) (string, model.Locator, error) {
 	var (
 		selectedPath    string
-		selectedLocator basespec.Locator
+		selectedLocator model.Locator
 	)
 	for _, candidate := range skillDomain.SkillDefinitionFiles() {
 		candidatePath := filepath.Join(directory, string(candidate))
@@ -185,7 +185,7 @@ func findSkillDefinitionPath(
 		if selectedPath != "" {
 			return "", "", fmt.Errorf(
 				"%w: Skill directory has multiple configured Skill documents",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 			)
 		}
 		selectedPath = candidatePath
@@ -194,14 +194,14 @@ func findSkillDefinitionPath(
 	if selectedPath == "" {
 		return "", "", fmt.Errorf(
 			"%w: Skill directory lacks a configured Skill document",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return selectedPath, selectedLocator, nil
 }
 
 func skillFileDiscovery(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.DiscoverySpec, error) {
 	return documentTopology.DiscoverySpecForLocatorForUse(
 		documentTopology.DiscoveryUseSkill,

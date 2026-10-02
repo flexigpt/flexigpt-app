@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -44,7 +44,7 @@ type LocalPathRuntime interface {
 	ResolveLocalPath(
 		ctx context.Context,
 		value source.Source,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (string, error)
 
 	SupportsLocalPath(
@@ -66,7 +66,7 @@ func NewRuntime(
 	if reader == nil || opener == nil {
 		return nil, fmt.Errorf(
 			"%w: source runtime dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	value := &runtime{
@@ -96,7 +96,7 @@ func ReadSnapshotEntry(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: source snapshot read context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -105,7 +105,7 @@ func ReadSnapshotEntry(
 	if snapshot == nil {
 		return nil, fmt.Errorf(
 			"%w: source snapshot is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := entry.Validate(); err != nil {
@@ -114,20 +114,20 @@ func ReadSnapshotEntry(
 	if !entry.IsRegular {
 		return nil, fmt.Errorf(
 			"%w: source entry %q is not a regular file",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			entry.Locator,
 		)
 	}
-	if maximumBytes <= 0 || maximumBytes > basespec.MaxScanBytes {
+	if maximumBytes <= 0 || maximumBytes > model.MaxScanBytes {
 		return nil, fmt.Errorf(
 			"%w: source snapshot read limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if entry.SizeBytes > maximumBytes {
 		return nil, fmt.Errorf(
 			"%w: source entry %q exceeds byte limit",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			entry.Locator,
 		)
 	}
@@ -139,7 +139,7 @@ func ReadSnapshotEntry(
 	if reader == nil {
 		return nil, fmt.Errorf(
 			"%w: source snapshot returned a nil reader for %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			entry.Locator,
 		)
 	}
@@ -153,14 +153,14 @@ func ReadSnapshotEntry(
 	if int64(len(content)) > maximumBytes {
 		return nil, fmt.Errorf(
 			"%w: source entry %q exceeds byte limit",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			entry.Locator,
 		)
 	}
 	if int64(len(content)) != entry.SizeBytes {
 		return nil, fmt.Errorf(
 			"%w: source entry %q changed size during snapshot read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			entry.Locator,
 		)
 	}
@@ -178,7 +178,7 @@ func ReadVerifiedSnapshotEntry(
 	ctx context.Context,
 	runtime Runtime,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 	expectedGeneration string,
 	maximumBytes int64,
 ) (
@@ -189,7 +189,7 @@ func ReadVerifiedSnapshotEntry(
 	if ctx == nil {
 		return nil, "", fmt.Errorf(
 			"%w: verified source read context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -198,7 +198,7 @@ func ReadVerifiedSnapshotEntry(
 	if runtime == nil {
 		return nil, "", fmt.Errorf(
 			"%w: verified source read runtime is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := value.Validate(); err != nil {
@@ -207,13 +207,13 @@ func ReadVerifiedSnapshotEntry(
 	if err := locator.Validate(false); err != nil {
 		return nil, "", err
 	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := model.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return nil, "", err
 	}
-	if maximumBytes <= 0 || maximumBytes > basespec.MaxScanBytes {
+	if maximumBytes <= 0 || maximumBytes > model.MaxScanBytes {
 		return nil, "", fmt.Errorf(
 			"%w: verified source read limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -228,7 +228,7 @@ func ReadVerifiedSnapshotEntry(
 	if snapshot.Generation() != expectedGeneration {
 		return nil, "", fmt.Errorf(
 			"%w: source generation changed since it was observed",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	content, err = readSnapshotLocator(
@@ -255,7 +255,7 @@ func VerifySnapshotContentDigest(
 	ctx context.Context,
 	runtime Runtime,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
 	maximumBytes int64,
@@ -263,10 +263,10 @@ func VerifySnapshotContentDigest(
 	if err := cryptoutil.ValidateDigest(expectedDigest); err != nil {
 		return err
 	}
-	if maximumBytes <= 0 || maximumBytes > basespec.MaxCandidateBytes {
+	if maximumBytes <= 0 || maximumBytes > model.MaxCandidateBytes {
 		return fmt.Errorf(
 			"%w: source digest verification limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -284,7 +284,7 @@ func VerifySnapshotContentDigest(
 	if actualDigest != expectedDigest {
 		return fmt.Errorf(
 			"%w: Source content for %q changed since refresh",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			locator,
 		)
 	}
@@ -297,12 +297,12 @@ func (r *runtime) Get(
 	id source.SourceID,
 ) (source.Source, error) {
 	if r == nil || r.reader == nil {
-		return source.Source{}, basespec.ErrClosed
+		return source.Source{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return source.Source{}, fmt.Errorf(
 			"%w: source runtime context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -321,7 +321,7 @@ func (r *runtime) Get(
 	if value.ID != id {
 		return source.Source{}, fmt.Errorf(
 			"%w: source reader returned %q for requested source %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.ID,
 			id,
 		)
@@ -329,7 +329,7 @@ func (r *runtime) Get(
 	if value.RootID != rootID {
 		return source.Source{}, fmt.Errorf(
 			"%w: source reader returned root %q for requested root %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.RootID,
 			rootID,
 		)
@@ -345,12 +345,12 @@ func (r *runtime) List(
 	rootID root.RootID,
 ) ([]source.Source, error) {
 	if r == nil || r.reader == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: source runtime context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -369,7 +369,7 @@ func (r *runtime) List(
 		if value.RootID != rootID {
 			return nil, fmt.Errorf(
 				"%w: source reader returned Source %q for another Root",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				value.ID,
 			)
 		}
@@ -386,12 +386,12 @@ func (r *runtime) Open(
 	value source.Source,
 ) (Snapshot, error) {
 	if r == nil || r.opener == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: source runtime context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -419,10 +419,10 @@ func (r *runtime) Open(
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	if ctx == nil {
-		return "", fmt.Errorf("%w: source local-path context is nil", basespec.ErrInvalid)
+		return "", fmt.Errorf("%w: source local-path context is nil", model.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -437,7 +437,7 @@ func (r *runtime) ResolveLocalPath(
 		!r.SupportsLocalPath(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: source runtime has no native path resolver",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	location, err := r.localPaths.ResolveLocalPath(
@@ -462,12 +462,12 @@ func (r *runtime) SupportsLocalPath(
 
 func validateSnapshot(snapshot Snapshot) error {
 	if snapshot == nil {
-		return fmt.Errorf("%w: source opener returned a nil snapshot", basespec.ErrInvalid)
+		return fmt.Errorf("%w: source opener returned a nil snapshot", model.ErrInvalid)
 	}
-	if err := basespec.ValidateSourceGeneration(snapshot.Generation()); err != nil {
+	if err := model.ValidateSourceGeneration(snapshot.Generation()); err != nil {
 		return fmt.Errorf(
 			"%w: source snapshot returned an invalid generation: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}

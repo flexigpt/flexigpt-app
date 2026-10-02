@@ -1,10 +1,10 @@
 package consumerapi
 
 import (
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -39,9 +39,9 @@ type ListSkillsRequest struct {
 type SkillListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
+	Name        model.LogicalName `json:"name"`
+	DisplayName string            `json:"displayName"`
+	Description string            `json:"description,omitempty"`
 
 	State            artifact.State    `json:"state"`
 	Enabled          bool              `json:"enabled"`

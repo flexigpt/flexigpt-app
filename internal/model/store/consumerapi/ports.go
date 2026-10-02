@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
@@ -24,7 +24,7 @@ func NewManagementStore(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: Model management Store requires an API",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &ManagementStoreFacade{api: api}, nil
@@ -35,7 +35,7 @@ func (s *ManagementStoreFacade) ResolveModel(
 	ref artifact.ArtifactRef,
 ) (ResolvedModel, error) {
 	if s == nil || s.api == nil {
-		return ResolvedModel{}, basespec.ErrClosed
+		return ResolvedModel{}, model.ErrClosed
 	}
 	return s.api.ResolveModel(ctx, ref)
 }
@@ -45,7 +45,7 @@ func (s *ManagementStoreFacade) ResolveProvider(
 	ref artifact.ArtifactRef,
 ) (ResolvedProvider, error) {
 	if s == nil || s.api == nil {
-		return ResolvedProvider{}, basespec.ErrClosed
+		return ResolvedProvider{}, model.ErrClosed
 	}
 	return s.api.ResolveProvider(ctx, ref)
 }
@@ -55,7 +55,7 @@ func (s *ManagementStoreFacade) ResolveProviderDefaultModel(
 	ref artifact.ArtifactRef,
 ) (DefaultModelResolution, error) {
 	if s == nil || s.api == nil {
-		return DefaultModelResolution{}, basespec.ErrClosed
+		return DefaultModelResolution{}, model.ErrClosed
 	}
 	return s.api.ResolveProviderDefaultModel(ctx, ref)
 }
@@ -65,7 +65,7 @@ func (s *ManagementStoreFacade) CreateProvider(
 	request ManagedProviderCreateRequest,
 ) (ManagedProviderCreateResult, error) {
 	if s == nil || s.api == nil {
-		return ManagedProviderCreateResult{}, basespec.ErrClosed
+		return ManagedProviderCreateResult{}, model.ErrClosed
 	}
 	return s.api.CreateProvider(ctx, request)
 }
@@ -75,7 +75,7 @@ func (s *ManagementStoreFacade) ReplaceProvider(
 	request ManagedProviderReplaceRequest,
 ) (ManagedProviderReplaceResult, error) {
 	if s == nil || s.api == nil {
-		return ManagedProviderReplaceResult{}, basespec.ErrClosed
+		return ManagedProviderReplaceResult{}, model.ErrClosed
 	}
 	return s.api.ReplaceProvider(ctx, request)
 }
@@ -86,7 +86,7 @@ func (s *ManagementStoreFacade) DeleteProvider(
 	expectedArtifactRevision uint64,
 ) error {
 	if s == nil || s.api == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.api.DeleteProvider(ctx, ref, expectedArtifactRevision)
 }
@@ -96,7 +96,7 @@ func (s *ManagementStoreFacade) CreateModel(
 	request ManagedModelCreateRequest,
 ) (ManagedModelCreateResult, error) {
 	if s == nil || s.api == nil {
-		return ManagedModelCreateResult{}, basespec.ErrClosed
+		return ManagedModelCreateResult{}, model.ErrClosed
 	}
 	return s.api.CreateModel(ctx, request)
 }
@@ -106,7 +106,7 @@ func (s *ManagementStoreFacade) ReplaceModel(
 	request ManagedModelReplaceRequest,
 ) (ManagedModelReplaceResult, error) {
 	if s == nil || s.api == nil {
-		return ManagedModelReplaceResult{}, basespec.ErrClosed
+		return ManagedModelReplaceResult{}, model.ErrClosed
 	}
 	return s.api.ReplaceModel(ctx, request)
 }
@@ -117,7 +117,7 @@ func (s *ManagementStoreFacade) DeleteModel(
 	expectedArtifactRevision uint64,
 ) error {
 	if s == nil || s.api == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.api.DeleteModel(ctx, ref, expectedArtifactRevision)
 }
@@ -129,7 +129,7 @@ func (s *ManagementStoreFacade) SetProviderEnabled(
 	enabled bool,
 ) (artifact.Artifact, error) {
 	if s == nil || s.api == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
+		return artifact.Artifact{}, model.ErrClosed
 	}
 	return s.api.SetProviderEnabled(ctx, ref, expectedRevision, enabled)
 }
@@ -141,7 +141,7 @@ func (s *ManagementStoreFacade) SetModelEnabled(
 	enabled bool,
 ) (artifact.Artifact, error) {
 	if s == nil || s.api == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
+		return artifact.Artifact{}, model.ErrClosed
 	}
 	return s.api.SetModelEnabled(ctx, ref, expectedRevision, enabled)
 }
@@ -151,7 +151,7 @@ func (s *ManagementStoreFacade) SaveProviderSettings(
 	request SaveProviderSettingsRequest,
 ) (ProviderView, error) {
 	if s == nil || s.api == nil {
-		return ProviderView{}, basespec.ErrClosed
+		return ProviderView{}, model.ErrClosed
 	}
 	return s.api.SaveProviderSettings(ctx, request)
 }
@@ -163,7 +163,7 @@ func (s *ManagementStoreFacade) ResetProviderSettings(
 	expectedSettingsRevision uint64,
 ) (ProviderView, error) {
 	if s == nil || s.api == nil {
-		return ProviderView{}, basespec.ErrClosed
+		return ProviderView{}, model.ErrClosed
 	}
 	return s.api.ResetProviderSettings(
 		ctx,
@@ -178,7 +178,7 @@ func (s *ManagementStoreFacade) SetProviderAPIKey(
 	request SetProviderAPIKeyRequest,
 ) (ProviderAPIKeyStatus, error) {
 	if s == nil || s.api == nil {
-		return ProviderAPIKeyStatus{}, basespec.ErrClosed
+		return ProviderAPIKeyStatus{}, model.ErrClosed
 	}
 	return s.api.SetProviderAPIKey(ctx, request)
 }
@@ -190,7 +190,7 @@ func (s *ManagementStoreFacade) ClearProviderAPIKey(
 	expectedAPIKeyRevision uint64,
 ) (ProviderAPIKeyStatus, error) {
 	if s == nil || s.api == nil {
-		return ProviderAPIKeyStatus{}, basespec.ErrClosed
+		return ProviderAPIKeyStatus{}, model.ErrClosed
 	}
 	return s.api.ClearProviderAPIKey(
 		ctx,
@@ -205,7 +205,7 @@ func (s *ManagementStoreFacade) GetProvider(
 	ref artifact.ArtifactRef,
 ) (ProviderView, error) {
 	if s == nil || s.api == nil {
-		return ProviderView{}, basespec.ErrClosed
+		return ProviderView{}, model.ErrClosed
 	}
 	return s.api.GetProvider(ctx, ref)
 }
@@ -215,7 +215,7 @@ func (s *ManagementStoreFacade) GetModel(
 	ref artifact.ArtifactRef,
 ) (ModelView, error) {
 	if s == nil || s.api == nil {
-		return ModelView{}, basespec.ErrClosed
+		return ModelView{}, model.ErrClosed
 	}
 	return s.api.GetModel(ctx, ref)
 }
@@ -230,7 +230,7 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: Model catalog Store requires an API",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &CatalogStore{api: api}, nil
@@ -241,7 +241,7 @@ func (s *CatalogStore) ListProviders(
 	rootID root.RootID,
 ) ([]ProviderListItem, error) {
 	if s == nil || s.api == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return s.api.ListProviders(ctx, ListProvidersRequest{
 		RootID: rootID,
@@ -253,7 +253,7 @@ func (s *CatalogStore) ListModels(
 	rootID root.RootID,
 ) ([]ModelListItem, error) {
 	if s == nil || s.api == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return s.api.ListModels(ctx, ListModelsRequest{
 		RootID: rootID,
@@ -266,7 +266,7 @@ func (s *CatalogStore) ListModelsByProvider(
 	provider declaration.ArtifactNameReference,
 ) ([]ModelListItem, error) {
 	if s == nil || s.api == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return s.api.ListModelsByProvider(ctx, ListModelsByProviderRequest{
 		RootID:   rootID,

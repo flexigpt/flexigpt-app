@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
@@ -44,7 +44,7 @@ const (
 type ConversationResourceSelectionRef struct {
 	Artifact         artifact.ArtifactRef `json:"artifact"`
 	Name             string               `json:"name,omitempty"`
-	Locator          basespec.Locator     `json:"locator,omitempty"`
+	Locator          model.Locator        `json:"locator,omitempty"`
 	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest,omitempty"`
 	ArtifactRevision uint64               `json:"artifactRevision,omitempty"`
 }
@@ -63,7 +63,7 @@ type ConversationSelection struct {
 type ConversationContextUsage struct {
 	Artifact                 artifact.ArtifactRef           `json:"artifact"`
 	Name                     string                         `json:"name,omitempty"`
-	Locator                  basespec.Locator               `json:"locator,omitempty"`
+	Locator                  model.Locator                  `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest              `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     cryptoutil.Digest              `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                         `json:"usedArtifactRevision,omitempty"`
@@ -79,7 +79,7 @@ type ConversationSkillUsage struct {
 	Artifact                 artifact.ArtifactRef         `json:"artifact"`
 	Name                     string                       `json:"name,omitempty"`
 	DisplayName              string                       `json:"displayName,omitempty"`
-	Locator                  basespec.Locator             `json:"locator,omitempty"`
+	Locator                  model.Locator                `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest            `json:"selectedDefinitionDigest,omitempty"`
 	UsedDefinitionDigest     cryptoutil.Digest            `json:"usedDefinitionDigest,omitempty"`
 	UsedArtifactRevision     uint64                       `json:"usedArtifactRevision,omitempty"`
@@ -274,7 +274,7 @@ func initializeContextUsage(
 		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Context Artifact",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		index[selected.Artifact] = len(usage.Contexts)
@@ -303,7 +303,7 @@ func initializeSkillUsage(
 		if _, duplicate := index[selected.Artifact]; duplicate {
 			return nil, nil, fmt.Errorf(
 				"%w: duplicate selected Skill Artifact",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		index[selected.Artifact] = len(usage.Skills)
@@ -470,8 +470,8 @@ func conversationResourceChanged(
 	usedDigest cryptoutil.Digest,
 	selectedRevision uint64,
 	usedRevision uint64,
-	selectedLocator basespec.Locator,
-	usedLocator basespec.Locator,
+	selectedLocator model.Locator,
+	usedLocator model.Locator,
 ) bool {
 	if selectedDigest != "" && selectedDigest != usedDigest {
 		return true

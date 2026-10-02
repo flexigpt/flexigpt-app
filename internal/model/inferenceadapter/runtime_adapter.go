@@ -10,8 +10,8 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
@@ -51,38 +51,38 @@ type AdapterDefinition struct {
 }
 
 func (d AdapterDefinition) Validate() error {
-	if err := basespec.ValidateIdentifier(
+	if err := model.ValidateIdentifier(
 		"Model adapter ID",
 		d.ID,
-		basespec.MaxKindBytes,
+		model.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Model adapter version",
 		d.Version,
-		basespec.MaxVersionBytes,
+		model.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Model adapter origin",
 		d.Origin,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Model adapter path",
 		d.Path,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Model adapter API key header",
 		d.APIKeyHeaderKey,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -123,7 +123,7 @@ func NewRuntimeAdapter(
 		if _, duplicate := output.adapters[definition.ID]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Model runtime adapter %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				definition.ID,
 			)
 		}
@@ -192,12 +192,12 @@ func (a *RuntimeAdapter) LookupModelAdapter(
 	adapter string,
 ) (modelConsumerAPI.AdapterDescriptor, bool, error) {
 	if a == nil {
-		return modelConsumerAPI.AdapterDescriptor{}, false, basespec.ErrClosed
+		return modelConsumerAPI.AdapterDescriptor{}, false, model.ErrClosed
 	}
 	if ctx == nil {
 		return modelConsumerAPI.AdapterDescriptor{}, false, fmt.Errorf(
 			"%w: Model adapter lookup context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -250,12 +250,12 @@ func (a *RuntimeAdapter) ResolveProviderRuntime(
 	resolved modelConsumerAPI.ResolvedProvider,
 ) (inferenceSpec.ProviderParam, error) {
 	if a == nil {
-		return inferenceSpec.ProviderParam{}, basespec.ErrClosed
+		return inferenceSpec.ProviderParam{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return inferenceSpec.ProviderParam{}, fmt.Errorf(
 			"%w: Model Provider runtime resolution context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -277,12 +277,12 @@ func (a *RuntimeAdapter) ResolveRuntime(
 	requestPatch modelAggregate.PreparedRuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	if a == nil {
-		return RuntimeConfiguration{}, basespec.ErrClosed
+		return RuntimeConfiguration{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model runtime resolution context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -393,7 +393,7 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 	if !found {
 		return providerRuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model adapter %q is not installed",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			resolved.Provider.Document.Adapter,
 		)
 	}
@@ -420,7 +420,7 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 		if a.credentials == nil {
 			return providerRuntimeConfiguration{}, fmt.Errorf(
 				"%w: Model credential resolver is unavailable",
-				basespec.ErrReferenceUnresolved,
+				model.ErrReferenceUnresolved,
 			)
 		}
 		credential, err = a.credentials.ResolveModelCredential(
@@ -433,13 +433,13 @@ func (a *RuntimeAdapter) resolveProviderRuntime(
 		if credential.APIKey == "" {
 			return providerRuntimeConfiguration{}, fmt.Errorf(
 				"%w: Model credential binding resolved to an empty value",
-				basespec.ErrReferenceUnresolved,
+				model.ErrReferenceUnresolved,
 			)
 		}
 	} else if requireCredential && authentication.Mode != "none" {
 		return providerRuntimeConfiguration{}, fmt.Errorf(
 			"%w: Model Provider %q has no configured credential",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			resolved.Provider.Artifact.LogicalName,
 		)
 	}
@@ -522,7 +522,7 @@ func resolveConnection(
 		strings.TrimSpace(output.Path) == "" {
 		return resolvedConnection{}, fmt.Errorf(
 			"%w: effective Model Provider connection is incomplete",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	if output.Headers == nil {
@@ -554,7 +554,7 @@ func decodeAuthentication(
 	if output.Prefix != nil && *output.Prefix != "" {
 		return authentication{}, fmt.Errorf(
 			"%w: Model Provider authentication prefixes are not supported by inference-go ProviderParam",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	return output, nil
@@ -614,7 +614,7 @@ func decodeObjectMap(
 ) (map[string]any, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -633,7 +633,7 @@ func decodeObject(
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return err
@@ -688,13 +688,13 @@ func modelParamFromDefaults(
 	if modelName == "" {
 		return inferenceSpec.ModelParam{}, fmt.Errorf(
 			"%w: Model providerModelID is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if wire.TimeoutMS < 0 {
 		return inferenceSpec.ModelParam{}, fmt.Errorf(
 			"%w: Model timeoutMS cannot be negative",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -747,7 +747,7 @@ func modelParamFromDefaults(
 	if len(wire.AdapterParameters) != 0 {
 		canonical, err := jsonutil.CanonicalizeObject(
 			wire.AdapterParameters,
-			basespec.MaxDefinitionBodyBytes,
+			model.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return inferenceSpec.ModelParam{}, err
@@ -780,7 +780,7 @@ func collectCapabilityOverrides(
 		}
 		canonical, err := jsonutil.CanonicalizeObject(
 			raw,
-			basespec.MaxDefinitionBodyBytes,
+			model.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return nil, err

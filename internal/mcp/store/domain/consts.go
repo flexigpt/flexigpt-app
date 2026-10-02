@@ -3,9 +3,9 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 const (
@@ -19,7 +19,7 @@ const (
 	ManagedMCPPackageKind       source.PackageKind = "mcp"
 	ManagedMCPPolicyPackageKind source.PackageKind = "mcp-policy"
 	MCPCollectionPackageKind    source.PackageKind = "mcp-collection"
-	SourceDecoderID             basespec.DecoderID = "artifact.mcp-json"
+	SourceDecoderID             model.DecoderID    = "artifact.mcp-json"
 
 	InstallationDataSchemaVersion = "v1"
 	BuiltInInstallerName          = "mcp"

@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -19,12 +19,12 @@ func (s *Store) GetTopologyHydration(
 	installerName string,
 ) (topology.Hydration, bool, error) {
 	if s == nil || s.db == nil {
-		return topology.Hydration{}, false, basespec.ErrClosed
+		return topology.Hydration{}, false, model.ErrClosed
 	}
 	if ctx == nil {
 		return topology.Hydration{}, false, fmt.Errorf(
 			"%w: topology hydration context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -58,7 +58,7 @@ func (s *Store) GetTopologyHydration(
 	if err := value.Validate(); err != nil {
 		return topology.Hydration{}, false, fmt.Errorf(
 			"%w: invalid persisted topology hydration: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -70,12 +70,12 @@ func (s *Store) PutTopologyHydration(
 	value topology.Hydration,
 ) error {
 	if s == nil || s.db == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: topology hydration context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -108,7 +108,7 @@ func (s *Store) ListTopologyPackageHydrations(
 	ctx context.Context,
 ) ([]topology.PackageHydration, error) {
 	if s == nil || s.db == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	rows, err := s.db.QueryContext(
 		ctx,
@@ -136,7 +136,7 @@ func (s *Store) ListTopologyPackageHydrations(
 		value := topology.PackageHydration{
 			Key: topology.PackageHydrationKey{
 				InstallerName: installerName,
-				Scope:         basespec.Locator(scope),
+				Scope:         model.Locator(scope),
 			},
 			RootID:      root.RootID(rootID),
 			SourceID:    source.SourceID(sourceID),
@@ -145,7 +145,7 @@ func (s *Store) ListTopologyPackageHydrations(
 		if err := value.Validate(); err != nil {
 			return nil, fmt.Errorf(
 				"%w: invalid persisted package hydration: %w",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				err,
 			)
 		}
@@ -208,12 +208,12 @@ func (s *Store) PurgeTopologyRoot(
 	rootID root.RootID,
 ) error {
 	if s == nil || s.db == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: topology purge context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {

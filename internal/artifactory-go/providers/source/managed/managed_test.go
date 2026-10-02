@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func TestManagedPackagePublicationUsesSemanticAddress(t *testing.T) {

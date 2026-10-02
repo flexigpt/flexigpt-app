@@ -5,13 +5,13 @@ import (
 	"path"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func ToolPackageAddress(
-	name basespec.LogicalName,
-	version basespec.LogicalVersion,
+	name model.LogicalName,
+	version model.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	return source.NewManagedPackageAddress(
 		ToolPackageKind,
@@ -21,7 +21,7 @@ func ToolPackageAddress(
 }
 
 func ToolCollectionPackageAddress(
-	name basespec.LogicalName,
+	name model.LogicalName,
 ) (source.ManagedPackageAddress, error) {
 	return source.NewManagedPackageAddress(
 		ToolCollectionPackageKind,
@@ -31,7 +31,7 @@ func ToolCollectionPackageAddress(
 }
 
 func ToolPackageAddressFromLocator(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.ManagedPackageAddress, error) {
 	return packageAddressFromLocator(
 		ToolPackageKind,
@@ -41,7 +41,7 @@ func ToolPackageAddressFromLocator(
 }
 
 func ToolCollectionPackageAddressFromLocator(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.ManagedPackageAddress, error) {
 	return packageAddressFromLocator(
 		ToolCollectionPackageKind,
@@ -52,8 +52,8 @@ func ToolCollectionPackageAddressFromLocator(
 
 func packageAddressFromLocator(
 	kind source.PackageKind,
-	documentFile basespec.Locator,
-	locator basespec.Locator,
+	documentFile model.Locator,
+	locator model.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -61,14 +61,14 @@ func packageAddressFromLocator(
 	if path.Base(string(locator)) != string(documentFile) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package locator %q is not %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			locator,
 			documentFile,
 		)
 	}
 
 	address, err := source.ParseManagedPackageAddressDirectory(
-		basespec.Locator(path.Dir(string(locator))),
+		model.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -76,7 +76,7 @@ func packageAddressFromLocator(
 	if address.Kind != kind {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: package kind is %q, expected %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			address.Kind,
 			kind,
 		)

@@ -4,9 +4,9 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -15,7 +15,7 @@ func (a *API) CreateSkillCollection(
 	request collection.CreateRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.Create(ctx, request)
 }
@@ -27,7 +27,7 @@ func (a *API) ResolveSkillCollection(
 	if a == nil ||
 		a.resources == nil ||
 		a.collections == nil {
-		return collection.CollectionCapabilityPlan{}, basespec.ErrClosed
+		return collection.CollectionCapabilityPlan{}, model.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -46,7 +46,7 @@ func (a *API) GetSkillCollection(
 	ref artifact.ArtifactRef,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.Read(ctx, ref)
 }
@@ -58,7 +58,7 @@ func (a *API) SetSkillCollectionEnabled(
 	enabled bool,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.SetEnabled(
 		ctx,
@@ -73,7 +73,7 @@ func (a *API) ListSkillCollections(
 	rootID root.RootID,
 ) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return a.collections.ListDomain(ctx, collection.ListRequest{
 		RootID: rootID,
@@ -85,7 +85,7 @@ func (a *API) ListSkillCollectionMemberships(
 	ref artifact.ArtifactRef,
 ) ([]collection.ArtifactMembershipView, error) {
 	if a == nil || a.collections == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return a.collections.ListMembershipsForArtifact(ctx, ref)
 }
@@ -95,7 +95,7 @@ func (a *API) UpdateSkillCollection(
 	request collection.UpdateRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.Update(ctx, request)
 }
@@ -105,7 +105,7 @@ func (a *API) AddSkillCollectionMember(
 	request collection.AddMemberRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.AddMember(ctx, request)
 }
@@ -115,7 +115,7 @@ func (a *API) AttachSkillArtifactToCollection(
 	request collection.AddArtifactMemberRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.AddArtifactMember(ctx, request)
 }
@@ -125,7 +125,7 @@ func (a *API) RemoveSkillCollectionMember(
 	request collection.RemoveMemberRequest,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return a.collections.RemoveMember(ctx, request)
 }
@@ -135,7 +135,7 @@ func (a *API) DeleteSkillCollection(
 	request collection.DeleteRequest,
 ) error {
 	if a == nil || a.collections == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return a.collections.Delete(ctx, request)
 }

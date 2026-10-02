@@ -3,7 +3,7 @@ package declaration
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 // ArtifactNameReference is the portable identity shape shared by the Model
@@ -14,8 +14,8 @@ import (
 // cross-root locator. Scope is limited to the current Root lookup policy or
 // the protected built-in Root.
 type ArtifactNameReference struct {
-	Name  basespec.LogicalName `json:"name"`
-	Scope LookupScope          `json:"scope,omitempty"`
+	Name  model.LogicalName `json:"name"`
+	Scope LookupScope       `json:"scope,omitempty"`
 }
 
 func (r ArtifactNameReference) Validate() error {

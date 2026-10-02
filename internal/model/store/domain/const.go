@@ -6,9 +6,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 const (
@@ -29,7 +29,7 @@ const (
 	// RootID and SourceID together.
 	ManagedSourceID source.SourceID = "0192c4c0-0002-7000-8000-000000000001"
 
-	ManagedSourceStorageKey basespec.StorageKey = "model-artifacts"
+	ManagedSourceStorageKey model.StorageKey = "model-artifacts"
 
 	BuiltInInstallerName   = "model"
 	HydrationSchemaVersion = "model.builtin-hydration/v1"
@@ -52,10 +52,10 @@ func ManagedSourceDraft() source.Draft {
 	}
 }
 
-func ModelProviderDocumentFile() basespec.Locator {
+func ModelProviderDocumentFile() model.Locator {
 	return documentTopology.ModelProviderDocumentFile()
 }
 
-func ModelDocumentFile() basespec.Locator {
+func ModelDocumentFile() model.Locator {
 	return documentTopology.ModelDocumentFile()
 }

@@ -8,8 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 // ProviderLocatorResolver adapts provider-owned locator resolver factories to
@@ -25,7 +25,7 @@ func NewProviderLocatorResolver(
 	if runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: provider locator resolver runtime is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -53,7 +53,7 @@ func NewProviderLocatorResolver(
 		if bound == nil {
 			return nil, fmt.Errorf(
 				"%w: locator resolver %q bound to nil",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				factory.LocatorKind(),
 			)
 		}
@@ -65,7 +65,7 @@ func NewProviderLocatorResolver(
 			if _, duplicate := output.resolvers[key]; duplicate {
 				return nil, fmt.Errorf(
 					"%w: duplicate locator resolver %q for %q",
-					basespec.ErrConflict,
+					model.ErrConflict,
 					key.LocatorKind,
 					key.ArtifactKind,
 				)
@@ -81,7 +81,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	request LocatorRequest,
 ) (artifact.ArtifactRef, error) {
 	if r == nil {
-		return artifact.ArtifactRef{}, basespec.ErrClosed
+		return artifact.ArtifactRef{}, model.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
 		return artifact.ArtifactRef{}, err
@@ -107,7 +107,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if !found {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: no %q locator resolver is registered for Artifact kind %q",
-			basespec.ErrLocatorUnresolved,
+			model.ErrLocatorUnresolved,
 			locatorKind,
 			key.ArtifactKind,
 		)
@@ -141,7 +141,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if ref.RootID != request.RootID {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: locator resolver returned an Artifact from another Root",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return ref, nil

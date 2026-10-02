@@ -6,8 +6,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
@@ -23,7 +23,7 @@ type TargetV1 struct {
 	ProviderArtifact         artifact.ArtifactRef `json:"providerArtifact"`
 	ProviderDefinitionDigest cryptoutil.Digest    `json:"providerDefinitionDigest"`
 	ConfigurationFingerprint cryptoutil.Digest    `json:"configurationFingerprint"`
-	Name                     basespec.LogicalName `json:"name"`
+	Name                     model.LogicalName    `json:"name"`
 }
 
 func (t TargetV1) Validate() error {
@@ -92,14 +92,14 @@ func DecodeTarget(
 	if target.Provider != MappedTargetProviderV1 {
 		return TargetV1{}, fmt.Errorf(
 			"%w: unsupported Model mapped target provider %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			target.Provider,
 		)
 	}
 	if target.Type != declaration.TypeModel {
 		return TargetV1{}, fmt.Errorf(
 			"%w: mapped target type is %q, expected Model",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			target.Type,
 		)
 	}
@@ -117,7 +117,7 @@ func DecodeTarget(
 	if target.Name != value.Name {
 		return TargetV1{}, fmt.Errorf(
 			"%w: mapped Model target name differs from payload",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return value, nil

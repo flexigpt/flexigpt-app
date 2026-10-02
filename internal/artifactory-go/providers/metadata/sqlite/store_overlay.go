@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 )
 
 const storeOverlayColumns = `
@@ -20,7 +20,7 @@ func (r *LocalStateRepository) GetStoreOverlay(
 	namespace overlay.Namespace,
 ) (overlay.StoreRecord, bool, error) {
 	if r == nil || r.store == nil {
-		return overlay.StoreRecord{}, false, basespec.ErrClosed
+		return overlay.StoreRecord{}, false, model.ErrClosed
 	}
 	if err := namespace.Validate(); err != nil {
 		return overlay.StoreRecord{}, false, err
@@ -46,7 +46,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 	now time.Time,
 ) (overlay.StoreRecord, error) {
 	if r == nil || r.store == nil {
-		return overlay.StoreRecord{}, basespec.ErrClosed
+		return overlay.StoreRecord{}, model.ErrClosed
 	}
 	if err := request.Validate(); err != nil {
 		return overlay.StoreRecord{}, err
@@ -54,7 +54,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 	if now.IsZero() {
 		return overlay.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -80,7 +80,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if request.ExpectedRevision != 0 {
-			return overlay.StoreRecord{}, basespec.ErrConflict
+			return overlay.StoreRecord{}, model.ErrConflict
 		}
 
 		output = overlay.StoreRecord{
@@ -117,12 +117,12 @@ func (r *LocalStateRepository) PutStoreOverlay(
 
 	default:
 		if current.Revision != request.ExpectedRevision {
-			return overlay.StoreRecord{}, basespec.ErrConflict
+			return overlay.StoreRecord{}, model.ErrConflict
 		}
 		if current.Revision == ^uint64(0) {
 			return overlay.StoreRecord{}, fmt.Errorf(
 				"%w: store overlay revision is exhausted",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -175,7 +175,7 @@ func (r *LocalStateRepository) DeleteStoreOverlay(
 	expectedRevision uint64,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := namespace.Validate(); err != nil {
 		return err
@@ -183,7 +183,7 @@ func (r *LocalStateRepository) DeleteStoreOverlay(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected store overlay revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -232,7 +232,7 @@ func scanStoreOverlay(
 	if row == nil {
 		return overlay.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

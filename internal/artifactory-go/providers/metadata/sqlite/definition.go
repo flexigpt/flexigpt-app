@@ -8,11 +8,11 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -53,7 +53,7 @@ func putDefinitionTx(
 	if canonical.Digest != value.Digest {
 		return fmt.Errorf(
 			"%w: Definition is not canonical",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -112,7 +112,7 @@ func putDefinitionTx(
 	if !equalDefinitions(existing, canonical) {
 		return fmt.Errorf(
 			"%w: Definition digest %q conflicts with existing immutable Definition",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 			canonical.Digest,
 		)
 	}
@@ -156,7 +156,7 @@ func scanDefinition(
 	if row == nil {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: Definition row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := row.Scan(
@@ -191,8 +191,8 @@ func scanDefinition(
 	value.Kind = artifact.ArtifactKind(kind)
 	value.SchemaID = schema.SchemaID(schemaID)
 	value.SchemaVersion = schemaVersion
-	value.LogicalName = basespec.LogicalName(logicalName)
-	value.LogicalVersion = basespec.LogicalVersion(logicalVersion)
+	value.LogicalName = model.LogicalName(logicalName)
+	value.LogicalVersion = model.LogicalVersion(logicalVersion)
 	value.DisplayName = displayName
 	value.Description = description
 	value.Body = append([]byte(nil), bodyRaw...)

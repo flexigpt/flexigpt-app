@@ -9,7 +9,7 @@ import (
 
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 type GoToolCaller interface {
@@ -31,7 +31,7 @@ func New(
 	if caller == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Runtime Go Tool caller is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{caller: caller}, nil
@@ -42,12 +42,12 @@ func (s *Service) Invoke(
 	request InvokeRequest,
 ) (*InvokeResponse, error) {
 	if s == nil || s.caller == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Runtime context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -58,7 +58,7 @@ func (s *Service) Invoke(
 	if function == "" {
 		return nil, fmt.Errorf(
 			"%w: Go Tool function is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -69,7 +69,7 @@ func (s *Service) Invoke(
 	if !json.Valid(args) {
 		return nil, fmt.Errorf(
 			"%w: Tool invocation arguments are invalid JSON",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -77,7 +77,7 @@ func (s *Service) Invoke(
 		int64(request.TimeoutMS) > int64((1<<63-1)/time.Millisecond) {
 		return nil, fmt.Errorf(
 			"%w: Tool timeout is outside the supported range",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

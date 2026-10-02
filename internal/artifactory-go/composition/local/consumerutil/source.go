@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -43,13 +43,13 @@ func EnsureAndRefreshSource(
 	if sources == nil || discovery == nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if ctx == nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -63,7 +63,7 @@ func EnsureAndRefreshSource(
 	if !draft.Enabled || draft.Discovery.Empty() {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle requires an enabled Source with discovery",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	draft.Discovery = draft.Discovery.Normalized()
@@ -122,7 +122,7 @@ func NormalizeFilesystemSourceRoot(
 	label string,
 ) (string, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
-		return "", fmt.Errorf("%w: %s is required", basespec.ErrInvalid, label)
+		return "", fmt.Errorf("%w: %s is required", model.ErrInvalid, label)
 	}
 	absolute, err := filepath.Abs(raw)
 	if err != nil {
@@ -134,11 +134,11 @@ func NormalizeFilesystemSourceRoot(
 func FilesystemSourceStorageKey(
 	prefix string,
 	rootPath string,
-) basespec.StorageKey {
+) model.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
 
-	return basespec.StorageKey(prefix + "-hash" + digest[:24])
+	return model.StorageKey(prefix + "-hash" + digest[:24])
 }

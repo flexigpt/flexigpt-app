@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 // ValidateEntryTree validates every concrete nested declaration in a
@@ -32,11 +32,11 @@ func validateEntryTree(
 	entry declaration.Entry,
 	depth int,
 ) error {
-	if depth > basespec.MaxDiscoveryDepth {
+	if depth > model.MaxDiscoveryDepth {
 		return fmt.Errorf(
 			"%w: declaration nesting exceeds depth %d",
-			basespec.ErrInvalid,
-			basespec.MaxDiscoveryDepth,
+			model.ErrInvalid,
+			model.MaxDiscoveryDepth,
 		)
 	}
 	if err := entry.Validate(); err != nil {
@@ -190,7 +190,7 @@ func validateEntryTree(
 	default:
 		return fmt.Errorf(
 			"%w: unsupported declaration type %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			entry.Header().Type,
 		)
 	}
@@ -240,7 +240,7 @@ func validateMemberTree(
 		}
 		return fmt.Errorf(
 			"%w: %s does not allow member selectors",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			label,
 		)
 	case declaration.MemberContained:
@@ -250,6 +250,6 @@ func validateMemberTree(
 		}
 		return validateEntryTree(target, depth)
 	default:
-		return fmt.Errorf("%w: unknown member form", basespec.ErrInvalid)
+		return fmt.Errorf("%w: unknown member form", model.ErrInvalid)
 	}
 }

@@ -8,9 +8,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
@@ -24,7 +24,7 @@ type Contribution struct {
 	Name             string                   `json:"-"`
 	Insert           declaration.InsertTarget `json:"-"`
 	MediaType        string                   `json:"-"`
-	Locator          basespec.Locator         `json:"-"`
+	Locator          model.Locator            `json:"-"`
 	Content          string                   `json:"-"`
 	OriginalBytes    int                      `json:"-"`
 	IncludedBytes    int                      `json:"-"`
@@ -100,7 +100,7 @@ func (a *Adapter) compose(
 	refs []artifact.ArtifactRef,
 ) (Plan, error) {
 	if a == nil || a.artifacts == nil || a.engine == nil {
-		return Plan{}, basespec.ErrClosed
+		return Plan{}, model.ErrClosed
 	}
 	if err := ctx.Err(); err != nil {
 		return Plan{}, err
@@ -298,7 +298,7 @@ func (a *Adapter) resolveContribution(
 	default:
 		return Contribution{}, fmt.Errorf(
 			"%w: Artifact kind %q cannot contribute to Workspace prompt",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			record.Kind,
 		)
 	}

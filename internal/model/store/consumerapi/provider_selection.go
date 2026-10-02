@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
@@ -17,10 +17,10 @@ import (
 func (s *ManagementStoreFacade) SelectDefaultProvider(
 	ctx context.Context,
 	preferred *artifact.ArtifactRef,
-	baseName basespec.LogicalName,
+	baseName model.LogicalName,
 ) (*artifact.ArtifactRef, error) {
 	if s == nil || s.api == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := s.api.ready(ctx); err != nil {
 		return nil, err
@@ -29,9 +29,9 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 	if preferred != nil {
 		record, err := s.api.artifacts.Get(ctx, *preferred)
 		if err != nil {
-			if !errors.Is(err, basespec.ErrArtifactNotFound) &&
-				!errors.Is(err, basespec.ErrRootNotFound) &&
-				!errors.Is(err, basespec.ErrRetired) {
+			if !errors.Is(err, model.ErrArtifactNotFound) &&
+				!errors.Is(err, model.ErrRootNotFound) &&
+				!errors.Is(err, model.ErrRetired) {
 				return nil, err
 			}
 		} else if record.Kind == modelDomain.ModelProviderArtifactKind &&
@@ -85,7 +85,7 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 	ref artifact.ArtifactRef,
 ) error {
 	if s == nil || s.api == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := s.api.ready(ctx); err != nil {
 		return err
@@ -105,7 +105,7 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 	if record.State != artifact.StateAvailable || !record.Enabled {
 		return fmt.Errorf(
 			"%w: Model Provider %q must be enabled before it can be selected as default",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.LogicalName,
 		)
 	}
@@ -120,7 +120,7 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 	if !found || !credential.Active() {
 		return fmt.Errorf(
 			"%w: Model Provider %q has no configured API key",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.LogicalName,
 		)
 	}

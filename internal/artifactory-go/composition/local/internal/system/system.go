@@ -19,10 +19,10 @@ import (
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/resource"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/metadata/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/schema/shareable"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/source/embedded"
@@ -87,7 +87,7 @@ func Open(
 	if config.BaseDirectory == "" {
 		return nil, fmt.Errorf(
 			"%w: artifact system base directory is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if config.Clock == nil {
@@ -114,7 +114,7 @@ func Open(
 		ctx,
 		filepath.Join(
 			base,
-			basespec.ArtifactStoreMetadataFileName,
+			model.ArtifactStoreMetadataFileName,
 		),
 	)
 	if err != nil {
@@ -148,11 +148,11 @@ func Open(
 	managedAdapter, err := managed.New(
 		filepath.Join(
 			base,
-			basespec.ArtifactStoreContentDirectoryName,
+			model.ArtifactStoreContentDirectoryName,
 		),
 		filepath.Join(
 			base,
-			basespec.ArtifactStoreStagingDirectoryName,
+			model.ArtifactStoreStagingDirectoryName,
 		),
 	)
 	if err != nil {
@@ -430,12 +430,12 @@ func (c *Components) getManagedSourceState(
 	if c == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return ManagedPackageResult{}, basespec.ErrClosed
+		return ManagedPackageResult{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed Source state context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -448,7 +448,7 @@ func (c *Components) getManagedSourceState(
 	if !c.managedSources.SupportsManagedPackages(value.Kind) {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -504,7 +504,7 @@ func (c *Components) publishProtectedManagedPackage(
 	if c == nil || !c.isProtectedRoot(rootID) {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: Root %q is not a declared protected topology Root",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			rootID,
 		)
 	}
@@ -555,7 +555,7 @@ func (c *Components) removeProtectedManagedPackage(
 	if c == nil || !c.isProtectedRoot(rootID) {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: Root %q is not a declared protected topology Root",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			rootID,
 		)
 	}
@@ -582,12 +582,12 @@ func (c *Components) publishManagedPackage(
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
 	if c == nil {
-		return ManagedPackageResult{}, basespec.ErrClosed
+		return ManagedPackageResult{}, model.ErrClosed
 	}
 	if c.isProtectedRoot(rootID) && !allowProtected {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed package publication for protected Root %q requires the protected installer path",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			rootID,
 		)
 	}
@@ -662,12 +662,12 @@ func (c *Components) removeManagedPackage(
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
 	if c == nil {
-		return ManagedPackageResult{}, basespec.ErrClosed
+		return ManagedPackageResult{}, model.ErrClosed
 	}
 	if c.isProtectedRoot(rootID) && !allowProtected {
 		return ManagedPackageResult{}, fmt.Errorf(
 			"%w: managed package removal for protected Root %q requires the protected installer path",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			rootID,
 		)
 	}
@@ -677,7 +677,7 @@ func (c *Components) removeManagedPackage(
 	if err := address.Validate(); err != nil {
 		return ManagedPackageResult{}, err
 	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := model.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return ManagedPackageResult{}, err
 	}
 
@@ -712,7 +712,7 @@ func (c *Components) removeManagedPackage(
 		if exists {
 			return ManagedPackageResult{}, fmt.Errorf(
 				"%w: managed Source changed before package removal",
-				basespec.ErrConflict,
+				model.ErrConflict,
 			)
 		}
 		updated, err := c.Sources.MarkContentChanged(
@@ -785,7 +785,7 @@ func managedPackageExists(
 	if confirmErr != nil || closeErr != nil {
 		return false, errors.Join(statErr, confirmErr, closeErr)
 	}
-	if errors.Is(statErr, basespec.ErrNotFound) {
+	if errors.Is(statErr, model.ErrNotFound) {
 		return false, nil
 	}
 	if statErr != nil {
@@ -794,7 +794,7 @@ func managedPackageExists(
 	if !entry.IsDirectory {
 		return false, fmt.Errorf(
 			"%w: managed package %q is not a directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			address,
 		)
 	}
@@ -819,12 +819,12 @@ func (c *Components) managedSource(
 		c.Sources == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return source.Source{}, basespec.ErrClosed
+		return source.Source{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return source.Source{}, fmt.Errorf(
 			"%w: managed Source context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -833,7 +833,7 @@ func (c *Components) managedSource(
 	if expectedSourceRevision == 0 {
 		return source.Source{}, fmt.Errorf(
 			"%w: expected source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	value, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
@@ -841,12 +841,12 @@ func (c *Components) managedSource(
 		return source.Source{}, err
 	}
 	if value.Revision != expectedSourceRevision {
-		return source.Source{}, basespec.ErrConflict
+		return source.Source{}, model.ErrConflict
 	}
 	if !c.managedSources.SupportsManagedPackages(value.Kind) {
 		return source.Source{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}

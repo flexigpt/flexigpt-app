@@ -6,10 +6,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -21,10 +21,10 @@ func (a *API) SaveMCPPolicy(
 	request ManagedMCPPolicyUpsertRequest,
 ) (ManagedMCPPolicyUpsertResult, error) {
 	if a == nil {
-		return ManagedMCPPolicyUpsertResult{}, basespec.ErrClosed
+		return ManagedMCPPolicyUpsertResult{}, model.ErrClosed
 	}
 	if a.collections == nil {
-		return ManagedMCPPolicyUpsertResult{}, basespec.ErrClosed
+		return ManagedMCPPolicyUpsertResult{}, model.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return ManagedMCPPolicyUpsertResult{}, err
@@ -32,7 +32,7 @@ func (a *API) SaveMCPPolicy(
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := request.Name.Validate(); err != nil {
@@ -41,7 +41,7 @@ func (a *API) SaveMCPPolicy(
 	if a.protection.IsProtectedRoot(request.Collection.RootID) {
 		return ManagedMCPPolicyUpsertResult{}, fmt.Errorf(
 			"%w: managed MCP Policy publication is not allowed in a protected Root",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 
@@ -163,12 +163,12 @@ func (a *API) DeleteMCPPolicy(
 	expectedRevision uint64,
 ) error {
 	if a == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected MCP Policy Artifact revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	record, err := a.artifacts.Get(ctx, ref)
@@ -178,22 +178,22 @@ func (a *API) DeleteMCPPolicy(
 	if record.Kind != mcpDomain.MCPPolicyArtifactKind {
 		return fmt.Errorf(
 			"%w: Artifact is not an MCP Policy",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if record.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if a.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: protected MCP Policy deletion is not allowed",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return fmt.Errorf(
 			"%w: contained MCP Policies cannot be removed as managed packages",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -208,7 +208,7 @@ func (a *API) DeleteMCPPolicy(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: MCP Policy is not backed by a managed Source",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	address, err := mcpDomain.ManagedPackageAddressFromMCPPolicyLocator(
@@ -237,7 +237,7 @@ func (a *API) DeleteMCPPolicy(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed MCP Policy Artifact is not missing",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return a.artifacts.Purge(ctx, ref, missing.Revision)

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
@@ -64,7 +64,7 @@ func MergeServerData(
 	}
 	payload, err := jsonutil.MarshalCanonicalObject(
 		value,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func decodeServerDataPayload(
 ) (ServerData, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return ServerData{}, err
@@ -108,11 +108,11 @@ func decodeServerDataPayload(
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&value,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	); err != nil {
 		return ServerData{}, fmt.Errorf(
 			"%w: decode MCP installation data: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -132,22 +132,22 @@ func (value ServerData) Validate() error {
 	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP installation schema %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.SchemaVersion,
 		)
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"selected MCP connection profile",
 		value.SelectedConnectionProfile,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if len(value.Inputs) > basespec.MaxDefinitionDependencies ||
-		len(value.AdditionalPolicies) > basespec.MaxDefinitionDependencies {
+	if len(value.Inputs) > model.MaxDefinitionDependencies ||
+		len(value.AdditionalPolicies) > model.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: MCP installation data exceeds entry limits",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	seen := make(map[artifact.ArtifactRef]struct{})
@@ -155,21 +155,21 @@ func (value ServerData) Validate() error {
 		if !installationInputNamePattern.MatchString(name) {
 			return fmt.Errorf(
 				"%w: invalid MCP installation input name %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				name,
 			)
 		}
 		if binding.Value != nil && binding.SecretRef != "" {
 			return fmt.Errorf(
 				"%w: MCP input %q has both value and secretRef",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				name,
 			)
 		}
 		if binding.Value == nil && binding.SecretRef == "" {
 			return fmt.Errorf(
 				"%w: MCP input %q has no value or secretRef",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				name,
 			)
 		}
@@ -186,7 +186,7 @@ func (value ServerData) Validate() error {
 		if _, duplicate := seen[ref]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate additional MCP Policy",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		seen[ref] = struct{}{}
@@ -207,6 +207,6 @@ func stripRetiredRuntimeEnabled(
 	delete(fields, "runtimeEnabled")
 	return jsonutil.MarshalCanonicalObject(
 		fields,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	)
 }

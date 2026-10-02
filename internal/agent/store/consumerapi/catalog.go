@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func agentBuiltinRootID() root.RootID {
@@ -29,7 +29,7 @@ func (a *API) getAgentRecord(
 	ref artifact.ArtifactRef,
 ) (artifact.Artifact, error) {
 	if a == nil || a.artifacts == nil {
-		return artifact.Artifact{}, basespec.ErrClosed
+		return artifact.Artifact{}, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return artifact.Artifact{}, err
@@ -42,7 +42,7 @@ func (a *API) getAgentRecord(
 	if !agentDomain.IsAgentKind(value.Kind) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			ref.ArtifactID,
 		)
 	}
@@ -58,7 +58,7 @@ func (a *API) SetAgentEnabled(
 	if expectedRevision == 0 {
 		return AgentView{}, fmt.Errorf(
 			"%w: expected Agent Artifact revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if _, err := a.getAgentRecord(ctx, ref); err != nil {
@@ -81,7 +81,7 @@ func (a *API) ResolveAgent(
 	ref artifact.ArtifactRef,
 ) (AgentResolution, error) {
 	if a == nil || a.declarationResolver == nil {
-		return AgentResolution{}, basespec.ErrClosed
+		return AgentResolution{}, model.ErrClosed
 	}
 	plan, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
 	if err != nil {
@@ -94,7 +94,7 @@ func (a *API) ResolveAgent(
 	if plan.RootArtifact == nil {
 		return AgentResolution{}, fmt.Errorf(
 			"%w: Agent resolution has no Artifact root",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	agent, err := a.GetAgent(ctx, *plan.RootArtifact)
@@ -112,7 +112,7 @@ func (a *API) ResolveAgentCapabilities(
 	ref artifact.ArtifactRef,
 ) (AgentCapabilityPlan, error) {
 	if a == nil || a.declarationResolver == nil {
-		return AgentCapabilityPlan{}, basespec.ErrClosed
+		return AgentCapabilityPlan{}, model.ErrClosed
 	}
 	value, err := a.declarationResolver.ResolveAgentCapabilities(ctx, ref)
 	if err != nil {
@@ -194,7 +194,7 @@ func projectAgentCapabilityPlan(
 			default:
 				return AgentCapabilityPlan{}, fmt.Errorf(
 					"%w: Agent capability %q has unsupported Skill use mode %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					occurrence.Path,
 					mode,
 				)
@@ -214,7 +214,7 @@ func projectAgentBoolean(
 	if err := json.Unmarshal(raw, &value); err != nil {
 		return nil, fmt.Errorf(
 			"%w: Agent relationship field %q must be boolean",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			name,
 		)
 	}
@@ -226,7 +226,7 @@ func (a *API) listCollectionAgentRefs(
 	ref artifact.ArtifactRef,
 ) ([]artifact.ArtifactRef, error) {
 	if a == nil || a.collections == nil || a.declarationResolver == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if _, err := a.collections.Read(ctx, ref); err != nil {
 		return nil, err
@@ -282,7 +282,7 @@ func (a *API) agentViewWithSourceCache(
 	if !agentDomain.IsAgentKind(record.Kind) {
 		return AgentView{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			record.ID,
 		)
 	}

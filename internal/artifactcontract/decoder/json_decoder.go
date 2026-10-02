@@ -10,12 +10,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 )
 
-const JSONDecoderID basespec.DecoderID = "artifact-declaration-json"
+const JSONDecoderID model.DecoderID = "artifact-declaration-json"
 
 type JSONDecoder struct {
 	core *canonicalDecoder
@@ -27,7 +27,7 @@ func NewJSONDecoder() *JSONDecoder {
 	}
 }
 
-func (*JSONDecoder) ID() basespec.DecoderID {
+func (*JSONDecoder) ID() model.DecoderID {
 	return JSONDecoderID
 }
 
@@ -45,7 +45,7 @@ func (d *JSONDecoder) BindExpectedCanonicalizer(
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
 			"%w: canonical JSON declaration decoder is unavailable",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return d.core.BindExpectedCanonicalizer(catalog)

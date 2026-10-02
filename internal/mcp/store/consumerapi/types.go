@@ -3,9 +3,9 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -20,9 +20,9 @@ type ListServersRequest struct {
 type ServerListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
+	Name        model.LogicalName `json:"name"`
+	DisplayName string            `json:"displayName"`
+	Description string            `json:"description,omitempty"`
 
 	State            artifact.State    `json:"state"`
 	Enabled          bool              `json:"enabled"`
@@ -39,9 +39,9 @@ type ListPoliciesRequest struct {
 type PolicyListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
+	Name        model.LogicalName `json:"name"`
+	DisplayName string            `json:"displayName"`
+	Description string            `json:"description,omitempty"`
 
 	State            artifact.State    `json:"state"`
 	Enabled          bool              `json:"enabled"`
@@ -125,7 +125,7 @@ type PolicyView struct {
 type ManagedMCPPolicyUpsertRequest struct {
 	Collection                 artifact.ArtifactRef `json:"collection"`
 	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
-	Name                       basespec.LogicalName `json:"name"`
+	Name                       model.LogicalName    `json:"name"`
 	Description                string               `json:"description,omitempty"`
 	Policy                     mcpPolicy.MCPPolicy  `json:"policy"`
 	Enabled                    bool                 `json:"enabled"`
@@ -168,11 +168,11 @@ type ManagedMCPReplaceResult struct {
 }
 
 type BuiltInArtifactExpectation struct {
-	Locator          basespec.Locator            `json:"locator"`
-	Subresource      basespec.SubresourceLocator `json:"subresource"`
-	Kind             artifact.ArtifactKind       `json:"kind"`
-	LogicalName      basespec.LogicalName        `json:"logicalName"`
-	DefinitionDigest cryptoutil.Digest           `json:"definitionDigest"`
+	Locator          model.Locator            `json:"locator"`
+	Subresource      model.SubresourceLocator `json:"subresource"`
+	Kind             artifact.ArtifactKind    `json:"kind"`
+	LogicalName      model.LogicalName        `json:"logicalName"`
+	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
 }
 
 type ServerStore interface {
@@ -205,7 +205,7 @@ type ManagementStore interface {
 	ListMCPServersReferencingPolicy(
 		ctx context.Context,
 		rootID root.RootID,
-		policyName basespec.LogicalName,
+		policyName model.LogicalName,
 	) ([]artifact.ArtifactRef, error)
 
 	CreateMCPServer(

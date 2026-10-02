@@ -6,12 +6,12 @@ import (
 	"time"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -59,10 +59,10 @@ func (p Publication) Validate() error {
 	if p.ExpectedSourceRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateSourceGeneration(
+	if err := model.ValidateSourceGeneration(
 		p.SourceGeneration,
 	); err != nil {
 		return err
@@ -80,7 +80,7 @@ func (p Publication) Validate() error {
 	if p.RefreshedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: Source refresh publication time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := diagnostic.Validate(p.Diagnostics); err != nil {
@@ -100,7 +100,7 @@ func (p Publication) Validate() error {
 		if _, duplicate := seenDefinitions[value.Digest]; duplicate {
 			return fmt.Errorf(
 				"%w: publication repeats Definition %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				value.Digest,
 			)
 		}
@@ -118,13 +118,13 @@ func (p Publication) Validate() error {
 			value.State != artifact.StateAvailable {
 			return fmt.Errorf(
 				"%w: invalid source-created Artifact",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if _, duplicate := seenArtifacts[value.ID]; duplicate {
 			return fmt.Errorf(
 				"%w: publication repeats Artifact %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				value.ID,
 			)
 		}
@@ -138,13 +138,13 @@ func (p Publication) Validate() error {
 			value.Binding.SourceID != p.SourceID {
 			return fmt.Errorf(
 				"%w: source-derived Artifact update belongs to another Source",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if _, duplicate := seenArtifacts[value.ArtifactID]; duplicate {
 			return fmt.Errorf(
 				"%w: publication repeats Artifact %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				value.ArtifactID,
 			)
 		}

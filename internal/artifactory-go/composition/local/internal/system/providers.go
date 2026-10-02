@@ -5,8 +5,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/registry/providerregistry"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 )
 
 func providerRegistryFromConfig(
@@ -34,7 +34,7 @@ func bindProviderSchemas(
 	if schemas == nil {
 		return fmt.Errorf(
 			"%w: provider schema catalog is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -68,7 +68,7 @@ func bindProviderSchemas(
 			if _, duplicate := seen[key]; duplicate {
 				return fmt.Errorf(
 					"%w: decoder %q repeats required schema %q/%q/%q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					decoder.ID(),
 					key.Kind,
 					key.SchemaID,
@@ -80,7 +80,7 @@ func bindProviderSchemas(
 			if _, found := available[key]; !found {
 				return fmt.Errorf(
 					"%w: decoder %q requires unregistered schema %q/%q/%q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					decoder.ID(),
 					key.Kind,
 					key.SchemaID,

@@ -16,8 +16,8 @@ import (
 	"github.com/flexigpt/mapstore-go"
 
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/internal/mapstoreio"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/source/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -51,7 +51,7 @@ func New(
 	if strings.TrimSpace(base) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source base directory is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(base)
@@ -65,7 +65,7 @@ func New(
 	if strings.TrimSpace(stagingBase) == "" {
 		return nil, fmt.Errorf(
 			"%w: managed Source staging directory is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	// Staging is outside the portable Source tree. Managed package generation
@@ -92,7 +92,7 @@ func (*Adapter) Kind() source.SourceKind {
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (string, error) {
 	if err := a.validateSource(ctx, value); err != nil {
 		return "", err
@@ -132,15 +132,15 @@ func (a *Adapter) BootstrapManagedSource(
 // authorizes this operation before it reaches the adapter.
 func (a *Adapter) RemoveManagedRoot(
 	ctx context.Context,
-	rootStorageKey basespec.StorageKey,
+	rootStorageKey model.StorageKey,
 ) error {
 	if a == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: managed root removal context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -192,7 +192,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: bootstrapped managed Source path is not a directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	empty, err := managedDirectoryEmpty(root)
@@ -202,7 +202,7 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 	if !empty {
 		return fmt.Errorf(
 			"%w: refusing to discard a managed Source with published package content",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	if err := os.Remove(root); err != nil {
@@ -269,7 +269,7 @@ func (a *Adapter) PublishPackage(
 		return "", err
 	}
 	if publication.ExpectedGeneration != "" {
-		if err := basespec.ValidateSourceGeneration(
+		if err := model.ValidateSourceGeneration(
 			publication.ExpectedGeneration,
 		); err != nil {
 			return "", err
@@ -281,7 +281,7 @@ func (a *Adapter) PublishPackage(
 		if current != publication.ExpectedGeneration {
 			return "", fmt.Errorf(
 				"%w: managed Source changed before package publication",
-				basespec.ErrConflict,
+				model.ErrConflict,
 			)
 		}
 	}
@@ -292,7 +292,7 @@ func (a *Adapter) PublishPackage(
 	if exists && publication.ExpectedGeneration == "" {
 		return "", fmt.Errorf(
 			"%w: replacing managed package %v requires an expected generation",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			publication.Address,
 		)
 	}
@@ -309,13 +309,13 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(stagingRoot, basespec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, model.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 
 	temporary, err := os.MkdirTemp(
 		stagingRoot,
-		basespec.ManagedPackageTemporaryPrefix,
+		model.ManagedPackageTemporaryPrefix,
 	)
 	if err != nil {
 		return "", err
@@ -339,7 +339,7 @@ func (a *Adapter) PublishPackage(
 	if exists {
 		previousPackage, err = os.MkdirTemp(
 			stagingRoot,
-			basespec.ManagedPackagePreviousPrefix,
+			model.ManagedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return "", err
@@ -418,7 +418,7 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if err := basespec.ValidateSourceGeneration(expectedGeneration); err != nil {
+	if err := model.ValidateSourceGeneration(expectedGeneration); err != nil {
 		return err
 	}
 
@@ -432,7 +432,7 @@ func (a *Adapter) RemovePackage(
 	if current != expectedGeneration {
 		return fmt.Errorf(
 			"%w: managed Source changed before package removal",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	root, err := a.sourceRootPath(value, false)
@@ -457,7 +457,7 @@ func (a *Adapter) RemovePackage(
 	if !info.IsDir() {
 		return fmt.Errorf(
 			"%w: managed package is not a directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -465,13 +465,13 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(stagingRoot, basespec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, model.ArtifactStoreDirectoryMode); err != nil {
 		return err
 	}
 
 	tombstone, err := os.MkdirTemp(
 		stagingRoot,
-		basespec.ManagedPackageRemovalPrefix,
+		model.ManagedPackageRemovalPrefix,
 	)
 	if err != nil {
 		return err
@@ -503,12 +503,12 @@ func (*Adapter) NormalizeConfig(
 	}
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -516,11 +516,11 @@ func (*Adapter) NormalizeConfig(
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		&value,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"%w: managed Source config must be an empty object: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -547,7 +547,7 @@ func (a *Adapter) Open(
 
 func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
 	if a == nil || a.filesystem == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := value.Validate(); err != nil {
 		return err
@@ -555,14 +555,14 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 	if value.Kind != source.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: managed adapter received source kind %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.Kind,
 		)
 	}
 	if _, err := jsonutil.DecodeJSONRaw[config](value.Config); err != nil {
 		return fmt.Errorf(
 			"%w: invalid managed Source config: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -582,7 +582,7 @@ func (a *Adapter) sourceRootPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, basespec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, model.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -601,14 +601,14 @@ func (a *Adapter) sourceStagingPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, basespec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, model.ArtifactStoreDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
 }
 
 func (a *Adapter) managedRootPath(
-	rootStorageKey basespec.StorageKey,
+	rootStorageKey model.StorageKey,
 ) (string, error) {
 	if err := rootStorageKey.Validate(); err != nil {
 		return "", err
@@ -624,14 +624,14 @@ func (a *Adapter) managedRootPath(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: managed Root path escapes managed Source base",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return root, nil
 }
 
 func (a *Adapter) managedStagingRootPath(
-	rootStorageKey basespec.StorageKey,
+	rootStorageKey model.StorageKey,
 ) (string, error) {
 	if err := rootStorageKey.Validate(); err != nil {
 		return "", err
@@ -647,7 +647,7 @@ func (a *Adapter) managedStagingRootPath(
 		filepath.IsAbs(relative) {
 		return "", fmt.Errorf(
 			"%w: managed Source staging path escapes staging base",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return root, nil
@@ -688,7 +688,7 @@ func (a *Adapter) confirmedGeneration(
 
 func managedPackagePath(
 	root string,
-	directory basespec.Locator,
+	directory model.Locator,
 	createParent bool,
 ) (string, error) {
 	parent := path.Dir(string(directory))
@@ -696,7 +696,7 @@ func managedPackagePath(
 	if parent != "." {
 		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			if err := os.MkdirAll(parentPath, basespec.ArtifactStoreDirectoryMode); err != nil {
+			if err := os.MkdirAll(parentPath, model.ArtifactStoreDirectoryMode); err != nil {
 				return "", err
 			}
 		}
@@ -767,10 +767,10 @@ func equivalentPackage(
 			return nil
 		}
 		entries++
-		if entries > basespec.MaxDiscoveryEntries {
+		if entries > model.MaxDiscoveryEntries {
 			return fmt.Errorf(
 				"%w: managed package exceeds entry limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		relative, err := filepath.Rel(root, location)
@@ -778,10 +778,10 @@ func equivalentPackage(
 			return err
 		}
 		if strings.Count(filepath.ToSlash(relative), "/")+1 >
-			basespec.MaxDiscoveryDepth {
+			model.MaxDiscoveryDepth {
 			return fmt.Errorf(
 				"%w: managed package exceeds depth limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		info, err := os.Stat(location)
@@ -794,18 +794,18 @@ func equivalentPackage(
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf(
 				"%w: managed package contains a non-regular file",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
-		if info.Size() < 0 || info.Size() > basespec.MaxScanBytes-total {
+		if info.Size() < 0 || info.Size() > model.MaxScanBytes-total {
 			return fmt.Errorf(
 				"%w: managed package exceeds byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		total += info.Size()
 		relative = filepath.ToSlash(relative)
-		if err := basespec.Locator(relative).ValidatePortable(false); err != nil {
+		if err := model.Locator(relative).ValidatePortable(false); err != nil {
 			return err
 		}
 		expectedContent, found := remaining[relative]
@@ -858,7 +858,7 @@ func readManagedPackageFile(
 }
 
 type packageFileKeyAttributes struct {
-	Locator basespec.Locator
+	Locator model.Locator
 }
 
 type packagePartitionProvider struct{}
@@ -870,7 +870,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: invalid managed package MapStore key",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := attributes.Locator.ValidatePortable(false); err != nil {
@@ -879,7 +879,7 @@ func (*packagePartitionProvider) GetPartitionDir(
 	if key.FileName != path.Base(string(attributes.Locator)) {
 		return "", fmt.Errorf(
 			"%w: managed package filename does not match its locator",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	parent := path.Dir(string(attributes.Locator))
@@ -895,7 +895,7 @@ func (*packagePartitionProvider) ListPartitions(
 	_ string,
 	_ int,
 ) (dirs []string, nextPageToken string, err error) {
-	return nil, "", basespec.ErrUnsupported
+	return nil, "", model.ErrUnsupported
 }
 
 func writeManagedPackageFiles(
@@ -908,7 +908,7 @@ func writeManagedPackageFiles(
 		true,
 		&packagePartitionProvider{},
 		mapstoreio.RawEncoderDecoder{
-			MaximumBytes: basespec.MaxScanBytes,
+			MaximumBytes: model.MaxScanBytes,
 		},
 	)
 	if err != nil {
@@ -947,7 +947,7 @@ func writeManagedPackageFiles(
 		}
 		content, err := mapstoreio.RawBytes(
 			stored,
-			basespec.MaxScanBytes,
+			model.MaxScanBytes,
 		)
 		if err != nil {
 			return err
@@ -955,7 +955,7 @@ func writeManagedPackageFiles(
 		if !bytes.Equal(content, file.Content) {
 			return fmt.Errorf(
 				"%w: MapStore changed managed package file %q",
-				basespec.ErrDigestMismatch,
+				model.ErrDigestMismatch,
 				file.Locator,
 			)
 		}
@@ -968,7 +968,7 @@ func writeManagedPackageFiles(
 }
 
 func managedPackageFileKey(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (mapstore.FileKey, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return mapstore.FileKey{}, err

@@ -3,8 +3,8 @@ package collection
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 func (p DomainPolicy) validateAuthoringConfiguration() error {
@@ -14,38 +14,38 @@ func (p DomainPolicy) validateAuthoringConfiguration() error {
 	if err := p.SourceStorageKey.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Collection domain Source display name",
 		p.SourceDisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
 	if err := p.BaselineName.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"Collection baseline display name",
 		p.BaselineDisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	return basespec.ValidateRequiredText(
+	return model.ValidateRequiredText(
 		"Collection baseline description",
 		p.BaselineDescription,
-		basespec.MaxDescriptionBytes,
+		model.MaxDescriptionBytes,
 	)
 }
 
 func (a *API) requireDeclarationAuthoring() error {
 	if a == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if a.domain != nil && a.domain.ReadOnly {
 		return fmt.Errorf(
 			"%w: %s Collection declarations are read-only",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			a.domain.Name,
 		)
 	}

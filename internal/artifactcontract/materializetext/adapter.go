@@ -10,11 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -26,7 +26,7 @@ type Document struct {
 	Insert           declaration.InsertTarget
 	MediaType        string
 	Content          string
-	Locator          basespec.Locator
+	Locator          model.Locator
 }
 
 type Adapter struct {
@@ -37,7 +37,7 @@ func NewAdapter(resources compositionapi.ResourceAPI) (*Adapter, error) {
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Text materializer ResourceAPI is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Adapter{resources: resources}, nil
@@ -48,7 +48,7 @@ func (a *Adapter) Resolve(
 	ref artifact.ArtifactRef,
 ) (Document, error) {
 	if a == nil || a.resources == nil {
-		return Document{}, basespec.ErrClosed
+		return Document{}, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return Document{}, err
@@ -65,7 +65,7 @@ func (a *Adapter) Resolve(
 	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {
 		return Document{}, fmt.Errorf(
 			"%w: Artifact %q is not Text",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			resolved.Artifact.ID,
 		)
 	}
@@ -73,7 +73,7 @@ func (a *Adapter) Resolve(
 		resolved.Definition.SchemaVersion != textv1.TextSchemaKey.SchemaVersion {
 		return Document{}, fmt.Errorf(
 			"%w: Text Artifact has unsupported schema",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -104,7 +104,7 @@ func (a *Adapter) ResolveWithContentSource(
 	contentSourceID source.SourceID,
 ) (Document, error) {
 	if a == nil || a.resources == nil {
-		return Document{}, basespec.ErrClosed
+		return Document{}, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return Document{}, err
@@ -118,7 +118,7 @@ func (a *Adapter) ResolveWithContentSource(
 	if contentRootID != ref.RootID {
 		return Document{}, fmt.Errorf(
 			"%w: Text content Source belongs to another Root",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -129,7 +129,7 @@ func (a *Adapter) ResolveWithContentSource(
 	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {
 		return Document{}, fmt.Errorf(
 			"%w: Artifact %q is not Text",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			resolved.Artifact.ID,
 		)
 	}
@@ -137,7 +137,7 @@ func (a *Adapter) ResolveWithContentSource(
 		resolved.Definition.SchemaVersion != textv1.TextSchemaKey.SchemaVersion {
 		return Document{}, fmt.Errorf(
 			"%w: Text Artifact has unsupported schema",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	declarationValue, err := textv1.DecodeTextJSON(resolved.Definition.Body)
@@ -159,7 +159,7 @@ func (a *Adapter) ResolveWithContentSource(
 	if declarationValue.Locator == nil {
 		return Document{}, fmt.Errorf(
 			"%w: Text has neither inline content nor locator",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	base, err := declaration.ResolveSourceRelativePathLocator(
@@ -176,8 +176,8 @@ func (a *Adapter) ResolveWithContentSource(
 		base,
 		declarationValue.Include,
 		declarationValue.Exclude,
-		basespec.DefaultMaxEntries,
-		basespec.MaxScanBytes,
+		model.DefaultMaxEntries,
+		model.MaxScanBytes,
 	)
 	if err != nil {
 		return Document{}, err
@@ -193,13 +193,13 @@ func (a *Adapter) ResolveWithContentSource(
 		if entry.SourceGeneration != generation || entry.SourceRevision != revision {
 			return Document{}, fmt.Errorf(
 				"%w: Text Source changed during materialization",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 			)
 		}
 		if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
 			return Document{}, fmt.Errorf(
 				"%w: Text source %q is not valid UTF-8 text",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Locator,
 			)
 		}
@@ -236,7 +236,7 @@ func (a *Adapter) contentForDocument(
 	if document.Locator == nil {
 		return "", fmt.Errorf(
 			"%w: Text has neither inline content nor locator",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -254,8 +254,8 @@ func (a *Adapter) contentForDocument(
 		base,
 		document.Include,
 		document.Exclude,
-		basespec.DefaultMaxEntries,
-		basespec.MaxScanBytes,
+		model.DefaultMaxEntries,
+		model.MaxScanBytes,
 	)
 	if err != nil {
 		return "", err
@@ -267,13 +267,13 @@ func (a *Adapter) contentForDocument(
 			entry.SourceGeneration != resolved.RefreshState.SourceGeneration {
 			return "", fmt.Errorf(
 				"%w: Text Source changed during materialization",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 			)
 		}
 		if !utf8.Valid(entry.Content) || bytes.ContainsRune(entry.Content, 0) {
 			return "", fmt.Errorf(
 				"%w: Text source %q is not valid UTF-8 text",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Locator,
 			)
 		}

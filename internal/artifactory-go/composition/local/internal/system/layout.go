@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -20,14 +20,14 @@ type storeManifest struct {
 func ensureStoreLayout(base string) error {
 	if err := os.MkdirAll(
 		base,
-		os.FileMode(basespec.ArtifactStoreDirectoryMode),
+		os.FileMode(model.ArtifactStoreDirectoryMode),
 	); err != nil {
 		return err
 	}
 
 	manifestPath := filepath.Join(
 		base,
-		basespec.ArtifactStoreManifestFileName,
+		model.ArtifactStoreManifestFileName,
 	)
 	raw, err := os.ReadFile(manifestPath)
 	switch {
@@ -37,8 +37,8 @@ func ensureStoreLayout(base string) error {
 		}
 
 		raw, err = json.Marshal(storeManifest{
-			Format:        basespec.ArtifactStoreFormat,
-			ContentLayout: basespec.ArtifactStoreContentLayout,
+			Format:        model.ArtifactStoreFormat,
+			ContentLayout: model.ArtifactStoreContentLayout,
 		})
 		if err != nil {
 			return err
@@ -56,23 +56,23 @@ func ensureStoreLayout(base string) error {
 	if err != nil {
 		return err
 	}
-	if manifest.Format != basespec.ArtifactStoreFormat ||
-		manifest.ContentLayout != basespec.ArtifactStoreContentLayout {
+	if manifest.Format != model.ArtifactStoreFormat ||
+		manifest.ContentLayout != model.ArtifactStoreContentLayout {
 		return fmt.Errorf(
 			"%w: unsupported Artifact Store layout %q/%q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			manifest.Format,
 			manifest.ContentLayout,
 		)
 	}
 
 	for _, directory := range []string{
-		basespec.ArtifactStoreContentDirectoryName,
-		basespec.ArtifactStoreStagingDirectoryName,
+		model.ArtifactStoreContentDirectoryName,
+		model.ArtifactStoreStagingDirectoryName,
 	} {
 		if err := os.MkdirAll(
 			filepath.Join(base, directory),
-			os.FileMode(basespec.ArtifactStoreDirectoryMode),
+			os.FileMode(model.ArtifactStoreDirectoryMode),
 		); err != nil {
 			return err
 		}
@@ -88,14 +88,14 @@ func removeStaleManifestTemporaryFiles(base string) error {
 	for _, entry := range entries {
 		if !strings.HasPrefix(
 			entry.Name(),
-			basespec.ArtifactStoreManifestTemporaryName,
+			model.ArtifactStoreManifestTemporaryName,
 		) {
 			continue
 		}
 		if entry.IsDir() {
 			return fmt.Errorf(
 				"%w: invalid Artifact Store manifest temporary directory %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Name(),
 			)
 		}
@@ -113,7 +113,7 @@ func writeNewStoreManifest(
 	base := filepath.Dir(manifestPath)
 	temporary, err := os.CreateTemp(
 		base,
-		basespec.ArtifactStoreManifestTemporaryName,
+		model.ArtifactStoreManifestTemporaryName,
 	)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func writeNewStoreManifest(
 	}
 
 	if err := temporary.Chmod(
-		os.FileMode(basespec.ArtifactStoreManifestMode),
+		os.FileMode(model.ArtifactStoreManifestMode),
 	); err != nil {
 		return cleanup(err)
 	}
@@ -148,12 +148,12 @@ func writeNewStoreManifest(
 func decodeStoreManifest(raw []byte) (storeManifest, error) {
 	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](
 		raw,
-		basespec.MaxConfigBytes,
+		model.MaxConfigBytes,
 	)
 	if err != nil {
 		return storeManifest{}, fmt.Errorf(
 			"%w: decode artifact store layout manifest: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}

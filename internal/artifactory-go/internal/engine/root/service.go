@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -25,7 +25,7 @@ func NewService(
 	if repository == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: root service dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -57,7 +57,7 @@ func (s *Service) EnsureSystem(
 	if s.policy == nil || !s.policy.IsProtectedRoot(draft.ID) {
 		return root.Root{}, fmt.Errorf(
 			"%w: Root %q is not declared as protected application topology",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			draft.ID,
 		)
 	}
@@ -92,7 +92,7 @@ func (s *Service) Update(
 	if update.ExpectedRevision == 0 {
 		return root.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
@@ -102,7 +102,7 @@ func (s *Service) Update(
 	if current.Revision != update.ExpectedRevision {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			id,
 		)
 	}
@@ -139,7 +139,7 @@ func (s *Service) Retire(
 	if expectedRevision == 0 {
 		return root.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
@@ -149,7 +149,7 @@ func (s *Service) Retire(
 	if current.Revision != expectedRevision {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			id,
 		)
 	}
@@ -181,7 +181,7 @@ func (s *Service) Purge(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected root revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return s.repository.Purge(ctx, id, expectedRevision)
@@ -211,7 +211,7 @@ func (s *Service) create(
 	if createErr == nil {
 		return value, nil
 	}
-	if !errors.Is(createErr, basespec.ErrConflict) {
+	if !errors.Is(createErr, model.ErrConflict) {
 		return root.Root{}, createErr
 	}
 
@@ -224,7 +224,7 @@ func (s *Service) create(
 		existing.Description != draft.Description {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q creation intent differs",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			draft.ID,
 		)
 	}
@@ -244,7 +244,7 @@ func requireRootDeletion(
 		deletionPolicy.IsRootDeletionProtected(rootID) {
 		return fmt.Errorf(
 			"%w: root %q is retained and cannot be retired or purged",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			rootID,
 		)
 	}
@@ -264,7 +264,7 @@ func RequireMutableRoot(
 	}
 	return fmt.Errorf(
 		"%w: root %q may only be mutated by a trusted protected-topology installer",
-		basespec.ErrProtected,
+		model.ErrProtected,
 		rootID,
 	)
 }

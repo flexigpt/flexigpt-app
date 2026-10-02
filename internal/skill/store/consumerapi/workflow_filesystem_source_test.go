@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
@@ -137,7 +137,7 @@ func TestSkillStoreWorkflowAddsAndRefreshesFilesystemSkill(
 	}
 
 	_, err = fixture.api.GetManagedSkillDocument(ctx, refreshed.Ref())
-	if !errors.Is(err, basespec.ErrUnsupported) {
+	if !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf(
 			"GetManagedSkillDocument for filesystem Skill error=%v, want ErrUnsupported",
 			err,

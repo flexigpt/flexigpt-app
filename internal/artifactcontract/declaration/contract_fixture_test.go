@@ -25,7 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -71,7 +71,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			}
 			raw, err := yamlutil.CanonicalObjectJSON(
 				rawYAML,
-				basespec.MaxDefinitionBytes,
+				model.MaxDefinitionBytes,
 			)
 			if err != nil {
 				t.Fatalf("canonicalize YAML: %v", err)
@@ -104,7 +104,7 @@ func TestContractFixturesValidateThroughCompletePipeline(t *testing.T) {
 			if err := jsonutil.ValidateJSONSchema(
 				compiled,
 				json.RawMessage(raw),
-				basespec.MaxDefinitionBytes,
+				model.MaxDefinitionBytes,
 			); err != nil {
 				t.Fatalf("validate fixture JSON Schema: %v", err)
 			}

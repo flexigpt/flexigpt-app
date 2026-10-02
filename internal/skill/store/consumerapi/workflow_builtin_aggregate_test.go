@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
@@ -83,7 +83,7 @@ func TestSkillStoreWorkflowAggregateHonorsBuiltinSkillEnablement(
 	}
 
 	_, err = aggregateService.ResolveArtifactSkill(ctx, disabled.Ref())
-	if !errors.Is(err, basespec.ErrReferenceUnresolved) {
+	if !errors.Is(err, model.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"aggregate resolution after built-in disable error=%v, want ErrReferenceUnresolved",
 			err,

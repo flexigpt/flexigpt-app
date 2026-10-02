@@ -4,7 +4,7 @@ import (
 	"container/list"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
 )
 
 const (

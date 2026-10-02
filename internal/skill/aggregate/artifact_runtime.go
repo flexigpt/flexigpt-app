@@ -12,9 +12,9 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
@@ -83,7 +83,7 @@ func (s *Service) ResolveArtifactSkill(
 	if len(values) != 1 {
 		return ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: expected one resolved Artifact Skill",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return values[0], nil
@@ -236,7 +236,7 @@ func (s *Service) DescribeArtifactSkill(
 	}
 	return ArtifactSkillSummary{}, fmt.Errorf(
 		"%w: runtime did not index Artifact Skill %q",
-		basespec.ErrReferenceUnresolved,
+		model.ErrReferenceUnresolved,
 		ref.ArtifactID,
 	)
 }
@@ -391,7 +391,7 @@ func (s *Service) resolveArtifactSkills(
 	if len(values) != len(readyRefs) {
 		return resolvedArtifactSkills{}, fmt.Errorf(
 			"%w: Artifact Skill router returned an unexpected result count",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -400,7 +400,7 @@ func (s *Service) resolveArtifactSkills(
 		if value.Artifact != ref {
 			return resolvedArtifactSkills{}, fmt.Errorf(
 				"%w: Artifact Skill router resolved another Artifact",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 			)
 		}
 		if !value.Enabled {
@@ -430,7 +430,7 @@ func (s *Service) resolveArtifactSkills(
 			previous != value.Artifact {
 			return resolvedArtifactSkills{}, fmt.Errorf(
 				"%w: Artifacts %q and %q resolve to one runtime Skill",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				previous.ArtifactID,
 				value.Artifact.ArtifactID,
 			)
@@ -472,7 +472,7 @@ func unavailableArtifactSkillsError(
 
 	summary := fmt.Errorf(
 		"%w: unavailable Artifact Skills: %s",
-		basespec.ErrReferenceUnresolved,
+		model.ErrReferenceUnresolved,
 		strings.Join(refs, ", "),
 	)
 	if len(causes) == 0 {

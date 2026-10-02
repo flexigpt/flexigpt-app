@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -71,9 +71,9 @@ type HydrationStore interface {
 }
 
 func ValidateHydrationInstallerName(value string) error {
-	return basespec.ValidateIdentifier(
+	return model.ValidateIdentifier(
 		"topology hydration installer name",
 		value,
-		basespec.MaxKindBytes,
+		model.MaxKindBytes,
 	)
 }

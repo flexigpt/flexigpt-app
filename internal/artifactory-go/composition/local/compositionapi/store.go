@@ -10,9 +10,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/internal/system"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 type Store struct {
@@ -61,7 +61,7 @@ func Open(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store composition context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -161,7 +161,7 @@ func (s *Store) EnsureProtectedTopology(
 	declaration topology.Declaration,
 ) (topology.Installed, error) {
 	if s == nil || s.components == nil {
-		return topology.Installed{}, basespec.ErrClosed
+		return topology.Installed{}, model.ErrClosed
 	}
 	return s.components.EnsureProtectedTopology(ctx, declaration)
 }
@@ -171,7 +171,7 @@ func (s *Store) PrepareTopologyHydrations(
 	desired []topology.Hydration,
 ) (map[string]bool, error) {
 	if s == nil || s.components == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return s.components.PrepareTopologyHydrations(ctx, desired)
 }
@@ -181,7 +181,7 @@ func (s *Store) CommitTopologyHydration(
 	desired topology.Hydration,
 ) error {
 	if s == nil || s.components == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.components.CommitTopologyHydration(ctx, desired)
 }
@@ -192,7 +192,7 @@ func (s *Store) PrepareTopologyPackageHydrations(
 	desired []topology.PackageHydration,
 ) (topology.PackageHydrationPreparation, error) {
 	if s == nil || s.components == nil {
-		return topology.PackageHydrationPreparation{}, basespec.ErrClosed
+		return topology.PackageHydrationPreparation{}, model.ErrClosed
 	}
 	return s.components.PrepareTopologyPackageHydrations(
 		ctx,
@@ -206,7 +206,7 @@ func (s *Store) CommitTopologyPackageHydration(
 	desired topology.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.components.CommitTopologyPackageHydration(ctx, desired)
 }
@@ -216,7 +216,7 @@ func (s *Store) DeleteTopologyPackageHydration(
 	value topology.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.components.DeleteTopologyPackageHydration(ctx, value)
 }

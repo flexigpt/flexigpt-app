@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -235,7 +235,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		ctx,
 		firstBeforePurge.Ref(),
 	)
-	if !errors.Is(err, basespec.ErrReferenceUnresolved) {
+	if !errors.Is(err, model.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"aggregate resolution after first Skill purge error=%v, want ErrReferenceUnresolved",
 			err,

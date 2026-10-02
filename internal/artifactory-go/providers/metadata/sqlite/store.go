@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
 
 	_ "github.com/glebarez/go-sqlite"
 )
@@ -49,13 +49,13 @@ func Open(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: SQLite context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if strings.TrimSpace(path) == "" {
 		return nil, fmt.Errorf(
 			"%w: SQLite path is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	absolute, err := filepath.Abs(path)
@@ -160,7 +160,7 @@ func verifySchemaV1Tx(
 		if !exists {
 			return fmt.Errorf(
 				"%w: Artifact Store database does not match v1 schema",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 			)
 		}
 	}

@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -57,9 +57,9 @@ type ToolImplementation struct {
 type ToolDocument struct {
 	declaration.Header
 
-	Version     basespec.LogicalVersion `json:"version"`
-	Tags        []string                `json:"tags,omitempty"`
-	AutoExecute bool                    `json:"autoExecute"`
+	Version     model.LogicalVersion `json:"version"`
+	Tags        []string             `json:"tags,omitempty"`
+	AutoExecute bool                 `json:"autoExecute"`
 
 	InputSchema   json.RawMessage  `json:"inputSchema"`
 	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`
@@ -150,10 +150,10 @@ func (v ToolDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: Tool declarations do not support locator",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidatePortableName(
+	if err := model.ValidatePortableName(
 		"Tool version",
 		string(v.Version),
 	); err != nil {
@@ -191,7 +191,7 @@ func (v ToolDocument) validateFields() error {
 		v.UserArgSchema != nil {
 		return fmt.Errorf(
 			"%w: Tool userArgSchema is supported only for sdk Tools",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil
@@ -200,26 +200,26 @@ func (v ToolDocument) validateFields() error {
 func (v ToolImplementation) Validate() error {
 	switch v.Kind {
 	case ImplementationKindGo:
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"Go Tool function",
 			v.Function,
-			basespec.MaxURIBytes,
+			model.MaxURIBytes,
 		); err != nil {
 			return err
 		}
 		if v.SDKType != "" || v.SDKToolType != "" {
 			return fmt.Errorf(
 				"%w: Go Tool implementation cannot contain SDK fields",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return nil
 
 	case ImplementationKindSDK:
-		if err := basespec.ValidateIdentifier(
+		if err := model.ValidateIdentifier(
 			"SDK Tool type",
 			v.SDKType,
-			basespec.MaxKindBytes,
+			model.MaxKindBytes,
 		); err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func (v ToolImplementation) Validate() error {
 		if v.Function != "" {
 			return fmt.Errorf(
 				"%w: SDK Tool implementation cannot contain Go function",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return nil
@@ -237,7 +237,7 @@ func (v ToolImplementation) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Tool implementation kind %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			v.Kind,
 		)
 	}
@@ -252,34 +252,34 @@ func (v SDKToolType) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported SDK Tool type %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			v,
 		)
 	}
 }
 
 func validateTags(values []string) error {
-	if len(values) > basespec.MaxDefinitionDependencies {
+	if len(values) > model.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: Tool tags exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
+			model.ErrInvalid,
+			model.MaxDefinitionDependencies,
 		)
 	}
 
 	seen := make(map[string]struct{}, len(values))
 	for index, value := range values {
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"Tool tag",
 			value,
-			basespec.MaxLogicalNameBytes,
+			model.MaxLogicalNameBytes,
 		); err != nil {
 			return fmt.Errorf("tool tags[%d]: %w", index, err)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Tool tag %q is repeated",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 				value,
 			)
 		}

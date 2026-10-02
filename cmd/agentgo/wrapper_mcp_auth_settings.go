@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
@@ -32,7 +32,7 @@ func newMCPSettingsAdapter(
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP global settings overlay store is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &mcpSettingsAdapter{
@@ -44,7 +44,7 @@ func (s *mcpSettingsAdapter) getMCPSettings(
 	ctx context.Context,
 ) (mcpAuth.MCPAuthSettings, uint64, error) {
 	if s == nil || s.overlays == nil {
-		return mcpAuth.MCPAuthSettings{}, 0, basespec.ErrClosed
+		return mcpAuth.MCPAuthSettings{}, 0, model.ErrClosed
 	}
 
 	record, found, err := s.overlays.GetStoreOverlay(
@@ -62,11 +62,11 @@ func (s *mcpSettingsAdapter) getMCPSettings(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	); err != nil {
 		return mcpAuth.MCPAuthSettings{}, 0, fmt.Errorf(
 			"%w: decode MCP global settings overlay: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -88,7 +88,7 @@ func (s *mcpSettingsAdapter) putMCPSettings(
 	value mcpAuth.MCPAuthSettings,
 ) (uint64, error) {
 	if s == nil || s.overlays == nil {
-		return 0, basespec.ErrClosed
+		return 0, model.ErrClosed
 	}
 
 	settings, err := normalizeMCPGlobalSettings(value)
@@ -100,7 +100,7 @@ func (s *mcpSettingsAdapter) putMCPSettings(
 		mcpGlobalSettingsPayload{
 			OAuthLoopbackListenAddr: settings.OAuthLoopbackListenAddr,
 		},
-		basespec.MaxLocalDataBytes,
+		model.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return 0, err
@@ -137,20 +137,20 @@ func normalizeMCPGlobalSettings(
 	if err != nil {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen address must be host:port",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if !isLoopbackMCPSettingsHost(host) {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen host must be loopback",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	number, err := strconv.Atoi(port)
 	if err != nil || number <= 0 || number > 65535 {
 		return mcpAuth.MCPAuthSettings{}, fmt.Errorf(
 			"%w: OAuth loopback listen port must be 1..65535",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return value, nil

@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func (s *Service) ListByRoot(
@@ -18,12 +18,12 @@ func (s *Service) ListByRoot(
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if s == nil || s.repository == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact catalog list context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -50,12 +50,12 @@ func (s *Service) ListBySource(
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if s == nil || s.repository == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact catalog list context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -87,16 +87,16 @@ func (s *Service) FindByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
+	logicalName model.LogicalName,
 	options catalog.ListOptions,
 ) ([]catalog.Entry, error) {
 	if s == nil || s.repository == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact identity query context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -133,12 +133,12 @@ func (s *Service) GetMany(
 	refs []artifact.ArtifactRef,
 ) ([]artifact.Artifact, error) {
 	if s == nil || s.repository == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact batch get context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -161,12 +161,12 @@ func (s *Service) GetDefinitions(
 	keys []definition.Key,
 ) ([]definition.Definition, error) {
 	if s == nil || s.definitions == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Definition batch get context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -232,7 +232,7 @@ func (s *Service) attachDocuments(
 		if !found {
 			return nil, fmt.Errorf(
 				"%w: listed Artifact Definition is unavailable",
-				basespec.ErrDefinitionNotFound,
+				model.ErrDefinitionNotFound,
 			)
 		}
 		copyValue := value.Clone()

@@ -17,8 +17,8 @@ import (
 	"github.com/flexigpt/mapstore-go/keyringencdec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/secretapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 )
 
 const (
@@ -60,7 +60,7 @@ func New(
 	if strings.TrimSpace(file) == "" {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store secret MapStore file is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -70,17 +70,17 @@ func New(
 	if config.KeyringUser == "" {
 		config.KeyringUser = defaultKeyringUser
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Artifact Store secret keyring service",
 		config.KeyringService,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return nil, err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Artifact Store secret keyring user",
 		config.KeyringUser,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: initialize Artifact Store keyring encryption: %w",
-			basespec.ErrSecretUnavailable,
+			model.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -115,7 +115,7 @@ func New(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: initialize Artifact Store secret MapStore: %w",
-			basespec.ErrSecretUnavailable,
+			model.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -158,7 +158,7 @@ func (s *Store) Put(
 	if _, exists := values[id]; exists {
 		return fmt.Errorf(
 			"%w: Artifact Store secret ref %q already exists",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			ref,
 		)
 	}
@@ -169,7 +169,7 @@ func (s *Store) Put(
 	); err != nil {
 		return fmt.Errorf(
 			"%w: persist Artifact Store secret: %w",
-			basespec.ErrSecretUnavailable,
+			model.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -200,7 +200,7 @@ func (s *Store) Get(
 	if !found {
 		return "", fmt.Errorf(
 			"%w: Artifact Store secret ref %q",
-			basespec.ErrSecretNotFound,
+			model.ErrSecretNotFound,
 			ref,
 		)
 	}
@@ -209,7 +209,7 @@ func (s *Store) Get(
 	if !ok {
 		return "", fmt.Errorf(
 			"%w: Artifact Store secret ref %q is not a string",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			ref,
 		)
 	}
@@ -251,7 +251,7 @@ func (s *Store) Delete(
 	); err != nil {
 		return fmt.Errorf(
 			"%w: delete Artifact Store secret: %w",
-			basespec.ErrSecretUnavailable,
+			model.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -269,12 +269,12 @@ func (s *Store) ready(
 	ctx context.Context,
 ) error {
 	if s == nil || s.store == nil || s.encEncrypt == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Artifact Store secret MapStore context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -287,7 +287,7 @@ func (s *Store) values(
 	if err != nil {
 		return nil, fmt.Errorf(
 			"%w: read Artifact Store secret MapStore: %w",
-			basespec.ErrSecretUnavailable,
+			model.ErrSecretUnavailable,
 			err,
 		)
 	}
@@ -296,7 +296,7 @@ func (s *Store) values(
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store secret MapStore has invalid value layout",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return values, nil

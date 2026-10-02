@@ -7,10 +7,10 @@ import (
 	"fmt"
 
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -45,7 +45,7 @@ func (s *Store) getRefreshState(
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
-			basespec.ErrRefreshStateNotFound,
+			model.ErrRefreshStateNotFound,
 			sourceID,
 			rootID,
 		)
@@ -61,7 +61,7 @@ func (p *Publisher) Publish(
 	publication refreshimpl.Publication,
 ) (source.RefreshState, error) {
 	if p == nil || p.store == nil {
-		return source.RefreshState{}, basespec.ErrClosed
+		return source.RefreshState{}, model.ErrClosed
 	}
 	if err := publication.Validate(); err != nil {
 		return source.RefreshState{}, err
@@ -93,20 +93,20 @@ func (p *Publisher) Publish(
 		currentSource.Revision != publication.ExpectedSourceRevision {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source changed or was disabled during refresh",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	if currentSource.RootID != publication.RootID ||
 		currentSource.ID != publication.SourceID {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh publisher loaded another Source",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if currentSource.Discovery.Empty() {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source has no declaration discovery configuration",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 	var currentRefreshRevision uint64
@@ -126,13 +126,13 @@ func (p *Publisher) Publish(
 	if currentRefreshRevision != publication.ExpectedRefreshRevision {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh state changed during refresh",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	if currentRefreshRevision == ^uint64(0) {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh revision is exhausted",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -232,7 +232,7 @@ func scanRefreshState(
 	if row == nil {
 		return source.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh state row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := row.Scan(

@@ -3,7 +3,7 @@ package codec
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 )
 
 func TestAllSchemaCodecsCoverSchemaKeys(t *testing.T) {

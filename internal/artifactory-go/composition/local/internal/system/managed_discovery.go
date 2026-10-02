@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	managedartifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/managedartifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // pruneManagedDeclarationDiscovery removes one exact explicit declaration
@@ -19,18 +19,18 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	rootID root.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (managedartifactimpl.SourceState, error) {
 	if c == nil ||
 		c.Sources == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return managedartifactimpl.SourceState{}, basespec.ErrClosed
+		return managedartifactimpl.SourceState{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return managedartifactimpl.SourceState{}, fmt.Errorf(
 			"%w: managed discovery pruning context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -48,7 +48,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	if expectedSourceRevision == 0 {
 		return managedartifactimpl.SourceState{}, fmt.Errorf(
 			"%w: expected Source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -57,32 +57,32 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 		return managedartifactimpl.SourceState{}, err
 	}
 	if current.Revision != expectedSourceRevision {
-		return managedartifactimpl.SourceState{}, basespec.ErrConflict
+		return managedartifactimpl.SourceState{}, model.ErrConflict
 	}
 	if !current.Enabled {
 		return managedartifactimpl.SourceState{}, fmt.Errorf(
 			"%w: managed Source is disabled",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	if !c.managedSources.SupportsManagedPackages(current.Kind) {
 		return managedartifactimpl.SourceState{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			current.Kind,
 		)
 	}
 	if !current.Discovery.Authoritative {
 		return managedartifactimpl.SourceState{}, fmt.Errorf(
 			"%w: managed discovery pruning requires an authoritative Source",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
 	next := current.Discovery.Clone()
 	changed := false
 	locators := make(
-		[]basespec.Locator,
+		[]model.Locator,
 		0,
 		len(next.ExplicitLocators),
 	)

@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type snapshot struct {
@@ -27,7 +27,7 @@ func (s *snapshot) Generation() string {
 
 func (s *snapshot) Stat(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return source.Entry{}, err
@@ -40,7 +40,7 @@ func (s *snapshot) Stat(
 	if errors.Is(err, fs.ErrNotExist) {
 		return source.Entry{}, fmt.Errorf(
 			"%w: embedded locator %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -52,7 +52,7 @@ func (s *snapshot) Stat(
 
 func (s *snapshot) ReadDir(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) ([]source.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *snapshot) ReadDir(
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf(
 			"%w: embedded directory %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			locator,
 		)
 	}
@@ -96,7 +96,7 @@ func (s *snapshot) ReadDir(
 
 func (s *snapshot) Open(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (io.ReadCloser, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (s *snapshot) Open(
 	if !info.Mode().IsRegular() {
 		return nil, fmt.Errorf(
 			"%w: embedded locator %q is not a regular file",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 		)
 	}
@@ -134,7 +134,7 @@ func (s *snapshot) Confirm(ctx context.Context) error {
 	if current != s.generation {
 		return fmt.Errorf(
 			"%w: embedded source changed during discovery",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return nil
@@ -147,12 +147,12 @@ func (s *snapshot) Close() error {
 
 func (s *snapshot) ensureOpen(ctx context.Context) error {
 	if s == nil || s.closed.Load() {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return ctx.Err()
 }
 
-func fsName(locator basespec.Locator) (string, error) {
+func fsName(locator model.Locator) (string, error) {
 	if err := locator.Validate(true); err != nil {
 		return "", err
 	}
@@ -163,24 +163,24 @@ func fsName(locator basespec.Locator) (string, error) {
 }
 
 func joinLocator(
-	parent basespec.Locator,
+	parent model.Locator,
 	name string,
-) (basespec.Locator, error) {
+) (model.Locator, error) {
 	if name == "" || strings.Contains(name, "/") || !fs.ValidPath(name) {
 		return "", fmt.Errorf(
 			"%w: invalid embedded entry name %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			name,
 		)
 	}
 	if parent == "." {
-		return basespec.Locator(name), nil
+		return model.Locator(name), nil
 	}
-	return basespec.Locator(path.Join(string(parent), name)), nil
+	return model.Locator(path.Join(string(parent), name)), nil
 }
 
 func entryFromInfo(
-	locator basespec.Locator,
+	locator model.Locator,
 	info fs.FileInfo,
 ) source.Entry {
 	name := info.Name()

@@ -11,7 +11,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/secret/keyringmapstore"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -63,7 +63,7 @@ func composeArtifactStore(
 	secretValues, err := keyringmapstore.New(
 		filepath.Join(
 			baseDirectory,
-			basespec.ArtifactStoreSecretValuesFileName,
+			model.ArtifactStoreSecretValuesFileName,
 		),
 		keyringmapstore.Config{},
 	)

@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // ReadPackageFiles reads a complete portable package directory from an fs.FS.
@@ -25,12 +25,12 @@ import (
 func ReadPackageFiles(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot basespec.Locator,
+	packageRoot model.Locator,
 ) ([]source.ManagedPackageFile, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -39,13 +39,13 @@ func ReadPackageFiles(
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package filesystem is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if packageRoot == "" {
 		return nil, fmt.Errorf(
 			"%w: embedded package root is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if packageRoot != "." {
@@ -65,13 +65,13 @@ func ReadPackageFiles(
 	if !info.IsDir() {
 		return nil, fmt.Errorf(
 			"%w: embedded package %q is not a directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			packageRoot,
 		)
 	}
 
 	files := make([]source.ManagedPackageFile, 0)
-	seen := make(map[basespec.Locator]struct{})
+	seen := make(map[model.Locator]struct{})
 	var totalBytes int64
 
 	err = fs.WalkDir(
@@ -87,7 +87,7 @@ func ReadPackageFiles(
 			if entry == nil {
 				return fmt.Errorf(
 					"%w: embedded package walk returned no entry for %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					location,
 				)
 			}
@@ -97,14 +97,14 @@ func ReadPackageFiles(
 			if !entry.Type().IsRegular() {
 				return fmt.Errorf(
 					"%w: embedded package file %q is not regular",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					location,
 				)
 			}
-			if len(files) >= basespec.MaxDiscoveryEntries {
+			if len(files) >= model.MaxDiscoveryEntries {
 				return fmt.Errorf(
 					"%w: embedded package exceeds the file count limit",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 
@@ -115,7 +115,7 @@ func ReadPackageFiles(
 			if _, duplicate := seen[relative]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded package contains duplicate file %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					relative,
 				)
 			}
@@ -127,10 +127,10 @@ func ReadPackageFiles(
 			}
 			if !fileInfo.Mode().IsRegular() ||
 				fileInfo.Size() < 0 ||
-				fileInfo.Size() > basespec.MaxScanBytes-totalBytes {
+				fileInfo.Size() > model.MaxScanBytes-totalBytes {
 				return fmt.Errorf(
 					"%w: embedded package exceeds the byte limit",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 
@@ -162,9 +162,9 @@ func ReadPackageFiles(
 }
 
 func packageRelativeLocator(
-	packageRoot basespec.Locator,
+	packageRoot model.Locator,
 	location string,
-) (basespec.Locator, error) {
+) (model.Locator, error) {
 	relative := location
 	if packageRoot != "." {
 		prefix := string(packageRoot) + "/"
@@ -173,14 +173,14 @@ func packageRelativeLocator(
 		if !found || relative == "" {
 			return "", fmt.Errorf(
 				"%w: embedded package file %q is outside package root %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				location,
 				packageRoot,
 			)
 		}
 	}
 
-	value := basespec.Locator(relative)
+	value := model.Locator(relative)
 	if err := value.ValidatePortable(false); err != nil {
 		return "", err
 	}
@@ -193,10 +193,10 @@ func readPackageFile(
 	location string,
 	expectedSize int64,
 ) ([]byte, error) {
-	if expectedSize < 0 || expectedSize > basespec.MaxScanBytes {
+	if expectedSize < 0 || expectedSize > model.MaxScanBytes {
 		return nil, fmt.Errorf(
 			"%w: embedded package file %q has invalid size",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			location,
 		)
 	}
@@ -216,7 +216,7 @@ func readPackageFile(
 	if int64(len(content)) != expectedSize {
 		return nil, fmt.Errorf(
 			"%w: embedded package file %q changed while being read",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			location,
 		)
 	}

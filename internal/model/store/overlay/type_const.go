@@ -8,10 +8,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 )
 
 const (
@@ -82,14 +82,14 @@ func (v ProviderOverlay) Validate() error {
 	if v.SchemaVersion != OverlaySchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported Model Provider overlay schema %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			v.SchemaVersion,
 		)
 	}
 	if v.Revision == 0 {
 		return fmt.Errorf(
 			"%w: Model Provider overlay revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if v.DefaultModel != nil {
@@ -124,14 +124,14 @@ func (v ModelOverlay) Validate() error {
 	if v.SchemaVersion != OverlaySchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported Model overlay schema %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			v.SchemaVersion,
 		)
 	}
 	if v.Revision == 0 {
 		return fmt.Errorf(
 			"%w: Model overlay revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

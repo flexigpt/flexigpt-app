@@ -8,8 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 // PrepareTopologyHydrations reconciles all installer desired states before
@@ -20,12 +20,12 @@ func (c *Components) PrepareTopologyHydrations(
 	desiredValues []topology.Hydration,
 ) (map[string]bool, error) {
 	if c == nil || c.metadata == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: topology hydration context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -46,7 +46,7 @@ func (c *Components) PrepareTopologyHydrations(
 		if _, duplicate := seenInstallers[desired.InstallerName]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate topology hydration installer %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				desired.InstallerName,
 			)
 		}
@@ -54,7 +54,7 @@ func (c *Components) PrepareTopologyHydrations(
 		if !c.isProtectedRoot(desired.RootID) {
 			return nil, fmt.Errorf(
 				"%w: topology hydration root %q is not protected",
-				basespec.ErrProtected,
+				model.ErrProtected,
 				desired.RootID,
 			)
 		}
@@ -113,7 +113,7 @@ func (c *Components) GetTopologyHydration(
 	installerName string,
 ) (topology.Hydration, bool, error) {
 	if c == nil || c.metadata == nil {
-		return topology.Hydration{}, false, basespec.ErrClosed
+		return topology.Hydration{}, false, model.ErrClosed
 	}
 	return c.metadata.GetTopologyHydration(ctx, installerName)
 }
@@ -138,12 +138,12 @@ func (c *Components) PutTopologyHydration(
 		c.metadata == nil ||
 		c.Roots == nil ||
 		c.Sources == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: topology hydration context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -158,7 +158,7 @@ func (c *Components) PutTopologyHydration(
 	if !c.isProtectedRoot(value.RootID) {
 		return fmt.Errorf(
 			"%w: topology hydration root %q is not currently protected",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			value.RootID,
 		)
 	}
@@ -199,12 +199,12 @@ func (c *Components) ResetTopologyHydration(
 		c.metadata == nil ||
 		c.Roots == nil ||
 		c.managedSources == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: topology reset context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -233,7 +233,7 @@ func (c *Components) ResetTopologyHydration(
 	if !c.isProtectedRoot(rootID) && !ownedByStoredHydration {
 		return fmt.Errorf(
 			"%w: topology hydration installer %q does not own root %q",
-			basespec.ErrProtected,
+			model.ErrProtected,
 			installerName,
 			rootID,
 		)
@@ -242,7 +242,7 @@ func (c *Components) ResetTopologyHydration(
 	// Remove source-side package data first. If this fails, metadata remains
 	// intact and the next startup can retry safely.
 	rootValue, err := c.Roots.Get(ctx, rootID)
-	if errors.Is(err, basespec.ErrRootNotFound) {
+	if errors.Is(err, model.ErrRootNotFound) {
 		// Preparation runs before EnsureProtectedTopology. Therefore, a
 		// missing protected Root is the normal first-install state. It is
 		// also valid after a clean hydration reset completed and a process

@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type Reader interface {
@@ -29,7 +29,7 @@ type Repository interface {
 	FindByStorageKey(
 		ctx context.Context,
 		rootID root.RootID,
-		storageKey basespec.StorageKey,
+		storageKey model.StorageKey,
 	) (source.Source, error)
 
 	Create(
@@ -69,17 +69,17 @@ type Snapshot interface {
 
 	Stat(
 		ctx context.Context,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (source.Entry, error)
 
 	ReadDir(
 		ctx context.Context,
-		locator basespec.Locator,
+		locator model.Locator,
 	) ([]source.Entry, error)
 
 	Open(
 		ctx context.Context,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (io.ReadCloser, error)
 
 	Confirm(ctx context.Context) error
@@ -104,7 +104,7 @@ type LocalPathResolver interface {
 	ResolveLocalPath(
 		ctx context.Context,
 		value source.Source,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (string, error)
 }
 
@@ -167,7 +167,7 @@ type ManagedSourceBootstrapper interface {
 type ManagedRootRemover interface {
 	RemoveManagedRoot(
 		ctx context.Context,
-		rootStorageKey basespec.StorageKey,
+		rootStorageKey model.StorageKey,
 	) error
 }
 

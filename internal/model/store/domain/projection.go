@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -30,8 +30,8 @@ const (
 // ArtifactNameReference is the Model-domain projection of a declaration
 // logical-name reference.
 type ArtifactNameReference struct {
-	Name  basespec.LogicalName `json:"name"`
-	Scope LookupScope          `json:"scope,omitempty"`
+	Name  model.LogicalName `json:"name"`
+	Scope LookupScope       `json:"scope,omitempty"`
 }
 
 func (r ArtifactNameReference) Clone() ArtifactNameReference {
@@ -264,7 +264,7 @@ type CapabilitiesPatch struct {
 // Conversion to the source declaration contract remains internal.
 type ProviderDocument struct {
 	Type              DocumentType           `json:"type"`
-	Name              basespec.LogicalName   `json:"name"`
+	Name              model.LogicalName      `json:"name"`
 	DisplayName       string                 `json:"displayName,omitempty"`
 	Description       string                 `json:"description,omitempty"`
 	Labels            map[string]string      `json:"labels,omitempty"`
@@ -281,7 +281,7 @@ type ProviderDocument struct {
 // Conversion to the source declaration contract remains internal.
 type ModelDocument struct {
 	Type              DocumentType          `json:"type"`
-	Name              basespec.LogicalName  `json:"name"`
+	Name              model.LogicalName     `json:"name"`
 	DisplayName       string                `json:"displayName,omitempty"`
 	Description       string                `json:"description,omitempty"`
 	Labels            map[string]string     `json:"labels,omitempty"`
@@ -319,7 +319,7 @@ func (v ProviderDocument) ToDeclaration() (
 ) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		v,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return modelproviderv1.ProviderDocument{}, err
@@ -356,7 +356,7 @@ func (v ModelDocument) Validate() error {
 func (v ModelDocument) ToDeclaration() (modelv1.ModelDocument, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		v,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return modelv1.ModelDocument{}, err

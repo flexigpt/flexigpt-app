@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -15,7 +15,7 @@ import (
 // declaration. The root uses an empty SubresourceLocator. Named external
 // members and selectors remain relationships and do not emit Artifacts.
 type NamedEntry struct {
-	SubresourceLocator basespec.SubresourceLocator
+	SubresourceLocator model.SubresourceLocator
 	Entry              Entry
 }
 
@@ -36,7 +36,7 @@ func (e NamedEntry) Validate() error {
 	if e.Entry.Header().Name == "" {
 		return fmt.Errorf(
 			"%w: named declaration entry requires name",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil
@@ -52,7 +52,7 @@ func WalkNamedEntries(root Entry) ([]NamedEntry, error) {
 	if root.Header().Name == "" {
 		return nil, fmt.Errorf(
 			"%w: declaration root requires name",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -61,7 +61,7 @@ func WalkNamedEntries(root Entry) ([]NamedEntry, error) {
 		return nil, err
 	}
 
-	seen := make(map[basespec.SubresourceLocator]struct{}, len(output))
+	seen := make(map[model.SubresourceLocator]struct{}, len(output))
 	result := make([]NamedEntry, len(output))
 	for index, value := range output {
 		if err := value.Validate(); err != nil {
@@ -70,7 +70,7 @@ func WalkNamedEntries(root Entry) ([]NamedEntry, error) {
 		if _, duplicate := seen[value.SubresourceLocator]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: declaration emits duplicate named subresource %q",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 				value.SubresourceLocator,
 			)
 		}
@@ -86,11 +86,11 @@ func walkDeclaration(
 	depth int,
 	output *[]NamedEntry,
 ) error {
-	if depth > basespec.MaxDiscoveryDepth {
+	if depth > model.MaxDiscoveryDepth {
 		return fmt.Errorf(
 			"%w: declaration nesting exceeds depth %d",
-			basespec.ErrInvalid,
-			basespec.MaxDiscoveryDepth,
+			model.ErrInvalid,
+			model.MaxDiscoveryDepth,
 		)
 	}
 	if err := entry.Validate(); err != nil {
@@ -99,7 +99,7 @@ func walkDeclaration(
 	if entry.Header().Name == "" {
 		return fmt.Errorf(
 			"%w: concrete declaration requires name",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -238,7 +238,7 @@ func walkSingleMember(
 	if form == MemberSelector {
 		return fmt.Errorf(
 			"%w: singular member position does not allow selectors",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return walkMember(member, base, depth, output)
@@ -307,7 +307,7 @@ func walkWorkflowNodes(
 		if _, duplicate := seen[id]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate Workflow node ID %q",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 				id,
 			)
 		}
@@ -317,7 +317,7 @@ func walkWorkflowNodes(
 		delete(fields, "join")
 		memberRaw, err := jsonutil.MarshalCanonicalObject(
 			fields,
-			basespec.MaxDefinitionBodyBytes,
+			model.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return err
@@ -333,7 +333,7 @@ func walkWorkflowNodes(
 		if form == MemberSelector {
 			return fmt.Errorf(
 				"%w: Workflow node %q cannot contain a selector",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				id,
 			)
 		}
@@ -404,7 +404,7 @@ func isDirectProgramSlotMemberPath(
 // StableWorkflowNodeSegment uses the node ID when it is portable. Other
 // valid workflow IDs remain deterministic without becoming path traversal.
 func StableWorkflowNodeSegment(value string) string {
-	if basespec.ValidatePortableName("Workflow node ID", value) == nil {
+	if model.ValidatePortableName("Workflow node ID", value) == nil {
 		return value
 	}
 	digest := strings.TrimPrefix(
@@ -421,11 +421,11 @@ func appendPath(current []string, segments ...string) []string {
 
 func subresourceForPath(
 	path []string,
-) (basespec.SubresourceLocator, error) {
+) (model.SubresourceLocator, error) {
 	if len(path) == 0 {
 		return "", nil
 	}
-	value := basespec.SubresourceLocator(strings.Join(path, "/"))
+	value := model.SubresourceLocator(strings.Join(path, "/"))
 	if err := value.Validate(); err != nil {
 		return "", err
 	}

@@ -7,10 +7,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 )
 
 // DefinitionForEntry projects one named canonical declaration Entry into the
@@ -70,12 +70,12 @@ func definitionForEntry(
 	if !found {
 		return definition.Definition{}, fmt.Errorf(
 			"%w: unsupported canonical declaration type %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			header.Type,
 		)
 	}
 
-	var logicalVersion basespec.LogicalVersion
+	var logicalVersion model.LogicalVersion
 	if header.Type == declaration.TypeText {
 		text, err := textv1.DecodeTextEntry(entry)
 		if err != nil {
@@ -84,7 +84,7 @@ func definitionForEntry(
 		// Artifact Store's generic identity includes LogicalVersion. Text uses
 		// that internal slot to index its contract identity tuple
 		// (text, name, insert) without adding a declaration version field.
-		logicalVersion = basespec.LogicalVersion(text.Insert)
+		logicalVersion = model.LogicalVersion(text.Insert)
 	}
 
 	return definitionForDocument(
@@ -98,14 +98,14 @@ func definitionForEntry(
 func definitionForDocument(
 	header declaration.Header,
 	key schema.Key,
-	logicalVersion basespec.LogicalVersion,
+	logicalVersion model.LogicalVersion,
 	body []byte,
 ) (definition.Definition, error) {
 	value := definition.Definition{
 		Kind:           artifact.ArtifactKind(key.Kind),
 		SchemaID:       key.SchemaID,
 		SchemaVersion:  key.SchemaVersion,
-		LogicalName:    basespec.LogicalName(header.Name),
+		LogicalName:    model.LogicalName(header.Name),
 		LogicalVersion: logicalVersion,
 		DisplayName:    header.DisplayName,
 		Description:    header.Description,

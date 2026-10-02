@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 const rootColumns = `
@@ -53,7 +53,7 @@ func (s *Store) getRoot(
 	if errors.Is(err, sql.ErrNoRows) {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q",
-			basespec.ErrRootNotFound,
+			model.ErrRootNotFound,
 			id,
 		)
 	}
@@ -97,7 +97,7 @@ func (s *Store) updateRoot(
 	if expectedRevision == 0 ||
 		value.Revision != expectedRevision+1 ||
 		value.RetiredAt != nil {
-		return fmt.Errorf("%w: invalid root update", basespec.ErrInvalid)
+		return fmt.Errorf("%w: invalid root update", model.ErrInvalid)
 	}
 	result, err := s.db.ExecContext(
 		ctx,
@@ -130,7 +130,7 @@ func (s *Store) retireRoot(
 	}
 	if value.RetiredAt == nil ||
 		value.Revision != expectedRevision+1 {
-		return fmt.Errorf("%w: invalid root retirement", basespec.ErrInvalid)
+		return fmt.Errorf("%w: invalid root retirement", model.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -146,7 +146,7 @@ func (s *Store) retireRoot(
 	if activeChildren {
 		return fmt.Errorf(
 			"%w: Root %q still owns Sources or Artifact records",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			value.ID,
 		)
 	}
@@ -177,7 +177,7 @@ func (s *Store) purgeRoot(
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
-		return fmt.Errorf("%w: expected root revision is required", basespec.ErrInvalid)
+		return fmt.Errorf("%w: expected root revision is required", model.ErrInvalid)
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -193,7 +193,7 @@ func (s *Store) purgeRoot(
 	if activeChildren {
 		return fmt.Errorf(
 			"%w: Root %q still owns Sources or Artifact records",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			id,
 		)
 	}
@@ -226,7 +226,7 @@ func (s *Store) requireActiveRoot(
 		string(id),
 	).Scan(&marker)
 	if errors.Is(err, sql.ErrNoRows) {
-		return fmt.Errorf("%w: root %q", basespec.ErrRootNotFound, id)
+		return fmt.Errorf("%w: root %q", model.ErrRootNotFound, id)
 	}
 	return err
 }
@@ -246,7 +246,7 @@ func getActiveRootTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return root.Root{}, fmt.Errorf(
 			"%w: root %q",
-			basespec.ErrRootNotFound,
+			model.ErrRootNotFound,
 			id,
 		)
 	}
@@ -289,7 +289,7 @@ func scanRoot(row scanner) (root.Root, error) {
 	if row == nil {
 		return root.Root{}, fmt.Errorf(
 			"%w: Root row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := row.Scan(
@@ -306,7 +306,7 @@ func scanRoot(row scanner) (root.Root, error) {
 	}
 	value := root.Root{
 		ID:          root.RootID(id),
-		StorageKey:  basespec.StorageKey(storageKey),
+		StorageKey:  model.StorageKey(storageKey),
 		DisplayName: displayName,
 		Description: description,
 		Revision:    revision,
@@ -329,7 +329,7 @@ func requireOneChanged(
 		return err
 	}
 	if changed != 1 {
-		return fmt.Errorf("%w: %s", basespec.ErrConflict, message)
+		return fmt.Errorf("%w: %s", model.ErrConflict, message)
 	}
 	return nil
 }

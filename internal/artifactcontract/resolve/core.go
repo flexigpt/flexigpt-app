@@ -7,11 +7,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type resolutionState struct {
@@ -143,7 +143,7 @@ func (r *Resolver) ResolveWorkspaceWithCompositionSource(
 	compositionSourceID source.SourceID,
 ) (*ResolvedEntry, error) {
 	if r == nil || r.artifacts == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (r *Resolver) ResolveWorkspaceEntry(
 	if value.Workspace == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace resolver produced no Workspace projection",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return value, nil
@@ -188,7 +188,7 @@ func (r *Resolver) ResolveTerminalArtifact(
 	ref artifact.ArtifactRef,
 ) (artifact.ArtifactRef, error) {
 	if r == nil || r.artifacts == nil {
-		return artifact.ArtifactRef{}, basespec.ErrClosed
+		return artifact.ArtifactRef{}, model.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return artifact.ArtifactRef{}, err
@@ -205,7 +205,7 @@ func (r *Resolver) resolveTyped(
 	expected declaration.Type,
 ) (*ResolvedEntry, error) {
 	if r == nil || r.artifacts == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return nil, err
@@ -223,7 +223,7 @@ func (r *Resolver) resolveArtifact(
 	state *resolutionState,
 	ref artifact.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion basespec.LogicalVersion,
+	expectedVersion model.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if err := r.reserve(state, depth); err != nil {
@@ -244,7 +244,7 @@ func (r *Resolver) resolveArtifact(
 	if _, active := state.active[ref]; active {
 		return nil, fmt.Errorf(
 			"%w: declaration composition cycle at Artifact %q",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
@@ -284,7 +284,7 @@ func (r *Resolver) resolveArtifact(
 				mapped.Name != loaded.record.LogicalName {
 				return nil, fmt.Errorf(
 					"%w: mapped target does not match Artifact identity",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 			return &ResolvedEntry{
@@ -319,7 +319,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion basespec.LogicalVersion,
+	expectedVersion model.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
 	record, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
@@ -328,13 +328,13 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if record.Ref() != ref {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: ArtifactReader returned another Artifact",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if record.State != artifact.StateAvailable {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not available",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -343,7 +343,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if err := declarationType.Validate(); err != nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has unsupported declaration type: %w",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 			err,
 		)
@@ -351,7 +351,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if expectedType != "" && declarationType != expectedType {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has type %q, expected %q",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 			declarationType,
 			expectedType,
@@ -360,7 +360,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if expectedVersion != "" && record.LogicalVersion != expectedVersion {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has Text insertion identity %q, expected %q",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 			record.LogicalVersion,
 			expectedVersion,
@@ -370,7 +370,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if record.ResolvedDefinition == nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q has no current Definition",
-			basespec.ErrDefinitionNotFound,
+			model.ErrDefinitionNotFound,
 			record.ID,
 		)
 	}
@@ -388,7 +388,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		definitions[0].Digest != *record.ResolvedDefinition {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition changed during resolution",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 	definitionValue := definitions[0]
@@ -401,7 +401,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		definitionValue.LogicalVersion != record.LogicalVersion {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition identity differs from Artifact state",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 		)
 	}
 
@@ -409,7 +409,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 	if err != nil {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition body is not a canonical declaration: %w",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			err,
 		)
 	}
@@ -418,7 +418,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		header.Name != string(definitionValue.LogicalName) {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition declaration identity differs from Artifact state",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 		)
 	}
 	if declarationType == declaration.TypeText {
@@ -426,10 +426,10 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 		if err != nil {
 			return loadedDeclarationArtifact{}, err
 		}
-		if record.LogicalVersion != basespec.LogicalVersion(text.Insert) {
+		if record.LogicalVersion != model.LogicalVersion(text.Insert) {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: Text Artifact identity does not match insert target",
-				basespec.ErrDigestMismatch,
+				model.ErrDigestMismatch,
 			)
 		}
 	}
@@ -446,7 +446,7 @@ func (r *Resolver) resolveTerminalArtifact(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion basespec.LogicalVersion,
+	expectedVersion model.LogicalVersion,
 ) (artifact.ArtifactRef, error) {
 	loaded, err := r.resolveTerminalDeclaration(ctx, ref, expectedType, expectedVersion)
 	if err != nil {
@@ -459,24 +459,24 @@ func (r *Resolver) resolveTerminalDeclaration(
 	ctx context.Context,
 	ref artifact.ArtifactRef,
 	expectedType declaration.Type,
-	expectedVersion basespec.LogicalVersion,
+	expectedVersion model.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
 	current := ref
-	expectedName := basespec.LogicalName("")
+	expectedName := model.LogicalName("")
 	seen := make(map[artifact.ArtifactRef]struct{})
 
 	for depth := 0; depth <= r.limits.MaxDepth; depth++ {
 		if _, duplicate := seen[current]; duplicate {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration alias cycle at Artifact %q",
-				basespec.ErrReferenceUnresolved,
+				model.ErrReferenceUnresolved,
 				current.ArtifactID,
 			)
 		}
 		if len(seen) >= r.limits.MaxNodes {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration alias limit exceeded",
-				basespec.ErrLocatorLimitExceeded,
+				model.ErrLocatorLimitExceeded,
 			)
 		}
 		seen[current] = struct{}{}
@@ -494,7 +494,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 			loaded.record.LogicalName != expectedName {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration resolved to another name",
-				basespec.ErrReferenceUnresolved,
+				model.ErrReferenceUnresolved,
 			)
 		}
 
@@ -508,7 +508,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 		if r.locators == nil {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: source-selected declaration requires a locator resolver",
-				basespec.ErrLocatorUnresolved,
+				model.ErrLocatorUnresolved,
 			)
 		}
 
@@ -521,7 +521,7 @@ func (r *Resolver) resolveTerminalDeclaration(
 				Entry:               loaded.entry.Clone(),
 				Locator:             header.Locator.Clone(),
 				ExpectedType:        header.Type,
-				ExpectedLogicalName: basespec.LogicalName(header.Name),
+				ExpectedLogicalName: model.LogicalName(header.Name),
 			},
 		)
 		if err != nil {
@@ -533,17 +533,17 @@ func (r *Resolver) resolveTerminalDeclaration(
 		if next.RootID != loaded.record.RootID {
 			return loadedDeclarationArtifact{}, fmt.Errorf(
 				"%w: locator resolver returned an Artifact from another Root",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		expectedType = header.Type
-		expectedName = basespec.LogicalName(header.Name)
+		expectedName = model.LogicalName(header.Name)
 		current = next
 	}
 
 	return loadedDeclarationArtifact{}, fmt.Errorf(
 		"%w: source-selected declaration alias depth exceeded",
-		basespec.ErrLocatorLimitExceeded,
+		model.ErrLocatorLimitExceeded,
 	)
 }
 
@@ -574,7 +574,7 @@ func (r *Resolver) reserve(
 	if depth > r.limits.MaxDepth {
 		return fmt.Errorf(
 			"%w: Artifact resolution exceeds depth %d",
-			basespec.ErrLocatorLimitExceeded,
+			model.ErrLocatorLimitExceeded,
 			r.limits.MaxDepth,
 		)
 	}
@@ -582,7 +582,7 @@ func (r *Resolver) reserve(
 	if state.nodes > r.limits.MaxNodes {
 		return fmt.Errorf(
 			"%w: Artifact resolution exceeds %d nodes",
-			basespec.ErrLocatorLimitExceeded,
+			model.ErrLocatorLimitExceeded,
 			r.limits.MaxNodes,
 		)
 	}
@@ -597,7 +597,7 @@ func validateDefinitionContract(
 	if !found {
 		return fmt.Errorf(
 			"%w: no schema is registered for Artifact type %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			declarationType,
 		)
 	}
@@ -605,7 +605,7 @@ func validateDefinitionContract(
 		value.SchemaVersion != key.SchemaVersion {
 		return fmt.Errorf(
 			"%w: Artifact Definition schema does not match Artifact type %q",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 			declarationType,
 		)
 	}

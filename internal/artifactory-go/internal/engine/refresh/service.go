@@ -10,13 +10,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/discovery"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -51,7 +51,7 @@ func NewService(
 		timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: Source refresh service dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -71,12 +71,12 @@ func (s *Service) RefreshRoot(
 	rootID root.RootID,
 ) (refresh.RefreshRootResult, error) {
 	if s == nil {
-		return refresh.RefreshRootResult{}, basespec.ErrClosed
+		return refresh.RefreshRootResult{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return refresh.RefreshRootResult{}, fmt.Errorf(
 			"%w: Root refresh context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -135,12 +135,12 @@ func (s *Service) RefreshSource(
 	sourceID source.SourceID,
 ) (refresh.RefreshSourceResult, error) {
 	if s == nil {
-		return refresh.RefreshSourceResult{}, basespec.ErrClosed
+		return refresh.RefreshSourceResult{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return refresh.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source refresh context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -167,14 +167,14 @@ func (s *Service) RefreshSource(
 	if !value.Enabled {
 		return refresh.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source %q is disabled",
-			basespec.ErrConflict,
+			model.ErrConflict,
 			sourceID,
 		)
 	}
 	if value.Discovery.Empty() {
 		return refresh.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source %q has no declaration discovery configuration",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 			sourceID,
 		)
 	}
@@ -188,7 +188,7 @@ func (s *Service) RefreshSource(
 	switch {
 	case stateErr == nil:
 		expectedRefreshRevision = previous.Revision
-	case errors.Is(stateErr, basespec.ErrRefreshStateNotFound):
+	case errors.Is(stateErr, model.ErrRefreshStateNotFound):
 	default:
 		return refresh.RefreshSourceResult{}, stateErr
 	}
@@ -279,7 +279,7 @@ func (s *Service) RefreshSource(
 	if err := published.Validate(); err != nil {
 		return refresh.RefreshSourceResult{}, fmt.Errorf(
 			"%w: refresh publisher returned invalid state: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -331,12 +331,12 @@ func (s *Service) InspectSource(
 	sourceID source.SourceID,
 ) (source.RefreshInspection, error) {
 	if s == nil {
-		return source.RefreshInspection{}, basespec.ErrClosed
+		return source.RefreshInspection{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return source.RefreshInspection{}, fmt.Errorf(
 			"%w: Source refresh inspection context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -375,10 +375,10 @@ func (s *Service) InspectSourceMetadata(
 	value source.Source,
 ) (source.RefreshInspection, error) {
 	if s == nil {
-		return source.RefreshInspection{}, basespec.ErrClosed
+		return source.RefreshInspection{}, model.ErrClosed
 	}
 	if ctx == nil {
-		return source.RefreshInspection{}, basespec.ErrInvalid
+		return source.RefreshInspection{}, model.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
 		return source.RefreshInspection{}, err
@@ -436,7 +436,7 @@ func definitionsFromObservations(
 		if observation.Definition == nil {
 			return nil, fmt.Errorf(
 				"%w: valid Source observation has no Definition",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if _, duplicate := seen[observation.Definition.Digest]; duplicate {

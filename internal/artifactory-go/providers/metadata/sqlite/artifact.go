@@ -9,11 +9,11 @@ import (
 	"time"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -38,7 +38,7 @@ func (s *Store) getArtifact(
 	if errors.Is(err, sql.ErrNoRows) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q in Root %q",
-			basespec.ErrArtifactNotFound,
+			model.ErrArtifactNotFound,
 			ref.ArtifactID,
 			ref.RootID,
 		)
@@ -108,7 +108,7 @@ func (s *Store) findArtifactsByIdentity(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	logicalName basespec.LogicalName,
+	logicalName model.LogicalName,
 ) ([]artifact.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (s *Store) findArtifactByOrigin(
 	if errors.Is(err, sql.ErrNoRows) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact origin %q/%q/%q",
-			basespec.ErrArtifactNotFound,
+			model.ErrArtifactNotFound,
 			binding.SourceID,
 			binding.Locator,
 			binding.SubresourceLocator,
@@ -199,7 +199,7 @@ func (s *Store) createArtifact(
 	if value.Revision != 1 {
 		return fmt.Errorf(
 			"%w: initial Artifact revision must be one",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -236,7 +236,7 @@ func (s *Store) updateArtifactLocal(
 		value.Revision != expectedRevision+1 {
 		return fmt.Errorf(
 			"%w: invalid Artifact local update",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -253,25 +253,25 @@ func (s *Store) updateArtifactLocal(
 		return artifactNotFound(err, value.Ref())
 	}
 	if current.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if current.RootID != value.RootID ||
 		current.ID != value.ID {
 		return fmt.Errorf(
 			"%w: Artifact local update changed Artifact identity",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if !value.ModifiedAt.After(current.ModifiedAt) {
 		return fmt.Errorf(
 			"%w: Artifact update time must advance current state",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if !sameArtifactSourceFields(current, value) {
 		return fmt.Errorf(
 			"%w: local Artifact update attempted to change source-owned fields",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -345,25 +345,25 @@ func updateArtifactSourceStateTx(
 		})
 	}
 	if current.Revision != update.ExpectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if current.Binding != update.Binding {
 		return fmt.Errorf(
 			"%w: source-derived Artifact update changed binding",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if current.RootID != update.RootID ||
 		current.Binding.SourceID != update.Binding.SourceID {
 		return fmt.Errorf(
 			"%w: source-derived Artifact update changed Source identity",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if !update.ModifiedAt.After(current.ModifiedAt) {
 		return fmt.Errorf(
 			"%w: source-derived Artifact update time must advance",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -434,7 +434,7 @@ func (s *Store) purgeArtifact(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -574,7 +574,7 @@ func scanArtifact(
 	if row == nil {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := row.Scan(
@@ -608,12 +608,12 @@ func scanArtifact(
 		RootID: root.RootID(rootID),
 		Binding: artifact.SourceBinding{
 			SourceID:           source.SourceID(sourceID),
-			Locator:            basespec.Locator(locator),
-			SubresourceLocator: basespec.SubresourceLocator(subresource),
+			Locator:            model.Locator(locator),
+			SubresourceLocator: model.SubresourceLocator(subresource),
 		},
 		Kind:                artifact.ArtifactKind(kind),
-		LogicalName:         basespec.LogicalName(logicalName),
-		LogicalVersion:      basespec.LogicalVersion(logicalVersion),
+		LogicalName:         model.LogicalName(logicalName),
+		LogicalVersion:      model.LogicalVersion(logicalVersion),
 		ResolvedDefinition:  parseDigest(resolvedDefinition),
 		SourceContentDigest: parseDigest(sourceContent),
 		State:               artifact.State(state),
@@ -667,7 +667,7 @@ func artifactNotFound(
 	}
 	return fmt.Errorf(
 		"%w: Artifact %q in Root %q",
-		basespec.ErrArtifactNotFound,
+		model.ErrArtifactNotFound,
 		ref.ArtifactID,
 		ref.RootID,
 	)

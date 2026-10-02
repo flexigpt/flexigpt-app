@@ -4,10 +4,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -16,12 +16,12 @@ const (
 		agentv1.AgentType,
 	)
 
-	ManagedAgentPackageKind           source.PackageKind   = "agent"
-	BuiltinAgentCollectionPackageKind source.PackageKind   = "agent-collection"
-	AgentManagedSourceStorageKey      basespec.StorageKey  = "user-agents"
-	AgentManagedCollectionPackageKind source.PackageKind   = "plugin"
-	AgentBaselineCollectionName       basespec.LogicalName = "agent-baseline"
-	AgentSchemaID                     schema.SchemaID      = agentv1.AgentSchemaID
+	ManagedAgentPackageKind           source.PackageKind = "agent"
+	BuiltinAgentCollectionPackageKind source.PackageKind = "agent-collection"
+	AgentManagedSourceStorageKey      model.StorageKey   = "user-agents"
+	AgentManagedCollectionPackageKind source.PackageKind = "plugin"
+	AgentBaselineCollectionName       model.LogicalName  = "agent-baseline"
+	AgentSchemaID                     schema.SchemaID    = agentv1.AgentSchemaID
 
 	AgentSchemaVersion            = agentv1.AgentSchemaVersion
 	AgentManagedSourceDisplayName = "User-managed Agents"

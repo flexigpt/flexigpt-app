@@ -6,7 +6,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -61,12 +61,12 @@ func (p *ManagedProfilePolicy) Validate(
 	raw []byte,
 ) ([]byte, error) {
 	if p == nil || p.compiled == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBytes,
+		model.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -74,7 +74,7 @@ func (p *ManagedProfilePolicy) Validate(
 	if err := jsonutil.ValidateJSONSchema(
 		p.compiled,
 		json.RawMessage(canonical),
-		basespec.MaxDefinitionBytes,
+		model.MaxDefinitionBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func NewManagedProfileRegistry(
 	if len(descriptors) == 0 {
 		return nil, fmt.Errorf(
 			"%w: managed profile registry has no descriptors",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -114,7 +114,7 @@ func NewManagedProfileRegistry(
 		if _, duplicate := output.byType[policy.declarationType]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: declaration type %q has multiple managed profile policies",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				policy.declarationType,
 			)
 		}
@@ -129,7 +129,7 @@ func (r *ManagedProfileRegistry) ManagedProfilePolicyFor(
 	declarationType Type,
 ) (*ManagedProfilePolicy, error) {
 	if r == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := declarationType.Validate(); err != nil {
 		return nil, err
@@ -139,7 +139,7 @@ func (r *ManagedProfileRegistry) ManagedProfilePolicyFor(
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: no managed profile policy for declaration type %q",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			declarationType,
 		)
 	}
@@ -150,10 +150,10 @@ func (r *ManagedProfileRegistry) ManagedProfilePolicyFor(
 func compileManagedProfilePolicy(
 	descriptor ManagedProfilePolicyDescriptor,
 ) (*ManagedProfilePolicy, error) {
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"managed profile policy ID",
 		descriptor.ID,
-		basespec.MaxKindBytes,
+		model.MaxKindBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -191,7 +191,7 @@ func compileManagedProfilePolicy(
 				json.RawMessage(restrictions),
 			},
 		},
-		basespec.MaxDefinitionBytes,
+		model.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -220,14 +220,14 @@ func canonicalManagedProfileSchema(
 	if len(raw) == 0 {
 		return nil, fmt.Errorf(
 			"%w: %s is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			label,
 		)
 	}
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBytes,
+		model.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("%s: %w", label, err)
@@ -254,7 +254,7 @@ func validateManagedProfileBaseSchemaType(
 	if !found {
 		return fmt.Errorf(
 			"%w: managed profile base schema has no type rule",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -267,7 +267,7 @@ func validateManagedProfileBaseSchemaType(
 	if value.Const != string(expected) {
 		return fmt.Errorf(
 			"%w: managed profile base schema type is %q, expected %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value.Const,
 			expected,
 		)

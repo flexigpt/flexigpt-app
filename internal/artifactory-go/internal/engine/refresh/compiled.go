@@ -5,9 +5,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func (s *Service) RegisterCompiledDocuments(
@@ -17,7 +17,7 @@ func (s *Service) RegisterCompiledDocuments(
 	packages []topology.CompiledPackage,
 ) error {
 	if s == nil || s.discovery == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err

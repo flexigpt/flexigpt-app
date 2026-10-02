@@ -7,10 +7,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -19,7 +19,7 @@ func (c *Components) RegisterCompiledPackages(
 	values []topology.CompiledRegistration,
 ) error {
 	if c == nil || c.Refresh == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
@@ -29,7 +29,7 @@ func (c *Components) RegisterCompiledPackages(
 		if !c.isProtectedRoot(value.Set.Hydration.RootID) {
 			return fmt.Errorf(
 				"%w: compiled built-in registration targets an unprotected Root",
-				basespec.ErrProtected,
+				model.ErrProtected,
 			)
 		}
 
@@ -59,7 +59,7 @@ func (c *Components) HydrateCompiledPackages(
 		c.Refresh == nil ||
 		c.Artifacts == nil ||
 		c.managedSources == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return err
@@ -110,7 +110,7 @@ func (c *Components) HydrateCompiledPackages(
 			batches[key] = batch
 		}
 
-		byScope := make(map[basespec.Locator]topology.CompiledPackage)
+		byScope := make(map[model.Locator]topology.CompiledPackage)
 		for _, packageValue := range set.Packages {
 			scope, err := packageValue.Address.Directory()
 			if err != nil {
@@ -124,7 +124,7 @@ func (c *Components) HydrateCompiledPackages(
 			if !found {
 				return fmt.Errorf(
 					"%w: compiled hydration selected unknown package scope %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					scope,
 				)
 			}
@@ -187,7 +187,7 @@ func (c *Components) HydrateCompiledPackages(
 			!sourceValue.Enabled {
 			return fmt.Errorf(
 				"%w: compiled hydration requires an enabled managed Source",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -283,7 +283,7 @@ func (c *Components) verifyCompiledPackage(
 				*record.SourceContentDigest != document.Digest {
 				return fmt.Errorf(
 					"%w: compiled package Artifact does not match generated catalog",
-					basespec.ErrDigestMismatch,
+					model.ErrDigestMismatch,
 				)
 			}
 		}
@@ -296,12 +296,12 @@ func readCompiledPackageFiles(
 	value topology.CompiledPackage,
 ) ([]source.ManagedPackageFile, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf("%w: compiled package context is nil", basespec.ErrInvalid)
+		return nil, fmt.Errorf("%w: compiled package context is nil", model.ErrInvalid)
 	}
-	if len(value.Files) == 0 || len(value.Files) > basespec.MaxDiscoveryEntries {
+	if len(value.Files) == 0 || len(value.Files) > model.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: compiled package has an invalid file count",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -315,17 +315,17 @@ func readCompiledPackageFiles(
 			return nil, err
 		}
 
-		if file.Size < 0 || file.Size > basespec.MaxScanBytes-total {
+		if file.Size < 0 || file.Size > model.MaxScanBytes-total {
 			return nil, fmt.Errorf(
 				"%w: compiled package exceeds the byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		actual := cryptoutil.DigestBytes(file.Content)
 		if int64(len(file.Content)) != file.Size || actual != file.Digest {
 			return nil, fmt.Errorf(
 				"%w: compiled package %q file %q: size %d/%d, digest %q/%q",
-				basespec.ErrDigestMismatch,
+				model.ErrDigestMismatch,
 				value.Address,
 				file.Locator,
 				len(file.Content),

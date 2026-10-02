@@ -7,13 +7,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 type CatalogInstaller struct {
 	registration topology.CompiledRegistration
 	hydrator     topology.CompiledHydrationCoordinator
-	scopes       []basespec.Locator
+	scopes       []model.Locator
 }
 
 func NewCatalogInstallerForSet(
@@ -24,11 +24,11 @@ func NewCatalogInstallerForSet(
 	if hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: generated catalog installer dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
-	scopes := make([]basespec.Locator, 0, len(set.Packages))
+	scopes := make([]model.Locator, 0, len(set.Packages))
 	for _, packageValue := range set.Packages {
 		scope, err := packageValue.Address.Directory()
 		if err != nil {
@@ -58,18 +58,18 @@ func (i *CatalogInstaller) BuiltInName() string {
 	return i.registration.Set.Hydration.InstallerName
 }
 
-func (i *CatalogInstaller) BuiltInPackageScopes() []basespec.Locator {
+func (i *CatalogInstaller) BuiltInPackageScopes() []model.Locator {
 	if i == nil {
 		return nil
 	}
-	return append([]basespec.Locator(nil), i.scopes...)
+	return append([]model.Locator(nil), i.scopes...)
 }
 
 func (i *CatalogInstaller) DesiredHydration(
 	ctx context.Context,
 ) (topology.Hydration, error) {
 	if i == nil {
-		return topology.Hydration{}, basespec.ErrClosed
+		return topology.Hydration{}, model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return topology.Hydration{}, err
@@ -81,7 +81,7 @@ func (i *CatalogInstaller) DesiredPackageHydrations(
 	ctx context.Context,
 ) ([]topology.PackageHydration, error) {
 	if i == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return nil, err
@@ -115,7 +115,7 @@ func (i *CatalogInstaller) CompiledRegistration(
 	ctx context.Context,
 ) (topology.CompiledRegistration, error) {
 	if i == nil {
-		return topology.CompiledRegistration{}, basespec.ErrClosed
+		return topology.CompiledRegistration{}, model.ErrClosed
 	}
 	if err := installerapi.RequirePrivileged(ctx); err != nil {
 		return topology.CompiledRegistration{}, err
@@ -132,7 +132,7 @@ func (i *CatalogInstaller) Ensure(
 	ctx context.Context,
 ) error {
 	if i == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	registration, err := i.CompiledRegistration(ctx)
 	if err != nil {
@@ -173,7 +173,7 @@ func (i *CatalogInstaller) EnsurePackageHydration(
 	stale []topology.PackageHydration,
 ) error {
 	if i == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	registration, err := i.CompiledRegistration(ctx)
 	if err != nil {

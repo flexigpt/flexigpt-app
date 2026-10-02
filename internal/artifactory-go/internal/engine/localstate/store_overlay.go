@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -63,7 +63,7 @@ func (s *Service) DeleteStoreOverlay(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected store overlay revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return s.repository.DeleteStoreOverlay(
@@ -82,7 +82,7 @@ func (s *Service) requireStoreNamespace(
 	if _, found := s.storeNamespaces[namespace]; !found {
 		return fmt.Errorf(
 			"%w: store overlay namespace %q is not registered",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			namespace,
 		)
 	}

@@ -7,8 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func (a *Adapter) ApplyPackageBatch(
@@ -57,7 +57,7 @@ func (a *Adapter) ApplyPackageBatch(
 		if _, duplicate := published[publication.Address]; duplicate {
 			return fmt.Errorf(
 				"%w: repeated package publication %q/%q/%q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				publication.Address.Kind,
 				publication.Address.Name,
 				publication.Address.Version,
@@ -87,7 +87,7 @@ func (a *Adapter) ApplyPackageBatch(
 
 		temporary, err := os.MkdirTemp(
 			stagingRoot,
-			basespec.ManagedPackageTemporaryPrefix,
+			model.ManagedPackageTemporaryPrefix,
 		)
 		if err != nil {
 			return err
@@ -153,7 +153,7 @@ func (a *Adapter) ApplyPackageBatch(
 		if !info.IsDir() {
 			return fmt.Errorf(
 				"%w: managed package target is not a directory",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if err := os.RemoveAll(target); err != nil {
@@ -188,7 +188,7 @@ func writeStagedPackageFiles(
 		)
 		if err := os.MkdirAll(
 			filepath.Dir(location),
-			basespec.ArtifactStoreDirectoryMode,
+			model.ArtifactStoreDirectoryMode,
 		); err != nil {
 			return err
 		}
@@ -212,12 +212,12 @@ func replaceStagedPackage(
 		if !info.IsDir() {
 			return fmt.Errorf(
 				"%w: managed package target is not a directory",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		previous, err = os.MkdirTemp(
 			stagingRoot,
-			basespec.ManagedPackagePreviousPrefix,
+			model.ManagedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return err

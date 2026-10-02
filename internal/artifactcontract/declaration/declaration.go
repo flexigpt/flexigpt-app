@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -43,7 +43,7 @@ func (i InsertTarget) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Text insertion target %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			i,
 		)
 	}
@@ -86,7 +86,7 @@ func (t Type) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Artifact declaration type %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			t,
 		)
 	}
@@ -128,7 +128,7 @@ func (h Header) Validate(
 		h.Type != options.ExpectedType {
 		return fmt.Errorf(
 			"%w: declaration type is %q, expected %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			h.Type,
 			options.ExpectedType,
 		)
@@ -137,32 +137,32 @@ func (h Header) Validate(
 		if options.RequireName || options.ExpectedType != "" {
 			return fmt.Errorf(
 				"%w: artifact declaration name is required",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 	} else {
-		if err := basespec.ValidatePortableName(
+		if err := model.ValidatePortableName(
 			"artifact declaration name",
 			h.Name,
 		); err != nil {
 			return err
 		}
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"artifact declaration display name",
 		h.DisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"artifact declaration description",
 		h.Description,
-		basespec.MaxDescriptionBytes,
+		model.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateLabels("headers", h.Labels); err != nil {
+	if err := model.ValidateLabels("headers", h.Labels); err != nil {
 		return fmt.Errorf("artifact declaration labels: %w", err)
 	}
 	if h.Locator != nil {
@@ -170,18 +170,18 @@ func (h Header) Validate(
 			return fmt.Errorf("artifact declaration locator: %w", err)
 		}
 	}
-	if len(h.Metadata) > basespec.MaxLabels {
+	if len(h.Metadata) > model.MaxLabels {
 		return fmt.Errorf(
 			"%w: artifact declaration metadata exceeds %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxLabels,
+			model.ErrInvalid,
+			model.MaxLabels,
 		)
 	}
 	for key, value := range h.Metadata {
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"artifact declaration metadata key",
 			key,
-			basespec.MaxSchemaIDBytes,
+			model.MaxSchemaIDBytes,
 		); err != nil {
 			return err
 		}

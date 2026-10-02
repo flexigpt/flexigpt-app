@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 type InstallerDependencies struct {
@@ -22,7 +22,7 @@ func NewInstaller(
 	if dependencies.Hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool generated catalog installer dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

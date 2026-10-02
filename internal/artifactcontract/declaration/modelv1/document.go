@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -136,16 +136,16 @@ func (v ModelDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: model declarations do not support locator",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := v.Provider.Validate(); err != nil {
 		return fmt.Errorf("model provider reference: %w", err)
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Model providerModelID",
 		v.ProviderModelID,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -180,7 +180,7 @@ func ValidateDefaultsPatch(raw json.RawMessage) error {
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("model defaults patch: %w", err)
@@ -213,7 +213,7 @@ func validatePatchObject(
 	}
 	_, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -236,7 +236,7 @@ func validateNoSecretObject(
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		basespec.MaxDefinitionBodyBytes,
+		model.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -259,7 +259,7 @@ func rejectSecretValues(
 			if modelSecretKey(key) && child != nil {
 				return fmt.Errorf(
 					"%w: %s contains forbidden credential field %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					label,
 					key,
 				)

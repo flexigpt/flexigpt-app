@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 type CollectionCapabilityOccurrence = resolve.CapabilityOccurrence
@@ -25,7 +25,7 @@ func (a *API) ResolveCapabilities(
 	if a == nil || a.resolver == nil {
 		return CollectionCapabilityPlan{}, fmt.Errorf(
 			"%w: Collection resolver is unavailable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -36,14 +36,14 @@ func (a *API) ResolveCapabilities(
 	if generic.RootType != declaration.TypePlugin {
 		return CollectionCapabilityPlan{}, fmt.Errorf(
 			"%w: Artifact %q is not a Plugin",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
 	if generic.RootArtifact == nil {
 		return CollectionCapabilityPlan{}, fmt.Errorf(
 			"%w: Collection has no source-backed Artifact",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	view, err := a.Read(ctx, *generic.RootArtifact)

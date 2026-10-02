@@ -3,11 +3,11 @@ package discovery
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -24,13 +24,13 @@ type Observation struct {
 	RootID  root.RootID            `json:"rootID"`
 	Binding artifact.SourceBinding `json:"binding"`
 
-	Kind           artifact.ArtifactKind   `json:"kind,omitempty"`
-	LogicalName    basespec.LogicalName    `json:"logicalName,omitempty"`
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	Definition     *definition.Definition  `json:"-"`
+	Kind           artifact.ArtifactKind  `json:"kind,omitempty"`
+	LogicalName    model.LogicalName      `json:"logicalName,omitempty"`
+	LogicalVersion model.LogicalVersion   `json:"logicalVersion,omitempty"`
+	Definition     *definition.Definition `json:"-"`
 
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
-	DecoderID           basespec.DecoderID      `json:"decoderID,omitempty"`
+	DecoderID           model.DecoderID         `json:"decoderID,omitempty"`
 	State               ObservationState        `json:"state"`
 	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
@@ -74,7 +74,7 @@ func (o Observation) Validate() error {
 			o.DecoderID == "" {
 			return fmt.Errorf(
 				"%w: valid Source observation requires Definition, source digest, and decoder",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		// Definition admission belongs to the decoder/generated boundary and
@@ -87,7 +87,7 @@ func (o Observation) Validate() error {
 			o.Definition.LogicalVersion != o.LogicalVersion {
 			return fmt.Errorf(
 				"%w: valid Source observation Definition does not match observation identity",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -98,14 +98,14 @@ func (o Observation) Validate() error {
 			o.Definition != nil {
 			return fmt.Errorf(
 				"%w: invalid Source observation cannot retain declaration identity",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
 	default:
 		return fmt.Errorf(
 			"%w: invalid Source observation state %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			o.State,
 		)
 	}

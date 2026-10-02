@@ -7,7 +7,7 @@ import (
 	"slices"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 //go:embed skills
@@ -79,7 +79,7 @@ func EmbeddedPackages(packageSet string) (fs.FS, error) {
 	default:
 		return nil, fmt.Errorf(
 			"%w: embedded package set %q is not compiled into the application",
-			basespec.ErrNotFound,
+			model.ErrNotFound,
 			packageSet,
 		)
 	}
@@ -94,11 +94,11 @@ func EmbeddedPackages(packageSet string) (fs.FS, error) {
 // embedded package filesystem.
 func DirectPackageRoots(
 	packages fs.FS,
-) ([]basespec.Locator, error) {
+) ([]model.Locator, error) {
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package filesystem is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -109,20 +109,20 @@ func DirectPackageRoots(
 	if len(entries) == 0 {
 		return nil, fmt.Errorf(
 			"%w: embedded package filesystem has no packages",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
-	output := make([]basespec.Locator, 0, len(entries))
+	output := make([]model.Locator, 0, len(entries))
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			return nil, fmt.Errorf(
 				"%w: embedded package root contains non-directory %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Name(),
 			)
 		}
-		root := basespec.Locator(entry.Name())
+		root := model.Locator(entry.Name())
 		if err := root.ValidatePortable(false); err != nil {
 			return nil, err
 		}
@@ -134,7 +134,7 @@ func DirectPackageRoots(
 
 func embeddedSubtree(
 	embedded fs.FS,
-	root basespec.Locator,
+	root model.Locator,
 ) (fs.FS, error) {
 	if embedded == nil || !fs.ValidPath(string(root)) {
 		return nil, fmt.Errorf(

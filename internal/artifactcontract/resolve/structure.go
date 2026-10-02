@@ -14,9 +14,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 func (r *Resolver) resolveStructure(
@@ -30,13 +30,13 @@ func (r *Resolver) resolveStructure(
 	if !found {
 		return fmt.Errorf(
 			"%w: resolved declaration has no Root scope",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if node.Artifact == nil {
 		return fmt.Errorf(
 			"%w: mapped fallback target cannot declare child relationships",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	from := node.Artifact
@@ -337,7 +337,7 @@ func (r *Resolver) resolveStructure(
 	default:
 		return fmt.Errorf(
 			"%w: unsupported declaration type %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			node.Type,
 		)
 	}
@@ -346,7 +346,7 @@ func (r *Resolver) resolveStructure(
 func decodeStoredStructure[T any](entry declaration.Entry) (T, error) {
 	var value T
 	if err := entry.DecodeInto(&value); err != nil {
-		return value, fmt.Errorf("%w: decode stored declaration: %w", basespec.ErrInvalid, err)
+		return value, fmt.Errorf("%w: decode stored declaration: %w", model.ErrInvalid, err)
 	}
 	return value, nil
 }
@@ -367,7 +367,7 @@ func (r *Resolver) resolveSingleMember(
 	if form == declaration.MemberSelector {
 		return ResolvedRelationship{}, fmt.Errorf(
 			"%w: singular relationship does not allow member selectors",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return r.resolveMember(

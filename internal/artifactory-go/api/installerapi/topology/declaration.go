@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // Declaration is application-supplied protected topology metadata.
@@ -42,24 +42,24 @@ func (d Declaration) Validate() error {
 	if err := d.Root.StorageKey.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"protected Root display name",
 		d.Root.DisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"protected Root description",
 		d.Root.Description,
-		basespec.MaxDescriptionBytes,
+		model.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
 	if len(d.Sources) == 0 {
 		return fmt.Errorf(
 			"%w: protected topology requires at least one Source declaration",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -74,10 +74,10 @@ func (d Declaration) Validate() error {
 		if err := draft.Kind.Validate(); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"protected Source display name",
 			draft.DisplayName,
-			basespec.MaxDisplayNameBytes,
+			model.MaxDisplayNameBytes,
 		); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)
 		}
@@ -91,7 +91,7 @@ func (d Declaration) Validate() error {
 		if _, duplicate := seen[draft.ID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate protected Source %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				draft.ID,
 			)
 		}

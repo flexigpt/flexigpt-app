@@ -7,9 +7,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
 )
 
 // Tool is internal decoded Store material. Consumer and Wails APIs expose
@@ -27,14 +27,14 @@ func DecodeTool(
 	if record.Kind != ToolArtifactKind {
 		return Tool{}, fmt.Errorf(
 			"%w: Artifact %q is not a Tool",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if record.State != artifact.StateAvailable {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool Artifact %q is unavailable",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -46,7 +46,7 @@ func DecodeTool(
 		value.SchemaVersion != toolv1.ToolSchemaKey.SchemaVersion {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool Artifact %q has an unsupported schema",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			record.ID,
 		)
 	}
@@ -54,7 +54,7 @@ func DecodeTool(
 		*record.ResolvedDefinition != value.Digest {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool definition changed during read",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 
@@ -62,10 +62,10 @@ func DecodeTool(
 	if err != nil {
 		return Tool{}, err
 	}
-	if record.LogicalName != basespec.LogicalName(document.Name) {
+	if record.LogicalName != model.LogicalName(document.Name) {
 		return Tool{}, fmt.Errorf(
 			"%w: tool identity differs from its declaration",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 		)
 	}
 
@@ -81,14 +81,14 @@ func DecodeTool(
 // the collection package.
 func ValidateToolCollectionDocument(
 	document pluginv1.PluginDocument,
-) ([]basespec.LogicalName, error) {
+) ([]model.LogicalName, error) {
 	if err := document.Validate(); err != nil {
 		return nil, err
 	}
 	if document.Locator != nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Collections cannot be located aliases",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -100,8 +100,8 @@ func ValidateToolCollectionDocument(
 		return nil, err
 	}
 
-	seen := make(map[basespec.LogicalName]struct{}, len(ordered))
-	names := make([]basespec.LogicalName, 0, len(ordered))
+	seen := make(map[model.LogicalName]struct{}, len(ordered))
+	names := make([]model.LogicalName, 0, len(ordered))
 	for index, member := range ordered {
 		form, err := member.MemberForm()
 		if err != nil {
@@ -117,7 +117,7 @@ func ValidateToolCollectionDocument(
 			header.Locator != nil {
 			return nil, fmt.Errorf(
 				"%w: Tool Collections require named built-in Tool references",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 			)
 		}
 
@@ -130,19 +130,19 @@ func ValidateToolCollectionDocument(
 			len(relationship.Use) != 0 {
 			return nil, fmt.Errorf(
 				"%w: Tool Collection member %q has unsupported relationship behavior",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 				header.Name,
 			)
 		}
 
-		name := basespec.LogicalName(header.Name)
+		name := model.LogicalName(header.Name)
 		if err := name.Validate(); err != nil {
 			return nil, err
 		}
 		if _, duplicate := seen[name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Tool Collection repeats Tool %q",
-				basespec.ErrIdentityConflict,
+				model.ErrIdentityConflict,
 				name,
 			)
 		}

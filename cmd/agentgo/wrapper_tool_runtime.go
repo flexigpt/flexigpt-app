@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
@@ -68,7 +68,7 @@ func withToolRuntime[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.service == nil {
-			return zero, basespec.ErrClosed
+			return zero, model.ErrClosed
 		}
 		return fn(w.service)
 	})

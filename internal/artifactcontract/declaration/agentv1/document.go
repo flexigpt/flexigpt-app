@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -170,7 +170,7 @@ func (v AgentDocument) validateFields() error {
 	if v.Loop != nil && v.Workflow != nil {
 		return fmt.Errorf(
 			"%w: Agent cannot contain both loop and workflow",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if v.Loop != nil {
@@ -203,7 +203,7 @@ func validateProgramMember(
 		value.Header().Type != expected {
 		return fmt.Errorf(
 			"%w: %s must be one named or contained %q member",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			label,
 			expected,
 		)
@@ -225,7 +225,7 @@ func validateMemberRelationship(member declaration.Entry) error {
 		if len(relationship.Use) != 0 {
 			return fmt.Errorf(
 				"%w: Agent Model member cannot contain use",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return validateBooleanOverride(
@@ -237,7 +237,7 @@ func validateMemberRelationship(member declaration.Entry) error {
 		if len(relationship.Use) != 0 {
 			return fmt.Errorf(
 				"%w: Agent Tool member cannot contain use",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return validateBooleanOverride(
@@ -249,7 +249,7 @@ func validateMemberRelationship(member declaration.Entry) error {
 		if len(relationship.Overrides) != 0 {
 			return fmt.Errorf(
 				"%w: agent skill member cannot contain overrides",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if len(relationship.Use) == 0 {
@@ -258,14 +258,14 @@ func validateMemberRelationship(member declaration.Entry) error {
 		if len(relationship.Use) != 1 {
 			return fmt.Errorf(
 				"%w: agent skill use supports only mode",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		raw, found := relationship.Use["mode"]
 		if !found {
 			return fmt.Errorf(
 				"%w: agent skill use requires mode",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		var mode string
@@ -278,7 +278,7 @@ func validateMemberRelationship(member declaration.Entry) error {
 		default:
 			return fmt.Errorf(
 				"%w: unsupported agent skill use mode %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				mode,
 			)
 		}
@@ -288,7 +288,7 @@ func validateMemberRelationship(member declaration.Entry) error {
 			len(relationship.Use) != 0 {
 			return fmt.Errorf(
 				"%w: Agent %q member does not support overrides or use",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				member.Header().Type,
 			)
 		}
@@ -304,7 +304,7 @@ func validateBooleanOverride(
 		if name != allowed {
 			return fmt.Errorf(
 				"%w: unsupported Agent member override %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				name,
 			)
 		}

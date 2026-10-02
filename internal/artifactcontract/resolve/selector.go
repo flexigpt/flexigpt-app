@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 func (r *Resolver) expandSelector(
@@ -24,19 +24,19 @@ func (r *Resolver) expandSelector(
 	if from == nil {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector requires a source-backed declaration origin",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 		)
 	}
 	if r.sourceArtifacts == nil {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector source enumeration is unavailable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if r.sourceEntries == nil {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector Source entry inspection is unavailable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -53,7 +53,7 @@ func (r *Resolver) expandSelector(
 	if !found || !typeResolver.SupportsSelectors() {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: Artifact type %q does not support member selectors",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			selector.Type,
 		)
 	}
@@ -78,14 +78,14 @@ func (r *Resolver) expandSelector(
 	if err := baseEntry.Validate(); err != nil {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector base inspection: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
 	if baseEntry.Locator != base {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector base inspection returned %q for %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			baseEntry.Locator,
 			base,
 		)
@@ -93,19 +93,19 @@ func (r *Resolver) expandSelector(
 	if !baseEntry.IsDirectory {
 		return ResolvedSelector{}, fmt.Errorf(
 			"%w: member selector base %q is not a directory",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			base,
 		)
 	}
 
-	sourceSelection, err := basespec.NewPathSelection(
+	sourceSelection, err := model.NewPathSelection(
 		selector.Include,
 		selector.Exclude,
 	)
 	if err != nil {
 		return ResolvedSelector{}, err
 	}
-	nameSelection, err := basespec.NewPathSelection(
+	nameSelection, err := model.NewPathSelection(
 		selector.NameInclude,
 		selector.NameExclude,
 	)
@@ -208,8 +208,8 @@ func (r *Resolver) expandSelector(
 }
 
 func selectorRelativePath(
-	base basespec.Locator,
-	candidate basespec.Locator,
+	base model.Locator,
+	candidate model.Locator,
 ) (string, bool) {
 	if base == "." {
 		return string(candidate), true

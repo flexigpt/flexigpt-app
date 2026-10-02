@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -171,22 +171,22 @@ func (v MCPPolicyDocument) validatePolicy() error {
 	default:
 		return fmt.Errorf(
 			"%w: invalid MCP policy trustLevel %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			v.TrustLevel,
 		)
 	}
-	if len(v.ToolPolicies) > basespec.MaxDefinitionDependencies {
+	if len(v.ToolPolicies) > model.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: MCP policy toolPolicies exceed %d entries",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionDependencies,
+			model.ErrInvalid,
+			model.MaxDefinitionDependencies,
 		)
 	}
 	for name, policy := range v.ToolPolicies {
-		if err := basespec.ValidateRequiredText(
+		if err := model.ValidateRequiredText(
 			"MCP policy tool name",
 			name,
-			basespec.MaxLogicalNameBytes,
+			model.MaxLogicalNameBytes,
 		); err != nil {
 			return err
 		}
@@ -244,7 +244,7 @@ func validateApprovalRule(
 	default:
 		return fmt.Errorf(
 			"%w: %s %q is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			label,
 			value,
 		)
@@ -261,7 +261,7 @@ func validateExecutionMode(
 	default:
 		return fmt.Errorf(
 			"%w: %s %q is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			label,
 			value,
 		)

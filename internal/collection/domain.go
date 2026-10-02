@@ -12,26 +12,26 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
 
 const (
-	SkillManagedSourceStorageKey basespec.StorageKey = "user-skills"
-	MCPManagedSourceStorageKey   basespec.StorageKey = "user-mcps"
+	SkillManagedSourceStorageKey model.StorageKey = "user-skills"
+	MCPManagedSourceStorageKey   model.StorageKey = "user-mcps"
 
-	SkillBaselineCollectionName basespec.LogicalName = "skill-baseline"
-	MCPBaselineCollectionName   basespec.LogicalName = "mcp-baseline"
+	SkillBaselineCollectionName model.LogicalName = "skill-baseline"
+	MCPBaselineCollectionName   model.LogicalName = "mcp-baseline"
 )
 
 type DomainPolicy struct {
 	Name                string
-	SourceStorageKey    basespec.StorageKey
+	SourceStorageKey    model.StorageKey
 	SourceDisplayName   string
-	BaselineName        basespec.LogicalName
+	BaselineName        model.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
 	PackageKind         source.PackageKind
@@ -79,10 +79,10 @@ func MCPDomainPolicy() DomainPolicy {
 }
 
 func (p DomainPolicy) Validate() error {
-	if err := basespec.ValidateIdentifier(
+	if err := model.ValidateIdentifier(
 		"Collection domain name",
 		p.Name,
-		basespec.MaxKindBytes,
+		model.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (p DomainPolicy) Validate() error {
 	if path.Base(string(documentFile)) != string(documentFile) {
 		return fmt.Errorf(
 			"%w: Collection domain document file must be a package-root file",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	switch strings.ToLower(path.Ext(string(documentFile))) {
@@ -112,14 +112,14 @@ func (p DomainPolicy) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: Collection domain document file %q has an unsupported extension",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			documentFile,
 		)
 	}
 	if len(p.AllowedMemberTypes) == 0 {
 		return fmt.Errorf(
 			"%w: Collection domain %q has no allowed member types",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			p.Name,
 		)
 	}
@@ -131,7 +131,7 @@ func (p DomainPolicy) Validate() error {
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Collection domain %q repeats member type %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				p.Name,
 				value,
 			)
@@ -150,7 +150,7 @@ func (p DomainPolicy) Validate() error {
 		default:
 			return fmt.Errorf(
 				"%w: Collection domain %q has unsupported member form %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				p.Name,
 				form,
 			)
@@ -158,7 +158,7 @@ func (p DomainPolicy) Validate() error {
 		if _, duplicate := seenForms[form]; duplicate {
 			return fmt.Errorf(
 				"%w: Collection domain %q repeats member form %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				p.Name,
 				form,
 			)
@@ -209,7 +209,7 @@ func (a *API) EnsureBaseline(
 	if a == nil || a.domain == nil {
 		return CollectionView{}, fmt.Errorf(
 			"%w: Collection baseline is not configured",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
@@ -258,7 +258,7 @@ func (a *API) EnsureBaseline(
 		},
 		artifact.ArtifactKind(pluginv1.PluginType),
 	)
-	if err != nil && !errors.Is(err, basespec.ErrArtifactNotFound) && !errors.Is(err, basespec.ErrNotFound) {
+	if err != nil && !errors.Is(err, model.ErrArtifactNotFound) && !errors.Is(err, model.ErrNotFound) {
 		return CollectionView{}, err
 	} else if existing.State == artifact.StateAvailable {
 		return a.Read(ctx, existing.Ref())
@@ -293,8 +293,8 @@ func (a *API) EnsureBaseline(
 		}
 		return a.Read(ctx, record.Ref())
 
-	case errors.Is(err, basespec.ErrArtifactNotFound),
-		errors.Is(err, basespec.ErrNotFound):
+	case errors.Is(err, model.ErrArtifactNotFound),
+		errors.Is(err, model.ErrNotFound):
 	default:
 		return CollectionView{}, err
 	}
@@ -318,7 +318,7 @@ func (a *API) domainManagedSource(
 	sourceID source.SourceID,
 ) (source.Summary, error) {
 	if a == nil || a.domain == nil {
-		return source.Summary{}, basespec.ErrClosed
+		return source.Summary{}, model.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return source.Summary{}, err
@@ -332,13 +332,13 @@ func (a *API) domainManagedSource(
 			value.StorageKey != a.domain.SourceStorageKey {
 			return source.Summary{}, fmt.Errorf(
 				"%w: Collection belongs to another managed domain Source",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 			)
 		}
 		if !value.Enabled {
 			return source.Summary{}, fmt.Errorf(
 				"%w: Collection domain Source is disabled",
-				basespec.ErrConflict,
+				model.ErrConflict,
 			)
 		}
 		return value, nil
@@ -384,7 +384,7 @@ func (a *API) validateDomainMember(
 	if !a.domain.allows(member.Type) {
 		return fmt.Errorf(
 			"%w: %s Collection cannot contain %q members",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			a.domain.Name,
 			member.Type,
 		)
@@ -392,7 +392,7 @@ func (a *API) validateDomainMember(
 	if !a.domain.allowsMemberForm(declaration.MemberNamed) {
 		return fmt.Errorf(
 			"%w: %s Collection does not support named external members",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			a.domain.Name,
 		)
 	}
@@ -412,7 +412,7 @@ func (a *API) validateDomainEntry(
 	if !a.domain.allows(member.Header().Type) {
 		return fmt.Errorf(
 			"%w: %s Collection cannot contain %q members",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			a.domain.Name,
 			member.Header().Type,
 		)
@@ -420,7 +420,7 @@ func (a *API) validateDomainEntry(
 	if !a.domain.allowsMemberForm(form) {
 		return fmt.Errorf(
 			"%w: %s Collection cannot contain %q members",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			a.domain.Name,
 			form,
 		)
@@ -439,7 +439,7 @@ func (a *API) validateEditableDomainDocument(
 		if form != declaration.MemberNamed {
 			return fmt.Errorf(
 				"%w: editable Plugin cannot contain contained or selector members",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 			)
 		}
 		if err := a.validateDomainEntry(member); err != nil {
@@ -503,7 +503,7 @@ func (a *API) readCollectionDocument(
 		record.State != artifact.StateAvailable {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Artifact %q is not an available Plugin",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -512,7 +512,7 @@ func (a *API) readCollectionDocument(
 		!a.readOnlyDomainOrigin(record) {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Collection does not belong to this read-only domain",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
@@ -524,7 +524,7 @@ func (a *API) readCollectionDocument(
 		*record.ResolvedDefinition != definitionValue.Digest {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Collection definition changed during read",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 	document, err := pluginv1.DecodePluginJSON(definitionValue.Body)
@@ -535,7 +535,7 @@ func (a *API) readCollectionDocument(
 	if document.Name != string(record.LogicalName) {
 		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return record, document, nil
@@ -584,7 +584,7 @@ func (a *API) Read(
 	ref artifact.ArtifactRef,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, basespec.ErrClosed
+		return CollectionView{}, model.ErrClosed
 	}
 	ref, err := a.resolveCollectionRef(ctx, ref)
 	if err != nil {
@@ -601,7 +601,7 @@ func (a *API) Read(
 	if !visible {
 		return CollectionView{}, fmt.Errorf(
 			"%w: Collection is not visible in this domain",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if a.domain != nil && a.domain.ValidateDocument != nil {
@@ -672,7 +672,7 @@ func readCollectionViewOf(
 	}
 	view := CollectionView{
 		Artifact:    record.Clone(),
-		Name:        basespec.LogicalName(document.Name),
+		Name:        model.LogicalName(document.Name),
 		DisplayName: displayName,
 		Description: document.Description,
 		Editable:    editable,
@@ -693,7 +693,7 @@ func readCollectionViewOf(
 		header := entry.Header()
 		member := CollectionMemberView{
 			Type:      header.Type,
-			Name:      basespec.LogicalName(header.Name),
+			Name:      model.LogicalName(header.Name),
 			Contained: form == declaration.MemberContained,
 			Selector:  form == declaration.MemberSelector,
 		}

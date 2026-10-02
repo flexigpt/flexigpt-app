@@ -10,11 +10,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -30,7 +30,7 @@ const (
 
 type Result struct {
 	Observations []Observation
-	SeenLocators []basespec.Locator
+	SeenLocators []model.Locator
 	Diagnostics  []diagnostic.Diagnostic
 	Candidates   int
 }
@@ -45,7 +45,7 @@ func (r Result) Clone() Result {
 		output.Observations[index] = value.Clone()
 	}
 	output.SeenLocators = append(
-		[]basespec.Locator(nil),
+		[]model.Locator(nil),
 		r.SeenLocators...,
 	)
 	output.Diagnostics = diagnostic.Clone(r.Diagnostics)
@@ -56,14 +56,14 @@ func (r Result) Validate() error {
 	if r.Candidates < 0 {
 		return fmt.Errorf(
 			"%w: discovery candidate count cannot be negative",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := diagnostic.Validate(r.Diagnostics); err != nil {
 		return err
 	}
 
-	seenLocators := make(map[basespec.Locator]struct{})
+	seenLocators := make(map[model.Locator]struct{})
 	for _, locator := range r.SeenLocators {
 		if err := locator.Validate(false); err != nil {
 			return err
@@ -71,7 +71,7 @@ func (r Result) Validate() error {
 		if _, duplicate := seenLocators[locator]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate discovered Source locator %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				locator,
 			)
 		}
@@ -94,7 +94,7 @@ func (r Result) Validate() error {
 			if _, duplicate := seenTyped[key]; duplicate {
 				return fmt.Errorf(
 					"%w: duplicate typed Source observation",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 			seenTyped[key] = struct{}{}
@@ -103,7 +103,7 @@ func (r Result) Validate() error {
 			if _, duplicate := seenInvalid[observation.Binding]; duplicate {
 				return fmt.Errorf(
 					"%w: duplicate invalid Source observation",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 			seenInvalid[observation.Binding] = struct{}{}
@@ -123,7 +123,7 @@ func NewEngine(
 	if decoders == nil {
 		return nil, fmt.Errorf(
 			"%w: discovery engine dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Engine{
@@ -136,7 +136,7 @@ func (e *Engine) DecoderFingerprint() (
 	error,
 ) {
 	if e == nil || e.decoders == nil {
-		return "", basespec.ErrClosed
+		return "", model.ErrClosed
 	}
 	return e.decoders.Fingerprint()
 }
@@ -147,12 +147,12 @@ func (e *Engine) Discover(
 	snapshot sourceimpl.Snapshot,
 ) (Result, error) {
 	if e == nil || e.decoders == nil {
-		return Result{}, basespec.ErrClosed
+		return Result{}, model.ErrClosed
 	}
 	if ctx == nil {
 		return Result{}, fmt.Errorf(
 			"%w: discovery context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -164,16 +164,16 @@ func (e *Engine) Discover(
 	if !value.Enabled {
 		return Result{}, fmt.Errorf(
 			"%w: disabled Source cannot be refreshed",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	if snapshot == nil {
 		return Result{}, fmt.Errorf(
 			"%w: Source snapshot is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateSourceGeneration(
+	if err := model.ValidateSourceGeneration(
 		snapshot.Generation(),
 	); err != nil {
 		return Result{}, err
@@ -183,7 +183,7 @@ func (e *Engine) Discover(
 	if spec.Empty() {
 		return Result{}, fmt.Errorf(
 			"%w: Source has no declaration discovery configuration",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 	if err := spec.Validate(); err != nil {
@@ -204,7 +204,7 @@ func (e *Engine) Discover(
 		Diagnostics:  make([]diagnostic.Diagnostic, 0),
 	}
 	foundCandidates := make(
-		map[basespec.Locator]struct{},
+		map[model.Locator]struct{},
 		len(entries),
 	)
 	for _, entry := range entries {
@@ -224,7 +224,7 @@ func (e *Engine) Discover(
 		}
 	}
 
-	seenLocators := make(map[basespec.Locator]struct{}, len(entries))
+	seenLocators := make(map[model.Locator]struct{}, len(entries))
 	validOrigins := make(map[typedOrigin]Observation)
 	invalidBindings := make(map[artifact.SourceBinding]struct{})
 	var consumed int64
@@ -265,7 +265,7 @@ func (e *Engine) Discover(
 		if entry.SizeBytes > spec.MaxTotalBytes-consumed {
 			return Result{}, fmt.Errorf(
 				"%w: discovery exceeds total byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -282,7 +282,7 @@ func (e *Engine) Discover(
 		if consumed > spec.MaxTotalBytes {
 			return Result{}, fmt.Errorf(
 				"%w: discovery exceeds total byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -424,7 +424,7 @@ func (e *Engine) Discover(
 		); err != nil {
 			return Result{}, fmt.Errorf(
 				"%w: decoder %q returned invalid diagnostics: %w",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				decoder.ID(),
 				err,
 			)
@@ -450,7 +450,7 @@ func (e *Engine) Discover(
 			if err := item.SubresourceLocator.Validate(); err != nil {
 				return Result{}, fmt.Errorf(
 					"%w: decoder %q emitted invalid subresource: %w",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					decoder.ID(),
 					err,
 				)
@@ -472,7 +472,7 @@ func (e *Engine) Discover(
 			); err != nil {
 				return Result{}, fmt.Errorf(
 					"%w: decoder %q returned invalid decoded diagnostics: %w",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					decoder.ID(),
 					err,
 				)
@@ -642,7 +642,7 @@ func (e *Engine) Discover(
 		}
 	}
 
-	result.SeenLocators = make([]basespec.Locator, 0, len(seenLocators))
+	result.SeenLocators = make([]model.Locator, 0, len(seenLocators))
 	for locator := range seenLocators {
 		result.SeenLocators = append(result.SeenLocators, locator)
 	}
@@ -686,7 +686,7 @@ func removeObservationsForBinding(
 
 func decodedBinding(
 	sourceID source.SourceID,
-	candidateLocator basespec.Locator,
+	candidateLocator model.Locator,
 	candidateDigest cryptoutil.Digest,
 	item providerapi.Decoded,
 ) (artifact.SourceBinding, *cryptoutil.Digest, error) {
@@ -694,7 +694,7 @@ func decodedBinding(
 		(item.OriginContentDigest == nil) {
 		return artifact.SourceBinding{}, nil, fmt.Errorf(
 			"%w: declaration origin locator and digest must be supplied together",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -703,7 +703,7 @@ func decodedBinding(
 		if err := item.OriginLocator.Validate(false); err != nil {
 			return artifact.SourceBinding{}, nil, fmt.Errorf(
 				"%w: decoder emitted invalid declaration origin: %w",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				err,
 			)
 		}
@@ -756,7 +756,7 @@ type snapshotEntryReader struct {
 
 func (r snapshotEntryReader) ReadSourceEntry(
 	ctx context.Context,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (providerapi.SourceContent, error) {
 	entry, err := statEntry(ctx, r.snapshot, locator)
 	if err != nil {
@@ -781,9 +781,9 @@ func (r snapshotEntryReader) ReadSourceEntry(
 func appendInvalid(
 	r *Result,
 	value source.Source,
-	locator basespec.Locator,
+	locator model.Locator,
 	sourceDigest *cryptoutil.Digest,
-	decoderID basespec.DecoderID,
+	decoderID model.DecoderID,
 	diagnostics []diagnostic.Diagnostic,
 ) {
 	appendInvalidBinding(
@@ -804,7 +804,7 @@ func appendInvalidBinding(
 	value source.Source,
 	binding artifact.SourceBinding,
 	sourceDigest *cryptoutil.Digest,
-	decoderID basespec.DecoderID,
+	decoderID model.DecoderID,
 	diagnostics []diagnostic.Diagnostic,
 ) {
 	r.Observations = append(r.Observations, Observation{
@@ -819,16 +819,16 @@ func appendInvalidBinding(
 
 func (e *Engine) allowedDecoders(
 	spec source.DiscoverySpec,
-) (map[basespec.DecoderID]struct{}, error) {
+) (map[model.DecoderID]struct{}, error) {
 	allowed := make(
-		map[basespec.DecoderID]struct{},
+		map[model.DecoderID]struct{},
 		len(spec.AllowedDecoderIDs),
 	)
 	for _, decoderID := range spec.AllowedDecoderIDs {
 		if _, found := e.decoders.find(decoderID); !found {
 			return nil, fmt.Errorf(
 				"%w: decoder %q",
-				basespec.ErrDecoderUnavailable,
+				model.ErrDecoderUnavailable,
 				decoderID,
 			)
 		}
@@ -839,7 +839,7 @@ func (e *Engine) allowedDecoders(
 			if _, found := e.decoders.find(decoderID); !found {
 				return nil, fmt.Errorf(
 					"%w: decoder %q",
-					basespec.ErrDecoderUnavailable,
+					model.ErrDecoderUnavailable,
 					decoderID,
 				)
 			}
@@ -847,7 +847,7 @@ func (e *Engine) allowedDecoders(
 				if _, permitted := allowed[decoderID]; !permitted {
 					return nil, fmt.Errorf(
 						"%w: hinted decoder %q is not allowed by Source discovery",
-						basespec.ErrInvalid,
+						model.ErrInvalid,
 						decoderID,
 					)
 				}
@@ -860,11 +860,11 @@ func (e *Engine) allowedDecoders(
 func (e *Engine) selectDecoder(
 	ctx context.Context,
 	candidate providerapi.Candidate,
-	allowed map[basespec.DecoderID]struct{},
+	allowed map[model.DecoderID]struct{},
 ) (providerapi.Decoder, []diagnostic.Diagnostic) {
 	var selected providerapi.Decoder
 	best := providerapi.RecognitionNone
-	tied := make([]basespec.DecoderID, 0)
+	tied := make([]model.DecoderID, 0)
 
 	for _, decoder := range e.decoders.registered() {
 		if len(allowed) != 0 {
@@ -894,7 +894,7 @@ func (e *Engine) selectDecoder(
 		if recognition > best {
 			best = recognition
 			selected = decoder
-			tied = []basespec.DecoderID{decoder.ID()}
+			tied = []model.DecoderID{decoder.ID()}
 			continue
 		}
 		if recognition == best &&
@@ -926,8 +926,8 @@ func collectCandidates(
 	snapshot sourceimpl.Snapshot,
 	spec source.DiscoverySpec,
 ) ([]source.Entry, error) {
-	found := make(map[basespec.Locator]source.Entry)
-	visited := make(map[basespec.Locator]struct{})
+	found := make(map[model.Locator]source.Entry)
+	visited := make(map[model.Locator]struct{})
 
 	add := func(entry source.Entry) error {
 		if err := entry.Validate(); err != nil {
@@ -940,7 +940,7 @@ func collectCandidates(
 			len(found) >= spec.MaxCandidates {
 			return fmt.Errorf(
 				"%w: discovery exceeds %d candidates",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				spec.MaxCandidates,
 			)
 		}
@@ -950,7 +950,7 @@ func collectCandidates(
 
 	for _, locator := range spec.ExplicitLocators {
 		entry, err := statEntry(ctx, snapshot, locator)
-		if errors.Is(err, basespec.ErrNotFound) {
+		if errors.Is(err, model.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -963,7 +963,7 @@ func collectCandidates(
 
 	for _, root := range spec.DirectoryRoots {
 		rootEntry, err := statEntry(ctx, snapshot, root.Root)
-		if errors.Is(err, basespec.ErrNotFound) {
+		if errors.Is(err, model.ErrNotFound) {
 			continue
 		}
 		if err != nil {
@@ -972,11 +972,11 @@ func collectCandidates(
 		if !rootEntry.IsDirectory {
 			return nil, fmt.Errorf(
 				"%w: discovery root %q is not a directory",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				root.Root,
 			)
 		}
-		selection, err := basespec.NewPathSelection(
+		selection, err := model.NewPathSelection(
 			root.IncludePatterns,
 			root.ExcludePatterns,
 		)
@@ -984,8 +984,8 @@ func collectCandidates(
 			return nil, err
 		}
 
-		var visit func(basespec.Locator, int) error
-		visit = func(directory basespec.Locator, depth int) error {
+		var visit func(model.Locator, int) error
+		visit = func(directory model.Locator, depth int) error {
 			entries, err := readDirectoryEntries(
 				ctx,
 				snapshot,
@@ -1003,7 +1003,7 @@ func collectCandidates(
 					if len(visited) > spec.MaxEntries {
 						return fmt.Errorf(
 							"%w: discovery exceeds %d entries",
-							basespec.ErrInvalid,
+							model.ErrInvalid,
 							spec.MaxEntries,
 						)
 					}
@@ -1012,7 +1012,7 @@ func collectCandidates(
 				if nextDepth > spec.MaxDepth {
 					return fmt.Errorf(
 						"%w: discovery exceeds depth %d at %q",
-						basespec.ErrInvalid,
+						model.ErrInvalid,
 						spec.MaxDepth,
 						entry.Locator,
 					)
@@ -1071,7 +1071,7 @@ func collectCandidates(
 func statEntry(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.Entry, error) {
 	entry, err := snapshot.Stat(ctx, locator)
 	if err != nil {
@@ -1083,7 +1083,7 @@ func statEntry(
 	if entry.Locator != locator {
 		return source.Entry{}, fmt.Errorf(
 			"%w: Source snapshot stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -1094,13 +1094,13 @@ func statEntry(
 func readDirectoryEntries(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
-	directory basespec.Locator,
+	directory model.Locator,
 ) ([]source.Entry, error) {
 	values, err := snapshot.ReadDir(ctx, directory)
 	if err != nil {
 		return nil, err
 	}
-	seen := make(map[basespec.Locator]struct{}, len(values))
+	seen := make(map[model.Locator]struct{}, len(values))
 	output := make([]source.Entry, 0, len(values))
 	for _, entry := range values {
 		if err := entry.Validate(); err != nil {
@@ -1109,7 +1109,7 @@ func readDirectoryEntries(
 		if !isDirectChild(directory, entry.Locator) {
 			return nil, fmt.Errorf(
 				"%w: Source snapshot returned non-child %q for directory %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Locator,
 				directory,
 			)
@@ -1117,7 +1117,7 @@ func readDirectoryEntries(
 		if _, duplicate := seen[entry.Locator]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: Source snapshot returned duplicate entry %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				entry.Locator,
 			)
 		}
@@ -1131,8 +1131,8 @@ func readDirectoryEntries(
 }
 
 func isDirectChild(
-	parent basespec.Locator,
-	child basespec.Locator,
+	parent model.Locator,
+	child model.Locator,
 ) bool {
 	if child == "." {
 		return false
@@ -1156,14 +1156,14 @@ func cloneCandidate(
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
 	output.RequestedDecoderIDs = append(
-		[]basespec.DecoderID(nil),
+		[]model.DecoderID(nil),
 		value.RequestedDecoderIDs...,
 	)
 	return output
 }
 
 func validateCandidateDiagnostics(
-	locator basespec.Locator,
+	locator model.Locator,
 	values []diagnostic.Diagnostic,
 ) error {
 	if err := diagnostic.Validate(values); err != nil {
@@ -1193,8 +1193,8 @@ func validateCandidateDiagnostics(
 }
 
 func validateDecodedDiagnostics(
-	locator basespec.Locator,
-	subresource basespec.SubresourceLocator,
+	locator model.Locator,
+	subresource model.SubresourceLocator,
 	values []diagnostic.Diagnostic,
 ) error {
 	if err := diagnostic.Validate(values); err != nil {

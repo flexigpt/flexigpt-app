@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // ArtifactReader is the Root-scoped read boundary for normal resolver work.
@@ -23,7 +23,7 @@ type ArtifactReader interface {
 		ctx context.Context,
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
-		logicalName basespec.LogicalName,
+		logicalName model.LogicalName,
 		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 
@@ -56,7 +56,7 @@ type SourceEntryInspector interface {
 		ctx context.Context,
 		rootID root.RootID,
 		sourceID source.SourceID,
-		locator basespec.Locator,
+		locator model.Locator,
 	) (source.Entry, error)
 }
 

@@ -9,8 +9,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
@@ -57,13 +57,13 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 	if err := snapshot.Confirm(t.Context()); err != nil {
 		t.Fatalf("Confirm: %v", err)
 	}
-	if _, err := snapshot.Stat(t.Context(), "missing.txt"); !errors.Is(err, basespec.ErrNotFound) {
+	if _, err := snapshot.Stat(t.Context(), "missing.txt"); !errors.Is(err, model.ErrNotFound) {
 		t.Fatalf("missing Stat error=%v", err)
 	}
 	if err := snapshot.Close(); err != nil {
 		t.Fatalf("Close: %v", err)
 	}
-	if _, err := snapshot.Open(t.Context(), "one.txt"); !errors.Is(err, basespec.ErrClosed) {
+	if _, err := snapshot.Open(t.Context(), "one.txt"); !errors.Is(err, model.ErrClosed) {
 		t.Fatalf("Open after Close error=%v", err)
 	}
 }
@@ -71,7 +71,7 @@ func TestEmbeddedAdapterNormalizesAndReadsImmutableProvider(t *testing.T) {
 func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 	t.Parallel()
 
-	if _, err := New(map[string]fs.FS{"missing": nil}); !errors.Is(err, basespec.ErrInvalid) {
+	if _, err := New(map[string]fs.FS{"missing": nil}); !errors.Is(err, model.ErrInvalid) {
 		t.Fatalf("nil provider error=%v, want ErrInvalid", err)
 	}
 	adapter, err := New(nil)
@@ -83,7 +83,7 @@ func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 		[]byte(`{"providerKey":"missing"}`),
 	); !errors.Is(
 		err,
-		basespec.ErrSourceUnavailable,
+		model.ErrSourceUnavailable,
 	) {
 		t.Fatalf("unavailable config error=%v", err)
 	}

@@ -12,12 +12,12 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
@@ -180,7 +180,7 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	}
 	for _, entry := range policyEntries {
 		if entry.Binding.Locator !=
-			basespec.Locator(defaultpolicy.PolicyLocator) ||
+			model.Locator(defaultpolicy.PolicyLocator) ||
 			entry.Binding.SubresourceLocator != "" ||
 			entry.Kind != workspaceDomain.WorkspaceArtifactKind ||
 			string(entry.LogicalName) != defaultpolicy.PolicyID {
@@ -242,7 +242,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	if record.Ref() != ref {
 		return WorkspaceArtifactView{}, fmt.Errorf(
 			"%w: Artifact lookup returned another occurrence",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -339,7 +339,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
 	}
 	if expectedRevision != 0 &&
 		values.Directory.Revision != expectedRevision {
-		return WorkspaceDirectoryView{}, basespec.ErrConflict
+		return WorkspaceDirectoryView{}, model.ErrConflict
 	}
 
 	update := func(current source.Summary) error {
@@ -390,13 +390,13 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 	if !values.HasDirectory && !values.HasPolicy {
 		return fmt.Errorf(
 			"%w: Workspace directory is not registered",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	if expectedRevision != 0 &&
 		values.HasDirectory &&
 		values.Directory.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	ownedSources := make(map[source.SourceID]struct{}, 2)
@@ -438,7 +438,7 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 		if record.State != artifact.StateMissing {
 			return fmt.Errorf(
 				"%w: retired Workspace Source still has a non-missing Artifact",
-				basespec.ErrConflict,
+				model.ErrConflict,
 			)
 		}
 		if err := a.artifacts.Purge(ctx, record.Ref(), record.Revision); err != nil {
@@ -625,7 +625,7 @@ func (a *StoreAPI) listManifestIntent(
 	ctx context.Context,
 	rootID root.RootID,
 	directoryID source.SourceID,
-) ([]basespec.Locator, error) {
+) ([]model.Locator, error) {
 	entries, err := a.resources.ReadSourceTree(
 		ctx,
 		rootID,
@@ -633,13 +633,13 @@ func (a *StoreAPI) listManifestIntent(
 		".",
 		documentTopology.WorkspaceManifestPatterns(),
 		nil,
-		basespec.DefaultMaxEntries,
-		basespec.MaxScanBytes,
+		model.DefaultMaxEntries,
+		model.MaxScanBytes,
 	)
 	if err != nil {
 		return nil, err
 	}
-	output := make([]basespec.Locator, 0, len(entries))
+	output := make([]model.Locator, 0, len(entries))
 	for _, entry := range entries {
 		output = append(output, entry.Locator)
 	}
@@ -734,7 +734,7 @@ func (a *StoreAPI) effectiveWorkspaces(
 			if cryptoutil.DigestBytes(workspace.Definition.Body) != a.policy.Digest {
 				return nil, nil, fmt.Errorf(
 					"%w: default Workspace Definition differs from the loaded policy",
-					basespec.ErrDigestMismatch,
+					model.ErrDigestMismatch,
 				)
 			}
 			return []WorkspaceDirectoryWorkspace{{
@@ -792,10 +792,10 @@ func (a *StoreAPI) effectiveWorkspaces(
 }
 
 func invalidWorkspaceManifestDiagnostics(
-	intent []basespec.Locator,
+	intent []model.Locator,
 	physical []artifact.Artifact,
 ) []diagnostic.Diagnostic {
-	available := make(map[basespec.Locator]struct{}, len(physical))
+	available := make(map[model.Locator]struct{}, len(physical))
 	for _, record := range physical {
 		available[record.Binding.Locator] = struct{}{}
 	}
@@ -896,29 +896,29 @@ func isWorkspaceDirectoryCatalogArtifact(
 		return true
 	}
 	return value.Binding.SourceID == values.Policy.ID &&
-		value.Binding.Locator == basespec.Locator(defaultpolicy.PolicyLocator) &&
+		value.Binding.Locator == model.Locator(defaultpolicy.PolicyLocator) &&
 		value.Binding.SubresourceLocator == "" &&
 		value.Kind == workspaceDomain.WorkspaceArtifactKind &&
 		string(value.LogicalName) == defaultpolicy.PolicyID
 }
 
-func workspaceRootStorageKey(rootPath string) basespec.StorageKey {
+func workspaceRootStorageKey(rootPath string) model.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
-	return basespec.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
+	return model.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
 }
 
 func policySourceDiscovery() (source.DiscoverySpec, error) {
 	value := source.DiscoverySpec{
-		ExplicitLocators: []basespec.Locator{defaultpolicy.PolicyLocator},
+		ExplicitLocators: []model.Locator{defaultpolicy.PolicyLocator},
 		DecoderHints: []source.DecoderHint{{
 			Locator:    defaultpolicy.PolicyLocator,
 			Recursive:  false,
-			DecoderIDs: []basespec.DecoderID{"artifact-declaration-yaml"},
+			DecoderIDs: []model.DecoderID{"artifact-declaration-yaml"},
 		}},
-		AllowedDecoderIDs: []basespec.DecoderID{"artifact-declaration-yaml"},
+		AllowedDecoderIDs: []model.DecoderID{"artifact-declaration-yaml"},
 		Authoritative:     true,
 	}
 	value = value.Normalized()

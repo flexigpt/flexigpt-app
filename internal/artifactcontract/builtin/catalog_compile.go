@@ -14,30 +14,30 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 // Expectation is the declaration admission result expected from one source
 // document or subresource.
 type Expectation struct {
-	Locator          basespec.Locator
-	Subresource      basespec.SubresourceLocator
+	Locator          model.Locator
+	Subresource      model.SubresourceLocator
 	Kind             artifact.ArtifactKind
-	LogicalName      basespec.LogicalName
-	LogicalVersion   basespec.LogicalVersion
+	LogicalName      model.LogicalName
+	LogicalVersion   model.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
 }
 
 // PackageInput is one prepared managed package. Package preparation remains
 // domain-owned. This package only performs generic Artifact Store admission.
 type PackageInput struct {
-	EmbeddedRoot basespec.Locator
+	EmbeddedRoot model.Locator
 	Address      source.ManagedPackageAddress
-	DocumentFile basespec.Locator
+	DocumentFile model.Locator
 	Files        []source.ManagedPackageFile
 	Expectations []Expectation
 }
@@ -67,7 +67,7 @@ func Compile(
 	if ctx == nil {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog compilation context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -76,19 +76,19 @@ func Compile(
 	if temporaryDirectory == "" {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog compilation directory is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if config.SetName == "" {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog set name is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if config.SchemaVersion == "" {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog schema version is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := topology.ValidateHydrationInstallerName(
@@ -102,7 +102,7 @@ func Compile(
 	if len(config.Packages) == 0 {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog set %q has no packages",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			config.SetName,
 		)
 	}
@@ -122,7 +122,7 @@ func Compile(
 		if provider == nil {
 			return topology.CompiledPackageSet{}, fmt.Errorf(
 				"%w: built-in catalog provider %d is nil",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				index,
 			)
 		}
@@ -290,7 +290,7 @@ func (p PackageInput) rootExpectation() (Expectation, error) {
 
 	return Expectation{}, fmt.Errorf(
 		"%w: package %q has no root Artifact expectation",
-		basespec.ErrInvalid,
+		model.ErrInvalid,
 		p.EmbeddedRoot,
 	)
 }
@@ -314,7 +314,7 @@ func compilePackage(
 		Documents:    make([]topology.CompiledDocument, 0),
 	}
 
-	fileDigests := make(map[basespec.Locator]cryptoutil.Digest)
+	fileDigests := make(map[model.Locator]cryptoutil.Digest)
 	for _, file := range input.Files {
 		digest := cryptoutil.DigestBytes(file.Content)
 		fileDigests[file.Locator] = digest
@@ -327,8 +327,8 @@ func compilePackage(
 	}
 
 	type origin struct {
-		locator     basespec.Locator
-		subresource basespec.SubresourceLocator
+		locator     model.Locator
+		subresource model.SubresourceLocator
 		kind        artifact.ArtifactKind
 	}
 
@@ -341,7 +341,7 @@ func compilePackage(
 		}] = value
 	}
 
-	documents := make(map[basespec.Locator]*topology.CompiledDocument)
+	documents := make(map[model.Locator]*topology.CompiledDocument)
 	for _, entry := range entries {
 		relative, found := cutPackageRelativeLocator(
 			scope,
@@ -360,7 +360,7 @@ func compilePackage(
 		if !found {
 			return topology.CompiledPackage{}, fmt.Errorf(
 				"%w: package %q emitted undeclared Artifact %q",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				scope,
 				entry.Ref().ArtifactID,
 			)
@@ -373,7 +373,7 @@ func compilePackage(
 			entry.Definition.Digest != wanted.DefinitionDigest {
 			return topology.CompiledPackage{}, fmt.Errorf(
 				"%w: admitted Artifact differs from package expectation",
-				basespec.ErrDigestMismatch,
+				model.ErrDigestMismatch,
 			)
 		}
 
@@ -385,7 +385,7 @@ func compilePackage(
 			*record.SourceContentDigest != fileDigests[relative] {
 			return topology.CompiledPackage{}, fmt.Errorf(
 				"%w: source digest differs from embedded package file",
-				basespec.ErrDigestMismatch,
+				model.ErrDigestMismatch,
 			)
 		}
 
@@ -420,7 +420,7 @@ func compilePackage(
 	if len(expected) != 0 {
 		return topology.CompiledPackage{}, fmt.Errorf(
 			"%w: package %q has unfulfilled Artifact expectations",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			scope,
 		)
 	}
@@ -457,15 +457,15 @@ func compilePackage(
 }
 
 func cutPackageRelativeLocator(
-	scope basespec.Locator,
-	locator basespec.Locator,
-) (basespec.Locator, bool) {
+	scope model.Locator,
+	locator model.Locator,
+) (model.Locator, bool) {
 	prefix := string(scope) + "/"
 	raw, found := strings.CutPrefix(string(locator), prefix)
 	if !found || raw == "" {
 		return "", false
 	}
-	return basespec.Locator(raw), true
+	return model.Locator(raw), true
 }
 
 func generatedHydrationFingerprint(
@@ -494,8 +494,8 @@ func validationFingerprint(
 		Digest   cryptoutil.Digest `json:"digest"`
 	}
 	type decoderValue struct {
-		ID       basespec.DecoderID `json:"id"`
-		Revision string             `json:"revision"`
+		ID       model.DecoderID `json:"id"`
+		Revision string          `json:"revision"`
 	}
 
 	schemas := make([]schemaValue, 0)

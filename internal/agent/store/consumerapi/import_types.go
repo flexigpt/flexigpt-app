@@ -5,10 +5,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -35,11 +35,11 @@ type AgentImportDestination struct {
 	SourceID        source.SourceID      `json:"sourceID"`
 	Collection      artifact.ArtifactRef `json:"collection"`
 
-	CollectionRevision    uint64               `json:"collectionRevision"`
-	CollectionName        basespec.LogicalName `json:"collectionName"`
-	CollectionDisplayName string               `json:"collectionDisplayName"`
-	Baseline              bool                 `json:"baseline"`
-	Enabled               bool                 `json:"enabled"`
+	CollectionRevision    uint64            `json:"collectionRevision"`
+	CollectionName        model.LogicalName `json:"collectionName"`
+	CollectionDisplayName string            `json:"collectionDisplayName"`
+	Baseline              bool              `json:"baseline"`
+	Enabled               bool              `json:"enabled"`
 }
 
 type AgentImportPreviewRequest struct {
@@ -54,17 +54,17 @@ type AgentImportPreviewRequest struct {
 }
 
 type AgentImportArtifactPreview struct {
-	OccurrencePath   string                  `json:"occurrencePath"`
-	Type             declaration.Type        `json:"type"`
-	Name             basespec.LogicalName    `json:"name"`
-	LogicalVersion   basespec.LogicalVersion `json:"logicalVersion,omitempty"`
-	DefinitionDigest cryptoutil.Digest       `json:"definitionDigest"`
+	OccurrencePath   string               `json:"occurrencePath"`
+	Type             declaration.Type     `json:"type"`
+	Name             model.LogicalName    `json:"name"`
+	LogicalVersion   model.LogicalVersion `json:"logicalVersion,omitempty"`
+	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
 }
 
 type AgentImportRelationship struct {
 	Path   string                   `json:"path"`
 	Type   declaration.Type         `json:"type"`
-	Name   basespec.LogicalName     `json:"name"`
+	Name   model.LogicalName        `json:"name"`
 	Scope  declaration.LookupScope  `json:"scope,omitempty"`
 	Status resolve.ResolutionStatus `json:"status"`
 
@@ -97,8 +97,8 @@ type AgentMCPSetupInput struct {
 }
 
 type AgentMCPSetupDescriptor struct {
-	OccurrencePath string               `json:"occurrencePath"`
-	Name           basespec.LogicalName `json:"name"`
+	OccurrencePath string            `json:"occurrencePath"`
+	Name           model.LogicalName `json:"name"`
 
 	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
 
@@ -157,14 +157,14 @@ type AgentExportRequest struct {
 }
 
 type AgentExportResult struct {
-	Type              declaration.Type     `json:"type"`
-	Name              basespec.LogicalName `json:"name"`
-	MediaType         string               `json:"mediaType"`
-	SuggestedFileName string               `json:"suggestedFileName"`
-	Content           string               `json:"content"`
-	ContentDigest     cryptoutil.Digest    `json:"contentDigest"`
-	DefinitionDigest  cryptoutil.Digest    `json:"definitionDigest"`
-	ArtifactRevision  uint64               `json:"artifactRevision"`
-	BuiltIn           bool                 `json:"builtIn"`
-	Managed           bool                 `json:"managed"`
+	Type              declaration.Type  `json:"type"`
+	Name              model.LogicalName `json:"name"`
+	MediaType         string            `json:"mediaType"`
+	SuggestedFileName string            `json:"suggestedFileName"`
+	Content           string            `json:"content"`
+	ContentDigest     cryptoutil.Digest `json:"contentDigest"`
+	DefinitionDigest  cryptoutil.Digest `json:"definitionDigest"`
+	ArtifactRevision  uint64            `json:"artifactRevision"`
+	BuiltIn           bool              `json:"builtIn"`
+	Managed           bool              `json:"managed"`
 }

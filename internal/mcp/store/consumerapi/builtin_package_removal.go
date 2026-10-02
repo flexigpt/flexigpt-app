@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 func (a *API) purgeBuiltInServerInstallation(
@@ -15,7 +15,7 @@ func (a *API) purgeBuiltInServerInstallation(
 	if a == nil || a.overlays == nil {
 		return fmt.Errorf(
 			"%w: MCP Artifact local-state repository is unavailable",
-			basespec.ErrClosed,
+			model.ErrClosed,
 		)
 	}
 	return a.overlays.PurgeServerLocalState(ctx, ref)

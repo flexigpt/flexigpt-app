@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 const sourceColumns = `
@@ -44,7 +44,7 @@ func (s *Store) createSource(
 	if rootValue.StorageKey != value.RootStorageKey {
 		return fmt.Errorf(
 			"%w: Source Root storage key does not match Root metadata",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -96,7 +96,7 @@ func (s *Store) getSource(
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
-			basespec.ErrSourceNotFound,
+			model.ErrSourceNotFound,
 			id,
 			rootID,
 		)
@@ -107,7 +107,7 @@ func (s *Store) getSource(
 func (s *Store) findSourceByStorageKey(
 	ctx context.Context,
 	rootID root.RootID,
-	storageKey basespec.StorageKey,
+	storageKey model.StorageKey,
 ) (source.Source, error) {
 	if err := rootID.Validate(); err != nil {
 		return source.Source{}, err
@@ -130,7 +130,7 @@ func (s *Store) findSourceByStorageKey(
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.Source{}, fmt.Errorf(
 			"%w: Source storage key %q in Root %q",
-			basespec.ErrSourceNotFound,
+			model.ErrSourceNotFound,
 			storageKey,
 			rootID,
 		)
@@ -183,7 +183,7 @@ func (s *Store) updateSource(
 		value.RetiredAt != nil {
 		return fmt.Errorf(
 			"%w: invalid Source update",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	discoveryRaw, err := encodeJSON(value.Discovery.Normalized())
@@ -210,7 +210,7 @@ func (s *Store) updateSource(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	result, err := tx.ExecContext(
@@ -293,7 +293,7 @@ func (s *Store) retireSource(
 		value.Revision != expectedRevision+1 {
 		return fmt.Errorf(
 			"%w: invalid Source retirement",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -316,14 +316,14 @@ func (s *Store) retireSource(
 		return err
 	}
 	if current.Revision != expectedRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if current.RootStorageKey != value.RootStorageKey ||
 		current.StorageKey != value.StorageKey ||
 		current.Kind != value.Kind {
 		return fmt.Errorf(
 			"%w: Source retirement changed Source identity",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -393,7 +393,7 @@ func (s *Store) discardSource(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -457,7 +457,7 @@ func (s *Store) purgeSource(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Source revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	result, err := s.db.ExecContext(
@@ -509,7 +509,7 @@ func getActiveSourceTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return source.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
-			basespec.ErrSourceNotFound,
+			model.ErrSourceNotFound,
 			sourceID,
 			rootID,
 		)
@@ -585,7 +585,7 @@ func scanSource(
 	if row == nil {
 		return source.Source{}, fmt.Errorf(
 			"%w: Source row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := row.Scan(
@@ -612,8 +612,8 @@ func scanSource(
 	value := source.Source{
 		ID:             source.SourceID(id),
 		RootID:         root.RootID(rootID),
-		RootStorageKey: basespec.StorageKey(rootStorageKey),
-		StorageKey:     basespec.StorageKey(storageKey),
+		RootStorageKey: model.StorageKey(rootStorageKey),
+		StorageKey:     model.StorageKey(storageKey),
 		Kind:           source.SourceKind(kind),
 		DisplayName:    displayName,
 		Enabled:        enabled != 0,

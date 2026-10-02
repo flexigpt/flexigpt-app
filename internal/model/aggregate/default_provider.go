@@ -5,11 +5,11 @@ import (
 
 	"github.com/flexigpt/inference-go/modelpreset"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
-const baseDefaultProviderName = basespec.LogicalName(
+const baseDefaultProviderName = model.LogicalName(
 	modelpreset.ProviderOpenAIResponses,
 )
 

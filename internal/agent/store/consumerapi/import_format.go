@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -30,7 +30,7 @@ func managedAgentImportFormatForPath(
 	default:
 		return "", fmt.Errorf(
 			"%w: managed Agent import accepts .json, .yaml, or .yml files",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 }
@@ -43,17 +43,17 @@ func canonicalManagedAgentImportDocument(
 	case managedAgentImportFormatJSON:
 		return jsonutil.CanonicalizeObject(
 			raw,
-			basespec.MaxDefinitionBytes,
+			model.MaxDefinitionBytes,
 		)
 	case managedAgentImportFormatYAML:
 		return yamlutil.CanonicalObjectJSON(
 			raw,
-			basespec.MaxDefinitionBytes,
+			model.MaxDefinitionBytes,
 		)
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported managed Agent import format %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			format,
 		)
 	}

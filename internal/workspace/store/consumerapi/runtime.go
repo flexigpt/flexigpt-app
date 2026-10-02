@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
@@ -20,7 +20,7 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	artifacts []artifact.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
 	if a == nil || a.resources == nil {
-		return WorkspacePromptPlan{}, basespec.ErrClosed
+		return WorkspacePromptPlan{}, model.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -74,7 +74,7 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
 	if a == nil || a.resources == nil {
-		return WorkspaceSkillLoadPlan{}, basespec.ErrClosed
+		return WorkspaceSkillLoadPlan{}, model.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -128,7 +128,7 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	artifacts []artifact.ArtifactRef,
 ) (WorkspaceMCPServerLoadPlan, error) {
 	if a == nil || a.resources == nil {
-		return WorkspaceMCPServerLoadPlan{}, basespec.ErrClosed
+		return WorkspaceMCPServerLoadPlan{}, model.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -182,7 +182,7 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	selection WorkspaceRuntimeSelection,
 ) (WorkspaceRuntimePlan, error) {
 	if a == nil || a.resources == nil {
-		return WorkspaceRuntimePlan{}, basespec.ErrClosed
+		return WorkspaceRuntimePlan{}, model.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -298,7 +298,7 @@ func (a *StoreAPI) loadWorkspaceMCPServers(
 	if a == nil || a.mcpAdapter == nil {
 		return mcp.LoadPlan{}, fmt.Errorf(
 			"%w: Workspace MCP resolver is unavailable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	return a.mcpAdapter.Load(ctx, workspace, refs)

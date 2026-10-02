@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 func TestEnsureStoreLayoutCreatesOnlyGenericStoreRoots(t *testing.T) {
@@ -18,9 +18,9 @@ func TestEnsureStoreLayoutCreatesOnlyGenericStoreRoots(t *testing.T) {
 	}
 
 	for _, location := range []string{
-		filepath.Join(base, basespec.ArtifactStoreManifestFileName),
-		filepath.Join(base, basespec.ArtifactStoreContentDirectoryName),
-		filepath.Join(base, basespec.ArtifactStoreStagingDirectoryName),
+		filepath.Join(base, model.ArtifactStoreManifestFileName),
+		filepath.Join(base, model.ArtifactStoreContentDirectoryName),
+		filepath.Join(base, model.ArtifactStoreStagingDirectoryName),
 	} {
 		if _, err := os.Stat(location); err != nil {
 			t.Fatalf("missing %q: %v", location, err)

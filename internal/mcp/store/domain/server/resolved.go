@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -72,7 +72,7 @@ func (r Resolved) Validate() error {
 		r.InstallationRevision == 0 {
 		return fmt.Errorf(
 			"%w: resolved MCP revisions are required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -82,7 +82,7 @@ func (r Resolved) Validate() error {
 	if err := cryptoutil.ValidateDigest(r.SourceContentDigest); err != nil {
 		return err
 	}
-	if err := basespec.ValidateSourceGeneration(r.SourceGeneration); err != nil {
+	if err := model.ValidateSourceGeneration(r.SourceGeneration); err != nil {
 		return err
 	}
 	if err := r.Document.Validate(); err != nil {

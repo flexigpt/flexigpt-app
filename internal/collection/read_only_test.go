@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 func TestReadOnlyDomainDoesNotRequireAuthoringConfiguration(t *testing.T) {
@@ -37,20 +37,20 @@ func TestReadOnlyDomainRejectsAuthoringBeforeStoreAccess(t *testing.T) {
 	}
 	ctx := t.Context()
 
-	if _, err := api.Create(ctx, CreateRequest{}); !errors.Is(err, basespec.ErrUnsupported) {
+	if _, err := api.Create(ctx, CreateRequest{}); !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf("Create error = %v", err)
 	}
-	if _, err := api.EnsureBaseline(ctx, ""); !errors.Is(err, basespec.ErrUnsupported) {
+	if _, err := api.EnsureBaseline(ctx, ""); !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf("EnsureBaseline error = %v", err)
 	}
 	if _, err := api.loadEditableCollection(
 		ctx,
 		artifact.ArtifactRef{},
 		1,
-	); !errors.Is(err, basespec.ErrUnsupported) {
+	); !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf("loadEditableCollection error = %v", err)
 	}
-	if _, err := api.domainManagedSource(ctx, "", ""); !errors.Is(err, basespec.ErrUnsupported) {
+	if _, err := api.domainManagedSource(ctx, "", ""); !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf("domainManagedSource error = %v", err)
 	}
 }

@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 type NamedRelationshipRequest struct {
@@ -44,7 +44,7 @@ func (r *Resolver) InspectNamedRelationship(
 	request NamedRelationshipRequest,
 ) (NamedRelationshipInspection, error) {
 	if r == nil || r.artifacts == nil {
-		return NamedRelationshipInspection{}, basespec.ErrClosed
+		return NamedRelationshipInspection{}, model.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return NamedRelationshipInspection{}, err
@@ -60,7 +60,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if form != declaration.MemberNamed {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship inspection requires a named member",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -68,7 +68,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if header.Locator != nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship inspection does not accept a locator",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -90,7 +90,7 @@ func (r *Resolver) InspectNamedRelationship(
 		&state,
 		request.RootID,
 		header.Type,
-		basespec.LogicalName(header.Name),
+		model.LogicalName(header.Name),
 		expectedVersion,
 		relationship.Scope,
 		nil,
@@ -108,7 +108,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if value == nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship has no target",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -121,7 +121,7 @@ func (r *Resolver) InspectNamedRelationship(
 	if output.Artifact == nil && output.Mapped == nil {
 		return NamedRelationshipInspection{}, fmt.Errorf(
 			"%w: named relationship resolved without a target",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return output, nil
@@ -134,8 +134,8 @@ func namedRelationshipInspectionFailure(
 	if partial {
 		return status, issue, true
 	}
-	if errors.Is(err, basespec.ErrInvalid) ||
-		errors.Is(err, basespec.ErrDigestMismatch) {
+	if errors.Is(err, model.ErrInvalid) ||
+		errors.Is(err, model.ErrDigestMismatch) {
 		return ResolutionUnavailable, ResolutionIssue{
 			Code:    "artifact.reference-invalid",
 			Message: diagnostic.BoundedMessage(err.Error()),
@@ -153,7 +153,7 @@ func (r *Resolver) ResolveNamedRelationship(
 	request NamedRelationshipRequest,
 ) (NamedRelationshipTarget, error) {
 	if r == nil || r.artifacts == nil {
-		return NamedRelationshipTarget{}, basespec.ErrClosed
+		return NamedRelationshipTarget{}, model.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return NamedRelationshipTarget{}, err
@@ -169,7 +169,7 @@ func (r *Resolver) ResolveNamedRelationship(
 	if form != declaration.MemberNamed {
 		return NamedRelationshipTarget{}, fmt.Errorf(
 			"%w: named relationship preflight requires a named member",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -177,7 +177,7 @@ func (r *Resolver) ResolveNamedRelationship(
 	if header.Locator != nil {
 		return NamedRelationshipTarget{}, fmt.Errorf(
 			"%w: named relationship preflight does not accept a locator",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -196,7 +196,7 @@ func (r *Resolver) ResolveNamedRelationship(
 		&state,
 		request.RootID,
 		header.Type,
-		basespec.LogicalName(header.Name),
+		model.LogicalName(header.Name),
 		expectedVersion,
 		relationship.Scope,
 		nil,
@@ -208,7 +208,7 @@ func (r *Resolver) ResolveNamedRelationship(
 	if value == nil {
 		return NamedRelationshipTarget{}, fmt.Errorf(
 			"%w: named relationship has no target",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -223,7 +223,7 @@ func (r *Resolver) ResolveNamedRelationship(
 	if output.Artifact == nil && output.Mapped == nil {
 		return NamedRelationshipTarget{}, fmt.Errorf(
 			"%w: named relationship resolved without a target",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return output, nil

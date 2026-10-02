@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
@@ -229,7 +229,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 			Enabled: true,
 		},
 	)
-	if !errors.Is(err, basespec.ErrUnsupported) {
+	if !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf(
 			"replace external Skill error=%v, want ErrUnsupported",
 			err,
@@ -241,7 +241,7 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		external.Artifact.Ref(),
 		external.Artifact.Revision,
 	)
-	if !errors.Is(err, basespec.ErrUnsupported) {
+	if !errors.Is(err, model.ErrUnsupported) {
 		t.Fatalf(
 			"purge external Skill error=%v, want ErrUnsupported",
 			err,

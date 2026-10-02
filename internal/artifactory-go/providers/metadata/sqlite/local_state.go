@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/localstate"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 )
 
 const protectedOverlayColumns = `
@@ -29,7 +29,7 @@ func (r *LocalStateRepository) GetOverlay(
 	namespace overlay.Namespace,
 ) (overlay.Record, bool, error) {
 	if r == nil || r.store == nil {
-		return overlay.Record{}, false, basespec.ErrClosed
+		return overlay.Record{}, false, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return overlay.Record{}, false, err
@@ -62,7 +62,7 @@ func (r *LocalStateRepository) PutOverlay(
 	now time.Time,
 ) (overlay.Record, error) {
 	if r == nil || r.store == nil {
-		return overlay.Record{}, basespec.ErrClosed
+		return overlay.Record{}, model.ErrClosed
 	}
 	if err := request.Validate(); err != nil {
 		return overlay.Record{}, err
@@ -70,7 +70,7 @@ func (r *LocalStateRepository) PutOverlay(
 	if now.IsZero() {
 		return overlay.Record{}, fmt.Errorf(
 			"%w: protected overlay time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -107,7 +107,7 @@ func (r *LocalStateRepository) PutOverlay(
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if request.ExpectedOverlayRevision != 0 {
-			return overlay.Record{}, basespec.ErrConflict
+			return overlay.Record{}, model.ErrConflict
 		}
 		output = overlay.Record{
 			Artifact:      request.Artifact,
@@ -146,12 +146,12 @@ func (r *LocalStateRepository) PutOverlay(
 
 	default:
 		if current.Revision != request.ExpectedOverlayRevision {
-			return overlay.Record{}, basespec.ErrConflict
+			return overlay.Record{}, model.ErrConflict
 		}
 		if current.Revision == ^uint64(0) {
 			return overlay.Record{}, fmt.Errorf(
 				"%w: protected overlay revision is exhausted",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -211,7 +211,7 @@ func (r *LocalStateRepository) DeleteOverlay(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return err
@@ -224,7 +224,7 @@ func (r *LocalStateRepository) DeleteOverlay(
 		now.IsZero() {
 		return fmt.Errorf(
 			"%w: invalid protected overlay deletion request",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -251,13 +251,13 @@ func (r *LocalStateRepository) DeleteOverlay(
 		namespace,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if err != nil {
 		return err
 	}
 	if current.Revision != expectedOverlayRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	if err := queueNamespaceBindingSecretsTx(
@@ -313,7 +313,7 @@ func (r *LocalStateRepository) GetBinding(
 	key secret.BindingKey,
 ) (secret.Binding, bool, error) {
 	if r == nil || r.store == nil {
-		return secret.Binding{}, false, basespec.ErrClosed
+		return secret.Binding{}, false, model.ErrClosed
 	}
 	if err := key.Validate(); err != nil {
 		return secret.Binding{}, false, err
@@ -340,7 +340,7 @@ func (r *LocalStateRepository) CreatePendingSecret(
 	record secret.Record,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := record.Validate(); err != nil {
 		return err
@@ -348,7 +348,7 @@ func (r *LocalStateRepository) CreatePendingSecret(
 	if record.State != secret.RecordStatePending {
 		return fmt.Errorf(
 			"%w: new secret record must begin pending",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -373,7 +373,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	now time.Time,
 ) (secret.Binding, error) {
 	if r == nil || r.store == nil {
-		return secret.Binding{}, basespec.ErrClosed
+		return secret.Binding{}, model.ErrClosed
 	}
 	if err := request.Key.Validate(); err != nil {
 		return secret.Binding{}, err
@@ -381,7 +381,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	if request.ExpectedArtifactRevision == 0 {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := request.Record.Validate(); err != nil {
@@ -390,13 +390,13 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	if request.Record.State != secret.RecordStatePending {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: attached secret record must be pending",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if now.IsZero() {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: secret binding time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -424,7 +424,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	if errors.Is(err, sql.ErrNoRows) {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: staged secret record is unavailable",
-			basespec.ErrSecretNotFound,
+			model.ErrSecretNotFound,
 		)
 	}
 	if err != nil {
@@ -435,7 +435,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 		record.SHA256 != request.Record.SHA256 {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: staged secret record changed before binding publication",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 
@@ -450,10 +450,10 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	}
 	if found {
 		if current.Revision != request.ExpectedBindingRevision {
-			return secret.Binding{}, basespec.ErrConflict
+			return secret.Binding{}, model.ErrConflict
 		}
 	} else if request.ExpectedBindingRevision != 0 {
-		return secret.Binding{}, basespec.ErrConflict
+		return secret.Binding{}, model.ErrConflict
 	}
 
 	if found && current.Ref != nil {
@@ -473,7 +473,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 		if current.Revision == ^uint64(0) {
 			return secret.Binding{}, fmt.Errorf(
 				"%w: secret binding revision is exhausted",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		output = current.Clone()
@@ -577,7 +577,7 @@ func (r *LocalStateRepository) ClearSecretBinding(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := request.Validate(); err != nil {
 		return err
@@ -585,7 +585,7 @@ func (r *LocalStateRepository) ClearSecretBinding(
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret binding time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -610,13 +610,13 @@ func (r *LocalStateRepository) ClearSecretBinding(
 		if request.ExpectedBindingRevision == 0 {
 			return tx.Commit()
 		}
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if err != nil {
 		return err
 	}
 	if current.Revision != request.ExpectedBindingRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 	if current.Ref == nil {
 		return tx.Commit()
@@ -624,7 +624,7 @@ func (r *LocalStateRepository) ClearSecretBinding(
 	if current.Revision == ^uint64(0) {
 		return fmt.Errorf(
 			"%w: secret binding revision is exhausted",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -674,7 +674,7 @@ func (r *LocalStateRepository) QueueSecretForCleanup(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return err
@@ -682,7 +682,7 @@ func (r *LocalStateRepository) QueueSecretForCleanup(
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret cleanup time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -704,7 +704,7 @@ func (r *LocalStateRepository) PurgeArtifactLocalState(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return err
@@ -712,7 +712,7 @@ func (r *LocalStateRepository) PurgeArtifactLocalState(
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: local-state purge time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -738,12 +738,12 @@ func (r *LocalStateRepository) RecoverPendingSecrets(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret recovery time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -796,12 +796,12 @@ func (r *LocalStateRepository) ListSecretCleanup(
 	maximum int,
 ) ([]secret.Cleanup, error) {
 	if r == nil || r.store == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
-	if maximum <= 0 || maximum > basespec.MaxDiscoveryEntries {
+	if maximum <= 0 || maximum > model.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: secret cleanup limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -864,7 +864,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 	ref secret.Ref,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return err
@@ -884,7 +884,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 		return err
 	}
 	if record.State != secret.RecordStateCleanup {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	var bound int
@@ -898,7 +898,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 		return err
 	}
 	if bound != 0 {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	result, err := tx.ExecContext(
@@ -928,22 +928,22 @@ func (r *LocalStateRepository) RecordSecretCleanupFailure(
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"secret cleanup failure reason",
 		reason,
-		basespec.MaxDescriptionBytes,
+		model.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
 	if now.IsZero() {
 		return fmt.Errorf(
 			"%w: secret cleanup time is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -994,7 +994,7 @@ func scanProtectedOverlay(
 	if row == nil {
 		return overlay.Record{}, fmt.Errorf(
 			"%w: protected overlay row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -1074,7 +1074,7 @@ func scanSecretBinding(
 	if row == nil {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: secret binding row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -1115,7 +1115,7 @@ func scanSecretBinding(
 		if !sha256Value.Valid {
 			return secret.Binding{}, fmt.Errorf(
 				"%w: active secret binding has no secret record",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		ref := secret.Ref(secretRef.String)
@@ -1151,7 +1151,7 @@ func scanSecretRecord(
 	if row == nil {
 		return secret.Record{}, fmt.Errorf(
 			"%w: secret record row is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -1204,12 +1204,12 @@ func ensureLocalStateArtifactTx(
 	}
 	if expectedRevision != 0 &&
 		value.Revision != expectedRevision {
-		return artifact.Artifact{}, basespec.ErrConflict
+		return artifact.Artifact{}, model.ErrConflict
 	}
 	if requireAvailable && value.State != artifact.StateAvailable {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			value.ID,
 		)
 	}
@@ -1226,7 +1226,7 @@ func enqueueSecretRecordTx(
 	if errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf(
 			"%w: secret record %q",
-			basespec.ErrSecretNotFound,
+			model.ErrSecretNotFound,
 			ref,
 		)
 	}

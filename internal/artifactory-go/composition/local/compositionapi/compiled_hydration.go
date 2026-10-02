@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 func (s *Store) RegisterCompiledPackages(
@@ -12,7 +12,7 @@ func (s *Store) RegisterCompiledPackages(
 	values []topology.CompiledRegistration,
 ) error {
 	if s == nil || s.components == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.components.RegisterCompiledPackages(ctx, values)
 }
@@ -22,7 +22,7 @@ func (s *Store) HydrateCompiledPackages(
 	plans []topology.CompiledPackagePlan,
 ) error {
 	if s == nil || s.components == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return s.components.HydrateCompiledPackages(ctx, plans)
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -24,7 +24,7 @@ func DecodeGeneratedPackageSet(
 	if len(bytes.TrimSpace(raw)) == 0 {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated built-in package set is empty",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -119,7 +119,7 @@ func validateGeneratedPackageSet(
 	if value.Format != topology.CompiledPackageSetFormat {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated package format %q; regenerate built-in catalogs",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Format,
 		)
 	}
@@ -128,7 +128,7 @@ func validateGeneratedPackageSet(
 		value.Hydration.Fingerprint == "" {
 		return topology.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated built-in package set is incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return value, nil

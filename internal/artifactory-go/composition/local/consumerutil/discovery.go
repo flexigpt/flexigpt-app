@@ -3,16 +3,16 @@ package consumerutil
 import (
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // AppendUniqueLocator appends a declaration locator only when it is not
 // already present.
 func AppendUniqueLocator(
-	values []basespec.Locator,
-	value basespec.Locator,
-) []basespec.Locator {
+	values []model.Locator,
+	value model.Locator,
+) []model.Locator {
 	if slices.Contains(values, value) {
 		return values
 	}

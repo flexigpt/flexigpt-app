@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
@@ -123,7 +123,7 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 	}
 
 	_, err = aggregateService.ResolveArtifactSkill(ctx, missing.Ref())
-	if !errors.Is(err, basespec.ErrReferenceUnresolved) {
+	if !errors.Is(err, model.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"aggregate resolution after Source disable error=%v, want ErrReferenceUnresolved",
 			err,

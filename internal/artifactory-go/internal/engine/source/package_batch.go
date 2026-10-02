@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 // PackageBatchWriter is a trusted source-adapter capability used by generated
@@ -30,7 +30,7 @@ func (r *Registry) ApplyPackageBatch(
 	removals []source.ManagedPackageAddress,
 ) error {
 	if r == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -43,7 +43,7 @@ func (r *Registry) ApplyPackageBatch(
 	if !found {
 		return fmt.Errorf(
 			"%w: source adapter %q",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.Kind,
 		)
 	}
@@ -51,7 +51,7 @@ func (r *Registry) ApplyPackageBatch(
 	if !supported {
 		return fmt.Errorf(
 			"%w: source kind %q has no package batch writer",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			value.Kind,
 		)
 	}
@@ -63,7 +63,7 @@ func (r *Registry) ApplyPackageBatch(
 		if publication.ExpectedGeneration != "" {
 			return fmt.Errorf(
 				"%w: compiled package batches do not use per-package generations",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 	}

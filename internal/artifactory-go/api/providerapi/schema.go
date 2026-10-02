@@ -7,7 +7,7 @@ package providerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 )
 
 // SchemaCodec supplies one published JSON Schema and domain-specific semantic

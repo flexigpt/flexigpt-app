@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -19,9 +19,9 @@ type SourceStateUpdate struct {
 	ArtifactID artifact.ArtifactID `json:"artifactID"`
 	RootID     root.RootID         `json:"rootID"`
 
-	Binding        artifact.SourceBinding  `json:"binding"`
-	LogicalName    basespec.LogicalName    `json:"logicalName"`
-	LogicalVersion basespec.LogicalVersion `json:"logicalVersion,omitempty"`
+	Binding        artifact.SourceBinding `json:"binding"`
+	LogicalName    model.LogicalName      `json:"logicalName"`
+	LogicalVersion model.LogicalVersion   `json:"logicalVersion,omitempty"`
 
 	ResolvedDefinition  *cryptoutil.Digest      `json:"resolvedDefinition,omitempty"`
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
@@ -63,7 +63,7 @@ func (u SourceStateUpdate) Validate() error {
 		u.ModifiedAt.IsZero() {
 		return fmt.Errorf(
 			"%w: invalid source-derived Artifact update",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil

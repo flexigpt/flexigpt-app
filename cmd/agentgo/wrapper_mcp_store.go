@@ -5,9 +5,9 @@ import (
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 
@@ -33,7 +33,7 @@ func withMCPStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, basespec.ErrClosed
+			return zero, model.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -46,7 +46,7 @@ func withMCPStoreManagement[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.management == nil {
-			return zero, basespec.ErrClosed
+			return zero, model.ErrClosed
 		}
 		return fn(w.management)
 	})
@@ -99,7 +99,7 @@ func (w *MCPStoreWrapper) GetMCPSettings() (
 ) {
 	return withRecoveryResp(func() (MCPSettingsView, error) {
 		if w == nil || w.settings == nil {
-			return MCPSettingsView{}, basespec.ErrClosed
+			return MCPSettingsView{}, model.ErrClosed
 		}
 		settings, revision, err := w.settings.getMCPSettings(
 			context.Background(),
@@ -120,7 +120,7 @@ func (w *MCPStoreWrapper) SaveMCPSettings(
 ) (MCPSettingsView, error) {
 	return withRecoveryResp(func() (MCPSettingsView, error) {
 		if w == nil || w.settings == nil {
-			return MCPSettingsView{}, basespec.ErrClosed
+			return MCPSettingsView{}, model.ErrClosed
 		}
 		if _, err := w.settings.putMCPSettings(
 			context.Background(),
@@ -159,7 +159,7 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 	return withRecoveryResp(
 		func() (collection.CollectionView, error) {
 			if w == nil || w.api == nil {
-				return collection.CollectionView{}, basespec.ErrClosed
+				return collection.CollectionView{}, model.ErrClosed
 			}
 
 			// A blank RootID means "create in the retained user Root". The
@@ -167,7 +167,7 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 			// merely because its baseline discovery has not completed.
 			if request.RootID == "" {
 				if w.roots == nil {
-					return collection.CollectionView{}, basespec.ErrClosed
+					return collection.CollectionView{}, model.ErrClosed
 				}
 				if _, err := w.roots.Create(
 					context.Background(),
@@ -271,7 +271,7 @@ func (w *MCPStoreWrapper) DeleteMCPCollection(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return basespec.ErrClosed
+			return model.ErrClosed
 		}
 		return w.api.DeleteMCPCollection(context.Background(), request)
 	})

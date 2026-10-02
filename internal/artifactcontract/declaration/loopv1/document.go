@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -141,7 +141,7 @@ func (v LoopDocument) validateFields() error {
 		if form == declaration.MemberSelector {
 			return fmt.Errorf(
 				"%w: Loop body cannot be a member selector",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if err := declaration.ValidateNoRelationshipBehavior(
@@ -164,7 +164,7 @@ func (v LoopDocument) validateFields() error {
 		v.Name != "" {
 		return fmt.Errorf(
 			"%w: inline standalone Loop requires body",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil

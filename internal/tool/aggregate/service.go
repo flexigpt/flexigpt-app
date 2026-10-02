@@ -8,8 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
@@ -32,7 +32,7 @@ func New(
 	if tools == nil || runtimeService == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Aggregate dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -73,7 +73,7 @@ func (s *Service) MapArtifactTarget(
 	if request.Definition.Digest != value.Tool.DefinitionDigest {
 		return resolve.MappedTarget{}, true, fmt.Errorf(
 			"%w: Tool definition changed during target mapping",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 
@@ -104,7 +104,7 @@ func (s *Service) ResolveMappedTool(
 		tool.Implementation.Kind != value.Implementation {
 		return toolConsumerAPI.ResolvedToolView{}, fmt.Errorf(
 			"%w: mapped Tool target no longer matches its Artifact",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return resolved, nil
@@ -124,7 +124,7 @@ func (s *Service) Invoke(
 	if resolved.Tool.Implementation.Kind != toolv1.ImplementationKindGo {
 		return nil, fmt.Errorf(
 			"%w: SDK Tools execute through provider inference",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -137,12 +137,12 @@ func (s *Service) Invoke(
 
 func (s *Service) ready(ctx context.Context) error {
 	if s == nil || s.tools == nil || s.runtime == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Tool Aggregate context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return ctx.Err()

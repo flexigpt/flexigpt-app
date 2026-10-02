@@ -7,11 +7,11 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -31,12 +31,12 @@ func (a *API) ListAgents(
 	request ListAgentsRequest,
 ) ([]AgentListItem, error) {
 	if a == nil || a.artifacts == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent list context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -46,7 +46,7 @@ func (a *API) ListAgents(
 		return nil, err
 	}
 
-	names := make(map[basespec.LogicalName]struct{}, len(request.LogicalNames))
+	names := make(map[model.LogicalName]struct{}, len(request.LogicalNames))
 	for index, name := range request.LogicalNames {
 		if err := name.Validate(); err != nil {
 			return nil, fmt.Errorf(
@@ -66,13 +66,13 @@ func (a *API) ListAgents(
 		if request.Collection.RootID != request.RootID {
 			return nil, fmt.Errorf(
 				"%w: Agent Collection belongs to another Root",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		if request.IncludeBuiltin {
 			return nil, fmt.Errorf(
 				"%w: collection-filtered Agent lists cannot include another Root",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 

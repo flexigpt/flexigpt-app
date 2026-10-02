@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
@@ -41,7 +41,7 @@ func New(
 		dependencies.Adapters == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Store dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := dependencies.BuiltinRoot.Validate(); err != nil {
@@ -53,7 +53,7 @@ func New(
 		) {
 		return nil, fmt.Errorf(
 			"%w: Model Store requires the protected built-in Root",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -327,12 +327,12 @@ func (a *API) ready(ctx context.Context) error {
 		a.overlays == nil ||
 		a.adapters == nil ||
 		a.builtinRoot == "" {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Model Store context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -353,7 +353,7 @@ func (a *API) requireKind(
 	if record.Kind != kind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q has kind %q, expected %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			record.ID,
 			record.Kind,
 			kind,

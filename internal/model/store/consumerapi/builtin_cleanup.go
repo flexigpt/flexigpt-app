@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
@@ -57,7 +57,7 @@ func NewBuiltinPackageCleanup(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: Model built-in package cleanup requires a Model Store API",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &builtinPackageCleanup{api: api}, nil
@@ -70,12 +70,12 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	addresses []source.ManagedPackageAddress,
 ) ([]BuiltinArtifactSnapshot, error) {
 	if c == nil || c.api == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if !documentTopology.IsBuiltinPackageSource(rootID, sourceID) {
 		return nil, fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 
@@ -134,12 +134,12 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	previous []BuiltinArtifactSnapshot,
 ) error {
 	if c == nil || c.api == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if !documentTopology.IsBuiltinPackageSource(rootID, sourceID) {
 		return fmt.Errorf(
 			"%w: Model cleanup does not target the built-in package Source",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 
@@ -210,8 +210,8 @@ func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 ) error {
 	record, err := c.api.artifacts.Get(ctx, ref)
 	if err != nil {
-		if errors.Is(err, basespec.ErrArtifactNotFound) ||
-			errors.Is(err, basespec.ErrRootNotFound) {
+		if errors.Is(err, model.ErrArtifactNotFound) ||
+			errors.Is(err, model.ErrRootNotFound) {
 			return nil
 		}
 		return err
@@ -239,7 +239,7 @@ func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 	default:
 		return fmt.Errorf(
 			"%w: built-in Model initial enabled label %q is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			raw,
 		)
 	}
@@ -262,8 +262,8 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 ) error {
 	record, err := c.api.artifacts.Get(ctx, value.Ref)
 	if err != nil &&
-		!errors.Is(err, basespec.ErrArtifactNotFound) &&
-		!errors.Is(err, basespec.ErrRootNotFound) {
+		!errors.Is(err, model.ErrArtifactNotFound) &&
+		!errors.Is(err, model.ErrRootNotFound) {
 		return err
 	}
 	if err == nil && record.State == artifact.StateAvailable {
@@ -282,8 +282,8 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 
 func managedPackageScopes(
 	addresses []source.ManagedPackageAddress,
-) (map[basespec.Locator]struct{}, error) {
-	output := make(map[basespec.Locator]struct{}, len(addresses))
+) (map[model.Locator]struct{}, error) {
+	output := make(map[model.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
 		if address.Kind != modelDomain.ModelProviderPackageKind &&
 			address.Kind != modelDomain.ModelPackageKind {
@@ -300,12 +300,12 @@ func managedPackageScopes(
 
 func entryBelongsToPackageScope(
 	entry catalog.Entry,
-	scopes map[basespec.Locator]struct{},
+	scopes map[model.Locator]struct{},
 ) bool {
 	if len(scopes) == 0 {
 		return false
 	}
-	scope := basespec.Locator(path.Dir(string(entry.Binding.Locator)))
+	scope := model.Locator(path.Dir(string(entry.Binding.Locator)))
 	_, found := scopes[scope]
 	return found
 }

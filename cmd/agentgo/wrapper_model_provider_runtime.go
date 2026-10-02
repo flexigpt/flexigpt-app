@@ -7,7 +7,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 )
@@ -22,7 +22,7 @@ func newInferenceProviderRuntimePublisher(
 	if providers == nil {
 		return nil, fmt.Errorf(
 			"%w: inference Provider runtime publisher is unavailable",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &inferenceProviderRuntimePublisher{
@@ -35,7 +35,7 @@ func (p *inferenceProviderRuntimePublisher) ClearProvider(
 	provider inferenceSpec.ProviderName,
 ) error {
 	if p == nil || p.providers == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	_, err := p.providers.DeleteProvider(
@@ -52,7 +52,7 @@ func (p *inferenceProviderRuntimePublisher) PublishProvider(
 	provider inferenceSpec.ProviderParam,
 ) error {
 	if p == nil || p.providers == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	_, err := p.providers.AddProvider(

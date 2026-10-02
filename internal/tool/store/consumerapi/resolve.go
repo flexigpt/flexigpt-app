@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 )
 
 func (a *API) ResolveEnabledTool(
@@ -34,7 +34,7 @@ func (a *API) ResolveEnabledTool(
 	if !output.Enabled() {
 		return ResolvedToolView{}, fmt.Errorf(
 			"%w: Tool %q or its Collection is disabled",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			value.Artifact.LogicalName,
 		)
 	}

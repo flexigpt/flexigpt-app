@@ -7,8 +7,8 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 
@@ -30,12 +30,12 @@ func (s *Service) SetProviderRuntimePublisher(
 	publisher ProviderRuntimePublisher,
 ) error {
 	if s == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if publisher == nil {
 		return fmt.Errorf(
 			"%w: Model Provider runtime publisher is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	s.providers = publisher
@@ -431,7 +431,7 @@ func (s *Service) providerRuntimePublisher() (
 	error,
 ) {
 	if s == nil || s.providers == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	return s.providers, nil
 }

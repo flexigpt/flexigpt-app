@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -40,7 +40,7 @@ func Load() (Policy, error) {
 	if err != nil {
 		return Policy{}, err
 	}
-	canonical, err := yamlutil.CanonicalObjectJSON(rawYAML, basespec.MaxDefinitionBytes)
+	canonical, err := yamlutil.CanonicalObjectJSON(rawYAML, model.MaxDefinitionBytes)
 	if err != nil {
 		return Policy{}, err
 	}
@@ -49,7 +49,7 @@ func Load() (Policy, error) {
 		return Policy{}, err
 	}
 	if document.Name != PolicyID {
-		return Policy{}, fmt.Errorf("%w: base policy name is %q", basespec.ErrInvalid, document.Name)
+		return Policy{}, fmt.Errorf("%w: base policy name is %q", model.ErrInvalid, document.Name)
 	}
 	if err := validatePolicyDocument(document); err != nil {
 		return Policy{}, err
@@ -67,10 +67,10 @@ func Load() (Policy, error) {
 
 func (p Policy) Validate() error {
 	if p.ID != PolicyID || p.Version != PolicyVersion {
-		return fmt.Errorf("%w: base policy identity is invalid", basespec.ErrInvalid)
+		return fmt.Errorf("%w: base policy identity is invalid", model.ErrInvalid)
 	}
 	if p.Document.Name != p.ID {
-		return fmt.Errorf("%w: base policy document identity is invalid", basespec.ErrInvalid)
+		return fmt.Errorf("%w: base policy document identity is invalid", model.ErrInvalid)
 	}
 	if err := cryptoutil.ValidateDigest(p.Digest); err != nil {
 		return err
@@ -84,10 +84,10 @@ func (p Policy) Validate() error {
 	}
 	if !bytes.Equal(canonical, p.CanonicalJSON) ||
 		cryptoutil.DigestBytes(canonical) != p.Digest {
-		return fmt.Errorf("%w: base policy bytes or digest do not match its document", basespec.ErrDigestMismatch)
+		return fmt.Errorf("%w: base policy bytes or digest do not match its document", model.ErrDigestMismatch)
 	}
 	if len(p.RawYAML) == 0 {
-		return fmt.Errorf("%w: base policy YAML is empty", basespec.ErrInvalid)
+		return fmt.Errorf("%w: base policy YAML is empty", model.ErrInvalid)
 	}
 	return nil
 }
@@ -100,14 +100,14 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 		}
 		header := member.Header()
 		if header.Type == declaration.TypeWorkspace {
-			return fmt.Errorf("%w: members[%d] cannot contain workspace", basespec.ErrInvalid, index)
+			return fmt.Errorf("%w: members[%d] cannot contain workspace", model.ErrInvalid, index)
 		}
 		if header.Type == declaration.TypeText {
 			if form != declaration.MemberContained {
-				return fmt.Errorf("%w: members[%d] text must be contained", basespec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must be contained", model.ErrInvalid, index)
 			}
 			if header.Locator == nil {
-				return fmt.Errorf("%w: members[%d] text must be source-backed", basespec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must be source-backed", model.ErrInvalid, index)
 			}
 			target, err := member.ContainedDeclaration()
 			if err != nil {
@@ -118,11 +118,11 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 				return fmt.Errorf("members[%d]: %w", index, err)
 			}
 			if text.Content != nil || text.Locator == nil {
-				return fmt.Errorf("%w: members[%d] text must use locator content", basespec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] text must use locator content", model.ErrInvalid, index)
 			}
 			if _, err := declaration.ResolveSourceRelativePathLocator(
 				*text.Locator,
-				basespec.Locator(PolicyLocator),
+				model.Locator(PolicyLocator),
 			); err != nil {
 				return fmt.Errorf(
 					"members[%d] text must use a local source-relative locator: %w",
@@ -141,10 +141,10 @@ func validatePolicyDocument(document workspacev1.WorkspaceDocument) error {
 				return fmt.Errorf("members[%d]: %w", index, err)
 			}
 			if relationship.Scope != declaration.LookupScopeBuiltin {
-				return fmt.Errorf("%w: members[%d] named non-text must use scope builtin", basespec.ErrInvalid, index)
+				return fmt.Errorf("%w: members[%d] named non-text must use scope builtin", model.ErrInvalid, index)
 			}
 		default:
-			return fmt.Errorf("%w: members[%d] contained non-text is not allowed", basespec.ErrInvalid, index)
+			return fmt.Errorf("%w: members[%d] contained non-text is not allowed", model.ErrInvalid, index)
 		}
 	}
 	return nil

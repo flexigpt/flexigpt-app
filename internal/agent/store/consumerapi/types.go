@@ -3,18 +3,18 @@ package consumerapi
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type AgentView struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        basespec.LogicalName `json:"name"`
-	DisplayName string               `json:"displayName"`
-	Description string               `json:"description,omitempty"`
+	Name        model.LogicalName `json:"name"`
+	DisplayName string            `json:"displayName"`
+	Description string            `json:"description,omitempty"`
 
 	State            artifact.State    `json:"state"`
 	Enabled          bool              `json:"enabled"`
@@ -41,7 +41,7 @@ const (
 type AgentCapabilityOccurrence struct {
 	Path     string                   `json:"path"`
 	Type     declaration.Type         `json:"type"`
-	Name     basespec.LogicalName     `json:"name,omitempty"`
+	Name     model.LogicalName        `json:"name,omitempty"`
 	Status   resolve.ResolutionStatus `json:"status"`
 	Required bool                     `json:"required"`
 
@@ -68,18 +68,18 @@ type AgentTextMaterialization struct {
 	Artifact         artifact.ArtifactRef     `json:"artifact"`
 	ArtifactRevision uint64                   `json:"artifactRevision"`
 	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
-	Name             basespec.LogicalName     `json:"name"`
+	Name             model.LogicalName        `json:"name"`
 	Insert           declaration.InsertTarget `json:"insert"`
 	MediaType        string                   `json:"mediaType,omitempty"`
 	Content          string                   `json:"content"`
-	Locator          basespec.Locator         `json:"locator"`
+	Locator          model.Locator            `json:"locator"`
 	BuiltIn          bool                     `json:"builtIn"`
 }
 
 type ListAgentsRequest struct {
 	RootID root.RootID `json:"rootID"`
 
-	LogicalNames []basespec.LogicalName `json:"logicalNames,omitempty"`
+	LogicalNames []model.LogicalName `json:"logicalNames,omitempty"`
 
 	// Collection limits the result to currently available direct Agent
 	// relationships selected by one Agent Collection Plugin.

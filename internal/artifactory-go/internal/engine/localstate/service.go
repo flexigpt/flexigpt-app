@@ -9,11 +9,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/secretapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -55,7 +55,7 @@ func NewService(
 	if repository == nil || artifacts == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact local-state dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if values != nil {
@@ -79,7 +79,7 @@ func NewService(
 		if _, duplicate := registered[namespace]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate protected overlay namespace %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				namespace,
 			)
 		}
@@ -101,7 +101,7 @@ func NewService(
 		if _, duplicate := storeRegistered[namespace]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate store overlay namespace %q",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				namespace,
 			)
 		}
@@ -167,7 +167,7 @@ func (s *Service) Put(
 		return overlay.Record{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return overlay.Record{}, basespec.ErrConflict
+		return overlay.Record{}, model.ErrConflict
 	}
 
 	payload, err := overlay.CanonicalPayload(request.Payload)
@@ -206,7 +206,7 @@ func (s *Service) Delete(
 		expectedOverlayRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact and overlay revisions are required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -218,7 +218,7 @@ func (s *Service) Delete(
 		return err
 	}
 	if target.Revision != expectedArtifactRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	if err := s.repository.DeleteOverlay(
@@ -271,7 +271,7 @@ func (s *Service) ReplaceBinding(
 	if s.values == nil {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -280,7 +280,7 @@ func (s *Service) ReplaceBinding(
 		return secret.Binding{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return secret.Binding{}, basespec.ErrConflict
+		return secret.Binding{}, model.ErrConflict
 	}
 
 	now := clockutil.NowUTC(s.clock)
@@ -343,7 +343,7 @@ func (s *Service) ClearBinding(
 		return err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return basespec.ErrConflict
+		return model.ErrConflict
 	}
 
 	if err := s.repository.ClearSecretBinding(
@@ -379,7 +379,7 @@ func (s *Service) ReadBinding(
 	if s.values == nil {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if _, err := s.availableArtifact(ctx, key.Artifact); err != nil {
@@ -393,13 +393,13 @@ func (s *Service) ReadBinding(
 	if !found || !binding.Active() {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: secret binding is not configured",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	if *binding.Ref != expectedRef {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: secret binding changed during runtime resolution",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 
@@ -410,7 +410,7 @@ func (s *Service) ReadBinding(
 	if secret.SHA256(value) != binding.SHA256 {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: physical secret value does not match binding SHA-256",
-			basespec.ErrDigestMismatch,
+			model.ErrDigestMismatch,
 		)
 	}
 	return value, binding.Clone(), nil
@@ -442,7 +442,7 @@ func (s *Service) PurgeArtifactLocalState(
 		!installerapi.IsPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected Artifact local-state purge requires installer privilege",
-			basespec.ErrProtected,
+			model.ErrProtected,
 		)
 	}
 
@@ -469,7 +469,7 @@ func (s *Service) DrainSecretGarbage(
 	if s.values == nil {
 		return fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 
@@ -494,7 +494,7 @@ func (s *Service) DrainSecretGarbage(
 				output,
 				fmt.Errorf(
 					"%w: cleanup record belongs to secret backend %q",
-					basespec.ErrUnsupported,
+					model.ErrUnsupported,
 					value.StoreName,
 				),
 			)
@@ -560,12 +560,12 @@ func (s *Service) ready(ctx context.Context) error {
 		s.artifacts == nil ||
 		s.clock == nil ||
 		s.closed.Load() {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Artifact local-state context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -582,7 +582,7 @@ func (s *Service) availableArtifact(
 	if value.State != artifact.StateAvailable {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			value.ID,
 		)
 	}
@@ -596,7 +596,7 @@ func (s *Service) requireProtected(
 		!s.policy.IsProtectedRoot(value.RootID) {
 		return fmt.Errorf(
 			"%w: protected Artifact overlays are valid only in protected Roots",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	return nil
@@ -611,7 +611,7 @@ func (s *Service) requireNamespace(
 	if _, found := s.namespaces[namespace]; !found {
 		return fmt.Errorf(
 			"%w: protected overlay namespace %q is not registered",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			namespace,
 		)
 	}

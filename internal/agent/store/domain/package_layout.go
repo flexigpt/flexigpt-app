@@ -8,23 +8,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
-func ManagedAgentDocumentFile() basespec.Locator {
+func ManagedAgentDocumentFile() model.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		documentTopology.DocumentUseManagedAgent,
 	)
 }
 
-func IsAgentDeclarationDocument(locator basespec.Locator) bool {
+func IsAgentDeclarationDocument(locator model.Locator) bool {
 	return documentTopology.IsAgentDeclarationDocument(locator)
 }
 
 func ManagedPackageAddressForAgent(
-	name basespec.LogicalName,
+	name model.LogicalName,
 ) (source.ManagedPackageAddress, error) {
 	if err := name.Validate(); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -39,7 +39,7 @@ func ManagedPackageAddressForAgent(
 
 func ManagedPackageLocatorForAgent(
 	address source.ManagedPackageAddress,
-) (basespec.Locator, error) {
+) (model.Locator, error) {
 	if err := ValidateManagedAgentPackageAddress(address); err != nil {
 		return "", err
 	}
@@ -47,7 +47,7 @@ func ManagedPackageLocatorForAgent(
 }
 
 func ManagedPackageAddressFromAgentLocator(
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -55,14 +55,14 @@ func ManagedPackageAddressFromAgentLocator(
 	if path.Base(string(locator)) != string(ManagedAgentDocumentFile()) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Agent locator %q is not %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			ManagedAgentDocumentFile(),
 		)
 	}
 
 	address, err := source.ParseManagedPackageAddressDirectory(
-		basespec.Locator(path.Dir(string(locator))),
+		model.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -82,14 +82,14 @@ func ValidateManagedAgentPackageAddress(
 	if address.Kind != ManagedAgentPackageKind {
 		return fmt.Errorf(
 			"%w: Agent package kind must be %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			ManagedAgentPackageKind,
 		)
 	}
 	if address.Version != documentTopology.UnversionedPackageVersion() {
 		return fmt.Errorf(
 			"%w: Agent package version must be %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			documentTopology.UnversionedPackageVersion(),
 		)
 	}
@@ -119,7 +119,7 @@ func ManagedAgentEntryPayload(
 	if document.Locator != nil {
 		return nil, definition.Definition{}, fmt.Errorf(
 			"%w: managed Agent declaration cannot be a source-selected alias",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	raw, err := entry.CanonicalJSON()
@@ -131,11 +131,11 @@ func ManagedAgentEntryPayload(
 		return nil, definition.Definition{}, err
 	}
 	if value.Kind != AgentArtifactKind ||
-		value.LogicalName != basespec.LogicalName(document.Name) ||
+		value.LogicalName != model.LogicalName(document.Name) ||
 		value.LogicalVersion != "" {
 		return nil, definition.Definition{}, fmt.Errorf(
 			"%w: managed Agent Definition identity is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 

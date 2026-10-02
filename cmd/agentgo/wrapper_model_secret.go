@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 )
 
@@ -20,7 +20,7 @@ func newArtifactModelCredentialResolver(
 	if secrets == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store Model credential runtime is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &artifactModelCredentialResolver{
@@ -33,7 +33,7 @@ func (r *artifactModelCredentialResolver) ResolveModelCredential(
 	binding secret.Binding,
 ) (inferenceadapter.Credential, error) {
 	if r == nil || r.secrets == nil {
-		return inferenceadapter.Credential{}, basespec.ErrClosed
+		return inferenceadapter.Credential{}, model.ErrClosed
 	}
 	if err := binding.Validate(); err != nil {
 		return inferenceadapter.Credential{}, err
@@ -41,7 +41,7 @@ func (r *artifactModelCredentialResolver) ResolveModelCredential(
 	if !binding.Active() {
 		return inferenceadapter.Credential{}, fmt.Errorf(
 			"%w: Model Provider credential is not configured",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 
@@ -59,7 +59,7 @@ func (r *artifactModelCredentialResolver) ResolveModelCredential(
 		*current.Ref != *binding.Ref {
 		return inferenceadapter.Credential{}, fmt.Errorf(
 			"%w: Model Provider credential changed during resolution",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 

@@ -6,11 +6,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -51,7 +51,7 @@ type PruneDiscoveryLocatorFunc func(
 	rootID root.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (SourceState, error)
 
 type ArtifactCommands interface {
@@ -111,7 +111,7 @@ func NewService(
 		dependencies.RemoveProtectedPackage == nil {
 		return nil, fmt.Errorf(
 			"%w: managed Artifact service dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -124,7 +124,7 @@ func (s *Service) Publish(
 	request artifact.PublishArtifactRequest,
 ) (artifact.PublishArtifactResult, error) {
 	if s == nil {
-		return artifact.PublishArtifactResult{}, basespec.ErrClosed
+		return artifact.PublishArtifactResult{}, model.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
 		return artifact.PublishArtifactResult{}, err
@@ -249,7 +249,7 @@ func (s *Service) Publish(
 		*resolved.ResolvedDefinition != request.ExpectedDefinition {
 		return artifact.PublishArtifactResult{}, fmt.Errorf(
 			"%w: managed package did not resolve to its expected Artifact",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 		)
 	}
 	return artifact.PublishArtifactResult{
@@ -275,7 +275,7 @@ func (s *Service) Remove(
 	request artifact.RemoveArtifactRequest,
 ) error {
 	if s == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
 		return err
@@ -287,7 +287,7 @@ func (s *Service) Remove(
 		return err
 	}
 	if request.ExpectedGeneration != "" {
-		if err := basespec.ValidateSourceGeneration(request.ExpectedGeneration); err != nil {
+		if err := model.ValidateSourceGeneration(request.ExpectedGeneration); err != nil {
 			return err
 		}
 	}
@@ -298,7 +298,7 @@ func (s *Service) Remove(
 		if request.ExpectedArtifact.RootID != request.RootID {
 			return fmt.Errorf(
 				"%w: expected Artifact belongs to another Root",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 	}
@@ -309,7 +309,7 @@ func (s *Service) Remove(
 		if s.dependencies.PruneDiscoveryLocator == nil {
 			return fmt.Errorf(
 				"%w: managed discovery locator pruning is unavailable",
-				basespec.ErrUnsupported,
+				model.ErrUnsupported,
 			)
 		}
 	}
@@ -333,7 +333,7 @@ func (s *Service) Remove(
 		request.ExpectedGeneration != state.Generation {
 		return fmt.Errorf(
 			"%w: managed Source changed before package removal",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	expectedGeneration := state.Generation
@@ -352,7 +352,7 @@ func (s *Service) Remove(
 		!state.Source.Discovery.Authoritative {
 		return fmt.Errorf(
 			"%w: managed discovery locator pruning requires an authoritative Source",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -426,7 +426,7 @@ func (s *Service) Remove(
 		value.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: managed package removal did not make expected Artifact missing",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return nil
@@ -440,7 +440,7 @@ func (s *Service) requireMutable(
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: managed Artifact context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -454,7 +454,7 @@ func (s *Service) requireMutable(
 			!s.dependencies.Policy.IsProtectedRoot(rootID) {
 			return fmt.Errorf(
 				"%w: managed protected operation requires a protected Root",
-				basespec.ErrProtected,
+				model.ErrProtected,
 			)
 		}
 		return installerapi.RequirePrivileged(ctx)
@@ -475,7 +475,7 @@ func validateManagedSourceState(
 	if err := state.Source.Validate(); err != nil {
 		return fmt.Errorf(
 			"%w: managed Source state: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -483,10 +483,10 @@ func validateManagedSourceState(
 		state.Source.ID != sourceID {
 		return fmt.Errorf(
 			"%w: managed Source state does not match request",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
-	if err := basespec.ValidateSourceGeneration(
+	if err := model.ValidateSourceGeneration(
 		state.Generation,
 	); err != nil {
 		return err
@@ -494,7 +494,7 @@ func validateManagedSourceState(
 	if requireEnabled && !state.Source.Enabled {
 		return fmt.Errorf(
 			"%w: managed Source is disabled",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	}
 	return nil

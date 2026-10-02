@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -26,7 +26,7 @@ func NewBaselineEnsurer(
 	if api == nil || api.collections == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent baseline ensurer requires collections",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &baselineEnsurer{api: api}, nil
@@ -37,7 +37,7 @@ func (s *baselineEnsurer) EnsureAgentBaselineCollection(
 	rootID root.RootID,
 ) (collection.CollectionView, error) {
 	if s == nil || s.api == nil {
-		return collection.CollectionView{}, basespec.ErrClosed
+		return collection.CollectionView{}, model.ErrClosed
 	}
 	return s.api.ensureAgentBaselineCollection(ctx, rootID)
 }

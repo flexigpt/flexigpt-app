@@ -10,11 +10,11 @@ import (
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/artifact"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -44,7 +44,7 @@ func NewService(
 		sources == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact resource service dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -64,7 +64,7 @@ func (s *Service) ResolveArtifact(
 		return resource.ResolvedArtifact{}, err
 	}
 	if s == nil {
-		return resource.ResolvedArtifact{}, basespec.ErrClosed
+		return resource.ResolvedArtifact{}, model.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
 		return resource.ResolvedArtifact{}, err
@@ -79,7 +79,7 @@ func (s *Service) ResolveArtifact(
 		record.SourceContentDigest == nil {
 		return resource.ResolvedArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not currently available",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -87,7 +87,7 @@ func (s *Service) ResolveArtifact(
 		if session.service != s {
 			return resource.ResolvedArtifact{}, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return s.resolveArtifactInSession(ctx, session, record)
@@ -112,7 +112,7 @@ func (s *Service) ResolveArtifact(
 func (s *Service) ResolveVerifiedLocalPath(
 	ctx context.Context,
 	resolved resource.ResolvedArtifact,
-	localLocator basespec.Locator,
+	localLocator model.Locator,
 ) (string, error) {
 	if err := validateContext(
 		ctx,
@@ -121,7 +121,7 @@ func (s *Service) ResolveVerifiedLocalPath(
 		return "", err
 	}
 	if s == nil {
-		return "", basespec.ErrClosed
+		return "", model.ErrClosed
 	}
 	if err := resolved.Validate(); err != nil {
 		return "", err
@@ -133,7 +133,7 @@ func (s *Service) ResolveVerifiedLocalPath(
 		if session.service != s {
 			return "", fmt.Errorf(
 				"%w: verification session belongs to another resource service",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return s.resolveVerifiedLocalPathInSession(ctx, session, resolved, localLocator)
@@ -150,14 +150,14 @@ func (s *Service) ResolveVerifiedLocalPath(
 	if !value.Enabled {
 		return "", fmt.Errorf(
 			"%w: Artifact Source %q is disabled",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.ID,
 		)
 	}
 	if value.Revision != resolved.RefreshState.SourceRevision {
 		return "", fmt.Errorf(
 			"%w: Source changed after Artifact resolution",
-			basespec.ErrRefreshRequired,
+			model.ErrRefreshRequired,
 		)
 	}
 	return sourceimpl.ResolveVerifiedLocalPath(
@@ -168,7 +168,7 @@ func (s *Service) ResolveVerifiedLocalPath(
 		localLocator,
 		resolved.RefreshState.SourceGeneration,
 		*resolved.Artifact.SourceContentDigest,
-		basespec.MaxCandidateBytes,
+		model.MaxCandidateBytes,
 	)
 }
 
@@ -176,14 +176,14 @@ func (s *Service) ReadSourceEntry(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	locator basespec.Locator,
+	locator model.Locator,
 	maximumBytes int64,
 ) (_ resource.VerifiedEntry, returnErr error) {
 	if err := validateContext(ctx, "Source entry read"); err != nil {
 		return resource.VerifiedEntry{}, err
 	}
 	if s == nil {
-		return resource.VerifiedEntry{}, basespec.ErrClosed
+		return resource.VerifiedEntry{}, model.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return resource.VerifiedEntry{}, err
@@ -194,17 +194,17 @@ func (s *Service) ReadSourceEntry(
 	if err := locator.Validate(false); err != nil {
 		return resource.VerifiedEntry{}, err
 	}
-	if maximumBytes <= 0 || maximumBytes > basespec.MaxScanBytes {
+	if maximumBytes <= 0 || maximumBytes > model.MaxScanBytes {
 		return resource.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source entry read limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if session := verificationSessionFromContext(ctx); session != nil {
 		if session.service != s {
 			return resource.VerifiedEntry{}, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 		return s.readSourceEntryInSession(ctx, session, rootID, sourceID, locator, maximumBytes)
@@ -217,7 +217,7 @@ func (s *Service) ReadSourceEntry(
 	if !value.Enabled {
 		return resource.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source %q is disabled",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.ID,
 		)
 	}
@@ -239,7 +239,7 @@ func (s *Service) ReadSourceEntry(
 	if entry.Locator != locator {
 		return resource.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -274,13 +274,13 @@ func (s *Service) StatSourceEntry(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (source.Entry, error) {
 	if err := validateContext(ctx, "Source entry stat"); err != nil {
 		return source.Entry{}, err
 	}
 	if s == nil {
-		return source.Entry{}, basespec.ErrClosed
+		return source.Entry{}, model.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return source.Entry{}, err
@@ -299,7 +299,7 @@ func (s *Service) StatSourceEntry(
 	if !value.Enabled {
 		return source.Entry{}, fmt.Errorf(
 			"%w: Source %q is disabled",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			sourceID,
 		)
 	}
@@ -320,7 +320,7 @@ func (s *Service) StatSourceEntry(
 	if entry.Locator != locator {
 		return source.Entry{}, fmt.Errorf(
 			"%w: Source stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			locator,
 			entry.Locator,
 		)
@@ -338,7 +338,7 @@ func (s *Service) ReadSourceTree(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-	base basespec.Locator,
+	base model.Locator,
 	include []string,
 	exclude []string,
 	maximumEntries int,
@@ -348,7 +348,7 @@ func (s *Service) ReadSourceTree(
 		return nil, err
 	}
 	if s == nil || s.sources == nil {
-		return nil, basespec.ErrClosed
+		return nil, model.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -359,7 +359,7 @@ func (s *Service) ReadSourceTree(
 	if err := base.Validate(true); err != nil {
 		return nil, err
 	}
-	selection, err := basespec.NewPathSelection(
+	selection, err := model.NewPathSelection(
 		include,
 		exclude,
 	)
@@ -367,17 +367,17 @@ func (s *Service) ReadSourceTree(
 		return nil, err
 	}
 	if maximumEntries <= 0 ||
-		maximumEntries > basespec.MaxDiscoveryEntries {
+		maximumEntries > model.MaxDiscoveryEntries {
 		return nil, fmt.Errorf(
 			"%w: Source tree entry limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if maximumBytes <= 0 ||
-		maximumBytes > basespec.MaxScanBytes {
+		maximumBytes > model.MaxScanBytes {
 		return nil, fmt.Errorf(
 			"%w: Source tree byte limit is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -388,7 +388,7 @@ func (s *Service) ReadSourceTree(
 	if !value.Enabled {
 		return nil, fmt.Errorf(
 			"%w: Source %q is disabled",
-			basespec.ErrSourceUnavailable,
+			model.ErrSourceUnavailable,
 			value.ID,
 		)
 	}
@@ -411,7 +411,7 @@ func (s *Service) ReadSourceTree(
 	if rootEntry.Locator != base {
 		return nil, fmt.Errorf(
 			"%w: Source stat for %q returned %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			base,
 			rootEntry.Locator,
 		)
@@ -441,7 +441,7 @@ func (s *Service) ReadSourceTree(
 		if len(selected) == maximumEntries {
 			return fmt.Errorf(
 				"%w: Source tree exceeds %d selected entries",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				maximumEntries,
 			)
 		}
@@ -453,18 +453,18 @@ func (s *Service) ReadSourceTree(
 	}
 
 	var visit func(
-		directory basespec.Locator,
+		directory model.Locator,
 		depth int,
 	) error
 	visit = func(
-		directory basespec.Locator,
+		directory model.Locator,
 		depth int,
 	) error {
-		if depth > basespec.DefaultMaxDepth {
+		if depth > model.DefaultMaxDepth {
 			return fmt.Errorf(
 				"%w: Source tree exceeds depth %d",
-				basespec.ErrInvalid,
-				basespec.DefaultMaxDepth,
+				model.ErrInvalid,
+				model.DefaultMaxDepth,
 			)
 		}
 		entries, err := snapshot.ReadDir(ctx, directory)
@@ -484,16 +484,16 @@ func (s *Service) ReadSourceTree(
 			if !sourceTreeDirectChild(directory, entry.Locator) {
 				return fmt.Errorf(
 					"%w: Source snapshot returned non-child %q for %q",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 					entry.Locator,
 					directory,
 				)
 			}
 			visited++
-			if visited > basespec.MaxDiscoveryEntries {
+			if visited > model.MaxDiscoveryEntries {
 				return fmt.Errorf(
 					"%w: Source tree exceeds traversal entry limit",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 
@@ -534,7 +534,7 @@ func (s *Service) ReadSourceTree(
 	default:
 		return nil, fmt.Errorf(
 			"%w: Source tree base %q is not a regular file or directory",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			base,
 		)
 	}
@@ -555,10 +555,10 @@ func (s *Service) ReadSourceTree(
 			maximumBytes-consumed {
 			return nil, fmt.Errorf(
 				"%w: Source tree exceeds aggregate byte limit",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
-		perEntryLimit := int64(basespec.MaxCandidateBytes)
+		perEntryLimit := int64(model.MaxCandidateBytes)
 		if remaining := maximumBytes - consumed; remaining < perEntryLimit {
 			perEntryLimit = remaining
 		}
@@ -589,8 +589,8 @@ func (s *Service) ReadSourceTree(
 }
 
 func sourceTreeDirectChild(
-	parent basespec.Locator,
-	child basespec.Locator,
+	parent model.Locator,
+	child model.Locator,
 ) bool {
 	if child == "." {
 		return false
@@ -609,8 +609,8 @@ func sourceTreeDirectChild(
 }
 
 func sourceTreeRelativeLocator(
-	base basespec.Locator,
-	value basespec.Locator,
+	base model.Locator,
+	value model.Locator,
 ) (string, error) {
 	if base == "." {
 		return string(value), nil
@@ -620,7 +620,7 @@ func sourceTreeRelativeLocator(
 	if !found || relative == "" {
 		return "", fmt.Errorf(
 			"%w: Source entry %q is outside tree base %q",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			value,
 			base,
 		)
@@ -645,7 +645,7 @@ func validateContext(
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: %s context is nil",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			operation,
 		)
 	}

@@ -5,13 +5,13 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
 type GoToolDescriptor struct {
 	Function    string
-	Name        basespec.LogicalName
-	Version     basespec.LogicalVersion
+	Name        model.LogicalName
+	Version     model.LogicalVersion
 	DisplayName string
 	Description string
 	Tags        []string
@@ -20,10 +20,10 @@ type GoToolDescriptor struct {
 }
 
 func (d GoToolDescriptor) Validate() error {
-	if err := basespec.ValidateRequiredText(
+	if err := model.ValidateRequiredText(
 		"Go Tool function",
 		d.Function,
-		basespec.MaxURIBytes,
+		model.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -33,17 +33,17 @@ func (d GoToolDescriptor) Validate() error {
 	if err := d.Version.Validate(false); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"Go Tool display name",
 		d.DisplayName,
-		basespec.MaxDisplayNameBytes,
+		model.MaxDisplayNameBytes,
 	); err != nil {
 		return err
 	}
-	if err := basespec.ValidateOptionalText(
+	if err := model.ValidateOptionalText(
 		"Go Tool description",
 		d.Description,
-		basespec.MaxDescriptionBytes,
+		model.MaxDescriptionBytes,
 	); err != nil {
 		return err
 	}
@@ -63,6 +63,6 @@ type GoToolLocator interface {
 
 	LookupGoToolByName(
 		ctx context.Context,
-		name basespec.LogicalName,
+		name model.LogicalName,
 	) (GoToolDescriptor, error)
 }

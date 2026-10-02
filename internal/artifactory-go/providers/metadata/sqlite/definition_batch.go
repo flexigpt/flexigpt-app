@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -115,7 +115,7 @@ func (s *Store) getDefinitions(
 		if !exists {
 			return nil, fmt.Errorf(
 				"%w: Definition %q in Root %q",
-				basespec.ErrDefinitionNotFound,
+				model.ErrDefinitionNotFound,
 				key.Digest,
 				key.RootID,
 			)

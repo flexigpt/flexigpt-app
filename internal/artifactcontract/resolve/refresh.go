@@ -6,10 +6,10 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 func (r *Resolver) RefreshPlugin(
@@ -73,7 +73,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 	if r == nil || r.refresh == nil {
 		return fmt.Errorf(
 			"%w: Artifact refresh coordinator is unavailable",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 		)
 	}
 	if err := validateResolutionContext(ctx); err != nil {
@@ -105,7 +105,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 		if !found {
 			return fmt.Errorf(
 				"%w: refresh root has no Root identity",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 			)
 		}
 
@@ -124,7 +124,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 			if target.RootID != rootID {
 				return fmt.Errorf(
 					"%w: refresh coordinator returned another Root",
-					basespec.ErrInvalid,
+					model.ErrInvalid,
 				)
 			}
 			if _, done := refreshed[target]; !done || changed {
@@ -154,7 +154,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 
 	return fmt.Errorf(
 		"%w: Artifact refresh closure exceeds depth %d",
-		basespec.ErrLocatorLimitExceeded,
+		model.ErrLocatorLimitExceeded,
 		r.limits.MaxDepth,
 	)
 }

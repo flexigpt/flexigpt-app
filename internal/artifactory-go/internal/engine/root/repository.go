@@ -3,7 +3,7 @@ package rootimpl
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 )
 
 type Repository interface {

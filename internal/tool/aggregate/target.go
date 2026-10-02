@@ -6,8 +6,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )
@@ -20,8 +20,8 @@ const (
 type TargetV1 struct {
 	ToolArtifact     artifact.ArtifactRef      `json:"toolArtifact"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
-	Name             basespec.LogicalName      `json:"name"`
-	Version          basespec.LogicalVersion   `json:"version"`
+	Name             model.LogicalName         `json:"name"`
+	Version          model.LogicalVersion      `json:"version"`
 	Implementation   toolv1.ImplementationKind `json:"implementation"`
 }
 
@@ -35,7 +35,7 @@ func (t TargetV1) Validate() error {
 	if err := t.Name.Validate(); err != nil {
 		return err
 	}
-	if err := basespec.ValidatePortableName(
+	if err := model.ValidatePortableName(
 		"mapped Tool version",
 		string(t.Version),
 	); err != nil {
@@ -47,7 +47,7 @@ func (t TargetV1) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: mapped Tool implementation %q is unsupported",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			t.Implementation,
 		)
 	}
@@ -59,7 +59,7 @@ func NewMappedTarget(
 	if !value.Enabled() || !value.Tool.BuiltIn {
 		return resolve.MappedTarget{}, fmt.Errorf(
 			"%w: Tool %q is disabled",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			value.Tool.Artifact.LogicalName,
 		)
 	}
@@ -101,14 +101,14 @@ func DecodeTarget(
 	if target.Provider != MappedTargetProviderV1 {
 		return TargetV1{}, fmt.Errorf(
 			"%w: unsupported Tool mapped target provider %q",
-			basespec.ErrUnsupported,
+			model.ErrUnsupported,
 			target.Provider,
 		)
 	}
 	if target.Type != declaration.TypeTool || !target.Builtin {
 		return TargetV1{}, fmt.Errorf(
 			"%w: mapped target is not a built-in Tool",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -125,7 +125,7 @@ func DecodeTarget(
 	if target.Name != value.Name {
 		return TargetV1{}, fmt.Errorf(
 			"%w: mapped Tool target name differs from payload",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return value, nil

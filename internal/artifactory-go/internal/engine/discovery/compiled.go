@@ -6,18 +6,18 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-const compiledDecoderID basespec.DecoderID = "artifact.builtin-compiled"
+const compiledDecoderID model.DecoderID = "artifact.builtin-compiled"
 
 type compiledDocumentKey struct {
 	rootID   root.RootID
 	sourceID source.SourceID
-	locator  basespec.Locator
+	locator  model.Locator
 }
 
 type compiledDocumentRegistry struct {
@@ -31,7 +31,7 @@ func (e *Engine) RegisterCompiledDocuments(
 	packages []topology.CompiledPackage,
 ) error {
 	if e == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 
 	pending := make(
@@ -57,7 +57,7 @@ func (e *Engine) RegisterCompiledDocuments(
 			if _, duplicate := pending[key]; duplicate {
 				return fmt.Errorf(
 					"%w: compiled built-in catalog repeats source locator %q",
-					basespec.ErrIdentityConflict,
+					model.ErrIdentityConflict,
 					locator,
 				)
 			}
@@ -80,7 +80,7 @@ func (e *Engine) RegisterCompiledDocuments(
 func (e *Engine) compiledDocument(
 	rootID root.RootID,
 	sourceID source.SourceID,
-	locator basespec.Locator,
+	locator model.Locator,
 ) (topology.CompiledDocument, bool) {
 	e.compiled.mu.RLock()
 	defer e.compiled.mu.RUnlock()

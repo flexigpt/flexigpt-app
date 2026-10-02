@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/agentskills-go/provider/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
 )
@@ -32,7 +32,7 @@ func NewArtifactRouter(
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill router dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return &ArtifactRouter{
@@ -55,7 +55,7 @@ func (r *ArtifactRouter) RootForArtifact(
 	if !skillDomain.IsSkillKind(value.Kind) {
 		return "", fmt.Errorf(
 			"%w: Artifact %q is not a Skill",
-			basespec.ErrReferenceUnresolved,
+			model.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
@@ -95,7 +95,7 @@ func (r *ArtifactRouter) ResolveArtifactSkills(
 		if !skillDomain.IsSkillKind(record.Kind) {
 			return nil, fmt.Errorf(
 				"%w: Artifact %q is not a Skill",
-				basespec.ErrReferenceUnresolved,
+				model.ErrReferenceUnresolved,
 				record.ID,
 			)
 		}
@@ -144,7 +144,7 @@ func (r *ArtifactRouter) ListRootSkills(
 			previous != value.Artifact {
 			return nil, fmt.Errorf(
 				"%w: Artifact Skills %q and %q resolve to one runtime Skill",
-				basespec.ErrConflict,
+				model.ErrConflict,
 				previous.ArtifactID,
 				value.Artifact.ArtifactID,
 			)
@@ -186,7 +186,7 @@ func (r *ArtifactRouter) resolveRecords(
 	if len(materials) != len(records) {
 		return nil, fmt.Errorf(
 			"%w: Skill materializer returned an unexpected result count",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -197,7 +197,7 @@ func (r *ArtifactRouter) resolveRecords(
 		if material.Artifact != record.Ref() {
 			return nil, fmt.Errorf(
 				"%w: Skill materializer resolved another Artifact",
-				basespec.ErrRefreshRequired,
+				model.ErrRefreshRequired,
 			)
 		}
 
@@ -230,7 +230,7 @@ func (r *ArtifactRouter) resolveRecord(
 	if len(values) != 1 {
 		return ResolvedArtifactSkill{}, fmt.Errorf(
 			"%w: expected one resolved Skill",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return values[0], nil
@@ -245,13 +245,13 @@ func (s ResolvedArtifactSkill) Validate() error {
 		s.Definition.Location == "" {
 		return fmt.Errorf(
 			"%w: runtime Skill definition is incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	if s.Version == "" {
 		return fmt.Errorf(
 			"%w: runtime Skill version is required",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return nil

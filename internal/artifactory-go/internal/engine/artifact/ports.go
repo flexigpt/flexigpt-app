@@ -3,12 +3,12 @@ package artifactimpl
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -33,7 +33,7 @@ type Reader interface {
 		ctx context.Context,
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
-		logicalName basespec.LogicalName,
+		logicalName model.LogicalName,
 	) ([]artifact.Artifact, error)
 
 	FindByOrigin(
@@ -64,7 +64,7 @@ type CatalogReader interface {
 		ctx context.Context,
 		rootID root.RootID,
 		kind artifact.ArtifactKind,
-		logicalName basespec.LogicalName,
+		logicalName model.LogicalName,
 		options catalog.ListOptions,
 	) ([]catalog.Entry, error)
 

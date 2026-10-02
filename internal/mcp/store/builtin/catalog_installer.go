@@ -6,9 +6,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 )
 
@@ -36,7 +36,7 @@ func NewInstaller(
 		dependencies.Cleanup == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP generated catalog installer dependencies are incomplete",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 
@@ -93,7 +93,7 @@ func (l lifecycle) CompleteCompiledHydration(
 	if !ok {
 		return fmt.Errorf(
 			"%w: MCP generated hydration lifecycle state is invalid",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 		)
 	}
 	return l.cleanup.CleanupRemovedBuiltInPackageServers(
@@ -112,7 +112,7 @@ func addressesForPlan(
 	)
 	seen := make(map[source.ManagedPackageAddress]struct{})
 
-	byScope := make(map[basespec.Locator]source.ManagedPackageAddress)
+	byScope := make(map[model.Locator]source.ManagedPackageAddress)
 	for _, packageValue := range plan.Registration.Set.Packages {
 		scope, err := packageValue.Address.Directory()
 		if err != nil {
@@ -126,7 +126,7 @@ func addressesForPlan(
 		if !found {
 			return nil, fmt.Errorf(
 				"%w: MCP generated package scope %q is unknown",
-				basespec.ErrInvalid,
+				model.ErrInvalid,
 				scope,
 			)
 		}

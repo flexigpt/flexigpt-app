@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"
@@ -233,7 +233,7 @@ func (w *MCPRuntimeWrapper) ready() error {
 		w.toolBridge == nil ||
 		w.auth == nil ||
 		w.oauthBroker == nil {
-		return basespec.ErrClosed
+		return model.ErrClosed
 	}
 	return nil
 }

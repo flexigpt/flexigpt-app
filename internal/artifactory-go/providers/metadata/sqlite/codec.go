@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -62,22 +62,22 @@ func encodeJSON(value any) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(encoded) > basespec.MaxDefinitionBytes {
+	if len(encoded) > model.MaxDefinitionBytes {
 		return nil, fmt.Errorf(
 			"%w: persisted JSON exceeds %d bytes",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionBytes,
+			model.ErrInvalid,
+			model.MaxDefinitionBytes,
 		)
 	}
 	canonical, err := jsonutil.Canonicalize(encoded)
 	if err != nil {
 		return nil, err
 	}
-	if len(canonical) > basespec.MaxDefinitionBytes {
+	if len(canonical) > model.MaxDefinitionBytes {
 		return nil, fmt.Errorf(
 			"%w: canonical persisted JSON exceeds %d bytes",
-			basespec.ErrInvalid,
-			basespec.MaxDefinitionBytes,
+			model.ErrInvalid,
+			model.MaxDefinitionBytes,
 		)
 	}
 	return canonical, nil
@@ -85,15 +85,15 @@ func encodeJSON(value any) ([]byte, error) {
 
 func decodeJSON(raw []byte, target any) error {
 	if len(raw) == 0 {
-		return fmt.Errorf("%w: persisted JSON is empty", basespec.ErrInvalid)
+		return fmt.Errorf("%w: persisted JSON is empty", model.ErrInvalid)
 	}
-	if len(raw) > basespec.MaxDefinitionBytes {
-		return fmt.Errorf("%w: persisted JSON exceeds size limit", basespec.ErrInvalid)
+	if len(raw) > model.MaxDefinitionBytes {
+		return fmt.Errorf("%w: persisted JSON exceeds size limit", model.ErrInvalid)
 	}
 	if err := json.Unmarshal(raw, target); err != nil {
 		return fmt.Errorf(
 			"%w: decode persisted JSON: %w",
-			basespec.ErrInvalid,
+			model.ErrInvalid,
 			err,
 		)
 	}
@@ -107,31 +107,31 @@ func sqliteError(err error) error {
 	message := strings.ToLower(err.Error())
 	switch {
 	case strings.Contains(message, "unique constraint failed"):
-		return fmt.Errorf("%w: metadata already exists", basespec.ErrConflict)
+		return fmt.Errorf("%w: metadata already exists", model.ErrConflict)
 	case strings.Contains(
 		message,
 		"artifact record requires active source",
 	):
 		return fmt.Errorf(
 			"%w: Artifact Source is no longer active",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	case strings.Contains(message, "artifact root retirement requires no active children"),
 		strings.Contains(message, "artifact root purge requires no active children"):
 		return fmt.Errorf(
 			"%w: Root still owns Sources or Artifact records",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	case strings.Contains(message, "foreign key constraint failed"):
 		return fmt.Errorf(
 			"%w: related metadata is missing or still referenced",
-			basespec.ErrConflict,
+			model.ErrConflict,
 		)
 	case strings.Contains(message, "database is locked"),
 		strings.Contains(message, "database is busy"),
 		strings.Contains(message, "sqlite_busy"),
 		strings.Contains(message, "sqlite_locked"):
-		return fmt.Errorf("%w: metadata database is busy", basespec.ErrConflict)
+		return fmt.Errorf("%w: metadata database is busy", model.ErrConflict)
 	default:
 		return err
 	}
