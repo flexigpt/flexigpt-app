@@ -6,16 +6,16 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 type apiOptions struct {
-	locatorResolvers  []providerapi.LocatorResolverFactory
+	locatorResolvers  []provider.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 }
@@ -23,11 +23,11 @@ type apiOptions struct {
 type Option func(*apiOptions)
 
 func WithLocatorResolvers(
-	values []providerapi.LocatorResolverFactory,
+	values []provider.LocatorResolverFactory,
 ) Option {
 	return func(options *apiOptions) {
 		options.locatorResolvers = append(
-			[]providerapi.LocatorResolverFactory(nil),
+			[]provider.LocatorResolverFactory(nil),
 			values...,
 		)
 	}
@@ -68,7 +68,7 @@ func WithTargetMappers(
 }
 
 type mcpLocatorRuntime struct {
-	artifacts compositionapi.ArtifactAPI
+	artifacts local.ArtifactAPI
 }
 
 func (r mcpLocatorRuntime) ListArtifactsBySource(

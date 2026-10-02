@@ -19,8 +19,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -33,10 +33,10 @@ const (
 )
 
 type API struct {
-	sources          compositionapi.SourceAPI
-	discovery        compositionapi.DiscoveryAPI
-	artifacts        compositionapi.ArtifactAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
+	sources          local.SourceAPI
+	discovery        local.DiscoveryAPI
+	artifacts        local.ArtifactAPI
+	managedArtifacts local.ManagedArtifactAPI
 	domain           *DomainPolicy
 	resolver         *resolve.Resolver
 
@@ -45,10 +45,10 @@ type API struct {
 }
 
 func NewWithResolver(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	managedArtifacts local.ManagedArtifactAPI,
 	resolver *resolve.Resolver,
 	domains ...DomainPolicy,
 ) (*API, error) {
@@ -63,10 +63,10 @@ func NewWithResolver(
 }
 
 func newAPI(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	managedArtifacts local.ManagedArtifactAPI,
 	resolver *resolve.Resolver,
 	domains ...DomainPolicy,
 ) (*API, error) {

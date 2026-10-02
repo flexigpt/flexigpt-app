@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"

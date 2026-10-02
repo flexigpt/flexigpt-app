@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -18,7 +18,7 @@ import (
 func NewPassthrough(
 	key schema.Key,
 	jsonSchema []byte,
-) providerapi.SchemaCodec {
+) provider.SchemaCodec {
 	return passthrough{
 		key:        key,
 		jsonSchema: append([]byte(nil), jsonSchema...),

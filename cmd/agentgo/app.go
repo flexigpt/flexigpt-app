@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
@@ -53,7 +53,7 @@ type App struct {
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
-	artifactStoreComposition *compositionapi.Store
+	artifactStoreComposition *local.Store
 
 	dataBasePath string
 

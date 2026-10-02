@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 // Package locatorpath implements portable source-relative path declaration
@@ -59,8 +59,8 @@ func (*locatorpathFactory) Revision() string {
 }
 
 func (f *locatorpathFactory) BindLocatorRuntime(
-	runtime providerapi.LocatorRuntime,
-) (providerapi.BoundLocatorResolver, error) {
+	runtime provider.LocatorRuntime,
+) (provider.BoundLocatorResolver, error) {
 	if f == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator resolver dependencies are incomplete",
@@ -77,12 +77,12 @@ func (f *locatorpathFactory) BindLocatorRuntime(
 type boundResolver struct {
 	artifactKinds []artifact.ArtifactKind
 
-	runtime providerapi.LocatorRuntime
+	runtime provider.LocatorRuntime
 }
 
 func (r *boundResolver) ResolveLocator(
 	ctx context.Context,
-	request providerapi.LocatorResolutionRequest,
+	request provider.LocatorResolutionRequest,
 ) (artifact.ArtifactRef, error) {
 	if r == nil || r.runtime == nil {
 		return artifact.ArtifactRef{}, model.ErrClosed
@@ -169,7 +169,7 @@ func declarationCandidateLocators(
 
 func (r *boundResolver) selectArtifact(
 	ctx context.Context,
-	request providerapi.LocatorResolutionRequest,
+	request provider.LocatorResolutionRequest,
 	locators []model.Locator,
 ) (artifact.ArtifactRef, error) {
 	records, err := r.runtime.ListArtifactsBySource(
@@ -242,7 +242,7 @@ func (r *boundResolver) selectArtifact(
 }
 
 func requestedTextLogicalVersion(
-	request providerapi.LocatorResolutionRequest,
+	request provider.LocatorResolutionRequest,
 ) (model.LogicalVersion, bool, error) {
 	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeText) ||
 		len(request.EntryJSON) == 0 {
@@ -261,7 +261,7 @@ func requestedTextLogicalVersion(
 }
 
 func requestedMCPServerSubresource(
-	request providerapi.LocatorResolutionRequest,
+	request provider.LocatorResolutionRequest,
 ) (model.SubresourceLocator, bool, error) {
 	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeMCP) ||
 		len(request.EntryJSON) == 0 {

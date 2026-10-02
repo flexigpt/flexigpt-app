@@ -8,13 +8,13 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -370,7 +370,7 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		candidate := providerapi.Candidate{
+		candidate := provider.Candidate{
 			SourceID:            value.ID,
 			SourceKind:          value.Kind,
 			Locator:             entry.Locator,
@@ -404,9 +404,9 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		var decoded []providerapi.Decoded
+		var decoded []provider.Decoded
 		var decoderDiagnostics []diagnostic.Diagnostic
-		if sourceAware, supported := decoder.(providerapi.SourceAwareDecoder); supported {
+		if sourceAware, supported := decoder.(provider.SourceAwareDecoder); supported {
 			decoded, decoderDiagnostics = sourceAware.DecodeWithSource(
 				ctx,
 				cloneCandidate(candidate),
@@ -688,7 +688,7 @@ func decodedBinding(
 	sourceID source.SourceID,
 	candidateLocator model.Locator,
 	candidateDigest cryptoutil.Digest,
-	item providerapi.Decoded,
+	item provider.Decoded,
 ) (artifact.SourceBinding, *cryptoutil.Digest, error) {
 	if (item.OriginLocator == "") !=
 		(item.OriginContentDigest == nil) {
@@ -757,10 +757,10 @@ type snapshotEntryReader struct {
 func (r snapshotEntryReader) ReadSourceEntry(
 	ctx context.Context,
 	locator model.Locator,
-) (providerapi.SourceContent, error) {
+) (provider.SourceContent, error) {
 	entry, err := statEntry(ctx, r.snapshot, locator)
 	if err != nil {
-		return providerapi.SourceContent{}, err
+		return provider.SourceContent{}, err
 	}
 	content, err := sourceimpl.ReadSnapshotEntry(
 		ctx,
@@ -769,9 +769,9 @@ func (r snapshotEntryReader) ReadSourceEntry(
 		r.maximumBytes,
 	)
 	if err != nil {
-		return providerapi.SourceContent{}, err
+		return provider.SourceContent{}, err
 	}
-	return providerapi.SourceContent{
+	return provider.SourceContent{
 		Locator: entry.Locator,
 		Content: content,
 		Digest:  cryptoutil.DigestBytes(content),
@@ -859,11 +859,11 @@ func (e *Engine) allowedDecoders(
 
 func (e *Engine) selectDecoder(
 	ctx context.Context,
-	candidate providerapi.Candidate,
+	candidate provider.Candidate,
 	allowed map[model.DecoderID]struct{},
-) (providerapi.Decoder, []diagnostic.Diagnostic) {
-	var selected providerapi.Decoder
-	best := providerapi.RecognitionNone
+) (provider.Decoder, []diagnostic.Diagnostic) {
+	var selected provider.Decoder
+	best := provider.RecognitionNone
 	tied := make([]model.DecoderID, 0)
 
 	for _, decoder := range e.decoders.registered() {
@@ -876,8 +876,8 @@ func (e *Engine) selectDecoder(
 			ctx,
 			cloneCandidate(candidate),
 		)
-		if recognition < providerapi.RecognitionNone ||
-			recognition > providerapi.RecognitionPreferred {
+		if recognition < provider.RecognitionNone ||
+			recognition > provider.RecognitionPreferred {
 			return nil, []diagnostic.Diagnostic{{
 				Severity: diagnostic.SeverityError,
 				Code:     DiagnosticCodeDecoderInvalidRecognition,
@@ -898,7 +898,7 @@ func (e *Engine) selectDecoder(
 			continue
 		}
 		if recognition == best &&
-			recognition != providerapi.RecognitionNone {
+			recognition != provider.RecognitionNone {
 			tied = append(tied, decoder.ID())
 		}
 	}
@@ -1151,8 +1151,8 @@ func isDirectChild(
 }
 
 func cloneCandidate(
-	value providerapi.Candidate,
-) providerapi.Candidate {
+	value provider.Candidate,
+) provider.Candidate {
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
 	output.RequestedDecoderIDs = append(

@@ -1,19 +1,19 @@
 package providermarkdown
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 
 const providerName = "artifact-markdown"
 
 // Provider registers physical Markdown source-format adapters. It emits Text
 // and Agent Artifacts for any Store Root.
 type Provider struct {
-	descriptor providerapi.Descriptor
+	descriptor provider.Descriptor
 }
 
 func NewProvider() (*Provider, error) {
-	descriptor := providerapi.Descriptor{
+	descriptor := provider.Descriptor{
 		Name: providerName,
-		Decoders: []providerapi.Decoder{
+		Decoders: []provider.Decoder{
 			NewAgentMarkdownDecoder(),
 			NewTextDecoder(),
 		},
@@ -26,9 +26,9 @@ func NewProvider() (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) Descriptor() providerapi.Descriptor {
+func (p *Provider) Descriptor() provider.Descriptor {
 	if p == nil {
-		return providerapi.Descriptor{}
+		return provider.Descriptor{}
 	}
 	return p.descriptor.Clone()
 }

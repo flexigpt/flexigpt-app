@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 

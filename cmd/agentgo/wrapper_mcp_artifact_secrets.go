@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
@@ -13,15 +13,15 @@ import (
 )
 
 type artifactMCPSecretResolver struct {
-	artifacts compositionapi.ArtifactAPI
-	bindings  compositionapi.SecretBindingAPI
-	runtime   compositionapi.SecretRuntimeAPI
+	artifacts local.ArtifactAPI
+	bindings  local.SecretBindingAPI
+	runtime   local.SecretRuntimeAPI
 }
 
 func newArtifactMCPSecretResolver(
-	artifacts compositionapi.ArtifactAPI,
-	bindings compositionapi.SecretBindingAPI,
-	runtime compositionapi.SecretRuntimeAPI,
+	artifacts local.ArtifactAPI,
+	bindings local.SecretBindingAPI,
+	runtime local.SecretRuntimeAPI,
 ) (*artifactMCPSecretResolver, error) {
 	if artifacts == nil || bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(

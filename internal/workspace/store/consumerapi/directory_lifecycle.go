@@ -9,7 +9,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
@@ -29,11 +29,11 @@ type workspaceSourceSet struct {
 }
 
 type workspaceSourceRegistry struct {
-	sources compositionapi.SourceAPI
+	sources local.SourceAPI
 }
 
 func newWorkspaceSourceRegistry(
-	sources compositionapi.SourceAPI,
+	sources local.SourceAPI,
 ) workspaceSourceRegistry {
 	return workspaceSourceRegistry{sources: sources}
 }

@@ -9,9 +9,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -34,20 +34,20 @@ func initMCPWrappers(
 	storeWrapper *MCPStoreWrapper,
 	runtimeWrapper *MCPRuntimeWrapper,
 	aggregateWrapper *MCPAggregateWrapper,
-	roots compositionapi.RootAPI,
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
-	protectedOverlays compositionapi.ProtectedOverlayAPI,
-	storeOverlays compositionapi.StoreOverlayAPI,
-	secretBindings compositionapi.SecretBindingAPI,
-	secretRuntime compositionapi.SecretRuntimeAPI,
-	localState compositionapi.LocalStateMaintenanceAPI,
+	roots local.RootAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
+	protectedOverlays local.ProtectedOverlayAPI,
+	storeOverlays local.StoreOverlayAPI,
+	secretBindings local.SecretBindingAPI,
+	secretRuntime local.SecretRuntimeAPI,
+	localState local.LocalStateMaintenanceAPI,
 	hydrator topology.CompiledHydrationCoordinator,
-	locatorResolvers []providerapi.LocatorResolverFactory,
+	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 ) (builtin.HydrationInstaller, error) {

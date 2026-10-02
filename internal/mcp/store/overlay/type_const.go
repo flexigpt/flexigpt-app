@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
@@ -93,8 +93,8 @@ type OverlayRepository interface {
 }
 
 type ArtifactOverlayDependencies struct {
-	Artifacts        compositionapi.ArtifactAPI
-	Protection       compositionapi.ProtectionAPI
-	ProtectedOverlay compositionapi.ProtectedOverlayAPI
-	LocalState       compositionapi.LocalStateMaintenanceAPI
+	Artifacts        local.ArtifactAPI
+	Protection       local.ProtectionAPI
+	ProtectedOverlay local.ProtectedOverlayAPI
+	LocalState       local.LocalStateMaintenanceAPI
 }

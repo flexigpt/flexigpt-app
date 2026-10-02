@@ -4,10 +4,10 @@ import (
 	"context"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
@@ -29,21 +29,21 @@ func (*Decoder) Revision() string {
 
 func (*Decoder) Recognize(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) providerapi.Recognition {
+	candidate provider.Candidate,
+) provider.Recognition {
 	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 	if candidate.RequestsDecoder(skillDomain.MarkdownDecoderID) {
-		return providerapi.RecognitionPreferred
+		return provider.RecognitionPreferred
 	}
-	return providerapi.RecognitionPossible
+	return provider.RecognitionPossible
 }
 
 func (*Decoder) Decode(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+	candidate provider.Candidate,
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
 		return nil, nil
 	}
@@ -70,7 +70,7 @@ func (*Decoder) Decode(
 		}
 	}
 
-	return []providerapi.Decoded{{
+	return []provider.Decoded{{
 		Definition: value,
 	}}, warnings
 }

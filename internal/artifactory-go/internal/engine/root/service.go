@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -45,8 +45,8 @@ func (s *Service) Create(
 	return s.create(ctx, draft)
 }
 
-// EnsureSystem is reserved for an application-owned protected-topology
-// installerapi. Artifact Store does not assign any feature meaning to the Root.
+// EnsureSystem is reserved for an application-owned protected-topology.
+// Artifact Store does not assign any feature meaning to the Root.
 func (s *Service) EnsureSystem(
 	ctx context.Context,
 	draft root.RootDraft,
@@ -61,7 +61,7 @@ func (s *Service) EnsureSystem(
 			draft.ID,
 		)
 	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := install.RequirePrivileged(ctx); err != nil {
 		return root.Root{}, err
 	}
 	return s.create(ctx, draft)
@@ -259,7 +259,7 @@ func RequireMutableRoot(
 	if policy == nil || !policy.IsProtectedRoot(rootID) {
 		return nil
 	}
-	if installerapi.IsPrivileged(ctx) {
+	if install.IsPrivileged(ctx) {
 		return nil
 	}
 	return fmt.Errorf(

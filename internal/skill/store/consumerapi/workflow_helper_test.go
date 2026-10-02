@@ -7,11 +7,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -19,7 +19,7 @@ import (
 )
 
 type skillWorkflowFixture struct {
-	store *compositionapi.Store
+	store *local.Store
 	api   *skillConsumerAPI.API
 
 	bootstrap       *builtin.BootstrapRegistry
@@ -35,11 +35,11 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	skillProvider, err := skillProviderAPI.NewProvider()
 	requireNoError(t, err)
 
-	store, err := compositionapi.Open(
+	store, err := local.Open(
 		t.Context(),
-		compositionapi.Config{
+		local.Config{
 			BaseDirectory: t.TempDir(),
-			Providers: []providerapi.Provider{
+			Providers: []provider.Provider{
 				canonicalProvider,
 				skillProvider,
 			},

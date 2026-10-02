@@ -20,13 +20,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
@@ -35,7 +35,7 @@ import (
 const workflowDependencySourceID source.SourceID = "0192c4c0-00f0-7000-8000-000000000001"
 
 type workflowHarness struct {
-	store *compositionapi.Store
+	store *local.Store
 	api   *agentConsumerAPI.API
 
 	dependencyDirectory     string
@@ -126,14 +126,14 @@ func newWorkflowHarness(
 	workspaceFS, err := builtin.EmbeddedWorkspacePackages()
 	requireNoError(t, err)
 
-	store, err := compositionapi.Open(
+	store, err := local.Open(
 		ctx,
-		compositionapi.Config{
+		local.Config{
 			BaseDirectory: t.TempDir(),
 			EmbeddedProviders: map[string]fs.FS{
 				defaultpolicy.ProviderKey: workspaceFS,
 			},
-			Providers: []providerapi.Provider{
+			Providers: []provider.Provider{
 				canonicalProvider,
 				markdownProvider,
 				skillProvider,
@@ -197,7 +197,7 @@ func (h *workflowHarness) installBundledAgents(
 		h.agentBootstrap = bootstrap
 		h.agentInstaller = installer
 	}
-	ctx := installerapi.WithPrivilege(t.Context())
+	ctx := install.WithPrivilege(t.Context())
 
 	requireNoError(t, h.agentBootstrap.Ensure(ctx))
 	h.addMissingBuiltinDependencies(t, ctx)

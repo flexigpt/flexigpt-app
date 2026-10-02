@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
@@ -71,7 +71,7 @@ func (i *CatalogInstaller) DesiredHydration(
 	if i == nil {
 		return topology.Hydration{}, model.ErrClosed
 	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := install.RequirePrivileged(ctx); err != nil {
 		return topology.Hydration{}, err
 	}
 	return i.registration.Set.Hydration, nil
@@ -83,7 +83,7 @@ func (i *CatalogInstaller) DesiredPackageHydrations(
 	if i == nil {
 		return nil, model.ErrClosed
 	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := install.RequirePrivileged(ctx); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +117,7 @@ func (i *CatalogInstaller) CompiledRegistration(
 	if i == nil {
 		return topology.CompiledRegistration{}, model.ErrClosed
 	}
-	if err := installerapi.RequirePrivileged(ctx); err != nil {
+	if err := install.RequirePrivileged(ctx); err != nil {
 		return topology.CompiledRegistration{}, err
 	}
 	// Generated catalogs are immutable after construction. Avoid copying the
@@ -201,5 +201,5 @@ func (i *CatalogInstaller) FinalizeHydration(
 ) error {
 	// HydrateCompiledPackages refreshes and verifies changed generated packages.
 	// There is no runtime declaration resolver work left for this installer.
-	return installerapi.RequirePrivileged(ctx)
+	return install.RequirePrivileged(ctx)
 }

@@ -9,13 +9,13 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -24,7 +24,7 @@ import (
 
 type SkillStoreWrapper struct {
 	api   *skillConsumerAPI.API
-	roots compositionapi.RootAPI
+	roots local.RootAPI
 }
 
 func NewSkillBuiltInInstaller(
@@ -43,16 +43,16 @@ func NewSkillBuiltInInstaller(
 
 func InitSkillStoreWrapper(
 	wrapper *SkillStoreWrapper,
-	roots compositionapi.RootAPI,
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
+	roots local.RootAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
-	locatorResolvers ...providerapi.LocatorResolverFactory,
+	locatorResolvers ...provider.LocatorResolverFactory,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
@@ -317,8 +317,6 @@ func (w *SkillStoreWrapper) CreateSkillCollection(
 			}
 
 			// A blank RootID is UI request routing to the retained user Root.
-			// "compositionapi.Open" owns retained Root creation during startup;
-			// an ordinary management request must not mutate topology.
 			if request.RootID == "" {
 				request.RootID = documentTopology.UserRootID()
 			}

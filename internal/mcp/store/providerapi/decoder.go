@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
@@ -28,22 +28,22 @@ func (*Decoder) Revision() string {
 
 func (*Decoder) Recognize(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) providerapi.Recognition {
+	candidate provider.Candidate,
+) provider.Recognition {
 	switch {
 	case sourceformat.IsRetiredMCPCollection(candidate.Content):
-		return providerapi.RecognitionPreferred
+		return provider.RecognitionPreferred
 	case sourceformat.IsMCPConfig(candidate.Content):
-		return providerapi.RecognitionPreferred
+		return provider.RecognitionPreferred
 	case isMCPConfigCandidate(candidate):
-		return providerapi.RecognitionPossible
+		return provider.RecognitionPossible
 	default:
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 }
 
 func isMCPConfigCandidate(
-	candidate providerapi.Candidate,
+	candidate provider.Candidate,
 ) bool {
 	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
 		return true
@@ -55,8 +55,8 @@ func isMCPConfigCandidate(
 
 func (d *Decoder) Decode(
 	ctx context.Context,
-	candidate providerapi.Candidate,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+	candidate provider.Candidate,
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	switch {
 	case sourceformat.IsRetiredMCPCollection(candidate.Content):
 		return nil, decoderError(
@@ -93,10 +93,10 @@ func (d *Decoder) Decode(
 
 func decodedValues(
 	values []sourceformat.Decoded,
-) []providerapi.Decoded {
-	output := make([]providerapi.Decoded, 0, len(values))
+) []provider.Decoded {
+	output := make([]provider.Decoded, 0, len(values))
 	for _, value := range values {
-		output = append(output, providerapi.Decoded{
+		output = append(output, provider.Decoded{
 			SubresourceLocator: value.SubresourceLocator,
 			Definition:         value.Definition,
 		})

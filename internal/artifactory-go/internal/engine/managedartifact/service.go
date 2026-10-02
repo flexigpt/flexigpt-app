@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
@@ -457,7 +457,7 @@ func (s *Service) requireMutable(
 				model.ErrProtected,
 			)
 		}
-		return installerapi.RequirePrivileged(ctx)
+		return install.RequirePrivileged(ctx)
 	}
 	return rootimpl.RequireMutableRoot(
 		ctx,

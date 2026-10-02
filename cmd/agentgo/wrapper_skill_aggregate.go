@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -30,8 +30,8 @@ func withSkillAggregate[T any](
 
 func InitSkillAggregateWrapper(
 	wrapper *SkillAggregateWrapper,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
 	runtimeWrapper *SkillRuntimeWrapper,
 ) error {
 	if wrapper == nil ||

@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
@@ -727,7 +727,7 @@ func (a *API) currentManagedSourceGeneration(
 	rootID root.RootID,
 	sourceID source.SourceID,
 ) (string, error) {
-	if err := compositionapi.EnsureSourceCurrent(
+	if err := local.EnsureSourceCurrent(
 		ctx,
 		a.discovery,
 		rootID,

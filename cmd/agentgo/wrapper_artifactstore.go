@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/secret/keyringmapstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/secretstore/keyringmapstore"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -23,7 +23,7 @@ import (
 func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
-) (*compositionapi.Store, error) {
+) (*local.Store, error) {
 	if err := documentTopology.ValidateApplicationTopology(); err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func composeArtifactStore(
 		return nil, err
 	}
 
-	providers := []providerapi.Provider{
+	providers := []provider.Provider{
 		canonicalProvider,
 		markdownProvider,
 		skillProvider,
@@ -80,9 +80,9 @@ func composeArtifactStore(
 		mcpOverlay.StoreNamespaces()...,
 	)
 
-	return compositionapi.Open(
+	return local.Open(
 		ctx,
-		compositionapi.Config{
+		local.Config{
 			BaseDirectory: baseDirectory,
 			EmbeddedProviders: map[string]fs.FS{
 				defaultpolicy.ProviderKey: workspaceFS,

@@ -3,7 +3,7 @@ package providercanonical
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 const providerName = "artifact-declaration"
@@ -11,18 +11,18 @@ const providerName = "artifact-declaration"
 // Provider registers the complete canonical declaration vocabulary exactly
 // once. Physical source-format providers remain separate.
 type Provider struct {
-	descriptor providerapi.Descriptor
+	descriptor provider.Descriptor
 }
 
 func New() (*Provider, error) {
-	descriptor := providerapi.Descriptor{
+	descriptor := provider.Descriptor{
 		Name:    providerName,
 		Schemas: codec.AllSchemaCodecs(),
-		Decoders: []providerapi.Decoder{
+		Decoders: []provider.Decoder{
 			decoder.NewJSONDecoder(),
 			decoder.NewYAMLDecoder(),
 		},
-		LocatorResolvers: []providerapi.LocatorResolverFactory{
+		LocatorResolvers: []provider.LocatorResolverFactory{
 			newLocatorpathFactory(),
 		},
 	}
@@ -34,9 +34,9 @@ func New() (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) Descriptor() providerapi.Descriptor {
+func (p *Provider) Descriptor() provider.Descriptor {
 	if p == nil {
-		return providerapi.Descriptor{}
+		return provider.Descriptor{}
 	}
 	return p.descriptor.Clone()
 }

@@ -7,13 +7,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/secretapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/secretstore"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -33,7 +33,7 @@ type Service struct {
 	artifacts  ArtifactReader
 	clock      clockutil.Clock
 	policy     root.RootPolicy
-	values     secretapi.ValueStore
+	values     secretstore.ValueStore
 
 	namespaces      map[overlay.Namespace]struct{}
 	storeNamespaces map[overlay.Namespace]struct{}
@@ -50,7 +50,7 @@ func NewService(
 	policy root.RootPolicy,
 	namespaces []overlay.Namespace,
 	storeNamespaces []overlay.Namespace,
-	values secretapi.ValueStore,
+	values secretstore.ValueStore,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
 		return nil, fmt.Errorf(
@@ -59,7 +59,7 @@ func NewService(
 		)
 	}
 	if values != nil {
-		if err := secretapi.ValidateValueStore(values); err != nil {
+		if err := secretstore.ValidateValueStore(values); err != nil {
 			return nil, err
 		}
 	}
@@ -439,7 +439,7 @@ func (s *Service) PurgeArtifactLocalState(
 	}
 	if s.policy != nil &&
 		s.policy.IsProtectedRoot(target.RootID) &&
-		!installerapi.IsPrivileged(ctx) {
+		!install.IsPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected Artifact local-state purge requires installer privilege",
 			model.ErrProtected,

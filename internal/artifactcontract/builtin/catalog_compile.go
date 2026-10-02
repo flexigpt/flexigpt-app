@@ -10,14 +10,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -50,7 +50,7 @@ type Config struct {
 	SetName             string
 	SchemaVersion       string
 	InstallerName       string
-	AdditionalProviders []providerapi.Provider
+	AdditionalProviders []provider.Provider
 	Packages            []PackageInput
 }
 
@@ -113,7 +113,7 @@ func Compile(
 	}
 
 	providers := make(
-		[]providerapi.Provider,
+		[]provider.Provider,
 		0,
 		1+len(config.AdditionalProviders),
 	)
@@ -172,7 +172,7 @@ func Compile(
 		return leftDirectory < rightDirectory
 	})
 
-	store, err := compositionapi.Open(ctx, compositionapi.Config{
+	store, err := local.Open(ctx, local.Config{
 		BaseDirectory: filepath.Join(
 			temporaryDirectory,
 			"artifact-store",
@@ -185,7 +185,7 @@ func Compile(
 	}
 	defer store.Close()
 
-	ctx = installerapi.WithPrivilege(ctx)
+	ctx = install.WithPrivilege(ctx)
 	if _, err := store.Topology.EnsureProtectedTopology(
 		ctx,
 		declaration,
@@ -297,7 +297,7 @@ func (p PackageInput) rootExpectation() (Expectation, error) {
 
 func compilePackage(
 	ctx context.Context,
-	store *compositionapi.Store,
+	store *local.Store,
 	input PackageInput,
 	entries []catalog.Entry,
 	validation cryptoutil.Digest,
@@ -487,7 +487,7 @@ func generatedHydrationFingerprint(
 }
 
 func validationFingerprint(
-	providers []providerapi.Provider,
+	providers []provider.Provider,
 ) (cryptoutil.Digest, error) {
 	type schemaValue struct {
 		Identity string            `json:"identity"`

@@ -6,11 +6,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
@@ -23,12 +23,12 @@ type WorkspaceStoreWrapper struct {
 func InitWorkspaceWrappers(
 	storeWrapper *WorkspaceStoreWrapper,
 	runtimeWrapper *WorkspaceRuntimeWrapper,
-	roots compositionapi.RootAPI,
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
-	locatorResolvers []providerapi.LocatorResolverFactory,
+	roots local.RootAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
+	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	mcpServers mcp.ServerResolver,
@@ -44,7 +44,7 @@ func InitWorkspaceWrappers(
 
 	config := workspaceConsumerAPI.DefaultConfig()
 	config.LocatorResolvers = append(
-		[]providerapi.LocatorResolverFactory(nil),
+		[]provider.LocatorResolverFactory(nil),
 		locatorResolvers...,
 	)
 	config.FallbackProviders = fallbackProviders

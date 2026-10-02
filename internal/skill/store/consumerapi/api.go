@@ -8,8 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
@@ -21,24 +21,24 @@ import (
 )
 
 type API struct {
-	sources          compositionapi.SourceAPI
-	discovery        compositionapi.DiscoveryAPI
-	artifacts        compositionapi.ArtifactAPI
-	resources        compositionapi.ResourceAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
-	protection       compositionapi.ProtectionAPI
+	sources          local.SourceAPI
+	discovery        local.DiscoveryAPI
+	artifacts        local.ArtifactAPI
+	resources        local.ResourceAPI
+	managedArtifacts local.ManagedArtifactAPI
+	protection       local.ProtectionAPI
 	collections      *collection.API
 
 	declarationResolver *resolve.Resolver
 }
 
 func New(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
 	options ...Option,
 ) (*API, error) {
 	if sources == nil ||

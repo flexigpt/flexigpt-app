@@ -1,20 +1,20 @@
 package providerapi
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 
 const artifactProviderName = "mcp"
 
 // Provider registers the standard .mcp.json and mcp.json source-format
 // adapter. Canonical MCP Collections are handled by artifactcontract/provider.
 type Provider struct {
-	descriptor providerapi.Descriptor
+	descriptor provider.Descriptor
 }
 
 func NewProvider() (*Provider, error) {
 	decoder := NewDecoder()
-	descriptor := providerapi.Descriptor{
+	descriptor := provider.Descriptor{
 		Name: artifactProviderName,
-		Decoders: []providerapi.Decoder{
+		Decoders: []provider.Decoder{
 			decoder,
 		},
 	}
@@ -26,9 +26,9 @@ func NewProvider() (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) Descriptor() providerapi.Descriptor {
+func (p *Provider) Descriptor() provider.Descriptor {
 	if p == nil {
-		return providerapi.Descriptor{}
+		return provider.Descriptor{}
 	}
 	return p.descriptor.Clone()
 }

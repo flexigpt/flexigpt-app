@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
@@ -18,11 +18,11 @@ import (
 )
 
 type API struct {
-	sources          compositionapi.SourceAPI
-	discovery        compositionapi.DiscoveryAPI
-	artifacts        compositionapi.ArtifactAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
-	protection       compositionapi.ProtectionAPI
+	sources          local.SourceAPI
+	discovery        local.DiscoveryAPI
+	artifacts        local.ArtifactAPI
+	managedArtifacts local.ManagedArtifactAPI
+	protection       local.ProtectionAPI
 
 	overlays    modelOverlay.OverlayRepository
 	adapters    AdapterRegistry

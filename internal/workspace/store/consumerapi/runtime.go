@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"

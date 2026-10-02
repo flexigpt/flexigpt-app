@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/agentskills-go/provider/fs"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
@@ -21,13 +21,13 @@ import (
 //
 // It intentionally does not infer Skill ownership from Collection membership.
 type ArtifactRouter struct {
-	artifacts compositionapi.ArtifactAPI
-	resources compositionapi.ResourceAPI
+	artifacts local.ArtifactAPI
+	resources local.ResourceAPI
 }
 
 func NewArtifactRouter(
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
 ) (*ArtifactRouter, error) {
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(

@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 const JSONDecoderID model.DecoderID = "artifact-declaration-json"
@@ -40,7 +40,7 @@ func (*JSONDecoder) RequiredSchemaKeys() []schema.Key {
 }
 
 func (d *JSONDecoder) BindExpectedCanonicalizer(
-	catalog providerapi.SchemaCatalog,
+	catalog provider.SchemaCatalog,
 ) error {
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
@@ -53,8 +53,8 @@ func (d *JSONDecoder) BindExpectedCanonicalizer(
 
 func (*JSONDecoder) Recognize(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) providerapi.Recognition {
+	candidate provider.Candidate,
+) provider.Recognition {
 	requested := candidate.RequestsDecoder(JSONDecoderID)
 	declared := documentTopology.IsCanonicalJSONDocument(
 		candidate.Locator,
@@ -64,7 +64,7 @@ func (*JSONDecoder) Recognize(
 	)
 	if (extension == ".yaml" || extension == ".yml") && !requested &&
 		!declared {
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 
 	var header struct {
@@ -72,23 +72,23 @@ func (*JSONDecoder) Recognize(
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		if requested || declared {
-			return providerapi.RecognitionPossible
+			return provider.RecognitionPossible
 		}
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 	if !supportsType(header.Type) {
 		if requested || declared {
-			return providerapi.RecognitionPossible
+			return provider.RecognitionPossible
 		}
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
-	return providerapi.RecognitionPreferred
+	return provider.RecognitionPreferred
 }
 
 func (d *JSONDecoder) Decode(
 	ctx context.Context,
-	candidate providerapi.Candidate,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+	candidate provider.Candidate,
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	if d == nil || d.core == nil {
 		return nil, []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityError,

@@ -1,0 +1,182 @@
+package provider
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+)
+
+// LocatorResolverFactory declares one owner-provided portable declaration
+// locator resolver.
+//
+// Artifact Store validates and distributes these factories but does not invoke
+// them itself. Artifact Resolver or owner APIs bind a factory to narrow Store
+// lifecycle operations when they need to resolve a declaration locator.
+//
+// Current built-in support is limited to `path`. URL, Git, package, archive,
+// and registry resolvers are intentionally future provider extensions.
+type LocatorResolverFactory interface {
+	LocatorKind() string
+	ArtifactKinds() []artifact.ArtifactKind
+	Revision() string
+
+	BindLocatorRuntime(
+		runtime LocatorRuntime,
+	) (BoundLocatorResolver, error)
+}
+
+// BoundLocatorResolver is a per-owner resolver instance. Binding keeps Store
+// lifecycle operations explicit and prevents providers from retaining global
+// Store service references.
+type BoundLocatorResolver interface {
+	ResolveLocator(
+		ctx context.Context,
+		request LocatorResolutionRequest,
+	) (artifact.ArtifactRef, error)
+}
+
+// LocatorRuntime is the current Source-index read capability available to a
+// bound declaration locator resolver.
+//
+// Locator resolution is intentionally read-only. Workspace refresh owns
+// Source discovery expansion and Source refresh.
+type LocatorRuntime interface {
+	ListArtifactsBySource(
+		ctx context.Context,
+		rootID root.RootID,
+		sourceID source.SourceID,
+	) ([]catalog.Entry, error)
+}
+
+// LocatorResolutionRequest is generic provider input. LocatorJSON and
+// EntryJSON preserve the portable declaration data without making
+// artifactory/providerapi import artifact declaration contracts.
+type LocatorResolutionRequest struct {
+	RootID root.RootID
+	From   *artifact.Artifact
+
+	LocatorJSON json.RawMessage
+	EntryJSON   json.RawMessage
+
+	ExpectedKind        artifact.ArtifactKind
+	ExpectedLogicalName model.LogicalName
+}
+
+func (r LocatorResolutionRequest) Validate() error {
+	if err := r.RootID.Validate(); err != nil {
+		return err
+	}
+	if r.From != nil {
+		if err := r.From.Validate(); err != nil {
+			return err
+		}
+		if r.From.RootID != r.RootID {
+			return fmt.Errorf(
+				"%w: locator origin Artifact belongs to another Root",
+				model.ErrInvalid,
+			)
+		}
+	}
+	if len(r.LocatorJSON) == 0 ||
+		len(r.LocatorJSON) > model.MaxDefinitionBodyBytes ||
+		!json.Valid(r.LocatorJSON) {
+		return fmt.Errorf(
+			"%w: locator resolver request has invalid locator JSON",
+			model.ErrInvalid,
+		)
+	}
+	if len(r.EntryJSON) != 0 &&
+		(len(r.EntryJSON) > model.MaxDefinitionBodyBytes ||
+			!json.Valid(r.EntryJSON)) {
+		return fmt.Errorf(
+			"%w: locator resolver request has invalid declaration JSON",
+			model.ErrInvalid,
+		)
+	}
+	if err := r.ExpectedKind.Validate(); err != nil {
+		return err
+	}
+	if r.ExpectedLogicalName != "" {
+		if err := r.ExpectedLogicalName.Validate(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// LocatorResolverKey identifies one provider-owned declaration locator
+// resolver slot.
+type LocatorResolverKey struct {
+	LocatorKind  string
+	ArtifactKind artifact.ArtifactKind
+}
+
+func (k LocatorResolverKey) Validate() error {
+	if err := model.ValidateIdentifier(
+		"locator resolver locator kind",
+		k.LocatorKind,
+		model.MaxKindBytes,
+	); err != nil {
+		return err
+	}
+	return k.ArtifactKind.Validate()
+}
+
+func ValidateLocatorResolverFactory(
+	value LocatorResolverFactory,
+) error {
+	if value == nil {
+		return model.ErrInvalid
+	}
+	if err := model.ValidateIdentifier(
+		"locator resolver kind",
+		value.LocatorKind(),
+		model.MaxKindBytes,
+	); err != nil {
+		return err
+	}
+	if err := model.ValidateRequiredText(
+		"locator resolver revision",
+		value.Revision(),
+		model.MaxVersionBytes,
+	); err != nil {
+		return err
+	}
+
+	kinds := value.ArtifactKinds()
+	if len(kinds) == 0 {
+		return fmt.Errorf(
+			"%w: locator resolver %q has no Artifact kinds",
+			model.ErrInvalid,
+			value.LocatorKind(),
+		)
+	}
+
+	seen := make(map[artifact.ArtifactKind]struct{}, len(kinds))
+	for index, kind := range kinds {
+		if err := kind.Validate(); err != nil {
+			return fmt.Errorf(
+				"locator resolver %q Artifact kind %d: %w",
+				value.LocatorKind(),
+				index,
+				err,
+			)
+		}
+		if _, duplicate := seen[kind]; duplicate {
+			return fmt.Errorf(
+				"%w: locator resolver %q repeats Artifact kind %q",
+				model.ErrConflict,
+				value.LocatorKind(),
+				kind,
+			)
+		}
+		seen[kind] = struct{}{}
+	}
+	return nil
+}

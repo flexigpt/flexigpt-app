@@ -11,23 +11,23 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
 type API struct {
-	roots            compositionapi.RootAPI
-	sources          compositionapi.SourceAPI
-	discovery        compositionapi.DiscoveryAPI
-	artifacts        compositionapi.ArtifactAPI
-	resources        compositionapi.ResourceAPI
-	protection       compositionapi.ProtectionAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
+	roots            local.RootAPI
+	sources          local.SourceAPI
+	discovery        local.DiscoveryAPI
+	artifacts        local.ArtifactAPI
+	resources        local.ResourceAPI
+	protection       local.ProtectionAPI
+	managedArtifacts local.ManagedArtifactAPI
 	texts            *materializetext.Adapter
 
 	collections         *collection.API
@@ -39,8 +39,8 @@ type API struct {
 }
 
 type apiOptions struct {
-	roots             compositionapi.RootAPI
-	locatorResolvers  []providerapi.LocatorResolverFactory
+	roots             local.RootAPI
+	locatorResolvers  []provider.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 	importSigner      *signer.Signer
@@ -52,7 +52,7 @@ type Option func(*apiOptions)
 // default user-Root Collection creation. Explicit Root-scoped operations do
 // not require this option.
 func WithRoots(
-	value compositionapi.RootAPI,
+	value local.RootAPI,
 ) Option {
 	return func(options *apiOptions) {
 		options.roots = value
@@ -60,11 +60,11 @@ func WithRoots(
 }
 
 func WithLocatorResolvers(
-	values []providerapi.LocatorResolverFactory,
+	values []provider.LocatorResolverFactory,
 ) Option {
 	return func(options *apiOptions) {
 		options.locatorResolvers = append(
-			[]providerapi.LocatorResolverFactory(nil),
+			[]provider.LocatorResolverFactory(nil),
 			values...,
 		)
 	}
@@ -113,12 +113,12 @@ func WithManagedAgentImportSigner(
 }
 
 func New(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
 	options ...Option,
 ) (*API, error) {
 	if sources == nil ||
@@ -247,7 +247,7 @@ func (a *API) requireMutable(
 }
 
 type agentLocatorRuntime struct {
-	artifacts compositionapi.ArtifactAPI
+	artifacts local.ArtifactAPI
 }
 
 func (r agentLocatorRuntime) ListArtifactsBySource(

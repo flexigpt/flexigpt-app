@@ -9,12 +9,12 @@ import (
 	"sync"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 )
 
-// Installer is implemented by one artifact-family-owned built-in installerapi.
+// Installer is implemented by one artifact-family-owned built-in api.
 // The generic built-in layer deliberately does not inspect package contents,
 // artifact definitions, or artifact-specific manifests.
 type Installer interface {
@@ -203,7 +203,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		return entries[left].name < entries[right].name
 	})
 
-	ctx = installerapi.WithPrivilege(ctx)
+	ctx = install.WithPrivilege(ctx)
 	prepared := make([]preparedHydration, 0, len(entries))
 
 	for _, entry := range entries {

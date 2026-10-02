@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
@@ -41,7 +41,7 @@ func (*YAMLDecoder) RequiredSchemaKeys() []schema.Key {
 }
 
 func (d *YAMLDecoder) BindExpectedCanonicalizer(
-	catalog providerapi.SchemaCatalog,
+	catalog provider.SchemaCatalog,
 ) error {
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
@@ -54,8 +54,8 @@ func (d *YAMLDecoder) BindExpectedCanonicalizer(
 
 func (*YAMLDecoder) Recognize(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) providerapi.Recognition {
+	candidate provider.Candidate,
+) provider.Recognition {
 	requested := candidate.RequestsDecoder(YAMLDecoderID)
 	declared := documentTopology.IsCanonicalYAMLDocument(
 		candidate.Locator,
@@ -65,7 +65,7 @@ func (*YAMLDecoder) Recognize(
 		extension != ".yml" &&
 		!requested &&
 		!declared {
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
 		candidate.Content,
@@ -73,32 +73,32 @@ func (*YAMLDecoder) Recognize(
 	)
 	if err != nil {
 		if requested || declared {
-			return providerapi.RecognitionPossible
+			return provider.RecognitionPossible
 		}
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 	var header struct {
 		Type declaration.Type `json:"type"`
 	}
 	if err := json.Unmarshal(raw, &header); err != nil {
 		if requested || declared {
-			return providerapi.RecognitionPossible
+			return provider.RecognitionPossible
 		}
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
 	if !supportsType(header.Type) {
 		if requested || declared {
-			return providerapi.RecognitionPossible
+			return provider.RecognitionPossible
 		}
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
-	return providerapi.RecognitionPreferred
+	return provider.RecognitionPreferred
 }
 
 func (d *YAMLDecoder) Decode(
 	ctx context.Context,
-	candidate providerapi.Candidate,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+	candidate provider.Candidate,
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	if d == nil || d.core == nil {
 		return nil, []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityError,

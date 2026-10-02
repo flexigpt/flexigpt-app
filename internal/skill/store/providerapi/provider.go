@@ -1,6 +1,6 @@
 package providerapi
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 
 const artifactProviderName = "agent-skill"
 
@@ -9,14 +9,14 @@ const artifactProviderName = "agent-skill"
 // There is no proprietary Skill Plugin
 // manifest adapter.
 type Provider struct {
-	descriptor providerapi.Descriptor
+	descriptor provider.Descriptor
 }
 
 func NewProvider() (*Provider, error) {
 	markdownDecoder := NewDecoder()
-	descriptor := providerapi.Descriptor{
+	descriptor := provider.Descriptor{
 		Name: artifactProviderName,
-		Decoders: []providerapi.Decoder{
+		Decoders: []provider.Decoder{
 			markdownDecoder,
 		},
 	}
@@ -28,9 +28,9 @@ func NewProvider() (*Provider, error) {
 	}, nil
 }
 
-func (p *Provider) Descriptor() providerapi.Descriptor {
+func (p *Provider) Descriptor() provider.Descriptor {
 	if p == nil {
-		return providerapi.Descriptor{}
+		return provider.Descriptor{}
 	}
 	return p.descriptor.Clone()
 }

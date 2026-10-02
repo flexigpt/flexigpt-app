@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
@@ -49,15 +49,15 @@ type Plan struct {
 }
 
 type Adapter struct {
-	artifacts compositionapi.ArtifactAPI
+	artifacts local.ArtifactAPI
 	text      *materializetext.Adapter
 	engine    *workspaceRuntime.Engine
 	policy    workspaceRuntime.CompositionPolicy
 }
 
 func New(
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
 	policy workspaceRuntime.CompositionPolicy,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {

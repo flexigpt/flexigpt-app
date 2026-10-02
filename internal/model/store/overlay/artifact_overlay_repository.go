@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
@@ -15,19 +15,19 @@ import (
 )
 
 type ArtifactOverlayDependencies struct {
-	Artifacts        compositionapi.ArtifactAPI
-	Protection       compositionapi.ProtectionAPI
-	ProtectedOverlay compositionapi.ProtectedOverlayAPI
-	Secrets          compositionapi.SecretBindingAPI
-	LocalState       compositionapi.LocalStateMaintenanceAPI
+	Artifacts        local.ArtifactAPI
+	Protection       local.ProtectionAPI
+	ProtectedOverlay local.ProtectedOverlayAPI
+	Secrets          local.SecretBindingAPI
+	LocalState       local.LocalStateMaintenanceAPI
 }
 
 type ArtifactOverlayRepository struct {
-	artifacts        compositionapi.ArtifactAPI
-	protection       compositionapi.ProtectionAPI
-	protectedOverlay compositionapi.ProtectedOverlayAPI
-	secrets          compositionapi.SecretBindingAPI
-	localState       compositionapi.LocalStateMaintenanceAPI
+	artifacts        local.ArtifactAPI
+	protection       local.ProtectionAPI
+	protectedOverlay local.ProtectedOverlayAPI
+	secrets          local.SecretBindingAPI
+	localState       local.LocalStateMaintenanceAPI
 }
 
 func NewArtifactOverlayRepository(

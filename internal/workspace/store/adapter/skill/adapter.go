@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -32,13 +32,13 @@ type LoadPlan struct {
 }
 
 type Adapter struct {
-	artifacts compositionapi.ArtifactAPI
-	resources compositionapi.ResourceAPI
+	artifacts local.ArtifactAPI
+	resources local.ResourceAPI
 }
 
 func New(
-	artifacts compositionapi.ArtifactAPI,
-	resources compositionapi.ResourceAPI,
+	artifacts local.ArtifactAPI,
+	resources local.ResourceAPI,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(

@@ -8,8 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -23,25 +23,25 @@ import (
 type ModelStoreWrapper struct {
 	api        *modelConsumerAPI.API
 	management *modelConsumerAPI.CatalogStore
-	roots      compositionapi.RootAPI
-	protection compositionapi.ProtectionAPI
+	roots      local.RootAPI
+	protection local.ProtectionAPI
 }
 
 func initModelWrappers(
 	ctx context.Context,
 	storeWrapper *ModelStoreWrapper,
 	aggregateWrapper *ModelAggregateWrapper,
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	roots compositionapi.RootAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
-	protectedOverlays compositionapi.ProtectedOverlayAPI,
-	secretBindings compositionapi.SecretBindingAPI,
-	secretRuntime compositionapi.SecretRuntimeAPI,
-	localState compositionapi.LocalStateMaintenanceAPI,
-	storeOverlays compositionapi.StoreOverlayAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	roots local.RootAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
+	protectedOverlays local.ProtectedOverlayAPI,
+	secretBindings local.SecretBindingAPI,
+	secretRuntime local.SecretRuntimeAPI,
+	localState local.LocalStateMaintenanceAPI,
+	storeOverlays local.StoreOverlayAPI,
 	hydrator topology.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || aggregateWrapper == nil {

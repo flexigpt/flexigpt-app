@@ -4,25 +4,25 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type DecoderRegistry struct {
-	decoders    []providerapi.Decoder
-	byID        map[model.DecoderID]providerapi.Decoder
+	decoders    []provider.Decoder
+	byID        map[model.DecoderID]provider.Decoder
 	fingerprint cryptoutil.Digest
 }
 
 func NewDecoderRegistry(
-	codecs []providerapi.SchemaCodec,
-	decoders ...providerapi.Decoder,
+	codecs []provider.SchemaCodec,
+	decoders ...provider.Decoder,
 ) (*DecoderRegistry, error) {
-	byID := make(map[model.DecoderID]providerapi.Decoder, len(decoders))
-	ordered := make([]providerapi.Decoder, 0, len(decoders))
+	byID := make(map[model.DecoderID]provider.Decoder, len(decoders))
+	ordered := make([]provider.Decoder, 0, len(decoders))
 	for _, decoder := range decoders {
 		if decoder == nil {
 			return nil, fmt.Errorf("%w: decoder is nil", model.ErrInvalid)
@@ -73,8 +73,8 @@ func (r *DecoderRegistry) Fingerprint() (cryptoutil.Digest, error) {
 }
 
 func registryFingerprint(
-	codecs []providerapi.SchemaCodec,
-	decoders []providerapi.Decoder,
+	codecs []provider.SchemaCodec,
+	decoders []provider.Decoder,
 ) (cryptoutil.Digest, error) {
 	type descriptor struct {
 		ID       model.DecoderID `json:"id"`
@@ -131,7 +131,7 @@ func registryFingerprint(
 
 func (r *DecoderRegistry) find(
 	id model.DecoderID,
-) (providerapi.Decoder, bool) {
+) (provider.Decoder, bool) {
 	if r == nil {
 		return nil, false
 	}
@@ -139,9 +139,9 @@ func (r *DecoderRegistry) find(
 	return value, exists
 }
 
-func (r *DecoderRegistry) registered() []providerapi.Decoder {
+func (r *DecoderRegistry) registered() []provider.Decoder {
 	if r == nil {
 		return nil
 	}
-	return append([]providerapi.Decoder(nil), r.decoders...)
+	return append([]provider.Decoder(nil), r.decoders...)
 }

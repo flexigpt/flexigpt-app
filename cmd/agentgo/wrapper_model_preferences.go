@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
@@ -19,11 +19,11 @@ type modelDefaultProviderPreferencePayload struct {
 }
 
 type artifactModelDefaultProviderPreferences struct {
-	overlays compositionapi.StoreOverlayAPI
+	overlays local.StoreOverlayAPI
 }
 
 func newArtifactModelDefaultProviderPreferences(
-	overlays compositionapi.StoreOverlayAPI,
+	overlays local.StoreOverlayAPI,
 ) (*artifactModelDefaultProviderPreferences, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -49,11 +49,11 @@ type AdapterRegistry interface {
 }
 
 type Dependencies struct {
-	Sources          compositionapi.SourceAPI
-	Discovery        compositionapi.DiscoveryAPI
-	Artifacts        compositionapi.ArtifactAPI
-	ManagedArtifacts compositionapi.ManagedArtifactAPI
-	Protection       compositionapi.ProtectionAPI
+	Sources          local.SourceAPI
+	Discovery        local.DiscoveryAPI
+	Artifacts        local.ArtifactAPI
+	ManagedArtifacts local.ManagedArtifactAPI
+	Protection       local.ProtectionAPI
 
 	Overlays modelOverlay.OverlayRepository
 	Adapters AdapterRegistry

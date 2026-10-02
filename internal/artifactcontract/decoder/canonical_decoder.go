@@ -7,14 +7,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 type canonicalDecoder struct {
-	schemas providerapi.ExpectedCanonicalizer
+	schemas provider.ExpectedCanonicalizer
 }
 
 func newCanonicalDecoder() *canonicalDecoder {
@@ -26,7 +26,7 @@ func (d *canonicalDecoder) RequiredSchemaKeys() []schema.Key {
 }
 
 func (d *canonicalDecoder) BindExpectedCanonicalizer(
-	schemas providerapi.SchemaCatalog,
+	schemas provider.SchemaCatalog,
 ) error {
 	if d == nil || schemas == nil {
 		return fmt.Errorf(
@@ -47,9 +47,9 @@ func supportsType(
 
 func (d *canonicalDecoder) Decode(
 	ctx context.Context,
-	candidate providerapi.Candidate,
+	candidate provider.Candidate,
 	raw []byte,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	if d == nil || d.schemas == nil {
 		return nil, decodeDiagnostic(
 			candidate,
@@ -122,12 +122,12 @@ func (d *canonicalDecoder) Decode(
 		)
 	}
 
-	output := make([]providerapi.Decoded, 0, len(entries))
+	output := make([]provider.Decoded, 0, len(entries))
 	for _, named := range entries {
 
 		value, err := definitionForNamedEntry(named)
 		if err != nil {
-			output = append(output, providerapi.Decoded{
+			output = append(output, provider.Decoded{
 				SubresourceLocator: named.SubresourceLocator,
 				Diagnostics: decodeDiagnosticAt(
 					candidate,
@@ -138,7 +138,7 @@ func (d *canonicalDecoder) Decode(
 			})
 			continue
 		}
-		decoded := providerapi.Decoded{
+		decoded := provider.Decoded{
 			SubresourceLocator: named.SubresourceLocator,
 			Definition:         value,
 		}
@@ -149,7 +149,7 @@ func (d *canonicalDecoder) Decode(
 }
 
 func decodeDiagnostic(
-	candidate providerapi.Candidate,
+	candidate provider.Candidate,
 	code string,
 	err error,
 ) []diagnostic.Diagnostic {
@@ -157,7 +157,7 @@ func decodeDiagnostic(
 }
 
 func decodeDiagnosticAt(
-	candidate providerapi.Candidate,
+	candidate provider.Candidate,
 	subresource model.SubresourceLocator,
 	code string,
 	err error,

@@ -15,8 +15,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 var orderedSchemaKeys = []schema.Key{
@@ -51,99 +51,99 @@ var schemaKeysByType = map[declaration.Type]schema.Key{
 	declaration.TypeWorkspace:     workspacev1.WorkspaceSchemaKey,
 }
 
-func NewTextV1SchemaCodec() providerapi.SchemaCodec {
+func NewTextV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		textv1.TextSchemaKey,
 		textv1.TextJSONSchema(),
 	)
 }
 
-func NewToolV1SchemaCodec() providerapi.SchemaCodec {
+func NewToolV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		toolv1.ToolSchemaKey,
 		toolv1.ToolJSONSchema(),
 	)
 }
 
-func NewModelV1SchemaCodec() providerapi.SchemaCodec {
+func NewModelV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		modelv1.ModelSchemaKey,
 		modelv1.ModelJSONSchema(),
 	)
 }
 
-func NewModelProviderV1SchemaCodec() providerapi.SchemaCodec {
+func NewModelProviderV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		modelproviderv1.ModelProviderSchemaKey,
 		modelproviderv1.ModelProviderJSONSchema(),
 	)
 }
 
-func NewSkillV1SchemaCodec() providerapi.SchemaCodec {
+func NewSkillV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		skillv1.SkillSchemaKey,
 		skillv1.SkillJSONSchema(),
 	)
 }
 
-func NewMCPV1SchemaCodec() providerapi.SchemaCodec {
+func NewMCPV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		mcpv1.MCPSchemaKey,
 		mcpv1.MCPJSONSchema(),
 	)
 }
 
-func NewMCPPolicyV1SchemaCodec() providerapi.SchemaCodec {
+func NewMCPPolicyV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		mcppolicyv1.MCPPolicySchemaKey,
 		mcppolicyv1.MCPPolicyJSONSchema(),
 	)
 }
 
-func NewPluginV1SchemaCodec() providerapi.SchemaCodec {
+func NewPluginV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		pluginv1.PluginSchemaKey,
 		pluginv1.PluginJSONSchema(),
 	)
 }
 
-func NewAgentV1SchemaCodec() providerapi.SchemaCodec {
+func NewAgentV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		agentv1.AgentSchemaKey,
 		agentv1.AgentJSONSchema(),
 	)
 }
 
-func NewTeamV1SchemaCodec() providerapi.SchemaCodec {
+func NewTeamV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		teamv1.TeamSchemaKey,
 		teamv1.TeamJSONSchema(),
 	)
 }
 
-func NewLoopV1SchemaCodec() providerapi.SchemaCodec {
+func NewLoopV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		loopv1.LoopSchemaKey,
 		loopv1.LoopJSONSchema(),
 	)
 }
 
-func NewWorkflowV1SchemaCodec() providerapi.SchemaCodec {
+func NewWorkflowV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		workflowv1.WorkflowSchemaKey,
 		workflowv1.WorkflowJSONSchema(),
 	)
 }
 
-func NewWorkspaceV1SchemaCodec() providerapi.SchemaCodec {
+func NewWorkspaceV1SchemaCodec() provider.SchemaCodec {
 	return NewPassthrough(
 		workspacev1.WorkspaceSchemaKey,
 		workspacev1.WorkspaceJSONSchema(),
 	)
 }
 
-func AllSchemaCodecs() []providerapi.SchemaCodec {
-	return []providerapi.SchemaCodec{
+func AllSchemaCodecs() []provider.SchemaCodec {
+	return []provider.SchemaCodec{
 		NewTextV1SchemaCodec(),
 		NewModelV1SchemaCodec(),
 		NewModelProviderV1SchemaCodec(),

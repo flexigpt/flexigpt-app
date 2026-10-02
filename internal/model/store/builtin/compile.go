@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 

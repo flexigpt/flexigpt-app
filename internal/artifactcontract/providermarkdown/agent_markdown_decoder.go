@@ -14,9 +14,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -45,18 +45,18 @@ func (*AgentMarkdownDecoder) Revision() string {
 
 func (*AgentMarkdownDecoder) Recognize(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) providerapi.Recognition {
+	candidate provider.Candidate,
+) provider.Recognition {
 	if !isAgentMarkdownCandidate(candidate.Locator) {
-		return providerapi.RecognitionNone
+		return provider.RecognitionNone
 	}
-	return providerapi.RecognitionPreferred
+	return provider.RecognitionPreferred
 }
 
 func (*AgentMarkdownDecoder) Decode(
 	_ context.Context,
-	candidate providerapi.Candidate,
-) ([]providerapi.Decoded, []diagnostic.Diagnostic) {
+	candidate provider.Candidate,
+) ([]provider.Decoded, []diagnostic.Diagnostic) {
 	document, body, err := decodeAgentMarkdown(
 		candidate.Content,
 		candidate.Locator,
@@ -108,7 +108,7 @@ func (*AgentMarkdownDecoder) Decode(
 		return nil, agentMarkdownDiagnostics(candidate.Locator, err)
 	}
 
-	output := make([]providerapi.Decoded, 0, len(namedEntries))
+	output := make([]provider.Decoded, 0, len(namedEntries))
 	for index, named := range namedEntries {
 		value := definitionValue
 		if index != 0 {
@@ -120,7 +120,7 @@ func (*AgentMarkdownDecoder) Decode(
 				)
 			}
 		}
-		output = append(output, providerapi.Decoded{
+		output = append(output, provider.Decoded{
 			SubresourceLocator: named.SubresourceLocator,
 			Definition:         value,
 		})

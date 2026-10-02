@@ -8,21 +8,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 )
 
 type workspaceRefreshCoordinator struct {
-	sources          compositionapi.SourceAPI
-	discovery        compositionapi.DiscoveryAPI
+	sources          local.SourceAPI
+	discovery        local.DiscoveryAPI
 	workspaceSources workspaceSourceRegistry
 }
 
 func newWorkspaceRefreshCoordinator(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
 	workspaceSources workspaceSourceRegistry,
 ) *workspaceRefreshCoordinator {
 	return &workspaceRefreshCoordinator{
@@ -89,14 +89,14 @@ func (c *workspaceRefreshCoordinator) PrepareLocatedMemberDiscovery(
 		return nil, nil
 	}
 
-	target, local, err := localRefreshLocator(
+	target, lo, err := localRefreshLocator(
 		*header.Locator,
 		request.Parent.Binding.Locator,
 	)
 	if err != nil {
 		return nil, err
 	}
-	if !local {
+	if !lo {
 		// A URL, Git, package, archive, or future locator kind has no local
 		// Source discovery behavior until its Source adapter is registered.
 		return nil, nil

@@ -9,16 +9,16 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type registeredCodec struct {
-	codec  providerapi.SchemaCodec
+	codec  provider.SchemaCodec
 	schema *jsonschema.Schema
 }
 
@@ -35,7 +35,7 @@ type Registry struct {
 	keys          []schema.Key
 }
 
-func NewRegistry(codecs ...providerapi.SchemaCodec) (*Registry, error) {
+func NewRegistry(codecs ...provider.SchemaCodec) (*Registry, error) {
 	values := make(map[schema.Key]registeredCodec, len(codecs))
 	byTypeVersion := make(
 		map[typeVersionKey]schema.Key,

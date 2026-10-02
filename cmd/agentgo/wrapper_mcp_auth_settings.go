@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -23,11 +23,11 @@ type mcpGlobalSettingsPayload struct {
 }
 
 type mcpSettingsAdapter struct {
-	overlays compositionapi.StoreOverlayAPI
+	overlays local.StoreOverlayAPI
 }
 
 func newMCPSettingsAdapter(
-	overlays compositionapi.StoreOverlayAPI,
+	overlays local.StoreOverlayAPI,
 ) (*mcpSettingsAdapter, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(

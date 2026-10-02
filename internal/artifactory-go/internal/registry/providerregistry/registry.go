@@ -3,35 +3,35 @@ package providerregistry
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 )
 
 type Registry struct {
-	providers        []providerapi.Descriptor
-	schemas          []providerapi.SchemaCodec
-	decoders         []providerapi.Decoder
-	locatorResolvers []providerapi.LocatorResolverFactory
+	providers        []provider.Descriptor
+	schemas          []provider.SchemaCodec
+	decoders         []provider.Decoder
+	locatorResolvers []provider.LocatorResolverFactory
 }
 
 func New(
-	providers ...providerapi.Provider,
+	providers ...provider.Provider,
 ) (*Registry, error) {
 	output := &Registry{
-		providers:        make([]providerapi.Descriptor, 0, len(providers)),
-		schemas:          make([]providerapi.SchemaCodec, 0),
-		decoders:         make([]providerapi.Decoder, 0),
-		locatorResolvers: make([]providerapi.LocatorResolverFactory, 0),
+		providers:        make([]provider.Descriptor, 0, len(providers)),
+		schemas:          make([]provider.SchemaCodec, 0),
+		decoders:         make([]provider.Decoder, 0),
+		locatorResolvers: make([]provider.LocatorResolverFactory, 0),
 	}
 
 	seenProviderNames := make(map[string]struct{}, len(providers))
 	schemaOwners := make(map[schema.Key]string)
 	decoderOwners := make(map[model.DecoderID]string)
-	locatorResolverOwners := make(map[providerapi.LocatorResolverKey]string)
+	locatorResolverOwners := make(map[provider.LocatorResolverKey]string)
 
-	for index, provider := range providers {
-		if provider == nil {
+	for index, pro := range providers {
+		if pro == nil {
 			return nil, fmt.Errorf(
 				"%w: artifact provider %d is nil",
 				model.ErrInvalid,
@@ -39,7 +39,7 @@ func New(
 			)
 		}
 
-		descriptor := provider.Descriptor().Clone()
+		descriptor := pro.Descriptor().Clone()
 		if err := descriptor.Validate(); err != nil {
 			return nil, err
 		}
@@ -84,7 +84,7 @@ func New(
 		}
 		for _, resolver := range descriptor.LocatorResolvers {
 			for _, artifactKind := range resolver.ArtifactKinds() {
-				key := providerapi.LocatorResolverKey{
+				key := provider.LocatorResolverKey{
 					LocatorKind:  resolver.LocatorKind(),
 					ArtifactKind: artifactKind,
 				}
@@ -123,38 +123,38 @@ func New(
 	return output, nil
 }
 
-func (r *Registry) Providers() []providerapi.Descriptor {
+func (r *Registry) Providers() []provider.Descriptor {
 	if r == nil {
 		return nil
 	}
 
-	output := make([]providerapi.Descriptor, len(r.providers))
+	output := make([]provider.Descriptor, len(r.providers))
 	for index, descriptor := range r.providers {
 		output[index] = descriptor.Clone()
 	}
 	return output
 }
 
-func (r *Registry) Schemas() []providerapi.SchemaCodec {
+func (r *Registry) Schemas() []provider.SchemaCodec {
 	if r == nil {
 		return nil
 	}
-	return append([]providerapi.SchemaCodec(nil), r.schemas...)
+	return append([]provider.SchemaCodec(nil), r.schemas...)
 }
 
-func (r *Registry) Decoders() []providerapi.Decoder {
+func (r *Registry) Decoders() []provider.Decoder {
 	if r == nil {
 		return nil
 	}
-	return append([]providerapi.Decoder(nil), r.decoders...)
+	return append([]provider.Decoder(nil), r.decoders...)
 }
 
-func (r *Registry) LocatorResolvers() []providerapi.LocatorResolverFactory {
+func (r *Registry) LocatorResolvers() []provider.LocatorResolverFactory {
 	if r == nil {
 		return nil
 	}
 	return append(
-		[]providerapi.LocatorResolverFactory(nil),
+		[]provider.LocatorResolverFactory(nil),
 		r.locatorResolvers...,
 	)
 }

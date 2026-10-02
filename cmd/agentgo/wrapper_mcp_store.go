@@ -4,7 +4,7 @@ import (
 	"context"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -22,7 +22,7 @@ type MCPSettingsView struct {
 type MCPStoreWrapper struct {
 	api        *mcpConsumerAPI.API
 	management *mcpConsumerAPI.MCPListService
-	roots      compositionapi.RootAPI
+	roots      local.RootAPI
 	settings   *mcpSettingsAdapter
 }
 

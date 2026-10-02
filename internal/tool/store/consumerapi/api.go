@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -16,10 +16,10 @@ import (
 )
 
 type API struct {
-	discovery        compositionapi.DiscoveryAPI
-	artifacts        compositionapi.ArtifactAPI
-	managedArtifacts compositionapi.ManagedArtifactAPI
-	protection       compositionapi.ProtectionAPI
+	discovery        local.DiscoveryAPI
+	artifacts        local.ArtifactAPI
+	managedArtifacts local.ManagedArtifactAPI
+	protection       local.ProtectionAPI
 	collections      *collection.API
 
 	builtinRoot      root.RootID
@@ -28,11 +28,11 @@ type API struct {
 }
 
 func New(
-	sources compositionapi.SourceAPI,
-	discovery compositionapi.DiscoveryAPI,
-	artifacts compositionapi.ArtifactAPI,
-	managedArtifacts compositionapi.ManagedArtifactAPI,
-	protection compositionapi.ProtectionAPI,
+	sources local.SourceAPI,
+	discovery local.DiscoveryAPI,
+	artifacts local.ArtifactAPI,
+	managedArtifacts local.ManagedArtifactAPI,
+	protection local.ProtectionAPI,
 	builtinRoot root.RootID,
 ) (*API, error) {
 	if sources == nil ||

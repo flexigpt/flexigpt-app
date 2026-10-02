@@ -3,7 +3,7 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
@@ -13,7 +13,7 @@ import (
 // workspaceLocatorRuntime keeps the generic provider runtime port out of the
 // Workspace consumer API surface.
 type workspaceLocatorRuntime struct {
-	artifacts compositionapi.ArtifactAPI
+	artifacts local.ArtifactAPI
 }
 
 func (r workspaceLocatorRuntime) ListArtifactsBySource(
