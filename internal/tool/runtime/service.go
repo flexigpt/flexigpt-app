@@ -9,7 +9,7 @@ import (
 
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 type GoToolCaller interface {

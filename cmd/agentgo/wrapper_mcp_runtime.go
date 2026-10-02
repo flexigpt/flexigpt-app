@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/runtime/invocation"

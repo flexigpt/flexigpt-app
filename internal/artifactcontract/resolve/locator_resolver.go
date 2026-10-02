@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 )
 
 // ProviderLocatorResolver adapts provider-owned locator resolver factories to

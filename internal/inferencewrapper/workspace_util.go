@@ -8,8 +8,8 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
 

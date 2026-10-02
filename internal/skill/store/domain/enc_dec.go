@@ -8,10 +8,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
 )
 
 // ManagedSkillDocument is a source-backed editable Skill document. It is

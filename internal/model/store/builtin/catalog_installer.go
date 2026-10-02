@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 

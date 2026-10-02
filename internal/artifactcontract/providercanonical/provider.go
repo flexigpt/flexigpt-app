@@ -3,7 +3,7 @@ package providercanonical
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 )
 
 const providerName = "artifact-declaration"

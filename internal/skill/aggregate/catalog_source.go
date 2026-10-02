@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 

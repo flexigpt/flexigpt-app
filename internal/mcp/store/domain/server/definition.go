@@ -7,8 +7,8 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 

@@ -6,9 +6,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"

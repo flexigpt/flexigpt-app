@@ -7,9 +7,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
 )
 
 // Tool is internal decoded Store material. Consumer and Wails APIs expose

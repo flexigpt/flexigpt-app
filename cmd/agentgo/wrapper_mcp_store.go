@@ -4,10 +4,10 @@ import (
 	"context"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 

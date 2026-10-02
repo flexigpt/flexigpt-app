@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
 )
 
 // Package locatorpath implements portable source-relative path declaration

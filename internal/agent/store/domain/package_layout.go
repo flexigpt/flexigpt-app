@@ -8,9 +8,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 )
 
 func ManagedAgentDocumentFile() basespec.Locator {

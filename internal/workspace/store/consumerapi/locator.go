@@ -3,11 +3,11 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 )
 
 // workspaceLocatorRuntime keeps the generic provider runtime port out of the

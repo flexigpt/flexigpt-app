@@ -367,18 +367,18 @@ linters:
 
     depguard:
       rules:
-        # Isolate the artifactstore package completely
+        # Isolate the artifactory package completely
         isolate_artifact_store:
-          # Applies to all files inside internal/artifactstore and its sub-packages
+          # Applies to all files inside internal/artifactory-go and its sub-packages
           files:
-            - "**/internal/artifactstore/**/*.go"
+            - "**/internal/artifactory-go/**/*.go"
 
           # Only allow these specific packages/prefixes. Anything else is banned.
           allow:
             # Allowed to use Go standard library packages.
             - "$gostd"
             # Allowed to import its own sub-packages.
-            - "github.com/flexigpt/flexigpt-app/internal/artifactstore"
+            - "github.com/flexigpt/flexigpt-app/internal/artifactory-go"
             - "github.com/flexigpt/flexigpt-app/internal/cryptoutil"
             - "github.com/flexigpt/flexigpt-app/internal/jsonutil"
             - "github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -450,12 +450,10 @@ linters:
           alias: assets
         - pkg: "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
           alias: documentTopology
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/internal/(\w+)
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/(\w+)
           alias: ${1}impl
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay
           alias: artifactOverlay
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactstore/consumerapi
-          alias: artifactConsumerAPI
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts
           alias: ${1}Consts
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/spec

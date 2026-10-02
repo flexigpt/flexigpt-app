@@ -8,8 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
 )

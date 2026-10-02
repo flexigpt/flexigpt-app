@@ -6,11 +6,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )

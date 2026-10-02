@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )

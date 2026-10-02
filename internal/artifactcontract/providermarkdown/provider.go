@@ -1,6 +1,6 @@
 package providermarkdown
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
 
 const providerName = "artifact-markdown"
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 

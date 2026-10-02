@@ -6,8 +6,8 @@ import (
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 

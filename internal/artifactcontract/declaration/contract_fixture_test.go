@@ -25,7 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )

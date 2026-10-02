@@ -3,7 +3,7 @@ package declaration
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 // ArtifactNameReference is the portable identity shape shared by the Model

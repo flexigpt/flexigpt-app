@@ -7,7 +7,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 )

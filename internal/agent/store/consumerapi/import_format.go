@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )

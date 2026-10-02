@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"

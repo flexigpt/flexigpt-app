@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 )
 
 // EnsureManagedDeclarationDiscovery ensures that one managed declaration

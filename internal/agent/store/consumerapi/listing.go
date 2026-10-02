@@ -7,11 +7,11 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 

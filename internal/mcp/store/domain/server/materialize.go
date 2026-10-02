@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 )
 
 func materializeValidated(

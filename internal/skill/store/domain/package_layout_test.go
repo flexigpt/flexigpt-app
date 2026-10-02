@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 

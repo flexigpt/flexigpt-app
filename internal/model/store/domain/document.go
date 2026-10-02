@@ -5,9 +5,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
 )
 
 // Provider is immutable decoded source material for one model.provider

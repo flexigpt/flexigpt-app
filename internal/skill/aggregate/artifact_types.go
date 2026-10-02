@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 )
 
 var ErrArtifactSkillSelectionRequired = errors.New(

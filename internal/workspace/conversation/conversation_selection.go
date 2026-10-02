@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"

@@ -8,9 +8,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"

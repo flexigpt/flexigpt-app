@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )

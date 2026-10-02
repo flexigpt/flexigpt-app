@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"

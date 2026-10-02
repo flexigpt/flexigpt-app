@@ -8,10 +8,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/secret"
 )
 
 const (

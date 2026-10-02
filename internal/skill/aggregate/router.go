@@ -8,11 +8,11 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/agentskills-go/provider/fs"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/root"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
 )

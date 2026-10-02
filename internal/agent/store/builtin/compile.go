@@ -6,7 +6,7 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
 )
 
 func Compile(

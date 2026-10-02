@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 // CompiledPackageInstaller is implemented by binary-owned built-in package

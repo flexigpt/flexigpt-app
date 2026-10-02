@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 // ValidateEntryTree validates every concrete nested declaration in a

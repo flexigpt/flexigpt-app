@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 

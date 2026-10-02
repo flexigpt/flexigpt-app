@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/llmtools-go"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/llmtoolsutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )

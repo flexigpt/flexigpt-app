@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
 )
 
 var ErrNotFound = errors.New("MCP secret not found")

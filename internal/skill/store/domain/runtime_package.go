@@ -5,7 +5,7 @@ import (
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 // SourceDocumentLocator resolves the SKILL.md document used by a canonical

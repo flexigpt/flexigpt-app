@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/tool/llmtoolsadapter"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"

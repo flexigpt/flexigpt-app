@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/schema"
 )
 
 const JSONDecoderID basespec.DecoderID = "artifact-declaration-json"

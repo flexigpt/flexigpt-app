@@ -10,14 +10,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/source"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/compositionapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/composition/local/compositionapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/source"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/providerapi"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/diagnostic"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )

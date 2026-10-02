@@ -4,7 +4,7 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/installerapi/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/api/installerapi/topology"
 )
 
 type InstallerDependencies struct {

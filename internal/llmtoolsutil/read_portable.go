@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
 )
 
 // ReadPortableTextFile reads exactly one selected text file through the

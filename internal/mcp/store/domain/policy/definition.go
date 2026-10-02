@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec"
-	"github.com/flexigpt/flexigpt-app/internal/artifactstore/basespec/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/basespec/definition"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
