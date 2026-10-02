@@ -3,7 +3,7 @@ application:
     dataDirectory: "flexigpt"
     settingsDirectory: "settings_v2"
     conversationsDirectory: "conversations_v2"
-    artifactStoreDirectory: "artifacts_v1"
+    artifactStoreDirectory: "artifacts_v2"
     artifactStoreManifestFile: "store.json"
     artifactStoreMetadataFile: "app.sqlite"
     artifactStoreContentDirectory: "content"
