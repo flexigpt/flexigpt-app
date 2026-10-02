@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -28,7 +28,7 @@ func (s LookupScope) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported member lookup scope %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			s,
 		)
 	}
@@ -50,7 +50,7 @@ func (s Selector) Validate() error {
 	if s.Type == TypeText || s.Type == TypeWorkspace {
 		return fmt.Errorf(
 			"%w: Artifact type %q does not support member selectors",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			s.Type,
 		)
 	}
@@ -61,25 +61,25 @@ func (s Selector) Validate() error {
 		return err
 	}
 
-	if err := model.ValidatePathPatterns(
+	if err := spec.ValidatePathPatterns(
 		"member selector include",
 		s.Include,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidatePathPatterns(
+	if err := spec.ValidatePathPatterns(
 		"member selector exclude",
 		s.Exclude,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidatePathPatterns(
+	if err := spec.ValidatePathPatterns(
 		"member selector nameInclude",
 		s.NameInclude,
 	); err != nil {
 		return err
 	}
-	return model.ValidatePathPatterns(
+	return spec.ValidatePathPatterns(
 		"member selector nameExclude",
 		s.NameExclude,
 	)
@@ -98,13 +98,13 @@ func validateLocalSelectorBase(value Locator) error {
 		if err != nil {
 			return fmt.Errorf(
 				"%w: invalid member selector base",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		if parsed.Scheme != "" {
 			return fmt.Errorf(
 				"%w: member selector base must be a local relative path",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return ValidatePortableLocatorPath(
@@ -123,7 +123,7 @@ func validateLocalSelectorBase(value Locator) error {
 	default:
 		return fmt.Errorf(
 			"%w: member selector base must be a local relative path",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 }
@@ -169,7 +169,7 @@ func ValidateNoRelationshipBehavior(
 		len(relationship.Use) != 0 {
 		return fmt.Errorf(
 			"%w: %s does not support overrides or use",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 		)
 	}
@@ -194,7 +194,7 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		if hasName || hasParameters {
 			return "", fmt.Errorf(
 				"%w: member selector cannot contain name or parameters",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		if err := validateAllowedMemberFields(
@@ -227,7 +227,7 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		if !hasName {
 			return "", fmt.Errorf(
 				"%w: contained member requires name",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		if err := validateAllowedMemberFields(
@@ -255,7 +255,7 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		} else if _, present := fields["insert"]; present {
 			return "", fmt.Errorf(
 				"%w: member insert is valid only for Text",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		if _, err := e.Relationship(); err != nil {
@@ -271,7 +271,7 @@ func (e Entry) MemberForm() (MemberForm, error) {
 		if !hasName {
 			return "", fmt.Errorf(
 				"%w: named member requires name",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		if err := validateAllowedMemberFields(
@@ -320,7 +320,7 @@ func (e Entry) TextInsert() (InsertTarget, error) {
 	if e.Header().Type != TypeText {
 		return "", fmt.Errorf(
 			"%w: insertion identity is valid only for Text",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	var value struct {
@@ -344,7 +344,7 @@ func (e Entry) ContainedDeclaration() (Entry, error) {
 	if !found {
 		return Entry{}, fmt.Errorf(
 			"%w: member does not contain parameters",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -353,7 +353,7 @@ func (e Entry) ContainedDeclaration() (Entry, error) {
 		target == nil {
 		return Entry{}, fmt.Errorf(
 			"%w: contained member parameters must be an object",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	for _, identity := range []string{"type", "name", "locator"} {
@@ -366,7 +366,7 @@ func (e Entry) ContainedDeclaration() (Entry, error) {
 		if !present {
 			return Entry{}, fmt.Errorf(
 				"%w: Text member requires direct insert",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		target["insert"] = append(json.RawMessage(nil), raw...)
@@ -374,7 +374,7 @@ func (e Entry) ContainedDeclaration() (Entry, error) {
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		target,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Entry{}, err
@@ -389,7 +389,7 @@ func NewContainedMember(target Entry) (Entry, error) {
 	if target.Header().Name == "" {
 		return Entry{}, fmt.Errorf(
 			"%w: contained declaration requires name",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -415,7 +415,7 @@ func NewContainedMember(target Entry) (Entry, error) {
 	}
 	parametersRaw, err := jsonutil.MarshalCanonicalObject(
 		parameters,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Entry{}, err
@@ -424,7 +424,7 @@ func NewContainedMember(target Entry) (Entry, error) {
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		member,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return Entry{}, err
@@ -447,7 +447,7 @@ func (e Entry) validateNamedMember(
 	if relationship.Scope != "" && header.Locator != nil {
 		return fmt.Errorf(
 			"%w: scoped named member cannot contain locator",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if header.Type == TypeText {
@@ -457,7 +457,7 @@ func (e Entry) validateNamedMember(
 	} else if _, present := fields["insert"]; present {
 		return fmt.Errorf(
 			"%w: member insert is valid only for Text",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -468,10 +468,10 @@ func (e Entry) validateNamedMember(
 	if header.Type != TypeMCP || header.Locator == nil {
 		return fmt.Errorf(
 			"%w: MCP server selector requires a locator-selected MCP member",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
-	var server model.LogicalName
+	var server spec.LogicalName
 	if err := json.Unmarshal(serverRaw, &server); err != nil {
 		return err
 	}
@@ -521,7 +521,7 @@ func validateAllowedMemberFields(
 		}
 		return fmt.Errorf(
 			"%w: member contains unsupported or flattened target field %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			name,
 		)
 	}

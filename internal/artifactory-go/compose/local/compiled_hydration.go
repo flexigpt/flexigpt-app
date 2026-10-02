@@ -3,8 +3,8 @@ package local
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Store) RegisterCompiledPackages(
@@ -12,7 +12,7 @@ func (s *Store) RegisterCompiledPackages(
 	values []topology.CompiledRegistration,
 ) error {
 	if s == nil || s.components == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return s.components.RegisterCompiledPackages(ctx, values)
 }
@@ -22,7 +22,7 @@ func (s *Store) HydrateCompiledPackages(
 	plans []topology.CompiledPackagePlan,
 ) error {
 	if s == nil || s.components == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return s.components.HydrateCompiledPackages(ctx, plans)
 }

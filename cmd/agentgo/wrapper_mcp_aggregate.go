@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
@@ -186,7 +186,7 @@ func (w *MCPAggregateWrapper) DeleteMCPPolicy(
 
 func (w *MCPAggregateWrapper) ready() error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return nil
 }

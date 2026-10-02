@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/agentskills-go/document"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
@@ -19,7 +19,7 @@ type WorkspaceSkill struct {
 	ArtifactRevision uint64               `json:"-"`
 	DefinitionDigest cryptoutil.Digest    `json:"-"`
 	SourceID         string               `json:"-"`
-	Locator          model.Locator        `json:"-"`
+	Locator          spec.Locator         `json:"-"`
 
 	Document        document.SkillDocument `json:"-"`
 	RuntimeLocation string                 `json:"-"`
@@ -61,7 +61,7 @@ func (a *Adapter) LoadSelected(
 	refs []artifact.ArtifactRef,
 ) (LoadPlan, error) {
 	if a == nil || a.artifacts == nil || a.resources == nil {
-		return LoadPlan{}, model.ErrClosed
+		return LoadPlan{}, spec.ErrClosed
 	}
 	return a.loadSelected(ctx, workspace, refs)
 }

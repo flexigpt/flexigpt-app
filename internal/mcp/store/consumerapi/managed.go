@@ -6,9 +6,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -19,7 +19,7 @@ func (a *API) CreateMCPServer(
 	request ManagedMCPCreateRequest,
 ) (ManagedMCPCreateResult, error) {
 	if a == nil || a.collections == nil {
-		return ManagedMCPCreateResult{}, model.ErrClosed
+		return ManagedMCPCreateResult{}, spec.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return ManagedMCPCreateResult{}, err
@@ -27,13 +27,13 @@ func (a *API) CreateMCPServer(
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPCreateResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if a.protection.IsProtectedRoot(request.Collection.RootID) {
 		return ManagedMCPCreateResult{}, fmt.Errorf(
 			"%w: managed MCP publication is not allowed in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -143,7 +143,7 @@ func (a *API) UpdateMCPServer(
 	request ManagedMCPReplaceRequest,
 ) (ManagedMCPReplaceResult, error) {
 	if a == nil || a.collections == nil {
-		return ManagedMCPReplaceResult{}, model.ErrClosed
+		return ManagedMCPReplaceResult{}, spec.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return ManagedMCPReplaceResult{}, err
@@ -154,25 +154,25 @@ func (a *API) UpdateMCPServer(
 	if request.Collection.RootID != request.Artifact.RootID {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Artifact belongs to another Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if request.ExpectedArtifactRevision == 0 {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: expected MCP Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if a.protection.IsProtectedRoot(request.Collection.RootID) {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: managed MCP replacement is not allowed in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -181,13 +181,13 @@ func (a *API) UpdateMCPServer(
 		return ManagedMCPReplaceResult{}, err
 	}
 	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
-		return ManagedMCPReplaceResult{}, model.ErrConflict
+		return ManagedMCPReplaceResult{}, spec.ErrConflict
 	}
 	if !collectionView.Editable &&
 		!collectionView.Baseline {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Collection is read-only",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -198,22 +198,22 @@ func (a *API) UpdateMCPServer(
 	if current.Kind != mcpDomain.MCPArtifactKind {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Server",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if current.Revision != request.ExpectedArtifactRevision {
-		return ManagedMCPReplaceResult{}, model.ErrConflict
+		return ManagedMCPReplaceResult{}, spec.ErrConflict
 	}
 	if current.Binding.SubresourceLocator != "" {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: contained MCP declarations cannot be replaced as managed MCP packages",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Server is not owned by this Collection Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -228,7 +228,7 @@ func (a *API) UpdateMCPServer(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Server is not backed by a managed Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -251,14 +251,14 @@ func (a *API) UpdateMCPServer(
 	if !memberFound {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Server is not a direct member of the requested Collection",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
 	if request.Document.LogicalName != current.LogicalName {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: replacement MCP logical name must remain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			current.LogicalName,
 		)
 	}
@@ -286,7 +286,7 @@ func (a *API) UpdateMCPServer(
 	if requestedAddress != currentAddress {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: replacement MCP cannot change managed package identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -303,7 +303,7 @@ func (a *API) UpdateMCPServer(
 	); err != nil {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: replacement MCP document is incompatible with current installation data: %w",
-			model.ErrConflict,
+			spec.ErrConflict,
 			err,
 		)
 	}
@@ -319,7 +319,7 @@ func (a *API) UpdateMCPServer(
 	if !inspection.IsCurrent() {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: managed MCP Source requires refresh",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -367,7 +367,7 @@ func (a *API) UpdateMCPServer(
 	if published.Artifact.Ref() != request.Artifact {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: replacement published another MCP Artifact",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -402,12 +402,12 @@ func (a *API) DeleteMCPServer(
 	expectedRevision uint64,
 ) error {
 	if a == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected MCP Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -418,22 +418,22 @@ func (a *API) DeleteMCPServer(
 	if record.Kind != mcpDomain.MCPArtifactKind {
 		return fmt.Errorf(
 			"%w: Artifact is not an MCP Server",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if record.Revision != expectedRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 	if a.protection.IsProtectedRoot(record.RootID) {
 		return fmt.Errorf(
 			"%w: protected MCP Server deletion is not allowed",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return fmt.Errorf(
 			"%w: contained MCP declarations cannot be removed as managed MCP packages",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -448,7 +448,7 @@ func (a *API) DeleteMCPServer(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: MCP Server is not backed by a managed Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	address, err := mcpDomain.ManagedPackageAddressFromMCPLocator(
@@ -478,7 +478,7 @@ func (a *API) DeleteMCPServer(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed MCP Artifact is not missing",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 	if err := a.overlays.PurgeServerLocalState(ctx, ref); err != nil {

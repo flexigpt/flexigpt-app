@@ -7,7 +7,7 @@ package provider
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 )
 
 // SchemaCodec supplies one published JSON Schema and domain-specific semantic

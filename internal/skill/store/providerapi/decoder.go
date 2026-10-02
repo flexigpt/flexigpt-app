@@ -4,10 +4,10 @@ import (
 	"context"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
@@ -19,7 +19,7 @@ func NewDecoder() *Decoder {
 	return &Decoder{}
 }
 
-func (*Decoder) ID() model.DecoderID {
+func (*Decoder) ID() spec.DecoderID {
 	return skillDomain.MarkdownDecoderID
 }
 
@@ -75,13 +75,13 @@ func (*Decoder) Decode(
 	}}, warnings
 }
 
-func expectedSkillName(locator model.Locator) string {
+func expectedSkillName(locator spec.Locator) string {
 	parent := path.Dir(string(locator))
 	if parent == "." {
 		return ""
 	}
 	if address, err := source.ParseManagedPackageAddressDirectory(
-		model.Locator(parent),
+		spec.Locator(parent),
 	); err == nil &&
 		address.Kind == skillDomain.ManagedSkillPackageKind {
 		return string(address.Name)

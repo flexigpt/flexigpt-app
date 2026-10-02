@@ -10,15 +10,15 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
-const runtimeRequestPatchDigestDomain = "flexigpt.model.runtime-request-patch/v1"
+const runtimeRequestPatchDigestDomain = "flexigpt.spec.runtime-request-patch/v1"
 
 // RuntimeConfiguration is the fully resolved inference runtime configuration
 // for one source-backed Model.
@@ -101,7 +101,7 @@ func (f RuntimeDefaultField) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Model runtime request clear field %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			f,
 		)
 	}
@@ -145,7 +145,7 @@ func (p *RuntimeRequestPatch) Prepare() (
 	if p.Defaults != nil {
 		canonical, err := jsonutil.MarshalCanonicalObject(
 			p.Defaults,
-			model.MaxDefinitionBodyBytes,
+			spec.MaxDefinitionBodyBytes,
 		)
 		if err != nil {
 			return PreparedRuntimeRequestPatch{}, fmt.Errorf(
@@ -197,7 +197,7 @@ func normalizeRuntimeDefaultFields(
 		if _, duplicate := seen[field]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate Model runtime request clear field %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				field,
 			)
 		}
@@ -235,7 +235,7 @@ func (p PreparedRuntimeRequestPatch) Apply(
 	if defaults == nil {
 		return fmt.Errorf(
 			"%w: effective Model defaults are nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ApplyRuntimeDefaults(defaults, p.defaults); err != nil {
@@ -256,7 +256,7 @@ func ApplyRuntimeDefaults(
 	if defaults == nil {
 		return fmt.Errorf(
 			"%w: effective Model defaults are nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -267,7 +267,7 @@ func ApplyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model defaults field %q must be an object",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					key,
 				)
 			}
@@ -279,7 +279,7 @@ func ApplyRuntimeDefaults(
 			if !ok {
 				return fmt.Errorf(
 					"%w: Model stopSequences must be an array",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 				)
 			}
 			if len(values) != 0 {

@@ -7,11 +7,11 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -47,7 +47,7 @@ func (a *API) ResolveModel(
 	if !m.Artifact.Enabled {
 		return ResolvedModel{}, fmt.Errorf(
 			"%w: Model %q is disabled",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			m.Artifact.LogicalName,
 		)
 	}
@@ -103,7 +103,7 @@ func (a *API) resolveProvider(
 	if !provider.Artifact.Enabled {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider %q is disabled",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			provider.Artifact.LogicalName,
 		)
 	}
@@ -118,7 +118,7 @@ func (a *API) resolveProvider(
 	if !found {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model Provider adapter %q is not installed",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			provider.Document.Adapter,
 		)
 	}
@@ -128,7 +128,7 @@ func (a *API) resolveProvider(
 	if adapter.ID != provider.Document.Adapter {
 		return ResolvedProvider{}, fmt.Errorf(
 			"%w: Model adapter registry returned %q for Provider adapter %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			adapter.ID,
 			provider.Document.Adapter,
 		)
@@ -197,7 +197,7 @@ func (a *API) resolveProviderReference(
 		default:
 			return modelDomain.Provider{}, fmt.Errorf(
 				"%w: Model Provider %q resolves to %d Artifacts in Root %q",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				reference.Name,
 				len(candidates),
 				rootID,
@@ -207,7 +207,7 @@ func (a *API) resolveProviderReference(
 
 	return modelDomain.Provider{}, fmt.Errorf(
 		"%w: Model Provider %q is unresolved",
-		model.ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 		reference.Name,
 	)
 }
@@ -216,7 +216,7 @@ func (a *API) availableIdentityCandidates(
 	ctx context.Context,
 	rootID root.RootID,
 	kind artifact.ArtifactKind,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
 	entries, err := a.artifacts.FindByIdentity(
 		ctx,
@@ -267,7 +267,7 @@ func (a *API) ResolveProviderDefaultModel(
 	if !provider.Artifact.Enabled {
 		return DefaultModelResolution{}, fmt.Errorf(
 			"%w: Model Provider %q is disabled",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			provider.Artifact.LogicalName,
 		)
 	}
@@ -368,7 +368,7 @@ func (a *API) resolveNamedModelForProvider(
 			if resolved.Provider.Artifact.Ref() != provider.Artifact.Ref() {
 				lastErr = fmt.Errorf(
 					"%w: Model %q resolves to another Provider",
-					model.ErrReferenceUnresolved,
+					spec.ErrReferenceUnresolved,
 					reference.Name,
 				)
 				continue
@@ -377,7 +377,7 @@ func (a *API) resolveNamedModelForProvider(
 		default:
 			return ResolvedModel{}, fmt.Errorf(
 				"%w: default Model %q resolves to %d Artifacts in Root %q",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				reference.Name,
 				len(candidates),
 				rootID,
@@ -390,7 +390,7 @@ func (a *API) resolveNamedModelForProvider(
 	}
 	return ResolvedModel{}, fmt.Errorf(
 		"%w: default Model %q is unresolved",
-		model.ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 		reference.Name,
 	)
 }
@@ -425,17 +425,17 @@ func (a *API) firstEnabledModelForProvider(
 
 	return ResolvedModel{}, fmt.Errorf(
 		"%w: Model Provider %q has no enabled resolved Models",
-		model.ErrReferenceUnresolved,
+		spec.ErrReferenceUnresolved,
 		provider.Artifact.LogicalName,
 	)
 }
 
 func bestEffortDefaultFailure(err error) bool {
-	return errors.Is(err, model.ErrReferenceUnresolved) ||
-		errors.Is(err, model.ErrArtifactNotFound) ||
-		errors.Is(err, model.ErrDefinitionNotFound) ||
-		errors.Is(err, model.ErrIdentityConflict) ||
-		errors.Is(err, model.ErrUnsupported)
+	return errors.Is(err, spec.ErrReferenceUnresolved) ||
+		errors.Is(err, spec.ErrArtifactNotFound) ||
+		errors.Is(err, spec.ErrDefinitionNotFound) ||
+		errors.Is(err, spec.ErrIdentityConflict) ||
+		errors.Is(err, spec.ErrUnsupported)
 }
 
 type resolveModel struct {

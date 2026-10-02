@@ -6,10 +6,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -23,17 +23,17 @@ type AdapterDescriptor struct {
 }
 
 func (d AdapterDescriptor) Validate() error {
-	if err := model.ValidateIdentifier(
+	if err := spec.ValidateIdentifier(
 		"Model adapter ID",
 		d.ID,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	return model.ValidateRequiredText(
+	return spec.ValidateRequiredText(
 		"Model adapter version",
 		d.Version,
-		model.MaxVersionBytes,
+		spec.MaxVersionBytes,
 	)
 }
 
@@ -98,10 +98,10 @@ func (r ListModelsByProviderRequest) Validate() error {
 type ProviderListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        model.LogicalName `json:"name"`
-	DisplayName string            `json:"displayName"`
-	Description string            `json:"description,omitempty"`
-	Adapter     string            `json:"adapter,omitempty"`
+	Name        spec.LogicalName `json:"name"`
+	DisplayName string           `json:"displayName"`
+	Description string           `json:"description,omitempty"`
+	Adapter     string           `json:"adapter,omitempty"`
 
 	State    artifact.State `json:"state"`
 	Enabled  bool           `json:"enabled"`
@@ -112,7 +112,7 @@ type ProviderListItem struct {
 type ModelListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name            model.LogicalName                  `json:"name"`
+	Name            spec.LogicalName                   `json:"name"`
 	DisplayName     string                             `json:"displayName"`
 	Description     string                             `json:"description,omitempty"`
 	Provider        *modelDomain.ArtifactNameReference `json:"provider,omitempty"`
@@ -290,7 +290,7 @@ func validateExpectedArtifactRevision(value uint64) error {
 	if value == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return nil

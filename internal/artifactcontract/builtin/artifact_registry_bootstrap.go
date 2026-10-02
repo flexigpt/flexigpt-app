@@ -9,9 +9,9 @@ import (
 	"sync"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Installer is implemented by one artifact-family-owned built-in api.
@@ -19,7 +19,7 @@ import (
 // artifact definitions, or artifact-specific manifests.
 type Installer interface {
 	BuiltInName() string
-	BuiltInPackageScopes() []model.Locator
+	BuiltInPackageScopes() []spec.Locator
 	Ensure(ctx context.Context) error
 }
 
@@ -82,7 +82,7 @@ type BootstrapRegistry struct {
 	mu         sync.RWMutex
 	ensureMu   sync.Mutex
 	installers map[string]Installer
-	scopes     map[model.Locator]string
+	scopes     map[spec.Locator]string
 }
 
 func NewDefaultBootstrapRegistry(
@@ -104,7 +104,7 @@ func NewBootstrapRegistry(
 	if ensurer == nil || hydrator == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in bootstrap dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := declaration.Validate(); err != nil {
@@ -115,16 +115,16 @@ func NewBootstrapRegistry(
 		topology:    ensurer,
 		hydrator:    hydrator,
 		installers:  map[string]Installer{},
-		scopes:      map[model.Locator]string{},
+		scopes:      map[spec.Locator]string{},
 	}, nil
 }
 
 func (r *BootstrapRegistry) Register(inst Installer) error {
 	if r == nil {
-		return fmt.Errorf("%w: built-in bootstrap registry is nil", model.ErrInvalid)
+		return fmt.Errorf("%w: built-in bootstrap registry is nil", spec.ErrInvalid)
 	}
 	if inst == nil {
-		return fmt.Errorf("%w: built-in installer is nil", model.ErrInvalid)
+		return fmt.Errorf("%w: built-in installer is nil", spec.ErrInvalid)
 	}
 
 	name := inst.BuiltInName()
@@ -142,12 +142,12 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 	if _, exists := r.installers[name]; exists {
 		return fmt.Errorf(
 			"%w: built-in installer %q is already registered",
-			model.ErrConflict,
+			spec.ErrConflict,
 			name,
 		)
 	}
 
-	existingScopes := make([]model.Locator, 0, len(r.scopes))
+	existingScopes := make([]spec.Locator, 0, len(r.scopes))
 	for scope := range r.scopes {
 		existingScopes = append(existingScopes, scope)
 	}
@@ -159,7 +159,7 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 			}
 			return fmt.Errorf(
 				"%w: built-in installer %q package scope %q overlaps %q owned by %s",
-				model.ErrConflict,
+				spec.ErrConflict,
 				name,
 				scope,
 				existing,
@@ -177,10 +177,10 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 
 func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	if r == nil {
-		return fmt.Errorf("%w: built-in bootstrap registry is nil", model.ErrInvalid)
+		return fmt.Errorf("%w: built-in bootstrap registry is nil", spec.ErrInvalid)
 	}
 	if ctx == nil {
-		return fmt.Errorf("%w: built-in bootstrap context is nil", model.ErrInvalid)
+		return fmt.Errorf("%w: built-in bootstrap context is nil", spec.ErrInvalid)
 	}
 
 	// One bootstrapper owns one protected topology in this process. Serializing
@@ -222,7 +222,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		if desired.InstallerName != entry.name {
 			return fmt.Errorf(
 				"%w: built-in installer %q returned hydration name %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				entry.name,
 				desired.InstallerName,
 			)
@@ -288,7 +288,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			if !found {
 				return fmt.Errorf(
 					"%w: hydration coordinator omitted installer %q",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					prepared[index].installer,
 				)
 			}
@@ -438,7 +438,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 			if _, found := desiredByInstaller[entry.name]; !found {
 				return fmt.Errorf(
 					"%w: hydration installer %q has no desired Source",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					entry.name,
 				)
 			}
@@ -494,10 +494,10 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 }
 
 func normalizePackageScopes(
-	values []model.Locator,
-) ([]model.Locator, error) {
-	seen := make(map[model.Locator]struct{}, len(values))
-	output := make([]model.Locator, 0, len(values))
+	values []spec.Locator,
+) ([]spec.Locator, error) {
+	seen := make(map[spec.Locator]struct{}, len(values))
+	output := make([]spec.Locator, 0, len(values))
 	for _, value := range values {
 		if err := value.ValidatePortable(false); err != nil {
 			return nil, err
@@ -505,7 +505,7 @@ func normalizePackageScopes(
 		if _, duplicate := seen[value]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate built-in package scope %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				value,
 			)
 		}
@@ -517,7 +517,7 @@ func normalizePackageScopes(
 		if packageScopesOverlap(output[index-1], output[index]) {
 			return nil, fmt.Errorf(
 				"%w: overlapping built-in package scopes %q and %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				output[index-1],
 				output[index],
 			)
@@ -527,8 +527,8 @@ func normalizePackageScopes(
 }
 
 func packageScopesOverlap(
-	left model.Locator,
-	right model.Locator,
+	left spec.Locator,
+	right spec.Locator,
 ) bool {
 	return left == right ||
 		strings.HasPrefix(string(left), string(right)+"/") ||

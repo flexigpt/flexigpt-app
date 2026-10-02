@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -31,7 +31,7 @@ func TestFilesystemSourceStorageKeyUsesIdentifierSafeHashSegment(
 			)
 		}
 
-		want := model.StorageKey(
+		want := spec.StorageKey(
 			prefix + "-hash" + digest[:24],
 		)
 		if key != want {

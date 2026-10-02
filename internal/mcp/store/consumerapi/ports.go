@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
@@ -24,7 +24,7 @@ func NewWorkspaceServerResolver(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace MCP resolver requires an API",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &WorkspaceServerResolver{api: api}, nil
@@ -35,7 +35,7 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 	ref artifact.ArtifactRef,
 ) (mcpDomainServer.Resolved, error) {
 	if r == nil || r.api == nil {
-		return mcpDomainServer.Resolved{}, model.ErrClosed
+		return mcpDomainServer.Resolved{}, spec.ErrClosed
 	}
 	read, err := r.api.resolveMCPServer(ctx, ref)
 	if err != nil {
@@ -59,7 +59,7 @@ func NewBaselineEnsurer(api *API) (BaselineEnsurer, error) {
 	if api == nil || api.collections == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP baseline ensurer requires collections",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &baselineEnsurer{api: api}, nil
@@ -70,7 +70,7 @@ func (s *baselineEnsurer) EnsureMCPBaselineCollection(
 	rootID root.RootID,
 ) (collection.CollectionView, error) {
 	if s == nil || s.api == nil {
-		return collection.CollectionView{}, model.ErrClosed
+		return collection.CollectionView{}, spec.ErrClosed
 	}
 	return s.api.ensureMCPBaselineCollection(ctx, rootID)
 }
@@ -87,7 +87,7 @@ func NewManagementStore(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP management Store requires an API",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &ManagementStoreFacade{api: api}, nil
@@ -98,7 +98,7 @@ func (s *ManagementStoreFacade) ResolveMCPServer(
 	ref artifact.ArtifactRef,
 ) (ServerRead, error) {
 	if s == nil || s.api == nil {
-		return ServerRead{}, model.ErrClosed
+		return ServerRead{}, spec.ErrClosed
 	}
 	return s.api.resolveMCPServer(ctx, ref)
 }
@@ -127,7 +127,7 @@ func (s *ManagementStoreFacade) ListMCPCollectionServers(
 func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(
 	ctx context.Context,
 	rootID root.RootID,
-	policyName model.LogicalName,
+	policyName spec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
 	return s.api.ListMCPServersReferencingPolicy(ctx, rootID, policyName)
 }
@@ -179,7 +179,7 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP catalog Store requires an API",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &CatalogStore{api: api}, nil
@@ -190,7 +190,7 @@ func (s *CatalogStore) ListMCPCollections(
 	rootID root.RootID,
 ) ([]collection.ListItem, error) {
 	if s == nil || s.api == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return s.api.ListMCPCollections(ctx, rootID)
 }
@@ -200,7 +200,7 @@ func (s *CatalogStore) ListServers(
 	rootID root.RootID,
 ) ([]ServerListItem, error) {
 	if s == nil || s.api == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return s.api.ListServers(ctx, ListServersRequest{RootID: rootID})
 }

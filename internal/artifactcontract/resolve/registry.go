@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // TypeResolver is one registered Artifact-type resolver definition.
@@ -92,13 +92,13 @@ func (r *Registry) Register(resolver TypeResolver) error {
 	if r == nil {
 		return fmt.Errorf(
 			"%w: Artifact resolver registry is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if resolver == nil {
 		return fmt.Errorf(
 			"%w: Artifact type resolver is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := resolver.Type().Validate(); err != nil {
@@ -107,7 +107,7 @@ func (r *Registry) Register(resolver TypeResolver) error {
 	if _, duplicate := r.resolvers[resolver.Type()]; duplicate {
 		return fmt.Errorf(
 			"%w: Artifact resolver %q is already registered",
-			model.ErrConflict,
+			spec.ErrConflict,
 			resolver.Type(),
 		)
 	}
@@ -129,14 +129,14 @@ func (r *Registry) ValidateComplete() error {
 	if r == nil {
 		return fmt.Errorf(
 			"%w: Artifact resolver registry is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	for _, declarationType := range declaration.Types() {
 		if _, found := r.Resolver(declarationType); !found {
 			return fmt.Errorf(
 				"%w: no resolver is registered for Artifact type %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				declarationType,
 			)
 		}
@@ -162,14 +162,14 @@ func (r *Registry) WithFallback(
 	if r == nil || provider == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact fallback registration is incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	resolver, found := r.Resolver(declarationType)
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: no resolver is registered for fallback type %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			declarationType,
 		)
 	}

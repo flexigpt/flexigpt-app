@@ -9,10 +9,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Package locatorpath implements portable source-relative path declaration
@@ -64,7 +64,7 @@ func (f *locatorpathFactory) BindLocatorRuntime(
 	if f == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: path locator resolver dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &boundResolver{
@@ -85,12 +85,12 @@ func (r *boundResolver) ResolveLocator(
 	request provider.LocatorResolutionRequest,
 ) (artifact.ArtifactRef, error) {
 	if r == nil || r.runtime == nil {
-		return artifact.ArtifactRef{}, model.ErrClosed
+		return artifact.ArtifactRef{}, spec.ErrClosed
 	}
 	if ctx == nil {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator resolution context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -102,13 +102,13 @@ func (r *boundResolver) ResolveLocator(
 	if request.From == nil {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path declaration locator requires a source-backed origin Artifact",
-			model.ErrLocatorUnresolved,
+			spec.ErrLocatorUnresolved,
 		)
 	}
 	if !slices.Contains(r.artifactKinds, request.ExpectedKind) {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator resolver does not support Artifact kind %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			request.ExpectedKind,
 		)
 	}
@@ -117,7 +117,7 @@ func (r *boundResolver) ResolveLocator(
 	if err := json.Unmarshal(request.LocatorJSON, &locator); err != nil {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: decode path locator: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -138,20 +138,20 @@ func (r *boundResolver) ResolveLocator(
 
 func declarationCandidateLocators(
 	expectedKind artifact.ArtifactKind,
-	target model.Locator,
-) ([]model.Locator, error) {
-	output := make([]model.Locator, 0, 2)
+	target spec.Locator,
+) ([]spec.Locator, error) {
+	output := make([]spec.Locator, 0, 2)
 	output = append(output, target)
 	if expectedKind != artifact.ArtifactKind(declaration.TypeSkill) ||
 		documentTopology.IsSkillPackageDocument(target) {
 		return output, nil
 	}
 
-	seen := map[model.Locator]struct{}{
+	seen := map[spec.Locator]struct{}{
 		target: {},
 	}
 	for _, documentFile := range documentTopology.SkillPackageDocumentFiles() {
-		document := model.Locator(path.Join(
+		document := spec.Locator(path.Join(
 			string(target),
 			string(documentFile),
 		))
@@ -170,7 +170,7 @@ func declarationCandidateLocators(
 func (r *boundResolver) selectArtifact(
 	ctx context.Context,
 	request provider.LocatorResolutionRequest,
-	locators []model.Locator,
+	locators []spec.Locator,
 ) (artifact.ArtifactRef, error) {
 	records, err := r.runtime.ListArtifactsBySource(
 		ctx,
@@ -193,7 +193,7 @@ func (r *boundResolver) selectArtifact(
 		return artifact.ArtifactRef{}, err
 	}
 
-	selectedLocators := make(map[model.Locator]struct{}, len(locators))
+	selectedLocators := make(map[spec.Locator]struct{}, len(locators))
 	for _, locator := range locators {
 		selectedLocators[locator] = struct{}{}
 	}
@@ -225,7 +225,7 @@ func (r *boundResolver) selectArtifact(
 	case 0:
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator did not produce %s/%s",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			request.ExpectedKind,
 			request.ExpectedLogicalName,
 		)
@@ -234,7 +234,7 @@ func (r *boundResolver) selectArtifact(
 	default:
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator produced %d %s Artifacts",
-			model.ErrIdentityConflict,
+			spec.ErrIdentityConflict,
 			len(candidates),
 			request.ExpectedKind,
 		)
@@ -243,7 +243,7 @@ func (r *boundResolver) selectArtifact(
 
 func requestedTextLogicalVersion(
 	request provider.LocatorResolutionRequest,
-) (model.LogicalVersion, bool, error) {
+) (spec.LogicalVersion, bool, error) {
 	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeText) ||
 		len(request.EntryJSON) == 0 {
 		return "", false, nil
@@ -257,12 +257,12 @@ func requestedTextLogicalVersion(
 	if err != nil {
 		return "", false, err
 	}
-	return model.LogicalVersion(insert), true, nil
+	return spec.LogicalVersion(insert), true, nil
 }
 
 func requestedMCPServerSubresource(
 	request provider.LocatorResolutionRequest,
-) (model.SubresourceLocator, bool, error) {
+) (spec.SubresourceLocator, bool, error) {
 	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeMCP) ||
 		len(request.EntryJSON) == 0 {
 		return "", false, nil
@@ -285,11 +285,11 @@ func requestedMCPServerSubresource(
 	if selector.Server == "" {
 		return "", false, nil
 	}
-	if err := model.LogicalName(selector.Server).Validate(); err != nil {
+	if err := spec.LogicalName(selector.Server).Validate(); err != nil {
 		return "", false, err
 	}
 
-	value := model.SubresourceLocator(
+	value := spec.SubresourceLocator(
 		"mcpServers/" + selector.Server,
 	)
 	if err := value.Validate(); err != nil {

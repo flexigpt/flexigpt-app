@@ -4,9 +4,9 @@ import (
 	"context"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
@@ -15,7 +15,7 @@ func (a *API) listCollectionTools(
 	ctx context.Context,
 	value collection.CollectionView,
 ) ([]ToolListItem, error) {
-	allowed := make(map[model.LogicalName]struct{}, len(value.Members))
+	allowed := make(map[spec.LogicalName]struct{}, len(value.Members))
 	for _, member := range value.Members {
 		if member.Type == "tool" {
 			allowed[member.Name] = struct{}{}

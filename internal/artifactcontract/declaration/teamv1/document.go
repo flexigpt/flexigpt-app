@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -144,7 +144,7 @@ func (v TeamDocument) validateFields() error {
 	if v.Loop != nil && v.Workflow != nil {
 		return fmt.Errorf(
 			"%w: Team cannot contain both loop and workflow",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if v.Loop != nil {
@@ -177,7 +177,7 @@ func validateProgramMember(
 		value.Header().Type != expected {
 		return fmt.Errorf(
 			"%w: %s must be one named or contained %q member",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 			expected,
 		)

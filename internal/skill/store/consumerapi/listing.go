@@ -6,10 +6,10 @@ import (
 	"sort"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -20,12 +20,12 @@ func (a *API) ListSkills(
 	request ListSkillsRequest,
 ) ([]SkillListItem, error) {
 	if a == nil || a.artifacts == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill list context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {

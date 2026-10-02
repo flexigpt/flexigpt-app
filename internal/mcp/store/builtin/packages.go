@@ -12,11 +12,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/policy"
@@ -30,19 +30,19 @@ import (
 // Artifact IDs are intentionally absent. Artifact Store assigns them while
 // refreshing the managed built-in Source.
 type PreparedPackage struct {
-	EmbeddedPackageRoot model.Locator
+	EmbeddedPackageRoot spec.Locator
 	PackageAddress      source.ManagedPackageAddress
-	DocumentFile        model.Locator
+	DocumentFile        spec.Locator
 	PackageFiles        []source.ManagedPackageFile
 	Expectations        []ArtifactExpectation
 }
 
 type ArtifactExpectation struct {
-	Locator          model.Locator
-	Subresource      model.SubresourceLocator
+	Locator          spec.Locator
+	Subresource      spec.SubresourceLocator
 	Kind             artifact.ArtifactKind
-	LogicalName      model.LogicalName
-	LogicalVersion   model.LogicalVersion
+	LogicalName      spec.LogicalName
+	LogicalVersion   spec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
 }
 
@@ -58,7 +58,7 @@ func PreparePackages(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP package preparation context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -67,7 +67,7 @@ func PreparePackages(
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded MCP package filesystem is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -94,7 +94,7 @@ func PreparePackages(
 func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot model.Locator,
+	packageRoot spec.Locator,
 ) (PreparedPackage, error) {
 	files, err := topology.ReadPackageFiles(
 		ctx,
@@ -119,7 +119,7 @@ func preparePackage(
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded MCP package %q lacks a supported Collection document",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			packageRoot,
 		)
 	}
@@ -135,7 +135,7 @@ func preparePackage(
 		)
 	}
 
-	packageName := model.LogicalName(
+	packageName := spec.LogicalName(
 		path.Base(string(packageRoot)),
 	)
 	if err := packageName.Validate(); err != nil {
@@ -160,12 +160,12 @@ func preparePackage(
 }
 
 func canonicalCollectionExpectations(
-	documentFile model.Locator,
+	documentFile spec.Locator,
 	document []byte,
 ) ([]ArtifactExpectation, error) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func canonicalCollectionExpectations(
 	if root.Header().Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
 			"%w: built-in MCP package root must be a Plugin",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
@@ -193,7 +193,7 @@ func canonicalCollectionExpectations(
 		default:
 			return nil, fmt.Errorf(
 				"%w: built-in MCP Plugin member %d has incompatible type %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 				member.Header().Type,
 			)
@@ -253,13 +253,13 @@ func canonicalCollectionExpectations(
 
 type preparedArtifactIdentity struct {
 	kind artifact.ArtifactKind
-	name model.LogicalName
+	name spec.LogicalName
 }
 
 func validatePreparedPackageIdentities(
 	packages []PreparedPackage,
 ) error {
-	seen := make(map[preparedArtifactIdentity]model.Locator)
+	seen := make(map[preparedArtifactIdentity]spec.Locator)
 	for _, packageValue := range packages {
 		for _, expected := range packageValue.Expectations {
 			if err := expected.Locator.ValidatePortable(false); err != nil {
@@ -287,7 +287,7 @@ func validatePreparedPackageIdentities(
 			if previous, duplicate := seen[identity]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded MCP packages %q and %q both provide %q/%q",
-					model.ErrConflict,
+					spec.ErrConflict,
 					previous,
 					packageValue.EmbeddedPackageRoot,
 					expected.Kind,
@@ -306,7 +306,7 @@ func PackageFingerprint(
 	if !documentTopology.IsCollectionDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
 			"%w: built-in MCP Collection document is not declared in topology",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 

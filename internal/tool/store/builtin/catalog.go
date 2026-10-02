@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
@@ -25,7 +25,7 @@ var (
 	generatedCatalogFingerprint     cryptoutil.Digest
 
 	generatedCollectionIndexOnce sync.Once
-	generatedCollectionIndex     map[model.LogicalName]model.LogicalName
+	generatedCollectionIndex     map[spec.LogicalName]spec.LogicalName
 	errGeneratedCollectionIndex  error
 )
 
@@ -66,7 +66,7 @@ func GeneratedCatalogFingerprint() cryptoutil.Digest {
 // avoids rediscovering membership by listing and decoding every Collection at
 // runtime.
 func GeneratedToolCollectionIndex() (
-	map[model.LogicalName]model.LogicalName,
+	map[spec.LogicalName]spec.LogicalName,
 	error,
 ) {
 	generatedCollectionIndexOnce.Do(func() {
@@ -77,7 +77,7 @@ func GeneratedToolCollectionIndex() (
 		}
 
 		collections := make(
-			map[model.Locator]model.LogicalName,
+			map[spec.Locator]spec.LogicalName,
 		)
 		for _, packageValue := range set.Packages {
 			if packageValue.Address.Kind !=
@@ -88,7 +88,7 @@ func GeneratedToolCollectionIndex() (
 		}
 
 		index := make(
-			map[model.LogicalName]model.LogicalName,
+			map[spec.LogicalName]spec.LogicalName,
 		)
 		for _, packageValue := range set.Packages {
 			if packageValue.Address.Kind != toolDomain.ToolPackageKind {

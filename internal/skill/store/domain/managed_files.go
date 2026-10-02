@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -21,7 +21,7 @@ func NormalizeManagedSkillFiles(
 		if len(skillMD) == 0 {
 			return nil, nil, fmt.Errorf(
 				"%w: SKILL.md content is required",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return []source.ManagedPackageFile{{
@@ -47,7 +47,7 @@ func NormalizeManagedSkillFiles(
 	if len(packageSkillMD) == 0 {
 		return nil, nil, fmt.Errorf(
 			"%w: managed Skill package must contain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			documentFile,
 		)
 	}
@@ -55,7 +55,7 @@ func NormalizeManagedSkillFiles(
 		!bytes.Equal(skillMD, packageSkillMD) {
 		return nil, nil, fmt.Errorf(
 			"%w: requested SKILL.md differs from package SKILL.md",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return normalized, packageSkillMD, nil
@@ -98,7 +98,7 @@ func ManagedSkillStorageFiles(
 			documentFound = true
 		}
 
-		locator := model.Locator(path.Join(
+		locator := spec.Locator(path.Join(
 			string(address.Name),
 			string(file.Locator),
 		))
@@ -114,7 +114,7 @@ func ManagedSkillStorageFiles(
 	if !documentFound {
 		return nil, fmt.Errorf(
 			"%w: logical managed Skill package must contain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			documentFile,
 		)
 	}
@@ -130,7 +130,7 @@ func PackageDigest(
 		return "", err
 	}
 	type fileManifest struct {
-		Locator model.Locator     `json:"locator"`
+		Locator spec.Locator      `json:"locator"`
 		Size    int64             `json:"size"`
 		Digest  cryptoutil.Digest `json:"digest"`
 	}
@@ -145,7 +145,7 @@ func PackageDigest(
 	raw, err := jsonutil.MarshalCanonicalObject(map[string]any{
 		"format": "skill-package-content/v1",
 		"files":  manifest,
-	}, model.MaxDefinitionBytes)
+	}, spec.MaxDefinitionBytes)
 	if err != nil {
 		return "", err
 	}

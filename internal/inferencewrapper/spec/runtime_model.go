@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -24,45 +24,45 @@ type RuntimeModel struct {
 }
 
 func (v RuntimeModel) Validate() error {
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Provider name",
 		string(v.ProviderParam.Name),
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Provider SDK type",
 		string(v.ProviderParam.SDKType),
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Provider origin",
 		v.ProviderParam.Origin,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Provider path",
 		v.ProviderParam.ChatCompletionPathPrefix,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Provider API key header",
 		v.ProviderParam.APIKeyHeaderKey,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"runtime Model name",
 		string(v.ModelParam.Name),
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}

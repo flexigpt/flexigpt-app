@@ -9,10 +9,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
@@ -41,7 +41,7 @@ func New(
 		dependencies.Adapters == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Store dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := dependencies.BuiltinRoot.Validate(); err != nil {
@@ -53,7 +53,7 @@ func New(
 		) {
 		return nil, fmt.Errorf(
 			"%w: Model Store requires the protected built-in Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -327,12 +327,12 @@ func (a *API) ready(ctx context.Context) error {
 		a.overlays == nil ||
 		a.adapters == nil ||
 		a.builtinRoot == "" {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Model Store context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -353,7 +353,7 @@ func (a *API) requireKind(
 	if record.Kind != kind {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q has kind %q, expected %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 			record.Kind,
 			kind,

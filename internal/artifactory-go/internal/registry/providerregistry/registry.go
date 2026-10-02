@@ -3,9 +3,9 @@ package providerregistry
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Registry struct {
@@ -27,14 +27,14 @@ func New(
 
 	seenProviderNames := make(map[string]struct{}, len(providers))
 	schemaOwners := make(map[schema.Key]string)
-	decoderOwners := make(map[model.DecoderID]string)
+	decoderOwners := make(map[spec.DecoderID]string)
 	locatorResolverOwners := make(map[provider.LocatorResolverKey]string)
 
 	for index, pro := range providers {
 		if pro == nil {
 			return nil, fmt.Errorf(
 				"%w: artifact provider %d is nil",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 			)
 		}
@@ -47,7 +47,7 @@ func New(
 		if _, duplicate := seenProviderNames[descriptor.Name]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate artifact provider %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				descriptor.Name,
 			)
 		}
@@ -58,7 +58,7 @@ func New(
 			if owner, exists := schemaOwners[key]; exists {
 				return nil, fmt.Errorf(
 					"%w: schema %q/%q/%q is owned by both providers %q and %q",
-					model.ErrConflict,
+					spec.ErrConflict,
 					key.Kind,
 					key.SchemaID,
 					key.SchemaVersion,
@@ -74,7 +74,7 @@ func New(
 			if owner, exists := decoderOwners[id]; exists {
 				return nil, fmt.Errorf(
 					"%w: decoder %q is owned by both providers %q and %q",
-					model.ErrConflict,
+					spec.ErrConflict,
 					id,
 					owner,
 					descriptor.Name,
@@ -91,7 +91,7 @@ func New(
 				if owner, exists := locatorResolverOwners[key]; exists {
 					return nil, fmt.Errorf(
 						"%w: locator resolver %q for Artifact kind %q is owned by both providers %q and %q",
-						model.ErrConflict,
+						spec.ErrConflict,
 						key.LocatorKind,
 						key.ArtifactKind,
 						owner,

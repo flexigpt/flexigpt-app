@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 )
 
 // ArtifactReader is intentionally narrow. Local state is attached to exact

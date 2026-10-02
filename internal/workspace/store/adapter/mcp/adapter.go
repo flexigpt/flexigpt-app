@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
@@ -50,7 +50,7 @@ func New(
 	if artifacts == nil || servers == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace MCP adapter dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &Adapter{
@@ -70,7 +70,7 @@ func (a *Adapter) Load(
 	if a == nil ||
 		a.artifacts == nil ||
 		a.servers == nil {
-		return LoadPlan{}, model.ErrClosed
+		return LoadPlan{}, spec.ErrClosed
 	}
 
 	output := LoadPlan{
@@ -117,7 +117,7 @@ func fatalLoadError(
 	if contextErr := ctx.Err(); contextErr != nil {
 		return contextErr
 	}
-	if errors.Is(err, model.ErrClosed) {
+	if errors.Is(err, spec.ErrClosed) {
 		return err
 	}
 	return nil

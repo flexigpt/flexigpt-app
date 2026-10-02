@@ -6,9 +6,9 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
@@ -22,10 +22,10 @@ import (
 func (a *API) ListMCPServersReferencingPolicy(
 	ctx context.Context,
 	rootID root.RootID,
-	policyName model.LogicalName,
+	policyName spec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
 	if a == nil || a.resources == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return nil, err
@@ -49,7 +49,7 @@ func (a *API) ListMCPServersReferencingPolicy(
 func (a *API) listMCPServersReferencingPolicy(
 	ctx context.Context,
 	rootID root.RootID,
-	policyName model.LogicalName,
+	policyName spec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
 	servers, err := a.ListServers(ctx, ListServersRequest{
 		RootID: rootID,
@@ -115,7 +115,7 @@ func (a *API) additionalPoliciesReferenceName(
 	ctx context.Context,
 	refs []artifact.ArtifactRef,
 	rootID root.RootID,
-	policyName model.LogicalName,
+	policyName spec.LogicalName,
 ) (bool, error) {
 	for _, ref := range refs {
 		terminal, err := a.resolveDeclarationArtifact(ctx, ref)

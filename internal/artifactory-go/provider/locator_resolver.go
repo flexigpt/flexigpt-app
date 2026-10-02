@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // LocatorResolverFactory declares one owner-provided portable declaration
@@ -65,7 +65,7 @@ type LocatorResolutionRequest struct {
 	EntryJSON   json.RawMessage
 
 	ExpectedKind        artifact.ArtifactKind
-	ExpectedLogicalName model.LogicalName
+	ExpectedLogicalName spec.LogicalName
 }
 
 func (r LocatorResolutionRequest) Validate() error {
@@ -79,24 +79,24 @@ func (r LocatorResolutionRequest) Validate() error {
 		if r.From.RootID != r.RootID {
 			return fmt.Errorf(
 				"%w: locator origin Artifact belongs to another Root",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 	}
 	if len(r.LocatorJSON) == 0 ||
-		len(r.LocatorJSON) > model.MaxDefinitionBodyBytes ||
+		len(r.LocatorJSON) > spec.MaxDefinitionBodyBytes ||
 		!json.Valid(r.LocatorJSON) {
 		return fmt.Errorf(
 			"%w: locator resolver request has invalid locator JSON",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if len(r.EntryJSON) != 0 &&
-		(len(r.EntryJSON) > model.MaxDefinitionBodyBytes ||
+		(len(r.EntryJSON) > spec.MaxDefinitionBodyBytes ||
 			!json.Valid(r.EntryJSON)) {
 		return fmt.Errorf(
 			"%w: locator resolver request has invalid declaration JSON",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := r.ExpectedKind.Validate(); err != nil {
@@ -118,10 +118,10 @@ type LocatorResolverKey struct {
 }
 
 func (k LocatorResolverKey) Validate() error {
-	if err := model.ValidateIdentifier(
+	if err := spec.ValidateIdentifier(
 		"locator resolver locator kind",
 		k.LocatorKind,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -132,19 +132,19 @@ func ValidateLocatorResolverFactory(
 	value LocatorResolverFactory,
 ) error {
 	if value == nil {
-		return model.ErrInvalid
+		return spec.ErrInvalid
 	}
-	if err := model.ValidateIdentifier(
+	if err := spec.ValidateIdentifier(
 		"locator resolver kind",
 		value.LocatorKind(),
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"locator resolver revision",
 		value.Revision(),
-		model.MaxVersionBytes,
+		spec.MaxVersionBytes,
 	); err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func ValidateLocatorResolverFactory(
 	if len(kinds) == 0 {
 		return fmt.Errorf(
 			"%w: locator resolver %q has no Artifact kinds",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			value.LocatorKind(),
 		)
 	}
@@ -171,7 +171,7 @@ func ValidateLocatorResolverFactory(
 		if _, duplicate := seen[kind]; duplicate {
 			return fmt.Errorf(
 				"%w: locator resolver %q repeats Artifact kind %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				value.LocatorKind(),
 				kind,
 			)

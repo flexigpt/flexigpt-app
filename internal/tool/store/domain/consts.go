@@ -3,9 +3,9 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -20,13 +20,13 @@ const (
 	HydrationSchemaVersion = "tool.builtin-hydration/v1"
 )
 
-func ToolDocumentFile() model.Locator {
+func ToolDocumentFile() spec.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		documentTopology.DocumentUseToolPackage,
 	)
 }
 
-func ToolCollectionDocumentFile() model.Locator {
+func ToolCollectionDocumentFile() spec.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		documentTopology.DocumentUseToolCollection,
 	)

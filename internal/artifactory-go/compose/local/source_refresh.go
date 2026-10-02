@@ -5,9 +5,9 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // EnsureSourceCurrent refreshes one Source only when no refresh state exists
@@ -21,13 +21,13 @@ func EnsureSourceCurrent(
 	if discovery == nil {
 		return fmt.Errorf(
 			"%w: Source discovery API is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Source refresh context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -45,7 +45,7 @@ func EnsureSourceCurrent(
 		return nil
 	}
 	if err != nil &&
-		!errors.Is(err, model.ErrRefreshStateNotFound) {
+		!errors.Is(err, spec.ErrRefreshStateNotFound) {
 		return err
 	}
 

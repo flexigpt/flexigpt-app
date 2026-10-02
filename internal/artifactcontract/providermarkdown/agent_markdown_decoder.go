@@ -14,14 +14,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const AgentMarkdownDecoderID model.DecoderID = "agent-markdown"
+const AgentMarkdownDecoderID spec.DecoderID = "agent-markdown"
 
 const markdownMediaType = "text/markdown"
 
@@ -35,7 +35,7 @@ func NewAgentMarkdownDecoder() *AgentMarkdownDecoder {
 	return &AgentMarkdownDecoder{}
 }
 
-func (*AgentMarkdownDecoder) ID() model.DecoderID {
+func (*AgentMarkdownDecoder) ID() spec.DecoderID {
 	return AgentMarkdownDecoderID
 }
 
@@ -67,7 +67,7 @@ func (*AgentMarkdownDecoder) Decode(
 
 	if strings.TrimSpace(body) != "" {
 		instructionName, err := declaration.DeriveNestedLogicalName(
-			model.LogicalName(document.Name),
+			spec.LogicalName(document.Name),
 			"instructions",
 		)
 		if err != nil {
@@ -129,14 +129,14 @@ func (*AgentMarkdownDecoder) Decode(
 }
 
 func isAgentMarkdownCandidate(
-	locator model.Locator,
+	locator spec.Locator,
 ) bool {
 	return documentTopology.IsAgentMarkdownDocument(locator)
 }
 
 func decodeAgentMarkdown(
 	content []byte,
-	locator model.Locator,
+	locator spec.Locator,
 ) (agentv1.AgentDocument, string, error) {
 	markdown, err := normalizeMarkdownOptional(content)
 	if err != nil {
@@ -151,7 +151,7 @@ func decodeAgentMarkdown(
 	if strings.TrimSpace(frontmatter) != "" {
 		raw, err := yamlutil.CanonicalObjectJSON(
 			[]byte(frontmatter),
-			model.MaxDefinitionBytes,
+			spec.MaxDefinitionBytes,
 		)
 		if err != nil {
 			return agentv1.AgentDocument{}, "", err
@@ -159,7 +159,7 @@ func decodeAgentMarkdown(
 		if err := jsonutil.DecodeCanonicalObjectBytesInto(
 			raw,
 			&fields,
-			model.MaxDefinitionBytes,
+			spec.MaxDefinitionBytes,
 		); err != nil {
 			return agentv1.AgentDocument{}, "", err
 		}
@@ -182,7 +182,7 @@ func decodeAgentMarkdown(
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		fields,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return agentv1.AgentDocument{}, "", err
@@ -215,12 +215,12 @@ func splitAgentMarkdown(
 	}
 	return "", "", fmt.Errorf(
 		"%w: Agent Markdown front matter has no closing delimiter",
-		model.ErrInvalid,
+		spec.ErrInvalid,
 	)
 }
 
 func agentMarkdownDiagnostics(
-	locator model.Locator,
+	locator spec.Locator,
 	err error,
 ) []diagnostic.Diagnostic {
 	return []diagnostic.Diagnostic{{
@@ -239,13 +239,13 @@ func normalizeMarkdownOptional(
 	if !utf8.Valid(content) {
 		return "", fmt.Errorf(
 			"%w: Markdown source must contain valid UTF-8",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if bytes.ContainsRune(content, 0) {
 		return "", fmt.Errorf(
 			"%w: Markdown source contains a NUL byte",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -261,7 +261,7 @@ func normalizeMarkdownOptional(
 // containing a source-format declaration. It keeps source material out of
 // Definition.Body while preserving declaration-relative locator semantics.
 func sourceEntryDeclarationLocator(
-	locator model.Locator,
+	locator spec.Locator,
 ) *declaration.Locator {
 	value := declaration.ScalarLocator(
 		"./" + path.Base(string(locator)),

@@ -21,12 +21,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
@@ -40,7 +40,7 @@ type workflowHarness struct {
 
 	dependencyDirectory     string
 	dependencySourceCreated bool
-	dependencyFiles         map[workflowDependency]model.Locator
+	dependencyFiles         map[workflowDependency]spec.Locator
 	nextDependencyFile      int
 
 	agentBootstrap *builtin.BootstrapRegistry
@@ -49,7 +49,7 @@ type workflowHarness struct {
 
 type workflowDependency struct {
 	Type   declaration.Type
-	Name   model.LogicalName
+	Name   spec.LogicalName
 	Insert declaration.InsertTarget
 }
 
@@ -68,7 +68,7 @@ func (f workflowMappedFallback) ResolveFallback(
 	if ctx == nil {
 		return resolve.FallbackTarget{}, false, fmt.Errorf(
 			"%w: workflow fallback context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -170,7 +170,7 @@ func newWorkflowHarness(
 	return &workflowHarness{
 		store:           store,
 		api:             api,
-		dependencyFiles: make(map[workflowDependency]model.Locator),
+		dependencyFiles: make(map[workflowDependency]spec.Locator),
 	}
 }
 
@@ -355,7 +355,7 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		content, err := workflowDependencyDocument(dependency)
 		requireNoError(t, err)
 
-		locator := model.Locator(fmt.Sprintf(
+		locator := spec.Locator(fmt.Sprintf(
 			"dependency-%04d.yaml",
 			h.nextDependencyFile,
 		))
@@ -393,7 +393,7 @@ func (h *workflowHarness) publishBuiltinDependencies(
 				Recursive:       true,
 				IncludePatterns: []string{"**/*.yaml"},
 			}},
-			AllowedDecoderIDs: []model.DecoderID{
+			AllowedDecoderIDs: []spec.DecoderID{
 				decoder.YAMLDecoderID,
 			},
 			Authoritative: true,

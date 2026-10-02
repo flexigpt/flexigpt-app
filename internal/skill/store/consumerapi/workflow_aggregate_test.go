@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
@@ -169,7 +169,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	}
 
 	_, err = aggregateService.ResolveArtifactSkill(ctx, disabled.Ref())
-	if !errors.Is(err, model.ErrReferenceUnresolved) {
+	if !errors.Is(err, spec.ErrReferenceUnresolved) {
 		t.Fatalf(
 			"aggregate resolution after disable error=%v, want ErrReferenceUnresolved",
 			err,

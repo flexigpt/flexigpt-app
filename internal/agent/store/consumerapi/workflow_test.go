@@ -10,8 +10,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -39,7 +39,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	known := requireNamedAgent(
 		t,
 		builtinAgents,
-		model.LogicalName("local-dev-workspace"),
+		spec.LogicalName("local-dev-workspace"),
 	)
 	if !known.BuiltIn {
 		t.Fatalf("bundled Agent BuiltIn = false")
@@ -97,7 +97,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	requireNamedAgent(
 		t,
 		userVisible,
-		model.LogicalName("local-dev-workspace"),
+		spec.LogicalName("local-dev-workspace"),
 	)
 
 	before := append([]agentConsumerAPI.AgentListItem(nil), builtinAgents...)
@@ -305,7 +305,7 @@ members:
 		t.Fatalf("managed Agent preview has no prepared envelope")
 	}
 	if preview.Agent == nil ||
-		preview.Agent.Name != model.LogicalName("workflow-agent") {
+		preview.Agent.Name != spec.LogicalName("workflow-agent") {
 		t.Fatalf("managed Agent preview has wrong projected Agent: %#v", preview.Agent)
 	}
 	if preview.NormalizedYAML == "" {
@@ -337,7 +337,7 @@ members:
 		committed.Agent.Ref,
 	)
 	requireNoError(t, err)
-	if current.Name != model.LogicalName("workflow-agent") {
+	if current.Name != spec.LogicalName("workflow-agent") {
 		t.Fatalf("read Agent name = %q", current.Name)
 	}
 
@@ -381,7 +381,7 @@ members:
 		t,
 		resolution.Capabilities,
 		declaration.TypeText,
-		model.LogicalName("workflow-agent-instructions"),
+		spec.LogicalName("workflow-agent-instructions"),
 	)
 	materialized, err := harness.api.MaterializeAgentText(
 		t.Context(),
@@ -436,7 +436,7 @@ members:
 		committed.Agent.Revision,
 		true,
 	)
-	requireErrorIs(t, err, model.ErrConflict)
+	requireErrorIs(t, err, spec.ErrConflict)
 
 	enabledAgent, err := harness.api.SetAgentEnabled(
 		t.Context(),
@@ -510,12 +510,12 @@ members:
 		collectionRef,
 		currentCollection.Artifact.Revision,
 	)
-	requireErrorIs(t, err, model.ErrConflict)
+	requireErrorIs(t, err, spec.ErrConflict)
 
 	memberIndex := requireAgentCollectionMemberIndex(
 		t,
 		currentCollection.Members,
-		model.LogicalName("workflow-agent"),
+		spec.LogicalName("workflow-agent"),
 	)
 	detachedCollection, err := harness.api.RemoveAgentCollectionMember(
 		t.Context(),
@@ -575,7 +575,7 @@ members:
 func requireNamedAgent(
 	t *testing.T,
 	values []agentConsumerAPI.AgentListItem,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) agentConsumerAPI.AgentListItem {
 	t.Helper()
 
@@ -608,7 +608,7 @@ func requireAvailableCapability(
 	t *testing.T,
 	plan agentConsumerAPI.AgentCapabilityPlan,
 	declarationType declaration.Type,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) artifact.ArtifactRef {
 	t.Helper()
 
@@ -641,7 +641,7 @@ func requireAvailableCapability(
 func requireAgentCollectionMemberIndex(
 	t *testing.T,
 	values []collection.MemberReference,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) int {
 	t.Helper()
 

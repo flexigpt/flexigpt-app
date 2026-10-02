@@ -8,12 +8,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ListRequest is the public Collection listing request.
@@ -33,9 +33,9 @@ type ListItem struct {
 	Ref      artifact.ArtifactRef `json:"ref"`
 	SourceID source.SourceID      `json:"sourceID"`
 
-	Name        model.LogicalName `json:"name"`
-	DisplayName string            `json:"displayName"`
-	Description string            `json:"description,omitempty"`
+	Name        spec.LogicalName `json:"name"`
+	DisplayName string           `json:"displayName"`
+	Description string           `json:"description,omitempty"`
 
 	State    artifact.State `json:"state"`
 	Enabled  bool           `json:"enabled"`
@@ -64,12 +64,12 @@ func (a *API) listCollections(
 	domainOnly bool,
 ) ([]ListItem, error) {
 	if a == nil || a.artifacts == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Collection list context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -205,7 +205,7 @@ func (a *API) collectionDocuments(
 	if len(values) != len(keys) {
 		return nil, fmt.Errorf(
 			"%w: Collection Definition batch is incomplete",
-			model.ErrDefinitionNotFound,
+			spec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -214,7 +214,7 @@ func (a *API) collectionDocuments(
 		if value.Digest != keys[index].Digest {
 			return nil, fmt.Errorf(
 				"%w: Collection Definition batch returned another digest",
-				model.ErrDigestMismatch,
+				spec.ErrDigestMismatch,
 			)
 		}
 		output[keys[index]] = value.Clone()
@@ -229,7 +229,7 @@ func (a *API) collectionProjectionFor(
 	if entry.Definition == nil {
 		return collectionProjection{}, fmt.Errorf(
 			"%w: Collection Definition is unavailable",
-			model.ErrDefinitionNotFound,
+			spec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -243,7 +243,7 @@ func (a *API) collectionProjectionFor(
 	if loaded == nil {
 		return collectionProjection{}, fmt.Errorf(
 			"%w: Collection listing requires an admitted Definition document",
-			model.ErrDefinitionNotFound,
+			spec.ErrDefinitionNotFound,
 		)
 	}
 
@@ -258,7 +258,7 @@ func (a *API) collectionProjectionFor(
 			if document.Name != string(entry.LogicalName) {
 				return collectionProjection{}, fmt.Errorf(
 					"%w: Collection Definition identity differs from catalog identity",
-					model.ErrDigestMismatch,
+					spec.ErrDigestMismatch,
 				)
 			}
 			projection := collectionProjection{
@@ -357,7 +357,7 @@ func (a *API) validateEditableProjection(
 		if member.Form != declaration.MemberNamed {
 			return fmt.Errorf(
 				"%w: editable Collection has a non-named member",
-				model.ErrUnsupported,
+				spec.ErrUnsupported,
 			)
 		}
 		if a.domain != nil &&
@@ -365,7 +365,7 @@ func (a *API) validateEditableProjection(
 				!a.domain.allowsMemberForm(member.Form)) {
 			return fmt.Errorf(
 				"%w: Collection member is outside the domain policy",
-				model.ErrUnsupported,
+				spec.ErrUnsupported,
 			)
 		}
 	}

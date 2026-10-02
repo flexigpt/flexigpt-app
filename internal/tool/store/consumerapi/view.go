@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
@@ -21,9 +21,9 @@ type ToolImplementationView struct {
 type ToolListItem struct {
 	Ref artifact.ArtifactRef `json:"ref"`
 
-	Name        model.LogicalName `json:"name"`
-	DisplayName string            `json:"displayName"`
-	Description string            `json:"description,omitempty"`
+	Name        spec.LogicalName `json:"name"`
+	DisplayName string           `json:"displayName"`
+	Description string           `json:"description,omitempty"`
 
 	State            artifact.State    `json:"state"`
 	Enabled          bool              `json:"enabled"`
@@ -33,15 +33,15 @@ type ToolListItem struct {
 }
 
 type ToolView struct {
-	Artifact         artifact.Artifact    `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
-	Name             model.LogicalName    `json:"name"`
-	Version          model.LogicalVersion `json:"version"`
-	DisplayName      string               `json:"displayName"`
-	Description      string               `json:"description,omitempty"`
-	Tags             []string             `json:"tags,omitempty"`
-	AutoExecute      bool                 `json:"autoExecute"`
-	BuiltIn          bool                 `json:"builtIn"`
+	Artifact         artifact.Artifact   `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest   `json:"definitionDigest"`
+	Name             spec.LogicalName    `json:"name"`
+	Version          spec.LogicalVersion `json:"version"`
+	DisplayName      string              `json:"displayName"`
+	Description      string              `json:"description,omitempty"`
+	Tags             []string            `json:"tags,omitempty"`
+	AutoExecute      bool                `json:"autoExecute"`
+	BuiltIn          bool                `json:"builtIn"`
 
 	InputSchema   json.RawMessage  `json:"inputSchema"`
 	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`

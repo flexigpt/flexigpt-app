@@ -5,9 +5,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Provider is immutable decoded source material for one model.provider
@@ -35,14 +35,14 @@ func DecodeProvider(
 	if record.Kind != ModelProviderArtifactKind {
 		return Provider{}, fmt.Errorf(
 			"%w: Artifact %q is not a Model Provider",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if record.State != artifact.StateAvailable {
 		return Provider{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -54,7 +54,7 @@ func DecodeProvider(
 		value.SchemaVersion != modelproviderv1.ModelProviderSchemaKey.SchemaVersion {
 		return Provider{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q has an unsupported schema",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
@@ -62,7 +62,7 @@ func DecodeProvider(
 		*record.ResolvedDefinition != value.Digest {
 		return Provider{}, fmt.Errorf(
 			"%w: Model Provider definition changed during read",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -70,10 +70,10 @@ func DecodeProvider(
 	if err != nil {
 		return Provider{}, err
 	}
-	if record.LogicalName != model.LogicalName(document.Name) {
+	if record.LogicalName != spec.LogicalName(document.Name) {
 		return Provider{}, fmt.Errorf(
 			"%w: Model Provider identity differs from its declaration",
-			model.ErrDigestMismatch,
+			spec.ErrDigestMismatch,
 		)
 	}
 
@@ -91,14 +91,14 @@ func DecodeModel(
 	if record.Kind != ModelArtifactKind {
 		return Model{}, fmt.Errorf(
 			"%w: Artifact %q is not a Model",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if record.State != artifact.StateAvailable {
 		return Model{}, fmt.Errorf(
 			"%w: Model Artifact %q is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -110,7 +110,7 @@ func DecodeModel(
 		value.SchemaVersion != modelv1.ModelSchemaKey.SchemaVersion {
 		return Model{}, fmt.Errorf(
 			"%w: Model Artifact %q has an unsupported schema",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
@@ -118,7 +118,7 @@ func DecodeModel(
 		*record.ResolvedDefinition != value.Digest {
 		return Model{}, fmt.Errorf(
 			"%w: Model definition changed during read",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -126,10 +126,10 @@ func DecodeModel(
 	if err != nil {
 		return Model{}, err
 	}
-	if record.LogicalName != model.LogicalName(document.Name) {
+	if record.LogicalName != spec.LogicalName(document.Name) {
 		return Model{}, fmt.Errorf(
 			"%w: Model identity differs from its declaration",
-			model.ErrDigestMismatch,
+			spec.ErrDigestMismatch,
 		)
 	}
 

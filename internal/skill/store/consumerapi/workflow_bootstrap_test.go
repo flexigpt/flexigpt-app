@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
@@ -39,7 +39,7 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		ctx,
 		documentTopology.BuiltinRootID(),
 	)
-	if !errors.Is(err, model.ErrRootNotFound) {
+	if !errors.Is(err, spec.ErrRootNotFound) {
 		t.Fatalf(
 			"built-in Root before hydration error=%v, want ErrRootNotFound",
 			err,
@@ -182,7 +182,7 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 			ExpectedRevision: baseline.Artifact.Revision,
 		},
 	)
-	if !errors.Is(err, model.ErrProtected) {
+	if !errors.Is(err, spec.ErrProtected) {
 		t.Fatalf(
 			"delete baseline error=%v, want ErrProtected",
 			err,

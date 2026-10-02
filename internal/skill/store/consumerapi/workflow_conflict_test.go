@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
@@ -53,7 +53,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 			Description:      "Stale writer must not win.",
 		},
 	)
-	if !errors.Is(err, model.ErrConflict) {
+	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
 			"stale Collection update error=%v, want ErrConflict",
 			err,
@@ -124,7 +124,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 			Enabled: true,
 		},
 	)
-	if !errors.Is(err, model.ErrConflict) {
+	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
 			"stale Collection Skill create error=%v, want ErrConflict",
 			err,
@@ -150,7 +150,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 		staleSkill.Revision,
 		true,
 	)
-	if !errors.Is(err, model.ErrConflict) {
+	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
 			"stale Skill enable error=%v, want ErrConflict",
 			err,
@@ -184,7 +184,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 			Enabled: true,
 		},
 	)
-	if !errors.Is(err, model.ErrConflict) {
+	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
 			"stale Skill replacement error=%v, want ErrConflict",
 			err,
@@ -202,7 +202,7 @@ func TestSkillStoreWorkflowRejectsStaleCollectionAndSkillMutations(
 		currentSkill.RootID,
 		currentSkill.Binding.SourceID,
 		currentSkill.Binding.Locator,
-		model.MaxCandidateBytes,
+		spec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(storedDocument.Content, initialDocument) {
@@ -309,7 +309,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 			Enabled: true,
 		},
 	)
-	if !errors.Is(err, model.ErrConflict) {
+	if !errors.Is(err, spec.ErrConflict) {
 		t.Fatalf(
 			"implicit managed Skill replacement error=%v, want ErrConflict",
 			err,
@@ -334,7 +334,7 @@ func TestSkillStoreWorkflowManagedCreateReplayIsIdempotentAndDoesNotReplace(
 		currentSkill.RootID,
 		currentSkill.Binding.SourceID,
 		currentSkill.Binding.Locator,
-		model.MaxCandidateBytes,
+		spec.MaxCandidateBytes,
 	)
 	requireNoError(t, err)
 	if !bytes.Equal(storedDocument.Content, initialDocument) {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ArtifactNameReferenceLookupRoots returns the only Roots allowed for a
@@ -32,7 +32,7 @@ func ArtifactNameReferenceLookupRoots(
 		if builtinRoot == "" {
 			return nil, fmt.Errorf(
 				"%w: built-in lookup is unavailable",
-				model.ErrReferenceUnresolved,
+				spec.ErrReferenceUnresolved,
 			)
 		}
 		if err := builtinRoot.Validate(); err != nil {
@@ -55,7 +55,7 @@ func ArtifactNameReferenceLookupRoots(
 	default:
 		return nil, fmt.Errorf(
 			"%w: unsupported Model reference scope %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			reference.Scope,
 		)
 	}

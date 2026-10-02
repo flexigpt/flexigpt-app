@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -23,7 +23,7 @@ func BodyFromDefinition(
 		input.SchemaVersion != mcppolicyv1.MCPPolicySchemaKey.SchemaVersion {
 		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Definition is not an MCP Policy",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -35,7 +35,7 @@ func BodyFromDefinition(
 }
 
 // BodyFromDocument projects an already validated declaration document into
-// the normalized MCP runtime policy model.
+// the normalized MCP runtime policy spec.
 func BodyFromDocument(
 	document mcppolicyv1.MCPPolicyDocument,
 ) (mcpPolicy.MCPPolicy, error) {
@@ -51,7 +51,7 @@ func BodyFromDocument(
 			ToolPolicies:  document.ToolPolicies,
 			AppsPolicy:    document.AppsPolicy,
 		},
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err
@@ -60,7 +60,7 @@ func BodyFromDocument(
 	if err := json.Unmarshal(raw, &body); err != nil {
 		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: decode MCP Policy body: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -85,7 +85,7 @@ func DefinitionForDocument(
 		Kind:          mcpDomain.MCPPolicyArtifactKind,
 		SchemaID:      mcppolicyv1.MCPPolicySchemaKey.SchemaID,
 		SchemaVersion: mcppolicyv1.MCPPolicySchemaKey.SchemaVersion,
-		LogicalName:   model.LogicalName(input.Name),
+		LogicalName:   spec.LogicalName(input.Name),
 		DisplayName:   input.Name,
 		Description:   input.Description,
 		Labels:        input.Labels,
@@ -96,13 +96,13 @@ func DefinitionForDocument(
 }
 
 func DocumentFromPolicy(
-	name model.LogicalName,
+	name spec.LogicalName,
 	description string,
 	body mcpPolicy.MCPPolicy,
 ) (mcppolicyv1.MCPPolicyDocument, error) {
 	raw, err := jsonutil.MarshalCanonicalObject(
 		body,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return mcppolicyv1.MCPPolicyDocument{}, err

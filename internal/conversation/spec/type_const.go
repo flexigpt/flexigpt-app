@@ -3,7 +3,7 @@ package spec
 import (
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"

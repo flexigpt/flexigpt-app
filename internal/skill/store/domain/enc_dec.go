@@ -8,10 +8,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
 // ManagedSkillDocument is a source-backed editable Skill document. It is
@@ -39,7 +39,7 @@ func ParseSkillDocument(
 	if err := document.ValidateSkillDocument(doc); err != nil {
 		return document.SkillDocument{}, nil, fmt.Errorf(
 			"%w: invalid Agent Skill document: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -87,7 +87,7 @@ func DefinitionForSkillDeclaration(
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
-		LogicalName:   model.LogicalName(doc.Name),
+		LogicalName:   spec.LogicalName(doc.Name),
 		DisplayName:   displayName,
 		Description:   doc.Description,
 		Labels:        declaration.CloneStringMap(doc.Labels),
@@ -120,28 +120,28 @@ func ValidateDefinition(
 	if value.Kind != SkillArtifactKind {
 		return fmt.Errorf(
 			"%w: Skill Definition kind must be %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			SkillArtifactKind,
 		)
 	}
 	if value.SchemaID != SkillSchemaID {
 		return fmt.Errorf(
 			"%w: Skill Definition schema must be %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			SkillSchemaID,
 		)
 	}
 	if value.SchemaVersion != SkillSchemaVersion {
 		return fmt.Errorf(
 			"%w: Skill Definition schema version must be %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			SkillSchemaVersion,
 		)
 	}
 	if len(value.Dependencies) != 0 {
 		return fmt.Errorf(
 			"%w: Skill Definition dependencies belong to the resolver graph",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -152,13 +152,13 @@ func ValidateDefinition(
 	if doc.Name != string(value.LogicalName) {
 		return fmt.Errorf(
 			"%w: Skill Definition logical name does not match declaration name",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if doc.Description != value.Description {
 		return fmt.Errorf(
 			"%w: Skill Definition description does not match declaration description",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return nil
@@ -190,7 +190,7 @@ func definitionForSkillDocument(
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
-		LogicalName:   model.LogicalName(doc.Name),
+		LogicalName:   spec.LogicalName(doc.Name),
 		DisplayName:   doc.DisplayName,
 		Description:   doc.Description,
 		Labels: map[string]string{

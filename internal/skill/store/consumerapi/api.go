@@ -10,11 +10,11 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -49,7 +49,7 @@ func New(
 		protection == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill Store dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -106,7 +106,7 @@ func New(
 }
 
 func SkillDiscoverySpec(
-	r model.Locator,
+	r spec.Locator,
 ) (source.DiscoverySpec, error) {
 	if r == "" {
 		r = "."
@@ -124,10 +124,10 @@ func (a *API) RegisterSkillDirectory(
 	if err := request.RootID.Validate(); err != nil {
 		return source.Summary{}, err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"Skill Source display name",
 		request.SourceDisplayName,
-		model.MaxDisplayNameBytes,
+		spec.MaxDisplayNameBytes,
 	); err != nil {
 		return source.Summary{}, err
 	}
@@ -201,7 +201,7 @@ func (a *API) GetSkill(
 	if !skillDomain.IsSkillKind(value.Kind) {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not a Skill",
-			model.ErrNotFound,
+			spec.ErrNotFound,
 			ref.ArtifactID,
 		)
 	}
@@ -230,7 +230,7 @@ func (a *API) CreateManagedSkill(
 	request ManagedSkillCreateRequest,
 ) (ManagedSkillCreateResult, error) {
 	if a == nil || a.collections == nil {
-		return ManagedSkillCreateResult{}, model.ErrClosed
+		return ManagedSkillCreateResult{}, spec.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
@@ -238,7 +238,7 @@ func (a *API) CreateManagedSkill(
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedSkillCreateResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := a.requireMutable(
@@ -248,7 +248,7 @@ func (a *API) CreateManagedSkill(
 	); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
-	if err := model.LogicalName(request.SkillName).Validate(); err != nil {
+	if err := spec.LogicalName(request.SkillName).Validate(); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
 
@@ -266,10 +266,10 @@ func (a *API) CreateManagedSkill(
 	if err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
-	if definitionValue.LogicalName != model.LogicalName(request.SkillName) {
+	if definitionValue.LogicalName != spec.LogicalName(request.SkillName) {
 		return ManagedSkillCreateResult{}, fmt.Errorf(
 			"%w: SKILL.md name does not match requested Skill name",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -378,7 +378,7 @@ func (a *API) ReplaceManagedSkill(
 	request ManagedSkillReplaceRequest,
 ) (ManagedSkillReplaceResult, error) {
 	if a == nil || a.collections == nil {
-		return ManagedSkillReplaceResult{}, model.ErrClosed
+		return ManagedSkillReplaceResult{}, spec.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return ManagedSkillReplaceResult{}, err
@@ -389,22 +389,22 @@ func (a *API) ReplaceManagedSkill(
 	if request.Collection.RootID != request.Artifact.RootID {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill Artifact belongs to another Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if request.ExpectedCollectionRevision == 0 {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if request.ExpectedArtifactRevision == 0 {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: expected Skill Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
-	if err := model.LogicalName(request.SkillName).Validate(); err != nil {
+	if err := spec.LogicalName(request.SkillName).Validate(); err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
 
@@ -413,13 +413,13 @@ func (a *API) ReplaceManagedSkill(
 		return ManagedSkillReplaceResult{}, err
 	}
 	if collectionView.Artifact.Revision != request.ExpectedCollectionRevision {
-		return ManagedSkillReplaceResult{}, model.ErrConflict
+		return ManagedSkillReplaceResult{}, spec.ErrConflict
 	}
 	if !collectionView.Editable &&
 		!collectionView.Baseline {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill Collection is read-only",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -428,19 +428,19 @@ func (a *API) ReplaceManagedSkill(
 		return ManagedSkillReplaceResult{}, err
 	}
 	if current.Revision != request.ExpectedArtifactRevision {
-		return ManagedSkillReplaceResult{}, model.ErrConflict
+		return ManagedSkillReplaceResult{}, spec.ErrConflict
 	}
 	if current.Binding.SubresourceLocator != "" ||
 		!skillDomain.IsSkillDefinitionFile(current.Binding.Locator) {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not a replaceable managed Skill package",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if current.Binding.SourceID != collectionView.Artifact.Binding.SourceID {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not owned by this Collection Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -455,7 +455,7 @@ func (a *API) ReplaceManagedSkill(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not backed by a managed Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -478,7 +478,7 @@ func (a *API) ReplaceManagedSkill(
 	if !memberFound {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not a direct member of the requested Collection",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -499,7 +499,7 @@ func (a *API) ReplaceManagedSkill(
 	if definitionValue.LogicalName != current.LogicalName {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: replacement Skill name must remain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			current.LogicalName,
 		)
 	}
@@ -520,7 +520,7 @@ func (a *API) ReplaceManagedSkill(
 	if requestedAddress != currentAddress {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: replacement Skill cannot change managed package identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -543,7 +543,7 @@ func (a *API) ReplaceManagedSkill(
 	if !inspection.IsCurrent() {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: managed Skill Source requires refresh",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -572,7 +572,7 @@ func (a *API) ReplaceManagedSkill(
 	if published.Artifact.Ref() != request.Artifact {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: replacement published another Skill Artifact",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -606,7 +606,7 @@ func (a *API) GetManagedSkillDocument(
 	ref artifact.ArtifactRef,
 ) (skillDomain.ManagedSkillDocument, error) {
 	if a == nil || a.resources == nil {
-		return skillDomain.ManagedSkillDocument{}, model.ErrClosed
+		return skillDomain.ManagedSkillDocument{}, spec.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -625,7 +625,7 @@ func (a *API) PurgeSkill(
 	if expectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Skill Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	value, err := a.GetSkill(ctx, ref)
@@ -633,7 +633,7 @@ func (a *API) PurgeSkill(
 		return err
 	}
 	if value.Revision != expectedRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 	if err := a.requireMutable(ctx, value.RootID, false); err != nil {
 		return err
@@ -650,7 +650,7 @@ func (a *API) PurgeSkill(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: source-backed Skill removal must update or unregister its Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if value.Binding.SubresourceLocator != "" ||
@@ -659,7 +659,7 @@ func (a *API) PurgeSkill(
 		) {
 		return fmt.Errorf(
 			"%w: managed Skill must originate at a configured package document",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -690,7 +690,7 @@ func (a *API) PurgeSkill(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed managed Skill Artifact is not missing",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -710,7 +710,7 @@ func (a *API) ResolveSkillCapabilities(
 	if a == nil ||
 		a.resources == nil ||
 		a.declarationResolver == nil {
-		return resolve.CapabilityPlan{}, model.ErrClosed
+		return resolve.CapabilityPlan{}, spec.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -743,13 +743,13 @@ func (a *API) getManagedSkillDocument(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: only managed Skills expose editable Skill documents",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if value.Binding.SubresourceLocator != "" {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: managed Skill must originate at a configured package document",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if _, err := skillDomain.ManagedPackageAddressFromSkillLocator(
@@ -757,7 +757,7 @@ func (a *API) getManagedSkillDocument(
 	); err != nil {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: only application-managed Skill packages expose editable documents",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -774,7 +774,7 @@ func (a *API) getManagedSkillDocument(
 		value.RootID,
 		value.Binding.SourceID,
 		value.Binding.Locator,
-		model.MaxCandidateBytes,
+		spec.MaxCandidateBytes,
 	)
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err
@@ -787,7 +787,7 @@ func (a *API) getManagedSkillDocument(
 			resolved.RefreshState.SourceGeneration {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: Skill Source changed while reading managed document",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 	doc, _, err := skillDomain.ParseSkillDocument(
@@ -808,7 +808,7 @@ func (a *API) ensureSkillBaselineCollection(
 	rootID root.RootID,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
-		return collection.CollectionView{}, model.ErrClosed
+		return collection.CollectionView{}, spec.ErrClosed
 	}
 	return a.collections.EnsureBaseline(ctx, rootID)
 }
@@ -827,7 +827,7 @@ func (a *API) requireMutable(
 	if !allowProtected {
 		return fmt.Errorf(
 			"%w: protected Root %q requires trusted installer access",
-			model.ErrProtected,
+			spec.ErrProtected,
 			rootID,
 		)
 	}

@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -120,18 +120,18 @@ func (v TextDocument) validateFields() error {
 	case v.Content != nil && v.Locator != nil:
 		return fmt.Errorf(
 			"%w: Text cannot contain both content and locator",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	case v.Content == nil && v.Locator == nil:
 		return fmt.Errorf(
 			"%w: Text requires content or locator",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	case v.Content != nil &&
 		(len(v.Include) != 0 || len(v.Exclude) != 0):
 		return fmt.Errorf(
 			"%w: inline Text cannot contain include or exclude patterns",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := declaration.ValidateOptionalContent(v.Content); err != nil {
@@ -140,8 +140,8 @@ func (v TextDocument) validateFields() error {
 	if err := declaration.ValidateOptionalMediaType(v.MediaType); err != nil {
 		return err
 	}
-	if err := model.ValidatePathPatterns("Text include", v.Include); err != nil {
+	if err := spec.ValidatePathPatterns("Text include", v.Include); err != nil {
 		return err
 	}
-	return model.ValidatePathPatterns("Text exclude", v.Exclude)
+	return spec.ValidatePathPatterns("Text exclude", v.Exclude)
 }

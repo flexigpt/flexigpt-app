@@ -21,10 +21,10 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -76,13 +76,13 @@ func newAPI(
 		managedArtifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: managed Collection dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if len(domains) > 1 {
 		return nil, fmt.Errorf(
 			"%w: Collection API has multiple domain policies",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	output := &API{
@@ -112,7 +112,7 @@ func newAPI(
 
 type CollectionView struct {
 	Artifact    artifact.Artifact      `json:"artifact"`
-	Name        model.LogicalName      `json:"name"`
+	Name        spec.LogicalName       `json:"name"`
 	DisplayName string                 `json:"displayName"`
 	Description string                 `json:"description,omitempty"`
 	Members     []MemberReference      `json:"members"`
@@ -124,10 +124,10 @@ type CollectionView struct {
 
 type CollectionMemberView struct {
 	Type      declaration.Type         `json:"type"`
-	Name      model.LogicalName        `json:"name,omitempty"`
+	Name      spec.LogicalName         `json:"name,omitempty"`
 	Insert    declaration.InsertTarget `json:"insert,omitempty"`
 	Locator   *declaration.Locator     `json:"locator,omitempty"`
-	Server    model.LogicalName        `json:"server,omitempty"`
+	Server    spec.LogicalName         `json:"server,omitempty"`
 	Contained bool                     `json:"contained"`
 	Selector  bool                     `json:"selector"`
 }
@@ -136,19 +136,19 @@ type CollectionMemberView struct {
 // cannot express a contained declaration.
 type MemberReference struct {
 	Type    declaration.Type         `json:"type"`
-	Name    model.LogicalName        `json:"name"`
+	Name    spec.LogicalName         `json:"name"`
 	Insert  declaration.InsertTarget `json:"insert,omitempty"`
 	Locator *declaration.Locator     `json:"locator,omitempty"`
 	Scope   declaration.LookupScope  `json:"scope,omitempty"`
-	Server  model.LogicalName        `json:"server,omitempty"`
+	Server  spec.LogicalName         `json:"server,omitempty"`
 }
 
 type CreateRequest struct {
-	RootID      root.RootID       `json:"rootID"`
-	SourceID    source.SourceID   `json:"sourceID,omitempty"`
-	Name        model.LogicalName `json:"name"`
-	DisplayName string            `json:"displayName,omitempty"`
-	Description string            `json:"description,omitempty"`
+	RootID      root.RootID      `json:"rootID"`
+	SourceID    source.SourceID  `json:"sourceID,omitempty"`
+	Name        spec.LogicalName `json:"name"`
+	DisplayName string           `json:"displayName,omitempty"`
+	Description string           `json:"description,omitempty"`
 }
 
 type UpdateRequest struct {
@@ -215,7 +215,7 @@ func (a *API) Get(
 	ref artifact.ArtifactRef,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	value, err := a.loadEditableCollection(ctx, ref, 0)
 	if err != nil {
@@ -236,12 +236,12 @@ func (a *API) SetEnabled(
 	enabled bool,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	if expectedRevision == 0 {
 		return CollectionView{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -250,7 +250,7 @@ func (a *API) SetEnabled(
 		return CollectionView{}, err
 	}
 	if view.Artifact.Revision != expectedRevision {
-		return CollectionView{}, model.ErrConflict
+		return CollectionView{}, spec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -278,12 +278,12 @@ func (a *API) Update(
 	request UpdateRequest,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
 		return CollectionView{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -342,12 +342,12 @@ func (a *API) RemoveMember(
 	request RemoveMemberRequest,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
 		return CollectionView{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -365,7 +365,7 @@ func (a *API) RemoveMember(
 	if request.Index < 0 || request.Index >= len(value.document.Members) {
 		return CollectionView{}, fmt.Errorf(
 			"%w: Collection member index %d is out of range",
-			model.ErrNotFound,
+			spec.ErrNotFound,
 			request.Index,
 		)
 	}
@@ -423,7 +423,7 @@ func (a *API) AddArtifactMember(
 	request AddArtifactMemberRequest,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	if err := request.Collection.Validate(); err != nil {
 		return CollectionView{}, err
@@ -434,7 +434,7 @@ func (a *API) AddArtifactMember(
 	if request.Collection.RootID != request.Artifact.RootID {
 		return CollectionView{}, fmt.Errorf(
 			"%w: Collection member Artifact belongs to another Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -487,11 +487,11 @@ func (a *API) MemberForCollectionSource(
 	ctx context.Context,
 	collectionRef artifact.ArtifactRef,
 	declarationType declaration.Type,
-	name model.LogicalName,
-	target model.Locator,
+	name spec.LogicalName,
+	target spec.Locator,
 ) (MemberReference, error) {
 	if a == nil {
-		return MemberReference{}, model.ErrClosed
+		return MemberReference{}, spec.ErrClosed
 	}
 	if err := declarationType.Validate(); err != nil {
 		return MemberReference{}, err
@@ -531,12 +531,12 @@ func (a *API) Delete(
 	request DeleteRequest,
 ) error {
 	if a == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -551,14 +551,14 @@ func (a *API) Delete(
 	if a.isBaselineEditableCollection(value) {
 		return fmt.Errorf(
 			"%w: baseline Collection %q cannot be deleted",
-			model.ErrProtected,
+			spec.ErrProtected,
 			value.artifact.LogicalName,
 		)
 	}
 	if len(value.document.Members) != 0 {
 		return fmt.Errorf(
 			"%w: Collection %q has %d direct members; detach them before deletion",
-			model.ErrConflict,
+			spec.ErrConflict,
 			value.artifact.LogicalName,
 			len(value.document.Members),
 		)
@@ -586,7 +586,7 @@ func (a *API) Delete(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Collection Artifact is not missing",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -615,7 +615,7 @@ func (a *API) resolveCollectionRef(
 	if !found {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: plugin did not resolve to a source-backed Artifact",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	return terminal, nil
@@ -627,7 +627,7 @@ func (a *API) create(
 	allowBaseline bool,
 ) (CollectionView, error) {
 	if a == nil {
-		return CollectionView{}, model.ErrClosed
+		return CollectionView{}, spec.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
 		return CollectionView{}, err
@@ -643,7 +643,7 @@ func (a *API) create(
 		!allowBaseline {
 		return CollectionView{}, fmt.Errorf(
 			"%w: baseline Collection %q is application-provisioned",
-			model.ErrProtected,
+			spec.ErrProtected,
 			request.Name,
 		)
 	}
@@ -694,12 +694,12 @@ func (a *API) create(
 		}
 		return CollectionView{}, fmt.Errorf(
 			"%w: managed Collection %q already exists",
-			model.ErrConflict,
+			spec.ErrConflict,
 			request.Name,
 		)
 
-	case errors.Is(err, model.ErrArtifactNotFound),
-		errors.Is(err, model.ErrNotFound):
+	case errors.Is(err, spec.ErrArtifactNotFound),
+		errors.Is(err, spec.ErrNotFound):
 	default:
 		return CollectionView{}, err
 	}
@@ -725,7 +725,7 @@ func (a *API) mutateMember(
 	ensure bool,
 ) (MemberMutationResult, error) {
 	if a == nil {
-		return MemberMutationResult{}, model.ErrClosed
+		return MemberMutationResult{}, spec.ErrClosed
 	}
 
 	if err := a.validateDomainMember(request.Member); err != nil {
@@ -752,12 +752,12 @@ func (a *API) mutateEntry(
 	ensure bool,
 ) (MemberMutationResult, error) {
 	if a == nil {
-		return MemberMutationResult{}, model.ErrClosed
+		return MemberMutationResult{}, spec.ErrClosed
 	}
 	if request.ExpectedRevision == 0 {
 		return MemberMutationResult{}, fmt.Errorf(
 			"%w: expected Collection revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := a.validateDomainEntry(request.Entry); err != nil {
@@ -855,14 +855,14 @@ func (a *API) managedSource(
 	if value.Kind != source.SourceKindManagedDirectory {
 		return source.Summary{}, fmt.Errorf(
 			"%w: editable Collection Source must have kind %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			source.SourceKindManagedDirectory,
 		)
 	}
 	if !value.Enabled {
 		return source.Summary{}, fmt.Errorf(
 			"%w: editable Collection Source is disabled",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 	return value, nil
@@ -912,7 +912,7 @@ func (a *API) publishDocument(
 			ExpectedKind: artifact.ArtifactKind(
 				pluginv1.PluginType,
 			),
-			ExpectedLogicalName: model.LogicalName(document.Name),
+			ExpectedLogicalName: spec.LogicalName(document.Name),
 			ExpectedDefinition:  digest,
 			Package: source.ManagedPackagePublication{
 				Address:            address,
@@ -950,24 +950,24 @@ func (a *API) loadEditableCollection(
 	if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Artifact %q is not a Plugin",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			record.ID,
 		)
 	}
 	if expectedRevision != 0 && record.Revision != expectedRevision {
-		return editableCollection{}, model.ErrConflict
+		return editableCollection{}, spec.ErrConflict
 	}
 	if record.State != artifact.StateAvailable {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection Artifact %q is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
 	if record.Binding.SubresourceLocator != "" {
 		return editableCollection{}, fmt.Errorf(
 			"%w: contained Collection declarations are not editable managed Collections",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -982,20 +982,20 @@ func (a *API) loadEditableCollection(
 	if sourceValue.Kind != source.SourceKindManagedDirectory {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection is not backed by a managed Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if !sourceValue.Enabled {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection Source is disabled",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if a.domain != nil &&
 		sourceValue.StorageKey != a.domain.SourceStorageKey {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection belongs to another managed domain Source",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -1008,7 +1008,7 @@ func (a *API) loadEditableCollection(
 	if address.Name != record.LogicalName {
 		return editableCollection{}, fmt.Errorf(
 			"%w: managed Collection package name does not match Artifact identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -1023,7 +1023,7 @@ func (a *API) loadEditableCollection(
 	if !inspection.IsCurrent() {
 		return editableCollection{}, fmt.Errorf(
 			"%w: managed Collection Source requires refresh",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -1040,13 +1040,13 @@ func (a *API) loadEditableCollection(
 	if document.Name != string(record.LogicalName) {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection declaration name differs from Artifact identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if document.Locator != nil {
 		return editableCollection{}, fmt.Errorf(
 			"%w: located Collection aliases are not editable managed Collections",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if err := a.validateEditableDomainDocument(document); err != nil {
@@ -1061,7 +1061,7 @@ func (a *API) loadEditableCollection(
 }
 
 func (a *API) managedCollectionAddress(
-	name model.LogicalName,
+	name spec.LogicalName,
 ) (source.ManagedPackageAddress, error) {
 	return managedCollectionAddressFor(
 		a.managedCollectionPackageKind(),
@@ -1071,7 +1071,7 @@ func (a *API) managedCollectionAddress(
 
 func managedCollectionAddressFor(
 	packageKind source.PackageKind,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) (source.ManagedPackageAddress, error) {
 	return source.NewManagedPackageAddress(
 		packageKind,
@@ -1081,7 +1081,7 @@ func managedCollectionAddressFor(
 }
 
 func (a *API) managedCollectionAddressFromLocator(
-	locator model.Locator,
+	locator spec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		a.managedCollectionPackageKind(),
@@ -1104,20 +1104,20 @@ func (a *API) managedCollectionDocumentUse() string {
 	return documentTopology.DocumentUseManagedCollection
 }
 
-func (a *API) managedCollectionDocumentFile() model.Locator {
+func (a *API) managedCollectionDocumentFile() spec.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		a.managedCollectionDocumentUse(),
 	)
 }
 
-func (a *API) managedCollectionDecoderID() (model.DecoderID, error) {
+func (a *API) managedCollectionDecoderID() (spec.DecoderID, error) {
 	return documentTopology.DefaultDocumentDecoderID(
 		a.managedCollectionDocumentUse(),
 	)
 }
 
 func managedCollectionAddressFromLocator(
-	locator model.Locator,
+	locator spec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		ManagedCollectionPackageKind,
@@ -1128,8 +1128,8 @@ func managedCollectionAddressFromLocator(
 
 func managedCollectionAddressFromLocatorFor(
 	packageKind source.PackageKind,
-	documentFile model.Locator,
-	locator model.Locator,
+	documentFile spec.Locator,
+	locator spec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -1143,13 +1143,13 @@ func managedCollectionAddressFromLocatorFor(
 	if path.Base(string(locator)) != string(documentFile) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Collection locator %q is not %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			locator,
 			documentFile,
 		)
 	}
 	address, err := source.ParseManagedPackageAddressDirectory(
-		model.Locator(path.Dir(string(locator))),
+		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -1157,7 +1157,7 @@ func managedCollectionAddressFromLocatorFor(
 	if address.Kind != packageKind {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Collection package kind must be %q",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			packageKind,
 		)
 	}
@@ -1242,7 +1242,7 @@ func (m MemberReference) entry() (declaration.Entry, error) {
 	if form != declaration.MemberNamed {
 		return declaration.Entry{}, fmt.Errorf(
 			"%w: managed Plugin member must be a named external member",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	return entry, nil
@@ -1258,14 +1258,14 @@ func memberReferenceFromEntry(
 	if form != declaration.MemberNamed {
 		return MemberReference{}, fmt.Errorf(
 			"%w: editable Plugin members must be named external references",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
 	header := entry.Header()
 	output := MemberReference{
 		Type: header.Type,
-		Name: model.LogicalName(header.Name),
+		Name: spec.LogicalName(header.Name),
 	}
 	if header.Locator != nil {
 		locator := header.Locator.Clone()
@@ -1295,7 +1295,7 @@ func memberReferenceFromEntry(
 		return MemberReference{}, err
 	}
 	if selector.Server != "" {
-		output.Server = model.LogicalName(selector.Server)
+		output.Server = spec.LogicalName(selector.Server)
 		if err := output.Server.Validate(); err != nil {
 			return MemberReference{}, err
 		}
@@ -1304,8 +1304,8 @@ func memberReferenceFromEntry(
 }
 
 func relativeSourceLocator(
-	from model.Locator,
-	target model.Locator,
+	from spec.Locator,
+	target spec.Locator,
 ) (declaration.Locator, error) {
 	if err := from.Validate(false); err != nil {
 		return declaration.Locator{}, err
@@ -1404,5 +1404,5 @@ func normalizedMemberIndex(
 			return index, nil
 		}
 	}
-	return 0, fmt.Errorf("%w: Collection member does not exist", model.ErrNotFound)
+	return 0, fmt.Errorf("%w: Collection member does not exist", spec.ErrNotFound)
 }

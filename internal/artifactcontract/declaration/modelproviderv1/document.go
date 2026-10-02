@@ -8,9 +8,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -142,13 +142,13 @@ func (v ProviderDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: Model Provider declarations do not support locator",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
-	if err := model.ValidateIdentifier(
+	if err := spec.ValidateIdentifier(
 		"Model Provider adapter",
 		v.Adapter,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -192,7 +192,7 @@ func validateConnection(raw json.RawMessage) error {
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("model provider connection: %w", err)
@@ -242,7 +242,7 @@ func validateAuthentication(raw json.RawMessage) error {
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("model provider authentication: %w", err)
@@ -262,7 +262,7 @@ func validateAuthentication(raw json.RawMessage) error {
 		if value.HeaderName != "" || value.Prefix != nil {
 			return fmt.Errorf(
 				"%w: authentication mode none cannot override header behavior",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 	case "apiKeyHeader", "bearerToken":
@@ -276,13 +276,13 @@ func validateAuthentication(raw json.RawMessage) error {
 			strings.ContainsAny(*value.Prefix, "\r\n\x00") {
 			return fmt.Errorf(
 				"%w: Model Provider authentication prefix contains CR, LF, or NUL",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Model Provider authentication mode %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			value.Mode,
 		)
 	}
@@ -290,14 +290,14 @@ func validateAuthentication(raw json.RawMessage) error {
 }
 
 func validateProviderConnectionPath(value string) error {
-	if len(value) > model.MaxURIBytes ||
+	if len(value) > spec.MaxURIBytes ||
 		!utf8.ValidString(value) ||
 		strings.TrimSpace(value) != value ||
 		!strings.HasPrefix(value, "/") ||
 		strings.ContainsAny(value, "?#\r\n\x00") {
 		return fmt.Errorf(
 			"%w: Model Provider connection path is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return nil
@@ -319,7 +319,7 @@ func validateProviderHeaderPatch(
 		if _, duplicate := removed[key]; duplicate {
 			return fmt.Errorf(
 				"%w: Model Provider connection removes header %q more than once",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				name,
 			)
 		}
@@ -336,23 +336,23 @@ func validateProviderHeaderPatch(
 		if providerSecretHeaderName(name) {
 			return fmt.Errorf(
 				"%w: Model Provider static header %q can carry credentials",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				name,
 			)
 		}
-		if len(value) > model.MaxURIBytes ||
+		if len(value) > spec.MaxURIBytes ||
 			!utf8.ValidString(value) ||
 			strings.ContainsAny(value, "\r\n\x00") {
 			return fmt.Errorf(
 				"%w: Model Provider static header %q has an invalid value",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				name,
 			)
 		}
 		if _, removed := removed[strings.ToLower(name)]; removed {
 			return fmt.Errorf(
 				"%w: Model Provider header %q is both set and removed",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				name,
 			)
 		}
@@ -367,7 +367,7 @@ func validateProviderHeaderName(
 	if value == "" || strings.TrimSpace(value) != value {
 		return fmt.Errorf(
 			"%w: %s is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 		)
 	}
@@ -382,7 +382,7 @@ func validateProviderHeaderName(
 		}
 		return fmt.Errorf(
 			"%w: %s contains invalid character %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 			character,
 		)
@@ -416,7 +416,7 @@ func validateProviderPatchObject(
 	}
 	_, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -434,7 +434,7 @@ func validateProviderNoSecretObject(
 
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -457,7 +457,7 @@ func rejectProviderSecretValues(
 			if providerSecretObjectKey(key) && child != nil {
 				return fmt.Errorf(
 					"%w: %s contains forbidden credential field %q",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					label,
 					key,
 				)

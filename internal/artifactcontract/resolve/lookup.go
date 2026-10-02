@@ -8,11 +8,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
 func (r *Resolver) resolveEntries(
@@ -103,7 +103,7 @@ func (r *Resolver) resolveMember(
 	switch form {
 	case declaration.MemberNamed:
 		header := member.Header()
-		var expectedVersion model.LogicalVersion
+		var expectedVersion spec.LogicalVersion
 		expectedVersion, err = memberTextLogicalVersion(member)
 		if err != nil {
 			return ResolvedRelationship{}, err
@@ -124,7 +124,7 @@ func (r *Resolver) resolveMember(
 				state,
 				rootID,
 				header.Type,
-				model.LogicalName(header.Name),
+				spec.LogicalName(header.Name),
 				expectedVersion,
 				relationshipFields.Scope,
 				from,
@@ -168,7 +168,7 @@ func (r *Resolver) resolveMember(
 	default:
 		return ResolvedRelationship{}, fmt.Errorf(
 			"%w: unsupported member form %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			form,
 		)
 	}
@@ -193,8 +193,8 @@ func (r *Resolver) resolveNamedMember(
 	state *resolutionState,
 	rootID root.RootID,
 	declarationType declaration.Type,
-	name model.LogicalName,
-	expectedVersion model.LogicalVersion,
+	name spec.LogicalName,
+	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifact.Artifact,
 	depth int,
@@ -267,8 +267,8 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	state *resolutionState,
 	rootID root.RootID,
 	declarationType declaration.Type,
-	name model.LogicalName,
-	expectedVersion model.LogicalVersion,
+	name spec.LogicalName,
+	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifact.Artifact,
 	depth int,
@@ -363,7 +363,7 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	case 0:
 		return nil, fmt.Errorf(
 			"%w: %s/%s is unavailable in composition source",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			declarationType,
 			name,
 		)
@@ -376,7 +376,7 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 	default:
 		return nil, fmt.Errorf(
 			"%w: %s/%s resolves to %d terminal Artifacts",
-			model.ErrIdentityConflict,
+			spec.ErrIdentityConflict,
 			declarationType,
 			name,
 			len(terminals),
@@ -389,8 +389,8 @@ func (r *Resolver) resolveInRoot(
 	state *resolutionState,
 	rootID root.RootID,
 	declarationType declaration.Type,
-	name model.LogicalName,
-	expectedVersion model.LogicalVersion,
+	name spec.LogicalName,
+	expectedVersion spec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, bool, error) {
 	records, err := r.artifacts.FindByIdentity(
@@ -453,7 +453,7 @@ func (r *Resolver) resolveInRoot(
 	default:
 		return nil, false, fmt.Errorf(
 			"%w: %s/%s resolves to %d terminal Artifacts in Root %q",
-			model.ErrIdentityConflict,
+			spec.ErrIdentityConflict,
 			declarationType,
 			name,
 			len(terminals),
@@ -467,8 +467,8 @@ func (r *Resolver) resolveFallback(
 	state *resolutionState,
 	rootID root.RootID,
 	declarationType declaration.Type,
-	name model.LogicalName,
-	expectedVersion model.LogicalVersion,
+	name spec.LogicalName,
+	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
 	from *artifact.Artifact,
 	depth int,
@@ -477,7 +477,7 @@ func (r *Resolver) resolveFallback(
 	if !found || typeResolver.FallbackProvider() == nil {
 		return nil, fmt.Errorf(
 			"%w: %s/%s",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			declarationType,
 			name,
 		)
@@ -498,7 +498,7 @@ func (r *Resolver) resolveFallback(
 	if !found {
 		return nil, fmt.Errorf(
 			"%w: %s/%s",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			declarationType,
 			name,
 		)
@@ -511,7 +511,7 @@ func (r *Resolver) resolveFallback(
 		if r.builtinRoot == "" || target.Artifact.RootID != r.builtinRoot {
 			return nil, fmt.Errorf(
 				"%w: Artifact-backed fallback must target the protected built-in Root",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return r.resolveArtifact(
@@ -527,7 +527,7 @@ func (r *Resolver) resolveFallback(
 	if !typeResolver.SupportsMappedFallbackTargets() {
 		return nil, fmt.Errorf(
 			"%w: Artifact type %q does not support mapped fallback targets",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			declarationType,
 		)
 	}
@@ -536,7 +536,7 @@ func (r *Resolver) resolveFallback(
 		!target.Mapped.Builtin {
 		return nil, fmt.Errorf(
 			"%w: fallback target identity is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -554,13 +554,13 @@ func (r *Resolver) resolveLocatedMember(
 	rootID root.RootID,
 	member declaration.Entry,
 	from *artifact.Artifact,
-	expectedVersion model.LogicalVersion,
+	expectedVersion spec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if from == nil {
 		return nil, fmt.Errorf(
 			"%w: located member requires a source-backed declaration origin",
-			model.ErrLocatorUnresolved,
+			spec.ErrLocatorUnresolved,
 		)
 	}
 	effectiveFrom := from
@@ -572,7 +572,7 @@ func (r *Resolver) resolveLocatedMember(
 	if r.locators == nil {
 		return nil, fmt.Errorf(
 			"%w: declaration locator requires a locator resolver",
-			model.ErrLocatorUnresolved,
+			spec.ErrLocatorUnresolved,
 		)
 	}
 
@@ -585,7 +585,7 @@ func (r *Resolver) resolveLocatedMember(
 			Entry:               member.Clone(),
 			Locator:             header.Locator.Clone(),
 			ExpectedType:        header.Type,
-			ExpectedLogicalName: model.LogicalName(header.Name),
+			ExpectedLogicalName: spec.LogicalName(header.Name),
 		},
 	)
 	if err != nil {
@@ -594,7 +594,7 @@ func (r *Resolver) resolveLocatedMember(
 	if ref.RootID != rootID {
 		return nil, fmt.Errorf(
 			"%w: located member resolver returned another Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return r.resolveArtifact(
@@ -619,7 +619,7 @@ func (r *Resolver) resolveContainedMember(
 	if from == nil {
 		return nil, fmt.Errorf(
 			"%w: contained declaration requires a source-backed parent",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -652,7 +652,7 @@ func (r *Resolver) resolveContainedMember(
 		ctx,
 		rootID,
 		artifact.ArtifactKind(header.Type),
-		model.LogicalName(header.Name),
+		spec.LogicalName(header.Name),
 		catalog.ListOptions{},
 	)
 	if err != nil {
@@ -683,7 +683,7 @@ func (r *Resolver) resolveContainedMember(
 	case 0:
 		return nil, fmt.Errorf(
 			"%w: contained declaration %s/%s has no matching source Artifact",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			header.Type,
 			header.Name,
 		)
@@ -699,7 +699,7 @@ func (r *Resolver) resolveContainedMember(
 	default:
 		return nil, fmt.Errorf(
 			"%w: contained declaration %s/%s has %d matching source Artifacts",
-			model.ErrIdentityConflict,
+			spec.ErrIdentityConflict,
 			header.Type,
 			header.Name,
 			len(matches),
@@ -711,7 +711,7 @@ func containedMemberSubresource(
 	parent artifact.Artifact,
 	member declaration.Entry,
 	relationshipPath []string,
-) (model.SubresourceLocator, error) {
+) (spec.SubresourceLocator, error) {
 	header := member.Header()
 	segments := append([]string(nil), relationshipPath...)
 	if !isDirectProgramSlotMember(relationshipPath, header.Type) {
@@ -726,7 +726,7 @@ func containedMemberSubresource(
 	}
 	segments = append(segments, header.Name)
 
-	value := model.SubresourceLocator(strings.Join(segments, "/"))
+	value := spec.SubresourceLocator(strings.Join(segments, "/"))
 	if parent.Binding.SubresourceLocator != "" {
 		value = parent.Binding.SubresourceLocator + "/" + value
 	}
@@ -756,7 +756,7 @@ func isDirectProgramSlotMember(
 
 func memberTextLogicalVersion(
 	member declaration.Entry,
-) (model.LogicalVersion, error) {
+) (spec.LogicalVersion, error) {
 	if member.Header().Type != declaration.TypeText {
 		return "", nil
 	}
@@ -764,7 +764,7 @@ func memberTextLogicalVersion(
 	if err != nil {
 		return "", err
 	}
-	return model.LogicalVersion(insert), nil
+	return spec.LogicalVersion(insert), nil
 }
 
 func resolutionFailure(
@@ -780,29 +780,29 @@ func resolutionFailure(
 	switch {
 	case errors.Is(err, context.Canceled),
 		errors.Is(err, context.DeadlineExceeded),
-		errors.Is(err, model.ErrClosed):
+		errors.Is(err, spec.ErrClosed):
 		return "", ResolutionIssue{}, false
-	case errors.Is(err, model.ErrDigestMismatch),
-		errors.Is(err, model.ErrInvalid):
+	case errors.Is(err, spec.ErrDigestMismatch),
+		errors.Is(err, spec.ErrInvalid):
 		return ResolutionUnavailable, issue("artifact.reference-invalid"), true
-	case errors.Is(err, model.ErrIdentityConflict):
+	case errors.Is(err, spec.ErrIdentityConflict):
 		return ResolutionAmbiguous, issue("artifact.identity-conflict"), true
-	case errors.Is(err, model.ErrLocatorLimitExceeded):
+	case errors.Is(err, spec.ErrLocatorLimitExceeded):
 		return ResolutionUnavailable, issue("artifact.locator-limit-exceeded"), true
-	case errors.Is(err, model.ErrLocatorUnresolved):
+	case errors.Is(err, spec.ErrLocatorUnresolved):
 		return ResolutionUnavailable, issue("artifact.locator-unresolved"), true
-	case errors.Is(err, model.ErrSourceUnavailable):
+	case errors.Is(err, spec.ErrSourceUnavailable):
 		return ResolutionUnavailable, issue("artifact.source-unavailable"), true
-	case errors.Is(err, model.ErrRefreshRequired):
+	case errors.Is(err, spec.ErrRefreshRequired):
 		return ResolutionUnavailable, issue("artifact.refresh-required"), true
-	case errors.Is(err, model.ErrUnsupported):
+	case errors.Is(err, spec.ErrUnsupported):
 		return ResolutionUnavailable, issue("artifact.selector-unavailable"), true
-	case errors.Is(err, model.ErrReferenceUnresolved),
-		errors.Is(err, model.ErrArtifactNotFound),
-		errors.Is(err, model.ErrRootNotFound),
-		errors.Is(err, model.ErrDefinitionNotFound),
-		errors.Is(err, model.ErrSourceNotFound),
-		errors.Is(err, model.ErrNotFound):
+	case errors.Is(err, spec.ErrReferenceUnresolved),
+		errors.Is(err, spec.ErrArtifactNotFound),
+		errors.Is(err, spec.ErrRootNotFound),
+		errors.Is(err, spec.ErrDefinitionNotFound),
+		errors.Is(err, spec.ErrSourceNotFound),
+		errors.Is(err, spec.ErrNotFound):
 		return ResolutionUnavailable, issue("artifact.reference-unresolved"), true
 	default:
 		return "", ResolutionIssue{}, false

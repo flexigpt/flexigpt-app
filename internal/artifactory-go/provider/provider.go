@@ -3,8 +3,8 @@ package provider
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Provider is one Artifact Store inbound format registration.
@@ -35,10 +35,10 @@ func (d Descriptor) Clone() Descriptor {
 }
 
 func (d Descriptor) Validate() error {
-	if err := model.ValidateIdentifier(
+	if err := spec.ValidateIdentifier(
 		"artifact provider name",
 		d.Name,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func (d Descriptor) Validate() error {
 		len(d.LocatorResolvers) == 0 {
 		return fmt.Errorf(
 			"%w: artifact provider %q has no registered capabilities",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			d.Name,
 		)
 	}
@@ -57,7 +57,7 @@ func (d Descriptor) Validate() error {
 		if codec == nil {
 			return fmt.Errorf(
 				"%w: artifact provider %q schema codec %d is nil",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				d.Name,
 				index,
 			)
@@ -74,7 +74,7 @@ func (d Descriptor) Validate() error {
 		if _, duplicate := seenSchemas[key]; duplicate {
 			return fmt.Errorf(
 				"%w: artifact provider %q repeats schema %q/%q/%q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				d.Name,
 				key.Kind,
 				key.SchemaID,
@@ -85,14 +85,14 @@ func (d Descriptor) Validate() error {
 	}
 
 	seenDecoders := make(
-		map[model.DecoderID]struct{},
+		map[spec.DecoderID]struct{},
 		len(d.Decoders),
 	)
 	for index, decoder := range d.Decoders {
 		if decoder == nil {
 			return fmt.Errorf(
 				"%w: Artifact provider %q decoder %d is nil",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				d.Name,
 				index,
 			)
@@ -100,17 +100,17 @@ func (d Descriptor) Validate() error {
 		if err := decoder.ID().Validate(); err != nil {
 			return err
 		}
-		if err := model.ValidateRequiredText(
+		if err := spec.ValidateRequiredText(
 			"Artifact provider decoder revision",
 			decoder.Revision(),
-			model.MaxVersionBytes,
+			spec.MaxVersionBytes,
 		); err != nil {
 			return err
 		}
 		if _, duplicate := seenDecoders[decoder.ID()]; duplicate {
 			return fmt.Errorf(
 				"%w: Artifact provider %q repeats decoder %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				d.Name,
 				decoder.ID(),
 			)
@@ -134,7 +134,7 @@ func (d Descriptor) Validate() error {
 			if _, duplicate := seenResolvers[key]; duplicate {
 				return fmt.Errorf(
 					"%w: Artifact provider %q repeats locator resolver %q for Artifact kind %q",
-					model.ErrConflict,
+					spec.ErrConflict,
 					d.Name,
 					resolver.LocatorKind(),
 					artifactKind,

@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
@@ -17,11 +17,11 @@ const mappedIdentifierSeparator = "."
 // provider. It has no ArtifactRef, Definition, Source binding, local data, or
 // lifecycle state.
 type MappedTarget struct {
-	Provider   string            `json:"provider"`
-	Identifier string            `json:"identifier"`
-	Type       declaration.Type  `json:"type"`
-	Name       model.LogicalName `json:"name"`
-	Builtin    bool              `json:"builtin"`
+	Provider   string           `json:"provider"`
+	Identifier string           `json:"identifier"`
+	Type       declaration.Type `json:"type"`
+	Name       spec.LogicalName `json:"name"`
+	Builtin    bool             `json:"builtin"`
 }
 
 // Validate validates the provider-independent portion of a mapped target.
@@ -32,17 +32,17 @@ func (m MappedTarget) Validate() error {
 	if err := m.Name.Validate(); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"mapped target provider",
 		m.Provider,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	); err != nil {
 		return err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"mapped target identifier",
 		m.Identifier,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -60,12 +60,12 @@ func (t FallbackTarget) Validate() error {
 	case t.Artifact == nil && t.Mapped == nil:
 		return fmt.Errorf(
 			"%w: fallback target is empty",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	case t.Artifact != nil && t.Mapped != nil:
 		return fmt.Errorf(
 			"%w: fallback target contains both Artifact and mapped targets",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -93,7 +93,7 @@ func EncodeMappedIdentifier[T any](
 
 	raw, err := jsonutil.MarshalCanonicalObject(
 		value,
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return "", err
@@ -101,17 +101,17 @@ func EncodeMappedIdentifier[T any](
 	if len(raw) == 0 || raw[0] != '{' {
 		return "", fmt.Errorf(
 			"%w: mapped identifier payload must be a JSON object",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
 	identifier := version + mappedIdentifierSeparator +
 		base64.RawURLEncoding.EncodeToString(raw)
 
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"mapped target identifier",
 		identifier,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return "", err
 	}
@@ -130,10 +130,10 @@ func DecodeMappedIdentifier[T any](
 	if err := validateMappedIdentifierVersion(expectedVersion); err != nil {
 		return zero, err
 	}
-	if err := model.ValidateRequiredText(
+	if err := spec.ValidateRequiredText(
 		"mapped target identifier",
 		identifier,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return zero, err
 	}
@@ -145,7 +145,7 @@ func DecodeMappedIdentifier[T any](
 	if !found || version != expectedVersion || encoded == "" {
 		return zero, fmt.Errorf(
 			"%w: unsupported mapped identifier version",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -153,25 +153,25 @@ func DecodeMappedIdentifier[T any](
 	if err != nil {
 		return zero, fmt.Errorf(
 			"%w: decode mapped identifier: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
-	if len(raw) == 0 || len(raw) > model.MaxLocalDataBytes {
+	if len(raw) == 0 || len(raw) > spec.MaxLocalDataBytes {
 		return zero, fmt.Errorf(
 			"%w: mapped identifier payload size is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
 	value, err := jsonutil.DecodeCanonicalObjectExact[T](
 		raw,
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return zero, fmt.Errorf(
 			"%w: decode mapped identifier payload: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -179,9 +179,9 @@ func DecodeMappedIdentifier[T any](
 }
 
 func validateMappedIdentifierVersion(version string) error {
-	return model.ValidateRequiredText(
+	return spec.ValidateRequiredText(
 		"mapped identifier version",
 		version,
-		model.MaxKindBytes,
+		spec.MaxKindBytes,
 	)
 }

@@ -12,10 +12,10 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -30,7 +30,7 @@ type LocatorRequest struct {
 	Entry               declaration.Entry
 	Locator             declaration.Locator
 	ExpectedType        declaration.Type
-	ExpectedLogicalName model.LogicalName
+	ExpectedLogicalName spec.LogicalName
 }
 
 // LocatorResolver resolves one supported external declaration locator kind.
@@ -91,16 +91,16 @@ func (l Limits) Normalized() Limits {
 
 func (l Limits) Validate() error {
 	l = l.Normalized()
-	if l.MaxDepth <= 0 || l.MaxDepth > model.MaxDiscoveryDepth {
+	if l.MaxDepth <= 0 || l.MaxDepth > spec.MaxDiscoveryDepth {
 		return fmt.Errorf(
 			"%w: Artifact resolver depth limit is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
-	if l.MaxNodes <= 0 || l.MaxNodes > model.MaxDiscoveryEntries {
+	if l.MaxNodes <= 0 || l.MaxNodes > spec.MaxDiscoveryEntries {
 		return fmt.Errorf(
 			"%w: Artifact resolver node limit is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return nil
@@ -154,7 +154,7 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 	if options.Artifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact resolver ArtifactReader is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	limits := options.Limits.Normalized()
@@ -211,7 +211,7 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 		if mapper == nil {
 			return nil, fmt.Errorf(
 				"%w: Artifact target mapper for %q is nil",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				declarationType,
 			)
 		}
@@ -247,7 +247,7 @@ type ResolutionIssue struct {
 type FallbackRequest struct {
 	RootID root.RootID
 	Type   declaration.Type
-	Name   model.LogicalName
+	Name   spec.LogicalName
 	Scope  declaration.LookupScope
 }
 
@@ -286,7 +286,7 @@ func (r ResolvedRelationship) IsAvailable() bool {
 
 type ResolvedSelector struct {
 	Type    declaration.Type        `json:"-"`
-	Base    model.Locator           `json:"-"`
+	Base    spec.Locator            `json:"-"`
 	Matches []ResolvedSelectorMatch `json:"-"`
 }
 
@@ -387,7 +387,7 @@ func validateResolutionContext(ctx context.Context) error {
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Artifact resolver context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return ctx.Err()

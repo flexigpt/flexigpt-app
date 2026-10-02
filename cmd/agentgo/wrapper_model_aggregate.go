@@ -7,8 +7,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
@@ -22,7 +22,7 @@ func (w *ModelAggregateWrapper) GetDefaultProvider() (
 	error,
 ) {
 	if w == nil || w.service == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return w.service.GetDefaultProvider(context.Background())
 }
@@ -31,14 +31,14 @@ func (w *ModelAggregateWrapper) SetDefaultProvider(
 	provider artifact.ArtifactRef,
 ) error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return w.service.SetDefaultProvider(context.Background(), provider)
 }
 
 func (w *ModelAggregateWrapper) ClearDefaultProvider() error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return w.service.ClearDefaultProvider(context.Background())
 }
@@ -47,7 +47,7 @@ func (w *ModelAggregateWrapper) SaveProviderSettings(
 	request modelConsumerAPI.SaveProviderSettingsRequest,
 ) (modelConsumerAPI.ProviderView, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderView{}, model.ErrClosed
+		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
 	}
 	return w.service.SaveProviderSettings(context.Background(), request)
 }
@@ -58,7 +58,7 @@ func (w *ModelAggregateWrapper) ResetProviderSettings(
 	expectedSettingsRevision uint64,
 ) (modelConsumerAPI.ProviderView, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderView{}, model.ErrClosed
+		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
 	}
 	return w.service.ResetProviderSettings(
 		context.Background(),
@@ -72,7 +72,7 @@ func (w *ModelAggregateWrapper) SetProviderAPIKey(
 	request modelConsumerAPI.SetProviderAPIKeyRequest,
 ) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, model.ErrClosed
+		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
 	return w.service.SetProviderAPIKey(context.Background(), request)
 }
@@ -83,7 +83,7 @@ func (w *ModelAggregateWrapper) ClearProviderAPIKey(
 	expectedAPIKeyRevision uint64,
 ) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ProviderAPIKeyStatus{}, model.ErrClosed
+		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
 	}
 	return w.service.ClearProviderAPIKey(
 		context.Background(),
@@ -97,7 +97,7 @@ func (w *ModelAggregateWrapper) CreateProvider(
 	request modelConsumerAPI.ManagedProviderCreateRequest,
 ) (modelConsumerAPI.ManagedProviderCreateResult, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ManagedProviderCreateResult{}, model.ErrClosed
+		return modelConsumerAPI.ManagedProviderCreateResult{}, spec.ErrClosed
 	}
 	return w.service.CreateProvider(context.Background(), request)
 }
@@ -106,7 +106,7 @@ func (w *ModelAggregateWrapper) UpdateProvider(
 	request modelConsumerAPI.ManagedProviderReplaceRequest,
 ) (modelConsumerAPI.ManagedProviderReplaceResult, error) {
 	if w == nil || w.service == nil {
-		return modelConsumerAPI.ManagedProviderReplaceResult{}, model.ErrClosed
+		return modelConsumerAPI.ManagedProviderReplaceResult{}, spec.ErrClosed
 	}
 	return w.service.UpdateProvider(context.Background(), request)
 }
@@ -116,7 +116,7 @@ func (w *ModelAggregateWrapper) DeleteProvider(
 	expectedProviderRevision uint64,
 ) error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return w.service.DeleteProvider(
 		context.Background(),
@@ -131,7 +131,7 @@ func (w *ModelAggregateWrapper) SetProviderEnabled(
 	enabled bool,
 ) (artifact.Artifact, error) {
 	if w == nil || w.service == nil {
-		return artifact.Artifact{}, model.ErrClosed
+		return artifact.Artifact{}, spec.ErrClosed
 	}
 	return w.service.SetProviderEnabled(
 		context.Background(),
@@ -145,7 +145,7 @@ func (w *ModelAggregateWrapper) setProviderRuntimePublisher(
 	publisher modelAggregate.ProviderRuntimePublisher,
 ) error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return w.service.SetProviderRuntimePublisher(publisher)
 }
@@ -155,7 +155,7 @@ func (w *ModelAggregateWrapper) targetMappers() (
 	error,
 ) {
 	if w == nil || w.service == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return map[declaration.Type]resolve.ArtifactTargetMapper{
 		declaration.TypeModel: w.service,
@@ -172,7 +172,7 @@ func initModelProviderRuntime(
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Model Provider startup context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -180,7 +180,7 @@ func initModelProviderRuntime(
 	}
 	if store == nil || store.management == nil ||
 		aggregate == nil || aggregate.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 
 	roots, err := store.managementRootIDs(ctx, "")

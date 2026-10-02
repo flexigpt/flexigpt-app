@@ -7,8 +7,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 
@@ -27,7 +27,7 @@ func New(
 	if store == nil || runtimeResolver == nil || preferences == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Aggregate dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &Service{
@@ -58,7 +58,7 @@ func (s *Service) InitializeProviderRuntime(
 	// silently choose one Root's settings or credentials for a colliding name.
 	candidates := make([]modelConsumerAPI.ProviderListItem, 0, len(providers))
 	seen := make(map[artifact.ArtifactRef]struct{}, len(providers))
-	names := make(map[model.LogicalName]int)
+	names := make(map[spec.LogicalName]int)
 	for _, provider := range providers {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -84,7 +84,7 @@ func (s *Service) InitializeProviderRuntime(
 				result,
 				fmt.Errorf(
 					"%w: runtime Provider %q (%s/%s) has a duplicate logical name",
-					model.ErrIdentityConflict,
+					spec.ErrIdentityConflict,
 					provider.Name,
 					provider.Ref.RootID,
 					provider.Ref.ArtifactID,
@@ -187,7 +187,7 @@ func (s *Service) MapArtifactTarget(
 	if request.Definition.Digest != resolved.Model.Definition.Digest {
 		return resolve.MappedTarget{}, true, fmt.Errorf(
 			"%w: Model Definition changed during target mapping",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 
@@ -219,7 +219,7 @@ func (s *Service) ResolveMappedRuntimeModel(
 		resolved.Fingerprint != value.ConfigurationFingerprint {
 		return RuntimeConfiguration{}, fmt.Errorf(
 			"%w: mapped Model target no longer matches current source-backed configuration",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -232,12 +232,12 @@ func (s *Service) ResolveMappedRuntimeModel(
 
 func (s *Service) ready(ctx context.Context) error {
 	if s == nil || s.store == nil || s.runtime == nil || s.preferences == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Model Aggregate context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return ctx.Err()

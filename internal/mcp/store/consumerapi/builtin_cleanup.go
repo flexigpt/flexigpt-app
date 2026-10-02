@@ -7,11 +7,11 @@ import (
 	"path"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
@@ -44,7 +44,7 @@ func NewBuiltinPackageCleanup(
 	if api == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP built-in package cleanup requires an API",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &builtinPackageCleanup{api: api}, nil
@@ -57,16 +57,16 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	addresses []source.ManagedPackageAddress,
 ) ([]artifact.ArtifactRef, error) {
 	if c == nil || c.api == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if !documentTopology.IsBuiltinPackageSource(rootID, sourceID) {
 		return nil, fmt.Errorf(
 			"%w: MCP cleanup does not target the built-in package Source",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
-	directories := make(map[model.Locator]struct{}, len(addresses))
+	directories := make(map[spec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
 		if address.Kind != mcpDomain.MCPCollectionPackageKind {
 			continue
@@ -99,11 +99,11 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 			continue
 		}
 
-		if _, found := directories[model.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
+		if _, found := directories[spec.Locator(path.Dir(string(entry.Binding.Locator)))]; !found {
 			continue
 		}
 		if !documentTopology.IsCollectionDocumentFile(
-			model.Locator(path.Base(string(entry.Binding.Locator))),
+			spec.Locator(path.Base(string(entry.Binding.Locator))),
 		) {
 			continue
 		}
@@ -121,14 +121,14 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 	refs []artifact.ArtifactRef,
 ) error {
 	if c == nil || c.api == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 
 	for _, ref := range refs {
 		record, err := c.api.artifacts.Get(ctx, ref)
 		if err != nil &&
-			!errors.Is(err, model.ErrArtifactNotFound) &&
-			!errors.Is(err, model.ErrRootNotFound) {
+			!errors.Is(err, spec.ErrArtifactNotFound) &&
+			!errors.Is(err, spec.ErrRootNotFound) {
 			return err
 		}
 		if err == nil && record.State == artifact.StateAvailable {

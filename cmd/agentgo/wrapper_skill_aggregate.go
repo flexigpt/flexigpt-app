@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
 
@@ -22,7 +22,7 @@ func withSkillAggregate[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.service == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 		return fn(w.service)
 	})

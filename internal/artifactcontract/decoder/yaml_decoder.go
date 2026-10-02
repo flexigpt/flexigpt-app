@@ -9,14 +9,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
 
-const YAMLDecoderID model.DecoderID = "artifact-declaration-yaml"
+const YAMLDecoderID spec.DecoderID = "artifact-declaration-yaml"
 
 type YAMLDecoder struct {
 	core *canonicalDecoder
@@ -28,7 +28,7 @@ func NewYAMLDecoder() *YAMLDecoder {
 	}
 }
 
-func (*YAMLDecoder) ID() model.DecoderID {
+func (*YAMLDecoder) ID() spec.DecoderID {
 	return YAMLDecoderID
 }
 
@@ -46,7 +46,7 @@ func (d *YAMLDecoder) BindExpectedCanonicalizer(
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
 			"%w: canonical YAML declaration decoder is unavailable",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return d.core.BindExpectedCanonicalizer(catalog)
@@ -69,7 +69,7 @@ func (*YAMLDecoder) Recognize(
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
 		candidate.Content,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		if requested || declared {
@@ -109,7 +109,7 @@ func (d *YAMLDecoder) Decode(
 	}
 	raw, err := yamlutil.CanonicalObjectJSON(
 		candidate.Content,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return nil, yamlDiagnostic(candidate.Locator, "", err)
@@ -118,8 +118,8 @@ func (d *YAMLDecoder) Decode(
 }
 
 func yamlDiagnostic(
-	locator model.Locator,
-	subresource model.SubresourceLocator,
+	locator spec.Locator,
+	subresource spec.SubresourceLocator,
 	err error,
 ) []diagnostic.Diagnostic {
 	location := &diagnostic.Location{

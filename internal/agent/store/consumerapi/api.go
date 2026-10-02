@@ -12,11 +12,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -129,7 +129,7 @@ func New(
 		protection == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent Store dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -228,7 +228,7 @@ func (a *API) requireMutable(
 	allowProtected bool,
 ) error {
 	if a == nil || a.protection == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
 		return err
@@ -239,7 +239,7 @@ func (a *API) requireMutable(
 	if !allowProtected {
 		return fmt.Errorf(
 			"%w: protected Root %q requires trusted installer access",
-			model.ErrProtected,
+			spec.ErrProtected,
 			rootID,
 		)
 	}
@@ -256,7 +256,7 @@ func (r agentLocatorRuntime) ListArtifactsBySource(
 	sourceID source.SourceID,
 ) ([]catalog.Entry, error) {
 	if r.artifacts == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return r.artifacts.ListBySource(ctx, rootID, sourceID, catalog.ListOptions{})
 }

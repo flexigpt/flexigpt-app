@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -57,9 +57,9 @@ type ToolImplementation struct {
 type ToolDocument struct {
 	declaration.Header
 
-	Version     model.LogicalVersion `json:"version"`
-	Tags        []string             `json:"tags,omitempty"`
-	AutoExecute bool                 `json:"autoExecute"`
+	Version     spec.LogicalVersion `json:"version"`
+	Tags        []string            `json:"tags,omitempty"`
+	AutoExecute bool                `json:"autoExecute"`
 
 	InputSchema   json.RawMessage  `json:"inputSchema"`
 	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`
@@ -150,10 +150,10 @@ func (v ToolDocument) validateFields() error {
 	if v.Locator != nil {
 		return fmt.Errorf(
 			"%w: Tool declarations do not support locator",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
-	if err := model.ValidatePortableName(
+	if err := spec.ValidatePortableName(
 		"Tool version",
 		string(v.Version),
 	); err != nil {
@@ -191,7 +191,7 @@ func (v ToolDocument) validateFields() error {
 		v.UserArgSchema != nil {
 		return fmt.Errorf(
 			"%w: Tool userArgSchema is supported only for sdk Tools",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return nil
@@ -200,26 +200,26 @@ func (v ToolDocument) validateFields() error {
 func (v ToolImplementation) Validate() error {
 	switch v.Kind {
 	case ImplementationKindGo:
-		if err := model.ValidateRequiredText(
+		if err := spec.ValidateRequiredText(
 			"Go Tool function",
 			v.Function,
-			model.MaxURIBytes,
+			spec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
 		if v.SDKType != "" || v.SDKToolType != "" {
 			return fmt.Errorf(
 				"%w: Go Tool implementation cannot contain SDK fields",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return nil
 
 	case ImplementationKindSDK:
-		if err := model.ValidateIdentifier(
+		if err := spec.ValidateIdentifier(
 			"SDK Tool type",
 			v.SDKType,
-			model.MaxKindBytes,
+			spec.MaxKindBytes,
 		); err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func (v ToolImplementation) Validate() error {
 		if v.Function != "" {
 			return fmt.Errorf(
 				"%w: SDK Tool implementation cannot contain Go function",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return nil
@@ -237,7 +237,7 @@ func (v ToolImplementation) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Tool implementation kind %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			v.Kind,
 		)
 	}
@@ -252,34 +252,34 @@ func (v SDKToolType) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported SDK Tool type %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			v,
 		)
 	}
 }
 
 func validateTags(values []string) error {
-	if len(values) > model.MaxDefinitionDependencies {
+	if len(values) > spec.MaxDefinitionDependencies {
 		return fmt.Errorf(
 			"%w: Tool tags exceed %d entries",
-			model.ErrInvalid,
-			model.MaxDefinitionDependencies,
+			spec.ErrInvalid,
+			spec.MaxDefinitionDependencies,
 		)
 	}
 
 	seen := make(map[string]struct{}, len(values))
 	for index, value := range values {
-		if err := model.ValidateRequiredText(
+		if err := spec.ValidateRequiredText(
 			"Tool tag",
 			value,
-			model.MaxLogicalNameBytes,
+			spec.MaxLogicalNameBytes,
 		); err != nil {
 			return fmt.Errorf("tool tags[%d]: %w", index, err)
 		}
 		if _, duplicate := seen[value]; duplicate {
 			return fmt.Errorf(
 				"%w: Tool tag %q is repeated",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				value,
 			)
 		}

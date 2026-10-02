@@ -6,10 +6,10 @@ import (
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
@@ -24,7 +24,7 @@ type API struct {
 
 	builtinRoot      root.RootID
 	builtinSource    source.SourceID
-	collectionByTool map[model.LogicalName]model.LogicalName
+	collectionByTool map[spec.LogicalName]spec.LogicalName
 }
 
 func New(
@@ -42,7 +42,7 @@ func New(
 		protection == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Store dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := builtinRoot.Validate(); err != nil {
@@ -52,7 +52,7 @@ func New(
 		!protection.IsProtectedRoot(builtinRoot) {
 		return nil, fmt.Errorf(
 			"%w: Tool Store requires the protected built-in Root",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -65,7 +65,7 @@ func New(
 	if builtinSource.Kind != source.SourceKindManagedDirectory {
 		return nil, fmt.Errorf(
 			"%w: built-in Tool Source must be managed",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	collectionByTool, err := toolBuiltin.GeneratedToolCollectionIndex()
@@ -135,7 +135,7 @@ func (a *API) SetToolEnabled(
 	if expectedRevision == 0 {
 		return ToolView{}, fmt.Errorf(
 			"%w: expected Tool revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -144,7 +144,7 @@ func (a *API) SetToolEnabled(
 		return ToolView{}, err
 	}
 	if value.Artifact.Revision != expectedRevision {
-		return ToolView{}, model.ErrConflict
+		return ToolView{}, spec.ErrConflict
 	}
 
 	updated, err := a.artifacts.SetEnabled(
@@ -204,7 +204,7 @@ func (a *API) getTool(
 	if actual != expected {
 		return toolDomain.Tool{}, fmt.Errorf(
 			"%w: Tool package identity differs from its declaration",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	return value, nil
@@ -212,12 +212,12 @@ func (a *API) getTool(
 
 func (a *API) ready(ctx context.Context) error {
 	if a == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Tool Store context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -231,7 +231,7 @@ func (a *API) requireBuiltinRef(ref artifact.ArtifactRef) error {
 		!a.protection.IsProtectedRoot(ref.RootID) {
 		return fmt.Errorf(
 			"%w: Tool Artifact is not in the protected built-in Root",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	return nil
@@ -245,7 +245,7 @@ func (a *API) requireBuiltinArtifact(record artifact.Artifact) error {
 		record.Binding.SubresourceLocator != "" {
 		return fmt.Errorf(
 			"%w: Tool catalog Artifact has an unsupported origin",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	return nil

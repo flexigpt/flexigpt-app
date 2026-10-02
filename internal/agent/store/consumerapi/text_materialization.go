@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // MaterializeAgentText resolves one Text Artifact through the Artifact Store's
@@ -17,12 +17,12 @@ func (a *API) MaterializeAgentText(
 	ref artifact.ArtifactRef,
 ) (AgentTextMaterialization, error) {
 	if a == nil || a.texts == nil {
-		return AgentTextMaterialization{}, model.ErrClosed
+		return AgentTextMaterialization{}, spec.ErrClosed
 	}
 	if ctx == nil {
 		return AgentTextMaterialization{}, fmt.Errorf(
 			"%w: Agent Text materialization context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -41,7 +41,7 @@ func (a *API) MaterializeAgentText(
 		Artifact:         value.Artifact,
 		ArtifactRevision: value.ArtifactRevision,
 		DefinitionDigest: value.DefinitionDigest,
-		Name:             model.LogicalName(value.Name),
+		Name:             spec.LogicalName(value.Name),
 		Insert:           value.Insert,
 		MediaType:        value.MediaType,
 		Content:          value.Content,

@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -74,7 +74,7 @@ func ParseMCPSecretRef(raw string) (MCPSecretRef, error) {
 
 	wire, err := jsonutil.DecodeCanonicalObjectExact[mcpSecretRefWire](
 		b,
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return MCPSecretRef{}, fmt.Errorf("secret ref %q is not valid json: %w", raw, err)
@@ -140,7 +140,7 @@ func ArtifactBindingSlot(
 	if storageKey == "" {
 		return "", fmt.Errorf(
 			"%w: could not derive MCP secret binding slot",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -176,7 +176,7 @@ func canonicalSecret(r MCPSecretRef) ([]byte, error) {
 	}
 	canonical, err := jsonutil.MarshalCanonicalObject(
 		wire,
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return nil, err

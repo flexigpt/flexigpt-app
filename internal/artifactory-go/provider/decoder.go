@@ -4,11 +4,11 @@ import (
 	"context"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -28,17 +28,17 @@ const (
 type Candidate struct {
 	SourceID            source.SourceID
 	SourceKind          source.SourceKind
-	Locator             model.Locator
+	Locator             spec.Locator
 	SourceContentDigest cryptoutil.Digest
 	Content             []byte
-	RequestedDecoderIDs []model.DecoderID
+	RequestedDecoderIDs []spec.DecoderID
 }
 
 // SourceContent is one bounded, snapshot-backed source file requested by a
 // source-aware decoder. The discovery engine owns the read, digest, and
 // snapshot lifetime.
 type SourceContent struct {
-	Locator model.Locator
+	Locator spec.Locator
 	Content []byte
 	Digest  cryptoutil.Digest
 }
@@ -47,16 +47,16 @@ type SourceContent struct {
 // referenced sibling source files without exposing Source configuration,
 // snapshots, or native paths.
 type SourceEntryReader interface {
-	ReadSourceEntry(ctx context.Context, locator model.Locator) (SourceContent, error)
+	ReadSourceEntry(ctx context.Context, locator spec.Locator) (SourceContent, error)
 }
 
-func (c Candidate) RequestsDecoder(id model.DecoderID) bool {
+func (c Candidate) RequestsDecoder(id spec.DecoderID) bool {
 	return slices.Contains(c.RequestedDecoderIDs, id)
 }
 
 // Decoded is one provider-derived definition emitted from a source candidate.
 type Decoded struct {
-	SubresourceLocator model.SubresourceLocator
+	SubresourceLocator spec.SubresourceLocator
 
 	// OriginLocator and OriginContentDigest override the candidate file as
 	// the physical declaration origin. They are used by source-aware format
@@ -65,7 +65,7 @@ type Decoded struct {
 	//
 	// An origin override is an inseparable locator/digest pair. Supplying only
 	// one member would attach content evidence to the wrong physical entry.
-	OriginLocator       model.Locator
+	OriginLocator       spec.Locator
 	OriginContentDigest *cryptoutil.Digest
 
 	Definition  definition.Definition
@@ -78,7 +78,7 @@ type Decoded struct {
 // source refresh synchronization, Definition persistence, and Artifact
 // lifecycle publication. The decoder owns format recognition and projection.
 type Decoder interface {
-	ID() model.DecoderID
+	ID() spec.DecoderID
 	Revision() string
 
 	Recognize(
@@ -108,7 +108,7 @@ type SourceAwareDecoder interface {
 // source bytes must be canonicalized through the registered Artifact Store
 // schema catalog before the decoder can project definitions.
 //
-// This replaces direct decoder dependencies on *shareable.Registry.
+// This replaces direct decoder dependencies on *jsonschema.Registry.
 type SchemaCanonicalizerBinder interface {
 	RequiredSchemaKeys() []schema.Key
 

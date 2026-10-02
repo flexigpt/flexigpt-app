@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -122,7 +122,7 @@ func (l Locator) MarshalJSON() ([]byte, error) {
 			Registry:   l.Registry,
 			Command:    l.Command,
 		},
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 }
 
@@ -130,7 +130,7 @@ func (l *Locator) UnmarshalJSON(raw []byte) error {
 	if l == nil {
 		return fmt.Errorf(
 			"%w: Locator target is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	canonical, err := jsonutil.Canonicalize(raw)
@@ -141,7 +141,7 @@ func (l *Locator) UnmarshalJSON(raw []byte) error {
 	if len(trimmed) == 0 {
 		return fmt.Errorf(
 			"%w: Locator is empty",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -162,7 +162,7 @@ func (l *Locator) UnmarshalJSON(raw []byte) error {
 	if err := jsonutil.DecodeCanonicalObjectBytesInto(
 		trimmed,
 		&object,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	); err != nil {
 		return err
 	}
@@ -200,7 +200,7 @@ func (l Locator) Validate() error {
 			l.Command != "" {
 			return fmt.Errorf(
 				"%w: scalar Locator cannot contain typed fields",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return validateScalarLocator(l.Scalar)
@@ -208,7 +208,7 @@ func (l Locator) Validate() error {
 	if l.Scalar != "" {
 		return fmt.Errorf(
 			"%w: typed Locator cannot contain a scalar value",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -268,7 +268,7 @@ func (l Locator) Validate() error {
 		if err := validateOptionalText(
 			"Git revision",
 			l.Revision,
-			model.MaxVersionBytes,
+			spec.MaxVersionBytes,
 		); err != nil {
 			return err
 		}
@@ -298,14 +298,14 @@ func (l Locator) Validate() error {
 		if err := validateRequiredText(
 			"package Locator package",
 			l.Package,
-			model.MaxURIBytes,
+			spec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
 		if err := validateOptionalText(
 			"package Locator version",
 			l.Version,
-			model.MaxVersionBytes,
+			spec.MaxVersionBytes,
 		); err != nil {
 			return err
 		}
@@ -338,7 +338,7 @@ func (l Locator) Validate() error {
 		if err := validateRequiredText(
 			"command Locator command",
 			l.Command,
-			model.MaxURIBytes,
+			spec.MaxURIBytes,
 		); err != nil {
 			return err
 		}
@@ -357,7 +357,7 @@ func (l Locator) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported Locator kind %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			l.Kind,
 		)
 	}
@@ -376,7 +376,7 @@ func (m PackageManager) Validate() error {
 	default:
 		return fmt.Errorf(
 			"%w: unsupported package manager %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			m,
 		)
 	}
@@ -387,7 +387,7 @@ func ValidatePortableLocatorPath(
 	value string,
 	allowRoot bool,
 ) error {
-	return model.ValidatePortableRelativeReference(
+	return spec.ValidatePortableRelativeReference(
 		label,
 		value,
 		allowRoot,
@@ -405,11 +405,11 @@ func validatePortableRootLocatorPath(
 	if value == "" {
 		return fmt.Errorf(
 			"%w: %s is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 		)
 	}
-	if err := model.Locator(value).ValidatePortable(allowRoot); err != nil {
+	if err := spec.Locator(value).ValidatePortable(allowRoot); err != nil {
 		return fmt.Errorf("%s: %w", label, err)
 	}
 	return nil
@@ -422,7 +422,7 @@ func ValidateAbsoluteURL(
 	if err := validateRequiredText(
 		label,
 		value,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -433,7 +433,7 @@ func ValidateAbsoluteURL(
 		strings.EqualFold(parsed.Scheme, "file") {
 		return fmt.Errorf(
 			"%w: %s must be an absolute non-file URL",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 		)
 	}
@@ -444,7 +444,7 @@ func validateScalarLocator(value string) error {
 	if err := validateRequiredText(
 		"scalar Locator",
 		value,
-		model.MaxURIBytes,
+		spec.MaxURIBytes,
 	); err != nil {
 		return err
 	}
@@ -452,7 +452,7 @@ func validateScalarLocator(value string) error {
 	if err != nil {
 		return fmt.Errorf(
 			"%w: invalid scalar Locator: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -460,7 +460,7 @@ func validateScalarLocator(value string) error {
 		if strings.EqualFold(parsed.Scheme, "file") {
 			return fmt.Errorf(
 				"%w: scalar Locator cannot use file URI",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		return nil
@@ -476,14 +476,14 @@ func validateScalarLocator(value string) error {
 
 // ResolveSourceRelativePathLocator resolves a local portable declaration
 // locator against the source entry that contains the declaration. It returns
-// only strict model.Locator values suitable for an already opened Source.
+// only strict spec.Locator values suitable for an already opened Source.
 //
 // URL, Git, package, and command locators deliberately remain the
 // responsibility of an external Locator Resolver.
 func ResolveSourceRelativePathLocator(
 	locator Locator,
-	declarationLocator model.Locator,
-) (model.Locator, error) {
+	declarationLocator spec.Locator,
+) (spec.Locator, error) {
 	if err := locator.Validate(); err != nil {
 		return "", err
 	}
@@ -501,7 +501,7 @@ func ResolveSourceRelativePathLocator(
 		if parsed.Scheme != "" {
 			return "", fmt.Errorf(
 				"%w: external locator requires a Locator Resolver",
-				model.ErrLocatorUnresolved,
+				spec.ErrLocatorUnresolved,
 			)
 		}
 		relative, _, _ = strings.Cut(locator.Scalar, "#")
@@ -512,7 +512,7 @@ func ResolveSourceRelativePathLocator(
 	default:
 		return "", fmt.Errorf(
 			"%w: locator kind %q requires a Locator Resolver",
-			model.ErrLocatorUnresolved,
+			spec.ErrLocatorUnresolved,
 			locator.Kind,
 		)
 	}
@@ -520,14 +520,14 @@ func ResolveSourceRelativePathLocator(
 	if relative == "" {
 		return "", fmt.Errorf(
 			"%w: local declaration locator is empty",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	relative = path.Clean(relative)
 
-	resolved := model.Locator(relative)
+	resolved := spec.Locator(relative)
 	if parent := path.Dir(string(declarationLocator)); parent != "." {
-		resolved = model.Locator(path.Join(parent, relative))
+		resolved = spec.Locator(path.Join(parent, relative))
 	}
 	if err := resolved.ValidatePortable(true); err != nil {
 		return "", err
@@ -546,7 +546,7 @@ func validateRequiredText(
 		strings.TrimSpace(value) != value {
 		return fmt.Errorf(
 			"%w: %s must be non-empty, bounded, valid UTF-8, and trimmed",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			label,
 		)
 	}
@@ -554,7 +554,7 @@ func validateRequiredText(
 		if character == 0 || unicode.IsControl(character) {
 			return fmt.Errorf(
 				"%w: %s contains a control character",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				label,
 			)
 		}
@@ -580,7 +580,7 @@ func requireEmptyFields(values ...string) error {
 		}
 		return fmt.Errorf(
 			"%w: Locator field %q is not valid for this Locator kind",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			values[index],
 		)
 	}

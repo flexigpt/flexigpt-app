@@ -5,25 +5,25 @@ import (
 	"path"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-func ManagedMCPDocumentFile() model.Locator {
+func ManagedMCPDocumentFile() spec.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		documentTopology.DocumentUseManagedMCP,
 	)
 }
 
-func ManagedMCPPolicyDocumentFile() model.Locator {
+func ManagedMCPPolicyDocumentFile() spec.Locator {
 	return documentTopology.MustDefaultDocumentFile(
 		documentTopology.DocumentUseManagedMCPPolicy,
 	)
 }
 
 func ManagedPackageAddressForMCP(
-	name model.LogicalName,
-	version model.LogicalVersion,
+	name spec.LogicalName,
+	version spec.LogicalVersion,
 ) (source.ManagedPackageAddress, error) {
 	if version == "" {
 		version = documentTopology.UnversionedPackageVersion()
@@ -37,7 +37,7 @@ func ManagedPackageAddressForMCP(
 
 func ManagedPackageLocatorForMCP(
 	address source.ManagedPackageAddress,
-) (model.Locator, error) {
+) (spec.Locator, error) {
 	if err := validateManagedMCPPackageAddress(address); err != nil {
 		return "", err
 	}
@@ -45,7 +45,7 @@ func ManagedPackageLocatorForMCP(
 }
 
 func ManagedPackageAddressFromMCPLocator(
-	locator model.Locator,
+	locator spec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -53,14 +53,14 @@ func ManagedPackageAddressFromMCPLocator(
 	if path.Base(string(locator)) != string(ManagedMCPDocumentFile()) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: MCP locator %q is not %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			locator,
 			ManagedMCPDocumentFile(),
 		)
 	}
 
 	address, err := source.ParseManagedPackageAddressDirectory(
-		model.Locator(path.Dir(string(locator))),
+		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -72,7 +72,7 @@ func ManagedPackageAddressFromMCPLocator(
 }
 
 func ManagedPackageAddressFromMCPPolicyLocator(
-	locator model.Locator,
+	locator spec.Locator,
 ) (source.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -80,14 +80,14 @@ func ManagedPackageAddressFromMCPPolicyLocator(
 	if path.Base(string(locator)) != string(ManagedMCPPolicyDocumentFile()) {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: MCP Policy locator %q is not %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			locator,
 			ManagedMCPPolicyDocumentFile(),
 		)
 	}
 
 	address, err := source.ParseManagedPackageAddressDirectory(
-		model.Locator(path.Dir(string(locator))),
+		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
 		return source.ManagedPackageAddress{}, err
@@ -95,7 +95,7 @@ func ManagedPackageAddressFromMCPPolicyLocator(
 	if address.Kind != ManagedMCPPolicyPackageKind {
 		return source.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: MCP Policy package kind must be %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			ManagedMCPPolicyPackageKind,
 		)
 	}
@@ -111,7 +111,7 @@ func validateManagedMCPPackageAddress(
 	if address.Kind != ManagedMCPPackageKind {
 		return fmt.Errorf(
 			"%w: MCP package kind must be %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			ManagedMCPPackageKind,
 		)
 	}

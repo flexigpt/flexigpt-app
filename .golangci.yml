@@ -450,9 +450,19 @@ linters:
           alias: assets
         - pkg: "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
           alias: documentTopology
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/(\w+)
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/impl
           alias: ${1}impl
-        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/impl
+          alias: ${1}impl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/(\w+)/impl
+          alias: ${1}impl
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/model
+          alias: ${1}
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/(\w+)/model
+          alias: ${2}
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/model
+          alias: ${1}
+        - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model
           alias: artifactOverlay
         - pkg: github.com/flexigpt/flexigpt-app/internal/(\w+)/consts
           alias: ${1}Consts

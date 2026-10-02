@@ -6,8 +6,8 @@ import (
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -78,7 +78,7 @@ func TestWorkflow_AgentCollectionMembershipRestoresAfterReimport(
 			Artifact:         first.Agent.Ref,
 		},
 	)
-	requireErrorIs(t, err, model.ErrIdentityConflict)
+	requireErrorIs(t, err, spec.ErrIdentityConflict)
 
 	secondaryRef := secondaryWithMember.Artifact.Ref()
 	requireCollectionContainsAgent(

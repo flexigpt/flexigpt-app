@@ -10,11 +10,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -89,7 +89,7 @@ func withAgentStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -336,7 +336,7 @@ func (w *AgentStoreWrapper) DeleteAgentCollection(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return w.api.DeleteAgentCollection(
 			context.Background(),
@@ -410,7 +410,7 @@ func (w *AgentStoreWrapper) DeleteManagedAgent(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return w.api.DeleteManagedAgent(context.Background(), request)
 	})

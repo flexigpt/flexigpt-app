@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 )
 
@@ -39,14 +39,14 @@ func artifactRefForRuntimeServerID(
 	if !found {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: unsupported MCP runtime server ID",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	decoded, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: decode MCP runtime server ID: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -54,7 +54,7 @@ func artifactRefForRuntimeServerID(
 	if !found {
 		return artifact.ArtifactRef{}, fmt.Errorf(
 			"%w: malformed MCP runtime server ID",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	ref := artifact.ArtifactRef{

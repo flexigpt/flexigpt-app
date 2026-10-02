@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
 
@@ -23,12 +23,12 @@ func withSkillRuntime[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 
 		service := w.service
 		if service == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 		return fn(service)
 	})

@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // verificationSessionStarter is intentionally optional. Production Resource
@@ -35,7 +35,7 @@ func WithResourceVerificationSession[T any](
 	if ctx == nil {
 		return zero, fmt.Errorf(
 			"%w: resource verification session context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -44,7 +44,7 @@ func WithResourceVerificationSession[T any](
 	if fn == nil {
 		return zero, fmt.Errorf(
 			"%w: resource verification session callback is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -60,7 +60,7 @@ func WithResourceVerificationSession[T any](
 	if sessionCtx == nil || session == nil {
 		return zero, fmt.Errorf(
 			"%w: resource verification session is incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 

@@ -10,9 +10,9 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/resource"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -58,7 +58,7 @@ func New(
 		secretCleaner == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Store dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := baselinePolicy.Validate(); err != nil {
@@ -188,7 +188,7 @@ func (a *API) ListMCPCollectionServers(
 		a.collections == nil ||
 		a.resources == nil ||
 		a.declarationResolver == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if err := collectionRef.Validate(); err != nil {
 		return nil, err
@@ -211,7 +211,7 @@ func (a *API) GetMCPPolicy(
 	ref artifact.ArtifactRef,
 ) (PolicyView, error) {
 	if a == nil {
-		return PolicyView{}, model.ErrClosed
+		return PolicyView{}, spec.ErrClosed
 	}
 	terminal, err := a.resolveDeclarationArtifact(ctx, ref)
 	if err != nil {
@@ -228,7 +228,7 @@ func (a *API) GetMCPPolicy(
 	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
 		return PolicyView{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Policy",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	body, err := a.policyBodyForResolvedArtifact(
@@ -256,7 +256,7 @@ func (a *API) saveMutableServerSettings(
 	if expectedArtifactRevision == 0 {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: expected MCP Server Artifact revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	material, err := a.resolveServerMaterial(ctx, ref)
@@ -267,11 +267,11 @@ func (a *API) saveMutableServerSettings(
 	if material.BuiltIn {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: protected MCP Server installation belongs in an overlay",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 	if material.Resource.Artifact.Revision != expectedArtifactRevision {
-		return artifact.Artifact{}, model.ErrConflict
+		return artifact.Artifact{}, spec.ErrConflict
 	}
 	if err := data.ValidateFor(terminal, material.Document); err != nil {
 		return artifact.Artifact{}, err
@@ -317,12 +317,12 @@ func (a *API) saveBuiltInServerSettings(
 	data mcpDomainServer.ServerData,
 ) error {
 	if a == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if a.overlays == nil {
 		return fmt.Errorf(
 			"%w: MCP overlay store is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	material, err := a.resolveServerMaterial(ctx, ref)
@@ -333,13 +333,13 @@ func (a *API) saveBuiltInServerSettings(
 	if !a.protection.IsProtectedRoot(terminal.RootID) {
 		return fmt.Errorf(
 			"%w: MCP Server is not in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 	if !material.BuiltIn {
 		return fmt.Errorf(
 			"%w: MCP Server is not a protected Artifact",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 	if err := data.ValidateFor(terminal, material.Document); err != nil {
@@ -351,10 +351,10 @@ func (a *API) saveBuiltInServerSettings(
 		return err
 	}
 	if found && current.Revision != expectedOverlayRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 	if !found && expectedOverlayRevision != 0 {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 	nextRevision := uint64(1)
 	if found {
@@ -401,7 +401,7 @@ func (a *API) listMCPCollectionServers(
 	if plugin == nil || plugin.Type != declaration.TypePlugin {
 		return nil, fmt.Errorf(
 			"%w: MCP Collection did not resolve as a Plugin",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -489,7 +489,7 @@ func (a *API) resolveMCPServer(
 	ref artifact.ArtifactRef,
 ) (ServerRead, error) {
 	if a == nil || a.resources == nil {
-		return ServerRead{}, model.ErrClosed
+		return ServerRead{}, spec.ErrClosed
 	}
 	return consumerutil.WithResourceVerificationSession(
 		ctx,
@@ -511,7 +511,7 @@ func (a *API) serverReadFromMaterial(
 	if material.Resource.Artifact.SourceContentDigest == nil {
 		return ServerRead{}, fmt.Errorf(
 			"%w: MCP Server has no source content digest",
-			model.ErrDigestMismatch,
+			spec.ErrDigestMismatch,
 		)
 	}
 
@@ -579,7 +579,7 @@ func (a *API) resolveServerMaterial(
 	ref artifact.ArtifactRef,
 ) (serverResolutionMaterial, error) {
 	if a == nil {
-		return serverResolutionMaterial{}, model.ErrClosed
+		return serverResolutionMaterial{}, spec.ErrClosed
 	}
 	terminal, err := a.resolveDeclarationArtifact(ctx, ref)
 	if err != nil {
@@ -596,7 +596,7 @@ func (a *API) resolveServerMaterial(
 	if resolved.Artifact.Kind != mcpDomain.MCPArtifactKind {
 		return serverResolutionMaterial{}, fmt.Errorf(
 			"%w: Artifact is not an MCP Server",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	document, err := mcpDomainServer.ServerDocumentFromDefinition(resolved.Definition)
@@ -626,7 +626,7 @@ func (a *API) resolveDeclarationArtifact(
 	ref artifact.ArtifactRef,
 ) (artifact.ArtifactRef, error) {
 	if a == nil || a.declarationResolver == nil {
-		return artifact.ArtifactRef{}, model.ErrClosed
+		return artifact.ArtifactRef{}, spec.ErrClosed
 	}
 	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)
 }
@@ -661,7 +661,7 @@ func (a *API) effectiveInstallation(
 			true,
 			fmt.Errorf(
 				"%w: protected MCP installation overlay store is unavailable",
-				model.ErrReferenceUnresolved,
+				spec.ErrReferenceUnresolved,
 			)
 	}
 	overlay, found, err := a.overlays.GetServerOverlay(ctx, record.Ref())
@@ -700,7 +700,7 @@ func (a *API) effectivePolicy(
 			if reference.Required {
 				return mcpPolicy.Effective{}, fmt.Errorf(
 					"%w: required MCP Policy %q did not resolve",
-					model.ErrReferenceUnresolved,
+					spec.ErrReferenceUnresolved,
 					reference.Name,
 				)
 			}
@@ -710,7 +710,7 @@ func (a *API) effectivePolicy(
 				if reference.Required {
 					return mcpPolicy.Effective{}, fmt.Errorf(
 						"%w: required MCP Policy %q is %s",
-						model.ErrReferenceUnresolved,
+						spec.ErrReferenceUnresolved,
 						reference.Name,
 						policyResult.Status,
 					)
@@ -720,7 +720,7 @@ func (a *API) effectivePolicy(
 				if !found {
 					return mcpPolicy.Effective{}, fmt.Errorf(
 						"%w: MCP Policy %q did not resolve to an Artifact",
-						model.ErrReferenceUnresolved,
+						spec.ErrReferenceUnresolved,
 						reference.Name,
 					)
 				}
@@ -737,7 +737,7 @@ func (a *API) effectivePolicy(
 		if ref.RootID != serverRef.RootID {
 			return mcpPolicy.Effective{}, fmt.Errorf(
 				"%w: additional MCP Policy belongs to another Root",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			)
 		}
 		terminal, err := a.resolveDeclarationArtifact(ctx, ref)
@@ -773,7 +773,7 @@ func (a *API) policyBodyForArtifact(
 	if resolved.Artifact.Kind != mcpDomain.MCPPolicyArtifactKind {
 		return mcpPolicy.MCPPolicy{}, fmt.Errorf(
 			"%w: Artifact %q is not an MCP Policy",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}

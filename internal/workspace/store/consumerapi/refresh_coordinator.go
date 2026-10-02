@@ -10,8 +10,8 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type workspaceRefreshCoordinator struct {
@@ -137,7 +137,7 @@ func (c *workspaceRefreshCoordinator) RefreshSource(
 	target resolve.RefreshTarget,
 ) error {
 	if c == nil || c.discovery == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	_, err := c.discovery.RefreshSource(
 		ctx,
@@ -188,8 +188,8 @@ func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
 
 func localRefreshLocator(
 	locator declaration.Locator,
-	declarationLocator model.Locator,
-) (model.Locator, bool, error) {
+	declarationLocator spec.Locator,
+) (spec.Locator, bool, error) {
 	if err := locator.Validate(); err != nil {
 		return "", false, err
 	}
@@ -216,19 +216,19 @@ func localRefreshLocator(
 
 func locatedRefreshCandidates(
 	declarationType declaration.Type,
-	target model.Locator,
-) []model.Locator {
+	target spec.Locator,
+) []spec.Locator {
 	if declarationType != declaration.TypeSkill ||
 		documentTopology.IsSkillPackageDocument(target) {
-		return []model.Locator{target}
+		return []spec.Locator{target}
 	}
 
-	output := []model.Locator{target}
-	seen := map[model.Locator]struct{}{
+	output := []spec.Locator{target}
+	seen := map[spec.Locator]struct{}{
 		target: {},
 	}
 	for _, skillDocument := range documentTopology.SkillPackageDocumentFiles() {
-		candidate := model.Locator(path.Join(
+		candidate := spec.Locator(path.Join(
 			string(target),
 			string(skillDocument),
 		))

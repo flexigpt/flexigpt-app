@@ -8,8 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
@@ -30,7 +30,7 @@ func InitToolAggregateWrapper(
 		return errors.New("tool aggregate wrapper dependencies are incomplete")
 	}
 	if storeWrapper.api == nil || runtimeWrapper.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 
 	service, err := toolAggregate.New(
@@ -127,7 +127,7 @@ func (w *ToolAggregateWrapper) HydrateInferenceToolChoice(
 
 func (w *ToolAggregateWrapper) ready() error {
 	if w == nil || w.service == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return nil
 }

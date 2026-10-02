@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
@@ -69,7 +69,7 @@ func WithDebugConfig(debugConfig *debugclient.DebugConfig) ProviderSetOption {
 	}
 }
 
-// WithSkillsRunScriptEnabled controls whether skills-runscript is advertised to the model.
+// WithSkillsRunScriptEnabled controls whether skills-runscript is advertised to the spec.
 // Default: false (safer; matches the default fsskillprovider which disables scripts).
 func WithSkillsRunScriptEnabled(enabled bool) ProviderSetOption {
 	return func(ps *ProviderSetAPI) { ps.skillsRunScriptEnabled = enabled }

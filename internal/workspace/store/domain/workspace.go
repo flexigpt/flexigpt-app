@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
@@ -40,10 +40,10 @@ func (v WorkspaceView) Validate() error {
 	if err := v.Artifact.Validate(); err != nil {
 		return err
 	}
-	return model.ValidateOptionalText(
+	return spec.ValidateOptionalText(
 		"Workspace description",
 		v.Description,
-		model.MaxDescriptionBytes,
+		spec.MaxDescriptionBytes,
 	)
 }
 

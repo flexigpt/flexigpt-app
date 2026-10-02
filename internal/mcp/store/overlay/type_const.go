@@ -5,26 +5,26 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 const (
-	InstallationNamespace   artifactOverlay.Namespace = "mcp.installation"
-	GlobalSettingsNamespace artifactOverlay.Namespace = "mcp.global"
+	InstallationNamespace   overlay.Namespace = "mcp.installation"
+	GlobalSettingsNamespace overlay.Namespace = "mcp.global"
 )
 
-func Namespaces() []artifactOverlay.Namespace {
-	return []artifactOverlay.Namespace{
+func Namespaces() []overlay.Namespace {
+	return []overlay.Namespace{
 		InstallationNamespace,
 	}
 }
 
-func StoreNamespaces() []artifactOverlay.Namespace {
-	return []artifactOverlay.Namespace{
+func StoreNamespaces() []overlay.Namespace {
+	return []overlay.Namespace{
 		GlobalSettingsNamespace,
 	}
 }
@@ -43,14 +43,14 @@ func (value ServerOverlay) Validate() error {
 	if value.SchemaVersion != mcpDomain.InstallationDataSchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported MCP server overlay schema %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			value.SchemaVersion,
 		)
 	}
 	if value.Revision == 0 {
 		return fmt.Errorf(
 			"%w: MCP server overlay revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return value.ServerData.Validate()

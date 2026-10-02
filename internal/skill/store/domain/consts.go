@@ -3,10 +3,10 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -16,7 +16,7 @@ const (
 	ManagedSkillPackageKind           source.PackageKind = "skill"
 	BuiltinSkillCollectionPackageKind source.PackageKind = "skill-collection"
 	SkillSchemaID                     schema.SchemaID    = skillv1.SkillSchemaID
-	MarkdownDecoderID                 model.DecoderID    = "agent.skill-markdown"
+	MarkdownDecoderID                 spec.DecoderID     = "agent.skill-markdown"
 
 	SkillSchemaVersion     = skillv1.SkillSchemaVersion
 	InsertLabelKey         = "skill.insert"
@@ -24,15 +24,15 @@ const (
 	HydrationSchemaVersion = "agent.skill.builtin-hydration/v1"
 )
 
-func SkillDefinitionFileName() model.Locator {
+func SkillDefinitionFileName() spec.Locator {
 	return documentTopology.DefaultSkillPackageDocumentFile()
 }
 
-func SkillDefinitionFiles() []model.Locator {
+func SkillDefinitionFiles() []spec.Locator {
 	return documentTopology.SkillPackageDocumentFiles()
 }
 
-func IsSkillDefinitionFile(locator model.Locator) bool {
+func IsSkillDefinitionFile(locator spec.Locator) bool {
 	return documentTopology.IsSkillPackageDocument(locator)
 }
 

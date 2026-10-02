@@ -7,13 +7,13 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Decoded struct {
-	SubresourceLocator model.SubresourceLocator
+	SubresourceLocator spec.SubresourceLocator
 	Definition         definition.Definition
 }
 
@@ -86,7 +86,7 @@ func DecodeMCPConfig(
 
 	output := make([]Decoded, 0, len(names))
 	for _, name := range names {
-		logicalName := model.LogicalName(name)
+		logicalName := spec.LogicalName(name)
 		if err := logicalName.Validate(); err != nil {
 			return nil, err
 		}
@@ -114,7 +114,7 @@ func DecodeMCPConfig(
 		default:
 			return nil, fmt.Errorf(
 				"%w: MCP config server %q has unsupported type %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				name,
 				transport,
 			)
@@ -140,7 +140,7 @@ func DecodeMCPConfig(
 		}
 
 		output = append(output, Decoded{
-			SubresourceLocator: model.SubresourceLocator(
+			SubresourceLocator: spec.SubresourceLocator(
 				"mcpServers/" + name,
 			),
 			Definition: definitionValue,
@@ -154,7 +154,7 @@ func decodeMCPConfigDocument(
 ) (configDocument, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return configDocument{}, err
@@ -167,7 +167,7 @@ func decodeMCPConfigDocument(
 	if isRetiredMCPCollectionKind(value.Kind) {
 		return configDocument{}, fmt.Errorf(
 			"%w: proprietary MCP collection manifests are not supported",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	return value, nil

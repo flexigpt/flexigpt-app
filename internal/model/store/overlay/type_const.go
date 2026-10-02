@@ -8,10 +8,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
@@ -24,22 +24,22 @@ const (
 
 	// Protected Model Artifacts store non-secret runtime state in Artifact Store protected overlay records.
 
-	ProviderRuntimeNamespace artifactOverlay.Namespace = "model.provider.runtime"
-	ModelRuntimeNamespace    artifactOverlay.Namespace = "model.runtime"
-	PreferencesNamespace     artifactOverlay.Namespace = "model.preferences"
+	ProviderRuntimeNamespace overlay.Namespace = "model.provider.runtime"
+	ModelRuntimeNamespace    overlay.Namespace = "model.runtime"
+	PreferencesNamespace     overlay.Namespace = "model.preferences"
 
 	ProviderCredentialSlot secret.Slot = "apiKey"
 )
 
-func Namespaces() []artifactOverlay.Namespace {
-	return []artifactOverlay.Namespace{
+func Namespaces() []overlay.Namespace {
+	return []overlay.Namespace{
 		ProviderRuntimeNamespace,
 		ModelRuntimeNamespace,
 	}
 }
 
-func StoreNamespaces() []artifactOverlay.Namespace {
-	return []artifactOverlay.Namespace{
+func StoreNamespaces() []overlay.Namespace {
+	return []overlay.Namespace{
 		PreferencesNamespace,
 	}
 }
@@ -82,14 +82,14 @@ func (v ProviderOverlay) Validate() error {
 	if v.SchemaVersion != OverlaySchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported Model Provider overlay schema %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			v.SchemaVersion,
 		)
 	}
 	if v.Revision == 0 {
 		return fmt.Errorf(
 			"%w: Model Provider overlay revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if v.DefaultModel != nil {
@@ -124,14 +124,14 @@ func (v ModelOverlay) Validate() error {
 	if v.SchemaVersion != OverlaySchemaVersion {
 		return fmt.Errorf(
 			"%w: unsupported Model overlay schema %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			v.SchemaVersion,
 		)
 	}
 	if v.Revision == 0 {
 		return fmt.Errorf(
 			"%w: Model overlay revision is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 

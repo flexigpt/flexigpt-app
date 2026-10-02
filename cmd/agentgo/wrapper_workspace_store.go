@@ -7,10 +7,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
@@ -74,7 +74,7 @@ func withWorkspaceStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -86,7 +86,7 @@ func withWorkspaceStoreError(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -104,7 +104,7 @@ func (w *WorkspaceStoreWrapper) RegisterWorkspaceDirectory(
 				return workspaceConsumerAPI.WorkspaceDirectoryView{}, err
 			}
 			if w.ensureArtifactBaselines == nil {
-				return workspaceConsumerAPI.WorkspaceDirectoryView{}, model.ErrClosed
+				return workspaceConsumerAPI.WorkspaceDirectoryView{}, spec.ErrClosed
 			}
 			if err := w.ensureArtifactBaselines(
 				ctx,

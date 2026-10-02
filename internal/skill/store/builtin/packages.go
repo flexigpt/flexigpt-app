@@ -12,10 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -24,9 +24,9 @@ import (
 // PreparedPackage is one embedded canonical Skill Collection package ready for
 // publication through the shared managed built-in Source.
 type PreparedPackage struct {
-	EmbeddedPackageRoot model.Locator
+	EmbeddedPackageRoot spec.Locator
 	PackageAddress      source.ManagedPackageAddress
-	DocumentFile        model.Locator
+	DocumentFile        spec.Locator
 	PackageFiles        []source.ManagedPackageFile
 	Expectations        []ArtifactExpectation
 }
@@ -34,10 +34,10 @@ type PreparedPackage struct {
 // ArtifactExpectation is build-time package admission data. It belongs to the
 // package compiler, not to the runtime Skill consumer API.
 type ArtifactExpectation struct {
-	Locator          model.Locator
-	Subresource      model.SubresourceLocator
+	Locator          spec.Locator
+	Subresource      spec.SubresourceLocator
 	Kind             artifact.ArtifactKind
-	LogicalName      model.LogicalName
+	LogicalName      spec.LogicalName
 	DefinitionDigest cryptoutil.Digest
 }
 
@@ -51,7 +51,7 @@ func PreparePackages(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: built-in Skill package preparation context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -60,7 +60,7 @@ func PreparePackages(
 	if packages == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded Skill package filesystem is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -91,7 +91,7 @@ func PreparePackages(
 func preparePackage(
 	ctx context.Context,
 	packages fs.FS,
-	packageRoot model.Locator,
+	packageRoot spec.Locator,
 ) (PreparedPackage, error) {
 	files, err := topology.ReadPackageFiles(
 		ctx,
@@ -116,7 +116,7 @@ func preparePackage(
 	if !found {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Skill package %q lacks a supported Collection document",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			packageRoot,
 		)
 	}
@@ -134,7 +134,7 @@ func preparePackage(
 		)
 	}
 
-	packageName := model.LogicalName(
+	packageName := spec.LogicalName(
 		path.Base(string(packageRoot)),
 	)
 	if err := packageName.Validate(); err != nil {
@@ -143,7 +143,7 @@ func preparePackage(
 	if collection.Name != string(packageName) {
 		return PreparedPackage{}, fmt.Errorf(
 			"%w: embedded Skill package directory %q does not match Plugin name %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			packageRoot,
 			collection.Name,
 		)
@@ -168,7 +168,7 @@ func preparePackage(
 }
 
 func canonicalCollectionPackage(
-	documentFile model.Locator,
+	documentFile spec.Locator,
 	document []byte,
 	files []source.ManagedPackageFile,
 ) (
@@ -178,7 +178,7 @@ func canonicalCollectionPackage(
 ) {
 	raw, err := yamlutil.CanonicalObjectJSON(
 		document,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return pluginv1.PluginDocument{}, nil, err
@@ -190,7 +190,7 @@ func canonicalCollectionPackage(
 	if root.Header().Type != declaration.TypePlugin {
 		return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 			"%w: built-in Skill package root must be a Plugin",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := decoder.ValidateEntryTree(root); err != nil {
@@ -208,7 +208,7 @@ func canonicalCollectionPackage(
 	}
 
 	filesByLocator := make(
-		map[model.Locator][]byte,
+		map[spec.Locator][]byte,
 		len(files),
 	)
 	expectations := make(
@@ -229,7 +229,7 @@ func canonicalCollectionPackage(
 		filesByLocator[file.Locator] = append([]byte(nil), file.Content...)
 	}
 
-	seenDocuments := map[model.Locator]struct{}{
+	seenDocuments := map[spec.Locator]struct{}{
 		documentFile: {},
 	}
 	for index, member := range collection.Members {
@@ -240,7 +240,7 @@ func canonicalCollectionPackage(
 		if form != declaration.MemberNamed {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill Plugin member %d must be a named external reference",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 			)
 		}
@@ -249,7 +249,7 @@ func canonicalCollectionPackage(
 		if header.Type != declaration.TypeSkill {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill Plugin member %d has type %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 				header.Type,
 			)
@@ -257,7 +257,7 @@ func canonicalCollectionPackage(
 		if header.Locator == nil {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill %q requires a local package locator",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -277,7 +277,7 @@ func canonicalCollectionPackage(
 		if !found {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill %q locator does not identify packaged %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				header.Name,
 				skillDomain.SkillDefinitionFileName(),
 			)
@@ -285,7 +285,7 @@ func canonicalCollectionPackage(
 		if _, duplicate := seenDocuments[documentLocator]; duplicate {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill Plugin references document %q more than once",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				documentLocator,
 			)
 		}
@@ -301,10 +301,10 @@ func canonicalCollectionPackage(
 				err,
 			)
 		}
-		if definitionValue.LogicalName != model.LogicalName(header.Name) {
+		if definitionValue.LogicalName != spec.LogicalName(header.Name) {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill document name differs from Plugin member %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				header.Name,
 			)
 		}
@@ -327,7 +327,7 @@ func canonicalCollectionPackage(
 		if _, found := seenDocuments[locator]; !found {
 			return pluginv1.PluginDocument{}, nil, fmt.Errorf(
 				"%w: built-in Skill document %q is not referenced by Plugin %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				locator,
 				collection.Name,
 			)
@@ -340,14 +340,14 @@ func canonicalCollectionPackage(
 
 type preparedArtifactIdentity struct {
 	kind artifact.ArtifactKind
-	name model.LogicalName
+	name spec.LogicalName
 }
 
 func validatePreparedPackageIdentities(
 	packages []PreparedPackage,
 ) error {
 	seen := make(
-		map[preparedArtifactIdentity]model.Locator,
+		map[preparedArtifactIdentity]spec.Locator,
 	)
 	for _, packageValue := range packages {
 		if err := packageValue.PackageAddress.Validate(); err != nil {
@@ -379,7 +379,7 @@ func validatePreparedPackageIdentities(
 			if previous, duplicate := seen[identity]; duplicate {
 				return fmt.Errorf(
 					"%w: embedded Skill packages %q and %q both provide %q/%q",
-					model.ErrConflict,
+					spec.ErrConflict,
 					previous,
 					packageValue.EmbeddedPackageRoot,
 					expected.Kind,
@@ -401,7 +401,7 @@ func PackageFingerprint(
 	if !documentTopology.IsCollectionDocumentFile(value.DocumentFile) {
 		return "", fmt.Errorf(
 			"%w: built-in Skill Collection document is not declared in topology",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	expectations := append(

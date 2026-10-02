@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/sourceformat"
 )
@@ -18,7 +18,7 @@ func NewDecoder() *Decoder {
 	return &Decoder{}
 }
 
-func (*Decoder) ID() model.DecoderID {
+func (*Decoder) ID() spec.DecoderID {
 	return mcpDomain.SourceDecoderID
 }
 
@@ -64,7 +64,7 @@ func (d *Decoder) Decode(
 			"",
 			fmt.Errorf(
 				"%w: proprietary MCP collection manifests are retired; use a canonical type: plugin declaration",
-				model.ErrUnsupported,
+				spec.ErrUnsupported,
 			),
 		)
 
@@ -83,7 +83,7 @@ func (d *Decoder) Decode(
 			"",
 			fmt.Errorf(
 				"%w: MCP configuration requires mcpServers",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 			),
 		)
 
@@ -105,8 +105,8 @@ func decodedValues(
 }
 
 func decoderError(
-	locator model.Locator,
-	subresource model.SubresourceLocator,
+	locator spec.Locator,
+	subresource spec.SubresourceLocator,
 	err error,
 ) []diagnostic.Diagnostic {
 	location := &diagnostic.Location{

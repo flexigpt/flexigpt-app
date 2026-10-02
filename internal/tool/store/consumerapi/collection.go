@@ -7,9 +7,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/catalog"
+	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
 )
@@ -79,13 +79,13 @@ func (a *API) SetToolCollectionEnabled(
 
 func (a *API) collectionForTool(
 	ctx context.Context,
-	name model.LogicalName,
+	name spec.LogicalName,
 ) (collection.CollectionView, error) {
 	collectionName, found := a.collectionByTool[name]
 	if !found {
 		return collection.CollectionView{}, fmt.Errorf(
 			"%w: Tool %q has no generated Tool Collection",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			name,
 		)
 	}
@@ -116,13 +116,13 @@ func (a *API) collectionForTool(
 	case 0:
 		return collection.CollectionView{}, fmt.Errorf(
 			"%w: Tool %q has no Tool Collection",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			name,
 		)
 	default:
 		return collection.CollectionView{}, fmt.Errorf(
 			"%w: Tool %q belongs to %d Tool Collections",
-			model.ErrIdentityConflict,
+			spec.ErrIdentityConflict,
 			name,
 			len(matches),
 		)

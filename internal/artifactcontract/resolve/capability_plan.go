@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -16,7 +16,7 @@ type CapabilityOccurrence struct {
 	Path     string                  `json:"path"`
 	Kind     string                  `json:"kind"`
 	Type     declaration.Type        `json:"type"`
-	Name     model.LogicalName       `json:"name,omitempty"`
+	Name     spec.LogicalName        `json:"name,omitempty"`
 	Status   ResolutionStatus        `json:"status"`
 	Required bool                    `json:"required"`
 	Scope    declaration.LookupScope `json:"scope,omitempty"`
@@ -35,7 +35,7 @@ type CapabilityPlan struct {
 	RootArtifact *artifact.ArtifactRef  `json:"rootArtifact,omitempty"`
 	RootMapped   *MappedTarget          `json:"rootMapped,omitempty"`
 	RootType     declaration.Type       `json:"rootType"`
-	RootName     model.LogicalName      `json:"rootName"`
+	RootName     spec.LogicalName       `json:"rootName"`
 	Occurrences  []CapabilityOccurrence `json:"occurrences"`
 	Complete     bool                   `json:"complete"`
 }
@@ -148,7 +148,7 @@ func capabilityPlanFor(root *ResolvedEntry) (CapabilityPlan, error) {
 	if root == nil {
 		return CapabilityPlan{}, fmt.Errorf(
 			"%w: capability plan has no root",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -168,7 +168,7 @@ func capabilityPlanFor(root *ResolvedEntry) (CapabilityPlan, error) {
 	if plan.RootName == "" {
 		return CapabilityPlan{}, fmt.Errorf(
 			"%w: capability root has no identity",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 
@@ -189,7 +189,7 @@ func RequireComplete(occurrences []CapabilityOccurrence) error {
 		}
 		return fmt.Errorf(
 			"%w: capability %q (%s/%s) is %s: %s",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			occurrence.Path,
 			occurrence.Type,
 			occurrence.Name,
@@ -307,7 +307,7 @@ func (c *capabilityCollector) collectRelationship(
 		Path:      path,
 		Kind:      "member",
 		Type:      header.Type,
-		Name:      model.LogicalName(header.Name),
+		Name:      spec.LogicalName(header.Name),
 		Status:    relationship.Status,
 		Required:  relationship.Required,
 		Scope:     relationship.Scope,
@@ -438,7 +438,7 @@ func resolvedEntryKey(entry *ResolvedEntry) string {
 	return "unknown"
 }
 
-func resolvedEntryName(entry *ResolvedEntry) model.LogicalName {
+func resolvedEntryName(entry *ResolvedEntry) spec.LogicalName {
 	if entry == nil {
 		return ""
 	}

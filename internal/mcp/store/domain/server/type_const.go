@@ -4,8 +4,8 @@ import (
 	"regexp"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 )
@@ -94,8 +94,8 @@ type ConnectionProfile struct {
 }
 
 type PolicyReference struct {
-	Name     model.LogicalName `json:"name"`
-	Required bool              `json:"required"`
+	Name     spec.LogicalName `json:"name"`
+	Required bool             `json:"required"`
 }
 
 // ServerConfiguration is the runtime projection of direct MCP declaration
@@ -117,11 +117,11 @@ type Include struct {
 // ServerDocument is the MCP consumer projection of one direct canonical mcpv1
 // declaration. It is not itself a portable document format.
 type ServerDocument struct {
-	LogicalName    model.LogicalName    `json:"logicalName"`
-	LogicalVersion model.LogicalVersion `json:"logicalVersion,omitempty"`
-	DisplayName    string               `json:"displayName,omitempty"`
-	Description    string               `json:"description,omitempty"`
-	Labels         map[string]string    `json:"labels,omitempty"`
+	LogicalName    spec.LogicalName    `json:"logicalName"`
+	LogicalVersion spec.LogicalVersion `json:"logicalVersion,omitempty"`
+	DisplayName    string              `json:"displayName,omitempty"`
+	Description    string              `json:"description,omitempty"`
+	Labels         map[string]string   `json:"labels,omitempty"`
 
 	MCPServer     CoreServer          `json:"mcpServer"`
 	Include       *Include            `json:"include,omitempty"`

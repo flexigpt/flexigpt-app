@@ -12,8 +12,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 

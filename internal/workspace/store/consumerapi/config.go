@@ -5,8 +5,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 )

@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -24,7 +24,7 @@ type EnsureAndRefreshSourceRequest struct {
 
 	// ReconcileDiscovery preserves caller-owned dynamic discovery closure when
 	// an existing Source is reused. A nil reconciler replaces discovery with
-	// Draft.Discovery.
+	// Draft.discovery.
 	ReconcileDiscovery DiscoveryReconciler
 }
 
@@ -43,13 +43,13 @@ func EnsureAndRefreshSource(
 	if sources == nil || discovery == nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if ctx == nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -63,7 +63,7 @@ func EnsureAndRefreshSource(
 	if !draft.Enabled || draft.Discovery.Empty() {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Source lifecycle requires an enabled Source with discovery",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	draft.Discovery = draft.Discovery.Normalized()
@@ -122,7 +122,7 @@ func NormalizeFilesystemSourceRoot(
 	label string,
 ) (string, error) {
 	if raw == "" || strings.TrimSpace(raw) != raw {
-		return "", fmt.Errorf("%w: %s is required", model.ErrInvalid, label)
+		return "", fmt.Errorf("%w: %s is required", spec.ErrInvalid, label)
 	}
 	absolute, err := filepath.Abs(raw)
 	if err != nil {
@@ -134,11 +134,11 @@ func NormalizeFilesystemSourceRoot(
 func FilesystemSourceStorageKey(
 	prefix string,
 	rootPath string,
-) model.StorageKey {
+) spec.StorageKey {
 	digest := strings.TrimPrefix(
 		string(cryptoutil.DigestBytes([]byte(rootPath))),
 		cryptoutil.DigestSHA256Prefix,
 	)
 
-	return model.StorageKey(prefix + "-hash" + digest[:24])
+	return spec.StorageKey(prefix + "-hash" + digest[:24])
 }

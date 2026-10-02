@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
@@ -59,7 +59,7 @@ func NewMCPListService(
 	if roots == nil || store == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP management dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &MCPListService{
@@ -78,7 +78,7 @@ type pageCursor struct {
 
 type pageKey struct {
 	rootID root.RootID
-	name   model.LogicalName
+	name   spec.LogicalName
 	id     artifact.ArtifactID
 }
 
@@ -176,12 +176,12 @@ func (s *MCPListService) orderedRoots(
 	ctx context.Context,
 ) ([]root.Root, error) {
 	if s == nil || s.roots == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP management context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -268,7 +268,7 @@ func afterCursor(value pageKey, cursor pageCursor) bool {
 	return lessPageKey(
 		pageKey{
 			rootID: root.RootID(cursor.AfterRoot),
-			name:   model.LogicalName(cursor.AfterName),
+			name:   spec.LogicalName(cursor.AfterName),
 			id:     artifact.ArtifactID(cursor.AfterID),
 		},
 		value,
@@ -291,7 +291,7 @@ func decodeCursor(
 	if err != nil {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -299,7 +299,7 @@ func decodeCursor(
 	if err := json.Unmarshal(raw, &cursor); err != nil {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if cursor.Kind != kind ||
@@ -307,7 +307,7 @@ func decodeCursor(
 		cursor.PageSize > MaxPageSize {
 		return pageCursor{}, fmt.Errorf(
 			"%w: stale MCP management page token",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -321,13 +321,13 @@ func decodeCursor(
 		cursor.AfterID == "" {
 		return pageCursor{}, fmt.Errorf(
 			"%w: invalid MCP management page token",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := root.RootID(cursor.AfterRoot).Validate(); err != nil {
 		return pageCursor{}, err
 	}
-	if err := model.LogicalName(cursor.AfterName).Validate(); err != nil {
+	if err := spec.LogicalName(cursor.AfterName).Validate(); err != nil {
 		return pageCursor{}, err
 	}
 	if err := artifact.ArtifactID(cursor.AfterID).Validate(); err != nil {

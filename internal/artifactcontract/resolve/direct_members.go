@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ResolvePluginMembers resolves only direct Plugin membership.
@@ -22,7 +22,7 @@ func (r *Resolver) ResolvePluginMembers(
 	ref artifact.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	if r == nil || r.artifacts == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return nil, err

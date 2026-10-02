@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
 
@@ -60,7 +60,7 @@ func (value ServerDocument) AcceptsSecretTarget(
 			declaration.Kind != InputOAuthClientCredentials {
 			return fmt.Errorf(
 				"%w: OAuth client credential target is not declared",
-				model.ErrReferenceUnresolved,
+				spec.ErrReferenceUnresolved,
 			)
 		}
 		return nil
@@ -82,13 +82,13 @@ func (value ServerDocument) AcceptsSecretTarget(
 		}
 		return fmt.Errorf(
 			"%w: MCP secret target is not declared by the server",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret kind %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			kind,
 		)
 	}
@@ -111,7 +111,7 @@ func (target SecretInputTarget) matches(
 	default:
 		return fmt.Errorf(
 			"%w: unsupported MCP secret input target %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			target.Kind,
 		)
 	}
@@ -138,7 +138,7 @@ func secretInputTargets(
 		if strings.TrimSpace(slot) == "" {
 			return fmt.Errorf(
 				"%w: secret input %q has no materialization slot in %s",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				inputName,
 				field,
 			)
@@ -150,7 +150,7 @@ func secretInputTargets(
 				!strings.EqualFold(current.Slot, next.Slot) {
 				return fmt.Errorf(
 					"%w: secret input %q is used by multiple targets",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					inputName,
 				)
 			}
@@ -163,7 +163,7 @@ func secretInputTargets(
 			owner != inputName {
 			return fmt.Errorf(
 				"%w: secret inputs %q and %q use the same materialization target",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				owner,
 				inputName,
 			)
@@ -179,7 +179,7 @@ func secretInputTargets(
 			if declared && declaration.Kind == InputSecret {
 				return fmt.Errorf(
 					"%w: secret input %q cannot be substituted into %s",
-					model.ErrInvalid,
+					spec.ErrInvalid,
 					inputName,
 					field,
 				)
@@ -306,7 +306,7 @@ func secretInputTargets(
 		if _, found := targets[inputName]; !found {
 			return nil, fmt.Errorf(
 				"%w: secret input %q has no permitted environment or HTTP header target",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				inputName,
 			)
 		}

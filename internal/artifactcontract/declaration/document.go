@@ -6,7 +6,7 @@ import (
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -21,7 +21,7 @@ func DecodeDocumentInto(
 ) error {
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return err
@@ -29,14 +29,14 @@ func DecodeDocumentInto(
 	if err := jsonutil.ValidateJSONSchema(
 		compiled,
 		json.RawMessage(canonical),
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	); err != nil {
 		return err
 	}
 	return jsonutil.DecodeCanonicalObjectBytesInto(
 		canonical,
 		target,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 }
 
@@ -48,24 +48,24 @@ func DecodeEntryDocumentInto(
 	target any,
 ) error {
 	if len(entry.raw) == 0 ||
-		len(entry.raw) > model.MaxDefinitionBodyBytes ||
+		len(entry.raw) > spec.MaxDefinitionBodyBytes ||
 		entry.raw[0] != '{' {
 		return fmt.Errorf(
 			"%w: canonical declaration entry must be a bounded JSON object",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := jsonutil.ValidateJSONSchema(
 		compiled,
 		entry.raw,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	); err != nil {
 		return err
 	}
 	return jsonutil.DecodeCanonicalObjectBytesInto(
 		entry.raw,
 		target,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 }
 
@@ -76,7 +76,7 @@ func ValidateDocument(
 	return jsonutil.ValidateJSONSchema(
 		compiled,
 		value,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 }
 
@@ -85,7 +85,7 @@ func CanonicalDocumentJSON(
 ) ([]byte, error) {
 	return jsonutil.MarshalCanonicalObject(
 		value,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 }
 

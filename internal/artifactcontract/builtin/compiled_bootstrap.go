@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // CompiledPackageInstaller is implemented by binary-owned built-in package
@@ -95,7 +95,7 @@ func (r *BootstrapRegistry) prepareCompiledHydration(
 			registration.Set.Hydration != state.desired {
 			return compiledHydrationWork{}, fmt.Errorf(
 				"%w: compiled installer %q has inconsistent hydration state",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				entry.name,
 			)
 		}

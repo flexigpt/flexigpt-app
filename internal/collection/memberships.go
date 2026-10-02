@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ArtifactMembershipView is one direct external Collection member whose
@@ -15,7 +15,7 @@ import (
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
 	Collection         artifact.ArtifactRef     `json:"collection"`
-	CollectionName     model.LogicalName        `json:"collectionName"`
+	CollectionName     spec.LogicalName         `json:"collectionName"`
 	CollectionRevision uint64                   `json:"collectionRevision"`
 	MemberIndex        int                      `json:"memberIndex"`
 	Member             MemberReference          `json:"member"`
@@ -33,7 +33,7 @@ func (a *API) ListMembershipsForArtifact(
 	if a == nil || a.resolver == nil {
 		return nil, fmt.Errorf(
 			"%w: Collection resolver is unavailable",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	target, err := a.artifacts.Get(ctx, ref)
@@ -47,7 +47,7 @@ func (a *API) ListMembershipsForArtifact(
 	if a.domain != nil && !a.domain.allows(targetType) {
 		return nil, fmt.Errorf(
 			"%w: Artifact type %q is not supported by the %s Collection domain",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			targetType,
 			a.domain.Name,
 		)
@@ -79,7 +79,7 @@ func (a *API) ListMembershipsForArtifact(
 		if plugin == nil || plugin.Type != declaration.TypePlugin {
 			return nil, fmt.Errorf(
 				"%w: Plugin %q did not resolve as a Plugin",
-				model.ErrReferenceUnresolved,
+				spec.ErrReferenceUnresolved,
 				collectionValue.Ref.ArtifactID,
 			)
 		}

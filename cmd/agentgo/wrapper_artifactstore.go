@@ -10,9 +10,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/providers/secretstore/keyringmapstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -63,7 +63,7 @@ func composeArtifactStore(
 	secretValues, err := keyringmapstore.New(
 		filepath.Join(
 			baseDirectory,
-			model.ArtifactStoreSecretValuesFileName,
+			spec.ArtifactStoreSecretValuesFileName,
 		),
 		keyringmapstore.Config{},
 	)

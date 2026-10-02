@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -58,17 +58,17 @@ func (n Node) MarshalJSON() ([]byte, error) {
 	}
 	return jsonutil.MarshalCanonicalObject(
 		fields,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 }
 
 func (n *Node) UnmarshalJSON(raw []byte) error {
 	if n == nil {
-		return fmt.Errorf("%w: Workflow node target is nil", model.ErrInvalid)
+		return fmt.Errorf("%w: Workflow node target is nil", spec.ErrInvalid)
 	}
 	canonical, err := jsonutil.CanonicalizeObject(
 		raw,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return err
@@ -89,7 +89,7 @@ func (n *Node) UnmarshalJSON(raw []byte) error {
 	delete(fields, "join")
 	memberRaw, err := jsonutil.MarshalCanonicalObject(
 		fields,
-		model.MaxDefinitionBodyBytes,
+		spec.MaxDefinitionBodyBytes,
 	)
 	if err != nil {
 		return err
@@ -225,7 +225,7 @@ func (v WorkflowDocument) validateFields() error {
 		if _, duplicate := nodes[node.ID]; duplicate {
 			return fmt.Errorf(
 				"%w: duplicate Workflow node ID %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				node.ID,
 			)
 		}
@@ -241,7 +241,7 @@ func (v WorkflowDocument) validateFields() error {
 		if form == declaration.MemberSelector {
 			return fmt.Errorf(
 				"%w: Workflow node %q cannot contain a member selector",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				node.ID,
 			)
 		}
@@ -256,7 +256,7 @@ func (v WorkflowDocument) validateFields() error {
 		default:
 			return fmt.Errorf(
 				"%w: workflow node %q has invalid join %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				node.ID,
 				node.Join,
 			)
@@ -268,7 +268,7 @@ func (v WorkflowDocument) validateFields() error {
 		if previous, duplicate := starts[start]; duplicate {
 			return fmt.Errorf(
 				"%w: Workflow start[%d] duplicates start[%d]",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				index,
 				previous,
 			)
@@ -277,7 +277,7 @@ func (v WorkflowDocument) validateFields() error {
 		if _, found := nodes[start]; !found {
 			return fmt.Errorf(
 				"%w: workflow start[%d] identifies unknown node %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 				start,
 			)
@@ -298,7 +298,7 @@ func (v WorkflowDocument) validateFields() error {
 		if previous, duplicate := edges[key]; duplicate {
 			return fmt.Errorf(
 				"%w: Workflow edges[%d] duplicates edges[%d]",
-				model.ErrIdentityConflict,
+				spec.ErrIdentityConflict,
 				index,
 				previous,
 			)
@@ -307,7 +307,7 @@ func (v WorkflowDocument) validateFields() error {
 		if _, found := nodes[edge.From]; !found {
 			return fmt.Errorf(
 				"%w: workflow edges[%d].from identifies unknown node %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 				edge.From,
 			)
@@ -315,7 +315,7 @@ func (v WorkflowDocument) validateFields() error {
 		if _, found := nodes[edge.To]; !found {
 			return fmt.Errorf(
 				"%w: workflow edges[%d].to identifies unknown node %q",
-				model.ErrInvalid,
+				spec.ErrInvalid,
 				index,
 				edge.To,
 			)

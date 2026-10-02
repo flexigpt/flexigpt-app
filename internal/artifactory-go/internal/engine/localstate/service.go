@@ -7,13 +7,13 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/secretstore"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/valuestore"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
@@ -33,7 +33,7 @@ type Service struct {
 	artifacts  ArtifactReader
 	clock      clockutil.Clock
 	policy     root.RootPolicy
-	values     secretstore.ValueStore
+	values     valuestore.ValueStore
 
 	namespaces      map[overlay.Namespace]struct{}
 	storeNamespaces map[overlay.Namespace]struct{}
@@ -50,16 +50,16 @@ func NewService(
 	policy root.RootPolicy,
 	namespaces []overlay.Namespace,
 	storeNamespaces []overlay.Namespace,
-	values secretstore.ValueStore,
+	values valuestore.ValueStore,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact local-state dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if values != nil {
-		if err := secretstore.ValidateValueStore(values); err != nil {
+		if err := valuestore.ValidateValueStore(values); err != nil {
 			return nil, err
 		}
 	}
@@ -79,7 +79,7 @@ func NewService(
 		if _, duplicate := registered[namespace]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate protected overlay namespace %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				namespace,
 			)
 		}
@@ -101,7 +101,7 @@ func NewService(
 		if _, duplicate := storeRegistered[namespace]; duplicate {
 			return nil, fmt.Errorf(
 				"%w: duplicate store overlay namespace %q",
-				model.ErrConflict,
+				spec.ErrConflict,
 				namespace,
 			)
 		}
@@ -167,7 +167,7 @@ func (s *Service) Put(
 		return overlay.Record{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return overlay.Record{}, model.ErrConflict
+		return overlay.Record{}, spec.ErrConflict
 	}
 
 	payload, err := overlay.CanonicalPayload(request.Payload)
@@ -206,7 +206,7 @@ func (s *Service) Delete(
 		expectedOverlayRevision == 0 {
 		return fmt.Errorf(
 			"%w: expected Artifact and overlay revisions are required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -218,7 +218,7 @@ func (s *Service) Delete(
 		return err
 	}
 	if target.Revision != expectedArtifactRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 
 	if err := s.repository.DeleteOverlay(
@@ -271,7 +271,7 @@ func (s *Service) ReplaceBinding(
 	if s.values == nil {
 		return secret.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -280,7 +280,7 @@ func (s *Service) ReplaceBinding(
 		return secret.Binding{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return secret.Binding{}, model.ErrConflict
+		return secret.Binding{}, spec.ErrConflict
 	}
 
 	now := clockutil.NowUTC(s.clock)
@@ -343,7 +343,7 @@ func (s *Service) ClearBinding(
 		return err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 
 	if err := s.repository.ClearSecretBinding(
@@ -379,7 +379,7 @@ func (s *Service) ReadBinding(
 	if s.values == nil {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if _, err := s.availableArtifact(ctx, key.Artifact); err != nil {
@@ -393,13 +393,13 @@ func (s *Service) ReadBinding(
 	if !found || !binding.Active() {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: secret binding is not configured",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if *binding.Ref != expectedRef {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: secret binding changed during runtime resolution",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -410,7 +410,7 @@ func (s *Service) ReadBinding(
 	if secret.SHA256(value) != binding.SHA256 {
 		return "", secret.Binding{}, fmt.Errorf(
 			"%w: physical secret value does not match binding SHA-256",
-			model.ErrDigestMismatch,
+			spec.ErrDigestMismatch,
 		)
 	}
 	return value, binding.Clone(), nil
@@ -442,7 +442,7 @@ func (s *Service) PurgeArtifactLocalState(
 		!install.IsPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected Artifact local-state purge requires installer privilege",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -469,7 +469,7 @@ func (s *Service) DrainSecretGarbage(
 	if s.values == nil {
 		return fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -494,7 +494,7 @@ func (s *Service) DrainSecretGarbage(
 				output,
 				fmt.Errorf(
 					"%w: cleanup record belongs to secret backend %q",
-					model.ErrUnsupported,
+					spec.ErrUnsupported,
 					value.StoreName,
 				),
 			)
@@ -560,12 +560,12 @@ func (s *Service) ready(ctx context.Context) error {
 		s.artifacts == nil ||
 		s.clock == nil ||
 		s.closed.Load() {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if ctx == nil {
 		return fmt.Errorf(
 			"%w: Artifact local-state context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return ctx.Err()
@@ -582,7 +582,7 @@ func (s *Service) availableArtifact(
 	if value.State != artifact.StateAvailable {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			value.ID,
 		)
 	}
@@ -596,7 +596,7 @@ func (s *Service) requireProtected(
 		!s.policy.IsProtectedRoot(value.RootID) {
 		return fmt.Errorf(
 			"%w: protected Artifact overlays are valid only in protected Roots",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	return nil
@@ -611,7 +611,7 @@ func (s *Service) requireNamespace(
 	if _, found := s.namespaces[namespace]; !found {
 		return fmt.Errorf(
 			"%w: protected overlay namespace %q is not registered",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 			namespace,
 		)
 	}

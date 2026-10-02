@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
 
@@ -25,7 +25,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	if err != nil {
 		t.Fatalf("ManagedSkillDirectoryLocator: %v", err)
 	}
-	wantDirectory := model.Locator(
+	wantDirectory := spec.Locator(
 		"skill/release-notes/unversioned/release-notes",
 	)
 	if directory != wantDirectory {
@@ -42,7 +42,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	if err != nil {
 		t.Fatalf("ManagedPackageLocatorForSkill: %v", err)
 	}
-	wantDocumentLocator := model.Locator(
+	wantDocumentLocator := spec.Locator(
 		"skill/release-notes/unversioned/release-notes/SKILL.md",
 	)
 	if documentLocator != wantDocumentLocator {
@@ -86,7 +86,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 		t.Fatalf("ManagedSkillStorageFiles: %v", err)
 	}
 
-	contents := make(map[model.Locator]string, len(files))
+	contents := make(map[spec.Locator]string, len(files))
 	for _, file := range files {
 		contents[file.Locator] = string(file.Content)
 	}
@@ -108,7 +108,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	_, err = skillDomain.ManagedPackageAddressFromSkillLocator(
 		"skill/release-notes/unversioned/not-release-notes/SKILL.md",
 	)
-	if !errors.Is(err, model.ErrInvalid) {
+	if !errors.Is(err, spec.ErrInvalid) {
 		t.Fatalf(
 			"mismatched runtime directory error=%v, want ErrInvalid",
 			err,

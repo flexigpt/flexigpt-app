@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/system"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/internal/engine/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/assembly"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Store struct {
@@ -32,7 +32,7 @@ type Store struct {
 	Topology          install.API
 	LocatorResolvers  []provider.LocatorResolverFactory
 
-	components *system.Components
+	components *assembly.Components
 	closeOnce  sync.Once
 	closeErr   error
 }
@@ -61,7 +61,7 @@ func Open(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store composition context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -94,9 +94,9 @@ func Open(
 		return nil, err
 	}
 
-	components, err := system.Open(
+	components, err := assembly.Open(
 		ctx,
-		system.Config{
+		assembly.Config{
 			BaseDirectory:     config.BaseDirectory,
 			EmbeddedProviders: config.EmbeddedProviders,
 			ArtifactProviders: append(
@@ -161,7 +161,7 @@ func (s *Store) EnsureProtectedTopology(
 	declaration topology.Declaration,
 ) (topology.Installed, error) {
 	if s == nil || s.components == nil {
-		return topology.Installed{}, model.ErrClosed
+		return topology.Installed{}, spec.ErrClosed
 	}
 	return s.components.EnsureProtectedTopology(ctx, declaration)
 }
@@ -171,7 +171,7 @@ func (s *Store) PrepareTopologyHydrations(
 	desired []topology.Hydration,
 ) (map[string]bool, error) {
 	if s == nil || s.components == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 	return s.components.PrepareTopologyHydrations(ctx, desired)
 }
@@ -181,7 +181,7 @@ func (s *Store) CommitTopologyHydration(
 	desired topology.Hydration,
 ) error {
 	if s == nil || s.components == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return s.components.CommitTopologyHydration(ctx, desired)
 }
@@ -192,7 +192,7 @@ func (s *Store) PrepareTopologyPackageHydrations(
 	desired []topology.PackageHydration,
 ) (topology.PackageHydrationPreparation, error) {
 	if s == nil || s.components == nil {
-		return topology.PackageHydrationPreparation{}, model.ErrClosed
+		return topology.PackageHydrationPreparation{}, spec.ErrClosed
 	}
 	return s.components.PrepareTopologyPackageHydrations(
 		ctx,
@@ -206,7 +206,7 @@ func (s *Store) CommitTopologyPackageHydration(
 	desired topology.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return s.components.CommitTopologyPackageHydration(ctx, desired)
 }
@@ -216,7 +216,7 @@ func (s *Store) DeleteTopologyPackageHydration(
 	value topology.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	return s.components.DeleteTopologyPackageHydration(ctx, value)
 }

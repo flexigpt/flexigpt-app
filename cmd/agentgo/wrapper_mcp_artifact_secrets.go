@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/secret"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
@@ -26,7 +26,7 @@ func newArtifactMCPSecretResolver(
 	if artifacts == nil || bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Store MCP secret dependencies are incomplete",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -94,7 +94,7 @@ func (r *artifactMCPSecretResolver) ResolveSecret(
 	if !found || !binding.Active() {
 		return "", fmt.Errorf(
 			"%w: %w: MCP secret is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			mcpDomainSecret.ErrNotFound,
 		)
 	}
@@ -113,7 +113,7 @@ func (r *artifactMCPSecretResolver) ResolveSecret(
 		*current.Ref != *binding.Ref {
 		return "", fmt.Errorf(
 			"%w: MCP secret changed during resolution",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 	return value, nil
@@ -158,7 +158,7 @@ func (r *artifactMCPSecretResolver) bindingKey(
 ) (secret.BindingKey, error) {
 	if r == nil || r.artifacts == nil ||
 		r.bindings == nil || r.runtime == nil {
-		return secret.BindingKey{}, model.ErrClosed
+		return secret.BindingKey{}, spec.ErrClosed
 	}
 
 	selector, err := mcpDomainSecret.ParseMCPSecretRef(logicalRef)
@@ -192,7 +192,7 @@ func (r *artifactMCPSecretResolver) availableServer(
 	if record.State != artifact.StateAvailable {
 		return artifact.Artifact{}, fmt.Errorf(
 			"%w: MCP Server Artifact is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	return record, nil

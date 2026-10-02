@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	artifactOverlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/overlay"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
@@ -28,7 +28,7 @@ func newArtifactModelDefaultProviderPreferences(
 	if overlays == nil {
 		return nil, fmt.Errorf(
 			"%w: Model preference overlay store is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return &artifactModelDefaultProviderPreferences{
@@ -40,7 +40,7 @@ func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 	ctx context.Context,
 ) (*artifact.ArtifactRef, error) {
 	if s == nil || s.overlays == nil {
-		return nil, model.ErrClosed
+		return nil, spec.ErrClosed
 	}
 
 	record, found, err := s.overlays.GetStoreOverlay(
@@ -55,11 +55,11 @@ func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
 		record.Payload,
 		&payload,
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	); err != nil {
 		return nil, fmt.Errorf(
 			"%w: decode Model default-provider preference: %w",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			err,
 		)
 	}
@@ -80,7 +80,7 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 	provider *artifact.ArtifactRef,
 ) error {
 	if s == nil || s.overlays == nil {
-		return model.ErrClosed
+		return spec.ErrClosed
 	}
 	if provider != nil {
 		if err := provider.Validate(); err != nil {
@@ -111,7 +111,7 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 		modelDefaultProviderPreferencePayload{
 			Provider: provider,
 		},
-		model.MaxLocalDataBytes,
+		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
 		return err
@@ -124,7 +124,7 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 
 	_, err = s.overlays.PutStoreOverlay(
 		ctx,
-		artifactOverlay.StorePutRequest{
+		overlay.StorePutRequest{
 			Namespace:        modelOverlay.PreferencesNamespace,
 			SchemaVersion:    modelPreferenceSchemaVersion,
 			Payload:          payload,

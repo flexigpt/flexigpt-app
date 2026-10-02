@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
 )
@@ -21,7 +21,7 @@ func (a *API) ExportAgent(
 	request AgentExportRequest,
 ) (AgentExportResult, error) {
 	if a == nil || a.artifacts == nil {
-		return AgentExportResult{}, model.ErrClosed
+		return AgentExportResult{}, spec.ErrClosed
 	}
 
 	record, err := a.getAgentRecord(ctx, request.Agent)
@@ -31,7 +31,7 @@ func (a *API) ExportAgent(
 	if record.State != artifact.StateAvailable {
 		return AgentExportResult{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			record.ID,
 		)
 	}
@@ -46,7 +46,7 @@ func (a *API) ExportAgent(
 
 	content, err := yamlutil.CanonicalObjectYAML(
 		definitionValue.Body,
-		model.MaxDefinitionBytes,
+		spec.MaxDefinitionBytes,
 	)
 	if err != nil {
 		return AgentExportResult{}, err

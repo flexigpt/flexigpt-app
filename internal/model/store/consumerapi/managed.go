@@ -9,11 +9,11 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
@@ -30,7 +30,7 @@ func (a *API) CreateProvider(
 	if a.protection.IsProtectedRoot(request.RootID) {
 		return ManagedProviderCreateResult{}, fmt.Errorf(
 			"%w: managed Model Provider publication is not allowed in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -128,22 +128,22 @@ func (a *API) ReplaceProvider(
 	if current.State != artifact.StateAvailable {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: Model Provider Artifact is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if current.Revision != request.ExpectedArtifactRevision {
-		return ManagedProviderReplaceResult{}, model.ErrConflict
+		return ManagedProviderReplaceResult{}, spec.ErrConflict
 	}
 	if current.Binding.SubresourceLocator != "" {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: contained Model Provider declarations cannot be replaced as managed packages",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if request.Document.Name != current.LogicalName {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model Provider logical name must remain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			current.LogicalName,
 		)
 	}
@@ -165,7 +165,7 @@ func (a *API) ReplaceProvider(
 	if requestedAddress != currentAddress {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model Provider cannot change package identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -191,7 +191,7 @@ func (a *API) ReplaceProvider(
 		return ManagedProviderReplaceResult{}, err
 	}
 	if refreshedCurrent.Revision != request.ExpectedArtifactRevision {
-		return ManagedProviderReplaceResult{}, model.ErrConflict
+		return ManagedProviderReplaceResult{}, spec.ErrConflict
 	}
 
 	published, err := a.managedArtifacts.Publish(
@@ -222,7 +222,7 @@ func (a *API) ReplaceProvider(
 	if published.Artifact.Ref() != request.Provider {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: replacement published another Model Provider Artifact",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -272,11 +272,11 @@ func (a *API) DeleteProvider(
 	if record.State != artifact.StateAvailable {
 		return fmt.Errorf(
 			"%w: Model Provider Artifact is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 
 	address, err := modelDomain.ModelProviderPackageAddressFromLocator(
@@ -316,7 +316,7 @@ func (a *API) DeleteProvider(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Model Provider Artifact is not missing",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -345,7 +345,7 @@ func (a *API) CreateModel(
 	if a.protection.IsProtectedRoot(request.RootID) {
 		return ManagedModelCreateResult{}, fmt.Errorf(
 			"%w: managed Model publication is not allowed in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -443,22 +443,22 @@ func (a *API) ReplaceModel(
 	if current.State != artifact.StateAvailable {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: Model Artifact is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if current.Revision != request.ExpectedArtifactRevision {
-		return ManagedModelReplaceResult{}, model.ErrConflict
+		return ManagedModelReplaceResult{}, spec.ErrConflict
 	}
 	if current.Binding.SubresourceLocator != "" {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: contained Model declarations cannot be replaced as managed packages",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	if request.Document.Name != current.LogicalName {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model logical name must remain %q",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			current.LogicalName,
 		)
 	}
@@ -480,7 +480,7 @@ func (a *API) ReplaceModel(
 	if requestedAddress != currentAddress {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: replacement Model cannot change package identity",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -506,7 +506,7 @@ func (a *API) ReplaceModel(
 		return ManagedModelReplaceResult{}, err
 	}
 	if refreshedCurrent.Revision != request.ExpectedArtifactRevision {
-		return ManagedModelReplaceResult{}, model.ErrConflict
+		return ManagedModelReplaceResult{}, spec.ErrConflict
 	}
 
 	published, err := a.managedArtifacts.Publish(
@@ -537,7 +537,7 @@ func (a *API) ReplaceModel(
 	if published.Artifact.Ref() != request.Model {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: replacement published another Model Artifact",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -585,11 +585,11 @@ func (a *API) DeleteModel(
 	if record.State != artifact.StateAvailable {
 		return fmt.Errorf(
 			"%w: Model Artifact is unavailable",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 		)
 	}
 	if record.Revision != expectedArtifactRevision {
-		return model.ErrConflict
+		return spec.ErrConflict
 	}
 
 	address, err := modelDomain.ModelPackageAddressFromLocator(
@@ -629,7 +629,7 @@ func (a *API) DeleteModel(
 	if missing.State != artifact.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Model Artifact is not missing",
-			model.ErrConflict,
+			spec.ErrConflict,
 		)
 	}
 
@@ -652,7 +652,7 @@ func (a *API) ensureManagedSource(
 	if a.protection.IsProtectedRoot(rootID) {
 		return source.Summary{}, fmt.Errorf(
 			"%w: managed Model Source is not allowed in a protected Root",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 
@@ -666,14 +666,14 @@ func (a *API) ensureManagedSource(
 		summary.Kind != source.SourceKindManagedDirectory {
 		return source.Summary{}, fmt.Errorf(
 			"%w: Root %q has an incompatible managed Model Source",
-			model.ErrConflict,
+			spec.ErrConflict,
 			rootID,
 		)
 	}
 	if summary.RetiredAt != nil {
 		return source.Summary{}, fmt.Errorf(
 			"%w: managed Model Source is retired",
-			model.ErrRetired,
+			spec.ErrRetired,
 		)
 	}
 	return summary, nil
@@ -682,7 +682,7 @@ func (a *API) ensureManagedSource(
 func (a *API) ensureManagedDeclarationDiscovery(
 	ctx context.Context,
 	rootID root.RootID,
-	locator model.Locator,
+	locator spec.Locator,
 	documentUse string,
 ) (source.Summary, error) {
 	summary, err := a.ensureManagedSource(ctx, rootID)
@@ -747,7 +747,7 @@ func (a *API) currentManagedSourceGeneration(
 	if !inspection.IsCurrent() {
 		return "", fmt.Errorf(
 			"%w: managed Model Source requires refresh",
-			model.ErrRefreshRequired,
+			spec.ErrRefreshRequired,
 		)
 	}
 	return inspection.State.SourceGeneration, nil
@@ -765,13 +765,13 @@ func (a *API) managedRecord(
 	if a.protection.IsProtectedRoot(record.RootID) {
 		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
 			"%w: protected Model Artifacts cannot be mutated through managed authoring",
-			model.ErrProtected,
+			spec.ErrProtected,
 		)
 	}
 	if record.Binding.SourceID != modelDomain.ManagedSourceID {
 		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not owned by the managed Model Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 
@@ -787,7 +787,7 @@ func (a *API) managedRecord(
 		summary.StorageKey != modelDomain.ManagedSourceStorageKey {
 		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not backed by the expected managed Source",
-			model.ErrUnsupported,
+			spec.ErrUnsupported,
 		)
 	}
 	return record, summary, nil

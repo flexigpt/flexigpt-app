@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/llmtools-go/fstool"
 	llmtoolsSpec "github.com/flexigpt/llmtools-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // ReadPortableTextFile reads exactly one selected text file through the
@@ -22,7 +22,7 @@ func ReadPortableTextFile(
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: portable file read context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -31,13 +31,13 @@ func ReadPortableTextFile(
 	if selectedPath == "" {
 		return nil, fmt.Errorf(
 			"%w: selected file path is required",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if maximumBytes <= 0 {
 		return nil, fmt.Errorf(
 			"%w: portable file byte limit is invalid",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -54,7 +54,7 @@ func ReadPortableTextFile(
 	if len(outputs) != 1 {
 		return nil, fmt.Errorf(
 			"%w: selected file reader returned %d outputs",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			len(outputs),
 		)
 	}
@@ -66,7 +66,7 @@ func ReadPortableTextFile(
 		output.FileItem != nil {
 		return nil, fmt.Errorf(
 			"%w: selected file reader did not return one text output",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 
@@ -74,14 +74,14 @@ func ReadPortableTextFile(
 	if len(value) > maximumBytes {
 		return nil, fmt.Errorf(
 			"%w: selected file exceeds %d bytes",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 			maximumBytes,
 		)
 	}
 	if !utf8.Valid(value) {
 		return nil, fmt.Errorf(
 			"%w: selected file is not valid UTF-8 text",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {

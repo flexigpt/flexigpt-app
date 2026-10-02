@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -45,7 +45,7 @@ func (c passthrough) Canonicalize(
 	if ctx == nil {
 		return schema.ParsedDocument{}, fmt.Errorf(
 			"%w: declaration schema codec context is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
@@ -54,7 +54,7 @@ func (c passthrough) Canonicalize(
 	if len(raw) == 0 {
 		return schema.ParsedDocument{}, fmt.Errorf(
 			"%w: declaration schema codec received empty canonical JSON",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	return schema.ParsedDocument{

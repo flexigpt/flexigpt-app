@@ -10,12 +10,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/install/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/root"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/topology"
+	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -97,7 +97,7 @@ func withSkillStore[T any](
 	return withRecoveryResp(func() (T, error) {
 		var zero T
 		if w == nil || w.api == nil {
-			return zero, model.ErrClosed
+			return zero, spec.ErrClosed
 		}
 		return fn(w.api)
 	})
@@ -125,7 +125,7 @@ func (w *SkillStoreWrapper) RefreshSkillSource(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return w.api.RefreshSkillSource(
 			context.Background(),
@@ -151,7 +151,7 @@ func (w *SkillStoreWrapper) ListSkillsForManagement() (
 ) {
 	return withRecoveryResp(func() ([]skillConsumerAPI.SkillListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
-			return nil, model.ErrClosed
+			return nil, spec.ErrClosed
 		}
 		roots, err := w.roots.List(context.Background())
 		if err != nil {
@@ -196,7 +196,7 @@ func (w *SkillStoreWrapper) ListSkillCollectionsForManagement() (
 ) {
 	return withRecoveryResp(func() ([]collection.ListItem, error) {
 		if w == nil || w.api == nil || w.roots == nil {
-			return nil, model.ErrClosed
+			return nil, spec.ErrClosed
 		}
 
 		roots, err := w.roots.List(context.Background())
@@ -297,7 +297,7 @@ func (w *SkillStoreWrapper) PurgeSkill(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return w.api.PurgeSkill(
 			context.Background(),
@@ -313,7 +313,7 @@ func (w *SkillStoreWrapper) CreateSkillCollection(
 	return withRecoveryResp(
 		func() (collection.CollectionView, error) {
 			if w == nil || w.api == nil {
-				return collection.CollectionView{}, model.ErrClosed
+				return collection.CollectionView{}, spec.ErrClosed
 			}
 
 			// A blank RootID is UI request routing to the retained user Root.
@@ -419,7 +419,7 @@ func (w *SkillStoreWrapper) DeleteSkillCollection(
 ) error {
 	return withRecovery(func() error {
 		if w == nil || w.api == nil {
-			return model.ErrClosed
+			return spec.ErrClosed
 		}
 		return w.api.DeleteSkillCollection(context.Background(), request)
 	})

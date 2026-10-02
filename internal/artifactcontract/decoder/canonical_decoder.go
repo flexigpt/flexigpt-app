@@ -7,10 +7,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/diagnostic"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
 type canonicalDecoder struct {
@@ -31,7 +31,7 @@ func (d *canonicalDecoder) BindExpectedCanonicalizer(
 	if d == nil || schemas == nil {
 		return fmt.Errorf(
 			"%w: canonical declaration schema catalog is nil",
-			model.ErrInvalid,
+			spec.ErrInvalid,
 		)
 	}
 	d.schemas = schemas
@@ -56,7 +56,7 @@ func (d *canonicalDecoder) Decode(
 			"artifact.declaration-schema-unavailable",
 			fmt.Errorf(
 				"%w: canonical declaration decoder has no schema catalog",
-				model.ErrClosed,
+				spec.ErrClosed,
 			),
 		)
 	}
@@ -79,7 +79,7 @@ func (d *canonicalDecoder) Decode(
 			"artifact.declaration-unsupported-type",
 			fmt.Errorf(
 				"%w: unsupported declaration type %q",
-				model.ErrUnsupported,
+				spec.ErrUnsupported,
 				header.Type,
 			),
 		)
@@ -158,7 +158,7 @@ func decodeDiagnostic(
 
 func decodeDiagnosticAt(
 	candidate provider.Candidate,
-	subresource model.SubresourceLocator,
+	subresource spec.SubresourceLocator,
 	code string,
 	err error,
 ) []diagnostic.Diagnostic {

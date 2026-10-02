@@ -1,0 +1,204 @@
+package sqlite
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"net/url"
+	"path/filepath"
+	"strings"
+	"sync"
+
+	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+
+	_ "github.com/glebarez/go-sqlite"
+)
+
+type Store struct {
+	db *sql.DB
+
+	definitionMu    sync.RWMutex
+	definitionCache map[definition.Key]definition.Definition
+	definitionBytes int
+}
+
+const (
+	schemaMarkerTable = "artifact_store_v1"
+)
+
+var schemaV1RequiredTables = []string{
+	"artifact_roots",
+	"artifact_topology_hydrations",
+	"artifact_sources",
+	topologyPackageHydrationTable,
+	"artifact_source_refresh_state",
+	"artifact_definitions",
+	"artifact_artifacts",
+	"artifact_protected_overlays",
+	"artifact_store_overlays",
+	"artifact_secret_records",
+	"artifact_secret_bindings",
+	"artifact_secret_cleanup",
+}
+
+func Open(
+	ctx context.Context,
+	path string,
+) (*Store, error) {
+	if ctx == nil {
+		return nil, fmt.Errorf(
+			"%w: SQLite context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if strings.TrimSpace(path) == "" {
+		return nil, fmt.Errorf(
+			"%w: SQLite path is empty",
+			spec.ErrInvalid,
+		)
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := sql.Open(
+		"sqlite",
+		dataSourceName(filepath.Clean(absolute)),
+	)
+	if err != nil {
+		return nil, fmt.Errorf(
+			"open Artifact Store metadata database: %w",
+			err,
+		)
+	}
+	db.SetMaxOpenConns(4)
+	if err := db.PingContext(ctx); err != nil {
+		_ = db.Close()
+		return nil, fmt.Errorf(
+			"ping Artifact Store metadata database: %w",
+			err,
+		)
+	}
+	if err := initializeSchema(ctx, db); err != nil {
+		_ = db.Close()
+		return nil, err
+	}
+	return &Store{db: db}, nil
+}
+
+func (s *Store) Close() error {
+	if s == nil || s.db == nil {
+		return nil
+	}
+	return s.db.Close()
+}
+
+func initializeSchema(
+	ctx context.Context,
+	db *sql.DB,
+) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	v1Exists, err := tableExistsTx(ctx, tx, schemaMarkerTable)
+	if err != nil {
+		return err
+	}
+	if v1Exists {
+		if _, err := tx.ExecContext(
+			ctx,
+			`CREATE TABLE IF NOT EXISTS artifact_topology_package_hydrations (
+				installer_name TEXT NOT NULL,
+				package_scope TEXT NOT NULL,
+				root_id TEXT NOT NULL,
+				source_id TEXT NOT NULL,
+				fingerprint TEXT NOT NULL,
+				updated_at INTEGER NOT NULL,
+				PRIMARY KEY (installer_name, package_scope)
+			)`,
+		); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(
+			ctx,
+			localStateSchema,
+		); err != nil {
+			return fmt.Errorf(
+				"initialize Artifact Store local-state extension schema: %w",
+				err,
+			)
+		}
+		if err := verifySchemaV1Tx(ctx, tx); err != nil {
+			return err
+		}
+		return tx.Commit()
+	}
+
+	if _, err := tx.ExecContext(ctx, sqliteSchema); err != nil {
+		return fmt.Errorf(
+			"initialize Artifact Store v1 schema: %w",
+			err,
+		)
+	}
+	return tx.Commit()
+}
+
+func verifySchemaV1Tx(
+	ctx context.Context,
+	tx *sql.Tx,
+) error {
+	for _, table := range schemaV1RequiredTables {
+		exists, err := tableExistsTx(ctx, tx, table)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			return fmt.Errorf(
+				"%w: Artifact Store database does not match v1 schema",
+				spec.ErrUnsupported,
+			)
+		}
+	}
+	return nil
+}
+
+func tableExistsTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	name string,
+) (bool, error) {
+	var exists int
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM sqlite_master
+			WHERE type = 'table' AND name = ?
+		)`,
+		name,
+	).Scan(&exists)
+	return exists != 0, err
+}
+
+func dataSourceName(path string) string {
+	normalized := filepath.ToSlash(path)
+	if filepath.VolumeName(path) != "" &&
+		!strings.HasPrefix(normalized, "/") {
+		normalized = "/" + normalized
+	}
+	value := &url.URL{
+		Scheme: "file",
+		Path:   normalized,
+	}
+	query := value.Query()
+	query.Set("_pragma", "foreign_keys(1)")
+	query.Add("_pragma", "journal_mode(WAL)")
+	query.Add("_pragma", "busy_timeout(5000)")
+	value.RawQuery = query.Encode()
+	return value.String()
+}

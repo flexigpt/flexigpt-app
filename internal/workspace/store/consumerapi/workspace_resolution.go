@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/model/artifact"
+	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
@@ -22,7 +22,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 	if a == nil || a.resolver == nil {
 		return workspaceDomain.Workspace{},
 			nil,
-			model.ErrClosed
+			spec.ErrClosed
 	}
 	workspace, err := a.resolveWorkspace(ctx, ref)
 	if err != nil {
@@ -41,7 +41,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 		resolved.Workspace == nil {
 		return workspaceDomain.Workspace{}, nil, fmt.Errorf(
 			"%w: Artifact %q did not resolve as a Workspace",
-			model.ErrReferenceUnresolved,
+			spec.ErrReferenceUnresolved,
 			ref.ArtifactID,
 		)
 	}
