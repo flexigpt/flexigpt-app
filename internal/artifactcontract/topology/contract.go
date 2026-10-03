@@ -1,5 +1,5 @@
-// Package topology owns declarative application Artifact contract topology.
-package topology
+// Package model owns declarative application Artifact contract topology.
+package model
 
 import (
 	_ "embed"

@@ -1,4 +1,4 @@
-// Package catalog contains Artifact Store's internal committed read spec.
+// Package model contains Artifact Store's internal committed read spec.
 //
 // It is not a transport model and is never returned directly by Agent, Skill,
 // Collection, MCP, Tool, or Workspace consumer APIs.
@@ -6,7 +6,7 @@
 // The Artifact Store owns this projection because it can read Artifact,
 // Source, and immutable Definition metadata in one durable read. Consumer
 // domains own their own public list responses.
-package catalog
+package model
 
 import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"

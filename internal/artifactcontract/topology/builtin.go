@@ -1,4 +1,4 @@
-package topology
+package model
 
 import (
 	_ "embed"

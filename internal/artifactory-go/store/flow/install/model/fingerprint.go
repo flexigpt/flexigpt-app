@@ -1,4 +1,4 @@
-package topology
+package model
 
 import (
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
