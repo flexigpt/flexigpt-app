@@ -4,7 +4,7 @@
 // capabilities after source mutation ports are extracted.
 package managedpackageimpl
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/internal"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/internal"
 
 type (
 	SourceState               = internal.SourceState

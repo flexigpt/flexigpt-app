@@ -19,7 +19,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -1336,7 +1336,7 @@ func (a *API) publishPreparedManagedAgent(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,

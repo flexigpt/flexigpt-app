@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -63,7 +63,7 @@ func (a *API) CreateProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: request.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
@@ -199,7 +199,7 @@ func (a *API) ReplaceProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -300,7 +300,7 @@ func (a *API) DeleteProvider(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		managedpackageFlowModel.RemoveRequest{
+		managepackageModel.RemoveRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,
@@ -378,7 +378,7 @@ func (a *API) CreateModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: request.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
@@ -514,7 +514,7 @@ func (a *API) ReplaceModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -613,7 +613,7 @@ func (a *API) DeleteModel(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		managedpackageFlowModel.RemoveRequest{
+		managepackageModel.RemoveRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,

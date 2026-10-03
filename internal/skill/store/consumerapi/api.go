@@ -14,8 +14,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
@@ -36,7 +36,7 @@ type API struct {
 	discovery        refreshFlow.API
 	artifacts        artifact.API
 	resources        resourceFlow.API
-	managedArtifacts managedpackageFlow.API
+	managedArtifacts managepackageFlow.API
 	protection       root.ProtectionAPI
 	definitions      definition.API
 	collections      *collection.API
@@ -49,7 +49,7 @@ func New(
 	discovery refreshFlow.API,
 	artifacts artifact.API,
 	resources resourceFlow.API,
-	managedArtifacts managedpackageFlow.API,
+	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
@@ -350,7 +350,7 @@ func (a *API) CreateManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -567,7 +567,7 @@ func (a *API) ReplaceManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -687,7 +687,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	removeRequest := managedpackageFlowModel.RemoveRequest{
+	removeRequest := managepackageModel.RemoveRequest{
 		RootID:           value.RootID,
 		SourceID:         value.Binding.SourceID,
 		Package:          packageAddress,

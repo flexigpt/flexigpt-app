@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	artifactStore "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -27,7 +27,7 @@ type Publication struct {
 
 	Definitions     []definitionModel.Definition
 	ArtifactCreates []artifactModel.Artifact
-	ArtifactUpdates []artifactStore.SourceStateUpdate
+	ArtifactUpdates []artifact.SourceStateUpdate
 	Diagnostics     []diagnostic.Diagnostic
 	RefreshedAt     time.Time
 }

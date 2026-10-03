@@ -1,6 +1,6 @@
 package jsonschema
 
-import schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 
 type Factory struct{}
 

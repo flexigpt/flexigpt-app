@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
+	managepackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -20,33 +20,33 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
 	locator spec.Locator,
-) (managedpackageimpl.SourceState, error) {
+) (managepackageimpl.SourceState, error) {
 	if c == nil ||
 		c.Sources == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return managedpackageimpl.SourceState{}, spec.ErrClosed
+		return managepackageimpl.SourceState{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return managedpackageimpl.SourceState{}, fmt.Errorf(
+		return managepackageimpl.SourceState{}, fmt.Errorf(
 			"%w: managed discovery pruning context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if err := locator.Validate(false); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if expectedSourceRevision == 0 {
-		return managedpackageimpl.SourceState{}, fmt.Errorf(
+		return managepackageimpl.SourceState{}, fmt.Errorf(
 			"%w: expected Source revision is required",
 			spec.ErrInvalid,
 		)
@@ -54,26 +54,26 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 
 	current, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if current.Revision != expectedSourceRevision {
-		return managedpackageimpl.SourceState{}, spec.ErrConflict
+		return managepackageimpl.SourceState{}, spec.ErrConflict
 	}
 	if !current.Enabled {
-		return managedpackageimpl.SourceState{}, fmt.Errorf(
+		return managepackageimpl.SourceState{}, fmt.Errorf(
 			"%w: managed Source is disabled",
 			spec.ErrConflict,
 		)
 	}
 	if !c.managedSources.SupportsManagedPackages(current.Kind) {
-		return managedpackageimpl.SourceState{}, fmt.Errorf(
+		return managepackageimpl.SourceState{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
 			spec.ErrUnsupported,
 			current.Kind,
 		)
 	}
 	if !current.Discovery.Authoritative {
-		return managedpackageimpl.SourceState{}, fmt.Errorf(
+		return managepackageimpl.SourceState{}, fmt.Errorf(
 			"%w: managed discovery pruning requires an authoritative Source",
 			spec.ErrInvalid,
 		)
@@ -102,7 +102,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 
 	inScope, err := next.InScope(locator)
 	if err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	if !inScope {
 		hints := make(
@@ -123,9 +123,9 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	if !changed {
 		r, err := c.getManagedSourceState(ctx, rootID, sourceID)
 		if err != nil {
-			return managedpackageimpl.SourceState{}, err
+			return managepackageimpl.SourceState{}, err
 		}
-		return managedpackageimpl.SourceState{
+		return managepackageimpl.SourceState{
 			Source:     r.Source,
 			Generation: r.Generation,
 		}, nil
@@ -137,7 +137,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 		next = next.Normalized()
 	}
 	if err := next.Validate(); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 
 	if _, err := c.Sources.Update(
@@ -151,13 +151,13 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 			Discovery:        &next,
 		},
 	); err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
 	r, err := c.getManagedSourceState(ctx, rootID, sourceID)
 	if err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
-	return managedpackageimpl.SourceState{
+	return managepackageimpl.SourceState{
 		Source:     r.Source,
 		Generation: r.Generation,
 	}, nil

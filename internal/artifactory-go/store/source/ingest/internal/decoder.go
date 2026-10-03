@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sort"
 
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"

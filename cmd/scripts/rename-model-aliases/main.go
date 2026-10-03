@@ -54,7 +54,7 @@ var targets = map[string]string{
 
 	prefix + "flow/artifactcleanup": "artifactcleanupFlow",
 	prefix + "flow/install":         "installFlow",
-	prefix + "flow/managedpackage":  "managedpackageFlow",
+	prefix + "flow/managepackage":   "managepackageFlow",
 	prefix + "flow/refresh":         "refreshFlow",
 	prefix + "flow/resource":        "resourceFlow",
 	prefix + "secret/impl":          "secretimpl",

@@ -1,10 +1,10 @@
 package sourceimpl
 
 import (
-	sourceStore "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/internal"
-	managedpackage "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 )
 
 // Package sourceimpl is a temporary compatibility facade.
@@ -12,10 +12,10 @@ import (
 // Deprecated: import source, source/driver, and source/managedpackage public
 // contracts directly. This package disappears in Phase 3.
 type (
-	Reader                    = sourceStore.Reader
-	Repository                = sourceStore.Repository
-	Runtime                   = sourceStore.Runtime
-	LocalPathRuntime          = sourceStore.LocalPathRuntime
+	Reader                    = source.Reader
+	Repository                = source.Repository
+	Runtime                   = source.Runtime
+	LocalPathRuntime          = source.LocalPathRuntime
 	Snapshot                  = driver.Snapshot
 	Opener                    = driver.Opener
 	LocalPathResolver         = driver.LocalPathResolver

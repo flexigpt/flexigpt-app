@@ -1,19 +1,19 @@
 package internal
 
 import (
-	sourceStore "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
-	managedpackage "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 )
 
 // These aliases intentionally keep current source implementation files small
 // during the contract extraction. The actual contracts now belong to source,
 // source/driver, and source/managedpackage.
 type (
-	Reader                    = sourceStore.Reader
-	Repository                = sourceStore.Repository
-	Runtime                   = sourceStore.Runtime
-	LocalPathRuntime          = sourceStore.LocalPathRuntime
+	Reader                    = source.Reader
+	Repository                = source.Repository
+	Runtime                   = source.Runtime
+	LocalPathRuntime          = source.LocalPathRuntime
 	Snapshot                  = driver.Snapshot
 	Opener                    = driver.Opener
 	LocalPathResolver         = driver.LocalPathResolver

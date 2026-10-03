@@ -24,8 +24,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -45,7 +45,7 @@ type API struct {
 	sources          source.API
 	discovery        refreshFlow.API
 	definitions      definition.API
-	managedArtifacts managedpackageFlow.API
+	managedArtifacts managepackageFlow.API
 
 	domain   *DomainPolicy
 	resolver *resolve.Resolver
@@ -59,7 +59,7 @@ func NewWithResolver(
 	cat catalog.API,
 	sources source.API,
 	discovery refreshFlow.API,
-	managedArtifacts managedpackageFlow.API,
+	managedArtifacts managepackageFlow.API,
 	definitions definition.API,
 	resolver *resolve.Resolver,
 	domains ...DomainPolicy,
@@ -562,7 +562,7 @@ func (a *API) Delete(
 		)
 	}
 
-	removeRequest := managedpackageFlowModel.RemoveRequest{
+	removeRequest := managepackageModel.RemoveRequest{
 		RootID:             value.artifact.RootID,
 		SourceID:           value.artifact.Binding.SourceID,
 		Package:            value.address,
@@ -901,7 +901,7 @@ func (a *API) publishDocument(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,

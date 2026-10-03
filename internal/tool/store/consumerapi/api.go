@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -25,7 +25,7 @@ import (
 type API struct {
 	protection       root.ProtectionAPI
 	artifacts        artifact.API
-	managedArtifacts managedpackageFlow.API
+	managedArtifacts managepackageFlow.API
 	discovery        refreshFlow.API
 	collections      *collection.API
 	cat              catalog.API
@@ -40,7 +40,7 @@ func New(
 	sources source.API,
 	discovery refreshFlow.API,
 	artifacts artifact.API,
-	managedArtifacts managedpackageFlow.API,
+	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,

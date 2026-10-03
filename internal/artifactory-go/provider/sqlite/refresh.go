@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -59,7 +59,7 @@ func (s *Store) getRefreshState(
 
 func (p *Publisher) Publish(
 	ctx context.Context,
-	publication refresh.Publication,
+	publication refreshFlow.Publication,
 ) (refreshModel.State, error) {
 	if p == nil || p.store == nil {
 		return refreshModel.State{}, spec.ErrClosed

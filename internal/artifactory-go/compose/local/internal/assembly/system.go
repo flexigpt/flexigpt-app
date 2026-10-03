@@ -17,7 +17,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
+	managepackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/impl"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/impl"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
@@ -67,7 +67,7 @@ type Components struct {
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
 	ShareableSchemas *jsonschema.Registry
-	ManagedArtifacts *managedpackageimpl.Service
+	ManagedArtifacts *managepackageimpl.Service
 	SourceRuntime    source.Runtime
 	LocalState       *secretimpl.Service
 
@@ -327,8 +327,8 @@ func Open(
 		managedSources:     sourceRegistry,
 		rootMutationPolicy: config.RootMutationPolicy,
 	}
-	managedArtifacts, err := managedpackageimpl.NewService(
-		managedpackageimpl.Dependencies{
+	managedArtifacts, err := managepackageimpl.NewService(
+		managepackageimpl.Dependencies{
 			Artifacts: artifactService,
 			Refresh:   refreshService,
 			Policy:    config.RootMutationPolicy,
@@ -336,16 +336,16 @@ func Open(
 				ctx context.Context,
 				rootID rootModel.RootID,
 				sourceID sourceModel.SourceID,
-			) (managedpackageimpl.SourceState, error) {
+			) (managepackageimpl.SourceState, error) {
 				result, err := components.getManagedSourceState(
 					ctx,
 					rootID,
 					sourceID,
 				)
 				if err != nil {
-					return managedpackageimpl.SourceState{}, err
+					return managepackageimpl.SourceState{}, err
 				}
-				return managedpackageimpl.SourceState{
+				return managepackageimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -356,7 +356,7 @@ func Open(
 				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
 				publication managedpackageModel.ManagedPackagePublication,
-			) (managedpackageimpl.SourceState, error) {
+			) (managepackageimpl.SourceState, error) {
 				result, err := components.publishManagedPackageForMutableRoot(
 					ctx,
 					rootID,
@@ -365,9 +365,9 @@ func Open(
 					publication,
 				)
 				if err != nil {
-					return managedpackageimpl.SourceState{}, err
+					return managepackageimpl.SourceState{}, err
 				}
-				return managedpackageimpl.SourceState{
+				return managepackageimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -378,7 +378,7 @@ func Open(
 				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
 				publication managedpackageModel.ManagedPackagePublication,
-			) (managedpackageimpl.SourceState, error) {
+			) (managepackageimpl.SourceState, error) {
 				result, err := components.publishProtectedManagedPackage(
 					ctx,
 					rootID,
@@ -387,9 +387,9 @@ func Open(
 					publication,
 				)
 				if err != nil {
-					return managedpackageimpl.SourceState{}, err
+					return managepackageimpl.SourceState{}, err
 				}
-				return managedpackageimpl.SourceState{
+				return managepackageimpl.SourceState{
 					Source:     result.Source,
 					Generation: result.Generation,
 				}, nil
@@ -888,7 +888,7 @@ func (c *Components) removeManagedArtifactPackage(
 	expectedRevision uint64,
 	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
-) (managedpackageimpl.SourceState, error) {
+) (managepackageimpl.SourceState, error) {
 	result, err := c.removeManagedPackageForMutableRoot(
 		ctx,
 		rootID,
@@ -898,9 +898,9 @@ func (c *Components) removeManagedArtifactPackage(
 		expectedGeneration,
 	)
 	if err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
-	return managedpackageimpl.SourceState{
+	return managepackageimpl.SourceState{
 		Source:     result.Source,
 		Generation: result.Generation,
 	}, nil
@@ -913,7 +913,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 	expectedRevision uint64,
 	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
-) (managedpackageimpl.SourceState, error) {
+) (managepackageimpl.SourceState, error) {
 	result, err := c.removeProtectedManagedPackage(
 		ctx,
 		rootID,
@@ -923,9 +923,9 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 		expectedGeneration,
 	)
 	if err != nil {
-		return managedpackageimpl.SourceState{}, err
+		return managepackageimpl.SourceState{}, err
 	}
-	return managedpackageimpl.SourceState{
+	return managepackageimpl.SourceState{
 		Source:     result.Source,
 		Generation: result.Generation,
 	}, nil

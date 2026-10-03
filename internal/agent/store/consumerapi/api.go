@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
@@ -35,7 +35,7 @@ type API struct {
 	artifacts        artifact.API
 	resources        resourceFlow.API
 	protection       root.ProtectionAPI
-	managedArtifacts managedpackageFlow.API
+	managedArtifacts managepackageFlow.API
 	definitions      definition.API
 	texts            *materializetext.Adapter
 
@@ -127,7 +127,7 @@ func New(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
-	managedArtifacts managedpackageFlow.API,
+	managedArtifacts managepackageFlow.API,
 	protection root.ProtectionAPI,
 	definitions definition.API,
 	options ...Option,

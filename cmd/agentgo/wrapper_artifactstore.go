@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	artifactLocator "github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -23,7 +23,7 @@ import (
 func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
-) (*local.Store, []artifactLocator.Factory, error) {
+) (*local.Store, []locator.Factory, error) {
 	if err := documentTopology.ValidateApplicationTopology(); err != nil {
 		return nil, nil, err
 	}
@@ -48,7 +48,7 @@ func composeArtifactStore(
 		return nil, nil, err
 	}
 
-	locatorRegistry, err := artifactLocator.NewRegistry(
+	locatorRegistry, err := locator.NewRegistry(
 		canonicalRegistration.LocatorFactories()...,
 	)
 	if err != nil {

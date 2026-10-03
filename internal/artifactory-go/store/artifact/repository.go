@@ -3,9 +3,9 @@ package artifact
 import (
 	"context"
 
-	artifactCatalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -47,7 +47,7 @@ type DefinitionReader = definition.API
 
 type Repository interface {
 	Reader
-	artifactCatalog.Repository
+	catalog.Repository
 
 	Create(
 		ctx context.Context,

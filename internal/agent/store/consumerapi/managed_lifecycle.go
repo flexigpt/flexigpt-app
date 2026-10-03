@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -50,7 +50,7 @@ func (a *API) DeleteManagedAgent(
 	locator := current.artifact.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		managedpackageFlowModel.RemoveRequest{
+		managepackageModel.RemoveRequest{
 			RootID:                current.artifact.RootID,
 			SourceID:              current.artifact.Binding.SourceID,
 			Package:               current.address,

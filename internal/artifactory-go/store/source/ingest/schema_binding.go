@@ -3,7 +3,7 @@ package ingest
 import (
 	"fmt"
 
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )

@@ -3,8 +3,8 @@ package providercanonical
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	artifactLocator "github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 )
 
@@ -15,7 +15,7 @@ import (
 type Registration struct {
 	schemaCodecs     []schema.Codec
 	decoders         []ingest.Decoder
-	locatorFactories []artifactLocator.Factory
+	locatorFactories []locator.Factory
 }
 
 func NewRegistration() (*Registration, error) {
@@ -34,7 +34,7 @@ func NewRegistration() (*Registration, error) {
 		return nil, err
 	}
 
-	locatorRegistry, err := artifactLocator.NewRegistry(
+	locatorRegistry, err := locator.NewRegistry(
 		newLocatorpathFactory(),
 	)
 	if err != nil {
@@ -62,12 +62,12 @@ func (r *Registration) Decoders() []ingest.Decoder {
 	return append([]ingest.Decoder(nil), r.decoders...)
 }
 
-func (r *Registration) LocatorFactories() []artifactLocator.Factory {
+func (r *Registration) LocatorFactories() []locator.Factory {
 	if r == nil {
 		return nil
 	}
 	return append(
-		[]artifactLocator.Factory(nil),
+		[]locator.Factory(nil),
 		r.locatorFactories...,
 	)
 }

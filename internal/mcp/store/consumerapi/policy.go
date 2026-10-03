@@ -8,7 +8,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -117,7 +117,7 @@ func (a *API) SaveMCPPolicy(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		managedpackageFlowModel.PublishRequest{
+		managepackageModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -219,7 +219,7 @@ func (a *API) DeleteMCPPolicy(
 	if err != nil {
 		return err
 	}
-	removeRequest := managedpackageFlowModel.RemoveRequest{
+	removeRequest := managepackageModel.RemoveRequest{
 		RootID:           record.RootID,
 		SourceID:         record.Binding.SourceID,
 		Package:          address,
