@@ -317,6 +317,8 @@ func (a *App) initManagers() {
 		artifactComposition.SecretRuntime,
 		artifactComposition.ArtifactCleanup,
 		artifactComposition.StoreOverlays,
+		artifactComposition.Catalog,
+		artifactComposition.Definitions,
 		artifactComposition.Topology,
 	)
 	if err != nil {

@@ -62,11 +62,9 @@ type Dependencies struct {
 	Discovery        refresh.API
 	ManagedArtifacts managedpackage.API
 	Protection       root.ProtectionAPI
-
-	Overlays modelOverlay.OverlayRepository
-	Adapters AdapterRegistry
-
-	BuiltinRoot rootModel.RootID
+	Overlays         modelOverlay.OverlayRepository
+	Adapters         AdapterRegistry
+	BuiltinRoot      rootModel.RootID
 }
 
 type ListProvidersRequest struct {

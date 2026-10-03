@@ -5,7 +5,7 @@ export namespace aggregate {
 	    inserts?: string[];
 	    namePrefix?: string;
 	    locationPrefix?: string;
-	    allowArtifacts?: artifact.ArtifactRef[];
+	    allowArtifacts?: model.ArtifactRef[];
 	    sessionID?: string;
 	    activity?: string;
 	
@@ -19,7 +19,7 @@ export namespace aggregate {
 	        this.inserts = source["inserts"];
 	        this.namePrefix = source["namePrefix"];
 	        this.locationPrefix = source["locationPrefix"];
-	        this.allowArtifacts = this.convertValues(source["allowArtifacts"], artifact.ArtifactRef);
+	        this.allowArtifacts = this.convertValues(source["allowArtifacts"], model.ArtifactRef);
 	        this.sessionID = source["sessionID"];
 	        this.activity = source["activity"];
 	    }
@@ -43,7 +43,7 @@ export namespace aggregate {
 		}
 	}
 	export class ArtifactSkillSummary {
-	    Artifact: artifact.ArtifactRef;
+	    Artifact: model.ArtifactRef;
 	    IsEnabled: boolean;
 	    Insert: string;
 	    HasArguments: boolean;
@@ -55,7 +55,7 @@ export namespace aggregate {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Artifact = this.convertValues(source["Artifact"], artifact.ArtifactRef);
+	        this.Artifact = this.convertValues(source["Artifact"], model.ArtifactRef);
 	        this.IsEnabled = source["IsEnabled"];
 	        this.Insert = source["Insert"];
 	        this.HasArguments = source["HasArguments"];
@@ -117,7 +117,7 @@ export namespace aggregate {
 		}
 	}
 	export class MCPServerRuntimeDetails {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    connection: server.MCPServerRuntimeSnapshot;
 	    authorization?: auth.MCPAuthStatus;
 	    pendingAuthorization?: auth.MCPOAuthAuthorization;
@@ -128,7 +128,7 @@ export namespace aggregate {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.connection = this.convertValues(source["connection"], server.MCPServerRuntimeSnapshot);
 	        this.authorization = this.convertValues(source["authorization"], auth.MCPAuthStatus);
 	        this.pendingAuthorization = this.convertValues(source["pendingAuthorization"], auth.MCPOAuthAuthorization);
@@ -153,7 +153,7 @@ export namespace aggregate {
 		}
 	}
 	export class ResolvedArtifactSkill {
-	    Artifact: artifact.ArtifactRef;
+	    Artifact: model.ArtifactRef;
 	    Definition: provider.SkillDef;
 	    Version: string;
 	    Enabled: boolean;
@@ -164,7 +164,7 @@ export namespace aggregate {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.Artifact = this.convertValues(source["Artifact"], artifact.ArtifactRef);
+	        this.Artifact = this.convertValues(source["Artifact"], model.ArtifactRef);
 	        this.Definition = this.convertValues(source["Definition"], provider.SkillDef);
 	        this.Version = source["Version"];
 	        this.Enabled = source["Enabled"];
@@ -255,119 +255,6 @@ export namespace aggregate {
 		    }
 		    return a;
 		}
-	}
-
-}
-
-export namespace artifact {
-	
-	export class SourceBinding {
-	    sourceID: string;
-	    locator: string;
-	    subresourceLocator?: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new SourceBinding(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.sourceID = source["sourceID"];
-	        this.locator = source["locator"];
-	        this.subresourceLocator = source["subresourceLocator"];
-	    }
-	}
-	export class Artifact {
-	    id: string;
-	    rootID: string;
-	    binding: SourceBinding;
-	    kind: string;
-	    logicalName: string;
-	    logicalVersion?: string;
-	    resolvedDefinition?: string;
-	    sourceContentDigest?: string;
-	    state: string;
-	    diagnostics?: diagnostic.Diagnostic[];
-	    displayName: string;
-	    enabled: boolean;
-	    revision: number;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Artifact(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.rootID = source["rootID"];
-	        this.binding = this.convertValues(source["binding"], SourceBinding);
-	        this.kind = source["kind"];
-	        this.logicalName = source["logicalName"];
-	        this.logicalVersion = source["logicalVersion"];
-	        this.resolvedDefinition = source["resolvedDefinition"];
-	        this.sourceContentDigest = source["sourceContentDigest"];
-	        this.state = source["state"];
-	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
-	        this.displayName = source["displayName"];
-	        this.enabled = source["enabled"];
-	        this.revision = source["revision"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ArtifactAddress {
-	    rootID: string;
-	    artifactID: string;
-	    kind: string;
-	    logicalName: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ArtifactAddress(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.artifactID = source["artifactID"];
-	        this.kind = source["kind"];
-	        this.logicalName = source["logicalName"];
-	    }
-	}
-	export class ArtifactRef {
-	    rootID: string;
-	    artifactID: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new ArtifactRef(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootID = source["rootID"];
-	        this.artifactID = source["artifactID"];
-	    }
 	}
 
 }
@@ -832,9 +719,9 @@ export namespace auth {
 export namespace collection {
 	
 	export class AddArtifactMemberRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedRevision: number;
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	
 	    static createFrom(source: any = {}) {
 	        return new AddArtifactMemberRequest(source);
@@ -842,9 +729,9 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -906,7 +793,7 @@ export namespace collection {
 		}
 	}
 	export class AddMemberRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedRevision: number;
 	    member: MemberReference;
 	
@@ -916,7 +803,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
 	        this.member = this.convertValues(source["member"], MemberReference);
 	    }
@@ -940,13 +827,13 @@ export namespace collection {
 		}
 	}
 	export class ArtifactMembershipView {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    collectionName: string;
 	    collectionRevision: number;
 	    memberIndex: number;
 	    member: MemberReference;
 	    status: string;
-	    resolvedArtifact?: artifact.ArtifactRef;
+	    resolvedArtifact?: model.ArtifactRef;
 	    resolvedToArtifact: boolean;
 	    code?: string;
 	    message?: string;
@@ -957,13 +844,13 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.collectionName = source["collectionName"];
 	        this.collectionRevision = source["collectionRevision"];
 	        this.memberIndex = source["memberIndex"];
 	        this.member = this.convertValues(source["member"], MemberReference);
 	        this.status = source["status"];
-	        this.resolvedArtifact = this.convertValues(source["resolvedArtifact"], artifact.ArtifactRef);
+	        this.resolvedArtifact = this.convertValues(source["resolvedArtifact"], model.ArtifactRef);
 	        this.resolvedToArtifact = source["resolvedToArtifact"];
 	        this.code = source["code"];
 	        this.message = source["message"];
@@ -1030,7 +917,7 @@ export namespace collection {
 		}
 	}
 	export class CollectionView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -1046,7 +933,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -1132,7 +1019,7 @@ export namespace collection {
 	    }
 	}
 	export class DeleteRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedRevision: number;
 	
 	    static createFrom(source: any = {}) {
@@ -1141,7 +1028,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
 	    }
 	
@@ -1164,7 +1051,7 @@ export namespace collection {
 		}
 	}
 	export class ListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    sourceID: string;
 	    name: string;
 	    displayName: string;
@@ -1184,7 +1071,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.sourceID = source["sourceID"];
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
@@ -1219,7 +1106,7 @@ export namespace collection {
 	}
 	
 	export class RemoveMemberRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedRevision: number;
 	    index: number;
 	
@@ -1229,7 +1116,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
 	        this.index = source["index"];
 	    }
@@ -1253,7 +1140,7 @@ export namespace collection {
 		}
 	}
 	export class UpdateRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedRevision: number;
 	    description?: string;
 	    displayName?: string;
@@ -1264,7 +1151,7 @@ export namespace collection {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
 	        this.description = source["description"];
 	        this.displayName = source["displayName"];
@@ -1299,7 +1186,7 @@ export namespace consumerapi {
 	    name?: string;
 	    status: string;
 	    required: boolean;
-	    artifact?: artifact.ArtifactRef;
+	    artifact?: model.ArtifactRef;
 	    mapped?: resolve.MappedTarget;
 	    autoExecute?: boolean;
 	    includeSystemPrompt?: boolean;
@@ -1318,7 +1205,7 @@ export namespace consumerapi {
 	        this.name = source["name"];
 	        this.status = source["status"];
 	        this.required = source["required"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
 	        this.autoExecute = source["autoExecute"];
 	        this.includeSystemPrompt = source["includeSystemPrompt"];
@@ -1378,7 +1265,7 @@ export namespace consumerapi {
 		}
 	}
 	export class AgentExportRequest {
-	    agent: artifact.ArtifactRef;
+	    agent: model.ArtifactRef;
 	
 	    static createFrom(source: any = {}) {
 	        return new AgentExportRequest(source);
@@ -1386,7 +1273,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
+	        this.agent = this.convertValues(source["agent"], model.ArtifactRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -1498,7 +1385,7 @@ export namespace consumerapi {
 	export class AgentMCPSetupDescriptor {
 	    occurrencePath: string;
 	    name: string;
-	    artifact?: artifact.ArtifactRef;
+	    artifact?: model.ArtifactRef;
 	    transport?: string;
 	    command?: string;
 	    url?: string;
@@ -1513,7 +1400,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.occurrencePath = source["occurrencePath"];
 	        this.name = source["name"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.transport = source["transport"];
 	        this.command = source["command"];
 	        this.url = source["url"];
@@ -1540,7 +1427,7 @@ export namespace consumerapi {
 		}
 	}
 	export class AgentRestoredMembership {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    path: string;
 	    message: string;
 	
@@ -1550,7 +1437,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.path = source["path"];
 	        this.message = source["message"];
 	    }
@@ -1574,7 +1461,7 @@ export namespace consumerapi {
 		}
 	}
 	export class AgentView {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -1591,7 +1478,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -1679,7 +1566,7 @@ export namespace consumerapi {
 	    rootID: string;
 	    rootDisplayName?: string;
 	    sourceID: string;
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    collectionRevision: number;
 	    collectionName: string;
 	    collectionDisplayName: string;
@@ -1695,7 +1582,7 @@ export namespace consumerapi {
 	        this.rootID = source["rootID"];
 	        this.rootDisplayName = source["rootDisplayName"];
 	        this.sourceID = source["sourceID"];
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.collectionRevision = source["collectionRevision"];
 	        this.collectionName = source["collectionName"];
 	        this.collectionDisplayName = source["collectionDisplayName"];
@@ -1745,7 +1632,7 @@ export namespace consumerapi {
 	    name: string;
 	    scope?: string;
 	    status: string;
-	    artifact?: artifact.ArtifactRef;
+	    artifact?: model.ArtifactRef;
 	    mapped?: resolve.MappedTarget;
 	    code?: string;
 	    message?: string;
@@ -1761,7 +1648,7 @@ export namespace consumerapi {
 	        this.name = source["name"];
 	        this.scope = source["scope"];
 	        this.status = source["status"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.mapped = this.convertValues(source["mapped"], resolve.MappedTarget);
 	        this.code = source["code"];
 	        this.message = source["message"];
@@ -1850,7 +1737,7 @@ export namespace consumerapi {
 	}
 	export class AgentImportPreviewRequest {
 	    path: string;
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
 	    expectedSourceDigest?: string;
 	
@@ -1861,7 +1748,7 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.path = source["path"];
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
 	        this.expectedSourceDigest = source["expectedSourceDigest"];
 	    }
@@ -1886,7 +1773,7 @@ export namespace consumerapi {
 	}
 	
 	export class AgentListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -1903,7 +1790,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -1969,7 +1856,7 @@ export namespace consumerapi {
 	}
 	
 	export class AgentTextMaterialization {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    artifactRevision: number;
 	    definitionDigest: string;
 	    name: string;
@@ -1985,7 +1872,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.artifactRevision = source["artifactRevision"];
 	        this.definitionDigest = source["definitionDigest"];
 	        this.name = source["name"];
@@ -2064,7 +1951,7 @@ export namespace consumerapi {
 	export class ListAgentsRequest {
 	    rootID: string;
 	    logicalNames?: string[];
-	    collection?: artifact.ArtifactRef;
+	    collection?: model.ArtifactRef;
 	    includeBuiltin?: boolean;
 	    enabled?: boolean;
 	
@@ -2076,7 +1963,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.rootID = source["rootID"];
 	        this.logicalNames = source["logicalNames"];
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.includeBuiltin = source["includeBuiltin"];
 	        this.enabled = source["enabled"];
 	    }
@@ -2100,7 +1987,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedAgentDeleteRequest {
-	    agent: artifact.ArtifactRef;
+	    agent: model.ArtifactRef;
 	    expectedRevision: number;
 	
 	    static createFrom(source: any = {}) {
@@ -2109,7 +1996,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.agent = this.convertValues(source["agent"], artifact.ArtifactRef);
+	        this.agent = this.convertValues(source["agent"], model.ArtifactRef);
 	        this.expectedRevision = source["expectedRevision"];
 	    }
 	
@@ -2132,7 +2019,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPCreateRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
 	    document: server.ServerDocument;
 	    enabled: boolean;
@@ -2143,7 +2030,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
 	        this.document = this.convertValues(source["document"], server.ServerDocument);
 	        this.enabled = source["enabled"];
@@ -2168,8 +2055,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPCreateResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	    collection: collection.CollectionView;
 	    membershipCreated: boolean;
 	
@@ -2179,8 +2066,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
@@ -2204,7 +2091,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPPolicyUpsertRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
 	    name: string;
 	    description?: string;
@@ -2217,7 +2104,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
 	        this.name = source["name"];
 	        this.description = source["description"];
@@ -2244,8 +2131,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPPolicyUpsertResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	    collection: collection.CollectionView;
 	    membershipCreated: boolean;
 	
@@ -2255,8 +2142,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
@@ -2280,9 +2167,9 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPReplaceRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    expectedArtifactRevision: number;
 	    document: server.ServerDocument;
 	    enabled: boolean;
@@ -2293,9 +2180,9 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
 	        this.document = this.convertValues(source["document"], server.ServerDocument);
 	        this.enabled = source["enabled"];
@@ -2320,8 +2207,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedMCPReplaceResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	    collection: collection.CollectionView;
 	
 	    static createFrom(source: any = {}) {
@@ -2330,8 +2217,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
 	    }
 	
@@ -2388,8 +2275,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedModelCreateResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedModelCreateResult(source);
@@ -2397,8 +2284,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2420,7 +2307,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedModelReplaceRequest {
-	    model: artifact.ArtifactRef;
+	    model: model.ArtifactRef;
 	    expectedArtifactRevision: number;
 	    document: domain.ModelDocument;
 	    enabled: boolean;
@@ -2431,7 +2318,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.model = this.convertValues(source["model"], artifact.ArtifactRef);
+	        this.model = this.convertValues(source["model"], model.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
 	        this.document = this.convertValues(source["document"], domain.ModelDocument);
 	        this.enabled = source["enabled"];
@@ -2456,8 +2343,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedModelReplaceResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedModelReplaceResult(source);
@@ -2465,8 +2352,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2522,8 +2409,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedProviderCreateResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedProviderCreateResult(source);
@@ -2531,8 +2418,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2554,7 +2441,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedProviderReplaceRequest {
-	    provider: artifact.ArtifactRef;
+	    provider: model.ArtifactRef;
 	    expectedArtifactRevision: number;
 	    document: domain.ProviderDocument;
 	    enabled: boolean;
@@ -2565,7 +2452,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.provider = this.convertValues(source["provider"], artifact.ArtifactRef);
+	        this.provider = this.convertValues(source["provider"], model.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
 	        this.document = this.convertValues(source["document"], domain.ProviderDocument);
 	        this.enabled = source["enabled"];
@@ -2590,8 +2477,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedProviderReplaceResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	
 	    static createFrom(source: any = {}) {
 	        return new ManagedProviderReplaceResult(source);
@@ -2599,8 +2486,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -2622,11 +2509,11 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedSkillCreateRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
 	    skillName: string;
 	    skillMD?: number[];
-	    files?: source.ManagedPackageFile[];
+	    files?: model.ManagedPackageFile[];
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2635,11 +2522,11 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
 	        this.skillName = source["skillName"];
 	        this.skillMD = source["skillMD"];
-	        this.files = this.convertValues(source["files"], source.ManagedPackageFile);
+	        this.files = this.convertValues(source["files"], model.ManagedPackageFile);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2662,8 +2549,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedSkillCreateResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	    collection: collection.CollectionView;
 	    membershipCreated: boolean;
 	
@@ -2673,8 +2560,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
 	        this.membershipCreated = source["membershipCreated"];
 	    }
@@ -2698,13 +2585,13 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedSkillReplaceRequest {
-	    collection: artifact.ArtifactRef;
+	    collection: model.ArtifactRef;
 	    expectedCollectionRevision: number;
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    expectedArtifactRevision: number;
 	    skillName: string;
 	    skillMD?: number[];
-	    files?: source.ManagedPackageFile[];
+	    files?: model.ManagedPackageFile[];
 	    enabled: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -2713,13 +2600,13 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.collection = this.convertValues(source["collection"], artifact.ArtifactRef);
+	        this.collection = this.convertValues(source["collection"], model.ArtifactRef);
 	        this.expectedCollectionRevision = source["expectedCollectionRevision"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.expectedArtifactRevision = source["expectedArtifactRevision"];
 	        this.skillName = source["skillName"];
 	        this.skillMD = source["skillMD"];
-	        this.files = this.convertValues(source["files"], source.ManagedPackageFile);
+	        this.files = this.convertValues(source["files"], model.ManagedPackageFile);
 	        this.enabled = source["enabled"];
 	    }
 	
@@ -2742,8 +2629,8 @@ export namespace consumerapi {
 		}
 	}
 	export class ManagedSkillReplaceResult {
-	    artifact: artifact.Artifact;
-	    address: artifact.ArtifactAddress;
+	    artifact: model.Artifact;
+	    address: model.ArtifactAddress;
 	    collection: collection.CollectionView;
 	
 	    static createFrom(source: any = {}) {
@@ -2752,8 +2639,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
-	        this.address = this.convertValues(source["address"], artifact.ArtifactAddress);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
+	        this.address = this.convertValues(source["address"], model.ArtifactAddress);
 	        this.collection = this.convertValues(source["collection"], collection.CollectionView);
 	    }
 	
@@ -2776,7 +2663,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ModelListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -2793,7 +2680,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -2824,7 +2711,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ModelView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    definitionDigest: string;
 	    document: domain.ModelDocument;
 	    settings: domain.ModelSettings;
@@ -2836,7 +2723,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.definitionDigest = source["definitionDigest"];
 	        this.document = this.convertValues(source["document"], domain.ModelDocument);
 	        this.settings = this.convertValues(source["settings"], domain.ModelSettings);
@@ -2862,7 +2749,7 @@ export namespace consumerapi {
 		}
 	}
 	export class PolicyListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -2878,7 +2765,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -2908,7 +2795,7 @@ export namespace consumerapi {
 		}
 	}
 	export class PolicyView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    body: policy.MCPPolicy;
 	    builtIn: boolean;
 	
@@ -2918,7 +2805,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.body = this.convertValues(source["body"], policy.MCPPolicy);
 	        this.builtIn = source["builtIn"];
 	    }
@@ -2958,7 +2845,7 @@ export namespace consumerapi {
 	    }
 	}
 	export class ProviderListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -2974,7 +2861,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -3004,7 +2891,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ProviderView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    definitionDigest: string;
 	    document: domain.ProviderDocument;
 	    settings: domain.ProviderSettings;
@@ -3017,7 +2904,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.definitionDigest = source["definitionDigest"];
 	        this.document = this.convertValues(source["document"], domain.ProviderDocument);
 	        this.settings = this.convertValues(source["settings"], domain.ProviderSettings);
@@ -3062,7 +2949,7 @@ export namespace consumerapi {
 	    }
 	}
 	export class ToolView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    definitionDigest: string;
 	    name: string;
 	    version: string;
@@ -3082,7 +2969,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.definitionDigest = source["definitionDigest"];
 	        this.name = source["name"];
 	        this.version = source["version"];
@@ -3148,7 +3035,7 @@ export namespace consumerapi {
 		}
 	}
 	export class SaveModelSettingsRequest {
-	    model: artifact.ArtifactRef;
+	    model: model.ArtifactRef;
 	    expectedModelRevision: number;
 	    expectedSettingsRevision: number;
 	    defaults?: domain.DefaultsPatch;
@@ -3161,7 +3048,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.model = this.convertValues(source["model"], artifact.ArtifactRef);
+	        this.model = this.convertValues(source["model"], model.ArtifactRef);
 	        this.expectedModelRevision = source["expectedModelRevision"];
 	        this.expectedSettingsRevision = source["expectedSettingsRevision"];
 	        this.defaults = this.convertValues(source["defaults"], domain.DefaultsPatch);
@@ -3188,7 +3075,7 @@ export namespace consumerapi {
 		}
 	}
 	export class SaveProviderSettingsRequest {
-	    provider: artifact.ArtifactRef;
+	    provider: model.ArtifactRef;
 	    expectedProviderRevision: number;
 	    expectedSettingsRevision: number;
 	    connection?: domain.ConnectionPatch;
@@ -3203,7 +3090,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.provider = this.convertValues(source["provider"], artifact.ArtifactRef);
+	        this.provider = this.convertValues(source["provider"], model.ArtifactRef);
 	        this.expectedProviderRevision = source["expectedProviderRevision"];
 	        this.expectedSettingsRevision = source["expectedSettingsRevision"];
 	        this.connection = this.convertValues(source["connection"], domain.ConnectionPatch);
@@ -3234,7 +3121,7 @@ export namespace consumerapi {
 	export class ServerInstallationDataView {
 	    selectedConnectionProfile?: string;
 	    inputs?: Record<string, InstallationInputView>;
-	    additionalPolicies?: artifact.ArtifactRef[];
+	    additionalPolicies?: model.ArtifactRef[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerInstallationDataView(source);
@@ -3244,7 +3131,7 @@ export namespace consumerapi {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.selectedConnectionProfile = source["selectedConnectionProfile"];
 	        this.inputs = this.convertValues(source["inputs"], InstallationInputView, true);
-	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], artifact.ArtifactRef);
+	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], model.ArtifactRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3266,7 +3153,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ServerInstallationView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    document: server.ServerDocument;
 	    installation: ServerInstallationDataView;
 	    installationRevision: number;
@@ -3278,7 +3165,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.document = this.convertValues(source["document"], server.ServerDocument);
 	        this.installation = this.convertValues(source["installation"], ServerInstallationDataView);
 	        this.installationRevision = source["installationRevision"];
@@ -3304,7 +3191,7 @@ export namespace consumerapi {
 		}
 	}
 	export class ServerListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -3320,7 +3207,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -3434,7 +3321,7 @@ export namespace consumerapi {
 		}
 	}
 	export class SetProviderAPIKeyRequest {
-	    provider: artifact.ArtifactRef;
+	    provider: model.ArtifactRef;
 	    expectedProviderRevision: number;
 	    expectedAPIKeyRevision: number;
 	    apiKey: string;
@@ -3445,7 +3332,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.provider = this.convertValues(source["provider"], artifact.ArtifactRef);
+	        this.provider = this.convertValues(source["provider"], model.ArtifactRef);
 	        this.expectedProviderRevision = source["expectedProviderRevision"];
 	        this.expectedAPIKeyRevision = source["expectedAPIKeyRevision"];
 	        this.apiKey = source["apiKey"];
@@ -3486,7 +3373,7 @@ export namespace consumerapi {
 	    }
 	}
 	export class SkillListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -3503,7 +3390,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -3552,8 +3439,8 @@ export namespace consumerapi {
 	    }
 	}
 	export class SkillPathRegistrationResult {
-	    source: source.Summary;
-	    artifact: artifact.Artifact;
+	    source: model.Summary;
+	    artifact: model.Artifact;
 	
 	    static createFrom(source: any = {}) {
 	        return new SkillPathRegistrationResult(source);
@@ -3561,8 +3448,8 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.source = this.convertValues(source["source"], source.Summary);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.source = this.convertValues(source["source"], model.Summary);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -3585,7 +3472,7 @@ export namespace consumerapi {
 	}
 	
 	export class ToolListItem {
-	    ref: artifact.ArtifactRef;
+	    ref: model.ArtifactRef;
 	    name: string;
 	    displayName: string;
 	    description?: string;
@@ -3601,7 +3488,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.ref = this.convertValues(source["ref"], artifact.ArtifactRef);
+	        this.ref = this.convertValues(source["ref"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.description = source["description"];
@@ -3632,7 +3519,7 @@ export namespace consumerapi {
 	}
 	
 	export class WorkspaceArtifactView {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    revision: number;
 	    displayName: string;
 	    kind: string;
@@ -3650,7 +3537,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.revision = source["revision"];
 	        this.displayName = source["displayName"];
 	        this.kind = source["kind"];
@@ -3794,8 +3681,8 @@ export namespace consumerapi {
 	}
 	export class WorkspaceDirectoryView {
 	    ref: WorkspaceDirectoryRef;
-	    root: root.Root;
-	    directorySource: source.Summary;
+	    root: model.Root;
+	    directorySource: model.Summary;
 	    enabled: boolean;
 	    policyID: string;
 	    policyVersion: string;
@@ -3810,8 +3697,8 @@ export namespace consumerapi {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.ref = this.convertValues(source["ref"], WorkspaceDirectoryRef);
-	        this.root = this.convertValues(source["root"], root.Root);
-	        this.directorySource = this.convertValues(source["directorySource"], source.Summary);
+	        this.root = this.convertValues(source["root"], model.Root);
+	        this.directorySource = this.convertValues(source["directorySource"], model.Summary);
 	        this.enabled = source["enabled"];
 	        this.policyID = source["policyID"];
 	        this.policyVersion = source["policyVersion"];
@@ -3840,7 +3727,7 @@ export namespace consumerapi {
 	}
 	
 	export class WorkspaceMCPServer {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    artifactRevision: number;
 	    definitionDigest: string;
 	    name: string;
@@ -3854,7 +3741,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.artifactRevision = source["artifactRevision"];
 	        this.definitionDigest = source["definitionDigest"];
 	        this.name = source["name"];
@@ -3882,7 +3769,7 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspaceMCPServerLoadPlan {
-	    workspace: artifact.ArtifactRef;
+	    workspace: model.ArtifactRef;
 	    servers: WorkspaceMCPServer[];
 	
 	    static createFrom(source: any = {}) {
@@ -3891,7 +3778,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
+	        this.workspace = this.convertValues(source["workspace"], model.ArtifactRef);
 	        this.servers = this.convertValues(source["servers"], WorkspaceMCPServer);
 	    }
 	
@@ -3960,7 +3847,7 @@ export namespace consumerapi {
 	    }
 	}
 	export class WorkspacePromptContribution {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    artifactRevision: number;
 	    definitionDigest: string;
 	    kind: string;
@@ -3978,7 +3865,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.artifactRevision = source["artifactRevision"];
 	        this.definitionDigest = source["definitionDigest"];
 	        this.kind = source["kind"];
@@ -4010,7 +3897,7 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspacePromptDecision {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    status: string;
 	    code?: string;
 	    originalBytes: number;
@@ -4022,7 +3909,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.status = source["status"];
 	        this.code = source["code"];
 	        this.originalBytes = source["originalBytes"];
@@ -4048,7 +3935,7 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspacePromptPlan {
-	    workspace: artifact.ArtifactRef;
+	    workspace: model.ArtifactRef;
 	    contributions: WorkspacePromptContribution[];
 	    instructions: string;
 	    userMessage: string;
@@ -4061,7 +3948,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
+	        this.workspace = this.convertValues(source["workspace"], model.ArtifactRef);
 	        this.contributions = this.convertValues(source["contributions"], WorkspacePromptContribution);
 	        this.instructions = source["instructions"];
 	        this.userMessage = source["userMessage"];
@@ -4088,7 +3975,7 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspaceSkill {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    artifactRevision: number;
 	    definitionDigest: string;
 	    name: string;
@@ -4103,7 +3990,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.artifactRevision = source["artifactRevision"];
 	        this.definitionDigest = source["definitionDigest"];
 	        this.name = source["name"];
@@ -4132,7 +4019,7 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspaceSkillLoadPlan {
-	    workspace: artifact.ArtifactRef;
+	    workspace: model.ArtifactRef;
 	    skills: WorkspaceSkill[];
 	
 	    static createFrom(source: any = {}) {
@@ -4141,7 +4028,7 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
+	        this.workspace = this.convertValues(source["workspace"], model.ArtifactRef);
 	        this.skills = this.convertValues(source["skills"], WorkspaceSkill);
 	    }
 	
@@ -4202,9 +4089,9 @@ export namespace consumerapi {
 		}
 	}
 	export class WorkspaceRuntimeSelection {
-	    promptArtifacts?: artifact.ArtifactRef[];
-	    skillArtifacts?: artifact.ArtifactRef[];
-	    mcpArtifacts?: artifact.ArtifactRef[];
+	    promptArtifacts?: model.ArtifactRef[];
+	    skillArtifacts?: model.ArtifactRef[];
+	    mcpArtifacts?: model.ArtifactRef[];
 	    requireComplete?: boolean;
 	
 	    static createFrom(source: any = {}) {
@@ -4213,9 +4100,9 @@ export namespace consumerapi {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.promptArtifacts = this.convertValues(source["promptArtifacts"], artifact.ArtifactRef);
-	        this.skillArtifacts = this.convertValues(source["skillArtifacts"], artifact.ArtifactRef);
-	        this.mcpArtifacts = this.convertValues(source["mcpArtifacts"], artifact.ArtifactRef);
+	        this.promptArtifacts = this.convertValues(source["promptArtifacts"], model.ArtifactRef);
+	        this.skillArtifacts = this.convertValues(source["skillArtifacts"], model.ArtifactRef);
+	        this.mcpArtifacts = this.convertValues(source["mcpArtifacts"], model.ArtifactRef);
 	        this.requireComplete = source["requireComplete"];
 	    }
 	
@@ -4244,7 +4131,7 @@ export namespace consumerapi {
 export namespace conversation {
 	
 	export class ConversationContextUsage {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    name?: string;
 	    locator?: string;
 	    selectedDefinitionDigest?: string;
@@ -4263,7 +4150,7 @@ export namespace conversation {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.locator = source["locator"];
 	        this.selectedDefinitionDigest = source["selectedDefinitionDigest"];
@@ -4296,7 +4183,7 @@ export namespace conversation {
 		}
 	}
 	export class ConversationResourceSelectionRef {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    name?: string;
 	    locator?: string;
 	    definitionDigest?: string;
@@ -4308,7 +4195,7 @@ export namespace conversation {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.locator = source["locator"];
 	        this.definitionDigest = source["definitionDigest"];
@@ -4334,7 +4221,7 @@ export namespace conversation {
 		}
 	}
 	export class ConversationSelection {
-	    workspace: artifact.ArtifactRef;
+	    workspace: model.ArtifactRef;
 	    displayName?: string;
 	    workspaceRevision?: number;
 	    contextRefs?: ConversationResourceSelectionRef[];
@@ -4346,7 +4233,7 @@ export namespace conversation {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
+	        this.workspace = this.convertValues(source["workspace"], model.ArtifactRef);
 	        this.displayName = source["displayName"];
 	        this.workspaceRevision = source["workspaceRevision"];
 	        this.contextRefs = this.convertValues(source["contextRefs"], ConversationResourceSelectionRef);
@@ -4372,7 +4259,7 @@ export namespace conversation {
 		}
 	}
 	export class ConversationSkillUsage {
-	    artifact: artifact.ArtifactRef;
+	    artifact: model.ArtifactRef;
 	    name?: string;
 	    displayName?: string;
 	    locator?: string;
@@ -4392,7 +4279,7 @@ export namespace conversation {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.name = source["name"];
 	        this.displayName = source["displayName"];
 	        this.locator = source["locator"];
@@ -4426,7 +4313,7 @@ export namespace conversation {
 		}
 	}
 	export class ConversationUsage {
-	    workspace: artifact.ArtifactRef;
+	    workspace: model.ArtifactRef;
 	    displayName?: string;
 	    workspaceRevision?: number;
 	    status: string;
@@ -4440,7 +4327,7 @@ export namespace conversation {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.workspace = this.convertValues(source["workspace"], artifact.ArtifactRef);
+	        this.workspace = this.convertValues(source["workspace"], model.ArtifactRef);
 	        this.displayName = source["displayName"];
 	        this.workspaceRevision = source["workspaceRevision"];
 	        this.status = source["status"];
@@ -5385,7 +5272,7 @@ export namespace domain {
 	}
 	
 	export class ManagedSkillDocument {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    document: document.SkillDocument;
 	
 	    static createFrom(source: any = {}) {
@@ -5394,7 +5281,7 @@ export namespace domain {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.document = this.convertValues(source["document"], document.SkillDocument);
 	    }
 	
@@ -5603,7 +5490,7 @@ export namespace domain {
 	
 	
 	export class WorkspaceView {
-	    artifact: artifact.Artifact;
+	    artifact: model.Artifact;
 	    description?: string;
 	
 	    static createFrom(source: any = {}) {
@@ -5612,7 +5499,7 @@ export namespace domain {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.artifact = this.convertValues(source["artifact"], artifact.Artifact);
+	        this.artifact = this.convertValues(source["artifact"], model.Artifact);
 	        this.description = source["description"];
 	    }
 	
@@ -5760,6 +5647,320 @@ export namespace main {
 	        this.args = source["args"];
 	        this.timeoutMS = source["timeoutMS"];
 	    }
+	}
+
+}
+
+export namespace model {
+	
+	export class SourceBinding {
+	    sourceID: string;
+	    locator: string;
+	    subresourceLocator?: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new SourceBinding(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.sourceID = source["sourceID"];
+	        this.locator = source["locator"];
+	        this.subresourceLocator = source["subresourceLocator"];
+	    }
+	}
+	export class Artifact {
+	    id: string;
+	    rootID: string;
+	    binding: SourceBinding;
+	    kind: string;
+	    logicalName: string;
+	    logicalVersion?: string;
+	    resolvedDefinition?: string;
+	    sourceContentDigest?: string;
+	    state: string;
+	    diagnostics?: diagnostic.Diagnostic[];
+	    displayName: string;
+	    enabled: boolean;
+	    revision: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Artifact(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.rootID = source["rootID"];
+	        this.binding = this.convertValues(source["binding"], SourceBinding);
+	        this.kind = source["kind"];
+	        this.logicalName = source["logicalName"];
+	        this.logicalVersion = source["logicalVersion"];
+	        this.resolvedDefinition = source["resolvedDefinition"];
+	        this.sourceContentDigest = source["sourceContentDigest"];
+	        this.state = source["state"];
+	        this.diagnostics = this.convertValues(source["diagnostics"], diagnostic.Diagnostic);
+	        this.displayName = source["displayName"];
+	        this.enabled = source["enabled"];
+	        this.revision = source["revision"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ArtifactAddress {
+	    rootID: string;
+	    artifactID: string;
+	    kind: string;
+	    logicalName: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArtifactAddress(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.artifactID = source["artifactID"];
+	        this.kind = source["kind"];
+	        this.logicalName = source["logicalName"];
+	    }
+	}
+	export class ArtifactRef {
+	    rootID: string;
+	    artifactID: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ArtifactRef(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.rootID = source["rootID"];
+	        this.artifactID = source["artifactID"];
+	    }
+	}
+	export class DecoderHint {
+	    locator: string;
+	    recursive?: boolean;
+	    decoderIDs: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DecoderHint(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.locator = source["locator"];
+	        this.recursive = source["recursive"];
+	        this.decoderIDs = source["decoderIDs"];
+	    }
+	}
+	export class DirectoryRoot {
+	    root: string;
+	    recursive?: boolean;
+	    includePatterns?: string[];
+	    excludePatterns?: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new DirectoryRoot(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.root = source["root"];
+	        this.recursive = source["recursive"];
+	        this.includePatterns = source["includePatterns"];
+	        this.excludePatterns = source["excludePatterns"];
+	    }
+	}
+	export class DiscoverySpec {
+	    explicitLocators?: string[];
+	    directoryRoots?: DirectoryRoot[];
+	    decoderHints?: DecoderHint[];
+	    allowedDecoderIDs?: string[];
+	    expectedContentDigests?: Record<string, string>;
+	    authoritative?: boolean;
+	    maxCandidateBytes?: number;
+	    maxTotalBytes?: number;
+	    maxCandidates?: number;
+	    maxEntries?: number;
+	    maxDepth?: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new DiscoverySpec(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.explicitLocators = source["explicitLocators"];
+	        this.directoryRoots = this.convertValues(source["directoryRoots"], DirectoryRoot);
+	        this.decoderHints = this.convertValues(source["decoderHints"], DecoderHint);
+	        this.allowedDecoderIDs = source["allowedDecoderIDs"];
+	        this.expectedContentDigests = source["expectedContentDigests"];
+	        this.authoritative = source["authoritative"];
+	        this.maxCandidateBytes = source["maxCandidateBytes"];
+	        this.maxTotalBytes = source["maxTotalBytes"];
+	        this.maxCandidates = source["maxCandidates"];
+	        this.maxEntries = source["maxEntries"];
+	        this.maxDepth = source["maxDepth"];
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	export class ManagedPackageFile {
+	    locator: string;
+	    content: number[];
+	
+	    static createFrom(source: any = {}) {
+	        return new ManagedPackageFile(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.locator = source["locator"];
+	        this.content = source["content"];
+	    }
+	}
+	export class Root {
+	    id: string;
+	    storageKey: string;
+	    displayName: string;
+	    description?: string;
+	    revision: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    // Go type: time
+	    retiredAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Root(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.storageKey = source["storageKey"];
+	        this.displayName = source["displayName"];
+	        this.description = source["description"];
+	        this.revision = source["revision"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.retiredAt = this.convertValues(source["retiredAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
+	
+	export class Summary {
+	    id: string;
+	    rootID: string;
+	    rootStorageKey: string;
+	    storageKey: string;
+	    kind: string;
+	    displayName: string;
+	    enabled: boolean;
+	    discovery: DiscoverySpec;
+	    revision: number;
+	    // Go type: time
+	    createdAt: any;
+	    // Go type: time
+	    modifiedAt: any;
+	    // Go type: time
+	    retiredAt?: any;
+	
+	    static createFrom(source: any = {}) {
+	        return new Summary(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.rootID = source["rootID"];
+	        this.rootStorageKey = source["rootStorageKey"];
+	        this.storageKey = source["storageKey"];
+	        this.kind = source["kind"];
+	        this.displayName = source["displayName"];
+	        this.enabled = source["enabled"];
+	        this.discovery = this.convertValues(source["discovery"], DiscoverySpec);
+	        this.revision = source["revision"];
+	        this.createdAt = this.convertValues(source["createdAt"], null);
+	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
+	        this.retiredAt = this.convertValues(source["retiredAt"], null);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
 	}
 
 }
@@ -5969,7 +6170,7 @@ export namespace resolve {
 	    status: string;
 	    required: boolean;
 	    scope?: string;
-	    artifact?: artifact.ArtifactRef;
+	    artifact?: model.ArtifactRef;
 	    mapped?: MappedTarget;
 	    overrides?: Record<string, Array<number>>;
 	    use?: Record<string, Array<number>>;
@@ -5989,7 +6190,7 @@ export namespace resolve {
 	        this.status = source["status"];
 	        this.required = source["required"];
 	        this.scope = source["scope"];
-	        this.artifact = this.convertValues(source["artifact"], artifact.ArtifactRef);
+	        this.artifact = this.convertValues(source["artifact"], model.ArtifactRef);
 	        this.mapped = this.convertValues(source["mapped"], MappedTarget);
 	        this.overrides = source["overrides"];
 	        this.use = source["use"];
@@ -6016,7 +6217,7 @@ export namespace resolve {
 		}
 	}
 	export class CapabilityPlan {
-	    rootArtifact?: artifact.ArtifactRef;
+	    rootArtifact?: model.ArtifactRef;
 	    rootMapped?: MappedTarget;
 	    rootType: string;
 	    rootName: string;
@@ -6029,64 +6230,12 @@ export namespace resolve {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.rootArtifact = this.convertValues(source["rootArtifact"], artifact.ArtifactRef);
+	        this.rootArtifact = this.convertValues(source["rootArtifact"], model.ArtifactRef);
 	        this.rootMapped = this.convertValues(source["rootMapped"], MappedTarget);
 	        this.rootType = source["rootType"];
 	        this.rootName = source["rootName"];
 	        this.occurrences = this.convertValues(source["occurrences"], CapabilityOccurrence);
 	        this.complete = source["complete"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
-export namespace root {
-	
-	export class Root {
-	    id: string;
-	    storageKey: string;
-	    displayName: string;
-	    description?: string;
-	    revision: number;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	    // Go type: time
-	    retiredAt?: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Root(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.storageKey = source["storageKey"];
-	        this.displayName = source["displayName"];
-	        this.description = source["description"];
-	        this.revision = source["revision"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.retiredAt = this.convertValues(source["retiredAt"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -8068,7 +8217,7 @@ export namespace server {
 	    schemaVersion: string;
 	    selectedConnectionProfile?: string;
 	    inputs?: Record<string, InputBinding>;
-	    additionalPolicies?: artifact.ArtifactRef[];
+	    additionalPolicies?: model.ArtifactRef[];
 	
 	    static createFrom(source: any = {}) {
 	        return new ServerData(source);
@@ -8079,7 +8228,7 @@ export namespace server {
 	        this.schemaVersion = source["schemaVersion"];
 	        this.selectedConnectionProfile = source["selectedConnectionProfile"];
 	        this.inputs = this.convertValues(source["inputs"], InputBinding, true);
-	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], artifact.ArtifactRef);
+	        this.additionalPolicies = this.convertValues(source["additionalPolicies"], model.ArtifactRef);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -8124,164 +8273,6 @@ export namespace server {
 	        this.mcpServer = this.convertValues(source["mcpServer"], CoreServer);
 	        this.include = this.convertValues(source["include"], Include);
 	        this.configuration = this.convertValues(source["configuration"], ServerConfiguration);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-
-}
-
-export namespace source {
-	
-	export class DecoderHint {
-	    locator: string;
-	    recursive?: boolean;
-	    decoderIDs: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new DecoderHint(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.locator = source["locator"];
-	        this.recursive = source["recursive"];
-	        this.decoderIDs = source["decoderIDs"];
-	    }
-	}
-	export class DirectoryRoot {
-	    root: string;
-	    recursive?: boolean;
-	    includePatterns?: string[];
-	    excludePatterns?: string[];
-	
-	    static createFrom(source: any = {}) {
-	        return new DirectoryRoot(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.root = source["root"];
-	        this.recursive = source["recursive"];
-	        this.includePatterns = source["includePatterns"];
-	        this.excludePatterns = source["excludePatterns"];
-	    }
-	}
-	export class DiscoverySpec {
-	    explicitLocators?: string[];
-	    directoryRoots?: DirectoryRoot[];
-	    decoderHints?: DecoderHint[];
-	    allowedDecoderIDs?: string[];
-	    expectedContentDigests?: Record<string, string>;
-	    authoritative?: boolean;
-	    maxCandidateBytes?: number;
-	    maxTotalBytes?: number;
-	    maxCandidates?: number;
-	    maxEntries?: number;
-	    maxDepth?: number;
-	
-	    static createFrom(source: any = {}) {
-	        return new DiscoverySpec(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.explicitLocators = source["explicitLocators"];
-	        this.directoryRoots = this.convertValues(source["directoryRoots"], DirectoryRoot);
-	        this.decoderHints = this.convertValues(source["decoderHints"], DecoderHint);
-	        this.allowedDecoderIDs = source["allowedDecoderIDs"];
-	        this.expectedContentDigests = source["expectedContentDigests"];
-	        this.authoritative = source["authoritative"];
-	        this.maxCandidateBytes = source["maxCandidateBytes"];
-	        this.maxTotalBytes = source["maxTotalBytes"];
-	        this.maxCandidates = source["maxCandidates"];
-	        this.maxEntries = source["maxEntries"];
-	        this.maxDepth = source["maxDepth"];
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
-	export class ManagedPackageFile {
-	    locator: string;
-	    content: number[];
-	
-	    static createFrom(source: any = {}) {
-	        return new ManagedPackageFile(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.locator = source["locator"];
-	        this.content = source["content"];
-	    }
-	}
-	export class Summary {
-	    id: string;
-	    rootID: string;
-	    rootStorageKey: string;
-	    storageKey: string;
-	    kind: string;
-	    displayName: string;
-	    enabled: boolean;
-	    discovery: DiscoverySpec;
-	    revision: number;
-	    // Go type: time
-	    createdAt: any;
-	    // Go type: time
-	    modifiedAt: any;
-	    // Go type: time
-	    retiredAt?: any;
-	
-	    static createFrom(source: any = {}) {
-	        return new Summary(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.rootID = source["rootID"];
-	        this.rootStorageKey = source["rootStorageKey"];
-	        this.storageKey = source["storageKey"];
-	        this.kind = source["kind"];
-	        this.displayName = source["displayName"];
-	        this.enabled = source["enabled"];
-	        this.discovery = this.convertValues(source["discovery"], DiscoverySpec);
-	        this.revision = source["revision"];
-	        this.createdAt = this.convertValues(source["createdAt"], null);
-	        this.modifiedAt = this.convertValues(source["modifiedAt"], null);
-	        this.retiredAt = this.convertValues(source["retiredAt"], null);
 	    }
 	
 		convertValues(a: any, classs: any, asMap: boolean = false): any {
@@ -9457,7 +9448,7 @@ export namespace spec {
 	    role: string;
 	    status: string;
 	    modelParam?: ModelParam;
-	    modelRef?: artifact.ArtifactRef;
+	    modelRef?: model.ArtifactRef;
 	    inputs?: InputUnion[];
 	    outputs?: OutputUnion[];
 	    toolChoices?: ToolChoice[];
@@ -9468,8 +9459,8 @@ export namespace spec {
 	    workspaceSelection?: conversation.ConversationSelection;
 	    workspaceUsage?: conversation.ConversationUsage;
 	    attachments?: attachment.Attachment[];
-	    enabledSkillRefs?: artifact.ArtifactRef[];
-	    activeSkillRefs?: artifact.ArtifactRef[];
+	    enabledSkillRefs?: model.ArtifactRef[];
+	    activeSkillRefs?: model.ArtifactRef[];
 	    usage?: Usage;
 	    error?: Error;
 	    debugDetails?: any;
@@ -9486,7 +9477,7 @@ export namespace spec {
 	        this.role = source["role"];
 	        this.status = source["status"];
 	        this.modelParam = this.convertValues(source["modelParam"], ModelParam);
-	        this.modelRef = this.convertValues(source["modelRef"], artifact.ArtifactRef);
+	        this.modelRef = this.convertValues(source["modelRef"], model.ArtifactRef);
 	        this.inputs = this.convertValues(source["inputs"], InputUnion);
 	        this.outputs = this.convertValues(source["outputs"], OutputUnion);
 	        this.toolChoices = this.convertValues(source["toolChoices"], ToolChoice);
@@ -9497,8 +9488,8 @@ export namespace spec {
 	        this.workspaceSelection = this.convertValues(source["workspaceSelection"], conversation.ConversationSelection);
 	        this.workspaceUsage = this.convertValues(source["workspaceUsage"], conversation.ConversationUsage);
 	        this.attachments = this.convertValues(source["attachments"], attachment.Attachment);
-	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], artifact.ArtifactRef);
-	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], artifact.ArtifactRef);
+	        this.enabledSkillRefs = this.convertValues(source["enabledSkillRefs"], model.ArtifactRef);
+	        this.activeSkillRefs = this.convertValues(source["activeSkillRefs"], model.ArtifactRef);
 	        this.usage = this.convertValues(source["usage"], Usage);
 	        this.error = this.convertValues(source["error"], Error);
 	        this.debugDetails = source["debugDetails"];

@@ -9,7 +9,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
@@ -49,6 +51,8 @@ func initModelWrappers(
 	secretRuntime secret.RuntimeAPI,
 	localState artifactcleanup.API,
 	storeOverlays overlay.StoreAPI,
+	cat catalog.API,
+	definitions definition.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || aggregateWrapper == nil {
@@ -95,9 +99,12 @@ func initModelWrappers(
 	}
 
 	api, err := modelConsumerAPI.New(modelConsumerAPI.Dependencies{
-		Sources:          sources,
-		Discovery:        discovery,
-		Artifacts:        artifacts,
+		Artifacts:   artifacts,
+		Cat:         cat,
+		Definitions: definitions,
+		Sources:     sources,
+		Discovery:   discovery,
+
 		ManagedArtifacts: managedArtifacts,
 		Protection:       protection,
 		Overlays:         overlays,
@@ -111,7 +118,7 @@ func initModelWrappers(
 	if err != nil {
 		return nil, err
 	}
-	catalog, err := modelConsumerAPI.NewCatalogStore(api)
+	c, err := modelConsumerAPI.NewCatalogStore(api)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +145,7 @@ func initModelWrappers(
 	}
 
 	storeWrapper.api = api
-	storeWrapper.management = catalog
+	storeWrapper.management = c
 	storeWrapper.roots = roots
 	storeWrapper.protection = protection
 	aggregateWrapper.service = aggregateService
