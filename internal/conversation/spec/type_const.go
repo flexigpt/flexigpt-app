@@ -3,7 +3,7 @@ package spec
 import (
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/attachment"
 
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
@@ -36,7 +36,7 @@ type ConversationMessage struct {
 
 	// ModelRef is the durable Artifact-backed model identity used by new
 	// conversations.
-	ModelRef *artifact.ArtifactRef `json:"modelRef,omitempty"`
+	ModelRef *artifactModel.ArtifactRef `json:"modelRef,omitempty"`
 
 	// Canonical, lossless events for this turn, in the order they occurred.
 	//
@@ -63,9 +63,9 @@ type ConversationMessage struct {
 
 	// Attachments that backed this turn's user input (files, URLs, etc).
 	// These are ref attachments; ContentBlock may or may not be hydrated.
-	Attachments      []attachment.Attachment `json:"attachments,omitempty"`
-	EnabledSkillRefs []artifact.ArtifactRef  `json:"enabledSkillRefs,omitempty"`
-	ActiveSkillRefs  []artifact.ArtifactRef  `json:"activeSkillRefs,omitempty"`
+	Attachments      []attachment.Attachment     `json:"attachments,omitempty"`
+	EnabledSkillRefs []artifactModel.ArtifactRef `json:"enabledSkillRefs,omitempty"`
+	ActiveSkillRefs  []artifactModel.ArtifactRef `json:"activeSkillRefs,omitempty"`
 
 	// Usage / error info from the model/provider for this turn
 	// (usually attached to assistant turns).

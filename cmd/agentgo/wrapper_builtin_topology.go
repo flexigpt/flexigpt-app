@@ -11,30 +11,30 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
 type skillBaselineEnsurer interface {
 	EnsureSkillBaselineCollection(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) (collection.CollectionView, error)
 }
 
 type mcpBaselineEnsurer interface {
 	EnsureMCPBaselineCollection(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) (collection.CollectionView, error)
 }
 
 type agentBaselineEnsurer interface {
 	EnsureAgentBaselineCollection(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) (collection.CollectionView, error)
 }
 
@@ -86,7 +86,7 @@ func ensureBuiltinArtifactTopology(
 
 func ensureUserArtifactBaselineCollectionsForRoot(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	skills skillBaselineEnsurer,
 	mcp mcpBaselineEnsurer,
 	agents agentBaselineEnsurer,
@@ -115,8 +115,8 @@ func ensureUserArtifactBaselineCollectionsForRoot(
 
 func ensureUserArtifactBaselineCollections(
 	ctx context.Context,
-	roots local.RootAPI,
-	protection local.ProtectionAPI,
+	roots root.API,
+	protection root.ProtectionAPI,
 	skills skillBaselineEnsurer,
 	mcp mcpBaselineEnsurer,
 	agents agentBaselineEnsurer,

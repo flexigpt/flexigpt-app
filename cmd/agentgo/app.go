@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -250,10 +250,12 @@ func (a *App) initManagers() {
 	err = InitToolStoreWrapper(
 		a.toolStoreAPI,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
-		artifactComposition.ManagedArtifacts,
+		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
+		artifactComposition.Catalog,
+		artifactComposition.Definitions,
 	)
 	if err != nil {
 		slog.Error(
@@ -305,15 +307,15 @@ func (a *App) initManagers() {
 		a.modelStoreAPI,
 		a.modelAggregateAPI,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
 		artifactComposition.Roots,
-		artifactComposition.ManagedArtifacts,
+		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
 		artifactComposition.ProtectedOverlays,
 		artifactComposition.SecretBindings,
 		artifactComposition.SecretRuntime,
-		artifactComposition.LocalState,
+		artifactComposition.ArtifactCleanup,
 		artifactComposition.StoreOverlays,
 		artifactComposition.Topology,
 	)
@@ -351,11 +353,13 @@ func (a *App) initManagers() {
 		a.skillStoreAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
+		artifactComposition.Catalog,
 		artifactComposition.Resources,
-		artifactComposition.ManagedArtifacts,
+		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
+		artifactComposition.Definitions,
 		fallbackProviders,
 		targetMappers,
 		artifactComposition.LocatorResolvers...,
@@ -391,12 +395,14 @@ func (a *App) initManagers() {
 	err = InitAgentStoreWrapper(
 		a.agentStoreAPI,
 		artifactComposition.Roots,
+		artifactComposition.Catalog,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
 		artifactComposition.Resources,
-		artifactComposition.ManagedArtifacts,
+		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
+		artifactComposition.Definitions,
 		fallbackProviders,
 		targetMappers,
 		artifactComposition.LocatorResolvers...,
@@ -437,6 +443,7 @@ func (a *App) initManagers() {
 	err = InitSkillAggregateWrapper(
 		a.skillAggregateAPI,
 		artifactComposition.Artifacts,
+		artifactComposition.Catalog,
 		artifactComposition.Resources,
 		a.skillRuntimeAPI,
 	)
@@ -459,16 +466,18 @@ func (a *App) initManagers() {
 		a.mcpAggregateAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
+		artifactComposition.Catalog,
+		artifactComposition.Definitions,
 		artifactComposition.Resources,
-		artifactComposition.ManagedArtifacts,
+		artifactComposition.ManagedPackages,
 		artifactComposition.Protection,
 		artifactComposition.ProtectedOverlays,
 		artifactComposition.StoreOverlays,
 		artifactComposition.SecretBindings,
 		artifactComposition.SecretRuntime,
-		artifactComposition.LocalState,
+		artifactComposition.ArtifactCleanup,
 		artifactComposition.Topology,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
@@ -502,14 +511,15 @@ func (a *App) initManagers() {
 		a.workspaceRuntimeAPI,
 		artifactComposition.Roots,
 		artifactComposition.Sources,
-		artifactComposition.Discovery,
+		artifactComposition.Refresh,
 		artifactComposition.Artifacts,
+		artifactComposition.Catalog,
 		artifactComposition.Resources,
 		artifactComposition.LocatorResolvers,
 		fallbackProviders,
 		targetMappers,
 		mcpWorkspaceResolver,
-		func(ctx context.Context, rootID root.RootID) error {
+		func(ctx context.Context, rootID rootModel.RootID) error {
 			return ensureUserArtifactBaselineCollectionsForRoot(
 				ctx,
 				rootID,

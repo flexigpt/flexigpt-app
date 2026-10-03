@@ -7,30 +7,53 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/assembly"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	artifactapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	catalogapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	definitionapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	schemaapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	artifactcleanupapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	managedpackageapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	overlayapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	rootapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secretapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	sourceapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Store struct {
-	Roots             RootAPI
-	Sources           SourceAPI
-	Discovery         DiscoveryAPI
-	Artifacts         ArtifactAPI
-	Resources         ResourceAPI
-	Schemas           SchemaAPI
-	ManagedArtifacts  ManagedArtifactAPI
-	ProtectedOverlays ProtectedOverlayAPI
-	SecretBindings    SecretBindingAPI
-	SecretRuntime     SecretRuntimeAPI
-	LocalState        LocalStateMaintenanceAPI
-	StoreOverlays     StoreOverlayAPI
-	Protection        ProtectionAPI
-	Topology          install.API
-	LocatorResolvers  []provider.LocatorResolverFactory
+	Roots     rootapi.API
+	Sources   sourceapi.API
+	Refresh   refreshapi.API
+	Artifacts artifactapi.API
+	Catalog   catalogapi.API
+
+	Definitions definitionapi.API
+	Schemas     schemaapi.API
+	Resources   resourceapi.API
+
+	ManagedPackages managedpackageapi.API
+
+	ProtectedOverlays overlayapi.API
+	StoreOverlays     overlayapi.StoreAPI
+
+	SecretBindings  secretapi.API
+	SecretRuntime   secretapi.RuntimeAPI
+	SecretLifecycle secretapi.LifecycleAPI
+
+	ArtifactCleanup artifactcleanupapi.API
+	Protection      rootapi.ProtectionAPI
+	Topology        install.API
+
+	// Temporary. Remove in Phase 2 when generic provider descriptors and
+	// generic locator resolver registration leave artifactory-go.
+	LocatorResolvers []provider.LocatorResolverFactory
 
 	components *assembly.Components
 	closeOnce  sync.Once
@@ -38,11 +61,11 @@ type Store struct {
 }
 
 type protectionAPI struct {
-	policy root.RootPolicy
+	policy rootModel.RootPolicy
 }
 
 func (p protectionAPI) IsProtectedRoot(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) bool {
 	return p.policy != nil &&
 		p.policy.IsProtectedRoot(rootID)
@@ -69,7 +92,7 @@ func Open(
 	}
 
 	retainedRootIDs := make(
-		[]root.RootID,
+		[]rootModel.RootID,
 		0,
 		len(config.RetainedRoots),
 	)
@@ -85,7 +108,7 @@ func Open(
 	}
 	rootPolicy, err := rootimpl.NewSetRootPolicy(
 		append(
-			[]root.RootID(nil),
+			[]rootModel.RootID(nil),
 			config.ProtectedRootIDs...,
 		),
 		retainedRootIDs,
@@ -120,25 +143,34 @@ func Open(
 	}
 
 	output := &Store{
-		Roots:             components.Roots,
-		Sources:           components.Sources,
-		Discovery:         components.Refresh,
-		Artifacts:         components.Artifacts,
-		Resources:         components.Resources,
-		Schemas:           components.ShareableSchemas,
-		ManagedArtifacts:  components.ManagedArtifacts,
+		Roots:           components.Roots,
+		Sources:         components.Sources,
+		Refresh:         components.Refresh,
+		Artifacts:       components.Artifacts,
+		Catalog:         components.Artifacts,
+		Definitions:     components.Definitions,
+		Schemas:         components.ShareableSchemas,
+		Resources:       components.Resources,
+		ManagedPackages: components.ManagedArtifacts,
+
 		ProtectedOverlays: components.LocalState,
-		SecretBindings:    components.LocalState,
-		SecretRuntime:     components.LocalState,
-		LocalState:        components.LocalState,
 		StoreOverlays:     components.LocalState,
+
+		SecretBindings:  components.LocalState,
+		SecretRuntime:   components.LocalState,
+		SecretLifecycle: components.LocalState,
+
+		ArtifactCleanup: components.LocalState,
+
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},
+
 		LocatorResolvers: append(
 			[]provider.LocatorResolverFactory(nil),
 			components.LocatorResolvers...,
 		),
+
 		components: components,
 	}
 	output.Topology = output

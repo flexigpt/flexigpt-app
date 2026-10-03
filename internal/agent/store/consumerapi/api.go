@@ -11,23 +11,32 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
 type API struct {
-	roots            local.RootAPI
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	resources        local.ResourceAPI
-	protection       local.ProtectionAPI
-	managedArtifacts local.ManagedArtifactAPI
+	roots            root.API
+	cat              catalog.API
+	sources          source.API
+	discovery        refresh.API
+	artifacts        artifact.API
+	resources        resource.API
+	protection       root.ProtectionAPI
+	managedArtifacts managedpackage.API
+	definitions      definition.API
 	texts            *materializetext.Adapter
 
 	collections         *collection.API
@@ -39,7 +48,7 @@ type API struct {
 }
 
 type apiOptions struct {
-	roots             local.RootAPI
+	roots             root.API
 	locatorResolvers  []provider.LocatorResolverFactory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
@@ -52,7 +61,7 @@ type Option func(*apiOptions)
 // default user-Root Collection creation. Explicit Root-scoped operations do
 // not require this option.
 func WithRoots(
-	value local.RootAPI,
+	value root.API,
 ) Option {
 	return func(options *apiOptions) {
 		options.roots = value
@@ -113,12 +122,14 @@ func WithManagedAgentImportSigner(
 }
 
 func New(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	cat catalog.API,
+	resources resource.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	definitions definition.API,
 	options ...Option,
 ) (*API, error) {
 	if sources == nil ||
@@ -126,7 +137,7 @@ func New(
 		artifacts == nil ||
 		resources == nil ||
 		managedArtifacts == nil ||
-		protection == nil {
+		protection == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Agent Store dependencies are incomplete",
 			spec.ErrInvalid,
@@ -169,11 +180,13 @@ func New(
 	output := &API{
 		roots:             config.roots,
 		sources:           sources,
+		cat:               cat,
 		discovery:         discovery,
 		artifacts:         artifacts,
 		resources:         resources,
 		managedArtifacts:  managedArtifacts,
 		protection:        protection,
+		definitions:       definitions,
 		fallbackProviders: maps.Clone(config.fallbackProviders),
 
 		texts:               texts,
@@ -183,7 +196,7 @@ func New(
 
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		agentLocatorRuntime{artifacts: artifacts},
+		agentLocatorRuntime{catalog: cat},
 	)
 	if err != nil {
 		return nil, err
@@ -192,7 +205,7 @@ func New(
 	graphResolver, err := resolve.NewWithOptions(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
-			SourceArtifacts:      artifacts,
+			Catalog:              cat,
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
@@ -206,10 +219,12 @@ func New(
 	}
 
 	collections, err := collection.NewWithResolver(
+		artifacts,
+		cat,
 		sources,
 		discovery,
-		artifacts,
 		managedArtifacts,
+		definitions,
 		graphResolver,
 		agentDomain.AgentCollectionDomainPolicy(),
 	)
@@ -224,7 +239,7 @@ func New(
 
 func (a *API) requireMutable(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	allowProtected bool,
 ) error {
 	if a == nil || a.protection == nil {
@@ -247,16 +262,16 @@ func (a *API) requireMutable(
 }
 
 type agentLocatorRuntime struct {
-	artifacts local.ArtifactAPI
+	catalog catalog.API
 }
 
 func (r agentLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]catalog.Entry, error) {
-	if r.artifacts == nil {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) ([]catalogModel.Entry, error) {
+	if r.catalog == nil {
 		return nil, spec.ErrClosed
 	}
-	return r.artifacts.ListBySource(ctx, rootID, sourceID, catalog.ListOptions{})
+	return r.catalog.ListBySource(ctx, rootID, sourceID, catalogModel.ListOptions{})
 }

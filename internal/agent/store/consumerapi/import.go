@@ -16,10 +16,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -45,15 +45,15 @@ type preparedAgentImport struct {
 
 	CanonicalDeclaration json.RawMessage `json:"canonicalDeclaration"`
 
-	RootID   root.RootID     `json:"rootID"`
-	SourceID source.SourceID `json:"sourceID"`
+	RootID   rootModel.RootID     `json:"rootID"`
+	SourceID sourceModel.SourceID `json:"sourceID"`
 
-	Collection                 artifact.ArtifactRef `json:"collection"`
-	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
-	ExpectedSourceGeneration   string               `json:"expectedSourceGeneration"`
+	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
+	ExpectedSourceGeneration   string                    `json:"expectedSourceGeneration"`
 
-	Address      source.ManagedPackageAddress `json:"address"`
-	AgentLocator spec.Locator                 `json:"agentLocator"`
+	Address      sourceModel.ManagedPackageAddress `json:"address"`
+	AgentLocator spec.Locator                      `json:"agentLocator"`
 
 	RestoredMemberships       []AgentRestoredMembership `json:"restoredMemberships"`
 	MCPSetupDescriptors       []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors"`
@@ -70,7 +70,7 @@ type plannedImportIdentity struct {
 
 func (a *API) ListAgentImportDestinations(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]AgentImportDestination, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed
@@ -697,7 +697,7 @@ func (a *API) CommitAgentImport(
 
 func (a *API) agentImportDestination(
 	ctx context.Context,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) (agentImportDestinationState, error) {
 	if a == nil || a.collections == nil {
@@ -739,7 +739,7 @@ func (a *API) agentImportDestination(
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory ||
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
 		!sourceValue.Enabled {
 		return agentImportDestinationState{}, fmt.Errorf(
@@ -815,17 +815,17 @@ func plannedImportArtifacts(
 
 func (a *API) agentImportIdentityConflicts(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	identities []plannedImportIdentity,
 ) ([]AgentImportConflict, error) {
 	output := make([]AgentImportConflict, 0)
 	for _, identity := range identities {
-		records, err := a.artifacts.FindByIdentity(
+		records, err := a.cat.FindByIdentity(
 			ctx,
 			rootID,
-			artifact.ArtifactKind(identity.Type),
+			artifactModel.ArtifactKind(identity.Type),
 			identity.Name,
-			catalog.ListOptions{},
+			catalogModel.ListOptions{},
 		)
 		if err != nil {
 			return nil, err
@@ -852,12 +852,12 @@ func (a *API) agentImportIdentityConflicts(
 			continue
 		}
 
-		builtinRecords, err := a.artifacts.FindByIdentity(
+		builtinRecords, err := a.cat.FindByIdentity(
 			ctx,
 			agentBuiltinRootID(),
-			artifact.ArtifactKind(identity.Type),
+			artifactModel.ArtifactKind(identity.Type),
 			identity.Name,
-			catalog.ListOptions{},
+			catalogModel.ListOptions{},
 		)
 		if err != nil {
 			return nil, err
@@ -878,9 +878,9 @@ func (a *API) agentImportIdentityConflicts(
 
 func (a *API) managedAgentPackageConflict(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	address source.ManagedPackageAddress,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	address sourceModel.ManagedPackageAddress,
 ) (*AgentImportConflict, error) {
 	if a == nil || a.resources == nil {
 		return nil, spec.ErrClosed
@@ -1031,7 +1031,7 @@ func memberTargetsAgentLocator(
 
 func (a *API) preflightManagedAgentDependencies(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	document agentv1.AgentDocument,
 ) (
 	[]AgentImportRelationship,
@@ -1120,7 +1120,7 @@ func (a *API) preflightManagedAgentDependencies(
 
 func (a *API) preflightNamedManagedDependency(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
 	memberPath string,
 ) (
@@ -1298,28 +1298,28 @@ func validateManagedDependencyTarget(
 
 func (a *API) publishPreparedManagedAgent(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	address source.ManagedPackageAddress,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	address sourceModel.ManagedPackageAddress,
 	raw []byte,
 	expectedDefinition cryptoutil.Digest,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if err := a.requireMutable(ctx, rootID, false); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := agentDomain.ValidateManagedAgentPackageAddress(address); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 
 	locator, err := agentDomain.ManagedPackageLocatorForAgent(address)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	decoderID, err := documentTopology.DefaultDocumentDecoderID(
 		documentTopology.DocumentUseManagedAgent,
 	)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if _, err := a.collections.EnsureManagedDeclarationDiscovery(
 		ctx,
@@ -1328,23 +1328,23 @@ func (a *API) publishPreparedManagedAgent(
 		locator,
 		decoderID,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: rootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
 				Locator:  locator,
 			},
 			ExpectedKind:        agentDomain.AgentArtifactKind,
 			ExpectedLogicalName: address.Name,
 			ExpectedDefinition:  expectedDefinition,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address: address,
-				Files: []source.ManagedPackageFile{{
+				Files: []sourceModel.ManagedPackageFile{{
 					Locator: agentDomain.ManagedAgentDocumentFile(),
 					Content: append([]byte(nil), raw...),
 				}},
@@ -1353,11 +1353,11 @@ func (a *API) publishPreparedManagedAgent(
 		},
 	)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if published.Artifact.ResolvedDefinition == nil ||
 		*published.Artifact.ResolvedDefinition != expectedDefinition {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: published Agent does not match prepared Definition",
 			spec.ErrDigestMismatch,
 		)
@@ -1367,7 +1367,7 @@ func (a *API) publishPreparedManagedAgent(
 
 func (a *API) bindMCPSetupArtifacts(
 	ctx context.Context,
-	agentRef artifact.ArtifactRef,
+	agentRef artifactModel.ArtifactRef,
 	values []AgentMCPSetupDescriptor,
 ) []AgentMCPSetupDescriptor {
 	output := append([]AgentMCPSetupDescriptor(nil), values...)
@@ -1431,7 +1431,7 @@ func importMCPSetupDescriptors(
 }
 
 func importMCPSetupDescriptor(
-	artifactRef *artifact.ArtifactRef,
+	artifactRef *artifactModel.ArtifactRef,
 	value agentDomain.ManagedMCPSetupDescriptor,
 ) AgentMCPSetupDescriptor {
 	output := AgentMCPSetupDescriptor{

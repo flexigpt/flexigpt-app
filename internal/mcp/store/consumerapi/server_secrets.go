@@ -4,13 +4,13 @@ import (
 	"context"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 func (a *API) GetServerSecrets(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerSecretsView, error) {
 	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {

@@ -7,17 +7,17 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 func (a *API) GetAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (AgentView, error) {
 	record, err := a.getAgentRecord(ctx, ref)
 	if err != nil {
@@ -58,7 +58,7 @@ func (a *API) ListAgents(
 		names[name] = struct{}{}
 	}
 
-	allowedRefs := map[artifact.ArtifactRef]struct{}(nil)
+	allowedRefs := map[artifactModel.ArtifactRef]struct{}(nil)
 	if request.Collection != nil {
 		if err := request.Collection.Validate(); err != nil {
 			return nil, err
@@ -80,24 +80,24 @@ func (a *API) ListAgents(
 		if err != nil {
 			return nil, err
 		}
-		allowedRefs = make(map[artifact.ArtifactRef]struct{}, len(refs))
+		allowedRefs = make(map[artifactModel.ArtifactRef]struct{}, len(refs))
 		for _, ref := range refs {
 			allowedRefs[ref] = struct{}{}
 		}
 	}
 
-	rootIDs := []root.RootID{request.RootID}
+	rootIDs := []rootModel.RootID{request.RootID}
 	if request.IncludeBuiltin &&
 		request.RootID != documentTopology.BuiltinRootID() {
 		rootIDs = append(rootIDs, documentTopology.BuiltinRootID())
 	}
 
-	entries := make([]catalog.Entry, 0)
+	entries := make([]catalogModel.Entry, 0)
 	for _, rootID := range rootIDs {
-		values, err := a.artifacts.ListByRoot(
+		values, err := a.cat.ListByRoot(
 			ctx,
 			rootID,
-			catalog.ListOptions{
+			catalogModel.ListOptions{
 				Kind:         agentDomain.AgentArtifactKind,
 				Enabled:      request.Enabled,
 				LogicalNames: request.LogicalNames,
@@ -109,7 +109,7 @@ func (a *API) ListAgents(
 		entries = append(entries, values...)
 	}
 
-	seen := make(map[artifact.ArtifactRef]struct{}, len(entries))
+	seen := make(map[artifactModel.ArtifactRef]struct{}, len(entries))
 	output := make([]AgentListItem, 0, len(entries))
 	for _, entry := range entries {
 		if entry.Kind != agentDomain.AgentArtifactKind {
@@ -153,7 +153,7 @@ func (a *API) ListAgents(
 }
 
 func agentViewFromCatalog(
-	entry catalog.Entry,
+	entry catalogModel.Entry,
 ) AgentView {
 	digest := cryptoutil.Digest("")
 	description := ""
@@ -163,8 +163,8 @@ func agentViewFromCatalog(
 	}
 
 	managed := false
-	if entry.State == artifact.StateAvailable &&
-		entry.Source.Kind == source.SourceKindManagedDirectory &&
+	if entry.State == artifactModel.StateAvailable &&
+		entry.Source.Kind == sourceModel.SourceKindManagedDirectory &&
 		entry.Source.StorageKey == agentDomain.AgentManagedSourceStorageKey &&
 		entry.Binding.SubresourceLocator == "" {
 		_, err := agentDomain.ManagedPackageAddressFromAgentLocator(

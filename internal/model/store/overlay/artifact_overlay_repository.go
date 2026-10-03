@@ -6,28 +6,32 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type ArtifactOverlayDependencies struct {
-	Artifacts        local.ArtifactAPI
-	Protection       local.ProtectionAPI
-	ProtectedOverlay local.ProtectedOverlayAPI
-	Secrets          local.SecretBindingAPI
-	LocalState       local.LocalStateMaintenanceAPI
+	Artifacts        artifact.API
+	Protection       root.ProtectionAPI
+	ProtectedOverlay overlay.API
+	Secrets          secret.API
+	LocalState       artifactcleanup.API
 }
 
 type ArtifactOverlayRepository struct {
-	artifacts        local.ArtifactAPI
-	protection       local.ProtectionAPI
-	protectedOverlay local.ProtectedOverlayAPI
-	secrets          local.SecretBindingAPI
-	localState       local.LocalStateMaintenanceAPI
+	artifacts        artifact.API
+	protection       root.ProtectionAPI
+	protectedOverlay overlay.API
+	secrets          secret.API
+	localState       artifactcleanup.API
 }
 
 func NewArtifactOverlayRepository(
@@ -55,7 +59,7 @@ func NewArtifactOverlayRepository(
 
 func (r *ArtifactOverlayRepository) GetProviderOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ProviderOverlay, bool, error) {
 	record, err := r.artifact(ctx, ref)
 	if err != nil {
@@ -83,7 +87,7 @@ func (r *ArtifactOverlayRepository) GetProviderOverlay(
 
 func (r *ArtifactOverlayRepository) PutProviderOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 	value ProviderOverlay,
@@ -113,7 +117,7 @@ func (r *ArtifactOverlayRepository) PutProviderOverlay(
 		}
 		stored, err := r.protectedOverlay.Put(
 			ctx,
-			overlay.PutRequest{
+			overlayModel.PutRequest{
 				Artifact:                 ref,
 				Namespace:                ProviderRuntimeNamespace,
 				SchemaVersion:            value.SchemaVersion,
@@ -160,7 +164,7 @@ func (r *ArtifactOverlayRepository) PutProviderOverlay(
 
 func (r *ArtifactOverlayRepository) DeleteProviderOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 ) error {
@@ -200,7 +204,7 @@ func (r *ArtifactOverlayRepository) DeleteProviderOverlay(
 
 func (r *ArtifactOverlayRepository) GetModelOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ModelOverlay, bool, error) {
 	record, err := r.artifact(ctx, ref)
 	if err != nil {
@@ -228,7 +232,7 @@ func (r *ArtifactOverlayRepository) GetModelOverlay(
 
 func (r *ArtifactOverlayRepository) PutModelOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 	value ModelOverlay,
@@ -258,7 +262,7 @@ func (r *ArtifactOverlayRepository) PutModelOverlay(
 		}
 		stored, err := r.protectedOverlay.Put(
 			ctx,
-			overlay.PutRequest{
+			overlayModel.PutRequest{
 				Artifact:                 ref,
 				Namespace:                ModelRuntimeNamespace,
 				SchemaVersion:            value.SchemaVersion,
@@ -305,7 +309,7 @@ func (r *ArtifactOverlayRepository) PutModelOverlay(
 
 func (r *ArtifactOverlayRepository) DeleteModelOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 ) error {
@@ -345,8 +349,8 @@ func (r *ArtifactOverlayRepository) DeleteModelOverlay(
 
 func (r *ArtifactOverlayRepository) GetProviderCredential(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (secret.Binding, bool, error) {
+	ref artifactModel.ArtifactRef,
+) (secretModel.Binding, bool, error) {
 	return r.secrets.GetBinding(
 		ctx,
 		ProviderCredentialBindingKey(ref),
@@ -355,11 +359,11 @@ func (r *ArtifactOverlayRepository) GetProviderCredential(
 
 func (r *ArtifactOverlayRepository) ReplaceProviderCredential(
 	ctx context.Context,
-	request secret.ReplaceBindingRequest,
-) (secret.Binding, error) {
+	request secretModel.ReplaceBindingRequest,
+) (secretModel.Binding, error) {
 	if request.Key.Namespace != ProviderRuntimeNamespace ||
 		request.Key.Slot != ProviderCredentialSlot {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: unsupported Model Provider secret binding slot",
 			spec.ErrInvalid,
 		)
@@ -369,7 +373,7 @@ func (r *ArtifactOverlayRepository) ReplaceProviderCredential(
 
 func (r *ArtifactOverlayRepository) ClearProviderCredential(
 	ctx context.Context,
-	request secret.ClearBindingRequest,
+	request secretModel.ClearBindingRequest,
 ) error {
 	if request.Key.Namespace != ProviderRuntimeNamespace ||
 		request.Key.Slot != ProviderCredentialSlot {
@@ -383,7 +387,7 @@ func (r *ArtifactOverlayRepository) ClearProviderCredential(
 
 func (r *ArtifactOverlayRepository) PurgeProviderLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.purgeLocalState(
 		ctx,
@@ -394,7 +398,7 @@ func (r *ArtifactOverlayRepository) PurgeProviderLocalState(
 
 func (r *ArtifactOverlayRepository) PurgeModelLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.purgeLocalState(
 		ctx,
@@ -405,7 +409,7 @@ func (r *ArtifactOverlayRepository) PurgeModelLocalState(
 
 func (r *ArtifactOverlayRepository) purgeLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	dataNamespace string,
 ) error {
 	record, err := r.artifact(ctx, ref)
@@ -424,32 +428,32 @@ func (r *ArtifactOverlayRepository) purgeLocalState(
 
 func (r *ArtifactOverlayRepository) artifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	if r == nil ||
 		r.artifacts == nil ||
 		r.protection == nil ||
 		r.protectedOverlay == nil ||
 		r.secrets == nil ||
 		r.localState == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return r.artifacts.Get(ctx, ref)
 }
 
 func (r *ArtifactOverlayRepository) putMutableData(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	namespace string,
 	value json.RawMessage,
 ) error {
-	fields, err := artifact.DecodeDataObject(record.Data)
+	fields, err := artifactModel.DecodeDataObject(record.Data)
 	if err != nil {
 		return err
 	}
 	fields[namespace] = append(json.RawMessage(nil), value...)
 
-	data, err := artifact.EncodeDataObject(fields)
+	data, err := artifactModel.EncodeDataObject(fields)
 	if err != nil {
 		return err
 	}
@@ -464,10 +468,10 @@ func (r *ArtifactOverlayRepository) putMutableData(
 
 func (r *ArtifactOverlayRepository) removeMutableData(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	namespace string,
 ) error {
-	fields, err := artifact.DecodeDataObject(record.Data)
+	fields, err := artifactModel.DecodeDataObject(record.Data)
 	if err != nil {
 		return err
 	}
@@ -476,7 +480,7 @@ func (r *ArtifactOverlayRepository) removeMutableData(
 	}
 	delete(fields, namespace)
 
-	data, err := artifact.EncodeDataObject(fields)
+	data, err := artifactModel.EncodeDataObject(fields)
 	if err != nil {
 		return err
 	}
@@ -519,7 +523,7 @@ func encodeProtectedProviderOverlay(
 }
 
 func decodeProtectedProviderOverlay(
-	record overlay.Record,
+	record overlayModel.Record,
 ) (ProviderOverlay, error) {
 	var payload providerOverlayPayload
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
@@ -563,7 +567,7 @@ func encodeProtectedModelOverlay(
 }
 
 func decodeProtectedModelOverlay(
-	record overlay.Record,
+	record overlayModel.Record,
 ) (ModelOverlay, error) {
 	var payload modelOverlayPayload
 	if err := jsonutil.DecodeCanonicalObjectExactInto(
@@ -594,7 +598,7 @@ func decodeProtectedModelOverlay(
 func decodeMutableProviderOverlay(
 	raw json.RawMessage,
 ) (ProviderOverlay, bool, error) {
-	fields, err := artifact.DecodeDataObject(raw)
+	fields, err := artifactModel.DecodeDataObject(raw)
 	if err != nil {
 		return ProviderOverlay{}, false, err
 	}
@@ -636,7 +640,7 @@ func encodeMutableProviderOverlay(
 func decodeMutableModelOverlay(
 	raw json.RawMessage,
 ) (ModelOverlay, bool, error) {
-	fields, err := artifact.DecodeDataObject(raw)
+	fields, err := artifactModel.DecodeDataObject(raw)
 	if err != nil {
 		return ModelOverlay{}, false, err
 	}

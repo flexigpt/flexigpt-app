@@ -6,21 +6,21 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
 
 type NamedRelationshipRequest struct {
-	RootID root.RootID
+	RootID rootModel.RootID
 	Member declaration.Entry
 }
 
 type NamedRelationshipTarget struct {
 	Type declaration.Type
 
-	Artifact *artifact.ArtifactRef
+	Artifact *artifactModel.ArtifactRef
 	Mapped   *MappedTarget
 }
 
@@ -31,7 +31,7 @@ type NamedRelationshipInspection struct {
 	Type   declaration.Type
 	Status ResolutionStatus
 
-	Artifact *artifact.ArtifactRef
+	Artifact *artifactModel.ArtifactRef
 	Mapped   *MappedTarget
 	Issue    *ResolutionIssue
 }
@@ -43,8 +43,8 @@ func (r *Resolver) InspectNamedRelationship(
 	ctx context.Context,
 	request NamedRelationshipRequest,
 ) (NamedRelationshipInspection, error) {
-	if r == nil || r.artifacts == nil {
-		return NamedRelationshipInspection{}, spec.ErrClosed
+	if err := r.ready(); err != nil {
+		return NamedRelationshipInspection{}, err
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return NamedRelationshipInspection{}, err
@@ -137,7 +137,7 @@ func namedRelationshipInspectionFailure(
 	if errors.Is(err, spec.ErrInvalid) ||
 		errors.Is(err, spec.ErrDigestMismatch) {
 		return ResolutionUnavailable, ResolutionIssue{
-			Code:    "artifact.reference-invalid",
+			Code:    "artifactModel.reference-invalid",
 			Message: diagnostic.BoundedMessage(err.Error()),
 		}, true
 	}
@@ -152,8 +152,8 @@ func (r *Resolver) ResolveNamedRelationship(
 	ctx context.Context,
 	request NamedRelationshipRequest,
 ) (NamedRelationshipTarget, error) {
-	if r == nil || r.artifacts == nil {
-		return NamedRelationshipTarget{}, spec.ErrClosed
+	if err := r.ready(); err != nil {
+		return NamedRelationshipTarget{}, err
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return NamedRelationshipTarget{}, err

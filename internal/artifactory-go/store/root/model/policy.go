@@ -1,4 +1,4 @@
-package root
+package model
 
 // RootPolicy identifies Roots whose source, package, and ordinary Artifact
 // mutations are prohibited. The application composition owns the concrete

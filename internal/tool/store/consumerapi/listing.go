@@ -22,7 +22,7 @@ func (a *API) listCollectionTools(
 		}
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		a.builtinRoot,
 		catalog.ListOptions{Kind: toolDomain.ToolArtifactKind},

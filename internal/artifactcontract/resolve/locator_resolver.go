@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -79,33 +79,33 @@ func NewProviderLocatorResolver(
 func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	ctx context.Context,
 	request LocatorRequest,
-) (artifact.ArtifactRef, error) {
+) (artifactModel.ArtifactRef, error) {
 	if r == nil {
-		return artifact.ArtifactRef{}, spec.ErrClosed
+		return artifactModel.ArtifactRef{}, spec.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if err := request.ExpectedType.Validate(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if request.ExpectedLogicalName != "" {
 		if err := request.ExpectedLogicalName.Validate(); err != nil {
-			return artifact.ArtifactRef{}, err
+			return artifactModel.ArtifactRef{}, err
 		}
 	}
 
 	locatorKind, err := providerLocatorKind(request.Locator)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	key := provider.LocatorResolverKey{
 		LocatorKind:  locatorKind,
-		ArtifactKind: artifact.ArtifactKind(request.ExpectedType),
+		ArtifactKind: artifactModel.ArtifactKind(request.ExpectedType),
 	}
 	resolver, found := r.resolvers[key]
 	if !found {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: no %q locator resolver is registered for Artifact kind %q",
 			spec.ErrLocatorUnresolved,
 			locatorKind,
@@ -115,11 +115,11 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 
 	locatorJSON, err := request.Locator.MarshalJSON()
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	entryJSON, err := request.Entry.CanonicalJSON()
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	ref, err := resolver.ResolveLocator(
 		ctx,
@@ -133,13 +133,13 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 		},
 	)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if ref.RootID != request.RootID {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: locator resolver returned an Artifact from another Root",
 			spec.ErrInvalid,
 		)

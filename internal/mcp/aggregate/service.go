@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -81,7 +81,7 @@ type MCPServerDetails struct {
 // MCPServerRuntimeDetails contains only process-local runtime/auth observations.
 // Configuration health and effective policy belong to the verified detail read.
 type MCPServerRuntimeDetails struct {
-	Ref                  artifact.ArtifactRef               `json:"ref"`
+	Ref                  artifactModel.ArtifactRef          `json:"ref"`
 	Connection           mcpServer.MCPServerRuntimeSnapshot `json:"connection"`
 	Authorization        *mcpAuth.MCPAuthStatus             `json:"authorization,omitempty"`
 	PendingAuthorization *mcpAuth.MCPOAuthAuthorization     `json:"pendingAuthorization,omitempty"`
@@ -111,7 +111,7 @@ func NewService(dependencies Dependencies) (*Service, error) {
 
 func (s *Service) GetMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
 		return MCPServerDetails{}, err
@@ -126,7 +126,7 @@ func (s *Service) GetMCPServer(
 
 func (s *Service) ListMCPCollectionServers(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
 		return nil, err
@@ -159,7 +159,7 @@ func (s *Service) GetMCPServersForRuntimeServers(
 			mcpServer.ErrInvalid,
 		)
 	}
-	refs := make(map[mcpServer.ServerID]artifact.ArtifactRef, len(servers))
+	refs := make(map[mcpServer.ServerID]artifactModel.ArtifactRef, len(servers))
 	for _, server := range servers {
 		ref, err := artifactRefForRuntimeServerID(server)
 		if err != nil {
@@ -203,7 +203,7 @@ func (s *Service) GetMCPServersForRuntimeServers(
 
 func (s *Service) SaveMCPServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) (MCPServerDetails, error) {
@@ -262,7 +262,7 @@ func (s *Service) UpdateMCPServer(
 
 func (s *Service) DeleteMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := s.ready(); err != nil {
@@ -305,7 +305,7 @@ func (s *Service) SaveMCPPolicy(
 
 func (s *Service) DeleteMCPPolicy(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := s.ready(); err != nil {
@@ -389,7 +389,7 @@ func retainServerSecretBindings(
 
 func (s *Service) saveMCPServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) (MCPServerDetails, error) {
@@ -436,7 +436,7 @@ func (s *Service) serverAuthHealth(
 	}, nil
 }
 
-func (s *Service) clearServerAuthStatus(ref artifact.ArtifactRef) {
+func (s *Service) clearServerAuthStatus(ref artifactModel.ArtifactRef) {
 	serverID, err := runtimeServerIDForArtifact(ref)
 	if err == nil {
 		s.auth.ClearAuthStatus(serverID)

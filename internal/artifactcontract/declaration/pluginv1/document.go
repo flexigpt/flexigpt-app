@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -22,9 +22,9 @@ var schemaJSON []byte
 
 var compiledPluginSchema = jsonutil.MustCompileJSONSchema(schemaJSON)
 
-var PluginSchemaKey = schema.ArtifactKey(
-	artifact.ArtifactKind(PluginType),
-	schema.SchemaID(PluginSchemaID),
+var PluginSchemaKey = schemaModel.ArtifactKey(
+	artifactModel.ArtifactKind(PluginType),
+	schemaModel.SchemaID(PluginSchemaID),
 	PluginSchemaVersion,
 )
 

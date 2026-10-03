@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
@@ -97,18 +97,18 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 			registered.ID,
 		)
 	}
-	if alpha.State != artifact.StateAvailable {
+	if alpha.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"alpha state=%q, want %q",
 			alpha.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
-	if beta.State != artifact.StateAvailable {
+	if beta.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"beta state=%q, want %q",
 			beta.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 
@@ -162,11 +162,11 @@ func TestSkillStoreWorkflowRegistersAndRefreshesSkillDirectory(
 
 	refreshedAlpha, err := fixture.api.GetSkill(ctx, alpha.Ref)
 	requireNoError(t, err)
-	if refreshedAlpha.State != artifact.StateAvailable {
+	if refreshedAlpha.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"refreshed alpha state=%q, want %q",
 			refreshedAlpha.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if refreshedAlpha.Enabled {

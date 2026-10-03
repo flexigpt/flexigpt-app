@@ -4,24 +4,25 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 )
 
 type artifactMCPSecretResolver struct {
-	artifacts local.ArtifactAPI
-	bindings  local.SecretBindingAPI
-	runtime   local.SecretRuntimeAPI
+	artifacts artifact.API
+	bindings  secret.API
+	runtime   secret.RuntimeAPI
 }
 
 func newArtifactMCPSecretResolver(
-	artifacts local.ArtifactAPI,
-	bindings local.SecretBindingAPI,
-	runtime local.SecretRuntimeAPI,
+	artifacts artifact.API,
+	bindings secret.API,
+	runtime secret.RuntimeAPI,
 ) (*artifactMCPSecretResolver, error) {
 	if artifacts == nil || bindings == nil || runtime == nil {
 		return nil, fmt.Errorf(
@@ -65,7 +66,7 @@ func (r *artifactMCPSecretResolver) SetMCPSecret(
 
 	binding, err := r.bindings.ReplaceBinding(
 		ctx,
-		secret.ReplaceBindingRequest{
+		secretModel.ReplaceBindingRequest{
 			Key:                      key,
 			ExpectedArtifactRevision: server.Revision,
 			ExpectedBindingRevision:  expectedBindingRevision,
@@ -145,7 +146,7 @@ func (r *artifactMCPSecretResolver) DeleteSecret(
 
 	return r.bindings.ClearBinding(
 		ctx,
-		secret.ClearBindingRequest{
+		secretModel.ClearBindingRequest{
 			Key:                      key,
 			ExpectedArtifactRevision: server.Revision,
 			ExpectedBindingRevision:  binding.Revision,
@@ -155,42 +156,42 @@ func (r *artifactMCPSecretResolver) DeleteSecret(
 
 func (r *artifactMCPSecretResolver) bindingKey(
 	logicalRef string,
-) (secret.BindingKey, error) {
+) (secretModel.BindingKey, error) {
 	if r == nil || r.artifacts == nil ||
 		r.bindings == nil || r.runtime == nil {
-		return secret.BindingKey{}, spec.ErrClosed
+		return secretModel.BindingKey{}, spec.ErrClosed
 	}
 
 	selector, err := mcpDomainSecret.ParseMCPSecretRef(logicalRef)
 	if err != nil {
-		return secret.BindingKey{}, err
+		return secretModel.BindingKey{}, err
 	}
 	slot, err := mcpDomainSecret.ArtifactBindingSlot(selector)
 	if err != nil {
-		return secret.BindingKey{}, err
+		return secretModel.BindingKey{}, err
 	}
 
-	key := secret.BindingKey{
+	key := secretModel.BindingKey{
 		Artifact:  selector.Server,
 		Namespace: mcpOverlay.InstallationNamespace,
 		Slot:      slot,
 	}
 	if err := key.Validate(); err != nil {
-		return secret.BindingKey{}, err
+		return secretModel.BindingKey{}, err
 	}
 	return key, nil
 }
 
 func (r *artifactMCPSecretResolver) availableServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	record, err := r.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
-	if record.State != artifact.StateAvailable {
-		return artifact.Artifact{}, fmt.Errorf(
+	if record.State != artifactModel.StateAvailable {
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: MCP Server Artifact is unavailable",
 			spec.ErrReferenceUnresolved,
 		)

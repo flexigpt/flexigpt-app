@@ -47,7 +47,7 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 		Kind:    modelDomain.ModelProviderArtifactKind,
 		Enabled: &enabled,
 	}
-	entries, err := s.api.artifacts.FindByIdentity(
+	entries, err := s.api.cat.FindByIdentity(
 		ctx,
 		s.api.builtinRoot,
 		modelDomain.ModelProviderArtifactKind,
@@ -63,7 +63,7 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 
 	// The baseline Provider may be disabled. Respect that choice and inspect
 	// only built-in Provider metadata, not documents, overlays, or Models.
-	entries, err = s.api.artifacts.ListByRoot(
+	entries, err = s.api.cat.ListByRoot(
 		ctx,
 		s.api.builtinRoot,
 		options,

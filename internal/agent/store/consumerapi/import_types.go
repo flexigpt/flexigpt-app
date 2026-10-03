@@ -5,9 +5,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -30,10 +30,10 @@ type AgentImportIssue struct {
 }
 
 type AgentImportDestination struct {
-	RootID          root.RootID          `json:"rootID"`
-	RootDisplayName string               `json:"rootDisplayName,omitempty"`
-	SourceID        source.SourceID      `json:"sourceID"`
-	Collection      artifact.ArtifactRef `json:"collection"`
+	RootID          rootModel.RootID          `json:"rootID"`
+	RootDisplayName string                    `json:"rootDisplayName,omitempty"`
+	SourceID        sourceModel.SourceID      `json:"sourceID"`
+	Collection      artifactModel.ArtifactRef `json:"collection"`
 
 	CollectionRevision    uint64           `json:"collectionRevision"`
 	CollectionName        spec.LogicalName `json:"collectionName"`
@@ -47,8 +47,8 @@ type AgentImportPreviewRequest struct {
 	// Its extension selects the backend parser and is never persisted.
 	Path string `json:"path"`
 
-	Collection                 artifact.ArtifactRef `json:"collection"`
-	ExpectedCollectionRevision uint64               `json:"expectedCollectionRevision"`
+	Collection                 artifactModel.ArtifactRef `json:"collection"`
+	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 
 	ExpectedSourceDigest cryptoutil.Digest `json:"expectedSourceDigest,omitempty"`
 }
@@ -68,8 +68,8 @@ type AgentImportRelationship struct {
 	Scope  declaration.LookupScope  `json:"scope,omitempty"`
 	Status resolve.ResolutionStatus `json:"status"`
 
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Mapped   *resolve.MappedTarget `json:"mapped,omitempty"`
+	Artifact *artifactModel.ArtifactRef `json:"artifact,omitempty"`
+	Mapped   *resolve.MappedTarget      `json:"mapped,omitempty"`
 
 	Code    string `json:"code,omitempty"`
 	Message string `json:"message,omitempty"`
@@ -82,9 +82,9 @@ type AgentImportConflict struct {
 }
 
 type AgentRestoredMembership struct {
-	Collection artifact.ArtifactRef `json:"collection"`
-	Path       string               `json:"path"`
-	Message    string               `json:"message"`
+	Collection artifactModel.ArtifactRef `json:"collection"`
+	Path       string                    `json:"path"`
+	Message    string                    `json:"message"`
 }
 
 type AgentMCPSetupInput struct {
@@ -100,7 +100,7 @@ type AgentMCPSetupDescriptor struct {
 	OccurrencePath string           `json:"occurrencePath"`
 	Name           spec.LogicalName `json:"name"`
 
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
+	Artifact *artifactModel.ArtifactRef `json:"artifact,omitempty"`
 
 	Transport string `json:"transport,omitempty"`
 	Command   string `json:"command,omitempty"`
@@ -153,7 +153,7 @@ type AgentImportCommitResult struct {
 }
 
 type AgentExportRequest struct {
-	Agent artifact.ArtifactRef `json:"agent"`
+	Agent artifactModel.ArtifactRef `json:"agent"`
 }
 
 type AgentExportResult struct {

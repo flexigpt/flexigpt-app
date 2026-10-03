@@ -1,31 +1,24 @@
-package consumerutil
+package resource
 
 import (
 	"context"
 	"errors"
 	"fmt"
 
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// verificationSessionStarter is intentionally optional. Production Resource
-// services expose BeginVerificationSession, while small test doubles can keep
-// implementing only the ordinary ResourceReader methods.
 type verificationSessionStarter interface {
 	BeginVerificationSession(
 		ctx context.Context,
-	) (context.Context, resource.VerificationSession, error)
+	) (context.Context, model.VerificationSession, error)
 }
 
-// WithResourceVerificationSession runs one read-only multi-artifact operation
-// under a shared source verification session when the supplied resource
-// implementation supports it.
-//
-// The session is confirmed and closed before this function returns. Therefore
-// callers never receive successful batch results from a source generation that
-// changed during the batch.
-func WithResourceVerificationSession[T any](
+// WithVerificationSession runs fn under a shared verification session when the
+// resource implementation supports sessions. Older test doubles may implement
+// only the ordinary Resource API.
+func WithVerificationSession[T any](
 	ctx context.Context,
 	resources any,
 	fn func(context.Context) (T, error),

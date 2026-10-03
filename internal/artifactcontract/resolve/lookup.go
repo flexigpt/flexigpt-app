@@ -8,9 +8,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -18,9 +18,9 @@ import (
 func (r *Resolver) resolveEntries(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	values []declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 	relationshipPath []string,
 ) ([]*ResolvedEntry, []ResolvedRelationship, error) {
@@ -65,9 +65,9 @@ func (r *Resolver) resolveEntries(
 func (r *Resolver) resolveMember(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 	relationshipPath []string,
 ) (ResolvedRelationship, error) {
@@ -93,7 +93,7 @@ func (r *Resolver) resolveMember(
 	if member.Header().Type == declaration.TypeWorkspace {
 		relationship.Status = ResolutionUnavailable
 		relationship.Issue = &ResolutionIssue{
-			Code:    "artifact.workspace-nested",
+			Code:    "artifactModel.workspace-nested",
 			Message: "Workspace cannot be resolved as a nested relationship",
 		}
 		return relationship, nil
@@ -191,12 +191,12 @@ func (r *Resolver) resolveMember(
 func (r *Resolver) resolveNamedMember(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	declarationType declaration.Type,
 	name spec.LogicalName,
 	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if state.usesCompositionSource(rootID) {
@@ -265,12 +265,12 @@ func (r *Resolver) resolveNamedMember(
 func (r *Resolver) resolveNamedMemberSourceLocal(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	declarationType declaration.Type,
 	name spec.LogicalName,
 	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 ) (*ResolvedEntry, error) {
 	if scope == declaration.LookupScopeBuiltin {
@@ -304,17 +304,17 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 		)
 	}
 
-	records, err := r.artifacts.FindByIdentity(
+	records, err := r.catalog.FindByIdentity(
 		ctx,
 		rootID,
-		artifact.ArtifactKind(declarationType),
+		artifactModel.ArtifactKind(declarationType),
 		name,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
-	compositionRecords := make([]catalog.Entry, 0)
+	compositionRecords := make([]catalogModel.Entry, 0)
 	for _, record := range records {
 		if record.Binding.SourceID != state.compositionSourceID {
 			continue
@@ -341,9 +341,9 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 		}
 		return r.resolveFallback(ctx, state, rootID, declarationType, name, expectedVersion, scope, from, depth)
 	}
-	terminals := make(map[artifact.ArtifactRef]struct{})
+	terminals := make(map[artifactModel.ArtifactRef]struct{})
 	for _, record := range compositionRecords {
-		if record.State != artifact.StateAvailable {
+		if record.State != artifactModel.StateAvailable {
 			continue
 		}
 		if expectedVersion != "" && record.LogicalVersion != expectedVersion {
@@ -368,7 +368,7 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 			name,
 		)
 	case 1:
-		var terminal artifact.ArtifactRef
+		var terminal artifactModel.ArtifactRef
 		for value := range terminals {
 			terminal = value
 		}
@@ -387,26 +387,26 @@ func (r *Resolver) resolveNamedMemberSourceLocal(
 func (r *Resolver) resolveInRoot(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	declarationType declaration.Type,
 	name spec.LogicalName,
 	expectedVersion spec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, bool, error) {
-	records, err := r.artifacts.FindByIdentity(
+	records, err := r.catalog.FindByIdentity(
 		ctx,
 		rootID,
-		artifact.ArtifactKind(declarationType),
+		artifactModel.ArtifactKind(declarationType),
 		name,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, false, err
 	}
 
-	terminals := make(map[artifact.ArtifactRef]struct{}, len(records))
+	terminals := make(map[artifactModel.ArtifactRef]struct{}, len(records))
 	for _, record := range records {
-		if record.State != artifact.StateAvailable {
+		if record.State != artifactModel.StateAvailable {
 			continue
 		}
 		if expectedVersion != "" &&
@@ -434,7 +434,7 @@ func (r *Resolver) resolveInRoot(
 	case 0:
 		return nil, false, nil
 	case 1:
-		var terminal artifact.ArtifactRef
+		var terminal artifactModel.ArtifactRef
 		for value := range terminals {
 			terminal = value
 		}
@@ -465,12 +465,12 @@ func (r *Resolver) resolveInRoot(
 func (r *Resolver) resolveFallback(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	declarationType declaration.Type,
 	name spec.LogicalName,
 	expectedVersion spec.LogicalVersion,
 	scope declaration.LookupScope,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 ) (*ResolvedEntry, error) {
 	typeResolver, found := r.registry.Resolver(declarationType)
@@ -551,9 +551,9 @@ func (r *Resolver) resolveFallback(
 func (r *Resolver) resolveLocatedMember(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	expectedVersion spec.LogicalVersion,
 	depth int,
 ) (*ResolvedEntry, error) {
@@ -610,9 +610,9 @@ func (r *Resolver) resolveLocatedMember(
 func (r *Resolver) resolveContainedMember(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	relationshipPath []string,
 	depth int,
 ) (*ResolvedEntry, error) {
@@ -648,20 +648,20 @@ func (r *Resolver) resolveContainedMember(
 	}
 
 	header := target.Header()
-	records, err := r.artifacts.FindByIdentity(
+	records, err := r.catalog.FindByIdentity(
 		ctx,
 		rootID,
-		artifact.ArtifactKind(header.Type),
+		artifactModel.ArtifactKind(header.Type),
 		spec.LogicalName(header.Name),
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	matches := make([]artifact.ArtifactRef, 0, 1)
+	matches := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, record := range records {
-		if record.State != artifact.StateAvailable ||
+		if record.State != artifactModel.StateAvailable ||
 			record.Binding.SourceID != from.Binding.SourceID ||
 			record.Binding.Locator != from.Binding.Locator ||
 			record.Binding.SubresourceLocator != subresource {
@@ -708,7 +708,7 @@ func (r *Resolver) resolveContainedMember(
 }
 
 func containedMemberSubresource(
-	parent artifact.Artifact,
+	parent artifactModel.Artifact,
 	member declaration.Entry,
 	relationshipPath []string,
 ) (spec.SubresourceLocator, error) {
@@ -784,26 +784,26 @@ func resolutionFailure(
 		return "", ResolutionIssue{}, false
 	case errors.Is(err, spec.ErrDigestMismatch),
 		errors.Is(err, spec.ErrInvalid):
-		return ResolutionUnavailable, issue("artifact.reference-invalid"), true
+		return ResolutionUnavailable, issue("artifactModel.reference-invalid"), true
 	case errors.Is(err, spec.ErrIdentityConflict):
-		return ResolutionAmbiguous, issue("artifact.identity-conflict"), true
+		return ResolutionAmbiguous, issue("artifactModel.identity-conflict"), true
 	case errors.Is(err, spec.ErrLocatorLimitExceeded):
-		return ResolutionUnavailable, issue("artifact.locator-limit-exceeded"), true
+		return ResolutionUnavailable, issue("artifactModel.locator-limit-exceeded"), true
 	case errors.Is(err, spec.ErrLocatorUnresolved):
-		return ResolutionUnavailable, issue("artifact.locator-unresolved"), true
+		return ResolutionUnavailable, issue("artifactModel.locator-unresolved"), true
 	case errors.Is(err, spec.ErrSourceUnavailable):
-		return ResolutionUnavailable, issue("artifact.source-unavailable"), true
+		return ResolutionUnavailable, issue("artifactModel.source-unavailable"), true
 	case errors.Is(err, spec.ErrRefreshRequired):
-		return ResolutionUnavailable, issue("artifact.refresh-required"), true
+		return ResolutionUnavailable, issue("artifactModel.refresh-required"), true
 	case errors.Is(err, spec.ErrUnsupported):
-		return ResolutionUnavailable, issue("artifact.selector-unavailable"), true
+		return ResolutionUnavailable, issue("artifactModel.selector-unavailable"), true
 	case errors.Is(err, spec.ErrReferenceUnresolved),
 		errors.Is(err, spec.ErrArtifactNotFound),
 		errors.Is(err, spec.ErrRootNotFound),
 		errors.Is(err, spec.ErrDefinitionNotFound),
 		errors.Is(err, spec.ErrSourceNotFound),
 		errors.Is(err, spec.ErrNotFound):
-		return ResolutionUnavailable, issue("artifact.reference-unresolved"), true
+		return ResolutionUnavailable, issue("artifactModel.reference-unresolved"), true
 	default:
 		return "", ResolutionIssue{}, false
 	}

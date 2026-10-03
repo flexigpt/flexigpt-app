@@ -1,4 +1,4 @@
-package refresh
+package model
 
 import (
 	"fmt"

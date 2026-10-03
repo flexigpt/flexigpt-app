@@ -7,12 +7,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
@@ -60,18 +60,18 @@ func (a *API) CreateProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: request.RootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
 				Locator:  locator,
 			},
 			ExpectedKind:        modelDomain.ModelProviderArtifactKind,
 			ExpectedLogicalName: name,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address: address,
-				Files: []source.ManagedPackageFile{{
+				Files: []sourceModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelProviderDocumentFile(),
 					Content: raw,
 				}},
@@ -125,7 +125,7 @@ func (a *API) ReplaceProvider(
 	if err != nil {
 		return ManagedProviderReplaceResult{}, err
 	}
-	if current.State != artifact.StateAvailable {
+	if current.State != artifactModel.StateAvailable {
 		return ManagedProviderReplaceResult{}, fmt.Errorf(
 			"%w: Model Provider Artifact is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -196,9 +196,9 @@ func (a *API) ReplaceProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: current.RootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
 				Locator:  current.Binding.Locator,
 			},
@@ -206,10 +206,10 @@ func (a *API) ReplaceProvider(
 			ExpectedLogicalName:     current.LogicalName,
 			ExpectedDefinition:      definitionValue.Digest,
 			AllowPackageReplacement: true,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
-				Files: []source.ManagedPackageFile{{
+				Files: []sourceModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelProviderDocumentFile(),
 					Content: raw,
 				}},
@@ -249,7 +249,7 @@ func (a *API) ReplaceProvider(
 // inspect, mutate, disable, delete, or purge Models that reference it.
 func (a *API) DeleteProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
 	if err := a.ready(ctx); err != nil {
@@ -269,7 +269,7 @@ func (a *API) DeleteProvider(
 	if err != nil {
 		return err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return fmt.Errorf(
 			"%w: Model Provider Artifact is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -297,7 +297,7 @@ func (a *API) DeleteProvider(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifact.RemoveArtifactRequest{
+		artifactModel.RemoveArtifactRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,
@@ -313,7 +313,7 @@ func (a *API) DeleteProvider(
 	if err != nil {
 		return err
 	}
-	if missing.State != artifact.StateMissing {
+	if missing.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Model Provider Artifact is not missing",
 			spec.ErrConflict,
@@ -375,18 +375,18 @@ func (a *API) CreateModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: request.RootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
 				Locator:  locator,
 			},
 			ExpectedKind:        modelDomain.ModelArtifactKind,
 			ExpectedLogicalName: name,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address: address,
-				Files: []source.ManagedPackageFile{{
+				Files: []sourceModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelDocumentFile(),
 					Content: raw,
 				}},
@@ -440,7 +440,7 @@ func (a *API) ReplaceModel(
 	if err != nil {
 		return ManagedModelReplaceResult{}, err
 	}
-	if current.State != artifact.StateAvailable {
+	if current.State != artifactModel.StateAvailable {
 		return ManagedModelReplaceResult{}, fmt.Errorf(
 			"%w: Model Artifact is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -511,9 +511,9 @@ func (a *API) ReplaceModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: current.RootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
 				Locator:  current.Binding.Locator,
 			},
@@ -521,10 +521,10 @@ func (a *API) ReplaceModel(
 			ExpectedLogicalName:     current.LogicalName,
 			ExpectedDefinition:      definitionValue.Digest,
 			AllowPackageReplacement: true,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
-				Files: []source.ManagedPackageFile{{
+				Files: []sourceModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelDocumentFile(),
 					Content: raw,
 				}},
@@ -562,7 +562,7 @@ func (a *API) ReplaceModel(
 
 func (a *API) DeleteModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
 	if err := a.ready(ctx); err != nil {
@@ -582,7 +582,7 @@ func (a *API) DeleteModel(
 	if err != nil {
 		return err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return fmt.Errorf(
 			"%w: Model Artifact is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -610,7 +610,7 @@ func (a *API) DeleteModel(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifact.RemoveArtifactRequest{
+		artifactModel.RemoveArtifactRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,
@@ -626,7 +626,7 @@ func (a *API) DeleteModel(
 	if err != nil {
 		return err
 	}
-	if missing.State != artifact.StateMissing {
+	if missing.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: removed Model Artifact is not missing",
 			spec.ErrConflict,
@@ -644,13 +644,13 @@ func (a *API) DeleteModel(
 
 func (a *API) ensureManagedSource(
 	ctx context.Context,
-	rootID root.RootID,
-) (source.Summary, error) {
+	rootID rootModel.RootID,
+) (sourceModel.Summary, error) {
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if a.protection.IsProtectedRoot(rootID) {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: managed Model Source is not allowed in a protected Root",
 			spec.ErrProtected,
 		)
@@ -659,19 +659,19 @@ func (a *API) ensureManagedSource(
 	draft := modelDomain.ManagedSourceDraft()
 	summary, _, err := a.sources.Ensure(ctx, rootID, draft)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if summary.ID != draft.ID ||
 		summary.StorageKey != draft.StorageKey ||
-		summary.Kind != source.SourceKindManagedDirectory {
-		return source.Summary{}, fmt.Errorf(
+		summary.Kind != sourceModel.SourceKindManagedDirectory {
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Root %q has an incompatible managed Model Source",
 			spec.ErrConflict,
 			rootID,
 		)
 	}
 	if summary.RetiredAt != nil {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: managed Model Source is retired",
 			spec.ErrRetired,
 		)
@@ -681,13 +681,13 @@ func (a *API) ensureManagedSource(
 
 func (a *API) ensureManagedDeclarationDiscovery(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	locator spec.Locator,
 	documentUse string,
-) (source.Summary, error) {
+) (sourceModel.Summary, error) {
 	summary, err := a.ensureManagedSource(ctx, rootID)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
 	required, err := documentTopology.DiscoverySpecForLocatorForUse(
@@ -695,9 +695,9 @@ func (a *API) ensureManagedDeclarationDiscovery(
 		locator,
 	)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
-	desired := consumerutil.MergeDiscoveryScopes(
+	desired := source.MergeDiscoveryScopes(
 		summary.Discovery,
 		required,
 	)
@@ -709,7 +709,7 @@ func (a *API) ensureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		summary.ID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: summary.Revision,
 			DisplayName:      summary.DisplayName,
 			Enabled:          true,
@@ -717,17 +717,17 @@ func (a *API) ensureManagedDeclarationDiscovery(
 		},
 	)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return updated, nil
 }
 
 func (a *API) currentManagedSourceGeneration(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 ) (string, error) {
-	if err := local.EnsureSourceCurrent(
+	if err := refresh.EnsureSourceCurrent(
 		ctx,
 		a.discovery,
 		rootID,
@@ -755,21 +755,21 @@ func (a *API) currentManagedSourceGeneration(
 
 func (a *API) managedRecord(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	kind artifact.ArtifactKind,
-) (artifact.Artifact, source.Summary, error) {
+	ref artifactModel.ArtifactRef,
+	kind artifactModel.ArtifactKind,
+) (artifactModel.Artifact, sourceModel.Summary, error) {
 	record, err := a.requireKind(ctx, ref, kind)
 	if err != nil {
-		return artifact.Artifact{}, source.Summary{}, err
+		return artifactModel.Artifact{}, sourceModel.Summary{}, err
 	}
 	if a.protection.IsProtectedRoot(record.RootID) {
-		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
+		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: protected Model Artifacts cannot be mutated through managed authoring",
 			spec.ErrProtected,
 		)
 	}
 	if record.Binding.SourceID != modelDomain.ManagedSourceID {
-		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
+		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not owned by the managed Model Source",
 			spec.ErrUnsupported,
 		)
@@ -781,11 +781,11 @@ func (a *API) managedRecord(
 		record.Binding.SourceID,
 	)
 	if err != nil {
-		return artifact.Artifact{}, source.Summary{}, err
+		return artifactModel.Artifact{}, sourceModel.Summary{}, err
 	}
-	if summary.Kind != source.SourceKindManagedDirectory ||
+	if summary.Kind != sourceModel.SourceKindManagedDirectory ||
 		summary.StorageKey != modelDomain.ManagedSourceStorageKey {
-		return artifact.Artifact{}, source.Summary{}, fmt.Errorf(
+		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not backed by the expected managed Source",
 			spec.ErrUnsupported,
 		)
@@ -795,44 +795,44 @@ func (a *API) managedRecord(
 
 func providerDefinition(
 	document modelDomain.ProviderDocument,
-) (definition.Definition, []byte, error) {
+) (definitionModel.Definition, []byte, error) {
 	declarationDocument, err := document.ToDeclaration()
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	raw, err := declarationDocument.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	entry, err := declaration.NewEntry(declarationDocument)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	value, err := decoder.DefinitionForEntry(entry)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	return value, raw, nil
 }
 
 func modelDefinition(
 	document modelDomain.ModelDocument,
-) (definition.Definition, []byte, error) {
+) (definitionModel.Definition, []byte, error) {
 	declarationDocument, err := document.ToDeclaration()
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	raw, err := declarationDocument.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	entry, err := declaration.NewEntry(declarationDocument)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	value, err := decoder.DefinitionForEntry(entry)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	return value, raw, nil
 }

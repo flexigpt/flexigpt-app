@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -16,7 +16,7 @@ import (
 // execution. The codec receives known canonical JSON and returns it unchanged
 // with the correct SchemaKey and document digest.
 func NewPassthrough(
-	key schema.Key,
+	key schemaModel.Key,
 	jsonSchema []byte,
 ) provider.SchemaCodec {
 	return passthrough{
@@ -26,11 +26,11 @@ func NewPassthrough(
 }
 
 type passthrough struct {
-	key        schema.Key
+	key        schemaModel.Key
 	jsonSchema []byte
 }
 
-func (c passthrough) Key() schema.Key {
+func (c passthrough) Key() schemaModel.Key {
 	return c.key
 }
 
@@ -41,23 +41,23 @@ func (c passthrough) JSONSchema() []byte {
 func (c passthrough) Canonicalize(
 	ctx context.Context,
 	raw []byte,
-) (schema.ParsedDocument, error) {
+) (schemaModel.ParsedDocument, error) {
 	if ctx == nil {
-		return schema.ParsedDocument{}, fmt.Errorf(
+		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: declaration schema codec context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return schema.ParsedDocument{}, err
+		return schemaModel.ParsedDocument{}, err
 	}
 	if len(raw) == 0 {
-		return schema.ParsedDocument{}, fmt.Errorf(
+		return schemaModel.ParsedDocument{}, fmt.Errorf(
 			"%w: declaration schema codec received empty canonical JSON",
 			spec.ErrInvalid,
 		)
 	}
-	return schema.ParsedDocument{
+	return schemaModel.ParsedDocument{
 		Key:    c.key,
 		Digest: cryptoutil.DigestBytes(raw),
 		Raw:    append([]byte(nil), raw...),

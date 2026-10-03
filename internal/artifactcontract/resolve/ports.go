@@ -4,65 +4,72 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// ArtifactReader is the Root-scoped read boundary for normal resolver work.
+// ArtifactReader is the entity read boundary used by declaration resolution.
+//
+// It intentionally follows the Artifact's current immutable Definition link.
+// Consumers should satisfy this with store/artifact.API.
+//
+// This is not a generic Definition repository. Resolver work begins with an
+// ArtifactRef and must preserve Artifact state and Artifact -> Definition
+// linkage validation.
 type ArtifactReader interface {
 	Get(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (artifact.Artifact, error)
+		ref artifactModel.ArtifactRef,
+	) (artifactModel.Artifact, error)
 
-	FindByIdentity(
+	GetDefinition(
 		ctx context.Context,
-		rootID root.RootID,
-		kind artifact.ArtifactKind,
-		logicalName spec.LogicalName,
-		options catalog.ListOptions,
-	) ([]catalog.Entry, error)
-
-	GetDefinitions(
-		ctx context.Context,
-		keys []definition.Key,
-	) ([]definition.Definition, error)
+		ref artifactModel.ArtifactRef,
+	) (definitionModel.Definition, error)
 }
 
-// SourceArtifactReader is required for member selector expansion only.
+// ArtifactCatalogReader is the committed Artifact read-projection boundary.
 //
-// The returned records are source-backed Artifact occurrences. Selector
-// matching is done by this package, using source locator, subresource locator,
-// Artifact type, and logical name.
-type SourceArtifactReader interface {
+// Consumers should satisfy this with store/artifact/catalog.API. It is
+// intentionally separate from ArtifactReader because catalog queries return
+// lightweight committed entries rather than complete mutable Artifact entities.
+type ArtifactCatalogReader interface {
+	FindByIdentity(
+		ctx context.Context,
+		rootID rootModel.RootID,
+		kind artifactModel.ArtifactKind,
+		logicalName spec.LogicalName,
+		options catalogModel.ListOptions,
+	) ([]catalogModel.Entry, error)
+
 	ListBySource(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		options catalog.ListOptions,
-	) ([]catalog.Entry, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		options catalogModel.ListOptions,
+	) ([]catalogModel.Entry, error)
 }
 
 // SourceEntryInspector confirms physical Source entry metadata without
-// exposing Source configuration or native filesystem paths. Selector
-// resolution uses it only to verify that a local selector base is a
-// directory.
+// exposing Source configuration or native filesystem paths.
+//
+// Consumers should satisfy this with store/flow/resource.API.
 type SourceEntryInspector interface {
 	StatSourceEntry(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
 		locator spec.Locator,
-	) (source.Entry, error)
+	) (sourceModel.Entry, error)
 }
 
 type RefreshTarget struct {
-	RootID   root.RootID
-	SourceID source.SourceID
+	RootID   rootModel.RootID
+	SourceID sourceModel.SourceID
 }
 
 func (t RefreshTarget) Validate() error {
@@ -78,12 +85,12 @@ type RefreshDirective struct {
 }
 
 type SelectorRefreshRequest struct {
-	Parent   artifact.Artifact
+	Parent   artifactModel.Artifact
 	Selector declaration.Selector
 }
 
 type LocatedMemberRefreshRequest struct {
-	Parent artifact.Artifact
+	Parent artifactModel.Artifact
 	Member declaration.Entry
 }
 

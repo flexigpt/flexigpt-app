@@ -6,8 +6,8 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -31,7 +31,7 @@ func (a *API) CreateAgentCollection(
 
 func (a *API) ensureAgentBaselineCollection(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -41,7 +41,7 @@ func (a *API) ensureAgentBaselineCollection(
 
 func (a *API) GetAgentCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -51,7 +51,7 @@ func (a *API) GetAgentCollection(
 
 func (a *API) ListAgentCollections(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed
@@ -98,7 +98,7 @@ func (a *API) AddAgentCollectionArtifactMember(
 	if err != nil {
 		return collection.CollectionView{}, err
 	}
-	if target.State != artifact.StateAvailable {
+	if target.State != artifactModel.StateAvailable {
 		return collection.CollectionView{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -132,7 +132,7 @@ func (a *API) RemoveAgentCollectionMember(
 
 func (a *API) SetAgentCollectionEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -149,7 +149,7 @@ func (a *API) SetAgentCollectionEnabled(
 
 func (a *API) DeleteAgentCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if a == nil || a.collections == nil {
@@ -166,7 +166,7 @@ func (a *API) DeleteAgentCollection(
 
 func (a *API) ListAgentCollectionMembers(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionCapabilityPlan{}, spec.ErrClosed
@@ -180,7 +180,7 @@ func (a *API) IsManagedAgentCollection(
 	if value.Artifact.Binding.SubresourceLocator != "" {
 		return false
 	}
-	if value.Artifact.Kind != artifact.ArtifactKind(
+	if value.Artifact.Kind != artifactModel.ArtifactKind(
 		pluginv1.PluginType,
 	) {
 		return false
@@ -193,7 +193,7 @@ func (a *API) IsManagedAgentCollection(
 }
 
 func (a *API) IsAgentArtifact(
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) bool {
 	return agentDomain.IsAgentKind(value.Kind)
 }

@@ -1,14 +1,12 @@
-package consumerutil
+package source
 
 import (
 	"slices"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// AppendUniqueLocator appends a declaration locator only when it is not
-// already present.
 func AppendUniqueLocator(
 	values []spec.Locator,
 	value spec.Locator,
@@ -19,12 +17,10 @@ func AppendUniqueLocator(
 	return append(values, value)
 }
 
-// AppendDirectoryRoot appends one discovery root when an identical root does
-// not already exist.
 func AppendDirectoryRoot(
-	values []source.DirectoryRoot,
-	value source.DirectoryRoot,
-) []source.DirectoryRoot {
+	values []sourceModel.DirectoryRoot,
+	value sourceModel.DirectoryRoot,
+) []sourceModel.DirectoryRoot {
 	for _, current := range values {
 		if current.Root != value.Root ||
 			current.Recursive != value.Recursive ||
@@ -43,11 +39,10 @@ func AppendDirectoryRoot(
 	return append(values, value.Clone())
 }
 
-// AppendDecoderHint merges requested decoders for one locator scope.
 func AppendDecoderHint(
-	values []source.DecoderHint,
-	value source.DecoderHint,
-) []source.DecoderHint {
+	values []sourceModel.DecoderHint,
+	value sourceModel.DecoderHint,
+) []sourceModel.DecoderHint {
 	for index := range values {
 		if values[index].Locator != value.Locator ||
 			values[index].Recursive != value.Recursive {
@@ -67,16 +62,14 @@ func AppendDecoderHint(
 	return append(values, value.Clone())
 }
 
-// MergeDiscoveryScopes preserves existing discovery closure while adding
-// required static scopes, decoder hints, and allowed decoders.
-//
-// Source limits and expected-content digests remain current-Source state.
-// They are intentionally not reconciled by this additive helper.
+// MergeDiscoveryScopes preserves current dynamic discovery state while adding
+// required static scopes, hints, and allowed decoders.
 func MergeDiscoveryScopes(
-	current source.DiscoverySpec,
-	required source.DiscoverySpec,
-) source.DiscoverySpec {
+	current sourceModel.DiscoverySpec,
+	required sourceModel.DiscoverySpec,
+) sourceModel.DiscoverySpec {
 	output := current.Clone()
+
 	for _, locator := range required.ExplicitLocators {
 		output.ExplicitLocators = AppendUniqueLocator(
 			output.ExplicitLocators,
@@ -103,7 +96,9 @@ func MergeDiscoveryScopes(
 			)
 		}
 	}
+
 	output.Authoritative = output.Authoritative ||
 		required.Authoritative
+
 	return output.Normalized()
 }

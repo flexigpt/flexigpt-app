@@ -56,11 +56,13 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 
 	api, err := skillConsumerAPI.New(
 		store.Sources,
-		store.Discovery,
+		store.Refresh,
 		store.Artifacts,
 		store.Resources,
-		store.ManagedArtifacts,
+		store.ManagedPackages,
 		store.Protection,
+		store.Catalog,
+		store.Definitions,
 		skillConsumerAPI.WithLocatorResolvers(
 			store.LocatorResolvers,
 		),

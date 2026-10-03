@@ -9,11 +9,11 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -24,21 +24,21 @@ import (
 type ResourceReader interface {
 	ResolveArtifact(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-		options resource.ResolveOptions,
-	) (resource.ResolvedArtifact, error)
+		ref artifactModel.ArtifactRef,
+		options resourceModel.ResolveOptions,
+	) (resourceModel.ResolvedArtifact, error)
 
 	ReadSourceEntry(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
 		locator spec.Locator,
 		maximumBytes int64,
-	) (resource.VerifiedEntry, error)
+	) (resourceModel.VerifiedEntry, error)
 
 	ResolveVerifiedLocalPath(
 		ctx context.Context,
-		resolved resource.ResolvedArtifact,
+		resolved resourceModel.ResolvedArtifact,
 		localLocator spec.Locator,
 	) (string, error)
 }
@@ -46,10 +46,10 @@ type ResourceReader interface {
 // ResolvedSkill is verified Skill package material. It contains no session,
 // Workspace, catalog, or execution state.
 type ResolvedSkill struct {
-	Artifact         artifact.ArtifactRef
+	Artifact         artifactModel.ArtifactRef
 	ArtifactRevision uint64
 	DefinitionDigest cryptoutil.Digest
-	SourceID         source.SourceID
+	SourceID         sourceModel.SourceID
 	Locator          spec.Locator
 
 	Document        document.SkillDocument
@@ -62,7 +62,7 @@ type ResolvedSkill struct {
 func ResolveAll(
 	ctx context.Context,
 	resources ResourceReader,
-	records []artifact.Artifact,
+	records []artifactModel.Artifact,
 ) ([]ResolvedSkill, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
@@ -83,7 +83,7 @@ func ResolveAll(
 		return []ResolvedSkill{}, nil
 	}
 
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		resources,
 		func(sessionCtx context.Context) ([]ResolvedSkill, error) {
@@ -107,7 +107,7 @@ func ResolveAll(
 func Resolve(
 	ctx context.Context,
 	resources ResourceReader,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 ) (ResolvedSkill, error) {
 	if ctx == nil {
 		return ResolvedSkill{}, fmt.Errorf(
@@ -125,7 +125,7 @@ func Resolve(
 		)
 	}
 	if !skillDomain.IsSkillKind(record.Kind) ||
-		record.State != artifact.StateAvailable ||
+		record.State != artifactModel.StateAvailable ||
 		record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {
 		return ResolvedSkill{}, fmt.Errorf(
@@ -138,7 +138,7 @@ func Resolve(
 	resolved, err := resources.ResolveArtifact(
 		ctx,
 		record.Ref(),
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return ResolvedSkill{}, err

@@ -16,10 +16,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 )
 
-var orderedSchemaKeys = []schema.Key{
+var orderedSchemaKeys = []schemaModel.Key{
 	textv1.TextSchemaKey,
 	toolv1.ToolSchemaKey,
 	modelproviderv1.ModelProviderSchemaKey,
@@ -35,7 +35,7 @@ var orderedSchemaKeys = []schema.Key{
 	workspacev1.WorkspaceSchemaKey,
 }
 
-var schemaKeysByType = map[declaration.Type]schema.Key{
+var schemaKeysByType = map[declaration.Type]schemaModel.Key{
 	declaration.TypeText:          textv1.TextSchemaKey,
 	declaration.TypeModel:         modelv1.ModelSchemaKey,
 	declaration.TypeTool:          toolv1.ToolSchemaKey,
@@ -160,13 +160,13 @@ func AllSchemaCodecs() []provider.SchemaCodec {
 	}
 }
 
-func SchemaKeys() []schema.Key {
-	return append([]schema.Key(nil), orderedSchemaKeys...)
+func SchemaKeys() []schemaModel.Key {
+	return append([]schemaModel.Key(nil), orderedSchemaKeys...)
 }
 
 func SchemaKeyForType(
 	declarationType declaration.Type,
-) (schema.Key, bool) {
+) (schemaModel.Key, bool) {
 	key, found := schemaKeysByType[declarationType]
 	return key, found
 }

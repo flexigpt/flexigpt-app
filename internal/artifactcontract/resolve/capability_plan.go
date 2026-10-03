@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -21,8 +21,8 @@ type CapabilityOccurrence struct {
 	Required bool                    `json:"required"`
 	Scope    declaration.LookupScope `json:"scope,omitempty"`
 
-	Artifact *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Mapped   *MappedTarget         `json:"mapped,omitempty"`
+	Artifact *artifactModel.ArtifactRef `json:"artifact,omitempty"`
+	Mapped   *MappedTarget              `json:"mapped,omitempty"`
 
 	Overrides map[string]json.RawMessage `json:"overrides,omitempty"`
 	Use       map[string]json.RawMessage `json:"use,omitempty"`
@@ -32,12 +32,12 @@ type CapabilityOccurrence struct {
 }
 
 type CapabilityPlan struct {
-	RootArtifact *artifact.ArtifactRef  `json:"rootArtifact,omitempty"`
-	RootMapped   *MappedTarget          `json:"rootMapped,omitempty"`
-	RootType     declaration.Type       `json:"rootType"`
-	RootName     spec.LogicalName       `json:"rootName"`
-	Occurrences  []CapabilityOccurrence `json:"occurrences"`
-	Complete     bool                   `json:"complete"`
+	RootArtifact *artifactModel.ArtifactRef `json:"rootArtifact,omitempty"`
+	RootMapped   *MappedTarget              `json:"rootMapped,omitempty"`
+	RootType     declaration.Type           `json:"rootType"`
+	RootName     spec.LogicalName           `json:"rootName"`
+	Occurrences  []CapabilityOccurrence     `json:"occurrences"`
+	Complete     bool                       `json:"complete"`
 }
 
 // ResolveCapabilities resolves any supported declaration Artifact and returns
@@ -46,7 +46,7 @@ type CapabilityPlan struct {
 // other declaration roots.
 func (r *Resolver) ResolveCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	// Empty expected type means infer it from the admitted Artifact.
 	// ResolveTyped owns context, reference, alias, and type checks.
@@ -61,7 +61,7 @@ func (r *Resolver) ResolveCapabilities(
 // relationships, including mapped Tool fallback targets.
 func (r *Resolver) ResolveSkillCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolveSkill(ctx, ref)
 	if err != nil {
@@ -72,7 +72,7 @@ func (r *Resolver) ResolveSkillCapabilities(
 
 func (r *Resolver) ResolvePluginCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolvePlugin(ctx, ref)
 	if err != nil {
@@ -83,7 +83,7 @@ func (r *Resolver) ResolvePluginCapabilities(
 
 func (r *Resolver) ResolveAgentCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolveAgent(ctx, ref)
 	if err != nil {
@@ -94,7 +94,7 @@ func (r *Resolver) ResolveAgentCapabilities(
 
 func (r *Resolver) ResolveTeamCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolveTeam(ctx, ref)
 	if err != nil {
@@ -105,7 +105,7 @@ func (r *Resolver) ResolveTeamCapabilities(
 
 func (r *Resolver) ResolveLoopCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolveLoop(ctx, ref)
 	if err != nil {
@@ -116,7 +116,7 @@ func (r *Resolver) ResolveLoopCapabilities(
 
 func (r *Resolver) ResolveWorkflowCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.ResolveWorkflow(ctx, ref)
 	if err != nil {
@@ -127,7 +127,7 @@ func (r *Resolver) ResolveWorkflowCapabilities(
 
 func (r *Resolver) ResolveWorkspaceCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CapabilityPlan, error) {
 	value, err := r.resolveTyped(ctx, ref, declaration.TypeWorkspace)
 	if err != nil {

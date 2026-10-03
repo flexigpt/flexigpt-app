@@ -9,8 +9,9 @@ import (
 	"strings"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -60,15 +61,15 @@ func (a *API) AddSkillPath(
 		return SkillPathRegistrationResult{}, err
 	}
 
-	summary, err := consumerutil.EnsureAndRefreshSource(
+	summary, err := refresh.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		consumerutil.EnsureAndRefreshSourceRequest{
+		refresh.EnsureAndRefreshSourceRequest{
 			RootID: request.RootID,
 			Draft: source.Draft{
 				ID: source.SourceID(uuidutil.NewUUIDv7()),
-				StorageKey: consumerutil.FilesystemSourceStorageKey(
+				StorageKey: fsdir.FilesystemSourceStorageKey(
 					"skill-path",
 					rootPath,
 				),

@@ -1,26 +1,26 @@
-package source
+package model
 
 import (
 	"fmt"
 	"time"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Summary struct {
-	ID             SourceID        `json:"id"`
-	RootID         root.RootID     `json:"rootID"`
-	RootStorageKey spec.StorageKey `json:"rootStorageKey"`
-	StorageKey     spec.StorageKey `json:"storageKey"`
-	Kind           SourceKind      `json:"kind"`
-	DisplayName    string          `json:"displayName"`
-	Enabled        bool            `json:"enabled"`
-	Discovery      DiscoverySpec   `json:"discovery"`
-	Revision       uint64          `json:"revision"`
-	CreatedAt      time.Time       `json:"createdAt"`
-	ModifiedAt     time.Time       `json:"modifiedAt"`
-	RetiredAt      *time.Time      `json:"retiredAt,omitempty"`
+	ID             SourceID         `json:"id"`
+	RootID         rootModel.RootID `json:"rootID"`
+	RootStorageKey spec.StorageKey  `json:"rootStorageKey"`
+	StorageKey     spec.StorageKey  `json:"storageKey"`
+	Kind           SourceKind       `json:"kind"`
+	DisplayName    string           `json:"displayName"`
+	Enabled        bool             `json:"enabled"`
+	Discovery      DiscoverySpec    `json:"discovery"`
+	Revision       uint64           `json:"revision"`
+	CreatedAt      time.Time        `json:"createdAt"`
+	ModifiedAt     time.Time        `json:"modifiedAt"`
+	RetiredAt      *time.Time       `json:"retiredAt,omitempty"`
 }
 
 func (s Summary) Validate() error {

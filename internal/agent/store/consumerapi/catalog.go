@@ -9,38 +9,38 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-func agentBuiltinRootID() root.RootID {
+func agentBuiltinRootID() rootModel.RootID {
 	return documentTopology.BuiltinRootID()
 }
 
 type agentSourceCacheKey struct {
-	rootID   root.RootID
-	sourceID source.SourceID
+	rootID   rootModel.RootID
+	sourceID sourceModel.SourceID
 }
 
 func (a *API) getAgentRecord(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	if a == nil || a.artifacts == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 
 	value, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if !agentDomain.IsAgentKind(value.Kind) {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not an Agent",
 			spec.ErrNotFound,
 			ref.ArtifactID,
@@ -51,7 +51,7 @@ func (a *API) getAgentRecord(
 
 func (a *API) SetAgentEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (AgentView, error) {
@@ -78,7 +78,7 @@ func (a *API) SetAgentEnabled(
 
 func (a *API) ResolveAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (AgentResolution, error) {
 	if a == nil || a.declarationResolver == nil {
 		return AgentResolution{}, spec.ErrClosed
@@ -109,7 +109,7 @@ func (a *API) ResolveAgent(
 
 func (a *API) ResolveAgentCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (AgentCapabilityPlan, error) {
 	if a == nil || a.declarationResolver == nil {
 		return AgentCapabilityPlan{}, spec.ErrClosed
@@ -223,8 +223,8 @@ func projectAgentBoolean(
 
 func (a *API) listCollectionAgentRefs(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) ([]artifact.ArtifactRef, error) {
+	ref artifactModel.ArtifactRef,
+) ([]artifactModel.ArtifactRef, error) {
 	if a == nil || a.collections == nil || a.declarationResolver == nil {
 		return nil, spec.ErrClosed
 	}
@@ -237,7 +237,7 @@ func (a *API) listCollectionAgentRefs(
 		return nil, err
 	}
 
-	refs := make(map[artifact.ArtifactRef]struct{})
+	refs := make(map[artifactModel.ArtifactRef]struct{})
 	for _, relationship := range plugin.MemberResults {
 		if relationship.Declared.Header().Type != agentv1.AgentType {
 			continue
@@ -260,7 +260,7 @@ func (a *API) listCollectionAgentRefs(
 		}
 	}
 
-	output := make([]artifact.ArtifactRef, 0, len(refs))
+	output := make([]artifactModel.ArtifactRef, 0, len(refs))
 	for target := range refs {
 		output = append(output, target)
 	}
@@ -269,15 +269,15 @@ func (a *API) listCollectionAgentRefs(
 
 func (a *API) agentView(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 ) (AgentView, error) {
 	return a.agentViewWithSourceCache(ctx, record, nil)
 }
 
 func (a *API) agentViewWithSourceCache(
 	ctx context.Context,
-	record artifact.Artifact,
-	sourceCache map[agentSourceCacheKey]source.Summary,
+	record artifactModel.Artifact,
+	sourceCache map[agentSourceCacheKey]sourceModel.Summary,
 ) (AgentView, error) {
 	if !agentDomain.IsAgentKind(record.Kind) {
 		return AgentView{}, fmt.Errorf(
@@ -300,7 +300,7 @@ func (a *API) agentViewWithSourceCache(
 		view.DefinitionDigest = *record.ResolvedDefinition
 	}
 
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return view, nil
 	}
 
@@ -319,11 +319,11 @@ func (a *API) agentViewWithSourceCache(
 
 func (a *API) agentManaged(
 	ctx context.Context,
-	record artifact.Artifact,
-	sourceCache map[agentSourceCacheKey]source.Summary,
+	record artifactModel.Artifact,
+	sourceCache map[agentSourceCacheKey]sourceModel.Summary,
 ) (bool, error) {
 	if record.RootID == agentBuiltinRootID() ||
-		record.State != artifact.StateAvailable ||
+		record.State != artifactModel.StateAvailable ||
 		record.Binding.SubresourceLocator != "" {
 		return false, nil
 	}
@@ -345,7 +345,7 @@ func (a *API) agentManaged(
 			sourceCache[key] = sourceValue
 		}
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory ||
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
 		return false, nil
 	}

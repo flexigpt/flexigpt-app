@@ -6,8 +6,9 @@ import (
 
 	"github.com/flexigpt/agentskills-go/document"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
@@ -15,11 +16,11 @@ import (
 )
 
 type WorkspaceSkill struct {
-	Artifact         artifact.ArtifactRef `json:"-"`
-	ArtifactRevision uint64               `json:"-"`
-	DefinitionDigest cryptoutil.Digest    `json:"-"`
-	SourceID         string               `json:"-"`
-	Locator          spec.Locator         `json:"-"`
+	Artifact         artifactModel.ArtifactRef `json:"-"`
+	ArtifactRevision uint64                    `json:"-"`
+	DefinitionDigest cryptoutil.Digest         `json:"-"`
+	SourceID         string                    `json:"-"`
+	Locator          spec.Locator              `json:"-"`
 
 	Document        document.SkillDocument `json:"-"`
 	RuntimeLocation string                 `json:"-"`
@@ -27,18 +28,18 @@ type WorkspaceSkill struct {
 }
 
 type LoadPlan struct {
-	Workspace artifact.ArtifactRef `json:"-"`
-	Skills    []WorkspaceSkill     `json:"-"`
+	Workspace artifactModel.ArtifactRef `json:"-"`
+	Skills    []WorkspaceSkill          `json:"-"`
 }
 
 type Adapter struct {
-	artifacts local.ArtifactAPI
-	resources local.ResourceAPI
+	artifacts artifact.API
+	resources resource.API
 }
 
 func New(
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
+	artifacts artifact.API,
+	resources resource.API,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(
@@ -58,7 +59,7 @@ func New(
 func (a *Adapter) LoadSelected(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (LoadPlan, error) {
 	if a == nil || a.artifacts == nil || a.resources == nil {
 		return LoadPlan{}, spec.ErrClosed
@@ -69,7 +70,7 @@ func (a *Adapter) LoadSelected(
 func (a *Adapter) loadSelected(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (LoadPlan, error) {
 	output := LoadPlan{
 		Workspace: workspace.Ref(),
@@ -96,7 +97,7 @@ func (a *Adapter) loadSelected(
 func (a *Adapter) resolve(
 	ctx context.Context,
 	_ workspaceDomain.Workspace,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 ) (WorkspaceSkill, error) {
 	value, err := materialize.Resolve(ctx, a.resources, record)
 	if err != nil {

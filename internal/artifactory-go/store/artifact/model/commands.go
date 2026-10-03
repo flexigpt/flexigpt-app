@@ -1,4 +1,4 @@
-package artifact
+package model
 
 import (
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"

@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
@@ -59,7 +59,7 @@ func withToolAggregate[T any](
 }
 
 func (w *ToolAggregateWrapper) MapToolTarget(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (resolve.MappedTarget, error) {
 	return withToolAggregate(
 		w,

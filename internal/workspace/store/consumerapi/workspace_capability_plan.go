@@ -6,13 +6,13 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
 func (a *StoreAPI) ResolveWorkspaceCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (resolve.CapabilityPlan, error) {
 	_, plan, err := a.resolveWorkspaceCapabilities(ctx, ref)
 	return plan, err
@@ -20,7 +20,7 @@ func (a *StoreAPI) ResolveWorkspaceCapabilities(
 
 func (a *StoreAPI) resolveWorkspaceCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (
 	workspaceDomain.Workspace,
 	resolve.CapabilityPlan,
@@ -53,9 +53,9 @@ func requireCompleteWorkspaceCapabilities(
 func workspaceArtifactRefs(
 	plan resolve.CapabilityPlan,
 	declarationType declaration.Type,
-) []artifact.ArtifactRef {
-	output := make([]artifact.ArtifactRef, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
+) []artifactModel.ArtifactRef {
+	output := make([]artifactModel.ArtifactRef, 0)
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 
 	for _, occurrence := range plan.Occurrences {
 		if occurrence.Status != resolve.ResolutionAvailable ||

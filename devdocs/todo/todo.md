@@ -2,6 +2,9 @@
 
 ## Laundry list
 
+- [ ] diff now has inspect path and tthen review again. we want inspect first and then on that click review shoudl already be done.
+- [ ] in case where manually path is entered, even if we put the target, the review doesnt work.
+
 - Testing
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.

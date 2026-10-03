@@ -1,10 +1,10 @@
-package consumerutil
+package collection
 
 import (
 	"container/list"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 )
 
 const (
@@ -21,19 +21,19 @@ const (
 // The independent entry-count limit also bounds small-document overhead.
 type DocumentCache[T any] struct {
 	mu     sync.Mutex
-	values map[definition.Key]*list.Element
+	values map[definitionModel.Key]*list.Element
 	order  list.List
 	bytes  int
 }
 
 type documentCacheValue[T any] struct {
-	key   definition.Key
+	key   definitionModel.Key
 	value T
 	cost  int
 }
 
 func (c *DocumentCache[T]) Get(
-	key definition.Key,
+	key definitionModel.Key,
 ) (T, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -49,7 +49,7 @@ func (c *DocumentCache[T]) Get(
 }
 
 func (c *DocumentCache[T]) GetOrLoad(
-	key definition.Key,
+	key definitionModel.Key,
 	inputBytes int,
 	load func() (T, error),
 ) (T, error) {
@@ -71,7 +71,7 @@ func (c *DocumentCache[T]) GetOrLoad(
 	}
 	cost := inputBytes + documentCacheEntryCost
 	if c.values == nil {
-		c.values = make(map[definition.Key]*list.Element)
+		c.values = make(map[definitionModel.Key]*list.Element)
 	}
 	for len(c.values) >= documentCacheEntries || c.bytes+cost > documentCacheInputBytes {
 		element := c.order.Back()

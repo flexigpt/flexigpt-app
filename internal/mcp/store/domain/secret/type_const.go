@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 )
 
 var ErrNotFound = errors.New("MCP secret not found")
@@ -44,9 +44,9 @@ func (kind MCPSecretKind) Validate() error {
 }
 
 type MCPSecretRef struct {
-	Server artifact.ArtifactRef `json:"server"`
-	Kind   MCPSecretKind        `json:"kind"`
-	Slot   string               `json:"slot,omitempty"`
+	Server artifactModel.ArtifactRef `json:"server"`
+	Kind   MCPSecretKind             `json:"kind"`
+	Slot   string                    `json:"slot,omitempty"`
 }
 
 func (ref MCPSecretRef) Validate() error {

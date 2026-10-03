@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntimeSpec "github.com/flexigpt/agentskills-go/runtime/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 )
 
 var ErrArtifactSkillSelectionRequired = errors.New(
@@ -15,18 +15,18 @@ var ErrArtifactSkillSelectionRequired = errors.New(
 )
 
 type ArtifactSkillFilter struct {
-	Types          []string               `json:"types,omitempty"`
-	Inserts        []document.SkillInsert `json:"inserts,omitempty"`
-	NamePrefix     string                 `json:"namePrefix,omitempty"`
-	LocationPrefix string                 `json:"locationPrefix,omitempty"`
-	AllowArtifacts []artifact.ArtifactRef `json:"allowArtifacts,omitempty"`
+	Types          []string                    `json:"types,omitempty"`
+	Inserts        []document.SkillInsert      `json:"inserts,omitempty"`
+	NamePrefix     string                      `json:"namePrefix,omitempty"`
+	LocationPrefix string                      `json:"locationPrefix,omitempty"`
+	AllowArtifacts []artifactModel.ArtifactRef `json:"allowArtifacts,omitempty"`
 
 	SessionID agentskillsRuntimeSpec.SessionID     `json:"sessionID,omitempty"`
 	Activity  agentskillsRuntimeSpec.SkillActivity `json:"activity,omitempty"`
 }
 
 type ArtifactSkillSummary struct {
-	Artifact     artifact.ArtifactRef
+	Artifact     artifactModel.ArtifactRef
 	IsEnabled    bool
 	Insert       document.SkillInsert
 	HasArguments bool
@@ -34,7 +34,7 @@ type ArtifactSkillSummary struct {
 }
 
 type ResolvedArtifactSkill struct {
-	Artifact   artifact.ArtifactRef
+	Artifact   artifactModel.ArtifactRef
 	Definition provider.SkillDef
 	Version    string
 	Enabled    bool

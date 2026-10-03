@@ -8,10 +8,17 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
@@ -23,25 +30,25 @@ import (
 type ModelStoreWrapper struct {
 	api        *modelConsumerAPI.API
 	management *modelConsumerAPI.CatalogStore
-	roots      local.RootAPI
-	protection local.ProtectionAPI
+	roots      root.API
+	protection root.ProtectionAPI
 }
 
 func initModelWrappers(
 	ctx context.Context,
 	storeWrapper *ModelStoreWrapper,
 	aggregateWrapper *ModelAggregateWrapper,
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	roots local.RootAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
-	protectedOverlays local.ProtectedOverlayAPI,
-	secretBindings local.SecretBindingAPI,
-	secretRuntime local.SecretRuntimeAPI,
-	localState local.LocalStateMaintenanceAPI,
-	storeOverlays local.StoreOverlayAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	roots root.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	protectedOverlays overlay.API,
+	secretBindings secret.API,
+	secretRuntime secret.RuntimeAPI,
+	localState artifactcleanup.API,
+	storeOverlays overlay.StoreAPI,
 	hydrator topology.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || aggregateWrapper == nil {
@@ -141,7 +148,7 @@ func initModelWrappers(
 }
 
 func (w *ModelStoreWrapper) ListProviders(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]modelConsumerAPI.ProviderListItem, error) {
 	if w == nil || w.management == nil {
 		return nil, spec.ErrClosed
@@ -165,7 +172,7 @@ func (w *ModelStoreWrapper) ListProviders(
 }
 
 func (w *ModelStoreWrapper) ListModels(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]modelConsumerAPI.ModelListItem, error) {
 	if w == nil || w.management == nil {
 		return nil, spec.ErrClosed
@@ -189,7 +196,7 @@ func (w *ModelStoreWrapper) ListModels(
 }
 
 func (w *ModelStoreWrapper) GetProvider(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (modelConsumerAPI.ProviderView, error) {
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ProviderView{}, spec.ErrClosed
@@ -198,7 +205,7 @@ func (w *ModelStoreWrapper) GetProvider(
 }
 
 func (w *ModelStoreWrapper) GetModel(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (modelConsumerAPI.ModelView, error) {
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ModelView{}, spec.ErrClosed
@@ -216,7 +223,7 @@ func (w *ModelStoreWrapper) SaveModelSettings(
 }
 
 func (w *ModelStoreWrapper) ResetModelSettings(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedModelRevision uint64,
 	expectedSettingsRevision uint64,
 ) (modelConsumerAPI.ModelView, error) {
@@ -232,7 +239,7 @@ func (w *ModelStoreWrapper) ResetModelSettings(
 }
 
 func (w *ModelStoreWrapper) GetProviderAPIKeyStatus(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
 	if w == nil || w.api == nil {
 		return modelConsumerAPI.ProviderAPIKeyStatus{}, spec.ErrClosed
@@ -268,7 +275,7 @@ func (w *ModelStoreWrapper) UpdateModel(
 }
 
 func (w *ModelStoreWrapper) DeleteModel(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if w == nil || w.api == nil {
@@ -282,12 +289,12 @@ func (w *ModelStoreWrapper) DeleteModel(
 }
 
 func (w *ModelStoreWrapper) SetModelEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if w == nil || w.api == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return w.api.SetModelEnabled(
 		context.Background(),
@@ -299,8 +306,8 @@ func (w *ModelStoreWrapper) SetModelEnabled(
 
 func (w *ModelStoreWrapper) managementRootIDs(
 	ctx context.Context,
-	requested root.RootID,
-) ([]root.RootID, error) {
+	requested rootModel.RootID,
+) ([]rootModel.RootID, error) {
 	if w == nil || w.roots == nil || w.protection == nil {
 		return nil, spec.ErrClosed
 	}
@@ -308,7 +315,7 @@ func (w *ModelStoreWrapper) managementRootIDs(
 		if err := requested.Validate(); err != nil {
 			return nil, err
 		}
-		return []root.RootID{requested}, nil
+		return []rootModel.RootID{requested}, nil
 	}
 
 	values, err := w.roots.List(ctx)
@@ -316,7 +323,7 @@ func (w *ModelStoreWrapper) managementRootIDs(
 		return nil, err
 	}
 
-	output := make([]root.RootID, 0, len(values))
+	output := make([]rootModel.RootID, 0, len(values))
 	for _, value := range values {
 		if value.RetiredAt != nil {
 			continue
@@ -329,8 +336,8 @@ func (w *ModelStoreWrapper) managementRootIDs(
 
 func (w *ModelStoreWrapper) writableManagementRoot(
 	ctx context.Context,
-	requested root.RootID,
-) (root.RootID, error) {
+	requested rootModel.RootID,
+) (rootModel.RootID, error) {
 	roots, err := w.managementRootIDs(ctx, requested)
 	if err != nil {
 		return "", err

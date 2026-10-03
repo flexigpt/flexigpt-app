@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -50,7 +50,7 @@ func (m MappedTarget) Validate() error {
 }
 
 type FallbackTarget struct {
-	Artifact *artifact.ArtifactRef
+	Artifact *artifactModel.ArtifactRef
 	Mapped   *MappedTarget
 }
 

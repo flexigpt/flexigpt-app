@@ -12,9 +12,9 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -25,8 +25,8 @@ const (
 )
 
 type LocatorRequest struct {
-	RootID              root.RootID
-	From                *artifact.Artifact
+	RootID              rootModel.RootID
+	From                *artifactModel.Artifact
 	Entry               declaration.Entry
 	Locator             declaration.Locator
 	ExpectedType        declaration.Type
@@ -42,15 +42,15 @@ type LocatorResolver interface {
 	ResolveArtifactLocator(
 		ctx context.Context,
 		request LocatorRequest,
-	) (artifact.ArtifactRef, error)
+	) (artifactModel.ArtifactRef, error)
 }
 
 // ArtifactTargetRequest contains a source-backed terminal Artifact selected
 // by normal resolver lookup. A registered type mapper may replace it with a
 // mapped target before it reaches a consumer capability plan.
 type ArtifactTargetRequest struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
+	Artifact   artifactModel.Artifact
+	Definition definitionModel.Definition
 	Type       declaration.Type
 }
 
@@ -109,9 +109,11 @@ func (l Limits) Validate() error {
 type ResolverOptions struct {
 	Artifacts ArtifactReader
 
-	// SourceArtifacts is used only for selector expansion. Normal named,
-	// located, and contained relationship resolution does not require it.
-	SourceArtifacts SourceArtifactReader
+	// Catalog is the committed Artifact read projection used for named,
+	// contained, and selector relationship resolution.
+	//
+	// Production composition should provide store/artifact/catalog.API.
+	Catalog ArtifactCatalogReader
 
 	// SourceEntries verifies that a selector base is a directory in the
 	// declaring Source. It is used only for member-selector resolution.
@@ -122,7 +124,7 @@ type ResolverOptions struct {
 
 	// ProtectedBuiltinRoot enables current Root followed by protected built-in
 	// Root lookup for named external members.
-	ProtectedBuiltinRoot root.RootID
+	ProtectedBuiltinRoot rootModel.RootID
 
 	// Tool and Model are the initial mapped-fallback-capable types. A future
 	// type may register a provider when its resolver and consumer support it.
@@ -139,21 +141,27 @@ type ResolverOptions struct {
 }
 
 type Resolver struct {
-	artifacts       ArtifactReader
-	sourceArtifacts SourceArtifactReader
-	locators        LocatorResolver
-	sourceEntries   SourceEntryInspector
-	registry        *Registry
-	targetMappers   map[declaration.Type]ArtifactTargetMapper
-	builtinRoot     root.RootID
-	refresh         RefreshCoordinator
-	limits          Limits
+	artifacts     ArtifactReader
+	catalog       ArtifactCatalogReader
+	locators      LocatorResolver
+	sourceEntries SourceEntryInspector
+	registry      *Registry
+	targetMappers map[declaration.Type]ArtifactTargetMapper
+	builtinRoot   rootModel.RootID
+	refresh       RefreshCoordinator
+	limits        Limits
 }
 
 func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 	if options.Artifacts == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact resolver ArtifactReader is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if options.Catalog == nil {
+		return nil, fmt.Errorf(
+			"%w: Artifact resolver ArtifactCatalogReader is nil",
 			spec.ErrInvalid,
 		)
 	}
@@ -186,20 +194,6 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 		}
 	}
 
-	sourceArtifacts := options.SourceArtifacts
-	if sourceArtifacts == nil {
-		if value, found := options.Artifacts.(SourceArtifactReader); found {
-			sourceArtifacts = value
-		}
-	}
-
-	sourceEntries := options.SourceEntries
-	if sourceEntries == nil {
-		if value, found := options.Artifacts.(SourceEntryInspector); found {
-			sourceEntries = value
-		}
-	}
-
 	targetMappers := make(
 		map[declaration.Type]ArtifactTargetMapper,
 		len(options.TargetMappers),
@@ -219,16 +213,23 @@ func NewWithOptions(options ResolverOptions) (*Resolver, error) {
 	}
 
 	return &Resolver{
-		artifacts:       options.Artifacts,
-		sourceArtifacts: sourceArtifacts,
-		locators:        options.Locators,
-		sourceEntries:   sourceEntries,
-		registry:        registry,
-		targetMappers:   targetMappers,
-		builtinRoot:     options.ProtectedBuiltinRoot,
-		refresh:         options.Refresh,
-		limits:          limits,
+		artifacts:     options.Artifacts,
+		catalog:       options.Catalog,
+		locators:      options.Locators,
+		sourceEntries: options.SourceEntries,
+		registry:      registry,
+		targetMappers: targetMappers,
+		builtinRoot:   options.ProtectedBuiltinRoot,
+		refresh:       options.Refresh,
+		limits:        limits,
 	}, nil
+}
+
+func (r *Resolver) ready() error {
+	if r == nil || r.artifacts == nil || r.catalog == nil {
+		return spec.ErrClosed
+	}
+	return nil
 }
 
 type ResolutionStatus string
@@ -245,7 +246,7 @@ type ResolutionIssue struct {
 }
 
 type FallbackRequest struct {
-	RootID root.RootID
+	RootID rootModel.RootID
 	Type   declaration.Type
 	Name   spec.LogicalName
 	Scope  declaration.LookupScope
@@ -291,10 +292,10 @@ type ResolvedSelector struct {
 }
 
 type ResolvedSelectorMatch struct {
-	Artifact artifact.ArtifactRef `json:"-"`
-	Status   ResolutionStatus     `json:"-"`
-	Resolved *ResolvedEntry       `json:"-"`
-	Issue    *ResolutionIssue     `json:"-"`
+	Artifact artifactModel.ArtifactRef `json:"-"`
+	Status   ResolutionStatus          `json:"-"`
+	Resolved *ResolvedEntry            `json:"-"`
+	Issue    *ResolutionIssue          `json:"-"`
 }
 
 // ResolvedEntry is an internal graph node. It can contain canonical
@@ -303,12 +304,12 @@ type ResolvedSelectorMatch struct {
 type ResolvedEntry struct {
 	Type declaration.Type `json:"-"`
 
-	scopeRootID       root.RootID
-	DeclarationOrigin *artifact.Artifact `json:"-"`
+	scopeRootID       rootModel.RootID
+	DeclarationOrigin *artifactModel.Artifact `json:"-"`
 
-	Artifact   *artifact.Artifact     `json:"-"`
-	Definition *definition.Definition `json:"-"`
-	Mapped     *MappedTarget          `json:"-"`
+	Artifact   *artifactModel.Artifact     `json:"-"`
+	Definition *definitionModel.Definition `json:"-"`
+	Mapped     *MappedTarget               `json:"-"`
 
 	Members            []*ResolvedEntry       `json:"-"`
 	MemberResults      []ResolvedRelationship `json:"-"`
@@ -363,14 +364,14 @@ type ResolvedWorkspace struct {
 	MemberResults []ResolvedRelationship `json:"-"`
 }
 
-func (r *ResolvedEntry) ArtifactRef() (artifact.ArtifactRef, bool) {
+func (r *ResolvedEntry) ArtifactRef() (artifactModel.ArtifactRef, bool) {
 	if r == nil || r.Artifact == nil {
-		return artifact.ArtifactRef{}, false
+		return artifactModel.ArtifactRef{}, false
 	}
 	return r.Artifact.Ref(), true
 }
 
-func (r *ResolvedEntry) RootID() (root.RootID, bool) {
+func (r *ResolvedEntry) RootID() (rootModel.RootID, bool) {
 	if r == nil {
 		return "", false
 	}

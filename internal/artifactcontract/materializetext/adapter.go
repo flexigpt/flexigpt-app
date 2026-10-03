@@ -9,17 +9,17 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type Document struct {
-	Artifact         artifact.ArtifactRef
+	Artifact         artifactModel.ArtifactRef
 	ArtifactRevision uint64
 	DefinitionDigest cryptoutil.Digest
 	Name             string
@@ -30,10 +30,10 @@ type Document struct {
 }
 
 type Adapter struct {
-	resources local.ResourceAPI
+	resources resource.API
 }
 
-func NewAdapter(resources local.ResourceAPI) (*Adapter, error) {
+func NewAdapter(resources resource.API) (*Adapter, error) {
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Text materializer ResourceAPI is nil",
@@ -45,7 +45,7 @@ func NewAdapter(resources local.ResourceAPI) (*Adapter, error) {
 
 func (a *Adapter) Resolve(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (Document, error) {
 	if a == nil || a.resources == nil {
 		return Document{}, spec.ErrClosed
@@ -57,12 +57,12 @@ func (a *Adapter) Resolve(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return Document{}, err
 	}
-	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {
+	if resolved.Artifact.Kind != artifactModel.ArtifactKind(textv1.TextType) {
 		return Document{}, fmt.Errorf(
 			"%w: Artifact %q is not Text",
 			spec.ErrReferenceUnresolved,
@@ -99,9 +99,9 @@ func (a *Adapter) Resolve(
 
 func (a *Adapter) ResolveWithContentSource(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	contentRootID root.RootID,
-	contentSourceID source.SourceID,
+	ref artifactModel.ArtifactRef,
+	contentRootID rootModel.RootID,
+	contentSourceID sourceModel.SourceID,
 ) (Document, error) {
 	if a == nil || a.resources == nil {
 		return Document{}, spec.ErrClosed
@@ -122,11 +122,11 @@ func (a *Adapter) ResolveWithContentSource(
 		)
 	}
 
-	resolved, err := a.resources.ResolveArtifact(ctx, ref, resource.ResolveOptions{})
+	resolved, err := a.resources.ResolveArtifact(ctx, ref, resourceModel.ResolveOptions{})
 	if err != nil {
 		return Document{}, err
 	}
-	if resolved.Artifact.Kind != artifact.ArtifactKind(textv1.TextType) {
+	if resolved.Artifact.Kind != artifactModel.ArtifactKind(textv1.TextType) {
 		return Document{}, fmt.Errorf(
 			"%w: Artifact %q is not Text",
 			spec.ErrReferenceUnresolved,
@@ -227,7 +227,7 @@ func (a *Adapter) ResolveWithContentSource(
 
 func (a *Adapter) contentForDocument(
 	ctx context.Context,
-	resolved resource.ResolvedArtifact,
+	resolved resourceModel.ResolvedArtifact,
 	document textv1.TextDocument,
 ) (string, error) {
 	if document.Content != nil {

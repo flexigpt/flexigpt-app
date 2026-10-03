@@ -8,10 +8,12 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	"github.com/flexigpt/agentskills-go/provider/fs"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
@@ -21,15 +23,17 @@ import (
 //
 // It intentionally does not infer Skill ownership from Collection membership.
 type ArtifactRouter struct {
-	artifacts local.ArtifactAPI
-	resources local.ResourceAPI
+	artifacts artifact.API
+	cat       catalog.API
+	resources resource.API
 }
 
 func NewArtifactRouter(
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
+	artifacts artifact.API,
+	cat catalog.API,
+	resources resource.API,
 ) (*ArtifactRouter, error) {
-	if artifacts == nil || resources == nil {
+	if artifacts == nil || cat == nil || resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill router dependencies are incomplete",
 			spec.ErrInvalid,
@@ -37,14 +41,15 @@ func NewArtifactRouter(
 	}
 	return &ArtifactRouter{
 		artifacts: artifacts,
+		cat:       cat,
 		resources: resources,
 	}, nil
 }
 
 func (r *ArtifactRouter) RootForArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (root.RootID, error) {
+	ref artifactModel.ArtifactRef,
+) (rootModel.RootID, error) {
 	if err := ref.Validate(); err != nil {
 		return "", err
 	}
@@ -64,7 +69,7 @@ func (r *ArtifactRouter) RootForArtifact(
 
 func (r *ArtifactRouter) ResolveArtifactSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedArtifactSkill, error) {
 	if err := ref.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
@@ -80,7 +85,7 @@ func (r *ArtifactRouter) ResolveArtifactSkill(
 // verification batch. This is the bulk counterpart to ResolveArtifactSkill.
 func (r *ArtifactRouter) ResolveArtifactSkills(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) ([]ResolvedArtifactSkill, error) {
 	for _, ref := range refs {
 		if err := ref.Validate(); err != nil {
@@ -105,24 +110,24 @@ func (r *ArtifactRouter) ResolveArtifactSkills(
 
 func (r *ArtifactRouter) ListRootSkills(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]ResolvedArtifactSkill, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-	entries, err := r.artifacts.ListByRoot(
+	entries, err := r.cat.ListByRoot(
 		ctx,
 		rootID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	refs := make([]artifact.ArtifactRef, 0, len(entries))
+	refs := make([]artifactModel.ArtifactRef, 0, len(entries))
 	for _, entry := range entries {
 		if !skillDomain.IsSkillKind(entry.Kind) ||
-			entry.State != artifact.StateAvailable ||
+			entry.State != artifactModel.StateAvailable ||
 			!entry.Enabled {
 			continue
 		}
@@ -138,7 +143,7 @@ func (r *ArtifactRouter) ListRootSkills(
 		return nil, err
 	}
 
-	seen := make(map[provider.SkillDef]artifact.ArtifactRef, len(output))
+	seen := make(map[provider.SkillDef]artifactModel.ArtifactRef, len(output))
 	for _, value := range output {
 		if previous, duplicate := seen[value.Definition]; duplicate &&
 			previous != value.Artifact {
@@ -173,7 +178,7 @@ func (r *ArtifactRouter) ListRootSkills(
 
 func (r *ArtifactRouter) resolveRecords(
 	ctx context.Context,
-	records []artifact.Artifact,
+	records []artifactModel.Artifact,
 ) ([]ResolvedArtifactSkill, error) {
 	if len(records) == 0 {
 		return []ResolvedArtifactSkill{}, nil
@@ -221,9 +226,9 @@ func (r *ArtifactRouter) resolveRecords(
 
 func (r *ArtifactRouter) resolveRecord(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 ) (ResolvedArtifactSkill, error) {
-	values, err := r.resolveRecords(ctx, []artifact.Artifact{record})
+	values, err := r.resolveRecords(ctx, []artifactModel.Artifact{record})
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
 	}

@@ -15,13 +15,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
+	definitionapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/impl"
 	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
@@ -41,7 +42,7 @@ type Config struct {
 	// It never reaches a provider or consumer.
 	ArtifactIDProvider        idprovider.Provider
 	Clock                     clockutil.Clock
-	RootMutationPolicy        root.RootPolicy
+	RootMutationPolicy        rootModel.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 
 	ProtectedOverlayNamespaces []overlay.Namespace
@@ -58,6 +59,7 @@ type Components struct {
 	Roots            *rootimpl.Service
 	Sources          *sourceimpl.Service
 	Artifacts        *artifactimpl.Service
+	Definitions      definitionapi.API
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
 	ShareableSchemas *jsonschema.Registry
@@ -69,7 +71,7 @@ type Components struct {
 
 	metadata           *sqlite.Store
 	managedSources     *sourceimpl.Registry
-	rootMutationPolicy root.RootPolicy
+	rootMutationPolicy rootModel.RootPolicy
 }
 
 func Open(
@@ -307,6 +309,7 @@ func Open(
 		Roots:              rootService,
 		Sources:            sourceService,
 		Artifacts:          artifactService,
+		Definitions:        definitionRepository,
 		Refresh:            refreshService,
 		Resources:          resourceService,
 		ShareableSchemas:   shareableRegistry,
@@ -324,7 +327,7 @@ func Open(
 			Policy:    config.RootMutationPolicy,
 			GetSourceState: func(
 				ctx context.Context,
-				rootID root.RootID,
+				rootID rootModel.RootID,
 				sourceID source.SourceID,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.getManagedSourceState(
@@ -342,7 +345,7 @@ func Open(
 			},
 			PublishPackage: func(
 				ctx context.Context,
-				rootID root.RootID,
+				rootID rootModel.RootID,
 				sourceID source.SourceID,
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
@@ -364,7 +367,7 @@ func Open(
 			},
 			PublishProtectedPackage: func(
 				ctx context.Context,
-				rootID root.RootID,
+				rootID rootModel.RootID,
 				sourceID source.SourceID,
 				expectedRevision uint64,
 				publication source.ManagedPackagePublication,
@@ -424,7 +427,7 @@ func (c *Components) Close() error {
 // metadata field.
 func (c *Components) getManagedSourceState(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 ) (ManagedPackageResult, error) {
 	if c == nil ||
@@ -475,7 +478,7 @@ func (c *Components) getManagedSourceState(
 // conflicts, the caller receives the conflict and must reload before retrying.
 func (c *Components) publishManagedPackageForMutableRoot(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
@@ -496,7 +499,7 @@ func (c *Components) publishManagedPackageForMutableRoot(
 // the application RootPolicy.
 func (c *Components) publishProtectedManagedPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
@@ -525,7 +528,7 @@ func (c *Components) publishProtectedManagedPackage(
 // revision after successful source-side removal.
 func (c *Components) removeManagedPackageForMutableRoot(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	address source.ManagedPackageAddress,
@@ -546,7 +549,7 @@ func (c *Components) removeManagedPackageForMutableRoot(
 // path. It is reserved for an explicit installer or update workflow.
 func (c *Components) removeProtectedManagedPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	address source.ManagedPackageAddress,
@@ -575,7 +578,7 @@ func (c *Components) removeProtectedManagedPackage(
 
 func (c *Components) publishManagedPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	publication source.ManagedPackagePublication,
@@ -654,7 +657,7 @@ func (c *Components) publishManagedPackage(
 
 func (c *Components) removeManagedPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 	address source.ManagedPackageAddress,
@@ -802,7 +805,7 @@ func managedPackageExists(
 }
 
 func (c *Components) isProtectedRoot(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) bool {
 	return c != nil &&
 		c.rootMutationPolicy != nil &&
@@ -811,7 +814,7 @@ func (c *Components) isProtectedRoot(
 
 func (c *Components) managedSource(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedSourceRevision uint64,
 ) (source.Source, error) {
@@ -873,7 +876,7 @@ func sourceSnapshotGeneration(
 
 func (c *Components) removeManagedArtifactPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedRevision uint64,
 	address source.ManagedPackageAddress,
@@ -898,7 +901,7 @@ func (c *Components) removeManagedArtifactPackage(
 
 func (c *Components) removeProtectedManagedArtifactPackage(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	sourceID source.SourceID,
 	expectedRevision uint64,
 	address source.ManagedPackageAddress,

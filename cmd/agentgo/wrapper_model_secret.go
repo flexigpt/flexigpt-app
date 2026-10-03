@@ -4,18 +4,18 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter"
 )
 
 type artifactModelCredentialResolver struct {
-	secrets local.SecretRuntimeAPI
+	secrets secret.RuntimeAPI
 }
 
 func newArtifactModelCredentialResolver(
-	secrets local.SecretRuntimeAPI,
+	secrets secret.RuntimeAPI,
 ) (*artifactModelCredentialResolver, error) {
 	if secrets == nil {
 		return nil, fmt.Errorf(
@@ -30,7 +30,7 @@ func newArtifactModelCredentialResolver(
 
 func (r *artifactModelCredentialResolver) ResolveModelCredential(
 	ctx context.Context,
-	binding secret.Binding,
+	binding secretModel.Binding,
 ) (inferenceadapter.Credential, error) {
 	if r == nil || r.secrets == nil {
 		return inferenceadapter.Credential{}, spec.ErrClosed

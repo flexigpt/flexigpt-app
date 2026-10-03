@@ -90,7 +90,7 @@ func (a *API) collectionForTool(
 		)
 	}
 
-	entries, err := a.artifacts.FindByIdentity(
+	entries, err := a.cat.FindByIdentity(
 		ctx,
 		a.builtinRoot,
 		artifact.ArtifactKind(pluginv1.PluginType),

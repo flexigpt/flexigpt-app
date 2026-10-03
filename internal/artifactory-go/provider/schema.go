@@ -7,7 +7,7 @@ package provider
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 )
 
 // SchemaCodec supplies one published JSON Schema and domain-specific semantic
@@ -19,13 +19,13 @@ import (
 // registered JSON Schema. A codec therefore does not canonicalize or execute
 // the same JSON Schema again.
 type SchemaCodec interface {
-	Key() schema.Key
+	Key() schemaModel.Key
 	JSONSchema() []byte
 
 	Canonicalize(
 		ctx context.Context,
 		raw []byte,
-	) (schema.ParsedDocument, error)
+	) (schemaModel.ParsedDocument, error)
 }
 
 // EntityCanonicalizer supports dispatch by an entity type inferred from a
@@ -33,9 +33,9 @@ type SchemaCodec interface {
 type EntityCanonicalizer interface {
 	CanonicalizeEntity(
 		ctx context.Context,
-		entity schema.EntityType,
+		entity schemaModel.EntityType,
 		raw []byte,
-	) (schema.ParsedDocument, error)
+	) (schemaModel.ParsedDocument, error)
 }
 
 // ExpectedCanonicalizer is the narrow Artifact Store capability required by a
@@ -43,9 +43,9 @@ type EntityCanonicalizer interface {
 type ExpectedCanonicalizer interface {
 	CanonicalizeExpected(
 		ctx context.Context,
-		expected schema.Key,
+		expected schemaModel.Key,
 		raw []byte,
-	) (schema.ParsedDocument, error)
+	) (schemaModel.ParsedDocument, error)
 }
 
 // SchemaCatalog is the narrow setup-time capability supplied to a decoder that
@@ -53,5 +53,5 @@ type ExpectedCanonicalizer interface {
 type SchemaCatalog interface {
 	ExpectedCanonicalizer
 
-	Keys() []schema.Key
+	Keys() []schemaModel.Key
 }

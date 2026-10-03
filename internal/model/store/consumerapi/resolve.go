@@ -218,7 +218,7 @@ func (a *API) availableIdentityCandidates(
 	kind artifact.ArtifactKind,
 	name spec.LogicalName,
 ) ([]artifact.ArtifactRef, error) {
-	entries, err := a.artifacts.FindByIdentity(
+	entries, err := a.cat.FindByIdentity(
 		ctx,
 		rootID,
 		kind,

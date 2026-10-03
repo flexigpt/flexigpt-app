@@ -4,27 +4,30 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 const (
-	InstallationNamespace   overlay.Namespace = "mcp.installation"
-	GlobalSettingsNamespace overlay.Namespace = "mcp.global"
+	InstallationNamespace   overlayModel.Namespace = "mcp.installation"
+	GlobalSettingsNamespace overlayModel.Namespace = "mcp.global"
 )
 
-func Namespaces() []overlay.Namespace {
-	return []overlay.Namespace{
+func Namespaces() []overlayModel.Namespace {
+	return []overlayModel.Namespace{
 		InstallationNamespace,
 	}
 }
 
-func StoreNamespaces() []overlay.Namespace {
-	return []overlay.Namespace{
+func StoreNamespaces() []overlayModel.Namespace {
+	return []overlayModel.Namespace{
 		GlobalSettingsNamespace,
 	}
 }
@@ -65,12 +68,12 @@ func (value ServerOverlay) Clone() ServerOverlay {
 type OverlayRepository interface {
 	GetServerOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (ServerOverlay, bool, error)
 
 	PutServerOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 		value ServerOverlay,
@@ -78,7 +81,7 @@ type OverlayRepository interface {
 
 	DeleteServerOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 	) error
@@ -88,13 +91,13 @@ type OverlayRepository interface {
 	// deletion and built-in compiled package lifecycle cleanup.
 	PurgeServerLocalState(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) error
 }
 
 type ArtifactOverlayDependencies struct {
-	Artifacts        local.ArtifactAPI
-	Protection       local.ProtectionAPI
-	ProtectedOverlay local.ProtectedOverlayAPI
-	LocalState       local.LocalStateMaintenanceAPI
+	Artifacts        artifact.API
+	Protection       root.ProtectionAPI
+	ProtectedOverlay overlay.API
+	LocalState       artifactcleanup.API
 }

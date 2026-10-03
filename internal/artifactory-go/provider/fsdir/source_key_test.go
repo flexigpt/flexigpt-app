@@ -1,4 +1,4 @@
-package consumerutil
+package fsdir
 
 import (
 	"fmt"

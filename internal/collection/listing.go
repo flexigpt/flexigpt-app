@@ -79,7 +79,7 @@ func (a *API) listCollections(
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
 		catalog.ListOptions{Kind: artifact.ArtifactKind(pluginv1.PluginType)},
@@ -198,7 +198,7 @@ func (a *API) collectionDocuments(
 		return map[definition.Key]definition.Definition{}, nil
 	}
 
-	values, err := a.artifacts.GetDefinitions(ctx, keys)
+	values, err := a.definitions.GetDefinitions(ctx, keys)
 	if err != nil {
 		return nil, err
 	}

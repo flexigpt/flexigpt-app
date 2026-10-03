@@ -3,31 +3,27 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 )
 
 // workspaceLocatorRuntime keeps the generic provider runtime port out of the
 // Workspace consumer API surface.
 type workspaceLocatorRuntime struct {
-	artifacts local.ArtifactAPI
+	cat catalog.API
 }
 
 func (r workspaceLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]catalog.Entry, error) {
-	if r.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
-	return r.artifacts.ListBySource(
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) ([]catalogModel.Entry, error) {
+	return r.cat.ListBySource(
 		ctx,
 		rootID,
 		sourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 }

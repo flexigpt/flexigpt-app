@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -88,7 +88,7 @@ func registryFingerprint(
 		})
 	}
 	type schemaDescriptor struct {
-		Key    schema.Key        `json:"key"`
+		Key    schemaModel.Key   `json:"key"`
 		Digest cryptoutil.Digest `json:"digest"`
 	}
 	schemas := make([]schemaDescriptor, 0, len(codecs))

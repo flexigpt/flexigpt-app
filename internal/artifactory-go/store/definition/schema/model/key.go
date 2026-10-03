@@ -1,9 +1,9 @@
-package schema
+package model
 
 import (
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -35,7 +35,7 @@ type Key struct {
 func (k Key) Validate() error {
 	switch k.Entity {
 	case EntityArtifact:
-		if err := artifact.ArtifactKind(k.Kind).Validate(); err != nil {
+		if err := artifactModel.ArtifactKind(k.Kind).Validate(); err != nil {
 			return err
 		}
 
@@ -58,7 +58,7 @@ func (k Key) Validate() error {
 }
 
 func ArtifactKey(
-	kind artifact.ArtifactKind,
+	kind artifactModel.ArtifactKind,
 	schemaID SchemaID,
 	schemaVersion string,
 ) Key {

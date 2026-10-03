@@ -10,12 +10,16 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -28,11 +32,12 @@ import (
 )
 
 type StoreAPI struct {
-	roots            local.RootAPI
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	resources        local.ResourceAPI
+	roots            root.API
+	cat              catalog.API
+	sources          source.API
+	discovery        refresh.API
+	artifacts        artifact.API
+	resources        resource.API
 	workspaceSources workspaceSourceRegistry
 	policy           defaultpolicy.Policy
 
@@ -44,14 +49,15 @@ type StoreAPI struct {
 }
 
 func NewStoreAPI(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	roots local.RootAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	resources resource.API,
+	roots root.API,
+	cat catalog.API,
 	config Config,
 ) (*StoreAPI, error) {
-	if sources == nil || discovery == nil || artifacts == nil || resources == nil || roots == nil {
+	if sources == nil || discovery == nil || artifacts == nil || resources == nil || roots == nil || cat == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Store dependencies are incomplete",
 			workspaceDomain.ErrInvalidWorkspace,
@@ -80,6 +86,7 @@ func NewStoreAPI(
 		workspaceSources: workspaceSources,
 		policy:           policy,
 		config:           config,
+		cat:              cat,
 	}
 
 	promptAdapter, err := prompt.New(
@@ -109,7 +116,7 @@ func NewStoreAPI(
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.LocatorResolvers,
 		workspaceLocatorRuntime{
-			artifacts: artifacts,
+			cat: cat,
 		},
 	)
 	if err != nil {
@@ -118,7 +125,7 @@ func NewStoreAPI(
 	resolver, err := resolve.NewWithOptions(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
-			SourceArtifacts:      artifacts,
+			Catalog:              cat,
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.FallbackProviders,
@@ -150,21 +157,21 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 	if err != nil {
 		return nil, err
 	}
-	directoryEntries, err := a.artifacts.ListBySource(
+	directoryEntries, err := a.cat.ListBySource(
 		ctx,
 		directory.RootID,
 		values.Directory.ID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	policyEntries, err := a.artifacts.ListBySource(
+	policyEntries, err := a.cat.ListBySource(
 		ctx,
 		directory.RootID,
 		values.Policy.ID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
@@ -209,7 +216,7 @@ func (a *StoreAPI) ListWorkspaceDirectoryArtifacts(
 func (a *StoreAPI) SetWorkspaceDirectoryArtifactEnabled(
 	ctx context.Context,
 	directory WorkspaceDirectoryRef,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (WorkspaceArtifactView, error) {
@@ -267,7 +274,7 @@ func (a *StoreAPI) RegisterWorkspaceDirectory(ctx context.Context, path string) 
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
 	}
-	var rootValue root.Root
+	var rootValue rootModel.Root
 	if found {
 		rootValue = existing
 	} else {
@@ -310,7 +317,7 @@ func (a *StoreAPI) RefreshWorkspaceDirectory(
 	if !values.Directory.Enabled || !values.Policy.Enabled {
 		return a.buildDirectoryView(ctx, ref.RootID)
 	}
-	for _, summary := range []source.Summary{
+	for _, summary := range []sourceModel.Summary{
 		values.Directory,
 		values.Policy,
 	} {
@@ -342,7 +349,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
 		return WorkspaceDirectoryView{}, spec.ErrConflict
 	}
 
-	update := func(current source.Summary) error {
+	update := func(current sourceModel.Summary) error {
 		if current.Enabled == enabled {
 			return nil
 		}
@@ -350,7 +357,7 @@ func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
 			ctx,
 			ref.RootID,
 			current.ID,
-			source.Update{
+			sourceModel.Update{
 				ExpectedRevision: current.Revision,
 				DisplayName:      current.DisplayName,
 				Enabled:          enabled,
@@ -360,9 +367,9 @@ func (a *StoreAPI) SetWorkspaceDirectoryEnabled(
 	}
 
 	// Keep the aggregate disabled during a partial two-Source transition.
-	order := []source.Summary{values.Directory, values.Policy}
+	order := []sourceModel.Summary{values.Directory, values.Policy}
 	if enabled {
-		order = []source.Summary{values.Policy, values.Directory}
+		order = []sourceModel.Summary{values.Policy, values.Directory}
 	}
 	for _, current := range order {
 		if err := update(current); err != nil {
@@ -399,8 +406,8 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 		return spec.ErrConflict
 	}
 
-	ownedSources := make(map[source.SourceID]struct{}, 2)
-	retire := func(current source.Summary) error {
+	ownedSources := make(map[sourceModel.SourceID]struct{}, 2)
+	retire := func(current sourceModel.Summary) error {
 		ownedSources[current.ID] = struct{}{}
 		_, err := a.sources.Retire(
 			ctx,
@@ -423,10 +430,10 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 		}
 	}
 
-	records, err := a.artifacts.ListByRoot(
+	records, err := a.cat.ListByRoot(
 		ctx,
 		ref.RootID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return err
@@ -435,7 +442,7 @@ func (a *StoreAPI) RemoveWorkspaceDirectory(
 		if _, owned := ownedSources[record.Binding.SourceID]; !owned {
 			continue
 		}
-		if record.State != artifact.StateMissing {
+		if record.State != artifactModel.StateMissing {
 			return fmt.Errorf(
 				"%w: retired Workspace Source still has a non-missing Artifact",
 				spec.ErrConflict,
@@ -462,9 +469,9 @@ func (a *StoreAPI) ListWorkspaceDirectories(ctx context.Context, request Workspa
 		return WorkspacePage{}, err
 	}
 
-	var cursor root.RootID
+	var cursor rootModel.RootID
 	if request.Cursor != "" {
-		cursor = root.RootID(request.Cursor)
+		cursor = rootModel.RootID(request.Cursor)
 		if err := cursor.Validate(); err != nil {
 			return WorkspacePage{}, err
 		}
@@ -503,7 +510,7 @@ func (a *StoreAPI) WorkspaceDefaultPolicy() WorkspaceDefaultPolicyView {
 
 func (a *StoreAPI) workspaceDirectoryListItem(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (WorkspaceDirectoryListItem, error) {
 	rootValue, err := a.roots.Get(ctx, rootID)
 	if err != nil {
@@ -528,61 +535,61 @@ func (a *StoreAPI) workspaceDirectoryListItem(
 
 func (a *StoreAPI) ensureWorkspaceSources(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	rootPath string,
-) (dir, policy source.Summary, err error) {
+) (dir, policy sourceModel.Summary, err error) {
 	directoryDiscovery, err := a.defaultDiscovery()
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
 	directoryConfig, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
 	}{RootPath: rootPath})
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
-	directory, err := consumerutil.EnsureAndRefreshSource(
+	directory, err := refresh.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		consumerutil.EnsureAndRefreshSourceRequest{
+		refresh.EnsureAndRefreshSourceRequest{
 			RootID: rootID,
-			Draft: source.Draft{
-				ID:          source.SourceID(uuidutil.NewUUIDv7()),
+			Draft: sourceModel.Draft{
+				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 				StorageKey:  WorkspaceDirectorySourceStorageKey,
-				Kind:        source.SourceKindFilesystemDirectory,
+				Kind:        sourceModel.SourceKindFilesystemDirectory,
 				DisplayName: "Workspace directory source",
 				Enabled:     true,
 				Config:      directoryConfig,
 				Discovery:   directoryDiscovery,
 			},
-			ReconcileDiscovery: consumerutil.MergeDiscoveryScopes,
+			ReconcileDiscovery: source.MergeDiscoveryScopes,
 		},
 	)
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
 	policyDiscovery, err := policySourceDiscovery()
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
 	policyConfig, err := json.Marshal(struct {
 		ProviderKey string `json:"providerKey"`
 		Root        string `json:"root"`
 	}{ProviderKey: defaultpolicy.ProviderKey, Root: defaultpolicy.PolicyRoot})
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
-	policy, err = consumerutil.EnsureAndRefreshSource(
+	policy, err = refresh.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		consumerutil.EnsureAndRefreshSourceRequest{
+		refresh.EnsureAndRefreshSourceRequest{
 			RootID: rootID,
-			Draft: source.Draft{
-				ID:          source.SourceID(uuidutil.NewUUIDv7()),
+			Draft: sourceModel.Draft{
+				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 				StorageKey:  WorkspaceBasePolicySourceStorageKey,
-				Kind:        source.SourceKindEmbeddedDirectory,
+				Kind:        sourceModel.SourceKindEmbeddedDirectory,
 				DisplayName: "Workspace base policy source",
 				Enabled:     true,
 				Config:      policyConfig,
@@ -591,7 +598,7 @@ func (a *StoreAPI) ensureWorkspaceSources(
 		},
 	)
 	if err != nil {
-		return source.Summary{}, source.Summary{}, err
+		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
 	return directory, policy, nil
 }
@@ -599,32 +606,32 @@ func (a *StoreAPI) ensureWorkspaceSources(
 // defaultDiscovery bootstraps Workspace identification. An explicitly
 // present Workspace declarations array is reconciled later by the loader.
 func (a *StoreAPI) defaultDiscovery() (
-	source.DiscoverySpec,
+	sourceModel.DiscoverySpec,
 	error,
 ) {
 	value, err := documentTopology.DiscoverySpecForUse(
 		documentTopology.DiscoveryUseWorkspace,
 	)
 	if err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	for _, hint := range a.config.AdditionalDecoderHints {
-		value.DecoderHints = consumerutil.AppendDecoderHint(
+		value.DecoderHints = source.AppendDecoderHint(
 			value.DecoderHints,
 			hint,
 		)
 	}
 	value = value.Normalized()
 	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return value, nil
 }
 
 func (a *StoreAPI) listManifestIntent(
 	ctx context.Context,
-	rootID root.RootID,
-	directoryID source.SourceID,
+	rootID rootModel.RootID,
+	directoryID sourceModel.SourceID,
 ) ([]spec.Locator, error) {
 	entries, err := a.resources.ReadSourceTree(
 		ctx,
@@ -649,19 +656,19 @@ func (a *StoreAPI) listManifestIntent(
 
 func (a *StoreAPI) listPhysicalWorkspaces(
 	ctx context.Context,
-	rootID root.RootID,
-	directoryID source.SourceID,
-) ([]artifact.Artifact, error) {
-	entries, err := a.artifacts.ListBySource(
+	rootID rootModel.RootID,
+	directoryID sourceModel.SourceID,
+) ([]artifactModel.Artifact, error) {
+	entries, err := a.cat.ListBySource(
 		ctx,
 		rootID,
 		directoryID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
-	refs := make([]artifact.ArtifactRef, 0)
+	refs := make([]artifactModel.ArtifactRef, 0)
 	for _, entry := range entries {
 		if entry.Kind != workspaceDomain.WorkspaceArtifactKind {
 			continue
@@ -670,7 +677,7 @@ func (a *StoreAPI) listPhysicalWorkspaces(
 			!documentTopology.IsWorkspaceManifestLocator(entry.Binding.Locator) {
 			continue
 		}
-		if entry.State != artifact.StateAvailable {
+		if entry.State != artifactModel.StateAvailable {
 			continue
 		}
 		refs = append(refs, entry.Ref())
@@ -690,8 +697,8 @@ func (a *StoreAPI) listPhysicalWorkspaces(
 
 func (a *StoreAPI) effectiveWorkspaces(
 	ctx context.Context,
-	rootID root.RootID,
-	directory, policy source.Summary,
+	rootID rootModel.RootID,
+	directory, policy sourceModel.Summary,
 ) ([]WorkspaceDirectoryWorkspace, []diagnostic.Diagnostic, error) {
 	if !directory.Enabled {
 		return []WorkspaceDirectoryWorkspace{}, nil, nil
@@ -725,7 +732,7 @@ func (a *StoreAPI) effectiveWorkspaces(
 			return nil, nil, err
 		}
 		if found &&
-			record.State == artifact.StateAvailable &&
+			record.State == artifactModel.StateAvailable &&
 			record.Enabled {
 			workspace, err := a.workspaceForRef(ctx, record.Ref())
 			if err != nil {
@@ -753,7 +760,7 @@ func (a *StoreAPI) effectiveWorkspaces(
 		return []WorkspaceDirectoryWorkspace{}, diagnostics, nil
 	}
 	output := make([]WorkspaceDirectoryWorkspace, 0, len(physical))
-	seen := make(map[artifact.ArtifactRef]struct{}, len(physical))
+	seen := make(map[artifactModel.ArtifactRef]struct{}, len(physical))
 	for _, record := range physical {
 		if !record.Enabled {
 			continue
@@ -793,7 +800,7 @@ func (a *StoreAPI) effectiveWorkspaces(
 
 func invalidWorkspaceManifestDiagnostics(
 	intent []spec.Locator,
-	physical []artifact.Artifact,
+	physical []artifactModel.Artifact,
 ) []diagnostic.Diagnostic {
 	available := make(map[spec.Locator]struct{}, len(physical))
 	for _, record := range physical {
@@ -817,7 +824,7 @@ func invalidWorkspaceManifestDiagnostics(
 	return output
 }
 
-func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (WorkspaceDirectoryView, error) {
+func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID rootModel.RootID) (WorkspaceDirectoryView, error) {
 	rootValue, err := a.roots.Get(ctx, rootID)
 	if err != nil {
 		return WorkspaceDirectoryView{}, err
@@ -850,7 +857,7 @@ func (a *StoreAPI) buildDirectoryView(ctx context.Context, rootID root.RootID) (
 }
 
 func workspaceArtifactViewOf(
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) WorkspaceArtifactView {
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),
@@ -868,7 +875,7 @@ func workspaceArtifactViewOf(
 }
 
 func workspaceArtifactCatalogViewOf(
-	value catalog.Entry,
+	value catalogModel.Entry,
 ) WorkspaceArtifactView {
 	return WorkspaceArtifactView{
 		Artifact:           value.Ref(),
@@ -887,7 +894,7 @@ func workspaceArtifactCatalogViewOf(
 
 func isWorkspaceDirectoryCatalogArtifact(
 	values workspaceSourceSet,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) bool {
 	if value.RootID != values.Directory.RootID {
 		return false
@@ -910,10 +917,10 @@ func workspaceRootStorageKey(rootPath string) spec.StorageKey {
 	return spec.StorageKey(WorkspaceRootStorageKeyPrefix + digest)
 }
 
-func policySourceDiscovery() (source.DiscoverySpec, error) {
-	value := source.DiscoverySpec{
+func policySourceDiscovery() (sourceModel.DiscoverySpec, error) {
+	value := sourceModel.DiscoverySpec{
 		ExplicitLocators: []spec.Locator{defaultpolicy.PolicyLocator},
-		DecoderHints: []source.DecoderHint{{
+		DecoderHints: []sourceModel.DecoderHint{{
 			Locator:    defaultpolicy.PolicyLocator,
 			Recursive:  false,
 			DecoderIDs: []spec.DecoderID{"artifact-declaration-yaml"},
@@ -923,7 +930,7 @@ func policySourceDiscovery() (source.DiscoverySpec, error) {
 	}
 	value = value.Normalized()
 	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return value, nil
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 )
@@ -22,7 +22,7 @@ type Config struct {
 	// AdditionalDecoderHints lets application composition add dedicated
 	// providers such as MCP or future YAML adapters without making Workspace
 	// import those consumer domains.
-	AdditionalDecoderHints []source.DecoderHint
+	AdditionalDecoderHints []sourceModel.DecoderHint
 }
 
 func (c Config) normalized() Config {
@@ -48,7 +48,7 @@ func (c Config) normalized() Config {
 	}
 
 	output.AdditionalDecoderHints = make(
-		[]source.DecoderHint,
+		[]sourceModel.DecoderHint,
 		len(c.AdditionalDecoderHints),
 	)
 	for index, hint := range c.AdditionalDecoderHints {

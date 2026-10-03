@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -113,7 +113,7 @@ func TestWorkflow_EmptyStore_InstallsAndReadsBundledAgents(
 	requireNoError(t, err)
 	requireSameAgentRevisions(t, before, after)
 
-	inspection, err := harness.store.Discovery.InspectSource(
+	inspection, err := harness.store.Refresh.InspectSource(
 		t.Context(),
 		documentTopology.BuiltinRootID(),
 		documentTopology.BuiltinPackageSourceID(),
@@ -178,7 +178,7 @@ func TestWorkflow_UserCollection_ManagedAgentCRUD(
 	)
 	requireNoError(t, err)
 
-	_, err = harness.store.Discovery.RefreshSource(
+	_, err = harness.store.Refresh.RefreshSource(
 		t.Context(),
 		documentTopology.UserRootID(),
 		updated.Artifact.Binding.SourceID,
@@ -591,7 +591,7 @@ func requireNamedAgent(
 func requireImportDestination(
 	t *testing.T,
 	values []agentConsumerAPI.AgentImportDestination,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) agentConsumerAPI.AgentImportDestination {
 	t.Helper()
 
@@ -609,7 +609,7 @@ func requireAvailableCapability(
 	plan agentConsumerAPI.AgentCapabilityPlan,
 	declarationType declaration.Type,
 	name spec.LogicalName,
-) artifact.ArtifactRef {
+) artifactModel.ArtifactRef {
 	t.Helper()
 
 	for _, occurrence := range plan.Occurrences {
@@ -635,7 +635,7 @@ func requireAvailableCapability(
 		name,
 		plan.Occurrences,
 	)
-	return artifact.ArtifactRef{}
+	return artifactModel.ArtifactRef{}
 }
 
 func requireAgentCollectionMemberIndex(
@@ -662,7 +662,7 @@ func requireAgentCollectionMemberIndex(
 
 func containsAgent(
 	values []agentConsumerAPI.AgentListItem,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
 		if value.Ref == ref {
@@ -674,7 +674,7 @@ func containsAgent(
 
 func containsCollection(
 	values []collection.ListItem,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
 		if value.Ref == ref {
@@ -686,7 +686,7 @@ func containsCollection(
 
 func hasImportDestination(
 	values []agentConsumerAPI.AgentImportDestination,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
 		if value.Collection == ref {

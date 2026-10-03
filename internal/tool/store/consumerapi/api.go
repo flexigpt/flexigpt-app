@@ -5,10 +5,16 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
@@ -16,30 +22,34 @@ import (
 )
 
 type API struct {
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	managedArtifacts local.ManagedArtifactAPI
-	protection       local.ProtectionAPI
+	protection       root.ProtectionAPI
+	artifacts        artifact.API
+	managedArtifacts managedpackage.API
+	discovery        refresh.API
 	collections      *collection.API
+	cat              catalog.API
+	definitions      definition.API
 
-	builtinRoot      root.RootID
-	builtinSource    source.SourceID
+	builtinRoot      rootModel.RootID
+	builtinSource    sourceModel.SourceID
 	collectionByTool map[spec.LogicalName]spec.LogicalName
 }
 
 func New(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
-	builtinRoot root.RootID,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	cat catalog.API,
+	definitions definition.API,
+	builtinRoot rootModel.RootID,
 ) (*API, error) {
 	if sources == nil ||
 		discovery == nil ||
 		artifacts == nil ||
 		managedArtifacts == nil ||
-		protection == nil {
+		protection == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Tool Store dependencies are incomplete",
 			spec.ErrInvalid,
@@ -62,7 +72,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	if builtinSource.Kind != source.SourceKindManagedDirectory {
+	if builtinSource.Kind != sourceModel.SourceKindManagedDirectory {
 		return nil, fmt.Errorf(
 			"%w: built-in Tool Source must be managed",
 			spec.ErrInvalid,
@@ -77,10 +87,12 @@ func New(
 	// A graph resolver is deliberately not installed here: the Tool target
 	// mapper itself calls this Store to check Collection membership.
 	collections, err := collection.NewWithResolver(
+		artifacts,
+		cat,
 		sources,
 		discovery,
-		artifacts,
 		managedArtifacts,
+		definitions,
 		nil,
 		toolCollectionPolicy(),
 	)
@@ -89,20 +101,22 @@ func New(
 	}
 
 	return &API{
-		discovery:        discovery,
+		protection:       protection,
 		artifacts:        artifacts,
 		managedArtifacts: managedArtifacts,
-		protection:       protection,
 		collections:      collections,
+		discovery:        discovery,
 		builtinRoot:      builtinRoot,
 		builtinSource:    builtinSource.ID,
 		collectionByTool: collectionByTool,
+		cat:              cat,
+		definitions:      definitions,
 	}, nil
 }
 
 func (a *API) GetTool(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ToolView, error) {
 	value, err := a.getTool(ctx, ref)
 	if err != nil {
@@ -113,7 +127,7 @@ func (a *API) GetTool(
 
 func (a *API) ListTools(
 	ctx context.Context,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 ) ([]ToolListItem, error) {
 	view, err := a.GetToolCollection(ctx, collectionRef)
 	if err != nil {
@@ -125,7 +139,7 @@ func (a *API) ListTools(
 
 func (a *API) SetToolEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (ToolView, error) {
@@ -162,7 +176,7 @@ func (a *API) SetToolEnabled(
 
 func (a *API) getTool(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (toolDomain.Tool, error) {
 	if err := a.ready(ctx); err != nil {
 		return toolDomain.Tool{}, err
@@ -223,7 +237,7 @@ func (a *API) ready(ctx context.Context) error {
 	return ctx.Err()
 }
 
-func (a *API) requireBuiltinRef(ref artifact.ArtifactRef) error {
+func (a *API) requireBuiltinRef(ref artifactModel.ArtifactRef) error {
 	if err := ref.Validate(); err != nil {
 		return err
 	}
@@ -237,7 +251,7 @@ func (a *API) requireBuiltinRef(ref artifact.ArtifactRef) error {
 	return nil
 }
 
-func (a *API) requireBuiltinArtifact(record artifact.Artifact) error {
+func (a *API) requireBuiltinArtifact(record artifactModel.Artifact) error {
 	if err := a.requireBuiltinRef(record.Ref()); err != nil {
 		return err
 	}

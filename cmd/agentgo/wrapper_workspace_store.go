@@ -6,10 +6,15 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
@@ -17,22 +22,23 @@ import (
 
 type WorkspaceStoreWrapper struct {
 	api                     *workspaceConsumerAPI.StoreAPI
-	ensureArtifactBaselines func(context.Context, root.RootID) error
+	ensureArtifactBaselines func(context.Context, rootModel.RootID) error
 }
 
 func InitWorkspaceWrappers(
 	storeWrapper *WorkspaceStoreWrapper,
 	runtimeWrapper *WorkspaceRuntimeWrapper,
-	roots local.RootAPI,
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
+	roots root.API,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	cat catalog.API,
+	resources resource.API,
 	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	mcpServers mcp.ServerResolver,
-	ensureArtifactBaselines func(context.Context, root.RootID) error,
+	ensureArtifactBaselines func(context.Context, rootModel.RootID) error,
 ) error {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
@@ -56,6 +62,7 @@ func InitWorkspaceWrappers(
 		artifacts,
 		resources,
 		roots,
+		cat,
 		config,
 	)
 	if err != nil {
@@ -203,7 +210,7 @@ func (w *WorkspaceStoreWrapper) ListWorkspaceDirectoryArtifacts(
 
 func (w *WorkspaceStoreWrapper) SetWorkspaceDirectoryArtifactEnabled(
 	directory workspaceConsumerAPI.WorkspaceDirectoryRef,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (workspaceConsumerAPI.WorkspaceArtifactView, error) {

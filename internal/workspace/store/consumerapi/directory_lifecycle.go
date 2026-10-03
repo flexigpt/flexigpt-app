@@ -9,11 +9,11 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -22,25 +22,25 @@ import (
 )
 
 type workspaceSourceSet struct {
-	Directory    source.Summary
-	Policy       source.Summary
+	Directory    sourceModel.Summary
+	Policy       sourceModel.Summary
 	HasDirectory bool
 	HasPolicy    bool
 }
 
 type workspaceSourceRegistry struct {
-	sources local.SourceAPI
+	sources source.API
 }
 
 func newWorkspaceSourceRegistry(
-	sources local.SourceAPI,
+	sources source.API,
 ) workspaceSourceRegistry {
 	return workspaceSourceRegistry{sources: sources}
 }
 
 func (r workspaceSourceRegistry) load(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (workspaceSourceSet, error) {
 	values, err := r.sources.List(ctx, rootID)
 	if err != nil {
@@ -75,7 +75,7 @@ func (r workspaceSourceRegistry) load(
 	}
 
 	if output.HasDirectory &&
-		output.Directory.Kind != source.SourceKindFilesystemDirectory {
+		output.Directory.Kind != sourceModel.SourceKindFilesystemDirectory {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace directory Source has kind %q",
 			spec.ErrInvalid,
@@ -83,7 +83,7 @@ func (r workspaceSourceRegistry) load(
 		)
 	}
 	if output.HasPolicy &&
-		output.Policy.Kind != source.SourceKindEmbeddedDirectory {
+		output.Policy.Kind != sourceModel.SourceKindEmbeddedDirectory {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace policy Source has kind %q",
 			spec.ErrInvalid,
@@ -95,7 +95,7 @@ func (r workspaceSourceRegistry) load(
 
 func (r workspaceSourceRegistry) required(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (workspaceSourceSet, error) {
 	values, err := r.load(ctx, rootID)
 	if err != nil {
@@ -113,14 +113,14 @@ func (r workspaceSourceRegistry) required(
 
 func (r workspaceSourceRegistry) refreshSource(
 	ctx context.Context,
-	current source.Summary,
-) (source.Summary, error) {
+	current sourceModel.Summary,
+) (sourceModel.Summary, error) {
 	if string(current.StorageKey) != WorkspaceBasePolicySourceStorageKey {
 		return current, nil
 	}
 	values, err := r.required(ctx, current.RootID)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return values.Directory, nil
 }
@@ -128,15 +128,15 @@ func (r workspaceSourceRegistry) refreshSource(
 func (a *StoreAPI) findWorkspaceRoot(
 	ctx context.Context,
 	rootPath string,
-) (root.Root, bool, error) {
+) (rootModel.Root, bool, error) {
 	storageKey := workspaceRootStorageKey(rootPath)
 	values, err := a.roots.List(ctx)
 	if err != nil {
-		return root.Root{}, false, err
+		return rootModel.Root{}, false, err
 	}
 
 	var (
-		found root.Root
+		found rootModel.Root
 		count int
 	)
 	for _, value := range values {
@@ -147,7 +147,7 @@ func (a *StoreAPI) findWorkspaceRoot(
 		count++
 	}
 	if count > 1 {
-		return root.Root{}, false, fmt.Errorf(
+		return rootModel.Root{}, false, fmt.Errorf(
 			"%w: multiple Roots use Workspace storage key %q",
 			spec.ErrIdentityConflict,
 			storageKey,
@@ -159,7 +159,7 @@ func (a *StoreAPI) findWorkspaceRoot(
 func (a *StoreAPI) ensureWorkspaceRoot(
 	ctx context.Context,
 	rootPath string,
-) (root.Root, bool, error) {
+) (rootModel.Root, bool, error) {
 	existing, found, err := a.findWorkspaceRoot(ctx, rootPath)
 	if err != nil || found {
 		return existing, false, err
@@ -174,8 +174,8 @@ func (a *StoreAPI) ensureWorkspaceRoot(
 		displayName = "Workspace directory"
 	}
 
-	created, err := a.roots.Create(ctx, root.RootDraft{
-		ID:          root.RootID(uuidutil.NewUUIDv7()),
+	created, err := a.roots.Create(ctx, rootModel.RootDraft{
+		ID:          rootModel.RootID(uuidutil.NewUUIDv7()),
 		StorageKey:  workspaceRootStorageKey(rootPath),
 		DisplayName: displayName,
 		Description: "Workspace directory",
@@ -184,16 +184,16 @@ func (a *StoreAPI) ensureWorkspaceRoot(
 		return created, true, nil
 	}
 	if !errors.Is(err, spec.ErrConflict) {
-		return root.Root{}, false, err
+		return rootModel.Root{}, false, err
 	}
 
 	// Another registration may have created the deterministic Root.
 	existing, found, findErr := a.findWorkspaceRoot(ctx, rootPath)
 	if findErr != nil {
-		return root.Root{}, false, findErr
+		return rootModel.Root{}, false, findErr
 	}
 	if !found {
-		return root.Root{}, false, err
+		return rootModel.Root{}, false, err
 	}
 	return existing, false, nil
 }
@@ -201,18 +201,18 @@ func (a *StoreAPI) ensureWorkspaceRoot(
 func (a *StoreAPI) defaultWorkspaceRecord(
 	ctx context.Context,
 	values workspaceSourceSet,
-) (artifact.Artifact, bool, error) {
-	entries, err := a.artifacts.ListBySource(
+) (artifactModel.Artifact, bool, error) {
+	entries, err := a.cat.ListBySource(
 		ctx,
 		values.Policy.RootID,
 		values.Policy.ID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
-		return artifact.Artifact{}, false, err
+		return artifactModel.Artifact{}, false, err
 	}
 
-	refs := make([]artifact.ArtifactRef, 0, 1)
+	refs := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, entry := range entries {
 		if entry.Binding.Locator == spec.Locator(defaultpolicy.PolicyLocator) &&
 			entry.Binding.SubresourceLocator == "" &&
@@ -223,15 +223,15 @@ func (a *StoreAPI) defaultWorkspaceRecord(
 	}
 	switch len(refs) {
 	case 0:
-		return artifact.Artifact{}, false, nil
+		return artifactModel.Artifact{}, false, nil
 	case 1:
 		values, err := a.artifacts.GetMany(ctx, refs)
 		if err != nil {
-			return artifact.Artifact{}, false, err
+			return artifactModel.Artifact{}, false, err
 		}
 		return values[0], true, nil
 	default:
-		return artifact.Artifact{}, false, fmt.Errorf(
+		return artifactModel.Artifact{}, false, fmt.Errorf(
 			"%w: policy Source produced multiple default Workspace Artifacts",
 			spec.ErrIdentityConflict,
 		)
@@ -240,7 +240,7 @@ func (a *StoreAPI) defaultWorkspaceRecord(
 
 func (a *StoreAPI) refreshEffectiveWorkspaces(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	values, err := a.workspaceSources.required(ctx, rootID)
 	if err != nil {
@@ -283,7 +283,7 @@ func (a *StoreAPI) refreshEffectiveWorkspaces(
 	if err != nil || !found {
 		return err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return nil
 	}
 	return a.resolver.RefreshWorkspaceWithCompositionSource(
@@ -297,7 +297,7 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
 ) error {
-	if workspace.Artifact.State != artifact.StateAvailable ||
+	if workspace.Artifact.State != artifactModel.StateAvailable ||
 		!workspace.Artifact.Enabled {
 		return fmt.Errorf(
 			"%w: selected Workspace is disabled or unavailable",
@@ -390,7 +390,7 @@ func (a *StoreAPI) requireEffectiveWorkspace(
 func (a *StoreAPI) isEffectivePhysicalWorkspace(
 	ctx context.Context,
 	values workspaceSourceSet,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (bool, error) {
 	records, err := a.listPhysicalWorkspaces(
 		ctx,
@@ -426,13 +426,13 @@ func (a *StoreAPI) isEffectivePhysicalWorkspace(
 
 func (a *StoreAPI) workspaceDirectoryRootIDs(
 	ctx context.Context,
-) ([]root.RootID, error) {
+) ([]rootModel.RootID, error) {
 	values, err := a.roots.List(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	output := make([]root.RootID, 0)
+	output := make([]rootModel.RootID, 0)
 	for _, value := range values {
 		if !strings.HasPrefix(
 			string(value.StorageKey),

@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
 )
@@ -26,8 +26,8 @@ func withWorkspaceRuntime[T any](
 }
 
 func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
-	workspace artifact.ArtifactRef,
-	artifacts []artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
+	artifacts []artifactModel.ArtifactRef,
 ) (workspaceConsumerAPI.WorkspacePromptPlan, error) {
 	return withWorkspaceRuntime(
 		w,
@@ -42,8 +42,8 @@ func (w *WorkspaceRuntimeWrapper) ComposeWorkspacePrompt(
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
-	workspace artifact.ArtifactRef,
-	artifacts []artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
+	artifacts []artifactModel.ArtifactRef,
 ) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error) {
 	return withWorkspaceRuntime(
 		w,
@@ -58,8 +58,8 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceSkills(
 }
 
 func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
-	workspace artifact.ArtifactRef,
-	artifacts []artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
+	artifacts []artifactModel.ArtifactRef,
 ) (workspaceConsumerAPI.WorkspaceMCPServerLoadPlan, error) {
 	return withWorkspaceRuntime(
 		w,
@@ -74,7 +74,7 @@ func (w *WorkspaceRuntimeWrapper) LoadWorkspaceMCPServers(
 }
 
 func (w *WorkspaceRuntimeWrapper) ResolveWorkspaceRuntimePlan(
-	workspace artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
 	selection workspaceConsumerAPI.WorkspaceRuntimeSelection,
 ) (workspaceConsumerAPI.WorkspaceRuntimePlan, error) {
 	return withWorkspaceRuntime(

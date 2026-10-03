@@ -35,7 +35,7 @@ func (a *API) ListSkills(
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
 		catalog.ListOptions{

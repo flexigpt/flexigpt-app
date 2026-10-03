@@ -5,19 +5,22 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
 
 type ArtifactOverlayRepository struct {
-	artifacts        local.ArtifactAPI
-	protection       local.ProtectionAPI
-	protectedOverlay local.ProtectedOverlayAPI
-	localState       local.LocalStateMaintenanceAPI
+	artifacts        artifact.API
+	protection       root.ProtectionAPI
+	protectedOverlay overlay.API
+	localState       artifactcleanup.API
 }
 
 func NewArtifactOverlayRepository(
@@ -43,7 +46,7 @@ func NewArtifactOverlayRepository(
 
 func (r *ArtifactOverlayRepository) GetServerOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerOverlay, bool, error) {
 	record, err := r.artifact(ctx, ref)
 	if err != nil {
@@ -71,7 +74,7 @@ func (r *ArtifactOverlayRepository) GetServerOverlay(
 
 func (r *ArtifactOverlayRepository) PutServerOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 	value ServerOverlay,
@@ -107,7 +110,7 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 
 	stored, err := r.protectedOverlay.Put(
 		ctx,
-		overlay.PutRequest{
+		overlayModel.PutRequest{
 			Artifact:                 ref,
 			Namespace:                InstallationNamespace,
 			SchemaVersion:            value.SchemaVersion,
@@ -130,7 +133,7 @@ func (r *ArtifactOverlayRepository) PutServerOverlay(
 
 func (r *ArtifactOverlayRepository) DeleteServerOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 ) error {
@@ -159,7 +162,7 @@ func (r *ArtifactOverlayRepository) DeleteServerOverlay(
 
 func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	if r == nil || r.localState == nil {
 		return spec.ErrClosed
@@ -169,14 +172,14 @@ func (r *ArtifactOverlayRepository) PurgeServerLocalState(
 
 func (r *ArtifactOverlayRepository) artifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	if r == nil ||
 		r.artifacts == nil ||
 		r.protection == nil ||
 		r.protectedOverlay == nil ||
 		r.localState == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return r.artifacts.Get(ctx, ref)
 }
@@ -197,7 +200,7 @@ func encodeProtectedServerOverlay(
 }
 
 func decodeProtectedServerOverlay(
-	record overlay.Record,
+	record overlayModel.Record,
 ) (ServerOverlay, error) {
 	var payload serverOverlayPayload
 	if err := jsonutil.DecodeCanonicalObjectExactInto(

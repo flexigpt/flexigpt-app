@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
@@ -13,14 +12,11 @@ func (a *API) listServers(
 	ctx context.Context,
 	request ListServersRequest,
 ) ([]ServerListItem, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
 		catalog.ListOptions{
@@ -71,14 +67,11 @@ func (a *API) listPolicies(
 	ctx context.Context,
 	request ListPoliciesRequest,
 ) ([]PolicyListItem, error) {
-	if a == nil || a.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
 	if err := request.RootID.Validate(); err != nil {
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
 		catalog.ListOptions{

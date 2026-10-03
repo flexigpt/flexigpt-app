@@ -6,12 +6,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type apiOptions struct {
@@ -68,21 +67,18 @@ func WithTargetMappers(
 }
 
 type mcpLocatorRuntime struct {
-	artifacts local.ArtifactAPI
+	cat catalog.API
 }
 
 func (r mcpLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
 	rootID root.RootID,
 	sourceID source.SourceID,
-) ([]catalog.Entry, error) {
-	if r.artifacts == nil {
-		return nil, spec.ErrClosed
-	}
-	return r.artifacts.ListBySource(
+) ([]catalogModel.Entry, error) {
+	return r.cat.ListBySource(
 		ctx,
 		rootID,
 		sourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
 
@@ -70,11 +70,11 @@ func TestSkillStoreWorkflowRefreshMarksExternalSkillInvalidAndRecovers(
 		registered.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if invalid.State != artifact.StateInvalid {
+	if invalid.State != artifactModel.StateInvalid {
 		t.Fatalf(
 			"invalid external Skill state=%q, want %q",
 			invalid.State,
-			artifact.StateInvalid,
+			artifactModel.StateInvalid,
 		)
 	}
 	if invalid.ResolvedDefinition != nil {
@@ -92,11 +92,11 @@ func TestSkillStoreWorkflowRefreshMarksExternalSkillInvalidAndRecovers(
 	if !found {
 		t.Fatalf("invalid external Skill %q disappeared from ListSkills", skillName)
 	}
-	if listedInvalid.State != artifact.StateInvalid {
+	if listedInvalid.State != artifactModel.StateInvalid {
 		t.Fatalf(
 			"listed invalid external Skill state=%q, want %q",
 			listedInvalid.State,
-			artifact.StateInvalid,
+			artifactModel.StateInvalid,
 		)
 	}
 
@@ -126,11 +126,11 @@ func TestSkillStoreWorkflowRefreshMarksExternalSkillInvalidAndRecovers(
 			registered.Artifact.Ref(),
 		)
 	}
-	if restored.State != artifact.StateAvailable {
+	if restored.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"restored external Skill state=%q, want %q",
 			restored.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if restored.ResolvedDefinition == nil {

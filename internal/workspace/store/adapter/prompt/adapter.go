@@ -7,8 +7,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -17,22 +18,22 @@ import (
 )
 
 type Contribution struct {
-	Artifact         artifact.ArtifactRef     `json:"-"`
-	ArtifactRevision uint64                   `json:"-"`
-	DefinitionDigest cryptoutil.Digest        `json:"-"`
-	Kind             artifact.ArtifactKind    `json:"-"`
-	Name             string                   `json:"-"`
-	Insert           declaration.InsertTarget `json:"-"`
-	MediaType        string                   `json:"-"`
-	Locator          spec.Locator             `json:"-"`
-	Content          string                   `json:"-"`
-	OriginalBytes    int                      `json:"-"`
-	IncludedBytes    int                      `json:"-"`
-	Truncated        bool                     `json:"-"`
+	Artifact         artifactModel.ArtifactRef  `json:"-"`
+	ArtifactRevision uint64                     `json:"-"`
+	DefinitionDigest cryptoutil.Digest          `json:"-"`
+	Kind             artifactModel.ArtifactKind `json:"-"`
+	Name             string                     `json:"-"`
+	Insert           declaration.InsertTarget   `json:"-"`
+	MediaType        string                     `json:"-"`
+	Locator          spec.Locator               `json:"-"`
+	Content          string                     `json:"-"`
+	OriginalBytes    int                        `json:"-"`
+	IncludedBytes    int                        `json:"-"`
+	Truncated        bool                       `json:"-"`
 }
 
 type Decision struct {
-	Artifact      artifact.ArtifactRef               `json:"-"`
+	Artifact      artifactModel.ArtifactRef          `json:"-"`
 	Status        workspaceRuntime.CompositionStatus `json:"-"`
 	Code          string                             `json:"-"`
 	OriginalBytes int                                `json:"-"`
@@ -40,24 +41,24 @@ type Decision struct {
 }
 
 type Plan struct {
-	Workspace     artifact.ArtifactRef    `json:"-"`
-	Contributions []Contribution          `json:"-"`
-	Instructions  string                  `json:"-"`
-	UserMessage   string                  `json:"-"`
-	Diagnostics   []diagnostic.Diagnostic `json:"-"`
-	Decisions     []Decision              `json:"-"`
+	Workspace     artifactModel.ArtifactRef `json:"-"`
+	Contributions []Contribution            `json:"-"`
+	Instructions  string                    `json:"-"`
+	UserMessage   string                    `json:"-"`
+	Diagnostics   []diagnostic.Diagnostic   `json:"-"`
+	Decisions     []Decision                `json:"-"`
 }
 
 type Adapter struct {
-	artifacts local.ArtifactAPI
+	artifacts artifact.API
 	text      *materializetext.Adapter
 	engine    *workspaceRuntime.Engine
 	policy    workspaceRuntime.CompositionPolicy
 }
 
 func New(
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
+	artifacts artifact.API,
+	resources resource.API,
 	policy workspaceRuntime.CompositionPolicy,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {
@@ -89,7 +90,7 @@ func New(
 func (a *Adapter) ComposeSelected(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (Plan, error) {
 	return a.compose(ctx, workspace, refs)
 }
@@ -97,7 +98,7 @@ func (a *Adapter) ComposeSelected(
 func (a *Adapter) compose(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (Plan, error) {
 	if a == nil || a.artifacts == nil || a.engine == nil {
 		return Plan{}, spec.ErrClosed
@@ -242,13 +243,13 @@ func (a *Adapter) compose(
 func (a *Adapter) selection(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
+	refs []artifactModel.ArtifactRef,
+) ([]artifactModel.Artifact, error) {
 	if len(refs) == 0 {
-		return []artifact.Artifact{}, nil
+		return []artifactModel.Artifact{}, nil
 	}
 
-	output := make([]artifact.Artifact, 0, len(refs))
+	output := make([]artifactModel.Artifact, 0, len(refs))
 	for _, ref := range refs {
 		value, err := a.artifacts.Get(ctx, ref)
 		if err != nil {
@@ -261,11 +262,11 @@ func (a *Adapter) selection(
 
 func (a *Adapter) resolveContribution(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	workspace workspaceDomain.Workspace,
 ) (Contribution, error) {
 	switch record.Kind {
-	case artifact.ArtifactKind(textv1.TextType):
+	case artifactModel.ArtifactKind(textv1.TextType):
 		var value materializetext.Document
 		var err error
 		if record.RootID == workspace.Artifact.RootID &&
@@ -305,28 +306,28 @@ func (a *Adapter) resolveContribution(
 }
 
 func selectedArtifact(
-	ref artifact.ArtifactRef,
-	values []artifact.Artifact,
-) artifact.Artifact {
+	ref artifactModel.ArtifactRef,
+	values []artifactModel.Artifact,
+) artifactModel.Artifact {
 	for _, value := range values {
 		if value.Ref() == ref {
 			return value
 		}
 	}
-	return artifact.Artifact{
+	return artifactModel.Artifact{
 		ID:     ref.ArtifactID,
 		RootID: ref.RootID,
 	}
 }
 
 func contributionID(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) string {
 	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }
 
 func artifactDiagnostic(
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 	code string,
 	message string,
 ) diagnostic.Diagnostic {

@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/registry"
+	providerregistry "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/registry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
@@ -30,8 +32,9 @@ func withSkillAggregate[T any](
 
 func InitSkillAggregateWrapper(
 	wrapper *SkillAggregateWrapper,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
+	artifacts artifact.API,
+	cat catalog.API,
+	resources resource.API,
 	runtimeWrapper *SkillRuntimeWrapper,
 ) error {
 	if wrapper == nil ||
@@ -43,6 +46,7 @@ func InitSkillAggregateWrapper(
 
 	router, err := skillAggregate.NewArtifactRouter(
 		artifacts,
+		cat,
 		resources,
 	)
 	if err != nil {
@@ -68,7 +72,7 @@ func InitSkillAggregateWrapper(
 // provider.SkillDef. The aggregate resyncs the owning Root catalog before
 // returning the value.
 func (w *SkillAggregateWrapper) ResolveArtifactSkill(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (skillAggregate.ResolvedArtifactSkill, error) {
 	return withSkillAggregate(
 		w,
@@ -84,7 +88,7 @@ func (w *SkillAggregateWrapper) ResolveArtifactSkill(
 // ResolveArtifactSkills resolves several durable ArtifactRefs in one call.
 // The aggregate synchronizes each owning Root once instead of once per Skill.
 func (w *SkillAggregateWrapper) ResolveArtifactSkills(
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) ([]skillAggregate.ResolvedArtifactSkill, error) {
 	return withSkillAggregate(
 		w,
@@ -119,10 +123,10 @@ func (w *SkillAggregateWrapper) GetArtifactSkillsPrompt(
 // whose results use runtime-native SkillDef identities.
 func (w *SkillAggregateWrapper) ListArtifactSkillRefs(
 	filter skillAggregate.ArtifactSkillFilter,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	return withSkillAggregate(
 		w,
-		func(service *skillAggregate.Service) ([]artifact.ArtifactRef, error) {
+		func(service *skillAggregate.Service) ([]artifactModel.ArtifactRef, error) {
 			return service.ListArtifactSkillRefs(
 				context.Background(),
 				filter,
@@ -135,7 +139,7 @@ func (w *SkillAggregateWrapper) ListArtifactSkillRefs(
 // summary. It is useful for management availability checks without requiring
 // callers to parse runtime-native SkillDef values.
 func (w *SkillAggregateWrapper) DescribeArtifactSkill(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (skillAggregate.ArtifactSkillSummary, error) {
 	return withSkillAggregate(
 		w,

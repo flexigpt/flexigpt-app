@@ -9,9 +9,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -34,18 +44,20 @@ func initMCPWrappers(
 	storeWrapper *MCPStoreWrapper,
 	runtimeWrapper *MCPRuntimeWrapper,
 	aggregateWrapper *MCPAggregateWrapper,
-	roots local.RootAPI,
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
-	protectedOverlays local.ProtectedOverlayAPI,
-	storeOverlays local.StoreOverlayAPI,
-	secretBindings local.SecretBindingAPI,
-	secretRuntime local.SecretRuntimeAPI,
-	localState local.LocalStateMaintenanceAPI,
+	roots root.API,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	cat catalog.API,
+	definitions definition.API,
+	resources resource.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	protectedOverlays overlay.API,
+	storeOverlays overlay.StoreAPI,
+	secretBindings secret.API,
+	secretRuntime secret.RuntimeAPI,
+	localState artifactcleanup.API,
 	hydrator topology.CompiledHydrationCoordinator,
 	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
@@ -60,6 +72,7 @@ func initMCPWrappers(
 		sources == nil ||
 		discovery == nil ||
 		artifacts == nil ||
+		cat == nil || definitions == nil ||
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
@@ -103,6 +116,8 @@ func initMCPWrappers(
 		resources,
 		managedArtifacts,
 		protection,
+		cat,
+		definitions,
 		overlays,
 		secrets,
 		mcpPolicy.Baseline(),
@@ -141,7 +156,7 @@ func initMCPWrappers(
 	if err != nil {
 		return nil, err
 	}
-	source, err := mcpAggregate.NewRuntimeServerSource(
+	s, err := mcpAggregate.NewRuntimeServerSource(
 		serverResolver,
 		secrets,
 		mcpEnvironmentResolver{},
@@ -200,7 +215,7 @@ func initMCPWrappers(
 		return cleanup(err)
 	}
 	runtimeManager, err = mcpConnection.NewMCPRuntimeManager(
-		source,
+		s,
 		authManager,
 		clientFactory,
 	)
@@ -222,7 +237,7 @@ func initMCPWrappers(
 	service, err := mcpAggregate.NewService(mcpAggregate.Dependencies{
 		Lifecycle: lifecycle,
 		Servers:   serverResolver,
-		Source:    source,
+		Source:    s,
 		Store:     managementStore,
 		Runtime:   runtimeManager,
 		Auth:      authManager,

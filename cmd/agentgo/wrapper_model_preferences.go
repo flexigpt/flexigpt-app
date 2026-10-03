@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -15,15 +15,15 @@ import (
 const modelPreferenceSchemaVersion = "v1"
 
 type modelDefaultProviderPreferencePayload struct {
-	Provider *artifact.ArtifactRef `json:"provider,omitempty"`
+	Provider *artifactModel.ArtifactRef `json:"provider,omitempty"`
 }
 
 type artifactModelDefaultProviderPreferences struct {
-	overlays local.StoreOverlayAPI
+	overlays overlay.StoreAPI
 }
 
 func newArtifactModelDefaultProviderPreferences(
-	overlays local.StoreOverlayAPI,
+	overlays overlay.StoreAPI,
 ) (*artifactModelDefaultProviderPreferences, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(
@@ -38,7 +38,7 @@ func newArtifactModelDefaultProviderPreferences(
 
 func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 	ctx context.Context,
-) (*artifact.ArtifactRef, error) {
+) (*artifactModel.ArtifactRef, error) {
 	if s == nil || s.overlays == nil {
 		return nil, spec.ErrClosed
 	}
@@ -77,7 +77,7 @@ func (s *artifactModelDefaultProviderPreferences) GetDefaultProvider(
 
 func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 	ctx context.Context,
-	provider *artifact.ArtifactRef,
+	provider *artifactModel.ArtifactRef,
 ) error {
 	if s == nil || s.overlays == nil {
 		return spec.ErrClosed
@@ -124,7 +124,7 @@ func (s *artifactModelDefaultProviderPreferences) SetDefaultProvider(
 
 	_, err = s.overlays.PutStoreOverlay(
 		ctx,
-		overlay.StorePutRequest{
+		overlayModel.StorePutRequest{
 			Namespace:        modelOverlay.PreferencesNamespace,
 			SchemaVersion:    modelPreferenceSchemaVersion,
 			Payload:          payload,

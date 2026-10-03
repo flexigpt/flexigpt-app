@@ -1,4 +1,4 @@
-package source
+package model
 
 import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 

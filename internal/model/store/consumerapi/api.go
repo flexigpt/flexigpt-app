@@ -8,25 +8,33 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
 )
 
 type API struct {
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	managedArtifacts local.ManagedArtifactAPI
-	protection       local.ProtectionAPI
+	protection       root.ProtectionAPI
+	artifacts        artifact.API
+	cat              catalog.API
+	definitions      definition.API
+	sources          source.API
+	discovery        refresh.API
+	managedArtifacts managedpackage.API
 
 	overlays    modelOverlay.OverlayRepository
 	adapters    AdapterRegistry
-	builtinRoot root.RootID
+	builtinRoot rootModel.RootID
 }
 
 func New(
@@ -38,7 +46,9 @@ func New(
 		dependencies.ManagedArtifacts == nil ||
 		dependencies.Protection == nil ||
 		dependencies.Overlays == nil ||
-		dependencies.Adapters == nil {
+		dependencies.Adapters == nil ||
+		dependencies.Cat == nil ||
+		dependencies.Definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Model Store dependencies are incomplete",
 			spec.ErrInvalid,
@@ -58,11 +68,13 @@ func New(
 	}
 
 	return &API{
+		protection:       dependencies.Protection,
+		artifacts:        dependencies.Artifacts,
+		cat:              dependencies.Cat,
+		definitions:      dependencies.Definitions,
 		sources:          dependencies.Sources,
 		discovery:        dependencies.Discovery,
-		artifacts:        dependencies.Artifacts,
 		managedArtifacts: dependencies.ManagedArtifacts,
-		protection:       dependencies.Protection,
 		overlays:         dependencies.Overlays,
 		adapters:         dependencies.Adapters,
 		builtinRoot:      dependencies.BuiltinRoot,
@@ -71,7 +83,7 @@ func New(
 
 func (a *API) GetProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ProviderView, error) {
 	value, err := a.loadProvider(ctx, ref)
 	if err != nil {
@@ -82,7 +94,7 @@ func (a *API) GetProvider(
 
 func (a *API) GetModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ModelView, error) {
 	value, err := a.loadModel(ctx, ref)
 	if err != nil {
@@ -102,10 +114,10 @@ func (a *API) ListProviders(
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
+		catalogModel.ListOptions{
 			Kind:            modelDomain.ModelProviderArtifactKind,
 			Enabled:         request.Enabled,
 			IncludeDocument: true,
@@ -172,10 +184,10 @@ func (a *API) ListModels(
 		return nil, err
 	}
 
-	entries, err := a.artifacts.ListByRoot(
+	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
+		catalogModel.ListOptions{
 			Kind:            modelDomain.ModelArtifactKind,
 			Enabled:         request.Enabled,
 			IncludeDocument: true,
@@ -263,22 +275,22 @@ func (a *API) ListModelsByProvider(
 // protected built-ins and mutable user-owned Provider Artifacts alike.
 func (a *API) SetProviderEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if err := a.ready(ctx); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := validateExpectedArtifactRevision(expectedRevision); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if _, err := a.requireKind(
 		ctx,
 		ref,
 		modelDomain.ModelProviderArtifactKind,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return a.artifacts.SetEnabled(
 		ctx,
@@ -292,22 +304,22 @@ func (a *API) SetProviderEnabled(
 // Provider enablement and never changes any linked Provider state.
 func (a *API) SetModelEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if err := a.ready(ctx); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := validateExpectedArtifactRevision(expectedRevision); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if _, err := a.requireKind(
 		ctx,
 		ref,
 		modelDomain.ModelArtifactKind,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return a.artifacts.SetEnabled(
 		ctx,
@@ -340,18 +352,18 @@ func (a *API) ready(ctx context.Context) error {
 
 func (a *API) requireKind(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	kind artifact.ArtifactKind,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+	kind artifactModel.ArtifactKind,
+) (artifactModel.Artifact, error) {
 	if err := ref.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if record.Kind != kind {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q has kind %q, expected %q",
 			spec.ErrUnsupported,
 			record.ID,
@@ -364,7 +376,7 @@ func (a *API) requireKind(
 
 func (a *API) loadProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (modelDomain.Provider, error) {
 	if err := a.ready(ctx); err != nil {
 		return modelDomain.Provider{}, err
@@ -387,7 +399,7 @@ func (a *API) loadProvider(
 
 func (a *API) loadModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (modelDomain.Model, error) {
 	if err := a.ready(ctx); err != nil {
 		return modelDomain.Model{}, err

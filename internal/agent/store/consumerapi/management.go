@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -110,7 +110,7 @@ func (a *API) ListAgentImportDestinationsForManagement(
 
 func (a *API) ensureDefaultAgentCollectionRoot(
 	ctx context.Context,
-) (root.RootID, error) {
+) (rootModel.RootID, error) {
 	if a == nil || a.roots == nil {
 		return "", spec.ErrClosed
 	}
@@ -143,7 +143,7 @@ func (a *API) ensureDefaultAgentCollectionRoot(
 
 func (a *API) managementRoots(
 	ctx context.Context,
-) ([]root.Root, error) {
+) ([]rootModel.Root, error) {
 	if a == nil || a.roots == nil {
 		return nil, spec.ErrClosed
 	}
@@ -162,7 +162,7 @@ func (a *API) managementRoots(
 		return nil, err
 	}
 
-	output := append([]root.Root(nil), values...)
+	output := append([]rootModel.Root(nil), values...)
 	sort.Slice(output, func(left, right int) bool {
 		return output[left].ID < output[right].ID
 	})

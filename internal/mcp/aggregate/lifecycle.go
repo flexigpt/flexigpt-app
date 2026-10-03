@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 )
@@ -21,7 +21,7 @@ type Lifecycle struct {
 	store interface {
 		SaveServerSettings(
 			ctx context.Context,
-			ref artifact.ArtifactRef,
+			ref artifactModel.ArtifactRef,
 			expectedSettingsRevision uint64,
 			data mcpDomainServer.ServerData,
 		) error
@@ -33,7 +33,7 @@ func NewLifecycle(
 	store interface {
 		SaveServerSettings(
 			ctx context.Context,
-			ref artifact.ArtifactRef,
+			ref artifactModel.ArtifactRef,
 			expectedSettingsRevision uint64,
 			data mcpDomainServer.ServerData,
 		) error
@@ -51,7 +51,7 @@ func NewLifecycle(
 
 func (l *Lifecycle) InvalidateServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	if l == nil || l.runtime == nil {
 		return mcpServer.ErrClosed
@@ -68,18 +68,18 @@ func (l *Lifecycle) InvalidateServer(
 // change, rather than disconnecting every server in a Root.
 func (l *Lifecycle) InvalidateServers(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) error {
 	if l == nil || l.runtime == nil {
 		return mcpServer.ErrClosed
 	}
 
-	unique := make(map[artifact.ArtifactRef]struct{}, len(refs))
+	unique := make(map[artifactModel.ArtifactRef]struct{}, len(refs))
 	for _, ref := range refs {
 		unique[ref] = struct{}{}
 	}
 
-	ordered := make([]artifact.ArtifactRef, 0, len(unique))
+	ordered := make([]artifactModel.ArtifactRef, 0, len(unique))
 	for ref := range unique {
 		ordered = append(ordered, ref)
 	}
@@ -99,7 +99,7 @@ func (l *Lifecycle) InvalidateServers(
 
 func (l *Lifecycle) SaveServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) error {

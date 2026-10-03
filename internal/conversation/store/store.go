@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
@@ -520,7 +520,7 @@ func validateConversationV1(value *spec.Conversation) error {
 
 func validateConversationArtifactRefs(
 	field string,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) error {
 	seen := make(map[string]struct{}, len(refs))
 	for index, ref := range refs {
@@ -574,7 +574,7 @@ func validateConversationToolSelections(
 func validateConversationSelectionRefs(
 	field string,
 	refs []workspaceConversation.ConversationResourceSelectionRef,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	seen := make(map[string]struct{}, len(refs))
 	for index, ref := range refs {

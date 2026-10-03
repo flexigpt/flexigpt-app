@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelAggregate "github.com/flexigpt/flexigpt-app/internal/model/aggregate"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
@@ -18,7 +18,7 @@ type ModelAggregateWrapper struct {
 }
 
 func (w *ModelAggregateWrapper) GetDefaultProvider() (
-	*artifact.ArtifactRef,
+	*artifactModel.ArtifactRef,
 	error,
 ) {
 	if w == nil || w.service == nil {
@@ -28,7 +28,7 @@ func (w *ModelAggregateWrapper) GetDefaultProvider() (
 }
 
 func (w *ModelAggregateWrapper) SetDefaultProvider(
-	provider artifact.ArtifactRef,
+	provider artifactModel.ArtifactRef,
 ) error {
 	if w == nil || w.service == nil {
 		return spec.ErrClosed
@@ -53,7 +53,7 @@ func (w *ModelAggregateWrapper) SaveProviderSettings(
 }
 
 func (w *ModelAggregateWrapper) ResetProviderSettings(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
 ) (modelConsumerAPI.ProviderView, error) {
@@ -78,7 +78,7 @@ func (w *ModelAggregateWrapper) SetProviderAPIKey(
 }
 
 func (w *ModelAggregateWrapper) ClearProviderAPIKey(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
 ) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
@@ -112,7 +112,7 @@ func (w *ModelAggregateWrapper) UpdateProvider(
 }
 
 func (w *ModelAggregateWrapper) DeleteProvider(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 ) error {
 	if w == nil || w.service == nil {
@@ -126,12 +126,12 @@ func (w *ModelAggregateWrapper) DeleteProvider(
 }
 
 func (w *ModelAggregateWrapper) SetProviderEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if w == nil || w.service == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return w.service.SetProviderEnabled(
 		context.Background(),

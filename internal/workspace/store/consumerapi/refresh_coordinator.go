@@ -8,21 +8,21 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type workspaceRefreshCoordinator struct {
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
+	sources          source.API
+	discovery        refresh.API
 	workspaceSources workspaceSourceRegistry
 }
 
 func newWorkspaceRefreshCoordinator(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
+	sources source.API,
+	discovery refresh.API,
 	workspaceSources workspaceSourceRegistry,
 ) *workspaceRefreshCoordinator {
 	return &workspaceRefreshCoordinator{
@@ -68,9 +68,9 @@ func (c *workspaceRefreshCoordinator) PrepareSelectorDiscovery(
 		}
 		include = defaultInclude
 	}
-	next.DirectoryRoots = consumerutil.AppendDirectoryRoot(
+	next.DirectoryRoots = source.AppendDirectoryRoot(
 		next.DirectoryRoots,
-		source.DirectoryRoot{
+		sourceModel.DirectoryRoot{
 			Root:            base,
 			Recursive:       true,
 			IncludePatterns: include,
@@ -123,7 +123,7 @@ func (c *workspaceRefreshCoordinator) PrepareLocatedMemberDiscovery(
 			return nil, err
 		}
 		if !inScope {
-			next.ExplicitLocators = consumerutil.AppendUniqueLocator(
+			next.ExplicitLocators = source.AppendUniqueLocator(
 				next.ExplicitLocators,
 				candidate,
 			)
@@ -149,8 +149,8 @@ func (c *workspaceRefreshCoordinator) RefreshSource(
 
 func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
 	ctx context.Context,
-	current source.Summary,
-	next source.DiscoverySpec,
+	current sourceModel.Summary,
+	next sourceModel.DiscoverySpec,
 ) ([]resolve.RefreshDirective, error) {
 	next = next.Normalized()
 	if err := next.Validate(); err != nil {
@@ -171,7 +171,7 @@ func (c *workspaceRefreshCoordinator) updateDiscoveryForRefresh(
 		ctx,
 		current.RootID,
 		current.ID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: current.Revision,
 			DisplayName:      current.DisplayName,
 			Enabled:          current.Enabled,

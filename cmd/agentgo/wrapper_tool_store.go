@@ -6,9 +6,15 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolBuiltin "github.com/flexigpt/flexigpt-app/internal/tool/store/builtin"
@@ -21,11 +27,13 @@ type ToolStoreWrapper struct {
 
 func InitToolStoreWrapper(
 	wrapper *ToolStoreWrapper,
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	cat catalog.API,
+	definitions definition.API,
 ) error {
 	if wrapper == nil {
 		return errors.New("tool store wrapper is required")
@@ -37,6 +45,8 @@ func InitToolStoreWrapper(
 		artifacts,
 		managedArtifacts,
 		protection,
+		cat,
+		definitions,
 		documentTopology.BuiltinRootID(),
 	)
 	if err != nil {
@@ -84,7 +94,7 @@ func (w *ToolStoreWrapper) ListToolCollections() (
 }
 
 func (w *ToolStoreWrapper) GetToolCollection(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	return withToolStore(
 		w,
@@ -95,7 +105,7 @@ func (w *ToolStoreWrapper) GetToolCollection(
 }
 
 func (w *ToolStoreWrapper) ListCollectionTools(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]toolConsumerAPI.ToolListItem, error) {
 	return withToolStore(
 		w,
@@ -106,7 +116,7 @@ func (w *ToolStoreWrapper) ListCollectionTools(
 }
 
 func (w *ToolStoreWrapper) GetTool(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (toolConsumerAPI.ToolView, error) {
 	return withToolStore(
 		w,
@@ -117,7 +127,7 @@ func (w *ToolStoreWrapper) GetTool(
 }
 
 func (w *ToolStoreWrapper) SetToolEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (toolConsumerAPI.ToolView, error) {
@@ -135,7 +145,7 @@ func (w *ToolStoreWrapper) SetToolEnabled(
 }
 
 func (w *ToolStoreWrapper) SetToolCollectionEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {

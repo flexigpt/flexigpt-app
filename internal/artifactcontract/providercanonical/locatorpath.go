@@ -10,8 +10,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -22,20 +22,20 @@ import (
 const locatorKindPath = "path"
 
 type locatorpathFactory struct {
-	artifactKinds []artifact.ArtifactKind
+	artifactKinds []artifactModel.ArtifactKind
 }
 
 func newLocatorpathFactory() *locatorpathFactory {
 	declarationTypes := declaration.Types()
 	artifactKinds := make(
-		[]artifact.ArtifactKind,
+		[]artifactModel.ArtifactKind,
 		0,
 		len(declarationTypes),
 	)
 	for _, declarationType := range declarationTypes {
 		artifactKinds = append(
 			artifactKinds,
-			artifact.ArtifactKind(declarationType),
+			artifactModel.ArtifactKind(declarationType),
 		)
 	}
 	return &locatorpathFactory{
@@ -47,11 +47,11 @@ func (*locatorpathFactory) LocatorKind() string {
 	return locatorKindPath
 }
 
-func (f *locatorpathFactory) ArtifactKinds() []artifact.ArtifactKind {
+func (f *locatorpathFactory) ArtifactKinds() []artifactModel.ArtifactKind {
 	if f == nil {
 		return nil
 	}
-	return append([]artifact.ArtifactKind(nil), f.artifactKinds...)
+	return append([]artifactModel.ArtifactKind(nil), f.artifactKinds...)
 }
 
 func (*locatorpathFactory) Revision() string {
@@ -75,7 +75,7 @@ func (f *locatorpathFactory) BindLocatorRuntime(
 }
 
 type boundResolver struct {
-	artifactKinds []artifact.ArtifactKind
+	artifactKinds []artifactModel.ArtifactKind
 
 	runtime provider.LocatorRuntime
 }
@@ -83,30 +83,30 @@ type boundResolver struct {
 func (r *boundResolver) ResolveLocator(
 	ctx context.Context,
 	request provider.LocatorResolutionRequest,
-) (artifact.ArtifactRef, error) {
+) (artifactModel.ArtifactRef, error) {
 	if r == nil || r.runtime == nil {
-		return artifact.ArtifactRef{}, spec.ErrClosed
+		return artifactModel.ArtifactRef{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator resolution context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if err := request.Validate(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if request.From == nil {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path declaration locator requires a source-backed origin Artifact",
 			spec.ErrLocatorUnresolved,
 		)
 	}
 	if !slices.Contains(r.artifactKinds, request.ExpectedKind) {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator resolver does not support Artifact kind %q",
 			spec.ErrUnsupported,
 			request.ExpectedKind,
@@ -115,7 +115,7 @@ func (r *boundResolver) ResolveLocator(
 
 	var locator declaration.Locator
 	if err := json.Unmarshal(request.LocatorJSON, &locator); err != nil {
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: decode path locator: %w",
 			spec.ErrInvalid,
 			err,
@@ -126,23 +126,23 @@ func (r *boundResolver) ResolveLocator(
 		request.From.Binding.Locator,
 	)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 
 	candidates, err := declarationCandidateLocators(request.ExpectedKind, target)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	return r.selectArtifact(ctx, request, candidates)
 }
 
 func declarationCandidateLocators(
-	expectedKind artifact.ArtifactKind,
+	expectedKind artifactModel.ArtifactKind,
 	target spec.Locator,
 ) ([]spec.Locator, error) {
 	output := make([]spec.Locator, 0, 2)
 	output = append(output, target)
-	if expectedKind != artifact.ArtifactKind(declaration.TypeSkill) ||
+	if expectedKind != artifactModel.ArtifactKind(declaration.TypeSkill) ||
 		documentTopology.IsSkillPackageDocument(target) {
 		return output, nil
 	}
@@ -171,26 +171,26 @@ func (r *boundResolver) selectArtifact(
 	ctx context.Context,
 	request provider.LocatorResolutionRequest,
 	locators []spec.Locator,
-) (artifact.ArtifactRef, error) {
+) (artifactModel.ArtifactRef, error) {
 	records, err := r.runtime.ListArtifactsBySource(
 		ctx,
 		request.RootID,
 		request.From.Binding.SourceID,
 	)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 
 	serverSubresource, hasServerSelector, err := requestedMCPServerSubresource(
 		request,
 	)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 
 	expectedTextVersion, hasTextVersion, err := requestedTextLogicalVersion(request)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 
 	selectedLocators := make(map[spec.Locator]struct{}, len(locators))
@@ -198,10 +198,10 @@ func (r *boundResolver) selectArtifact(
 		selectedLocators[locator] = struct{}{}
 	}
 
-	candidates := make([]catalog.Entry, 0)
+	candidates := make([]catalogModel.Entry, 0)
 	for _, record := range records {
 		if record.Kind != request.ExpectedKind ||
-			record.State != artifact.StateAvailable {
+			record.State != artifactModel.StateAvailable {
 			continue
 		}
 		if _, found := selectedLocators[record.Binding.Locator]; !found {
@@ -223,7 +223,7 @@ func (r *boundResolver) selectArtifact(
 
 	switch len(candidates) {
 	case 0:
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator did not produce %s/%s",
 			spec.ErrReferenceUnresolved,
 			request.ExpectedKind,
@@ -232,7 +232,7 @@ func (r *boundResolver) selectArtifact(
 	case 1:
 		return candidates[0].Ref(), nil
 	default:
-		return artifact.ArtifactRef{}, fmt.Errorf(
+		return artifactModel.ArtifactRef{}, fmt.Errorf(
 			"%w: path locator produced %d %s Artifacts",
 			spec.ErrIdentityConflict,
 			len(candidates),
@@ -244,7 +244,7 @@ func (r *boundResolver) selectArtifact(
 func requestedTextLogicalVersion(
 	request provider.LocatorResolutionRequest,
 ) (spec.LogicalVersion, bool, error) {
-	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeText) ||
+	if request.ExpectedKind != artifactModel.ArtifactKind(declaration.TypeText) ||
 		len(request.EntryJSON) == 0 {
 		return "", false, nil
 	}
@@ -263,7 +263,7 @@ func requestedTextLogicalVersion(
 func requestedMCPServerSubresource(
 	request provider.LocatorResolutionRequest,
 ) (spec.SubresourceLocator, bool, error) {
-	if request.ExpectedKind != artifact.ArtifactKind(declaration.TypeMCP) ||
+	if request.ExpectedKind != artifactModel.ArtifactKind(declaration.TypeMCP) ||
 		len(request.EntryJSON) == 0 {
 		return "", false, nil
 	}

@@ -3,7 +3,7 @@ package codec
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 )
 
 func TestAllSchemaCodecsCoverSchemaKeys(t *testing.T) {
@@ -20,7 +20,7 @@ func TestAllSchemaCodecsCoverSchemaKeys(t *testing.T) {
 		)
 	}
 
-	expectedSet := make(map[schema.Key]struct{}, len(expected))
+	expectedSet := make(map[schemaModel.Key]struct{}, len(expected))
 	for _, key := range expected {
 		if err := key.Validate(); err != nil {
 			t.Fatalf("invalid expected schema key %+v: %v", key, err)
@@ -31,7 +31,7 @@ func TestAllSchemaCodecsCoverSchemaKeys(t *testing.T) {
 		expectedSet[key] = struct{}{}
 	}
 
-	seen := make(map[schema.Key]struct{}, len(codecs))
+	seen := make(map[schemaModel.Key]struct{}, len(codecs))
 	for index, value := range codecs {
 		if value == nil {
 			t.Fatalf("codec %d is nil", index)

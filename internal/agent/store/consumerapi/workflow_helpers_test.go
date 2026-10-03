@@ -22,9 +22,9 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -32,7 +32,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
 )
 
-const workflowDependencySourceID source.SourceID = "0192c4c0-00f0-7000-8000-000000000001"
+const workflowDependencySourceID sourceModel.SourceID = "0192c4c0-00f0-7000-8000-000000000001"
 
 type workflowHarness struct {
 	store *local.Store
@@ -152,11 +152,13 @@ func newWorkflowHarness(
 
 	api, err := agentConsumerAPI.New(
 		store.Sources,
-		store.Discovery,
+		store.Refresh,
 		store.Artifacts,
+		store.Catalog,
 		store.Resources,
-		store.ManagedArtifacts,
+		store.ManagedPackages,
 		store.Protection,
+		store.Definitions,
 		agentConsumerAPI.WithRoots(store.Roots),
 		agentConsumerAPI.WithFallbackProviders(
 			workflowFallbackProviders(),
@@ -387,8 +389,8 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		})
 		requireNoError(t, err)
 
-		discovery := source.DiscoverySpec{
-			DirectoryRoots: []source.DirectoryRoot{{
+		discovery := sourceModel.DiscoverySpec{
+			DirectoryRoots: []sourceModel.DirectoryRoot{{
 				Root:            ".",
 				Recursive:       true,
 				IncludePatterns: []string{"**/*.yaml"},
@@ -402,10 +404,10 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		_, err = h.store.Sources.Create(
 			ctx,
 			documentTopology.BuiltinRootID(),
-			source.Draft{
+			sourceModel.Draft{
 				ID:          workflowDependencySourceID,
 				StorageKey:  "agent-test-dependencies",
-				Kind:        source.SourceKindFilesystemDirectory,
+				Kind:        sourceModel.SourceKindFilesystemDirectory,
 				DisplayName: "Agent workflow test dependencies",
 				Enabled:     true,
 				Config:      json.RawMessage(config),
@@ -416,7 +418,7 @@ func (h *workflowHarness) publishBuiltinDependencies(
 		h.dependencySourceCreated = true
 	}
 
-	refreshed, err := h.store.Discovery.RefreshSource(
+	refreshed, err := h.store.Refresh.RefreshSource(
 		ctx,
 		documentTopology.BuiltinRootID(),
 		workflowDependencySourceID,
@@ -571,7 +573,7 @@ func requireSameAgentRevisions(
 		)
 	}
 
-	revisions := make(map[artifact.ArtifactRef]uint64, len(before))
+	revisions := make(map[artifactModel.ArtifactRef]uint64, len(before))
 	for _, value := range before {
 		revisions[value.Ref] = value.Revision
 	}

@@ -55,7 +55,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 		t.Fatal("managed Skill is disabled before initial catalog synchronization")
 	}
 
-	inspection, err := fixture.store.Discovery.InspectSource(
+	inspection, err := fixture.store.Refresh.InspectSource(
 		ctx,
 		catalogSkill.RootID,
 		catalogSkill.Binding.SourceID,
@@ -296,6 +296,7 @@ func newSkillAggregateService(
 
 	router, err := skillAggregate.NewArtifactRouter(
 		fixture.store.Artifacts,
+		fixture.store.Catalog,
 		fixture.store.Resources,
 	)
 	requireNoError(t, err)

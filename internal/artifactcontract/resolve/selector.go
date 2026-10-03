@@ -7,18 +7,18 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (r *Resolver) expandSelector(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 ) (ResolvedSelector, error) {
 	if from == nil {
@@ -27,9 +27,9 @@ func (r *Resolver) expandSelector(
 			spec.ErrSourceUnavailable,
 		)
 	}
-	if r.sourceArtifacts == nil {
+	if r.catalog == nil {
 		return ResolvedSelector{}, fmt.Errorf(
-			"%w: member selector source enumeration is unavailable",
+			"%w: member selector Artifact catalog is unavailable",
 			spec.ErrUnsupported,
 		)
 	}
@@ -113,11 +113,11 @@ func (r *Resolver) expandSelector(
 		return ResolvedSelector{}, err
 	}
 
-	records, err := r.sourceArtifacts.ListBySource(
+	records, err := r.catalog.ListBySource(
 		ctx,
 		rootID,
 		effectiveSourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return ResolvedSelector{}, err
@@ -142,7 +142,7 @@ func (r *Resolver) expandSelector(
 	for _, record := range records {
 		if record.RootID != rootID ||
 			record.Binding.SourceID != effectiveSourceID ||
-			record.Kind != artifact.ArtifactKind(selector.Type) {
+			record.Kind != artifactModel.ArtifactKind(selector.Type) {
 			continue
 		}
 
@@ -171,7 +171,7 @@ func (r *Resolver) expandSelector(
 		match := ResolvedSelectorMatch{
 			Artifact: record.Ref(),
 		}
-		if record.State != artifact.StateAvailable {
+		if record.State != artifactModel.StateAvailable {
 			match.Status = ResolutionUnavailable
 			match.Issue = &ResolutionIssue{
 				Code:    "artifact.reference-unresolved",

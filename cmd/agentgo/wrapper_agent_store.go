@@ -9,11 +9,18 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -40,19 +47,22 @@ func NewAgentBuiltInInstaller(
 
 func InitAgentStoreWrapper(
 	wrapper *AgentStoreWrapper,
-	roots local.RootAPI,
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
+	roots root.API,
+	cat catalog.API,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	resources resource.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	definitions definition.API,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	locatorResolvers ...provider.LocatorResolverFactory,
 ) error {
 	if wrapper == nil ||
 		roots == nil ||
+		cat == nil || definitions == nil ||
 		sources == nil ||
 		discovery == nil ||
 		artifacts == nil ||
@@ -66,9 +76,11 @@ func InitAgentStoreWrapper(
 		sources,
 		discovery,
 		artifacts,
+		cat,
 		resources,
 		managedArtifacts,
 		protection,
+		definitions,
 		agentConsumerAPI.WithRoots(roots),
 		agentConsumerAPI.WithLocatorResolvers(locatorResolvers),
 		agentConsumerAPI.WithFallbackProviders(fallbackProviders),
@@ -136,7 +148,7 @@ func (w *AgentStoreWrapper) ListAgentCollectionsForManagement() (
 }
 
 func (w *AgentStoreWrapper) GetAgent(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (agentConsumerAPI.AgentView, error) {
 	return withAgentStore(
 		w,
@@ -150,7 +162,7 @@ func (w *AgentStoreWrapper) GetAgent(
 }
 
 func (w *AgentStoreWrapper) MaterializeAgentText(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (agentConsumerAPI.AgentTextMaterialization, error) {
 	return withAgentStore(
 		w,
@@ -161,7 +173,7 @@ func (w *AgentStoreWrapper) MaterializeAgentText(
 }
 
 func (w *AgentStoreWrapper) ResolveAgent(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (agentConsumerAPI.AgentResolution, error) {
 	return withAgentStore(
 		w,
@@ -172,7 +184,7 @@ func (w *AgentStoreWrapper) ResolveAgent(
 }
 
 func (w *AgentStoreWrapper) ResolveAgentCapabilities(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (agentConsumerAPI.AgentCapabilityPlan, error) {
 	return withAgentStore(
 		w,
@@ -183,7 +195,7 @@ func (w *AgentStoreWrapper) ResolveAgentCapabilities(
 }
 
 func (w *AgentStoreWrapper) SetAgentEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (agentConsumerAPI.AgentView, error) {
@@ -215,7 +227,7 @@ func (w *AgentStoreWrapper) CreateAgentCollection(
 }
 
 func (w *AgentStoreWrapper) GetAgentCollection(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	return withAgentStore(
 		w,
@@ -226,7 +238,7 @@ func (w *AgentStoreWrapper) GetAgentCollection(
 }
 
 func (w *AgentStoreWrapper) ListAgentCollections(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	return withAgentStore(
 		w,
@@ -237,7 +249,7 @@ func (w *AgentStoreWrapper) ListAgentCollections(
 }
 
 func (w *AgentStoreWrapper) ListAgentCollectionMembers(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
 	return withAgentStore(
 		w,
@@ -313,7 +325,7 @@ func (w *AgentStoreWrapper) RemoveAgentCollectionMember(
 }
 
 func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -331,7 +343,7 @@ func (w *AgentStoreWrapper) SetAgentCollectionEnabled(
 }
 
 func (w *AgentStoreWrapper) DeleteAgentCollection(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return withRecovery(func() error {

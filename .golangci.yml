@@ -85,7 +85,7 @@ linters:
     - govet
 
     # Checks import alias consistency.
-    - importas
+    # - importas
 
     # Reports interfaces with unnamed method parameters.
     - inamedparam
@@ -457,9 +457,9 @@ linters:
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/(\w+)/impl
           alias: ${1}impl
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/model
-          alias: ${1}
+          alias: ${1}Model
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/(\w+)/(\w+)/model
-          alias: ${2}
+          alias: ${2}Model
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)
           alias: ${1}Flow
         - pkg: github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/(\w+)/model

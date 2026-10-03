@@ -8,12 +8,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -21,24 +28,28 @@ import (
 )
 
 type API struct {
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	resources        local.ResourceAPI
-	managedArtifacts local.ManagedArtifactAPI
-	protection       local.ProtectionAPI
+	cat              catalog.API
+	sources          source.API
+	discovery        refresh.API
+	artifacts        artifact.API
+	resources        resource.API
+	managedArtifacts managedpackage.API
+	protection       root.ProtectionAPI
+	definitions      definition.API
 	collections      *collection.API
 
 	declarationResolver *resolve.Resolver
 }
 
 func New(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	resources resource.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	cat catalog.API,
+	definitions definition.API,
 	options ...Option,
 ) (*API, error) {
 	if sources == nil ||
@@ -46,7 +57,7 @@ func New(
 		artifacts == nil ||
 		resources == nil ||
 		managedArtifacts == nil ||
-		protection == nil {
+		protection == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: Skill Store dependencies are incomplete",
 			spec.ErrInvalid,
@@ -66,10 +77,12 @@ func New(
 		resources:        resources,
 		managedArtifacts: managedArtifacts,
 		protection:       protection,
+		cat:              cat,
+		definitions:      definitions,
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		skillLocatorRuntime{artifacts: artifacts},
+		skillLocatorRuntime{cat: cat},
 	)
 	if err != nil {
 		return nil, err
@@ -77,7 +90,7 @@ func New(
 	graphResolver, err := resolve.NewWithOptions(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
-			SourceArtifacts:      artifacts,
+			Catalog:              cat,
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
@@ -90,10 +103,12 @@ func New(
 		return nil, err
 	}
 	collections, err := collection.NewWithResolver(
+		artifacts,
+		cat,
 		sources,
 		discovery,
-		artifacts,
 		managedArtifacts,
+		definitions,
 		graphResolver,
 		collection.SkillDomainPolicy(),
 	)
@@ -107,7 +122,7 @@ func New(
 
 func SkillDiscoverySpec(
 	r spec.Locator,
-) (source.DiscoverySpec, error) {
+) (sourceModel.DiscoverySpec, error) {
 	if r == "" {
 		r = "."
 	}
@@ -120,29 +135,29 @@ func SkillDiscoverySpec(
 func (a *API) RegisterSkillDirectory(
 	ctx context.Context,
 	request SkillDirectoryRegistration,
-) (source.Summary, error) {
+) (sourceModel.Summary, error) {
 	if err := request.RootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := spec.ValidateRequiredText(
 		"Skill Source display name",
 		request.SourceDisplayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
-	rootPath, err := consumerutil.NormalizeFilesystemSourceRoot(
+	rootPath, err := fsdir.NormalizeFilesystemSourceRoot(
 		request.RootPath,
 		"Skill Source root path",
 	)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
 	discovery, err := SkillDiscoverySpec(".")
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	config, err := json.Marshal(struct {
 		RootPath string `json:"rootPath"`
@@ -150,22 +165,22 @@ func (a *API) RegisterSkillDirectory(
 		RootPath: rootPath,
 	})
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
-	return consumerutil.EnsureAndRefreshSource(
+	return refresh.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		consumerutil.EnsureAndRefreshSourceRequest{
+		refresh.EnsureAndRefreshSourceRequest{
 			RootID: request.RootID,
-			Draft: source.Draft{
-				ID: source.SourceID(uuidutil.NewUUIDv7()),
-				StorageKey: consumerutil.FilesystemSourceStorageKey(
+			Draft: sourceModel.Draft{
+				ID: sourceModel.SourceID(uuidutil.NewUUIDv7()),
+				StorageKey: fsdir.FilesystemSourceStorageKey(
 					"skill-path",
 					rootPath,
 				),
-				Kind:        source.SourceKindFilesystemDirectory,
+				Kind:        sourceModel.SourceKindFilesystemDirectory,
 				DisplayName: request.SourceDisplayName,
 				Enabled:     true,
 				Config:      config,
@@ -177,8 +192,8 @@ func (a *API) RegisterSkillDirectory(
 
 func (a *API) RefreshSkillSource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 ) error {
 	if err := rootID.Validate(); err != nil {
 		return err
@@ -192,14 +207,14 @@ func (a *API) RefreshSkillSource(
 
 func (a *API) GetSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	value, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if !skillDomain.IsSkillKind(value.Kind) {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is not a Skill",
 			spec.ErrNotFound,
 			ref.ArtifactID,
@@ -210,12 +225,12 @@ func (a *API) GetSkill(
 
 func (a *API) SetSkillEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if _, err := a.GetSkill(ctx, ref); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return a.artifacts.SetEnabled(
 		ctx,
@@ -332,16 +347,16 @@ func (a *API) CreateManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: rootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
 				Locator:  locator,
 			},
 			ExpectedKind:        skillDomain.SkillArtifactKind,
 			ExpectedLogicalName: definitionValue.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address: packageAddress,
 				Files:   storageFiles,
 			},
@@ -452,7 +467,7 @@ func (a *API) ReplaceManagedSkill(
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -549,16 +564,16 @@ func (a *API) ReplaceManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifact.PublishArtifactRequest{
+		artifactModel.PublishArtifactRequest{
 			RootID: current.RootID,
-			Binding: artifact.SourceBinding{
+			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
 				Locator:  current.Binding.Locator,
 			},
 			ExpectedKind:        skillDomain.SkillArtifactKind,
 			ExpectedLogicalName: current.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: source.ManagedPackagePublication{
+			Package: sourceModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: inspection.State.SourceGeneration,
 				Files:              storageFiles,
@@ -603,12 +618,12 @@ func (a *API) ReplaceManagedSkill(
 
 func (a *API) GetManagedSkillDocument(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (skillDomain.ManagedSkillDocument, error) {
 	if a == nil || a.resources == nil {
 		return skillDomain.ManagedSkillDocument{}, spec.ErrClosed
 	}
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (skillDomain.ManagedSkillDocument, error) {
@@ -619,7 +634,7 @@ func (a *API) GetManagedSkillDocument(
 
 func (a *API) PurgeSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
@@ -647,7 +662,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: source-backed Skill removal must update or unregister its Source",
 			spec.ErrUnsupported,
@@ -669,7 +684,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	removeRequest := artifact.RemoveArtifactRequest{
+	removeRequest := artifactModel.RemoveArtifactRequest{
 		RootID:           value.RootID,
 		SourceID:         value.Binding.SourceID,
 		Package:          packageAddress,
@@ -687,7 +702,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	if missing.State != artifact.StateMissing {
+	if missing.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: removed managed Skill Artifact is not missing",
 			spec.ErrConflict,
@@ -705,14 +720,14 @@ func (a *API) PurgeSkill(
 // fallback occurrences from Skill.allowedTools.
 func (a *API) ResolveSkillCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (resolve.CapabilityPlan, error) {
 	if a == nil ||
 		a.resources == nil ||
 		a.declarationResolver == nil {
 		return resolve.CapabilityPlan{}, spec.ErrClosed
 	}
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (resolve.CapabilityPlan, error) {
@@ -726,7 +741,7 @@ func (a *API) ResolveSkillCapabilities(
 
 func (a *API) getManagedSkillDocument(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (skillDomain.ManagedSkillDocument, error) {
 	value, err := a.GetSkill(ctx, ref)
 	if err != nil {
@@ -740,7 +755,7 @@ func (a *API) getManagedSkillDocument(
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory {
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: only managed Skills expose editable Skill documents",
 			spec.ErrUnsupported,
@@ -764,7 +779,7 @@ func (a *API) getManagedSkillDocument(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err
@@ -805,7 +820,7 @@ func (a *API) getManagedSkillDocument(
 
 func (a *API) ensureSkillBaselineCollection(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -815,7 +830,7 @@ func (a *API) ensureSkillBaselineCollection(
 
 func (a *API) requireMutable(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	allowProtected bool,
 ) error {
 	if err := rootID.Validate(); err != nil {

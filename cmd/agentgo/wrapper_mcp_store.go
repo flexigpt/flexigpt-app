@@ -4,9 +4,9 @@ import (
 	"context"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -22,7 +22,7 @@ type MCPSettingsView struct {
 type MCPStoreWrapper struct {
 	api        *mcpConsumerAPI.API
 	management *mcpConsumerAPI.MCPListService
-	roots      local.RootAPI
+	roots      root.API
 	settings   *mcpSettingsAdapter
 }
 
@@ -53,7 +53,7 @@ func withMCPStoreManagement[T any](
 }
 
 func (w *MCPStoreWrapper) ListMCPServers(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]mcpConsumerAPI.ServerListItem, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.ServerListItem, error) {
 		return api.ListServers(context.Background(), mcpConsumerAPI.ListServersRequest{
@@ -63,7 +63,7 @@ func (w *MCPStoreWrapper) ListMCPServers(
 }
 
 func (w *MCPStoreWrapper) ListMCPPolicies(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]mcpConsumerAPI.PolicyListItem, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]mcpConsumerAPI.PolicyListItem, error) {
 		return api.ListPolicies(context.Background(), mcpConsumerAPI.ListPoliciesRequest{
@@ -138,7 +138,7 @@ func (w *MCPStoreWrapper) SaveMCPSettings(
 }
 
 func (w *MCPStoreWrapper) GetMCPServerSecrets(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpConsumerAPI.ServerSecretsView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.ServerSecretsView, error) {
 		return api.GetServerSecrets(context.Background(), ref)
@@ -146,7 +146,7 @@ func (w *MCPStoreWrapper) GetMCPServerSecrets(
 }
 
 func (w *MCPStoreWrapper) GetMCPPolicy(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpConsumerAPI.PolicyView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (mcpConsumerAPI.PolicyView, error) {
 		return api.GetMCPPolicy(context.Background(), ref)
@@ -187,7 +187,7 @@ func (w *MCPStoreWrapper) CreateMCPCollection(
 }
 
 func (w *MCPStoreWrapper) GetMCPCollection(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) (collection.CollectionView, error) {
 		return api.GetMCPCollection(context.Background(), ref)
@@ -195,7 +195,7 @@ func (w *MCPStoreWrapper) GetMCPCollection(
 }
 
 func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -213,7 +213,7 @@ func (w *MCPStoreWrapper) SetMCPCollectionEnabled(
 }
 
 func (w *MCPStoreWrapper) ListMCPCollections(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	return withMCPStore(w, func(api *mcpConsumerAPI.API) ([]collection.ListItem, error) {
 		return api.ListMCPCollections(context.Background(), rootID)
@@ -221,7 +221,7 @@ func (w *MCPStoreWrapper) ListMCPCollections(
 }
 
 func (w *MCPStoreWrapper) ListMCPCollectionMemberships(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]collection.ArtifactMembershipView, error) {
 	return withMCPStore(
 		w,

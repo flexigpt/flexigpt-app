@@ -7,128 +7,128 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type resolutionState struct {
 	nodes                int
-	active               map[artifact.ArtifactRef]struct{}
-	directRoot           *artifact.ArtifactRef
-	compositionRootID    root.RootID
-	compositionSourceID  source.SourceID
+	active               map[artifactModel.ArtifactRef]struct{}
+	directRoot           *artifactModel.ArtifactRef
+	compositionRootID    rootModel.RootID
+	compositionSourceID  sourceModel.SourceID
 	hasCompositionSource bool
 }
 
 func newResolutionState() resolutionState {
 	return resolutionState{
-		active: make(map[artifact.ArtifactRef]struct{}),
+		active: make(map[artifactModel.ArtifactRef]struct{}),
 	}
 }
 
-func (s *resolutionState) usesCompositionSource(rootID root.RootID) bool {
+func (s *resolutionState) usesCompositionSource(rootID rootModel.RootID) bool {
 	return s != nil &&
 		s.hasCompositionSource &&
 		s.compositionRootID == rootID
 }
 
 type loadedDeclarationArtifact struct {
-	record          artifact.Artifact
-	definition      definition.Definition
+	record          artifactModel.Artifact
+	definition      definitionModel.Definition
 	entry           declaration.Entry
 	declarationType declaration.Type
 }
 
 func (r *Resolver) ResolveText(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeText)
 }
 
 func (r *Resolver) ResolveModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeModel)
 }
 
 func (r *Resolver) ResolveModelProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeModelProvider)
 }
 
 func (r *Resolver) ResolveTool(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeTool)
 }
 
 func (r *Resolver) ResolveSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeSkill)
 }
 
 func (r *Resolver) ResolveMCP(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeMCP)
 }
 
 func (r *Resolver) ResolveMCPPolicy(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeMCPPolicy)
 }
 
 func (r *Resolver) ResolvePlugin(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypePlugin)
 }
 
 func (r *Resolver) ResolveAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeAgent)
 }
 
 func (r *Resolver) ResolveTeam(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeTeam)
 }
 
 func (r *Resolver) ResolveLoop(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeLoop)
 }
 
 func (r *Resolver) ResolveWorkflow(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	return r.resolveTyped(ctx, ref, declaration.TypeWorkflow)
 }
 
 func (r *Resolver) ResolveWorkspace(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedWorkspace, error) {
 	value, err := r.ResolveWorkspaceEntry(ctx, ref)
 	if err != nil {
@@ -139,11 +139,11 @@ func (r *Resolver) ResolveWorkspace(
 
 func (r *Resolver) ResolveWorkspaceWithCompositionSource(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	compositionSourceID source.SourceID,
+	ref artifactModel.ArtifactRef,
+	compositionSourceID sourceModel.SourceID,
 ) (*ResolvedEntry, error) {
-	if r == nil || r.artifacts == nil {
-		return nil, spec.ErrClosed
+	if err := r.ready(); err != nil {
+		return nil, err
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return nil, err
@@ -163,7 +163,7 @@ func (r *Resolver) ResolveWorkspaceWithCompositionSource(
 
 func (r *Resolver) ResolveWorkspaceEntry(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (*ResolvedEntry, error) {
 	value, err := r.resolveTyped(ctx, ref, declaration.TypeWorkspace)
 	if err != nil {
@@ -185,27 +185,27 @@ func (r *Resolver) ResolveWorkspaceEntry(
 // composition.
 func (r *Resolver) ResolveTerminalArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.ArtifactRef, error) {
-	if r == nil || r.artifacts == nil {
-		return artifact.ArtifactRef{}, spec.ErrClosed
+	ref artifactModel.ArtifactRef,
+) (artifactModel.ArtifactRef, error) {
+	if err := r.ready(); err != nil {
+		return artifactModel.ArtifactRef{}, err
 	}
 	if err := validateResolutionContext(ctx); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	if err := ref.Validate(); err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	return r.resolveTerminalArtifact(ctx, ref, "", "")
 }
 
 func (r *Resolver) resolveTyped(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expected declaration.Type,
 ) (*ResolvedEntry, error) {
-	if r == nil || r.artifacts == nil {
-		return nil, spec.ErrClosed
+	if err := r.ready(); err != nil {
+		return nil, err
 	}
 	if err := validateResolutionContext(ctx); err != nil {
 		return nil, err
@@ -221,7 +221,7 @@ func (r *Resolver) resolveTyped(
 func (r *Resolver) resolveArtifact(
 	ctx context.Context,
 	state *resolutionState,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
 	expectedVersion spec.LogicalVersion,
 	depth int,
@@ -317,7 +317,7 @@ func (r *Resolver) resolveArtifact(
 
 func (r *Resolver) loadAvailableDeclarationArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
 	expectedVersion spec.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
@@ -331,7 +331,7 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			spec.ErrInvalid,
 		)
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not available",
 			spec.ErrReferenceUnresolved,
@@ -374,24 +374,19 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 			record.ID,
 		)
 	}
-	definitions, err := r.artifacts.GetDefinitions(
+	definitionValue, err := r.artifacts.GetDefinition(
 		ctx,
-		[]definition.Key{{
-			RootID: record.RootID,
-			Digest: *record.ResolvedDefinition,
-		}},
+		record.Ref(),
 	)
 	if err != nil {
 		return loadedDeclarationArtifact{}, err
 	}
-	if len(definitions) != 1 ||
-		definitions[0].Digest != *record.ResolvedDefinition {
+	if definitionValue.Digest != *record.ResolvedDefinition {
 		return loadedDeclarationArtifact{}, fmt.Errorf(
 			"%w: Artifact Definition changed during resolution",
 			spec.ErrRefreshRequired,
 		)
 	}
-	definitionValue := definitions[0]
 
 	if err := validateDefinitionContract(definitionValue, declarationType); err != nil {
 		return loadedDeclarationArtifact{}, err
@@ -444,26 +439,26 @@ func (r *Resolver) loadAvailableDeclarationArtifact(
 
 func (r *Resolver) resolveTerminalArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
 	expectedVersion spec.LogicalVersion,
-) (artifact.ArtifactRef, error) {
+) (artifactModel.ArtifactRef, error) {
 	loaded, err := r.resolveTerminalDeclaration(ctx, ref, expectedType, expectedVersion)
 	if err != nil {
-		return artifact.ArtifactRef{}, err
+		return artifactModel.ArtifactRef{}, err
 	}
 	return loaded.record.Ref(), nil
 }
 
 func (r *Resolver) resolveTerminalDeclaration(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedType declaration.Type,
 	expectedVersion spec.LogicalVersion,
 ) (loadedDeclarationArtifact, error) {
 	current := ref
 	expectedName := spec.LogicalName("")
-	seen := make(map[artifact.ArtifactRef]struct{})
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 
 	for depth := 0; depth <= r.limits.MaxDepth; depth++ {
 		if _, duplicate := seen[current]; duplicate {
@@ -590,7 +585,7 @@ func (r *Resolver) reserve(
 }
 
 func validateDefinitionContract(
-	value definition.Definition,
+	value definitionModel.Definition,
 	declarationType declaration.Type,
 ) error {
 	key, found := codec.SchemaKeyForType(declarationType)
@@ -612,19 +607,19 @@ func validateDefinitionContract(
 	return nil
 }
 
-func pointerArtifact(value artifact.Artifact) *artifact.Artifact {
+func pointerArtifact(value artifactModel.Artifact) *artifactModel.Artifact {
 	copyValue := value.Clone()
 	return &copyValue
 }
 
-func cloneArtifactPointer(value *artifact.Artifact) *artifact.Artifact {
+func cloneArtifactPointer(value *artifactModel.Artifact) *artifactModel.Artifact {
 	if value == nil {
 		return nil
 	}
 	return pointerArtifact(*value)
 }
 
-func pointerDefinition(value definition.Definition) *definition.Definition {
+func pointerDefinition(value definitionModel.Definition) *definitionModel.Definition {
 	copyValue := value.Clone()
 	return &copyValue
 }

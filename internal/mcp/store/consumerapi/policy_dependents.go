@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
@@ -21,9 +21,9 @@ import (
 // server with a stale resolved policy.
 func (a *API) ListMCPServersReferencingPolicy(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	policyName spec.LogicalName,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	if a == nil || a.resources == nil {
 		return nil, spec.ErrClosed
 	}
@@ -33,10 +33,10 @@ func (a *API) ListMCPServersReferencingPolicy(
 	if err := policyName.Validate(); err != nil {
 		return nil, err
 	}
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
-		func(sessionCtx context.Context) ([]artifact.ArtifactRef, error) {
+		func(sessionCtx context.Context) ([]artifactModel.ArtifactRef, error) {
 			return a.listMCPServersReferencingPolicy(
 				sessionCtx,
 				rootID,
@@ -48,9 +48,9 @@ func (a *API) ListMCPServersReferencingPolicy(
 
 func (a *API) listMCPServersReferencingPolicy(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	policyName spec.LogicalName,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	servers, err := a.ListServers(ctx, ListServersRequest{
 		RootID: rootID,
 	})
@@ -58,11 +58,11 @@ func (a *API) listMCPServersReferencingPolicy(
 		return nil, err
 	}
 
-	output := make([]artifact.ArtifactRef, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
+	output := make([]artifactModel.ArtifactRef, 0)
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 
 	for _, record := range servers {
-		if record.State != artifact.StateAvailable {
+		if record.State != artifactModel.StateAvailable {
 			continue
 		}
 
@@ -113,8 +113,8 @@ func (a *API) listMCPServersReferencingPolicy(
 
 func (a *API) additionalPoliciesReferenceName(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
-	rootID root.RootID,
+	refs []artifactModel.ArtifactRef,
+	rootID rootModel.RootID,
 	policyName spec.LogicalName,
 ) (bool, error) {
 	for _, ref := range refs {

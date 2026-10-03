@@ -8,7 +8,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 )
@@ -46,7 +46,7 @@ func NewWorkspaceInferenceBridge(
 // the selected Workspace.
 func validateArtifactSkillRefsForSelection(
 	sel *workspaceConversation.ConversationSelection,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) error {
 	if sel != nil {
 		if err := sel.Workspace.Validate(); err != nil {
@@ -147,7 +147,7 @@ func buildWorkspaceInstructionsSystemPromptPart(
 }
 
 func buildWorkspaceUserMessageInput(
-	workspaceRef artifact.ArtifactRef,
+	workspaceRef artifactModel.ArtifactRef,
 	userMessage string,
 ) inferenceSpec.InputUnion {
 	return inferenceSpec.InputUnion{
@@ -173,7 +173,7 @@ func buildWorkspaceUserMessageInput(
 }
 
 func workspaceContextInputID(
-	workspaceRef artifact.ArtifactRef,
+	workspaceRef artifactModel.ArtifactRef,
 ) string {
 	return workspaceContextInputIDPrefix +
 		string(workspaceRef.RootID) + ":" +
@@ -240,9 +240,9 @@ func isGeneratedCurrentContextInput(input inferenceSpec.InputUnion) bool {
 // for this turn. ArtifactRefs not owned by this Workspace selection remain in
 // the caller's explicit runtime allow-list and are resolved by the Skill bridge.
 func filterWorkspaceSkillRefsToResolvedSelection(
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 	usage *workspaceConversation.ConversationUsage,
-) []artifact.ArtifactRef {
+) []artifactModel.ArtifactRef {
 	if usage == nil || len(refs) == 0 {
 		return refs
 	}
@@ -257,7 +257,7 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 		available[workspaceArtifactRefKey(skill.Artifact)] = struct{}{}
 	}
 
-	filtered := make([]artifact.ArtifactRef, 0, len(refs))
+	filtered := make([]artifactModel.ArtifactRef, 0, len(refs))
 	for _, ref := range refs {
 		key := workspaceArtifactRefKey(ref)
 		if _, workspaceSelected := selected[key]; !workspaceSelected {
@@ -273,9 +273,9 @@ func filterWorkspaceSkillRefsToResolvedSelection(
 
 func markWorkspaceSkillSessionUsage(
 	usage *workspaceConversation.ConversationUsage,
-	enabledSkillRefs []artifact.ArtifactRef,
-	sessionSkillRefs []artifact.ArtifactRef,
-	activeSkillRefs []artifact.ArtifactRef,
+	enabledSkillRefs []artifactModel.ArtifactRef,
+	sessionSkillRefs []artifactModel.ArtifactRef,
+	activeSkillRefs []artifactModel.ArtifactRef,
 	advertised bool,
 ) {
 	if usage == nil || len(usage.Skills) == 0 {
@@ -351,6 +351,6 @@ func markWorkspaceSkillSessionUsage(
 	workspaceConversation.ResolveConversationUsageStatus(usage)
 }
 
-func workspaceArtifactRefKey(ref artifact.ArtifactRef) string {
+func workspaceArtifactRefKey(ref artifactModel.ArtifactRef) string {
 	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }

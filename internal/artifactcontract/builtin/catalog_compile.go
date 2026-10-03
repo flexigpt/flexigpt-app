@@ -12,11 +12,11 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -26,7 +26,7 @@ import (
 type Expectation struct {
 	Locator          spec.Locator
 	Subresource      spec.SubresourceLocator
-	Kind             artifact.ArtifactKind
+	Kind             artifactModel.ArtifactKind
 	LogicalName      spec.LogicalName
 	LogicalVersion   spec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
@@ -36,9 +36,9 @@ type Expectation struct {
 // domain-owned. This package only performs generic Artifact Store admission.
 type PackageInput struct {
 	EmbeddedRoot spec.Locator
-	Address      source.ManagedPackageAddress
+	Address      sourceModel.ManagedPackageAddress
 	DocumentFile spec.Locator
-	Files        []source.ManagedPackageFile
+	Files        []sourceModel.ManagedPackageFile
 	Expectations []Expectation
 }
 
@@ -205,18 +205,18 @@ func Compile(
 			return topology.CompiledPackageSet{}, err
 		}
 
-		if _, err := store.ManagedArtifacts.Publish(
+		if _, err := store.ManagedPackages.Publish(
 			ctx,
-			artifact.PublishArtifactRequest{
+			artifactModel.PublishArtifactRequest{
 				RootID: declaration.Root.ID,
-				Binding: artifact.SourceBinding{
+				Binding: artifactModel.SourceBinding{
 					SourceID: sourceID,
 					Locator:  locator,
 				},
 				ExpectedKind:        rootExpectation.Kind,
 				ExpectedLogicalName: rootExpectation.LogicalName,
 				ExpectedDefinition:  rootExpectation.DefinitionDigest,
-				Package: source.ManagedPackagePublication{
+				Package: sourceModel.ManagedPackagePublication{
 					Address: input.Address,
 					Files:   input.Files,
 				},
@@ -227,11 +227,11 @@ func Compile(
 		}
 	}
 
-	entries, err := store.Artifacts.ListBySource(
+	entries, err := store.Catalog.ListBySource(
 		ctx,
 		declaration.Root.ID,
 		sourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return topology.CompiledPackageSet{}, err
@@ -263,9 +263,9 @@ func Compile(
 // normalizePackageFileLineEndings makes generated package bytes independent
 // of CRLF checkout conversion before publication and content hashing.
 func normalizePackageFileLineEndings(
-	files []source.ManagedPackageFile,
-) []source.ManagedPackageFile {
-	normalized := append([]source.ManagedPackageFile(nil), files...)
+	files []sourceModel.ManagedPackageFile,
+) []sourceModel.ManagedPackageFile {
+	normalized := append([]sourceModel.ManagedPackageFile(nil), files...)
 	for index := range normalized {
 		content := normalized[index].Content
 		if !bytes.Contains(content, []byte("\r\n")) {
@@ -299,7 +299,7 @@ func compilePackage(
 	ctx context.Context,
 	store *local.Store,
 	input PackageInput,
-	entries []catalog.Entry,
+	entries []catalogModel.Entry,
 	validation cryptoutil.Digest,
 ) (topology.CompiledPackage, error) {
 	scope, err := input.Address.Directory()
@@ -329,7 +329,7 @@ func compilePackage(
 	type origin struct {
 		locator     spec.Locator
 		subresource spec.SubresourceLocator
-		kind        artifact.ArtifactKind
+		kind        artifactModel.ArtifactKind
 	}
 
 	expected := make(map[origin]Expectation, len(input.Expectations))
@@ -366,7 +366,7 @@ func compilePackage(
 			)
 		}
 
-		if entry.State != artifact.StateAvailable ||
+		if entry.State != artifactModel.StateAvailable ||
 			entry.Definition == nil ||
 			entry.LogicalName != wanted.LogicalName ||
 			entry.LogicalVersion != wanted.LogicalVersion ||

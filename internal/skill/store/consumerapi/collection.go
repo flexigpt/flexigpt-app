@@ -3,9 +3,9 @@ package consumerapi
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -22,14 +22,14 @@ func (a *API) CreateSkillCollection(
 
 func (a *API) ResolveSkillCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
 	if a == nil ||
 		a.resources == nil ||
 		a.collections == nil {
 		return collection.CollectionCapabilityPlan{}, spec.ErrClosed
 	}
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (collection.CollectionCapabilityPlan, error) {
@@ -43,7 +43,7 @@ func (a *API) ResolveSkillCollection(
 
 func (a *API) GetSkillCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -53,7 +53,7 @@ func (a *API) GetSkillCollection(
 
 func (a *API) SetSkillCollectionEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -70,7 +70,7 @@ func (a *API) SetSkillCollectionEnabled(
 
 func (a *API) ListSkillCollections(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed
@@ -82,7 +82,7 @@ func (a *API) ListSkillCollections(
 
 func (a *API) ListSkillCollectionMemberships(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]collection.ArtifactMembershipView, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed

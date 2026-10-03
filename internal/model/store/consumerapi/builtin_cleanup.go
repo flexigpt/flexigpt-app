@@ -87,7 +87,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 		return []BuiltinArtifactSnapshot{}, nil
 	}
 
-	entries, err := c.api.artifacts.ListBySource(
+	entries, err := c.api.cat.ListBySource(
 		ctx,
 		rootID,
 		sourceID,

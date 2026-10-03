@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -13,7 +13,7 @@ import (
 
 func (s *Service) SetMCPServerSecret(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	input string,
 	value string,
 ) (MCPServerDetails, error) {
@@ -76,7 +76,7 @@ func (s *Service) SetMCPServerSecret(
 
 func (s *Service) ClearMCPServerSecret(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	input string,
 ) (MCPServerDetails, error) {
 	if err := s.ready(); err != nil {
@@ -109,7 +109,7 @@ func (s *Service) ClearMCPServerSecret(
 
 func (s *Service) serverSecretTarget(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	input string,
 ) (
 	mcpDomainServer.Resolved,

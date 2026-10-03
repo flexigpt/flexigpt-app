@@ -5,10 +5,16 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -49,21 +55,23 @@ type AdapterRegistry interface {
 }
 
 type Dependencies struct {
-	Sources          local.SourceAPI
-	Discovery        local.DiscoveryAPI
-	Artifacts        local.ArtifactAPI
-	ManagedArtifacts local.ManagedArtifactAPI
-	Protection       local.ProtectionAPI
+	Artifacts        artifact.API
+	Cat              catalog.API
+	Definitions      definition.API
+	Sources          source.API
+	Discovery        refresh.API
+	ManagedArtifacts managedpackage.API
+	Protection       root.ProtectionAPI
 
 	Overlays modelOverlay.OverlayRepository
 	Adapters AdapterRegistry
 
-	BuiltinRoot root.RootID
+	BuiltinRoot rootModel.RootID
 }
 
 type ListProvidersRequest struct {
-	RootID  root.RootID `json:"rootID"`
-	Enabled *bool       `json:"enabled,omitempty"`
+	RootID  rootModel.RootID `json:"rootID"`
+	Enabled *bool            `json:"enabled,omitempty"`
 }
 
 func (r ListProvidersRequest) Validate() error {
@@ -71,8 +79,8 @@ func (r ListProvidersRequest) Validate() error {
 }
 
 type ListModelsRequest struct {
-	RootID  root.RootID `json:"rootID"`
-	Enabled *bool       `json:"enabled,omitempty"`
+	RootID  rootModel.RootID `json:"rootID"`
+	Enabled *bool            `json:"enabled,omitempty"`
 }
 
 func (r ListModelsRequest) Validate() error {
@@ -83,7 +91,7 @@ func (r ListModelsRequest) Validate() error {
 // exact authored Model.provider logical reference, not by a resolved runtime
 // Provider Artifact.
 type ListModelsByProviderRequest struct {
-	RootID   root.RootID                       `json:"rootID"`
+	RootID   rootModel.RootID                  `json:"rootID"`
 	Provider declaration.ArtifactNameReference `json:"provider"`
 	Enabled  *bool                             `json:"enabled,omitempty"`
 }
@@ -96,21 +104,21 @@ func (r ListModelsByProviderRequest) Validate() error {
 }
 
 type ProviderListItem struct {
-	Ref artifact.ArtifactRef `json:"ref"`
+	Ref artifactModel.ArtifactRef `json:"ref"`
 
 	Name        spec.LogicalName `json:"name"`
 	DisplayName string           `json:"displayName"`
 	Description string           `json:"description,omitempty"`
 	Adapter     string           `json:"adapter,omitempty"`
 
-	State    artifact.State `json:"state"`
-	Enabled  bool           `json:"enabled"`
-	Revision uint64         `json:"revision"`
-	BuiltIn  bool           `json:"builtIn"`
+	State    artifactModel.State `json:"state"`
+	Enabled  bool                `json:"enabled"`
+	Revision uint64              `json:"revision"`
+	BuiltIn  bool                `json:"builtIn"`
 }
 
 type ModelListItem struct {
-	Ref artifact.ArtifactRef `json:"ref"`
+	Ref artifactModel.ArtifactRef `json:"ref"`
 
 	Name            spec.LogicalName                   `json:"name"`
 	DisplayName     string                             `json:"displayName"`
@@ -118,10 +126,10 @@ type ModelListItem struct {
 	Provider        *modelDomain.ArtifactNameReference `json:"provider,omitempty"`
 	ProviderModelID string                             `json:"providerModelID,omitempty"`
 
-	State    artifact.State `json:"state"`
-	Enabled  bool           `json:"enabled"`
-	Revision uint64         `json:"revision"`
-	BuiltIn  bool           `json:"builtIn"`
+	State    artifactModel.State `json:"state"`
+	Enabled  bool                `json:"enabled"`
+	Revision uint64              `json:"revision"`
+	BuiltIn  bool                `json:"builtIn"`
 }
 
 // These aliases preserve the consumer API names while making the public
@@ -132,7 +140,7 @@ type (
 )
 
 type ProviderView struct {
-	Artifact         artifact.Artifact                  `json:"artifact"`
+	Artifact         artifactModel.Artifact             `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest                  `json:"definitionDigest"`
 	Document         modelDomain.ProviderDocument       `json:"document"`
 	Settings         ProviderSettings                   `json:"settings"`
@@ -141,7 +149,7 @@ type ProviderView struct {
 }
 
 type ModelView struct {
-	Artifact         artifact.Artifact         `json:"artifact"`
+	Artifact         artifactModel.Artifact    `json:"artifact"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 	Document         modelDomain.ModelDocument `json:"document"`
 	Settings         ModelSettings             `json:"settings"`
@@ -151,7 +159,7 @@ type ModelView struct {
 // SaveProviderSettingsRequest is complete replacement state for local
 // Provider settings. Omitted fields inherit from the Provider declaration.
 type SaveProviderSettingsRequest struct {
-	Provider                 artifact.ArtifactRef               `json:"provider"`
+	Provider                 artifactModel.ArtifactRef          `json:"provider"`
 	ExpectedProviderRevision uint64                             `json:"expectedProviderRevision"`
 	ExpectedSettingsRevision uint64                             `json:"expectedSettingsRevision"`
 	Connection               *modelDomain.ConnectionPatch       `json:"connection,omitempty"`
@@ -164,7 +172,7 @@ type SaveProviderSettingsRequest struct {
 // SaveModelSettingsRequest is complete replacement state for local Model
 // settings. Omitted fields inherit from the Model declaration.
 type SaveModelSettingsRequest struct {
-	Model                    artifact.ArtifactRef           `json:"model"`
+	Model                    artifactModel.ArtifactRef      `json:"model"`
 	ExpectedModelRevision    uint64                         `json:"expectedModelRevision"`
 	ExpectedSettingsRevision uint64                         `json:"expectedSettingsRevision"`
 	Defaults                 *modelDomain.DefaultsPatch     `json:"defaults,omitempty"`
@@ -181,19 +189,19 @@ type ProviderAPIKeyStatus struct {
 }
 
 type SetProviderAPIKeyRequest struct {
-	Provider                 artifact.ArtifactRef `json:"provider"`
-	ExpectedProviderRevision uint64               `json:"expectedProviderRevision"`
-	ExpectedAPIKeyRevision   uint64               `json:"expectedAPIKeyRevision"`
-	APIKey                   string               `json:"apiKey"`
+	Provider                 artifactModel.ArtifactRef `json:"provider"`
+	ExpectedProviderRevision uint64                    `json:"expectedProviderRevision"`
+	ExpectedAPIKeyRevision   uint64                    `json:"expectedAPIKeyRevision"`
+	APIKey                   string                    `json:"apiKey"`
 }
 
 // ResolvedProvider is the source-backed Provider runtime input. It contains
-// no plaintext secret. Runtime adapters resolve the secret only when they need
+// no plaintext secretModel. Runtime adapters resolve the secret only when they need
 // to build an in-memory inference ProviderParam.
 type ResolvedProvider struct {
 	Provider           modelDomain.Provider
 	ProviderOverlay    modelOverlay.ProviderOverlay
-	ProviderCredential *secret.Binding
+	ProviderCredential *secretModel.Binding
 	Adapter            AdapterDescriptor
 }
 
@@ -209,7 +217,7 @@ type ResolvedModel struct {
 	Provider modelDomain.Provider
 
 	ProviderOverlay    modelOverlay.ProviderOverlay
-	ProviderCredential *secret.Binding
+	ProviderCredential *secretModel.Binding
 	ModelOverlay       modelOverlay.ModelOverlay
 
 	Adapter     AdapterDescriptor
@@ -231,49 +239,49 @@ type DefaultModelResolution struct {
 }
 
 type ManagedProviderCreateRequest struct {
-	RootID   root.RootID                  `json:"rootID"`
+	RootID   rootModel.RootID             `json:"rootID"`
 	Document modelDomain.ProviderDocument `json:"document"`
 	Enabled  bool                         `json:"enabled"`
 }
 
 type ManagedProviderCreateResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
 }
 
 type ManagedProviderReplaceRequest struct {
-	Provider                 artifact.ArtifactRef         `json:"provider"`
+	Provider                 artifactModel.ArtifactRef    `json:"provider"`
 	ExpectedArtifactRevision uint64                       `json:"expectedArtifactRevision"`
 	Document                 modelDomain.ProviderDocument `json:"document"`
 	Enabled                  bool                         `json:"enabled"`
 }
 
 type ManagedProviderReplaceResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
 }
 
 type ManagedModelCreateRequest struct {
-	RootID   root.RootID               `json:"rootID"`
+	RootID   rootModel.RootID          `json:"rootID"`
 	Document modelDomain.ModelDocument `json:"document"`
 	Enabled  bool                      `json:"enabled"`
 }
 
 type ManagedModelCreateResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
 }
 
 type ManagedModelReplaceRequest struct {
-	Model                    artifact.ArtifactRef      `json:"model"`
+	Model                    artifactModel.ArtifactRef `json:"model"`
 	ExpectedArtifactRevision uint64                    `json:"expectedArtifactRevision"`
 	Document                 modelDomain.ModelDocument `json:"document"`
 	Enabled                  bool                      `json:"enabled"`
 }
 
 type ManagedModelReplaceResult struct {
-	Artifact artifact.Artifact        `json:"artifact"`
-	Address  artifact.ArtifactAddress `json:"address"`
+	Artifact artifactModel.Artifact        `json:"artifact"`
+	Address  artifactModel.ArtifactAddress `json:"address"`
 }
 
 func cloneOptionalModelReference(

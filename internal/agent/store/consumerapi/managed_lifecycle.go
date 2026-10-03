@@ -6,15 +6,15 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type editableManagedAgent struct {
-	artifact   artifact.Artifact
-	address    source.ManagedPackageAddress
+	artifact   artifactModel.Artifact
+	address    sourceModel.ManagedPackageAddress
 	generation string
 }
 
@@ -48,7 +48,7 @@ func (a *API) DeleteManagedAgent(
 	locator := current.artifact.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifact.RemoveArtifactRequest{
+		artifactModel.RemoveArtifactRequest{
 			RootID:                current.artifact.RootID,
 			SourceID:              current.artifact.Binding.SourceID,
 			Package:               current.address,
@@ -69,18 +69,18 @@ func (a *API) DeleteManagedAgent(
 
 func (a *API) purgeRemovedManagedAgentArtifacts(
 	ctx context.Context,
-	current artifact.Artifact,
-	rootRef artifact.ArtifactRef,
+	current artifactModel.Artifact,
+	rootRef artifactModel.ArtifactRef,
 ) error {
 	if a == nil || a.artifacts == nil {
 		return spec.ErrClosed
 	}
 
-	records, err := a.artifacts.ListBySource(
+	records, err := a.cat.ListBySource(
 		ctx,
 		current.RootID,
 		current.Binding.SourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return fmt.Errorf(
@@ -89,13 +89,13 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 		)
 	}
 
-	packageRecords := make([]catalog.Entry, 0)
+	packageRecords := make([]catalogModel.Entry, 0)
 	rootFound := false
 	for _, record := range records {
 		if record.Binding.Locator != current.Binding.Locator {
 			continue
 		}
-		if record.State != artifact.StateMissing {
+		if record.State != artifactModel.StateMissing {
 			return fmt.Errorf(
 				"%w: removed managed Agent package Artifact %q is not missing",
 				spec.ErrConflict,
@@ -134,7 +134,7 @@ func (a *API) purgeRemovedManagedAgentArtifacts(
 
 func (a *API) loadEditableManagedAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) (editableManagedAgent, error) {
 	return a.loadManagedAgent(ctx, ref, expectedRevision, true)
@@ -142,7 +142,7 @@ func (a *API) loadEditableManagedAgent(
 
 func (a *API) loadManagedAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	requireCurrentSource bool,
 ) (editableManagedAgent, error) {
@@ -160,7 +160,7 @@ func (a *API) loadManagedAgent(
 	if expectedRevision != 0 && record.Revision != expectedRevision {
 		return editableManagedAgent{}, spec.ErrConflict
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -191,7 +191,7 @@ func (a *API) loadManagedAgent(
 	if err != nil {
 		return editableManagedAgent{}, err
 	}
-	if sourceValue.Kind != source.SourceKindManagedDirectory ||
+	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent is not backed by the managed Agent Source",

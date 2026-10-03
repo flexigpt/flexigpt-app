@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -46,7 +46,7 @@ func (r *ArtifactServerResolver) ResolveMCPServer(
 
 func (r *ArtifactServerResolver) InspectMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpDomainServer.Resolved, error) {
 	if r == nil || r.store == nil {
 		return mcpDomainServer.Resolved{}, mcpServer.ErrClosed

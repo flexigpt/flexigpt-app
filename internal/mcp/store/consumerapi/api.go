@@ -8,10 +8,16 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/consumerutil"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -23,12 +29,14 @@ import (
 )
 
 type API struct {
-	sources          local.SourceAPI
-	discovery        local.DiscoveryAPI
-	artifacts        local.ArtifactAPI
-	resources        local.ResourceAPI
-	managedArtifacts local.ManagedArtifactAPI
-	protection       local.ProtectionAPI
+	cat              catalog.API
+	sources          source.API
+	discovery        refresh.API
+	artifacts        artifact.API
+	resources        resource.API
+	managedArtifacts managedpackage.API
+	protection       root.ProtectionAPI
+	definitions      definition.API
 
 	overlays            mcpOverlay.OverlayRepository
 	secretCleaner       mcpDomainServer.SecretCleaner
@@ -38,12 +46,14 @@ type API struct {
 }
 
 func New(
-	sources local.SourceAPI,
-	discovery local.DiscoveryAPI,
-	artifacts local.ArtifactAPI,
-	resources local.ResourceAPI,
-	managedArtifacts local.ManagedArtifactAPI,
-	protection local.ProtectionAPI,
+	sources source.API,
+	discovery refresh.API,
+	artifacts artifact.API,
+	resources resource.API,
+	managedArtifacts managedpackage.API,
+	protection root.ProtectionAPI,
+	cat catalog.API,
+	definitions definition.API,
 	overlays mcpOverlay.OverlayRepository,
 	secretCleaner mcpDomainServer.SecretCleaner,
 	baselinePolicy mcpPolicy.MCPPolicy,
@@ -55,7 +65,7 @@ func New(
 		resources == nil ||
 		managedArtifacts == nil ||
 		protection == nil ||
-		secretCleaner == nil {
+		secretCleaner == nil || cat == nil || definitions == nil {
 		return nil, fmt.Errorf(
 			"%w: MCP Store dependencies are incomplete",
 			spec.ErrInvalid,
@@ -80,10 +90,12 @@ func New(
 		overlays:         overlays,
 		secretCleaner:    secretCleaner,
 		baselinePolicy:   baselinePolicy,
+		cat:              cat,
+		definitions:      definitions,
 	}
 	locators, err := resolve.NewProviderLocatorResolver(
 		config.locatorResolvers,
-		mcpLocatorRuntime{artifacts: artifacts},
+		mcpLocatorRuntime{cat: cat},
 	)
 	if err != nil {
 		return nil, fmt.Errorf("bind MCP declaration locator resolvers: %w", err)
@@ -91,7 +103,7 @@ func New(
 	aliases, err := resolve.NewWithOptions(
 		resolve.ResolverOptions{
 			Artifacts:            artifacts,
-			SourceArtifacts:      artifacts,
+			Catalog:              cat,
 			SourceEntries:        resources,
 			Locators:             locators,
 			FallbackProviders:    config.fallbackProviders,
@@ -104,10 +116,12 @@ func New(
 		return nil, err
 	}
 	collections, err := collection.NewWithResolver(
+		artifacts,
+		cat,
 		sources,
 		discovery,
-		artifacts,
 		managedArtifacts,
+		definitions,
 		aliases,
 		collection.MCPDomainPolicy(),
 	)
@@ -135,7 +149,7 @@ func (a *API) ListPolicies(
 
 func (a *API) GetServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerInstallationView, error) {
 	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
@@ -152,7 +166,7 @@ func (a *API) GetServerSettings(
 
 func (a *API) SaveServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) error {
@@ -182,7 +196,7 @@ func (a *API) SaveServerSettings(
 // Aggregate owns the public projection and runtime identities.
 func (a *API) ListMCPCollectionServers(
 	ctx context.Context,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
 	if a == nil ||
 		a.collections == nil ||
@@ -194,7 +208,7 @@ func (a *API) ListMCPCollectionServers(
 		return nil, err
 	}
 
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) ([]ServerRead, error) {
@@ -208,7 +222,7 @@ func (a *API) ListMCPCollectionServers(
 
 func (a *API) GetMCPPolicy(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (PolicyView, error) {
 	if a == nil {
 		return PolicyView{}, spec.ErrClosed
@@ -220,7 +234,7 @@ func (a *API) GetMCPPolicy(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		terminal,
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return PolicyView{}, err
@@ -249,39 +263,39 @@ func (a *API) GetMCPPolicy(
 
 func (a *API) saveMutableServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 	data mcpDomainServer.ServerData,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if expectedArtifactRevision == 0 {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: expected MCP Server Artifact revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	material, err := a.resolveServerMaterial(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	terminal := material.Resource.Artifact.Ref()
 	if material.BuiltIn {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: protected MCP Server installation belongs in an overlay",
 			spec.ErrProtected,
 		)
 	}
 	if material.Resource.Artifact.Revision != expectedArtifactRevision {
-		return artifact.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, spec.ErrConflict
 	}
 	if err := data.ValidateFor(terminal, material.Document); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	encoded, err := mcpDomainServer.MergeServerData(
 		material.Resource.Artifact.Data,
 		data,
 	)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if jsonutil.Equal(material.Resource.Artifact.Data, encoded) {
 		return material.Resource.Artifact, nil
@@ -293,7 +307,7 @@ func (a *API) saveMutableServerSettings(
 		encoded,
 	)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := mcpDomainServer.CleanupUnboundServerSecrets(
 		ctx,
@@ -312,7 +326,7 @@ func (a *API) saveMutableServerSettings(
 
 func (a *API) saveBuiltInServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedOverlayRevision uint64,
 	data mcpDomainServer.ServerData,
 ) error {
@@ -385,7 +399,7 @@ func (a *API) saveBuiltInServerSettings(
 
 func (a *API) listMCPCollectionServers(
 	ctx context.Context,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
 	if _, err := a.collections.Read(ctx, collectionRef); err != nil {
 		return nil, err
@@ -405,7 +419,7 @@ func (a *API) listMCPCollectionServers(
 		)
 	}
 
-	refs := make(map[artifact.ArtifactRef]struct{})
+	refs := make(map[artifactModel.ArtifactRef]struct{})
 	for _, relationship := range plugin.MemberResults {
 		if relationship.Declared.Header().Type != declaration.TypeMCP {
 			continue
@@ -430,7 +444,7 @@ func (a *API) listMCPCollectionServers(
 		}
 	}
 
-	ordered := make([]artifact.ArtifactRef, 0, len(refs))
+	ordered := make([]artifactModel.ArtifactRef, 0, len(refs))
 	for ref := range refs {
 		ordered = append(ordered, ref)
 	}
@@ -476,7 +490,7 @@ func (a *API) listMCPCollectionServers(
 }
 
 type serverResolutionMaterial struct {
-	Resource                  resource.ResolvedArtifact
+	Resource                  resourceModel.ResolvedArtifact
 	Document                  mcpDomainServer.ServerDocument
 	Installation              mcpDomainServer.ServerData
 	InstallationRevision      uint64
@@ -486,12 +500,12 @@ type serverResolutionMaterial struct {
 
 func (a *API) resolveMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerRead, error) {
 	if a == nil || a.resources == nil {
 		return ServerRead{}, spec.ErrClosed
 	}
-	return consumerutil.WithResourceVerificationSession(
+	return resource.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (ServerRead, error) {
@@ -526,13 +540,13 @@ func (a *API) serverReadFromMaterial(
 	}
 
 	version, err := cryptoutil.CanonicalDigest(struct {
-		Server               artifact.ArtifactRef `json:"server"`
-		ArtifactRevision     uint64               `json:"artifactRevision"`
-		DefinitionDigest     cryptoutil.Digest    `json:"definitionDigest"`
-		SourceContentDigest  cryptoutil.Digest    `json:"sourceContentDigest"`
-		SourceGeneration     string               `json:"sourceGeneration"`
-		InstallationRevision uint64               `json:"installationRevision"`
-		PolicyDigest         cryptoutil.Digest    `json:"policyDigest"`
+		Server               artifactModel.ArtifactRef `json:"server"`
+		ArtifactRevision     uint64                    `json:"artifactRevision"`
+		DefinitionDigest     cryptoutil.Digest         `json:"definitionDigest"`
+		SourceContentDigest  cryptoutil.Digest         `json:"sourceContentDigest"`
+		SourceGeneration     string                    `json:"sourceGeneration"`
+		InstallationRevision uint64                    `json:"installationRevision"`
+		PolicyDigest         cryptoutil.Digest         `json:"policyDigest"`
 	}{
 		Server:               material.Resource.Artifact.Ref(),
 		ArtifactRevision:     material.Resource.Artifact.Revision,
@@ -576,7 +590,7 @@ func (a *API) serverReadFromMaterial(
 
 func (a *API) resolveServerMaterial(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (serverResolutionMaterial, error) {
 	if a == nil {
 		return serverResolutionMaterial{}, spec.ErrClosed
@@ -588,7 +602,7 @@ func (a *API) resolveServerMaterial(
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		terminal,
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return serverResolutionMaterial{}, err
@@ -623,17 +637,17 @@ func (a *API) resolveServerMaterial(
 
 func (a *API) resolveDeclarationArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.ArtifactRef, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.ArtifactRef, error) {
 	if a == nil || a.declarationResolver == nil {
-		return artifact.ArtifactRef{}, spec.ErrClosed
+		return artifactModel.ArtifactRef{}, spec.ErrClosed
 	}
 	return a.declarationResolver.ResolveTerminalArtifact(ctx, ref)
 }
 
 func (a *API) effectiveInstallation(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	document mcpDomainServer.ServerDocument,
 ) (
 	installation mcpDomainServer.ServerData,
@@ -682,9 +696,9 @@ func (a *API) effectiveInstallation(
 
 func (a *API) effectivePolicy(
 	ctx context.Context,
-	serverRef artifact.ArtifactRef,
+	serverRef artifactModel.ArtifactRef,
 	server mcpDomainServer.ServerDocument,
-	additional []artifact.ArtifactRef,
+	additional []artifactModel.ArtifactRef,
 ) (mcpPolicy.Effective, error) {
 	values := make([]mcpPolicy.MCPPolicy, 0, 1+len(additional))
 	if reference := server.Configuration.Policy; reference != nil {
@@ -760,12 +774,12 @@ func (a *API) effectivePolicy(
 
 func (a *API) policyBodyForArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpPolicy.MCPPolicy, error) {
 	resolved, err := a.resources.ResolveArtifact(
 		ctx,
 		ref,
-		resource.ResolveOptions{},
+		resourceModel.ResolveOptions{},
 	)
 	if err != nil {
 		return mcpPolicy.MCPPolicy{}, err

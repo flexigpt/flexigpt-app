@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -14,7 +14,7 @@ import (
 // management does not yet have a dedicated consumer API.
 func (a *API) MaterializeAgentText(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (AgentTextMaterialization, error) {
 	if a == nil || a.texts == nil {
 		return AgentTextMaterialization{}, spec.ErrClosed

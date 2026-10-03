@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpAuth "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/auth"
@@ -23,11 +23,11 @@ type mcpGlobalSettingsPayload struct {
 }
 
 type mcpSettingsAdapter struct {
-	overlays local.StoreOverlayAPI
+	overlays overlay.StoreAPI
 }
 
 func newMCPSettingsAdapter(
-	overlays local.StoreOverlayAPI,
+	overlays overlay.StoreAPI,
 ) (*mcpSettingsAdapter, error) {
 	if overlays == nil {
 		return nil, fmt.Errorf(
@@ -108,7 +108,7 @@ func (s *mcpSettingsAdapter) putMCPSettings(
 
 	record, err := s.overlays.PutStoreOverlay(
 		ctx,
-		overlay.StorePutRequest{
+		overlayModel.StorePutRequest{
 			Namespace:        mcpOverlay.GlobalSettingsNamespace,
 			SchemaVersion:    mcpGlobalSettingsSchemaVersion,
 			Payload:          payload,
