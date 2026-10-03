@@ -6,7 +6,7 @@ import (
 
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -24,7 +24,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 	sourceID := sourceModel.SourceID(
 		"0192c4c0-0001-7000-8000-000000000001",
 	)
-	policy, err := rootimpl.NewSetRootPolicy(
+	policy, err := root.NewSetRootPolicy(
 		[]rootModel.RootID{rootID},
 		nil,
 	)
@@ -56,7 +56,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 	}
 	ctx := installFlow.WithPrivilege(t.Context())
 
-	current, err := components.PrepareTopologyHydrations(
+	current, err := components.Install.PrepareTopologyHydrations(
 		ctx,
 		[]installModel.Hydration{desired},
 	)

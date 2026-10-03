@@ -1,16 +1,17 @@
-package internal
+package root
 
 import (
+	"context"
 	"fmt"
 
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// SetRootPolicy supports multiple protected topology Roots and multiple
-// retained application Roots.
-//
-// Protected Roots reject ordinary descendant mutations. Retained Roots reject
-// only Root retirement and purge.
+// SetRootPolicy supports protected topology Roots and retained application
+// Roots. Protected Roots reject ordinary descendant mutation. Retained Roots
+// reject only retirement and purge.
 type SetRootPolicy struct {
 	protected map[rootModel.RootID]struct{}
 	retained  map[rootModel.RootID]struct{}
@@ -31,12 +32,14 @@ func NewSetRootPolicy(
 		}
 		value.protected[rootID] = struct{}{}
 	}
+
 	for _, rootID := range retained {
 		if err := rootID.Validate(); err != nil {
 			return nil, fmt.Errorf("retained root: %w", err)
 		}
 		value.retained[rootID] = struct{}{}
 	}
+
 	return value, nil
 }
 
@@ -58,4 +61,38 @@ func (p *SetRootPolicy) IsRootDeletionProtected(
 	}
 	_, found := p.retained[rootID]
 	return found
+}
+
+func RequireMutableRoot(
+	ctx context.Context,
+	policy rootModel.RootPolicy,
+	rootID rootModel.RootID,
+) error {
+	if policy == nil || !policy.IsProtectedRoot(rootID) {
+		return nil
+	}
+	if installFlow.IsPrivileged(ctx) {
+		return nil
+	}
+	return fmt.Errorf(
+		"%w: root %q may only be mutated by a trusted protected-topology installer",
+		spec.ErrProtected,
+		rootID,
+	)
+}
+
+func RequireRootDeletion(
+	ctx context.Context,
+	policy rootModel.RootPolicy,
+	rootID rootModel.RootID,
+) error {
+	if deletionPolicy, supported := policy.(rootModel.RootDeletionPolicy); supported &&
+		deletionPolicy.IsRootDeletionProtected(rootID) {
+		return fmt.Errorf(
+			"%w: root %q is retained and cannot be retired or purged",
+			spec.ErrProtected,
+			rootID,
+		)
+	}
+	return RequireMutableRoot(ctx, policy, rootID)
 }

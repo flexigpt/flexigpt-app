@@ -35,8 +35,8 @@ interface ExpansionOverrideState {
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
 
-const MAX_HIGHLIGHT_CHARACTERS = 24_000;
-const MAX_HIGHLIGHT_LINES = 400;
+const MAX_HIGHLIGHT_CHARACTERS = 128_000;
+const MAX_HIGHLIGHT_LINES = 16384;
 const shikiAllowedTags = new Set(['code', 'pre', 'span']);
 
 function renderShikiNode(node: Node, key: string): ReactNode {

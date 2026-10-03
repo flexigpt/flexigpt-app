@@ -10,7 +10,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
@@ -85,7 +85,7 @@ func (s *Service) RefreshRoot(
 	if err := rootID.Validate(); err != nil {
 		return refreshModel.RefreshRootResult{}, err
 	}
-	if err := rootimpl.RequireMutableRoot(
+	if err := root.RequireMutableRoot(
 		ctx,
 		s.policy,
 		rootID,
@@ -152,7 +152,7 @@ func (s *Service) RefreshSource(
 	if err := sourceID.Validate(); err != nil {
 		return refreshModel.RefreshSourceResult{}, err
 	}
-	if err := rootimpl.RequireMutableRoot(
+	if err := root.RequireMutableRoot(
 		ctx,
 		s.policy,
 		rootID,

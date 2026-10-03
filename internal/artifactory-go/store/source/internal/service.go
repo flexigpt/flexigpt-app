@@ -7,7 +7,7 @@ import (
 	"errors"
 	"fmt"
 
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -97,7 +97,7 @@ func (s *Service) Ensure(
 	); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
 
@@ -191,7 +191,7 @@ func (s *Service) CreateWithStatus(
 	if err != nil {
 		return sourceModel.Summary{}, false, err
 	}
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.ID.Validate(); err != nil {
@@ -410,7 +410,7 @@ func (s *Service) Update(
 	id sourceModel.SourceID,
 	update sourceModel.Update,
 ) (sourceModel.Summary, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
@@ -510,7 +510,7 @@ func (s *Service) Retire(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) (sourceModel.Summary, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
@@ -572,7 +572,7 @@ func (s *Service) Discard(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return err
 	}
 	if err := rootID.Validate(); err != nil {
@@ -620,7 +620,7 @@ func (s *Service) Purge(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return err
 	}
 	if expectedRevision == 0 {
@@ -647,7 +647,7 @@ func (s *Service) MarkContentChanged(
 	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) (sourceModel.Summary, error) {
-	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if ctx == nil {

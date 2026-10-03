@@ -8,6 +8,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
+// ContentMutation is the trusted Source capability that acknowledges a
+// successful source-side mutation by advancing the Source revision.
+//
+// Physical writes belong to source/managedpackage.Runtime. This capability
+// publishes only the corresponding Source metadata transition.
+type ContentMutation interface {
+	MarkContentChanged(
+		ctx context.Context,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		expectedRevision uint64,
+	) (sourceModel.Summary, error)
+}
+
 type Reader interface {
 	Get(
 		ctx context.Context,

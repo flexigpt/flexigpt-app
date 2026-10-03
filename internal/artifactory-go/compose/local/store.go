@@ -12,14 +12,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -102,7 +100,7 @@ func Open(
 		}
 		retainedRootIDs = append(retainedRootIDs, draft.ID)
 	}
-	rootPolicy, err := rootimpl.NewSetRootPolicy(
+	rootPolicy, err := root.NewSetRootPolicy(
 		append(
 			[]rootModel.RootID(nil),
 			config.ProtectedRootIDs...,
@@ -147,28 +145,28 @@ func Open(
 		Sources:         components.Sources,
 		Refresh:         components.Refresh,
 		Artifacts:       components.Artifacts,
-		Catalog:         components.Artifacts,
+		Catalog:         components.Catalog,
 		Definitions:     components.Definitions,
-		Schemas:         components.ShareableSchemas,
+		Schemas:         components.Schemas,
 		Resources:       components.Resources,
 		ManagedPackages: components.ManagedArtifacts,
 
-		ProtectedOverlays: components.LocalState,
-		StoreOverlays:     components.LocalState,
+		ProtectedOverlays: components.ProtectedOverlays,
+		StoreOverlays:     components.StoreOverlays,
 
-		SecretBindings:  components.LocalState,
-		SecretRuntime:   components.LocalState,
-		SecretLifecycle: components.LocalState,
+		SecretBindings:  components.SecretBindings,
+		SecretRuntime:   components.SecretRuntime,
+		SecretLifecycle: components.SecretLifecycle,
 
-		ArtifactCleanup: components.LocalState,
+		ArtifactCleanup: components.ArtifactCleanup,
 
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},
+		Topology: components.Install,
 
 		components: components,
 	}
-	output.Topology = output
 
 	for _, draft := range config.RetainedRoots {
 		if _, err := output.Roots.Create(ctx, draft); err != nil {
@@ -181,71 +179,6 @@ func Open(
 		}
 	}
 	return output, nil
-}
-
-func (s *Store) EnsureProtectedTopology(
-	ctx context.Context,
-	declaration installModel.Declaration,
-) (installModel.Installed, error) {
-	if s == nil || s.components == nil {
-		return installModel.Installed{}, spec.ErrClosed
-	}
-	return s.components.EnsureProtectedTopology(ctx, declaration)
-}
-
-func (s *Store) PrepareTopologyHydrations(
-	ctx context.Context,
-	desired []installModel.Hydration,
-) (map[string]bool, error) {
-	if s == nil || s.components == nil {
-		return nil, spec.ErrClosed
-	}
-	return s.components.PrepareTopologyHydrations(ctx, desired)
-}
-
-func (s *Store) CommitTopologyHydration(
-	ctx context.Context,
-	desired installModel.Hydration,
-) error {
-	if s == nil || s.components == nil {
-		return spec.ErrClosed
-	}
-	return s.components.CommitTopologyHydration(ctx, desired)
-}
-
-func (s *Store) PrepareTopologyPackageHydrations(
-	ctx context.Context,
-	installerNames []string,
-	desired []installModel.PackageHydration,
-) (installModel.PackageHydrationPreparation, error) {
-	if s == nil || s.components == nil {
-		return installModel.PackageHydrationPreparation{}, spec.ErrClosed
-	}
-	return s.components.PrepareTopologyPackageHydrations(
-		ctx,
-		installerNames,
-		desired,
-	)
-}
-
-func (s *Store) CommitTopologyPackageHydration(
-	ctx context.Context,
-	desired installModel.PackageHydration,
-) error {
-	if s == nil || s.components == nil {
-		return spec.ErrClosed
-	}
-	return s.components.CommitTopologyPackageHydration(ctx, desired)
-}
-
-func (s *Store) DeleteTopologyPackageHydration(
-	ctx context.Context,
-	value installModel.PackageHydration,
-) error {
-	if s == nil || s.components == nil {
-		return spec.ErrClosed
-	}
-	return s.components.DeleteTopologyPackageHydration(ctx, value)
 }
 
 func (s *Store) Close() error {

@@ -131,8 +131,9 @@ func (a *Adapter) BootstrapManagedSource(
 	return nil
 }
 
-// RemoveManagedRoot removes all managed Source directories below one application-owned Root. "assembly.Components"
-// authorizes this operation before it reaches the adapter.
+// RemoveManagedRoot removes all managed Source directories below one
+// application-owned Root. The Install flow authorizes this operation before it
+// reaches the adapter.
 func (a *Adapter) RemoveManagedRoot(
 	ctx context.Context,
 	rootStorageKey spec.StorageKey,

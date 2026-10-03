@@ -4,25 +4,13 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// PackageBatchWriter is a trusted source-adapter capability used by generated
-// built-in hydration.
-//
-// It stages complete package directories and publishes them package by package.
-// The caller owns the single Source revision update and the final Source
-// refresh after the batch completes.
-type PackageBatchWriter interface {
-	ApplyPackageBatch(
-		ctx context.Context,
-		value sourceModel.Source,
-		publications []managedpackageModel.ManagedPackagePublication,
-		removals []managedpackageModel.ManagedPackageAddress,
-	) error
-}
+type PackageBatchWriter = managedpackage.BatchWriter
 
 func (r *Registry) ApplyPackageBatch(
 	ctx context.Context,
@@ -48,6 +36,7 @@ func (r *Registry) ApplyPackageBatch(
 			value.Kind,
 		)
 	}
+
 	writer, supported := adapter.(PackageBatchWriter)
 	if !supported {
 		return fmt.Errorf(
@@ -68,6 +57,7 @@ func (r *Registry) ApplyPackageBatch(
 			)
 		}
 	}
+
 	for _, address := range removals {
 		if err := address.Validate(); err != nil {
 			return err

@@ -1,11 +1,10 @@
-package assembly
+package internal
 
 import (
 	"context"
 	"fmt"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
@@ -16,7 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-func (c *Components) RegisterCompiledPackages(
+func (c *Service) RegisterCompiledPackages(
 	ctx context.Context,
 	values []installModel.CompiledRegistration,
 ) error {
@@ -39,7 +38,7 @@ func (c *Components) RegisterCompiledPackages(
 		// from the ordinary parser and Store admission path, then compared
 		// against that path in tests. Runtime only registers their source
 		// locator and file digest witnesses.
-		if err := c.Refresh.RegisterCompiledDocuments(
+		if err := c.refreshCompiled.RegisterCompiledDocuments(
 			ctx,
 			value.Set.Hydration.RootID,
 			value.Set.Hydration.SourceID,
@@ -51,7 +50,7 @@ func (c *Components) RegisterCompiledPackages(
 	return nil
 }
 
-func (c *Components) HydrateCompiledPackages(
+func (c *Service) HydrateCompiledPackages(
 	ctx context.Context,
 	plans []installModel.CompiledPackagePlan,
 ) error {
@@ -185,7 +184,7 @@ func (c *Components) HydrateCompiledPackages(
 		if err != nil {
 			return err
 		}
-		if sourceValue.Kind != managedfs.Kind ||
+		if !c.managedSources.SupportsManagedPackages(sourceValue.Kind) ||
 			!sourceValue.Enabled {
 			return fmt.Errorf(
 				"%w: compiled hydration requires an enabled managed Source",
@@ -208,7 +207,7 @@ func (c *Components) HydrateCompiledPackages(
 		//
 		// This gives the next refresh one coherent Source revision and avoids
 		// per-package publication and refresh loops.
-		if _, err := c.Sources.MarkContentChanged(
+		if _, err := c.sourceContent.MarkContentChanged(
 			ctx,
 			key.rootID,
 			key.sourceID,
@@ -251,7 +250,7 @@ func (c *Components) HydrateCompiledPackages(
 	return nil
 }
 
-func (c *Components) verifyCompiledPackage(
+func (c *Service) verifyCompiledPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,

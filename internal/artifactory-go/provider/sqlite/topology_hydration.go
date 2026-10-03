@@ -202,7 +202,7 @@ func (s *Store) DeleteTopologyPackageHydration(
 //
 // This deliberately bypasses ordinary lifecycle transitions. It is only
 // called by the trusted startup hydration path after authorization has been
-// established by assembly.Components.ResetTopologyHydration.
+// established by the trusted Install flow.
 func (s *Store) PurgeTopologyRoot(
 	ctx context.Context,
 	rootID rootModel.RootID,

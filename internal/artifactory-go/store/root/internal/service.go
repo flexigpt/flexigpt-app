@@ -40,7 +40,7 @@ func (s *Service) Create(
 	ctx context.Context,
 	draft rootModel.RootDraft,
 ) (rootModel.Root, error) {
-	if err := RequireMutableRoot(ctx, s.policy, draft.ID); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, draft.ID); err != nil {
 		return rootModel.Root{}, err
 	}
 	return s.create(ctx, draft)
@@ -87,7 +87,7 @@ func (s *Service) Update(
 	id rootModel.RootID,
 	update rootModel.RootUpdate,
 ) (rootModel.Root, error) {
-	if err := RequireMutableRoot(ctx, s.policy, id); err != nil {
+	if err := root.RequireMutableRoot(ctx, s.policy, id); err != nil {
 		return rootModel.Root{}, err
 	}
 	if update.ExpectedRevision == 0 {
@@ -134,7 +134,7 @@ func (s *Service) Retire(
 	if err := id.Validate(); err != nil {
 		return rootModel.Root{}, err
 	}
-	if err := requireRootDeletion(ctx, s.policy, id); err != nil {
+	if err := root.RequireRootDeletion(ctx, s.policy, id); err != nil {
 		return rootModel.Root{}, err
 	}
 	if expectedRevision == 0 {
@@ -176,7 +176,7 @@ func (s *Service) Purge(
 	if err := id.Validate(); err != nil {
 		return err
 	}
-	if err := requireRootDeletion(ctx, s.policy, id); err != nil {
+	if err := root.RequireRootDeletion(ctx, s.policy, id); err != nil {
 		return err
 	}
 	if expectedRevision == 0 {
@@ -230,42 +230,4 @@ func (s *Service) create(
 		)
 	}
 	return existing, nil
-}
-
-// requireRootDeletion permits normal mutable-root checks and additionally
-// rejects retirement or purge of a retained application Root. Retention is
-// not bypassed by installer context because it is an application data-retention
-// policy rather than protected-topology installation access.
-func requireRootDeletion(
-	ctx context.Context,
-	policy rootModel.RootPolicy,
-	rootID rootModel.RootID,
-) error {
-	if deletionPolicy, supported := policy.(rootModel.RootDeletionPolicy); supported &&
-		deletionPolicy.IsRootDeletionProtected(rootID) {
-		return fmt.Errorf(
-			"%w: root %q is retained and cannot be retired or purged",
-			spec.ErrProtected,
-			rootID,
-		)
-	}
-	return RequireMutableRoot(ctx, policy, rootID)
-}
-
-func RequireMutableRoot(
-	ctx context.Context,
-	policy rootModel.RootPolicy,
-	rootID rootModel.RootID,
-) error {
-	if policy == nil || !policy.IsProtectedRoot(rootID) {
-		return nil
-	}
-	if installFlow.IsPrivileged(ctx) {
-		return nil
-	}
-	return fmt.Errorf(
-		"%w: root %q may only be mutated by a trusted protected-topology installer",
-		spec.ErrProtected,
-		rootID,
-	)
 }

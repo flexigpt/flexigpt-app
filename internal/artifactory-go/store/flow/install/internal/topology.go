@@ -1,4 +1,4 @@
-package assembly
+package internal
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 // EnsureProtectedTopology creates or verifies a declared protected Root and
 // its generic Sources. Feature installers remain responsible for declaration
 // contracts, package validation, package publication, and Source refresh.
-func (c *Components) EnsureProtectedTopology(
+func (c *Service) EnsureProtectedTopology(
 	ctx context.Context,
 	declaration installModel.Declaration,
 ) (installModel.Installed, error) {
@@ -36,7 +36,7 @@ func (c *Components) EnsureProtectedTopology(
 		)
 	}
 
-	rootValue, err := c.Roots.EnsureSystem(ctx, declaration.Root)
+	rootValue, err := c.rootSystem.EnsureSystem(ctx, declaration.Root)
 	if err != nil {
 		return installModel.Installed{}, err
 	}

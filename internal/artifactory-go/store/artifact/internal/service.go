@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -189,7 +189,7 @@ func (s *Service) Purge(
 	if err := ref.Validate(); err != nil {
 		return err
 	}
-	if err := rootimpl.RequireMutableRoot(
+	if err := root.RequireMutableRoot(
 		ctx,
 		s.policy,
 		ref.RootID,
@@ -229,7 +229,7 @@ func (s *Service) updateLocal(
 	mutate func(*artifactModel.Artifact),
 ) (artifactModel.Artifact, error) {
 	if requireMutableRoot {
-		if err := rootimpl.RequireMutableRoot(
+		if err := root.RequireMutableRoot(
 			ctx,
 			s.policy,
 			ref.RootID,

@@ -1,4 +1,4 @@
-package assembly
+package internal
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 // PrepareTopologyHydrations reconciles all installer desired states before
 // any installer creates topology. It must operate as one batch because
 // multiple artifact families can share one protected Root.
-func (c *Components) PrepareTopologyHydrations(
+func (c *Service) PrepareTopologyHydrations(
 	ctx context.Context,
 	desiredValues []installModel.Hydration,
 ) (map[string]bool, error) {
@@ -108,7 +108,7 @@ func (c *Components) PrepareTopologyHydrations(
 	return currentByInstaller, nil
 }
 
-func (c *Components) GetTopologyHydration(
+func (c *Service) GetTopologyHydration(
 	ctx context.Context,
 	installerName string,
 ) (installModel.Hydration, bool, error) {
@@ -120,7 +120,7 @@ func (c *Components) GetTopologyHydration(
 
 // CommitTopologyHydration records successful installation only after the
 // generic topology and artifact-family installation paths both complete.
-func (c *Components) CommitTopologyHydration(
+func (c *Service) CommitTopologyHydration(
 	ctx context.Context,
 	desired installModel.Hydration,
 ) error {
@@ -130,7 +130,7 @@ func (c *Components) CommitTopologyHydration(
 	return c.PutTopologyHydration(ctx, desired)
 }
 
-func (c *Components) PutTopologyHydration(
+func (c *Service) PutTopologyHydration(
 	ctx context.Context,
 	value installModel.Hydration,
 ) error {
@@ -190,7 +190,7 @@ func equalTopologyHydration(
 // The hydration record intentionally survives this method. It is replaced only
 // after the next complete installation succeeds, making interrupted upgrades
 // converge on the next application start.
-func (c *Components) ResetTopologyHydration(
+func (c *Service) ResetTopologyHydration(
 	ctx context.Context,
 	installerName string,
 	rootID rootModel.RootID,
@@ -283,8 +283,8 @@ func (c *Components) ResetTopologyHydration(
 			err,
 		)
 	}
-	if c.LocalState != nil {
-		_ = c.LocalState.DrainSecretGarbage(
+	if c.localState != nil {
+		_ = c.localState.DrainSecretGarbage(
 			context.WithoutCancel(ctx),
 		)
 	}

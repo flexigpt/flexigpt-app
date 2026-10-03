@@ -7,8 +7,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
-	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -21,82 +20,6 @@ type SourceState struct {
 	Generation string
 }
 
-type GetSourceStateFunc func(
-	ctx context.Context,
-	rootID rootModel.RootID,
-	sourceID sourceModel.SourceID,
-) (SourceState, error)
-
-type PublishPackageFunc func(
-	ctx context.Context,
-	rootID rootModel.RootID,
-	sourceID sourceModel.SourceID,
-	expectedSourceRevision uint64,
-	publication managedpackageModel.ManagedPackagePublication,
-) (SourceState, error)
-
-type RemovePackageFunc func(
-	ctx context.Context,
-	rootID rootModel.RootID,
-	sourceID sourceModel.SourceID,
-	expectedSourceRevision uint64,
-	address managedpackageModel.ManagedPackageAddress,
-	expectedGeneration string,
-) (SourceState, error)
-
-// PruneDiscoveryLocatorFunc updates managed Source discovery after physical
-// package removal and before the managed Artifact service performs its final
-// refresh. The callback is optional because some packages emit multiple
-// declaration origins or are discovered through directory scopes.
-type PruneDiscoveryLocatorFunc func(
-	ctx context.Context,
-	rootID rootModel.RootID,
-	sourceID sourceModel.SourceID,
-	expectedSourceRevision uint64,
-	locator spec.Locator,
-) (SourceState, error)
-
-type ArtifactCommands interface {
-	Get(
-		ctx context.Context,
-		ref artifactModel.ArtifactRef,
-	) (artifactModel.Artifact, error)
-
-	FindByOrigin(
-		ctx context.Context,
-		rootID rootModel.RootID,
-		binding artifactModel.SourceBinding,
-		kind artifactModel.ArtifactKind,
-	) (artifactModel.Artifact, error)
-}
-
-type SourceRunner interface {
-	RefreshSource(
-		ctx context.Context,
-		rootID rootModel.RootID,
-		sourceID sourceModel.SourceID,
-	) (refreshModel.RefreshSourceResult, error)
-
-	InspectSource(
-		ctx context.Context,
-		rootID rootModel.RootID,
-		sourceID sourceModel.SourceID,
-	) (refreshModel.Inspection, error)
-}
-
-type Dependencies struct {
-	Artifacts ArtifactCommands
-	Refresh   SourceRunner
-	Policy    rootModel.RootPolicy
-
-	GetSourceState          GetSourceStateFunc
-	PublishPackage          PublishPackageFunc
-	PublishProtectedPackage PublishPackageFunc
-	RemovePackage           RemovePackageFunc
-	RemoveProtectedPackage  RemovePackageFunc
-	PruneDiscoveryLocator   PruneDiscoveryLocatorFunc
-}
-
 type Service struct {
 	dependencies Dependencies
 }
@@ -106,16 +29,16 @@ func NewService(
 ) (*Service, error) {
 	if dependencies.Artifacts == nil ||
 		dependencies.Refresh == nil ||
-		dependencies.GetSourceState == nil ||
-		dependencies.PublishPackage == nil ||
-		dependencies.PublishProtectedPackage == nil ||
-		dependencies.RemovePackage == nil ||
-		dependencies.RemoveProtectedPackage == nil {
+		dependencies.Sources == nil ||
+		dependencies.Runtime == nil ||
+		dependencies.ContentMutation == nil ||
+		dependencies.Packages == nil {
 		return nil, fmt.Errorf(
-			"%w: managed Artifact service dependencies are incomplete",
+			"%w: manage package service dependencies are incomplete",
 			spec.ErrInvalid,
 		)
 	}
+
 	return &Service{
 		dependencies: dependencies,
 	}, nil
@@ -140,12 +63,10 @@ func (s *Service) Publish(
 	if err := request.ExpectedLogicalName.Validate(); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
-	if err := cryptoutil.ValidateDigest(
-		request.ExpectedDefinition,
-	); err != nil {
+	if err := cryptoutil.ValidateDigest(request.ExpectedDefinition); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
-	if err := s.requireMutable(
+	if err := s.requireMutation(
 		ctx,
 		request.RootID,
 		request.AllowProtected,
@@ -159,7 +80,8 @@ func (s *Service) Publish(
 	if err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
-	state, err := s.dependencies.GetSourceState(
+
+	state, err := s.sourceState(
 		ctx,
 		request.RootID,
 		request.Binding.SourceID,
@@ -175,16 +97,13 @@ func (s *Service) Publish(
 	); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
+
 	if publication.ExpectedGeneration == "" &&
 		request.AllowPackageReplacement {
 		publication.ExpectedGeneration = state.Generation
 	}
 
-	publish := s.dependencies.PublishPackage
-	if request.AllowProtected {
-		publish = s.dependencies.PublishProtectedPackage
-	}
-	published, err := publish(
+	published, err := s.publishPackage(
 		ctx,
 		request.RootID,
 		request.Binding.SourceID,
@@ -236,6 +155,7 @@ func (s *Service) Publish(
 	); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
+
 	resolved, err := s.dependencies.Artifacts.FindByOrigin(
 		ctx,
 		request.RootID,
@@ -245,31 +165,19 @@ func (s *Service) Publish(
 	if err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
-	if resolved.State != artifactModel.StateAvailable ||
-		resolved.LogicalName != request.ExpectedLogicalName ||
-		resolved.ResolvedDefinition == nil ||
-		*resolved.ResolvedDefinition != request.ExpectedDefinition {
+	if !matchesPublishExpectation(resolved, request) {
 		return managepackageModel.PublishResult{}, fmt.Errorf(
 			"%w: managed package did not resolve to its expected Artifact",
 			spec.ErrReferenceUnresolved,
 		)
 	}
+
 	return managepackageModel.PublishResult{
 		Artifact:   resolved,
 		Source:     published.Source,
 		Generation: published.Generation,
 		Refreshed:  true,
 	}, nil
-}
-
-func matchesPublishExpectation(
-	value artifactModel.Artifact,
-	request managepackageModel.PublishRequest,
-) bool {
-	return value.State == artifactModel.StateAvailable &&
-		value.LogicalName == request.ExpectedLogicalName &&
-		value.ResolvedDefinition != nil &&
-		*value.ResolvedDefinition == request.ExpectedDefinition
 }
 
 func (s *Service) Remove(
@@ -289,7 +197,9 @@ func (s *Service) Remove(
 		return err
 	}
 	if request.ExpectedGeneration != "" {
-		if err := spec.ValidateSourceGeneration(request.ExpectedGeneration); err != nil {
+		if err := spec.ValidateSourceGeneration(
+			request.ExpectedGeneration,
+		); err != nil {
 			return err
 		}
 	}
@@ -308,14 +218,8 @@ func (s *Service) Remove(
 		if err := request.PruneDiscoveryLocator.Validate(false); err != nil {
 			return err
 		}
-		if s.dependencies.PruneDiscoveryLocator == nil {
-			return fmt.Errorf(
-				"%w: managed discovery locator pruning is unavailable",
-				spec.ErrUnsupported,
-			)
-		}
 	}
-	if err := s.requireMutable(
+	if err := s.requireMutation(
 		ctx,
 		request.RootID,
 		request.AllowProtected,
@@ -323,24 +227,13 @@ func (s *Service) Remove(
 		return err
 	}
 
-	state, err := s.dependencies.GetSourceState(
+	state, err := s.sourceState(
 		ctx,
 		request.RootID,
 		request.SourceID,
 	)
 	if err != nil {
 		return err
-	}
-	if request.ExpectedGeneration != "" &&
-		request.ExpectedGeneration != state.Generation {
-		return fmt.Errorf(
-			"%w: managed Source changed before package removal",
-			spec.ErrConflict,
-		)
-	}
-	expectedGeneration := state.Generation
-	if request.ExpectedGeneration != "" {
-		expectedGeneration = request.ExpectedGeneration
 	}
 	if err := validateManagedSourceState(
 		state,
@@ -350,6 +243,20 @@ func (s *Service) Remove(
 	); err != nil {
 		return err
 	}
+
+	if request.ExpectedGeneration != "" &&
+		request.ExpectedGeneration != state.Generation {
+		return fmt.Errorf(
+			"%w: managed Source changed before package removal",
+			spec.ErrConflict,
+		)
+	}
+
+	expectedGeneration := state.Generation
+	if request.ExpectedGeneration != "" {
+		expectedGeneration = request.ExpectedGeneration
+	}
+
 	if request.PruneDiscoveryLocator != nil &&
 		!state.Source.Discovery.Authoritative {
 		return fmt.Errorf(
@@ -358,11 +265,7 @@ func (s *Service) Remove(
 		)
 	}
 
-	remove := s.dependencies.RemovePackage
-	if request.AllowProtected {
-		remove = s.dependencies.RemoveProtectedPackage
-	}
-	removed, err := remove(
+	removed, err := s.removePackage(
 		ctx,
 		request.RootID,
 		request.SourceID,
@@ -381,8 +284,9 @@ func (s *Service) Remove(
 	); err != nil {
 		return err
 	}
+
 	if request.PruneDiscoveryLocator != nil {
-		removed, err = s.dependencies.PruneDiscoveryLocator(
+		removed, err = s.pruneDiscoveryLocator(
 			ctx,
 			request.RootID,
 			request.SourceID,
@@ -414,9 +318,11 @@ func (s *Service) Remove(
 			return err
 		}
 	}
+
 	if request.ExpectedArtifact == nil {
 		return nil
 	}
+
 	value, err := s.dependencies.Artifacts.Get(
 		ctx,
 		*request.ExpectedArtifact,
@@ -431,17 +337,28 @@ func (s *Service) Remove(
 			spec.ErrConflict,
 		)
 	}
+
 	return nil
 }
 
-func (s *Service) requireMutable(
+func matchesPublishExpectation(
+	value artifactModel.Artifact,
+	request managepackageModel.PublishRequest,
+) bool {
+	return value.State == artifactModel.StateAvailable &&
+		value.LogicalName == request.ExpectedLogicalName &&
+		value.ResolvedDefinition != nil &&
+		*value.ResolvedDefinition == request.ExpectedDefinition
+}
+
+func (s *Service) requireMutation(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	allowProtected bool,
 ) error {
 	if ctx == nil {
 		return fmt.Errorf(
-			"%w: managed Artifact context is nil",
+			"%w: manage package context is nil",
 			spec.ErrInvalid,
 		)
 	}
@@ -451,6 +368,7 @@ func (s *Service) requireMutable(
 	if err := rootID.Validate(); err != nil {
 		return err
 	}
+
 	if allowProtected {
 		if s.dependencies.Policy == nil ||
 			!s.dependencies.Policy.IsProtectedRoot(rootID) {
@@ -461,7 +379,8 @@ func (s *Service) requireMutable(
 		}
 		return installFlow.RequirePrivileged(ctx)
 	}
-	return rootimpl.RequireMutableRoot(
+
+	return root.RequireMutableRoot(
 		ctx,
 		s.dependencies.Policy,
 		rootID,
@@ -488,9 +407,7 @@ func validateManagedSourceState(
 			spec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateSourceGeneration(
-		state.Generation,
-	); err != nil {
+	if err := spec.ValidateSourceGeneration(state.Generation); err != nil {
 		return err
 	}
 	if requireEnabled && !state.Source.Enabled {

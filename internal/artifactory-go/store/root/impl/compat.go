@@ -1,7 +1,3 @@
-// Package rootimpl is a temporary compatibility facade.
-//
-// Deprecated: new Root composition must eventually depend on Root public
-// contracts and Root compose capabilities rather than this package.
 package rootimpl
 
 import (
@@ -9,12 +5,7 @@ import (
 )
 
 type (
-	Service       = internal.Service
-	SetRootPolicy = internal.SetRootPolicy
+	Service = internal.Service
 )
 
-var (
-	NewService         = internal.NewService
-	NewSetRootPolicy   = internal.NewSetRootPolicy
-	RequireMutableRoot = internal.RequireMutableRoot
-)
+var NewService = internal.NewService

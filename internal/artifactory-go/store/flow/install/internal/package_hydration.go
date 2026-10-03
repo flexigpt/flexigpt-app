@@ -1,4 +1,4 @@
-package assembly
+package internal
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-func (c *Components) PrepareTopologyPackageHydrations(
+func (c *Service) PrepareTopologyPackageHydrations(
 	ctx context.Context,
 	installerNames []string,
 	desiredValues []installModel.PackageHydration,
@@ -114,7 +114,7 @@ func (c *Components) PrepareTopologyPackageHydrations(
 	return preparation.Clone(), nil
 }
 
-func (c *Components) CommitTopologyPackageHydration(
+func (c *Service) CommitTopologyPackageHydration(
 	ctx context.Context,
 	value installModel.PackageHydration,
 ) error {
@@ -152,7 +152,7 @@ func (c *Components) CommitTopologyPackageHydration(
 	return c.metadata.PutTopologyPackageHydration(ctx, value)
 }
 
-func (c *Components) DeleteTopologyPackageHydration(
+func (c *Service) DeleteTopologyPackageHydration(
 	ctx context.Context,
 	value installModel.PackageHydration,
 ) error {
