@@ -9,7 +9,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -727,7 +727,7 @@ func (a *API) currentManagedSourceGeneration(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 ) (string, error) {
-	if err := refresh.EnsureSourceCurrent(
+	if err := refreshFlow.EnsureSourceCurrent(
 		ctx,
 		a.discovery,
 		rootID,

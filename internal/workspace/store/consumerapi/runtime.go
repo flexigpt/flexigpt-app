@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
@@ -22,7 +22,7 @@ func (a *StoreAPI) ComposeWorkspacePrompt(
 	if a == nil || a.resources == nil {
 		return WorkspacePromptPlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspacePromptPlan, error) {
@@ -76,7 +76,7 @@ func (a *StoreAPI) LoadWorkspaceSkills(
 	if a == nil || a.resources == nil {
 		return WorkspaceSkillLoadPlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceSkillLoadPlan, error) {
@@ -130,7 +130,7 @@ func (a *StoreAPI) LoadWorkspaceMCPServers(
 	if a == nil || a.resources == nil {
 		return WorkspaceMCPServerLoadPlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceMCPServerLoadPlan, error) {
@@ -184,7 +184,7 @@ func (a *StoreAPI) ResolveWorkspaceRuntimePlan(
 	if a == nil || a.resources == nil {
 		return WorkspaceRuntimePlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (WorkspaceRuntimePlan, error) {

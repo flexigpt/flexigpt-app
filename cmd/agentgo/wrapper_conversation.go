@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	conversationStore "github.com/flexigpt/flexigpt-app/internal/conversation/store"
 )
 
@@ -27,49 +27,49 @@ func InitConversationCollectionWrapper(
 }
 
 func (ccw *ConversationCollectionWrapper) PutConversation(
-	req *spec.PutConversationRequest,
-) (*spec.PutConversationResponse, error) {
-	return withRecoveryResp(func() (*spec.PutConversationResponse, error) {
+	req *conversationSpec.PutConversationRequest,
+) (*conversationSpec.PutConversationResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.PutConversationResponse, error) {
 		return ccw.store.PutConversation(context.Background(), req)
 	})
 }
 
 func (ccw *ConversationCollectionWrapper) DeleteConversation(
-	req *spec.DeleteConversationRequest,
-) (*spec.DeleteConversationResponse, error) {
-	return withRecoveryResp(func() (*spec.DeleteConversationResponse, error) {
+	req *conversationSpec.DeleteConversationRequest,
+) (*conversationSpec.DeleteConversationResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.DeleteConversationResponse, error) {
 		return ccw.store.DeleteConversation(context.Background(), req)
 	})
 }
 
 func (ccw *ConversationCollectionWrapper) GetConversation(
-	req *spec.GetConversationRequest,
-) (*spec.GetConversationResponse, error) {
-	return withRecoveryResp(func() (*spec.GetConversationResponse, error) {
+	req *conversationSpec.GetConversationRequest,
+) (*conversationSpec.GetConversationResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.GetConversationResponse, error) {
 		return ccw.store.GetConversation(context.Background(), req)
 	})
 }
 
 func (ccw *ConversationCollectionWrapper) ListConversations(
-	req *spec.ListConversationsRequest,
-) (*spec.ListConversationsResponse, error) {
-	return withRecoveryResp(func() (*spec.ListConversationsResponse, error) {
+	req *conversationSpec.ListConversationsRequest,
+) (*conversationSpec.ListConversationsResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.ListConversationsResponse, error) {
 		return ccw.store.ListConversations(context.Background(), req)
 	})
 }
 
 func (ccw *ConversationCollectionWrapper) SearchConversations(
-	req *spec.SearchConversationsRequest,
-) (*spec.SearchConversationsResponse, error) {
-	return withRecoveryResp(func() (*spec.SearchConversationsResponse, error) {
+	req *conversationSpec.SearchConversationsRequest,
+) (*conversationSpec.SearchConversationsResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.SearchConversationsResponse, error) {
 		return ccw.store.SearchConversations(context.Background(), req)
 	})
 }
 
 func (ccw *ConversationCollectionWrapper) PutMessagesToConversation(
-	req *spec.PutMessagesToConversationRequest,
-) (*spec.PutMessagesToConversationResponse, error) {
-	return withRecoveryResp(func() (*spec.PutMessagesToConversationResponse, error) {
+	req *conversationSpec.PutMessagesToConversationRequest,
+) (*conversationSpec.PutMessagesToConversationResponse, error) {
+	return withRecoveryResp(func() (*conversationSpec.PutMessagesToConversationResponse, error) {
 		return ccw.store.PutMessagesToConversation(context.Background(), req)
 	})
 }

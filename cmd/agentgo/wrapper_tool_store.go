@@ -11,8 +11,8 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -28,9 +28,9 @@ type ToolStoreWrapper struct {
 func InitToolStoreWrapper(
 	wrapper *ToolStoreWrapper,
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
-	managedArtifacts managedpackage.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,

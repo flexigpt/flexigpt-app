@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -17,21 +17,21 @@ import (
 func (s *Store) GetTopologyHydration(
 	ctx context.Context,
 	installerName string,
-) (topology.Hydration, bool, error) {
+) (installModel.Hydration, bool, error) {
 	if s == nil || s.db == nil {
-		return topology.Hydration{}, false, spec.ErrClosed
+		return installModel.Hydration{}, false, spec.ErrClosed
 	}
 	if ctx == nil {
-		return topology.Hydration{}, false, fmt.Errorf(
+		return installModel.Hydration{}, false, fmt.Errorf(
 			"%w: topology hydration context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return topology.Hydration{}, false, err
+		return installModel.Hydration{}, false, err
 	}
-	if err := topology.ValidateHydrationInstallerName(installerName); err != nil {
-		return topology.Hydration{}, false, err
+	if err := installModel.ValidateHydrationInstallerName(installerName); err != nil {
+		return installModel.Hydration{}, false, err
 	}
 
 	var rootID, sourceID, fingerprint string
@@ -43,20 +43,20 @@ func (s *Store) GetTopologyHydration(
 		installerName,
 	).Scan(&rootID, &sourceID, &fingerprint)
 	if errors.Is(err, sql.ErrNoRows) {
-		return topology.Hydration{}, false, nil
+		return installModel.Hydration{}, false, nil
 	}
 	if err != nil {
-		return topology.Hydration{}, false, err
+		return installModel.Hydration{}, false, err
 	}
 
-	value := topology.Hydration{
+	value := installModel.Hydration{
 		InstallerName: installerName,
 		RootID:        rootModel.RootID(rootID),
 		SourceID:      sourceModel.SourceID(sourceID),
 		Fingerprint:   cryptoutil.Digest(fingerprint),
 	}
 	if err := value.Validate(); err != nil {
-		return topology.Hydration{}, false, fmt.Errorf(
+		return installModel.Hydration{}, false, fmt.Errorf(
 			"%w: invalid persisted topology hydration: %w",
 			spec.ErrInvalid,
 			err,
@@ -67,7 +67,7 @@ func (s *Store) GetTopologyHydration(
 
 func (s *Store) PutTopologyHydration(
 	ctx context.Context,
-	value topology.Hydration,
+	value installModel.Hydration,
 ) error {
 	if s == nil || s.db == nil {
 		return spec.ErrClosed
@@ -106,7 +106,7 @@ func (s *Store) PutTopologyHydration(
 
 func (s *Store) ListTopologyPackageHydrations(
 	ctx context.Context,
-) ([]topology.PackageHydration, error) {
+) ([]installModel.PackageHydration, error) {
 	if s == nil || s.db == nil {
 		return nil, spec.ErrClosed
 	}
@@ -121,7 +121,7 @@ func (s *Store) ListTopologyPackageHydrations(
 	}
 	defer rows.Close()
 
-	output := make([]topology.PackageHydration, 0)
+	output := make([]installModel.PackageHydration, 0)
 	for rows.Next() {
 		var installerName, scope, rootID, sourceID, fingerprint string
 		if err := rows.Scan(
@@ -133,8 +133,8 @@ func (s *Store) ListTopologyPackageHydrations(
 		); err != nil {
 			return nil, err
 		}
-		value := topology.PackageHydration{
-			Key: topology.PackageHydrationKey{
+		value := installModel.PackageHydration{
+			Key: installModel.PackageHydrationKey{
 				InstallerName: installerName,
 				Scope:         spec.Locator(scope),
 			},
@@ -156,7 +156,7 @@ func (s *Store) ListTopologyPackageHydrations(
 
 func (s *Store) PutTopologyPackageHydration(
 	ctx context.Context,
-	value topology.PackageHydration,
+	value installModel.PackageHydration,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -183,7 +183,7 @@ func (s *Store) PutTopologyPackageHydration(
 
 func (s *Store) DeleteTopologyPackageHydration(
 	ctx context.Context,
-	key topology.PackageHydrationKey,
+	key installModel.PackageHydrationKey,
 ) error {
 	if err := key.Validate(); err != nil {
 		return err

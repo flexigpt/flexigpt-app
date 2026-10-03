@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
@@ -59,8 +59,8 @@ type Dependencies struct {
 	Cat              catalog.API
 	Definitions      definition.API
 	Sources          source.API
-	Discovery        refresh.API
-	ManagedArtifacts managedpackage.API
+	Discovery        refreshFlow.API
+	ManagedArtifacts managedpackageFlow.API
 	Protection       root.ProtectionAPI
 	Overlays         modelOverlay.OverlayRepository
 	Adapters         AdapterRegistry

@@ -12,7 +12,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
 	workspaceConversation "github.com/flexigpt/flexigpt-app/internal/workspace/conversation"
 	"github.com/flexigpt/mapstore-go"
@@ -149,8 +149,8 @@ func (cc *ConversationCollection) Close() (err error) {
 
 func (cc *ConversationCollection) PutConversation(
 	ctx context.Context,
-	req *spec.PutConversationRequest,
-) (*spec.PutConversationResponse, error) {
+	req *conversationSpec.PutConversationRequest,
+) (*conversationSpec.PutConversationResponse, error) {
 	if req == nil || req.Body == nil || req.ID == "" || req.Body.Title == "" {
 		return nil, errors.New("request or request body cannot be nil")
 	}
@@ -159,7 +159,7 @@ func (cc *ConversationCollection) PutConversation(
 	}
 
 	// Get filename from info.
-	info, err := uuidv7filename.Build(req.ID, req.Body.Title, spec.ConversationFileExtension)
+	info, err := uuidv7filename.Build(req.ID, req.Body.Title, conversationSpec.ConversationFileExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -169,8 +169,8 @@ func (cc *ConversationCollection) PutConversation(
 		return nil, err
 	}
 
-	currentConversation := &spec.Conversation{
-		SchemaVersion: spec.ConversationSchemaVersion,
+	currentConversation := &conversationSpec.Conversation{
+		SchemaVersion: conversationSpec.ConversationSchemaVersion,
 		ID:            req.ID,
 		Title:         req.Body.Title,
 		CreatedAt:     req.Body.CreatedAt,
@@ -221,19 +221,19 @@ func (cc *ConversationCollection) PutConversation(
 			slog.Warn("put conversation remove existing file", "error", err)
 		}
 	}
-	return &spec.PutConversationResponse{}, nil
+	return &conversationSpec.PutConversationResponse{}, nil
 }
 
 func (cc *ConversationCollection) PutMessagesToConversation(
 	ctx context.Context,
-	req *spec.PutMessagesToConversationRequest,
-) (*spec.PutMessagesToConversationResponse, error) {
+	req *conversationSpec.PutMessagesToConversationRequest,
+) (*conversationSpec.PutMessagesToConversationResponse, error) {
 	if req == nil || req.Body == nil || req.Body.Messages == nil || len(req.Body.Messages) == 0 {
 		return nil, errors.New("request or request body cannot be nil")
 	}
 
 	convoResp, err := cc.GetConversation(ctx,
-		&spec.GetConversationRequest{ID: req.ID, Title: req.Body.Title, ForceFetch: false})
+		&conversationSpec.GetConversationRequest{ID: req.ID, Title: req.Body.Title, ForceFetch: false})
 	if err != nil {
 		return nil, err
 	}
@@ -258,17 +258,17 @@ func (cc *ConversationCollection) PutMessagesToConversation(
 		return nil, err
 	}
 
-	return &spec.PutMessagesToConversationResponse{}, nil
+	return &conversationSpec.PutMessagesToConversationResponse{}, nil
 }
 
 func (cc *ConversationCollection) DeleteConversation(
 	ctx context.Context,
-	req *spec.DeleteConversationRequest,
-) (*spec.DeleteConversationResponse, error) {
+	req *conversationSpec.DeleteConversationRequest,
+) (*conversationSpec.DeleteConversationResponse, error) {
 	if req == nil {
 		return nil, errors.New("request cannot be nil")
 	}
-	info, err := uuidv7filename.Build(req.ID, req.Title, spec.ConversationFileExtension)
+	info, err := uuidv7filename.Build(req.ID, req.Title, conversationSpec.ConversationFileExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -278,17 +278,17 @@ func (cc *ConversationCollection) DeleteConversation(
 		return nil, err
 	}
 	slog.Info("delete conversation", "file", filename)
-	return &spec.DeleteConversationResponse{}, nil
+	return &conversationSpec.DeleteConversationResponse{}, nil
 }
 
 func (cc *ConversationCollection) GetConversation(
 	ctx context.Context,
-	req *spec.GetConversationRequest,
-) (*spec.GetConversationResponse, error) {
+	req *conversationSpec.GetConversationRequest,
+) (*conversationSpec.GetConversationResponse, error) {
 	if req == nil || req.Title == "" || req.ID == "" {
 		return nil, errors.New("request or request body cannot be nil")
 	}
-	info, err := uuidv7filename.Build(req.ID, req.Title, spec.ConversationFileExtension)
+	info, err := uuidv7filename.Build(req.ID, req.Title, conversationSpec.ConversationFileExtension)
 	if err != nil {
 		return nil, err
 	}
@@ -299,33 +299,33 @@ func (cc *ConversationCollection) GetConversation(
 		return nil, err
 	}
 	if schemaVersion, _ := stringField(raw, "schemaVersion"); schemaVersion !=
-		spec.ConversationSchemaVersion {
+		conversationSpec.ConversationSchemaVersion {
 		return nil, errors.New("unsupported schema version for conversation")
 	}
 
-	var convo spec.Conversation
+	var convo conversationSpec.Conversation
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &convo); err != nil {
 		return nil, err
 	}
-	if convo.SchemaVersion != spec.ConversationSchemaVersion {
+	if convo.SchemaVersion != conversationSpec.ConversationSchemaVersion {
 		return nil, errors.New("unsupported schema version for conversation")
 	}
 	if err := validateConversationV1(&convo); err != nil {
 		return nil, err
 	}
 
-	return &spec.GetConversationResponse{Body: &convo}, nil
+	return &conversationSpec.GetConversationResponse{Body: &convo}, nil
 }
 
 func (cc *ConversationCollection) ListConversations(
 	ctx context.Context,
-	req *spec.ListConversationsRequest,
-) (*spec.ListConversationsResponse, error) {
+	req *conversationSpec.ListConversationsRequest,
+) (*conversationSpec.ListConversationsResponse, error) {
 	token := ""
-	pageSize := spec.DefaultPageSize
+	pageSize := conversationSpec.DefaultPageSize
 	if req != nil {
 		token = req.PageToken
-		if req.PageSize > 0 && req.PageSize <= spec.MaxPageSize {
+		if req.PageSize > 0 && req.PageSize <= conversationSpec.MaxPageSize {
 			pageSize = req.PageSize
 		}
 	}
@@ -338,7 +338,7 @@ func (cc *ConversationCollection) ListConversations(
 		return nil, err
 	}
 
-	items := make([]spec.ConversationListItem, 0, len(fileEntries))
+	items := make([]conversationSpec.ConversationListItem, 0, len(fileEntries))
 	for _, f := range fileEntries {
 		filename := filepath.Base(f.BaseRelativePath)
 		info, err := uuidv7filename.Parse(filename)
@@ -353,11 +353,11 @@ func (cc *ConversationCollection) ListConversations(
 			// If we can't read it, treat as corrupted/legacy; skip.
 			continue
 		}
-		var convo spec.Conversation
+		var convo conversationSpec.Conversation
 		if err := jsonencdec.MapToStructWithJSONTags(raw, &convo); err != nil {
 			continue
 		}
-		if convo.SchemaVersion != spec.ConversationSchemaVersion {
+		if convo.SchemaVersion != conversationSpec.ConversationSchemaVersion {
 			// Older conversations are intentionally not interpreted as v1.
 			continue
 		}
@@ -366,15 +366,15 @@ func (cc *ConversationCollection) ListConversations(
 		}
 
 		fileModTime := f.FileInfo.ModTime()
-		items = append(items, spec.ConversationListItem{
+		items = append(items, conversationSpec.ConversationListItem{
 			ID:             info.ID,
 			SanatizedTitle: info.Suffix,
 			ModifiedAt:     &fileModTime,
 		})
 	}
 
-	return &spec.ListConversationsResponse{
-		Body: &spec.ListConversationsResponseBody{
+	return &conversationSpec.ListConversationsResponse{
+		Body: &conversationSpec.ListConversationsResponseBody{
 			ConversationListItems: items,
 			NextPageToken:         &next,
 		},
@@ -383,16 +383,16 @@ func (cc *ConversationCollection) ListConversations(
 
 func (cc *ConversationCollection) SearchConversations(
 	ctx context.Context,
-	req *spec.SearchConversationsRequest,
-) (*spec.SearchConversationsResponse, error) {
+	req *conversationSpec.SearchConversationsRequest,
+) (*conversationSpec.SearchConversationsResponse, error) {
 	if req == nil {
 		return nil, errors.New("request cannot be nil")
 	}
 	if cc.fts == nil {
 		return nil, errors.New("full-text search is disabled")
 	}
-	pageSize := spec.DefaultPageSize
-	if req.PageSize > 0 && req.PageSize <= spec.MaxPageSize {
+	pageSize := conversationSpec.DefaultPageSize
+	if req.PageSize > 0 && req.PageSize <= conversationSpec.MaxPageSize {
 		pageSize = req.PageSize
 	}
 
@@ -401,38 +401,38 @@ func (cc *ConversationCollection) SearchConversations(
 		return nil, err
 	}
 
-	items := make([]spec.ConversationListItem, 0, len(hits))
+	items := make([]conversationSpec.ConversationListItem, 0, len(hits))
 	for _, h := range hits {
 		info, err := uuidv7filename.Parse(filepath.Base(h.ID))
 		if err != nil {
 			continue
 		}
-		items = append(items, spec.ConversationListItem{
+		items = append(items, conversationSpec.ConversationListItem{
 			ID:             info.ID,
 			SanatizedTitle: info.Suffix,
 		})
 	}
-	return &spec.SearchConversationsResponse{
-		Body: &spec.SearchConversationsResponseBody{
+	return &conversationSpec.SearchConversationsResponse{
+		Body: &conversationSpec.SearchConversationsResponseBody{
 			ConversationListItems: items,
 			NextPageToken:         &next,
 		},
 	}, nil
 }
 
-func (cc *ConversationCollection) fileNameFromConversation(c spec.Conversation) (string, error) {
-	info, err := uuidv7filename.Build(c.ID, c.Title, spec.ConversationFileExtension)
+func (cc *ConversationCollection) fileNameFromConversation(c conversationSpec.Conversation) (string, error) {
+	info, err := uuidv7filename.Build(c.ID, c.Title, conversationSpec.ConversationFileExtension)
 	if err != nil {
 		return "", err
 	}
 	return info.FileName, nil
 }
 
-func validateConversationV1(value *spec.Conversation) error {
+func validateConversationV1(value *conversationSpec.Conversation) error {
 	if value == nil {
 		return errors.New("conversation is nil")
 	}
-	if value.SchemaVersion != spec.ConversationSchemaVersion {
+	if value.SchemaVersion != conversationSpec.ConversationSchemaVersion {
 		return errors.New("unsupported schema version for conversation")
 	}
 	if strings.TrimSpace(value.ID) == "" {

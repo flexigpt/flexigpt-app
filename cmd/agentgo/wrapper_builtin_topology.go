@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -40,7 +40,7 @@ type agentBaselineEnsurer interface {
 
 func ensureBuiltinArtifactTopology(
 	ctx context.Context,
-	topologyAPI install.API,
+	topologyAPI installFlow.API,
 	tools builtin.HydrationInstaller,
 	models builtin.HydrationInstaller,
 	skills builtin.HydrationInstaller,

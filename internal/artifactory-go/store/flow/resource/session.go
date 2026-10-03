@@ -5,14 +5,14 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type verificationSessionStarter interface {
 	BeginVerificationSession(
 		ctx context.Context,
-	) (context.Context, model.VerificationSession, error)
+	) (context.Context, resourceModel.VerificationSession, error)
 }
 
 // WithVerificationSession runs fn under a shared verification session when the

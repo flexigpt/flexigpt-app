@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -14,7 +14,7 @@ var generatedCatalogJSON []byte
 
 var (
 	generatedCatalogOnce sync.Once
-	generatedCatalog     topology.CompiledPackageSet
+	generatedCatalog     installModel.CompiledPackageSet
 	errGeneratedCatalog  error
 
 	generatedCatalogFingerprintOnce sync.Once
@@ -22,7 +22,7 @@ var (
 )
 
 func generatedCatalogValue() (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	error,
 ) {
 	generatedCatalogOnce.Do(func() {
@@ -31,18 +31,18 @@ func generatedCatalogValue() (
 		)
 	})
 	if errGeneratedCatalog != nil {
-		return topology.CompiledPackageSet{}, errGeneratedCatalog
+		return installModel.CompiledPackageSet{}, errGeneratedCatalog
 	}
 	return generatedCatalog, nil
 }
 
 func GeneratedCatalogSet() (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	error,
 ) {
 	value, err := generatedCatalogValue()
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 	return value.Clone(), nil
 }

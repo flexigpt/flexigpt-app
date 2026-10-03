@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -17,7 +17,7 @@ import (
 // multiple artifact families can share one protected Root.
 func (c *Components) PrepareTopologyHydrations(
 	ctx context.Context,
-	desiredValues []topology.Hydration,
+	desiredValues []installModel.Hydration,
 ) (map[string]bool, error) {
 	if c == nil || c.metadata == nil {
 		return nil, spec.ErrClosed
@@ -31,7 +31,7 @@ func (c *Components) PrepareTopologyHydrations(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return nil, err
 	}
 
@@ -111,9 +111,9 @@ func (c *Components) PrepareTopologyHydrations(
 func (c *Components) GetTopologyHydration(
 	ctx context.Context,
 	installerName string,
-) (topology.Hydration, bool, error) {
+) (installModel.Hydration, bool, error) {
 	if c == nil || c.metadata == nil {
-		return topology.Hydration{}, false, spec.ErrClosed
+		return installModel.Hydration{}, false, spec.ErrClosed
 	}
 	return c.metadata.GetTopologyHydration(ctx, installerName)
 }
@@ -122,9 +122,9 @@ func (c *Components) GetTopologyHydration(
 // generic topology and artifact-family installation paths both complete.
 func (c *Components) CommitTopologyHydration(
 	ctx context.Context,
-	desired topology.Hydration,
+	desired installModel.Hydration,
 ) error {
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 	return c.PutTopologyHydration(ctx, desired)
@@ -132,7 +132,7 @@ func (c *Components) CommitTopologyHydration(
 
 func (c *Components) PutTopologyHydration(
 	ctx context.Context,
-	value topology.Hydration,
+	value installModel.Hydration,
 ) error {
 	if c == nil ||
 		c.metadata == nil ||
@@ -149,7 +149,7 @@ func (c *Components) PutTopologyHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {
@@ -172,8 +172,8 @@ func (c *Components) PutTopologyHydration(
 }
 
 func equalTopologyHydration(
-	left topology.Hydration,
-	right topology.Hydration,
+	left installModel.Hydration,
+	right installModel.Hydration,
 ) bool {
 	return left.InstallerName == right.InstallerName &&
 		left.RootID == right.RootID &&
@@ -210,10 +210,10 @@ func (c *Components) ResetTopologyHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
-	if err := topology.ValidateHydrationInstallerName(installerName); err != nil {
+	if err := installModel.ValidateHydrationInstallerName(installerName); err != nil {
 		return err
 	}
 	if err := rootID.Validate(); err != nil {

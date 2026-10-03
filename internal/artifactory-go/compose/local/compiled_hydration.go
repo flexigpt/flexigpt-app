@@ -3,13 +3,13 @@ package local
 import (
 	"context"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Store) RegisterCompiledPackages(
 	ctx context.Context,
-	values []topology.CompiledRegistration,
+	values []installModel.CompiledRegistration,
 ) error {
 	if s == nil || s.components == nil {
 		return spec.ErrClosed
@@ -19,7 +19,7 @@ func (s *Store) RegisterCompiledPackages(
 
 func (s *Store) HydrateCompiledPackages(
 	ctx context.Context,
-	plans []topology.CompiledPackagePlan,
+	plans []installModel.CompiledPackagePlan,
 ) error {
 	if s == nil || s.components == nil {
 		return spec.ErrClosed

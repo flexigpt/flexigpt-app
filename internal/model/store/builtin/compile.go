@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
 
@@ -12,10 +12,10 @@ func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
 	prepared []PreparedPackage,
-) (topology.CompiledPackageSet, error) {
+) (installModel.CompiledPackageSet, error) {
 	values, err := NormalizePreparedPackages(prepared)
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	return builtin.Compile(

@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -18,19 +18,19 @@ import (
 func DecodeGeneratedPackageSet(
 	raw []byte,
 ) (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	error,
 ) {
 	if len(bytes.TrimSpace(raw)) == 0 {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated built-in package set is empty",
 			spec.ErrInvalid,
 		)
 	}
 
-	var value topology.CompiledPackageSet
+	var value installModel.CompiledPackageSet
 	if err := json.Unmarshal(raw, &value); err != nil {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"decode generated built-in package set JSON: %w",
 			err,
 		)
@@ -46,15 +46,15 @@ func DecodeGeneratedPackageSet(
 // JSON. It normalizes object key order and raw JSON body formatting without
 // changing array order.
 func CanonicalGeneratedPackageSet(
-	value topology.CompiledPackageSet,
+	value installModel.CompiledPackageSet,
 ) (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	cryptoutil.Digest,
 	error,
 ) {
 	normalized, _, fingerprint, err := canonicalGeneratedPackageSet(value)
 	if err != nil {
-		return topology.CompiledPackageSet{}, "", err
+		return installModel.CompiledPackageSet{}, "", err
 	}
 	return normalized, fingerprint, nil
 }
@@ -65,7 +65,7 @@ func CanonicalGeneratedPackageSet(
 // the order emitted by the compiler. The two-space indentation is presentation
 // only and does not affect the generated fingerprint.
 func RenderGeneratedPackageSetJSON(
-	value topology.CompiledPackageSet,
+	value installModel.CompiledPackageSet,
 ) ([]byte, error) {
 	_, canonical, _, err := canonicalGeneratedPackageSet(value)
 	if err != nil {
@@ -85,16 +85,16 @@ func RenderGeneratedPackageSetJSON(
 }
 
 func canonicalGeneratedPackageSet(
-	value topology.CompiledPackageSet,
+	value installModel.CompiledPackageSet,
 ) (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	[]byte,
 	cryptoutil.Digest,
 	error,
 ) {
 	raw, err := json.Marshal(value)
 	if err != nil {
-		return topology.CompiledPackageSet{}, nil, "", fmt.Errorf(
+		return installModel.CompiledPackageSet{}, nil, "", fmt.Errorf(
 			"marshal generated built-in package set: %w",
 			err,
 		)
@@ -102,22 +102,22 @@ func canonicalGeneratedPackageSet(
 
 	canonical, err := canonicalJSON(raw)
 	if err != nil {
-		return topology.CompiledPackageSet{}, nil, "", err
+		return installModel.CompiledPackageSet{}, nil, "", err
 	}
 
 	normalized, fingerprint, err := decodeCanonicalGeneratedPackageSet(canonical)
 	if err != nil {
-		return topology.CompiledPackageSet{}, nil, "", err
+		return installModel.CompiledPackageSet{}, nil, "", err
 	}
 
 	return normalized, canonical, fingerprint, nil
 }
 
 func validateGeneratedPackageSet(
-	value topology.CompiledPackageSet,
-) (topology.CompiledPackageSet, error) {
-	if value.Format != topology.CompiledPackageSetFormat {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+	value installModel.CompiledPackageSet,
+) (installModel.CompiledPackageSet, error) {
+	if value.Format != installModel.CompiledPackageSetFormat {
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated package format %q; regenerate built-in catalogs",
 			spec.ErrUnsupported,
 			value.Format,
@@ -126,7 +126,7 @@ func validateGeneratedPackageSet(
 	if value.Name == "" ||
 		value.Hydration.InstallerName == "" ||
 		value.Hydration.Fingerprint == "" {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: generated built-in package set is incomplete",
 			spec.ErrInvalid,
 		)
@@ -137,13 +137,13 @@ func validateGeneratedPackageSet(
 func decodeCanonicalGeneratedPackageSet(
 	canonical []byte,
 ) (
-	topology.CompiledPackageSet,
+	installModel.CompiledPackageSet,
 	cryptoutil.Digest,
 	error,
 ) {
 	value, err := DecodeGeneratedPackageSet(canonical)
 	if err != nil {
-		return topology.CompiledPackageSet{}, "", err
+		return installModel.CompiledPackageSet{}, "", err
 	}
 	return value, cryptoutil.DigestBytes(canonical), nil
 }

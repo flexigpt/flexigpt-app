@@ -12,7 +12,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
-	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 )
 
 // registerRuntimeProvider creates one ephemeral inference-go provider for one
@@ -24,7 +24,7 @@ import (
 // not as a persistence layer.
 func (ps *ProviderSetAPI) registerRuntimeProvider(
 	ctx context.Context,
-	runtimeModel spec.RuntimeModel,
+	runtimeModel inferencewrapperSpec.RuntimeModel,
 	completionKey string,
 ) (
 	inferenceSpec.ProviderName,
@@ -100,7 +100,7 @@ func (ps *ProviderSetAPI) registerRuntimeProvider(
 func (ps *ProviderSetAPI) newRuntimeCapabilityResolver(
 	ctx context.Context,
 	provider inferenceSpec.ProviderName,
-	runtimeModel spec.RuntimeModel,
+	runtimeModel inferencewrapperSpec.RuntimeModel,
 	completionKey string,
 ) (inferenceSpec.ModelCapabilityResolver, error) {
 	if len(runtimeModel.CapabilityOverrides) == 0 {

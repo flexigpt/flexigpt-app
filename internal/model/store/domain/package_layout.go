@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -15,7 +15,7 @@ func ModelProviderPackageAddress(
 	return sourceModel.NewManagedPackageAddress(
 		ModelProviderPackageKind,
 		name,
-		topology.UnversionedPackageVersion(),
+		documentTopology.UnversionedPackageVersion(),
 	)
 }
 
@@ -25,7 +25,7 @@ func ModelPackageAddress(
 	return sourceModel.NewManagedPackageAddress(
 		ModelPackageKind,
 		name,
-		topology.UnversionedPackageVersion(),
+		documentTopology.UnversionedPackageVersion(),
 	)
 }
 
@@ -81,7 +81,7 @@ func validateModelProviderPackageAddress(
 			ModelProviderPackageKind,
 		)
 	}
-	if address.Version != topology.UnversionedPackageVersion() {
+	if address.Version != documentTopology.UnversionedPackageVersion() {
 		return fmt.Errorf(
 			"%w: Model Provider packages must use the unversioned layout",
 			spec.ErrInvalid,
@@ -104,7 +104,7 @@ func validateModelPackageAddress(
 			ModelPackageKind,
 		)
 	}
-	if address.Version != topology.UnversionedPackageVersion() {
+	if address.Version != documentTopology.UnversionedPackageVersion() {
 		return fmt.Errorf(
 			"%w: Model packages must use the unversioned layout",
 			spec.ErrInvalid,
@@ -144,7 +144,7 @@ func packageAddressFromLocator(
 			kind,
 		)
 	}
-	if address.Version != topology.UnversionedPackageVersion() {
+	if address.Version != documentTopology.UnversionedPackageVersion() {
 		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Model packages must use the unversioned layout",
 			spec.ErrInvalid,

@@ -13,7 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -93,7 +93,7 @@ func preparePackage(
 	packages fs.FS,
 	packageRoot spec.Locator,
 ) (PreparedPackage, error) {
-	files, err := topology.ReadPackageFiles(
+	files, err := installModel.ReadPackageFiles(
 		ctx,
 		packages,
 		packageRoot,
@@ -410,7 +410,7 @@ func PackageFingerprint(
 	)
 	sortSkillExpectations(expectations)
 
-	return topology.PackageFingerprint(
+	return installModel.PackageFingerprint(
 		value.EmbeddedPackageRoot,
 		value.PackageAddress,
 		value.DocumentFile,

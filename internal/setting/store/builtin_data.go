@@ -1,20 +1,20 @@
 package store
 
-import "github.com/flexigpt/flexigpt-app/internal/setting/spec"
+import settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 
 // DefaultDebugSettingsData is written to disk on first start.
-var DefaultDebugSettingsData = spec.DebugSettings{
+var DefaultDebugSettingsData = settingSpec.DebugSettings{
 	LogLLMReqResp:           false,
 	DisableContentStripping: false,
-	LogLevel:                spec.DebugLogLevelInfo,
+	LogLevel:                settingSpec.DebugLogLevelInfo,
 }
 
 // DefaultSettingsData is written to disk on first start.
-var DefaultSettingsData = spec.SettingsSchema{
-	SchemaVersion: spec.SchemaVersion,
-	AppTheme: spec.AppTheme{
-		Type: spec.ThemeSystem,
-		Name: spec.ThemeNameSystem,
+var DefaultSettingsData = settingSpec.SettingsSchema{
+	SchemaVersion: settingSpec.SchemaVersion,
+	AppTheme: settingSpec.AppTheme{
+		Type: settingSpec.ThemeSystem,
+		Name: settingSpec.ThemeNameSystem,
 	},
 	Debug: DefaultDebugSettingsData,
 }

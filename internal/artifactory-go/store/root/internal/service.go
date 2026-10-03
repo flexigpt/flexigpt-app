@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -61,7 +61,7 @@ func (s *Service) EnsureSystem(
 			draft.ID,
 		)
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return rootModel.Root{}, err
 	}
 	return s.create(ctx, draft)
@@ -259,7 +259,7 @@ func RequireMutableRoot(
 	if policy == nil || !policy.IsProtectedRoot(rootID) {
 		return nil
 	}
-	if install.IsPrivileged(ctx) {
+	if installFlow.IsPrivileged(ctx) {
 		return nil
 	}
 	return fmt.Errorf(

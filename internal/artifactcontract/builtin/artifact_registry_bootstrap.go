@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -29,7 +29,7 @@ type Installer interface {
 type HydrationInstaller interface {
 	Installer
 
-	DesiredHydration(ctx context.Context) (topology.Hydration, error)
+	DesiredHydration(ctx context.Context) (installModel.Hydration, error)
 
 	// EnsureHydration creates or repairs this artifact family's desired
 	// topology and package state. It may publish managed Source content.
@@ -48,22 +48,22 @@ type PackageHydrationInstaller interface {
 
 	DesiredPackageHydrations(
 		ctx context.Context,
-	) ([]topology.PackageHydration, error)
+	) ([]installModel.PackageHydration, error)
 
 	EnsurePackageHydration(
 		ctx context.Context,
 		topologyCurrent bool,
-		stale []topology.PackageHydration,
+		stale []installModel.PackageHydration,
 	) error
 }
 
 type preparedHydration struct {
 	installer      string
-	desired        topology.Hydration
+	desired        installModel.Hydration
 	current        bool
-	packages       []topology.PackageHydration
-	stale          []topology.PackageHydration
-	packageCurrent map[topology.PackageHydrationKey]bool
+	packages       []installModel.PackageHydration
+	stale          []installModel.PackageHydration
+	packageCurrent map[installModel.PackageHydrationKey]bool
 }
 
 type registeredInstaller struct {
@@ -75,9 +75,9 @@ type registeredInstaller struct {
 // shared topology. It is intentionally unaware of Skills, MCPs, or any other
 // artifact format.
 type BootstrapRegistry struct {
-	declaration topology.Declaration
-	topology    topology.Ensurer
-	hydrator    topology.HydrationCoordinator
+	declaration installModel.Declaration
+	topology    installModel.Ensurer
+	hydrator    installModel.HydrationCoordinator
 
 	mu         sync.RWMutex
 	ensureMu   sync.Mutex
@@ -86,8 +86,8 @@ type BootstrapRegistry struct {
 }
 
 func NewDefaultBootstrapRegistry(
-	ensurer topology.Ensurer,
-	hydrator topology.HydrationCoordinator,
+	ensurer installModel.Ensurer,
+	hydrator installModel.HydrationCoordinator,
 ) (*BootstrapRegistry, error) {
 	return NewBootstrapRegistry(
 		documentTopology.BuiltinTopologyDeclaration(),
@@ -97,9 +97,9 @@ func NewDefaultBootstrapRegistry(
 }
 
 func NewBootstrapRegistry(
-	declaration topology.Declaration,
-	ensurer topology.Ensurer,
-	hydrator topology.HydrationCoordinator,
+	declaration installModel.Declaration,
+	ensurer installModel.Ensurer,
+	hydrator installModel.HydrationCoordinator,
 ) (*BootstrapRegistry, error) {
 	if ensurer == nil || hydrator == nil {
 		return nil, fmt.Errorf(
@@ -128,7 +128,7 @@ func (r *BootstrapRegistry) Register(inst Installer) error {
 	}
 
 	name := inst.BuiltInName()
-	if err := topology.ValidateHydrationInstallerName(name); err != nil {
+	if err := installModel.ValidateHydrationInstallerName(name); err != nil {
 		return fmt.Errorf("built-in installer name: %w", err)
 	}
 	scopes, err := normalizePackageScopes(inst.BuiltInPackageScopes())
@@ -203,7 +203,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		return entries[left].name < entries[right].name
 	})
 
-	ctx = install.WithPrivilege(ctx)
+	ctx = installFlow.WithPrivilege(ctx)
 	prepared := make([]preparedHydration, 0, len(entries))
 
 	for _, entry := range entries {
@@ -233,14 +233,14 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		})
 	}
 
-	packageCoordinator, packageAware := r.hydrator.(topology.PackageHydrationCoordinator)
+	packageCoordinator, packageAware := r.hydrator.(installModel.PackageHydrationCoordinator)
 	packageInstallerNames := make(
 		[]string,
 		0,
 	)
 	if packageAware {
 
-		desiredPackages := make([]topology.PackageHydration, 0)
+		desiredPackages := make([]installModel.PackageHydration, 0)
 		for _, entry := range entries {
 			installer, supported := entry.installer.(PackageHydrationInstaller)
 			if !supported {
@@ -263,13 +263,13 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 				}
 			}
 		}
-		if _, err := topology.NormalizePackageHydrations(desiredPackages); err != nil {
+		if _, err := installModel.NormalizePackageHydrations(desiredPackages); err != nil {
 			return err
 		}
 	}
 
 	if len(prepared) != 0 {
-		desiredValues := make([]topology.Hydration, 0, len(prepared))
+		desiredValues := make([]installModel.Hydration, 0, len(prepared))
 		for _, value := range prepared {
 			desiredValues = append(desiredValues, value.desired)
 		}
@@ -296,7 +296,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		}
 	}
 	if packageAware {
-		desiredPackages := make([]topology.PackageHydration, 0)
+		desiredPackages := make([]installModel.PackageHydration, 0)
 		for _, value := range prepared {
 			desiredPackages = append(desiredPackages, value.packages...)
 		}
@@ -310,7 +310,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		}
 		for index := range prepared {
 			prepared[index].packageCurrent = make(
-				map[topology.PackageHydrationKey]bool,
+				map[installModel.PackageHydrationKey]bool,
 			)
 			for _, value := range prepared[index].packages {
 				prepared[index].packageCurrent[value.Key] = preparation.CurrentFor(value.Key)
@@ -420,7 +420,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 	// all package publication completes. Finalizers must make shared refresh
 	// work idempotent through EnsureSourceCurrent or an equivalent operation.
 	desiredByInstaller := make(
-		map[string]topology.Hydration,
+		map[string]installModel.Hydration,
 		len(prepared),
 	)
 	for _, value := range prepared {

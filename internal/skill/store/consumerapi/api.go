@@ -13,9 +13,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -30,10 +30,10 @@ import (
 type API struct {
 	cat              catalog.API
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	artifacts        artifact.API
-	resources        resource.API
-	managedArtifacts managedpackage.API
+	resources        resourceFlow.API
+	managedArtifacts managedpackageFlow.API
 	protection       root.ProtectionAPI
 	definitions      definition.API
 	collections      *collection.API
@@ -43,10 +43,10 @@ type API struct {
 
 func New(
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
-	resources resource.API,
-	managedArtifacts managedpackage.API,
+	resources resourceFlow.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
@@ -168,11 +168,11 @@ func (a *API) RegisterSkillDirectory(
 		return sourceModel.Summary{}, err
 	}
 
-	return refresh.EnsureAndRefreshSource(
+	return refreshFlow.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		refresh.EnsureAndRefreshSourceRequest{
+		refreshFlow.EnsureAndRefreshSourceRequest{
 			RootID: request.RootID,
 			Draft: sourceModel.Draft{
 				ID: sourceModel.SourceID(uuidutil.NewUUIDv7()),
@@ -623,7 +623,7 @@ func (a *API) GetManagedSkillDocument(
 	if a == nil || a.resources == nil {
 		return skillDomain.ManagedSkillDocument{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (skillDomain.ManagedSkillDocument, error) {
@@ -727,7 +727,7 @@ func (a *API) ResolveSkillCapabilities(
 		a.declarationResolver == nil {
 		return resolve.CapabilityPlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (resolve.CapabilityPlan, error) {

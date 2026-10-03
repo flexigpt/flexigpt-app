@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 )
@@ -21,7 +21,7 @@ func TestFTSSearchHappyPath(t *testing.T) {
 		getNewPutRequestFromConversation(c1),
 	)
 
-	resp, err := cc.SearchConversations(t.Context(), &spec.SearchConversationsRequest{
+	resp, err := cc.SearchConversations(t.Context(), &conversationSpec.SearchConversationsRequest{
 		Query:     "banana",
 		PageToken: "",
 	})
@@ -46,13 +46,13 @@ func TestFTSRankingTitleVsBody(t *testing.T) {
 
 	// B: query term only inside a message.
 	b := newConv(t, "No match in title")
-	b.Messages = []spec.ConversationMessage{
+	b.Messages = []conversationSpec.ConversationMessage{
 		newTextTurn("m1", inferenceSpec.RoleUser, "alpha appears in body"),
 	}
 	_, _ = cc.PutConversation(t.Context(), getNewPutRequestFromConversation(b))
 
 	resp, _ := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "alpha"})
+		&conversationSpec.SearchConversationsRequest{Query: "alpha"})
 	if len(resp.Body.ConversationListItems) != 2 ||
 		resp.Body.ConversationListItems[0].ID != a.ID {
 		t.Fatalf("ranking wrong, hits=%v", resp.Body.ConversationListItems)
@@ -65,7 +65,7 @@ func TestFTSPagination(t *testing.T) {
 
 	for i := range 14 {
 		c := newConv(t, "Kiwi talk "+strconv.Itoa(i))
-		c.Messages = []spec.ConversationMessage{
+		c.Messages = []conversationSpec.ConversationMessage{
 			newTextTurn("m", inferenceSpec.RoleUser, "kiwi everywhere"),
 		}
 		_, _ = cc.PutConversation(t.Context(), getNewPutRequestFromConversation(c))
@@ -77,7 +77,7 @@ func TestFTSPagination(t *testing.T) {
 	)
 	for {
 		res, err := cc.SearchConversations(t.Context(),
-			&spec.SearchConversationsRequest{Query: "kiwi", PageToken: token})
+			&conversationSpec.SearchConversationsRequest{Query: "kiwi", PageToken: token})
 		if err != nil {
 			t.Fatalf("search page: %v", err)
 		}
@@ -107,14 +107,14 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 
 	// Ensure hit exists.
 	_, err := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "cherry"})
+		&conversationSpec.SearchConversationsRequest{Query: "cherry"})
 	if err != nil {
 		t.Fatalf("initial search: %v", err)
 	}
 
 	// Delete conversation.
 	_, _ = cc.DeleteConversation(t.Context(),
-		&spec.DeleteConversationRequest{ID: c.ID, Title: c.Title})
+		&conversationSpec.DeleteConversationRequest{ID: c.ID, Title: c.Title})
 
 	const retries = 10
 
@@ -124,7 +124,7 @@ func TestFTSDeletePurgesIndex(t *testing.T) {
 	for i := range retries {
 		res, err := cc.SearchConversations(
 			t.Context(),
-			&spec.SearchConversationsRequest{Query: "cherry"},
+			&conversationSpec.SearchConversationsRequest{Query: "cherry"},
 		)
 		if err == nil {
 			got = len(res.Body.ConversationListItems)
@@ -155,24 +155,24 @@ func TestFTSAddMessageUpdatesIndex(t *testing.T) {
 
 	// No hit yet.
 	res, _ := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "whisper"})
+		&conversationSpec.SearchConversationsRequest{Query: "whisper"})
 	if len(res.Body.ConversationListItems) != 0 {
 		t.Fatal("should have no hits before message added")
 	}
 
 	msg := newTextTurn("m1", inferenceSpec.RoleAssistant, "let me whisper a secret")
 	_, _ = cc.PutMessagesToConversation(t.Context(),
-		&spec.PutMessagesToConversationRequest{
+		&conversationSpec.PutMessagesToConversationRequest{
 			ID: c.ID,
-			Body: &spec.PutMessagesToConversationRequestBody{
+			Body: &conversationSpec.PutMessagesToConversationRequestBody{
 				Title:    c.Title,
-				Messages: []spec.ConversationMessage{msg},
+				Messages: []conversationSpec.ConversationMessage{msg},
 			},
 		})
 
 	// Now should hit.
 	res, _ = cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "whisper"})
+		&conversationSpec.SearchConversationsRequest{Query: "whisper"})
 	if len(res.Body.ConversationListItems) != 1 {
 		t.Fatalf("want 1 hit after adding message, got %d", len(res.Body.ConversationListItems))
 	}
@@ -183,7 +183,7 @@ func TestFTSDisabled(t *testing.T) {
 	cc := newCollection(t, dir, false)
 
 	_, err := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "x"})
+		&conversationSpec.SearchConversationsRequest{Query: "x"})
 	if err == nil {
 		t.Fatal("expected error when FTS disabled")
 	}
@@ -220,7 +220,7 @@ func TestFTSScaleSearch(t *testing.T) {
 
 	// Single-doc search.
 	res, err := cc.SearchConversations(t.Context(),
-		&spec.SearchConversationsRequest{Query: "fruit42", PageSize: pageSz})
+		&conversationSpec.SearchConversationsRequest{Query: "fruit42", PageSize: pageSz})
 	if err != nil {
 		t.Fatalf("search fruit42: %v", err)
 	}
@@ -234,7 +234,7 @@ func TestFTSScaleSearch(t *testing.T) {
 	total := 0
 	for page := 0; ; page++ {
 		r, err := cc.SearchConversations(t.Context(),
-			&spec.SearchConversationsRequest{
+			&conversationSpec.SearchConversationsRequest{
 				Query:     "common",
 				PageToken: token,
 				PageSize:  pageSz,
@@ -278,18 +278,18 @@ func newCollection(t *testing.T, dir string, withFTS bool) *ConversationCollecti
 	return cc
 }
 
-func newConv(t *testing.T, title string) *spec.Conversation {
+func newConv(t *testing.T, title string) *conversationSpec.Conversation {
 	t.Helper()
 	id := uuidutil.NewUUIDv7()
 	at, err := uuidutil.GetUUIDv7UnixTime(id)
 	if err != nil {
 		t.Fatalf("new convo failed %s", err.Error())
 	}
-	return &spec.Conversation{
+	return &conversationSpec.Conversation{
 		ID:         id,
 		Title:      title,
 		CreatedAt:  at,
 		ModifiedAt: at,
-		Messages:   []spec.ConversationMessage{},
+		Messages:   []conversationSpec.ConversationMessage{},
 	}
 }

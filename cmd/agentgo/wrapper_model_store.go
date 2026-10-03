@@ -12,10 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -41,15 +41,15 @@ func initModelWrappers(
 	storeWrapper *ModelStoreWrapper,
 	aggregateWrapper *ModelAggregateWrapper,
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
 	roots root.API,
-	managedArtifacts managedpackage.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	protectedOverlays overlay.API,
 	secretBindings secret.API,
 	secretRuntime secret.RuntimeAPI,
-	localState artifactcleanup.API,
+	localState artifactcleanupFlow.API,
 	storeOverlays overlay.StoreAPI,
 	cat catalog.API,
 	definitions definition.API,

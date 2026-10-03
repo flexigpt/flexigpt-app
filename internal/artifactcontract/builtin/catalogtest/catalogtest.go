@@ -8,7 +8,7 @@ import (
 	"runtime"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
@@ -32,7 +32,7 @@ func CandidatePath(
 // It does not compare structs. It does not compare raw Definition.Body bytes.
 // It does not compare pretty JSON file whitespace.
 func AssertGeneratedPackageSetMatches(
-	expected topology.CompiledPackageSet,
+	expected installModel.CompiledPackageSet,
 	actualErr error,
 	actualFingerprint cryptoutil.Digest,
 	generatedFile string,

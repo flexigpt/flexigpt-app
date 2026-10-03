@@ -11,7 +11,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -61,11 +61,11 @@ func (a *API) AddSkillPath(
 		return SkillPathRegistrationResult{}, err
 	}
 
-	summary, err := refresh.EnsureAndRefreshSource(
+	summary, err := refreshFlow.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		refresh.EnsureAndRefreshSourceRequest{
+		refreshFlow.EnsureAndRefreshSourceRequest{
 			RootID: request.RootID,
 			Draft: sourceModel.Draft{
 				ID: sourceModel.SourceID(uuidutil.NewUUIDv7()),

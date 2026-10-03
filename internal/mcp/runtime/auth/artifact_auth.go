@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
-	"github.com/modelcontextprotocol/go-sdk/auth/extauth"
+	mcpSDKAuth "github.com/modelcontextprotocol/go-sdk/auth"
+	mcpSDKExtAuth "github.com/modelcontextprotocol/go-sdk/auth/extauth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 
 	mcpConnection "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/connection"
@@ -461,13 +461,13 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 
 	httpConfig := config.StreamableHTTP
 	var (
-		metadataDocument *mcpAuth.ClientIDMetadataDocumentConfig
+		metadataDocument *mcpSDKAuth.ClientIDMetadataDocumentConfig
 		preregistered    *oauthex.ClientCredentials
-		dynamic          *mcpAuth.DynamicClientRegistrationConfig
+		dynamic          *mcpSDKAuth.DynamicClientRegistrationConfig
 	)
 
 	if httpConfig.ClientIDMetadataDocumentURL != "" {
-		metadataDocument = &mcpAuth.ClientIDMetadataDocumentConfig{
+		metadataDocument = &mcpSDKAuth.ClientIDMetadataDocumentConfig{
 			URL: httpConfig.ClientIDMetadataDocumentURL,
 		}
 	}
@@ -490,7 +490,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		)
 	}
 	if preregistered == nil {
-		dynamic = &mcpAuth.DynamicClientRegistrationConfig{
+		dynamic = &mcpSDKAuth.DynamicClientRegistrationConfig{
 			Metadata: &oauthex.ClientRegistrationMetadata{
 				RedirectURIs:    []string{m.oauthRedirectURL},
 				ClientName:      m.clientName,
@@ -508,8 +508,8 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 		}
 	}
 
-	handler, err := mcpAuth.NewAuthorizationCodeHandler(
-		&mcpAuth.AuthorizationCodeHandlerConfig{
+	handler, err := mcpSDKAuth.NewAuthorizationCodeHandler(
+		&mcpSDKAuth.AuthorizationCodeHandlerConfig{
 			ClientIDMetadataDocumentConfig:  metadataDocument,
 			PreregisteredClient:             preregistered,
 			DynamicClientRegistrationConfig: dynamic,
@@ -518,8 +518,8 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 			Client:                          m.httpClient,
 			AuthorizationCodeFetcher: func(
 				ctx context.Context,
-				args *mcpAuth.AuthorizationArgs,
-			) (*mcpAuth.AuthorizationResult, error) {
+				args *mcpSDKAuth.AuthorizationArgs,
+			) (*mcpSDKAuth.AuthorizationResult, error) {
 				if args == nil || args.URL == "" {
 					return nil, fmt.Errorf(
 						"%w: OAuth authorization URL is unavailable",
@@ -542,7 +542,7 @@ func (m *AuthManager) configureAuthorizationCodeOAuth(
 						ErrMCPAuthRequired,
 					)
 				}
-				return &mcpAuth.AuthorizationResult{
+				return &mcpSDKAuth.AuthorizationResult{
 					Code:  result.Code,
 					State: result.State,
 					Iss:   result.Iss,
@@ -607,8 +607,8 @@ func (m *AuthManager) configureClientCredentialsOAuth(
 	}
 	output.SensitiveValues = append(output.SensitiveValues, sensitive...)
 
-	handler, err := extauth.NewClientCredentialsHandler(
-		&extauth.ClientCredentialsHandlerConfig{
+	handler, err := mcpSDKExtAuth.NewClientCredentialsHandler(
+		&mcpSDKExtAuth.ClientCredentialsHandlerConfig{
 			Credentials: credentials,
 			HTTPClient:  m.httpClient,
 		},

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -16,20 +16,20 @@ import (
 // contracts, package validation, package publication, and Source refresh.
 func (c *Components) EnsureProtectedTopology(
 	ctx context.Context,
-	declaration topology.Declaration,
-) (topology.Installed, error) {
+	declaration installModel.Declaration,
+) (installModel.Installed, error) {
 	if c == nil || c.Roots == nil || c.Sources == nil {
-		return topology.Installed{}, spec.ErrClosed
+		return installModel.Installed{}, spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
-		return topology.Installed{}, err
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
+		return installModel.Installed{}, err
 	}
 	if err := declaration.Validate(); err != nil {
-		return topology.Installed{}, err
+		return installModel.Installed{}, err
 	}
 	if c.rootMutationPolicy == nil ||
 		!c.rootMutationPolicy.IsProtectedRoot(declaration.Root.ID) {
-		return topology.Installed{}, fmt.Errorf(
+		return installModel.Installed{}, fmt.Errorf(
 			"%w: declared Root %q is not protected by application policy",
 			spec.ErrProtected,
 			declaration.Root.ID,
@@ -38,20 +38,20 @@ func (c *Components) EnsureProtectedTopology(
 
 	rootValue, err := c.Roots.EnsureSystem(ctx, declaration.Root)
 	if err != nil {
-		return topology.Installed{}, err
+		return installModel.Installed{}, err
 	}
 
-	output := topology.Installed{
+	output := installModel.Installed{
 		Root:    rootValue,
 		Sources: make([]sourceModel.Summary, 0, len(declaration.Sources)),
 	}
 	for _, draft := range declaration.Sources {
 		value, err := c.Sources.Create(ctx, rootValue.ID, draft)
 		if err != nil {
-			return topology.Installed{}, err
+			return installModel.Installed{}, err
 		}
 		if !protectedSourceIntentMatches(value, rootValue.ID, draft) {
-			return topology.Installed{}, fmt.Errorf(
+			return installModel.Installed{}, fmt.Errorf(
 				"%w: protected Source %q declaration differs from stored topology",
 				spec.ErrConflict,
 				draft.ID,

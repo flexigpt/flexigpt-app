@@ -13,11 +13,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
@@ -46,18 +46,18 @@ func initMCPWrappers(
 	aggregateWrapper *MCPAggregateWrapper,
 	roots root.API,
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
 	cat catalog.API,
 	definitions definition.API,
-	resources resource.API,
-	managedArtifacts managedpackage.API,
+	resources resourceFlow.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	protectedOverlays overlay.API,
 	storeOverlays overlay.StoreAPI,
 	secretBindings secret.API,
 	secretRuntime secret.RuntimeAPI,
-	localState artifactcleanup.API,
+	localState artifactcleanupFlow.API,
 	hydrator installModel.CompiledHydrationCoordinator,
 	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,

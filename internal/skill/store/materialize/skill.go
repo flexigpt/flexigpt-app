@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/agentskills-go/document"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -83,7 +83,7 @@ func ResolveAll(
 		return []ResolvedSkill{}, nil
 	}
 
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		resources,
 		func(sessionCtx context.Context) ([]ResolvedSkill, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 )
@@ -34,7 +34,7 @@ func InitSkillAggregateWrapper(
 	wrapper *SkillAggregateWrapper,
 	artifacts artifact.API,
 	cat catalog.API,
-	resources resource.API,
+	resources resourceFlow.API,
 	runtimeWrapper *SkillRuntimeWrapper,
 ) error {
 	if wrapper == nil ||

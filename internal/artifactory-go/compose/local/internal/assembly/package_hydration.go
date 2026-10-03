@@ -4,43 +4,43 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (c *Components) PrepareTopologyPackageHydrations(
 	ctx context.Context,
 	installerNames []string,
-	desiredValues []topology.PackageHydration,
-) (topology.PackageHydrationPreparation, error) {
+	desiredValues []installModel.PackageHydration,
+) (installModel.PackageHydrationPreparation, error) {
 	if c == nil || c.metadata == nil {
-		return topology.PackageHydrationPreparation{}, spec.ErrClosed
+		return installModel.PackageHydrationPreparation{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return topology.PackageHydrationPreparation{}, fmt.Errorf(
+		return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 			"%w: topology package hydration context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return topology.PackageHydrationPreparation{}, err
+		return installModel.PackageHydrationPreparation{}, err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
-		return topology.PackageHydrationPreparation{}, err
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
+		return installModel.PackageHydrationPreparation{}, err
 	}
 
 	installers := make(map[string]struct{}, len(installerNames))
 	for index, installerName := range installerNames {
-		if err := topology.ValidateHydrationInstallerName(installerName); err != nil {
-			return topology.PackageHydrationPreparation{}, fmt.Errorf(
+		if err := installModel.ValidateHydrationInstallerName(installerName); err != nil {
+			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"package hydration installer %d: %w",
 				index,
 				err,
 			)
 		}
 		if _, duplicate := installers[installerName]; duplicate {
-			return topology.PackageHydrationPreparation{}, fmt.Errorf(
+			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: duplicate package hydration installer %q",
 				spec.ErrInvalid,
 				installerName,
@@ -49,25 +49,25 @@ func (c *Components) PrepareTopologyPackageHydrations(
 		installers[installerName] = struct{}{}
 	}
 
-	desired, err := topology.NormalizePackageHydrations(desiredValues)
+	desired, err := installModel.NormalizePackageHydrations(desiredValues)
 	if err != nil {
-		return topology.PackageHydrationPreparation{}, err
+		return installModel.PackageHydrationPreparation{}, err
 	}
 
-	preparation := topology.PackageHydrationPreparation{
+	preparation := installModel.PackageHydrationPreparation{
 		Current: make(
-			map[topology.PackageHydrationKey]bool,
+			map[installModel.PackageHydrationKey]bool,
 			len(desired),
 		),
-		Stale: make([]topology.PackageHydration, 0),
+		Stale: make([]installModel.PackageHydration, 0),
 	}
 	desiredByKey := make(
-		map[topology.PackageHydrationKey]topology.PackageHydration,
+		map[installModel.PackageHydrationKey]installModel.PackageHydration,
 		len(desired),
 	)
 	for _, desiredValue := range desired {
 		if _, found := installers[desiredValue.Key.InstallerName]; !found {
-			return topology.PackageHydrationPreparation{}, fmt.Errorf(
+			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: package hydration %q/%q has no participating installer",
 				spec.ErrInvalid,
 				desiredValue.Key.InstallerName,
@@ -75,7 +75,7 @@ func (c *Components) PrepareTopologyPackageHydrations(
 			)
 		}
 		if !c.isProtectedRoot(desiredValue.RootID) {
-			return topology.PackageHydrationPreparation{}, fmt.Errorf(
+			return installModel.PackageHydrationPreparation{}, fmt.Errorf(
 				"%w: package hydration root %q is not protected",
 				spec.ErrProtected,
 				desiredValue.RootID,
@@ -87,7 +87,7 @@ func (c *Components) PrepareTopologyPackageHydrations(
 
 	persisted, err := c.metadata.ListTopologyPackageHydrations(ctx)
 	if err != nil {
-		return topology.PackageHydrationPreparation{}, err
+		return installModel.PackageHydrationPreparation{}, err
 	}
 	for _, persistedValue := range persisted {
 		if _, managed := installers[persistedValue.Key.InstallerName]; !managed {
@@ -106,9 +106,9 @@ func (c *Components) PrepareTopologyPackageHydrations(
 		}
 	}
 
-	stale, err := topology.NormalizePackageHydrations(preparation.Stale)
+	stale, err := installModel.NormalizePackageHydrations(preparation.Stale)
 	if err != nil {
-		return topology.PackageHydrationPreparation{}, err
+		return installModel.PackageHydrationPreparation{}, err
 	}
 	preparation.Stale = stale
 	return preparation.Clone(), nil
@@ -116,7 +116,7 @@ func (c *Components) PrepareTopologyPackageHydrations(
 
 func (c *Components) CommitTopologyPackageHydration(
 	ctx context.Context,
-	value topology.PackageHydration,
+	value installModel.PackageHydration,
 ) error {
 	if c == nil || c.metadata == nil || c.Roots == nil || c.Sources == nil {
 		return spec.ErrClosed
@@ -130,7 +130,7 @@ func (c *Components) CommitTopologyPackageHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {
@@ -154,7 +154,7 @@ func (c *Components) CommitTopologyPackageHydration(
 
 func (c *Components) DeleteTopologyPackageHydration(
 	ctx context.Context,
-	value topology.PackageHydration,
+	value installModel.PackageHydration,
 ) error {
 	if c == nil || c.metadata == nil {
 		return spec.ErrClosed
@@ -168,7 +168,7 @@ func (c *Components) DeleteTopologyPackageHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {
@@ -178,8 +178,8 @@ func (c *Components) DeleteTopologyPackageHydration(
 }
 
 func equalTopologyPackageHydration(
-	left topology.PackageHydration,
-	right topology.PackageHydration,
+	left installModel.PackageHydration,
+	right installModel.PackageHydration,
 ) bool {
 	return left.Key == right.Key &&
 		left.RootID == right.RootID &&

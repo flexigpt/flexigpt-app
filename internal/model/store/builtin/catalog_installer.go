@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
 
 type InstallerDependencies struct {
-	Hydrator topology.CompiledHydrationCoordinator
+	Hydrator installModel.CompiledHydrationCoordinator
 	Cleanup  modelConsumerAPI.BuiltinPackageCleanup
 }
 
@@ -60,7 +60,7 @@ func NewInstaller(
 
 func (l lifecycle) PrepareCompiledHydration(
 	ctx context.Context,
-	plan topology.CompiledPackagePlan,
+	plan installModel.CompiledPackagePlan,
 ) (any, error) {
 	addresses, err := addressesForPlan(plan)
 	if err != nil {
@@ -84,7 +84,7 @@ func (l lifecycle) PrepareCompiledHydration(
 
 func (l lifecycle) CompleteCompiledHydration(
 	ctx context.Context,
-	plan topology.CompiledPackagePlan,
+	plan installModel.CompiledPackagePlan,
 	state any,
 ) error {
 	value, ok := state.(lifecycleState)
@@ -105,7 +105,7 @@ func (l lifecycle) CompleteCompiledHydration(
 }
 
 func addressesForPlan(
-	plan topology.CompiledPackagePlan,
+	plan installModel.CompiledPackagePlan,
 ) ([]sourceModel.ManagedPackageAddress, error) {
 	byScope := make(map[spec.Locator]sourceModel.ManagedPackageAddress)
 	for _, packageValue := range plan.Registration.Set.Packages {

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/modelcontextprotocol/go-sdk/auth"
+	mcpSDKAuth "github.com/modelcontextprotocol/go-sdk/auth"
 	mcpSDK "github.com/modelcontextprotocol/go-sdk/mcp"
 
 	mcpApps "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/apps"
@@ -252,12 +252,12 @@ func mergeStringMaps(
 	return output
 }
 
-func sdkOAuthHandler(value any) (auth.OAuthHandler, error) {
+func sdkOAuthHandler(value any) (mcpSDKAuth.OAuthHandler, error) {
 	if value == nil {
 		//nolint:nilnil // Explicit.
 		return nil, nil
 	}
-	handler, ok := value.(auth.OAuthHandler)
+	handler, ok := value.(mcpSDKAuth.OAuthHandler)
 	if !ok {
 		return nil, fmt.Errorf("prepared OAuth handler has incompatible type %T", value)
 	}

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -15,13 +15,13 @@ type CompiledPackageInstaller interface {
 
 	CompiledRegistration(
 		ctx context.Context,
-	) (topology.CompiledRegistration, error)
+	) (installModel.CompiledRegistration, error)
 }
 
 type compiledHydrationWork struct {
-	coordinator topology.CompiledHydrationCoordinator
+	coordinator installModel.CompiledHydrationCoordinator
 	handled     map[string]struct{}
-	plans       []topology.CompiledPackagePlan
+	plans       []installModel.CompiledPackagePlan
 }
 
 func (w compiledHydrationWork) handles(
@@ -67,7 +67,7 @@ func (r *BootstrapRegistry) prepareCompiledHydration(
 		handled: make(map[string]struct{}),
 	}
 
-	coordinator, supported := r.hydrator.(topology.CompiledHydrationCoordinator)
+	coordinator, supported := r.hydrator.(installModel.CompiledHydrationCoordinator)
 	if !supported {
 		return output, nil
 	}
@@ -78,7 +78,7 @@ func (r *BootstrapRegistry) prepareCompiledHydration(
 		byInstaller[value.installer] = value
 	}
 
-	registrations := make([]topology.CompiledRegistration, 0)
+	registrations := make([]installModel.CompiledRegistration, 0)
 	for _, entry := range entries {
 		installer, compiled := entry.installer.(CompiledPackageInstaller)
 		if !compiled {
@@ -107,11 +107,11 @@ func (r *BootstrapRegistry) prepareCompiledHydration(
 			continue
 		}
 
-		plan := topology.CompiledPackagePlan{
+		plan := installModel.CompiledPackagePlan{
 			Registration:    registration,
 			TopologyCurrent: state.current,
 			Stale: append(
-				[]topology.PackageHydration(nil),
+				[]installModel.PackageHydration(nil),
 				state.stale...,
 			),
 		}

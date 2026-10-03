@@ -11,12 +11,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
@@ -30,15 +30,15 @@ import (
 type Store struct {
 	Roots     root.API
 	Sources   source.API
-	Refresh   refresh.API
+	Refresh   refreshFlow.API
 	Artifacts artifact.API
 	Catalog   catalog.API
 
 	Definitions definition.API
 	Schemas     schema.API
-	Resources   resource.API
+	Resources   resourceFlow.API
 
-	ManagedPackages managedpackage.API
+	ManagedPackages managedpackageFlow.API
 
 	ProtectedOverlays overlay.API
 	StoreOverlays     overlay.StoreAPI
@@ -47,9 +47,9 @@ type Store struct {
 	SecretRuntime   secret.RuntimeAPI
 	SecretLifecycle secret.LifecycleAPI
 
-	ArtifactCleanup artifactcleanup.API
+	ArtifactCleanup artifactcleanupFlow.API
 	Protection      root.ProtectionAPI
-	Topology        install.API
+	Topology        installFlow.API
 
 	// Temporary. Remove in Phase 2 when generic provider descriptors and
 	// generic locator resolver registration leave artifactory-go.
@@ -74,7 +74,7 @@ func (p protectionAPI) IsProtectedRoot(
 func (p protectionAPI) RequirePrivilegedInstaller(
 	ctx context.Context,
 ) error {
-	return install.RequirePrivileged(ctx)
+	return installFlow.RequirePrivileged(ctx)
 }
 
 func Open(

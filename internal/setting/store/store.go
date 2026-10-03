@@ -7,12 +7,12 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
+	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 )
 
-type DebugSettingsApplier func(context.Context, spec.DebugSettings) error
+type DebugSettingsApplier func(context.Context, settingSpec.DebugSettings) error
 
 type SettingStore struct {
 	store                *mapstore.MapFileStore
@@ -42,7 +42,7 @@ func NewSettingStore(
 		)
 	}
 
-	file := filepath.Join(baseDir, spec.SettingsFile)
+	file := filepath.Join(baseDir, settingSpec.SettingsFile)
 	fileStore, err := mapstore.NewMapFileStore(
 		file,
 		defaultMap,
@@ -99,7 +99,7 @@ func (s *SettingStore) ApplyCurrentDebugSettings(
 
 	response, err := s.GetSettings(
 		ctx,
-		&spec.GetSettingsRequest{
+		&settingSpec.GetSettingsRequest{
 			ForceFetch: forceFetch,
 		},
 	)
@@ -134,7 +134,7 @@ func (s *SettingStore) Migrate(
 		return fmt.Errorf("read settings: %w", err)
 	}
 
-	var schema spec.SettingsSchema
+	var schema settingSpec.SettingsSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return fmt.Errorf("decode settings: %w", err)
 	}
@@ -159,10 +159,10 @@ func (s *SettingStore) Migrate(
 		}
 	}
 
-	if schema.SchemaVersion != spec.SchemaVersion {
+	if schema.SchemaVersion != settingSpec.SchemaVersion {
 		if err := s.store.SetKey(
 			[]string{settingKeySchemaVersion},
-			spec.SchemaVersion,
+			settingSpec.SchemaVersion,
 		); err != nil {
 			return fmt.Errorf(
 				"persist settings schema version: %w",
@@ -176,16 +176,16 @@ func (s *SettingStore) Migrate(
 
 func (s *SettingStore) SetAppTheme(
 	_ context.Context,
-	request *spec.SetAppThemeRequest,
-) (*spec.SetAppThemeResponse, error) {
+	request *settingSpec.SetAppThemeRequest,
+) (*settingSpec.SetAppThemeResponse, error) {
 	if s == nil || s.store == nil {
 		return nil, basespecClosedError()
 	}
 	if request == nil || request.Body == nil {
-		return nil, spec.ErrInvalidArgument
+		return nil, settingSpec.ErrInvalidArgument
 	}
 
-	theme := spec.AppTheme{
+	theme := settingSpec.AppTheme{
 		Type: request.Body.Type,
 		Name: request.Body.Name,
 	}
@@ -209,21 +209,21 @@ func (s *SettingStore) SetAppTheme(
 		"type", theme.Type,
 		"name", theme.Name,
 	)
-	return &spec.SetAppThemeResponse{}, nil
+	return &settingSpec.SetAppThemeResponse{}, nil
 }
 
 func (s *SettingStore) SetDebugSettings(
 	ctx context.Context,
-	request *spec.SetDebugSettingsRequest,
-) (*spec.SetDebugSettingsResponse, error) {
+	request *settingSpec.SetDebugSettingsRequest,
+) (*settingSpec.SetDebugSettingsResponse, error) {
 	if s == nil || s.store == nil {
 		return nil, basespecClosedError()
 	}
 	if request == nil || request.Body == nil {
-		return nil, spec.ErrInvalidArgument
+		return nil, settingSpec.ErrInvalidArgument
 	}
 
-	settings := spec.DebugSettings{
+	settings := settingSpec.DebugSettings{
 		LogLLMReqResp:           request.Body.LogLLMReqResp,
 		DisableContentStripping: request.Body.DisableContentStripping,
 		LogLevel:                request.Body.LogLevel,
@@ -255,13 +255,13 @@ func (s *SettingStore) SetDebugSettings(
 		"disableContentStripping", settings.DisableContentStripping,
 		"logLevel", settings.LogLevel,
 	)
-	return &spec.SetDebugSettingsResponse{}, nil
+	return &settingSpec.SetDebugSettingsResponse{}, nil
 }
 
 func (s *SettingStore) GetSettings(
 	_ context.Context,
-	request *spec.GetSettingsRequest,
-) (*spec.GetSettingsResponse, error) {
+	request *settingSpec.GetSettingsRequest,
+) (*settingSpec.GetSettingsResponse, error) {
 	if s == nil || s.store == nil {
 		return nil, basespecClosedError()
 	}
@@ -276,14 +276,14 @@ func (s *SettingStore) GetSettings(
 		return nil, err
 	}
 
-	var schema spec.SettingsSchema
+	var schema settingSpec.SettingsSchema
 	if err := jsonencdec.MapToStructWithJSONTags(raw, &schema); err != nil {
 		return nil, err
 	}
 	schema.Debug, _ = normalizeDebugSettings(schema.Debug)
 
-	return &spec.GetSettingsResponse{
-		Body: &spec.GetSettingsResponseBody{
+	return &settingSpec.GetSettingsResponse{
+		Body: &settingSpec.GetSettingsResponseBody{
 			AppTheme: schema.AppTheme,
 			Debug:    schema.Debug,
 		},
@@ -292,7 +292,7 @@ func (s *SettingStore) GetSettings(
 
 func (s *SettingStore) applyDebugSettings(
 	ctx context.Context,
-	settings spec.DebugSettings,
+	settings settingSpec.DebugSettings,
 ) error {
 	if s == nil || s.debugSettingsApplier == nil {
 		return nil

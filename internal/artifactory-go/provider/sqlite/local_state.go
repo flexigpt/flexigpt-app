@@ -10,7 +10,7 @@ import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
+	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -369,7 +369,7 @@ func (r *LocalStateRepository) CreatePendingSecret(
 
 func (r *LocalStateRepository) AttachSecretBinding(
 	ctx context.Context,
-	request localstate.AttachBindingRequest,
+	request secretimpl.AttachBindingRequest,
 	now time.Time,
 ) (secretModel.Binding, error) {
 	if r == nil || r.store == nil {

@@ -6,21 +6,21 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 )
 
 func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
-) (topology.CompiledPackageSet, error) {
+) (installModel.CompiledPackageSet, error) {
 	packages, err := builtin.EmbeddedAgentPackages()
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	prepared, err := PreparePackages(ctx, packages)
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	return builtin.Compile(ctx, temporaryDirectory, builtin.Config{

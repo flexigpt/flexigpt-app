@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/prompt"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/skill"
-	"github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
+	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
 func projectWorkspacePromptPlan(
@@ -98,7 +98,7 @@ func projectWorkspaceMCPServerLoadPlan(
 }
 
 func projectWorkspaceRuntimePlan(
-	workspace domain.Workspace,
+	workspace workspaceDomain.Workspace,
 	capabilities resolve.CapabilityPlan,
 	p prompt.Plan,
 	skills skill.LoadPlan,

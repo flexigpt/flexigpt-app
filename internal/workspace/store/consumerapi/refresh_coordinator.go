@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -16,13 +16,13 @@ import (
 
 type workspaceRefreshCoordinator struct {
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	workspaceSources workspaceSourceRegistry
 }
 
 func newWorkspaceRefreshCoordinator(
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	workspaceSources workspaceSourceRegistry,
 ) *workspaceRefreshCoordinator {
 	return &workspaceRefreshCoordinator{

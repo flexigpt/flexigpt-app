@@ -23,8 +23,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -40,9 +40,9 @@ type API struct {
 	artifacts        artifact.API
 	cat              catalog.API
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	definitions      definition.API
-	managedArtifacts managedpackage.API
+	managedArtifacts managedpackageFlow.API
 
 	domain   *DomainPolicy
 	resolver *resolve.Resolver
@@ -55,8 +55,8 @@ func NewWithResolver(
 	artifacts artifact.API,
 	cat catalog.API,
 	sources source.API,
-	discovery refresh.API,
-	managedArtifacts managedpackage.API,
+	discovery refreshFlow.API,
+	managedArtifacts managedpackageFlow.API,
 	definitions definition.API,
 	resolver *resolve.Resolver,
 	domains ...DomainPolicy,

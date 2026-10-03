@@ -4,11 +4,11 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 )
 
 type InstallerDependencies struct {
-	Hydrator topology.CompiledHydrationCoordinator
+	Hydrator installModel.CompiledHydrationCoordinator
 }
 
 type Installer struct {

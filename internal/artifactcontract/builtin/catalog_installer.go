@@ -5,21 +5,21 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type CatalogInstaller struct {
-	registration topology.CompiledRegistration
-	hydrator     topology.CompiledHydrationCoordinator
+	registration installModel.CompiledRegistration
+	hydrator     installModel.CompiledHydrationCoordinator
 	scopes       []spec.Locator
 }
 
 func NewCatalogInstallerForSet(
-	set topology.CompiledPackageSet,
-	hydrator topology.CompiledHydrationCoordinator,
-	lifecycle topology.CompiledPackageLifecycle,
+	set installModel.CompiledPackageSet,
+	hydrator installModel.CompiledHydrationCoordinator,
+	lifecycle installModel.CompiledPackageLifecycle,
 ) (*CatalogInstaller, error) {
 	if hydrator == nil {
 		return nil, fmt.Errorf(
@@ -42,7 +42,7 @@ func NewCatalogInstallerForSet(
 	// binary-owned immutable catalog, while the public GeneratedCatalogSet
 	// helpers still return defensive clones for ordinary callers.
 	return &CatalogInstaller{
-		registration: topology.CompiledRegistration{
+		registration: installModel.CompiledRegistration{
 			Set:       set,
 			Lifecycle: lifecycle,
 		},
@@ -67,29 +67,29 @@ func (i *CatalogInstaller) BuiltInPackageScopes() []spec.Locator {
 
 func (i *CatalogInstaller) DesiredHydration(
 	ctx context.Context,
-) (topology.Hydration, error) {
+) (installModel.Hydration, error) {
 	if i == nil {
-		return topology.Hydration{}, spec.ErrClosed
+		return installModel.Hydration{}, spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
-		return topology.Hydration{}, err
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
+		return installModel.Hydration{}, err
 	}
 	return i.registration.Set.Hydration, nil
 }
 
 func (i *CatalogInstaller) DesiredPackageHydrations(
 	ctx context.Context,
-) ([]topology.PackageHydration, error) {
+) ([]installModel.PackageHydration, error) {
 	if i == nil {
 		return nil, spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return nil, err
 	}
 
 	hydration := i.registration.Set.Hydration
 	output := make(
-		[]topology.PackageHydration,
+		[]installModel.PackageHydration,
 		0,
 		len(i.registration.Set.Packages),
 	)
@@ -98,8 +98,8 @@ func (i *CatalogInstaller) DesiredPackageHydrations(
 		if err != nil {
 			return nil, err
 		}
-		output = append(output, topology.PackageHydration{
-			Key: topology.PackageHydrationKey{
+		output = append(output, installModel.PackageHydration{
+			Key: installModel.PackageHydrationKey{
 				InstallerName: hydration.InstallerName,
 				Scope:         scope,
 			},
@@ -108,21 +108,21 @@ func (i *CatalogInstaller) DesiredPackageHydrations(
 			Fingerprint: packageValue.Fingerprint,
 		})
 	}
-	return topology.NormalizePackageHydrations(output)
+	return installModel.NormalizePackageHydrations(output)
 }
 
 func (i *CatalogInstaller) CompiledRegistration(
 	ctx context.Context,
-) (topology.CompiledRegistration, error) {
+) (installModel.CompiledRegistration, error) {
 	if i == nil {
-		return topology.CompiledRegistration{}, spec.ErrClosed
+		return installModel.CompiledRegistration{}, spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
-		return topology.CompiledRegistration{}, err
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
+		return installModel.CompiledRegistration{}, err
 	}
 	// Generated catalogs are immutable after construction. Avoid copying the
 	// complete package payload before every bootstrap registration.
-	return topology.CompiledRegistration{
+	return installModel.CompiledRegistration{
 		Set:       i.registration.Set,
 		Lifecycle: i.registration.Lifecycle,
 	}, nil
@@ -140,13 +140,13 @@ func (i *CatalogInstaller) Ensure(
 	}
 	if err := i.hydrator.RegisterCompiledPackages(
 		ctx,
-		[]topology.CompiledRegistration{registration},
+		[]installModel.CompiledRegistration{registration},
 	); err != nil {
 		return err
 	}
 	return i.hydrator.HydrateCompiledPackages(
 		ctx,
-		[]topology.CompiledPackagePlan{{
+		[]installModel.CompiledPackagePlan{{
 			Registration:    registration,
 			TopologyCurrent: false,
 			Changed:         i.BuiltInPackageScopes(),
@@ -170,7 +170,7 @@ func (i *CatalogInstaller) EnsureHydration(
 func (i *CatalogInstaller) EnsurePackageHydration(
 	ctx context.Context,
 	_ bool,
-	stale []topology.PackageHydration,
+	stale []installModel.PackageHydration,
 ) error {
 	if i == nil {
 		return spec.ErrClosed
@@ -181,17 +181,17 @@ func (i *CatalogInstaller) EnsurePackageHydration(
 	}
 	if err := i.hydrator.RegisterCompiledPackages(
 		ctx,
-		[]topology.CompiledRegistration{registration},
+		[]installModel.CompiledRegistration{registration},
 	); err != nil {
 		return err
 	}
 	return i.hydrator.HydrateCompiledPackages(
 		ctx,
-		[]topology.CompiledPackagePlan{{
+		[]installModel.CompiledPackagePlan{{
 			Registration:    registration,
 			TopologyCurrent: false,
 			Changed:         i.BuiltInPackageScopes(),
-			Stale:           append([]topology.PackageHydration(nil), stale...),
+			Stale:           append([]installModel.PackageHydration(nil), stale...),
 		}},
 	)
 }
@@ -201,5 +201,5 @@ func (i *CatalogInstaller) FinalizeHydration(
 ) error {
 	// HydrateCompiledPackages refreshes and verifies changed generated packages.
 	// There is no runtime declaration resolver work left for this installer.
-	return install.RequirePrivileged(ctx)
+	return installFlow.RequirePrivileged(ctx)
 }

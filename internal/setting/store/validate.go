@@ -3,56 +3,56 @@ package store
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/setting/spec"
+	settingSpec "github.com/flexigpt/flexigpt-app/internal/setting/spec"
 )
 
 // validateTheme checks a theme for correctness.
-func validateTheme(th *spec.AppTheme) error {
+func validateTheme(th *settingSpec.AppTheme) error {
 	if th == nil {
-		return spec.ErrInvalidTheme
+		return settingSpec.ErrInvalidTheme
 	}
 	switch th.Type {
-	case spec.ThemeSystem:
-		if th.Name != spec.ThemeNameSystem {
+	case settingSpec.ThemeSystem:
+		if th.Name != settingSpec.ThemeNameSystem {
 			return fmt.Errorf(
 				"%w: type and name required. input - type %s, name %s",
-				spec.ErrInvalidTheme,
+				settingSpec.ErrInvalidTheme,
 				th.Type,
 				th.Name,
 			)
 		}
 		return nil
-	case spec.ThemeLight:
-		if th.Name != spec.ThemeNameLight {
+	case settingSpec.ThemeLight:
+		if th.Name != settingSpec.ThemeNameLight {
 			return fmt.Errorf(
 				"%w: type and name required. input - type %s, name %s",
-				spec.ErrInvalidTheme,
+				settingSpec.ErrInvalidTheme,
 				th.Type,
 				th.Name,
 			)
 		}
 		return nil
-	case spec.ThemeDark:
-		if th.Name != spec.ThemeNameDark {
+	case settingSpec.ThemeDark:
+		if th.Name != settingSpec.ThemeNameDark {
 			return fmt.Errorf(
 				"%w: type and name required. input - type %s, name %s",
-				spec.ErrInvalidTheme,
+				settingSpec.ErrInvalidTheme,
 				th.Type,
 				th.Name,
 			)
 		}
 		return nil
-	case spec.ThemeOther:
+	case settingSpec.ThemeOther:
 		if th.Name == "" {
-			return fmt.Errorf("%w: name required", spec.ErrInvalidTheme)
+			return fmt.Errorf("%w: name required", settingSpec.ErrInvalidTheme)
 		}
 		return nil
 	default:
-		return spec.ErrInvalidTheme
+		return settingSpec.ErrInvalidTheme
 	}
 }
 
-func normalizeDebugSettings(cfg spec.DebugSettings) (spec.DebugSettings, bool) {
+func normalizeDebugSettings(cfg settingSpec.DebugSettings) (settingSpec.DebugSettings, bool) {
 	normalized := cfg
 	changed := false
 
@@ -70,18 +70,18 @@ func normalizeDebugSettings(cfg spec.DebugSettings) (spec.DebugSettings, bool) {
 }
 
 // validateDebugSettings checks whether debug settings are supported.
-func validateDebugSettings(cfg *spec.DebugSettings) error {
+func validateDebugSettings(cfg *settingSpec.DebugSettings) error {
 	if cfg == nil {
-		return spec.ErrInvalidDebugSettings
+		return settingSpec.ErrInvalidDebugSettings
 	}
 
 	switch cfg.LogLevel {
-	case spec.DebugLogLevelDebug,
-		spec.DebugLogLevelInfo,
-		spec.DebugLogLevelWarn,
-		spec.DebugLogLevelError:
+	case settingSpec.DebugLogLevelDebug,
+		settingSpec.DebugLogLevelInfo,
+		settingSpec.DebugLogLevelWarn,
+		settingSpec.DebugLogLevelError:
 		return nil
 	default:
-		return fmt.Errorf("%w: unsupported logLevel %q", spec.ErrInvalidDebugSettings, cfg.LogLevel)
+		return fmt.Errorf("%w: unsupported logLevel %q", settingSpec.ErrInvalidDebugSettings, cfg.LogLevel)
 	}
 }

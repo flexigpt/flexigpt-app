@@ -6,7 +6,7 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -33,7 +33,7 @@ func (a *API) ListMCPServersReferencingPolicy(
 	if err := policyName.Validate(); err != nil {
 		return nil, err
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) ([]artifactModel.ArtifactRef, error) {

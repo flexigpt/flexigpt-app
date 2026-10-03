@@ -12,7 +12,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -25,13 +25,13 @@ import (
 type ArtifactRouter struct {
 	artifacts artifact.API
 	cat       catalog.API
-	resources resource.API
+	resources resourceFlow.API
 }
 
 func NewArtifactRouter(
 	artifacts artifact.API,
 	cat catalog.API,
-	resources resource.API,
+	resources resourceFlow.API,
 ) (*ArtifactRouter, error) {
 	if artifacts == nil || cat == nil || resources == nil {
 		return nil, fmt.Errorf(

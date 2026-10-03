@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -48,17 +48,17 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 		}
 	})
 
-	desired := topology.Hydration{
+	desired := installModel.Hydration{
 		InstallerName: "test.installer",
 		RootID:        rootID,
 		SourceID:      sourceID,
 		Fingerprint:   cryptoutil.DigestBytes([]byte("fresh-install")),
 	}
-	ctx := install.WithPrivilege(t.Context())
+	ctx := installFlow.WithPrivilege(t.Context())
 
 	current, err := components.PrepareTopologyHydrations(
 		ctx,
-		[]topology.Hydration{desired},
+		[]installModel.Hydration{desired},
 	)
 	if err != nil {
 		t.Fatalf("PrepareTopologyHydrations: %v", err)

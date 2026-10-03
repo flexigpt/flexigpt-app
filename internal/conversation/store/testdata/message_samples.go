@@ -3,7 +3,7 @@ package testdata
 import (
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 )
 
 const tmpMessageDetails = `
@@ -42,66 +42,66 @@ func newStringPointer(s string) *string {
 	return &t
 }
 
-var MessageSamplesListBase = []spec.ConversationMessage{
+var MessageSamplesListBase = []conversationSpec.ConversationMessage{
 	{
 		ID:        "1",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 30, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleSystem,
+		Role:      conversationSpec.ConversationRoleSystem,
 		Content:   "Welcome to our chat application!",
 	},
 	{
 		ID:        "2",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 31, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "Hello! I need help with my order.",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "3",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 32, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "Of course, John. Can you provide your order number?",
 		Name:      newStringPointer("Assistant"),
 	},
 	{
 		ID:        "4",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 33, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "My order number is 12345.",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "5",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 34, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "Thank you. I found your order. How can I assist you further?",
 		Name:      newStringPointer("Assistant"),
 	},
 	{
 		ID:        "6",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 35, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "I want to change the delivery address.",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "7",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 36, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "Sure, please provide the new address.",
 		Name:      newStringPointer("Assistant"),
 	},
 	{
 		ID:        "8",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 37, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "123 New St, Springfield.",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "9",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 38, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "The address has been updated.",
 
 		Name: newStringPointer("Assistant"),
@@ -109,41 +109,41 @@ var MessageSamplesListBase = []spec.ConversationMessage{
 	{
 		ID:        "10",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 39, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleSystem,
+		Role:      conversationSpec.ConversationRoleSystem,
 		Content:   "Your chat will end in 10 minutes due to inactivity.",
 	},
 	{
 		ID:        "11",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 40, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "Thank you. Also, can I change the delivery date?",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "12",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 41, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "Yes, when would you like the order to be delivered?",
 		Name:      newStringPointer("Assistant"),
 	},
 	{
 		ID:        "13",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 42, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   "On 30th September.",
 		Name:      newStringPointer("John Doe"),
 	},
 	{
 		ID:        "14",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 43, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content:   "The delivery date has been updated to 30th September.",
 		Name:      newStringPointer("Assistant"),
 	},
 	{
 		ID:        "15",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 44, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content: `Great, that's all for now.
 
 May be I will see you again? Thanks a bunch!`,
@@ -152,7 +152,7 @@ May be I will see you again? Thanks a bunch!`,
 	{
 		ID:        "16",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content: `
 # My heading
 
@@ -201,7 +201,7 @@ In this setup:
 	{
 		ID:        "17",
 		CreatedAt: newTimePointer(2023, 9, 24, 9, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content: `
 		# Out of Breath
 
@@ -229,7 +229,7 @@ In this setup:
 	{
 		ID:        "18",
 		CreatedAt: newTimePointer(2023, 9, 24, 9, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content: `
 
 	` + "```python" + `
@@ -251,17 +251,17 @@ In this setup:
 	{
 		ID:        "19",
 		CreatedAt: newTimePointer(2023, 9, 24, 10, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   MarkDownCheatSheet,
 		Name:      newStringPointer("User"),
 	},
 }
 
-var MessageSamplesListComplex = []spec.ConversationMessage{
+var MessageSamplesListComplex = []conversationSpec.ConversationMessage{
 	{
 		ID:        "100",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 44, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content: `Great, that's all for now.
 
 May be I will see you again? Thanks a bunch!`,
@@ -270,7 +270,7 @@ May be I will see you again? Thanks a bunch!`,
 	{
 		ID:        "101",
 		CreatedAt: newTimePointer(2023, 9, 24, 8, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content: `
 	# My heading
 
@@ -319,7 +319,7 @@ May be I will see you again? Thanks a bunch!`,
 	{
 		ID:        "102",
 		CreatedAt: newTimePointer(2023, 9, 24, 9, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content: `
 		# Out of Breath
 
@@ -347,7 +347,7 @@ May be I will see you again? Thanks a bunch!`,
 	{
 		ID:        "103",
 		CreatedAt: newTimePointer(2023, 9, 24, 9, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleAssistant,
+		Role:      conversationSpec.ConversationRoleAssistant,
 		Content: `
 
 	` + "```python" + `
@@ -369,7 +369,7 @@ May be I will see you again? Thanks a bunch!`,
 	{
 		ID:        "104",
 		CreatedAt: newTimePointer(2023, 9, 24, 10, 45, 0, 0, time.UTC),
-		Role:      spec.ConversationRoleUser,
+		Role:      conversationSpec.ConversationRoleUser,
 		Content:   MarkDownCheatSheet,
 		Name:      newStringPointer("User"),
 	},

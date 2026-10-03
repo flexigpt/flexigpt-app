@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/impl"
@@ -511,7 +511,7 @@ func (c *Components) publishProtectedManagedPackage(
 			rootID,
 		)
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return ManagedPackageResult{}, err
 	}
 	return c.publishManagedPackage(
@@ -562,7 +562,7 @@ func (c *Components) removeProtectedManagedPackage(
 			rootID,
 		)
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return ManagedPackageResult{}, err
 	}
 	return c.removeManagedPackage(

@@ -12,9 +12,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -31,10 +31,10 @@ import (
 type API struct {
 	cat              catalog.API
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	artifacts        artifact.API
-	resources        resource.API
-	managedArtifacts managedpackage.API
+	resources        resourceFlow.API
+	managedArtifacts managedpackageFlow.API
 	protection       root.ProtectionAPI
 	definitions      definition.API
 
@@ -47,10 +47,10 @@ type API struct {
 
 func New(
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
-	resources resource.API,
-	managedArtifacts managedpackage.API,
+	resources resourceFlow.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	cat catalog.API,
 	definitions definition.API,
@@ -208,7 +208,7 @@ func (a *API) ListMCPCollectionServers(
 		return nil, err
 	}
 
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) ([]ServerRead, error) {
@@ -505,7 +505,7 @@ func (a *API) resolveMCPServer(
 	if a == nil || a.resources == nil {
 		return ServerRead{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (ServerRead, error) {

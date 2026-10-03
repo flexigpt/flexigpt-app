@@ -8,7 +8,7 @@ import (
 	"sync/atomic"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
@@ -439,7 +439,7 @@ func (s *Service) PurgeArtifactLocalState(
 	}
 	if s.policy != nil &&
 		s.policy.IsProtectedRoot(target.RootID) &&
-		!install.IsPrivileged(ctx) {
+		!installFlow.IsPrivileged(ctx) {
 		return fmt.Errorf(
 			"%w: protected Artifact local-state purge requires installer privilege",
 			spec.ErrProtected,

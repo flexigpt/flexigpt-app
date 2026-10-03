@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/skill/store/materialize"
@@ -34,12 +34,12 @@ type LoadPlan struct {
 
 type Adapter struct {
 	artifacts artifact.API
-	resources resource.API
+	resources resourceFlow.API
 }
 
 func New(
 	artifacts artifact.API,
-	resources resource.API,
+	resources resourceFlow.API,
 ) (*Adapter, error) {
 	if artifacts == nil || resources == nil {
 		return nil, fmt.Errorf(

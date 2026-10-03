@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
@@ -70,7 +70,7 @@ func TestConversationCollection(t *testing.T) {
 		}
 		tests := []struct {
 			name         string
-			conversation spec.Conversation
+			conversation conversationSpec.Conversation
 			expectError  bool
 		}{
 			{"Valid conversation", *validConvo, false},
@@ -91,7 +91,7 @@ func TestConversationCollection(t *testing.T) {
 
 				retrievedConvo, err := cc.GetConversation(
 					ctx,
-					&spec.GetConversationRequest{
+					&conversationSpec.GetConversationRequest{
 						ID:    tt.conversation.ID,
 						Title: tt.conversation.Title,
 					},
@@ -121,7 +121,7 @@ func TestConversationCollection(t *testing.T) {
 
 		_, err = cc.DeleteConversation(
 			ctx,
-			&spec.DeleteConversationRequest{ID: convo.ID, Title: convo.Title},
+			&conversationSpec.DeleteConversationRequest{ID: convo.ID, Title: convo.Title},
 		)
 		if err != nil {
 			t.Errorf("Failed to delete conversation: %v", err)
@@ -129,7 +129,7 @@ func TestConversationCollection(t *testing.T) {
 
 		_, err = cc.GetConversation(
 			ctx,
-			&spec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
+			&conversationSpec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
 		)
 		if err == nil {
 			t.Errorf("Expected error when getting deleted conversation, got none")
@@ -148,7 +148,7 @@ func TestConversationCollection(t *testing.T) {
 		}
 		tests := []struct {
 			name        string
-			message     spec.ConversationMessage
+			message     conversationSpec.ConversationMessage
 			expectError bool
 		}{
 			{
@@ -168,11 +168,11 @@ func TestConversationCollection(t *testing.T) {
 				ctx := t.Context()
 				_, err := cc.PutMessagesToConversation(
 					ctx,
-					&spec.PutMessagesToConversationRequest{
+					&conversationSpec.PutMessagesToConversationRequest{
 						ID: convo.ID,
-						Body: &spec.PutMessagesToConversationRequestBody{
+						Body: &conversationSpec.PutMessagesToConversationRequestBody{
 							Title:    convo.Title,
-							Messages: []spec.ConversationMessage{tt.message},
+							Messages: []conversationSpec.ConversationMessage{tt.message},
 						},
 					},
 				)
@@ -182,7 +182,7 @@ func TestConversationCollection(t *testing.T) {
 
 				retrievedConvo, err := cc.GetConversation(
 					ctx,
-					&spec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
+					&conversationSpec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
 				)
 				if err != nil {
 					t.Fatalf("Failed to get conversation: %v", err)
@@ -223,7 +223,7 @@ func TestConversationCollection(t *testing.T) {
 
 		retrieved, err := cc.GetConversation(
 			ctx,
-			&spec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
+			&conversationSpec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
 		)
 		if err != nil {
 			t.Fatalf("Failed to get overwritten conversation: %v", err)
@@ -240,19 +240,19 @@ func TestConversationCollection(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for nil request")
 		}
-		_, err = cc.PutConversation(ctx, &spec.PutConversationRequest{})
+		_, err = cc.PutConversation(ctx, &conversationSpec.PutConversationRequest{})
 		if err == nil {
 			t.Error("Expected error for missing ID and body")
 		}
-		_, err = cc.PutConversation(ctx, &spec.PutConversationRequest{ID: "id", Body: nil})
+		_, err = cc.PutConversation(ctx, &conversationSpec.PutConversationRequest{ID: "id", Body: nil})
 		if err == nil {
 			t.Error("Expected error for nil body")
 		}
 		_, err = cc.PutConversation(
 			ctx,
-			&spec.PutConversationRequest{
+			&conversationSpec.PutConversationRequest{
 				ID:   "",
-				Body: &spec.PutConversationRequestBody{Title: "t"},
+				Body: &conversationSpec.PutConversationRequestBody{Title: "t"},
 			},
 		)
 		if err == nil {
@@ -260,9 +260,9 @@ func TestConversationCollection(t *testing.T) {
 		}
 		_, err = cc.PutConversation(
 			ctx,
-			&spec.PutConversationRequest{
+			&conversationSpec.PutConversationRequest{
 				ID:   "id",
-				Body: &spec.PutConversationRequestBody{Title: ""},
+				Body: &conversationSpec.PutConversationRequestBody{Title: ""},
 			},
 		)
 		if err == nil {
@@ -277,14 +277,14 @@ func TestConversationCollection(t *testing.T) {
 		if err == nil {
 			t.Error("Expected error for nil request")
 		}
-		_, err = cc.PutMessagesToConversation(ctx, &spec.PutMessagesToConversationRequest{})
+		_, err = cc.PutMessagesToConversation(ctx, &conversationSpec.PutMessagesToConversationRequest{})
 		if err == nil {
 			t.Error("Expected error for nil body")
 		}
 		_, err = cc.PutMessagesToConversation(
 			ctx,
-			&spec.PutMessagesToConversationRequest{
-				Body: &spec.PutMessagesToConversationRequestBody{},
+			&conversationSpec.PutMessagesToConversationRequest{
+				Body: &conversationSpec.PutMessagesToConversationRequestBody{},
 			},
 		)
 		if err == nil {
@@ -292,9 +292,9 @@ func TestConversationCollection(t *testing.T) {
 		}
 		_, err = cc.PutMessagesToConversation(
 			ctx,
-			&spec.PutMessagesToConversationRequest{
-				Body: &spec.PutMessagesToConversationRequestBody{
-					Messages: []spec.ConversationMessage{},
+			&conversationSpec.PutMessagesToConversationRequest{
+				Body: &conversationSpec.PutMessagesToConversationRequestBody{
+					Messages: []conversationSpec.ConversationMessage{},
 				},
 			},
 		)
@@ -313,7 +313,7 @@ func TestConversationCollection(t *testing.T) {
 		// Non-existent conversation.
 		_, err = cc.DeleteConversation(
 			ctx,
-			&spec.DeleteConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
+			&conversationSpec.DeleteConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
 		)
 		if err == nil {
 			t.Error("Expected error for deleting non-existent conversation")
@@ -329,7 +329,7 @@ func TestConversationCollection(t *testing.T) {
 		}
 		_, err = cc.GetConversation(
 			ctx,
-			&spec.GetConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
+			&conversationSpec.GetConversationRequest{ID: nonexistentStr, Title: nonexistentStr},
 		)
 		if err == nil {
 			t.Error("Expected error for getting non-existent conversation")
@@ -339,11 +339,11 @@ func TestConversationCollection(t *testing.T) {
 	// NEW: Add messages to non-existent conversation.
 	t.Run("PutMessagesToNonExistentConversation", func(t *testing.T) {
 		ctx := t.Context()
-		_, err := cc.PutMessagesToConversation(ctx, &spec.PutMessagesToConversationRequest{
+		_, err := cc.PutMessagesToConversation(ctx, &conversationSpec.PutMessagesToConversationRequest{
 			ID: nonexistentStr,
-			Body: &spec.PutMessagesToConversationRequestBody{
+			Body: &conversationSpec.PutMessagesToConversationRequestBody{
 				Title: nonexistentStr,
-				Messages: []spec.ConversationMessage{
+				Messages: []conversationSpec.ConversationMessage{
 					newTextTurn("msg", inferenceSpec.RoleUser, "hi"),
 				},
 			},
@@ -364,13 +364,13 @@ func TestConversationCollection(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to save conversation: %v", err)
 		}
-		msgs := []spec.ConversationMessage{
+		msgs := []conversationSpec.ConversationMessage{
 			newTextTurn("m1", inferenceSpec.RoleUser, "hi"),
 			newTextTurn("m2", inferenceSpec.RoleUser, "hello"),
 		}
-		_, err = cc.PutMessagesToConversation(ctx, &spec.PutMessagesToConversationRequest{
+		_, err = cc.PutMessagesToConversation(ctx, &conversationSpec.PutMessagesToConversationRequest{
 			ID: convo.ID,
-			Body: &spec.PutMessagesToConversationRequestBody{
+			Body: &conversationSpec.PutMessagesToConversationRequestBody{
 				Title:    convo.Title,
 				Messages: msgs,
 			},
@@ -380,7 +380,7 @@ func TestConversationCollection(t *testing.T) {
 		}
 		retrieved, err := cc.GetConversation(
 			ctx,
-			&spec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
+			&conversationSpec.GetConversationRequest{ID: convo.ID, Title: convo.Title},
 		)
 		if err != nil {
 			t.Fatalf("Failed to get conversation: %v", err)
@@ -394,24 +394,24 @@ func TestConversationCollection(t *testing.T) {
 	t.Run("PartitioningDifferentMonths", func(t *testing.T) {
 		ctx := t.Context()
 		// Jan.
-		convo1 := &spec.Conversation{}
+		convo1 := &conversationSpec.Conversation{}
 		u := uuidutil.NewUUIDv7()
 
 		convo1.ID = u
 		convo1.Title = "Jan"
 		convo1.CreatedAt = time.Date(2023, 1, 15, 10, 0, 0, 0, time.UTC)
 		convo1.ModifiedAt = time.Now().UTC()
-		convo1.Messages = []spec.ConversationMessage{}
+		convo1.Messages = []conversationSpec.ConversationMessage{}
 
 		// Feb.
 		u = uuidutil.NewUUIDv7()
 
-		convo2 := &spec.Conversation{}
+		convo2 := &conversationSpec.Conversation{}
 		convo2.ID = u
 		convo2.Title = "Feb"
 		convo2.CreatedAt = time.Date(2023, 2, 15, 10, 0, 0, 0, time.UTC)
 		convo2.ModifiedAt = time.Now().UTC()
-		convo2.Messages = []spec.ConversationMessage{}
+		convo2.Messages = []conversationSpec.ConversationMessage{}
 
 		_, err = cc.PutConversation(ctx, getNewPutRequestFromConversation(convo1))
 		if err != nil {
@@ -514,7 +514,7 @@ func TestConversationCollectionListing(t *testing.T) {
 			}
 		}
 		// List with page size 10.
-		resp, err := cc.ListConversations(ctx, &spec.ListConversationsRequest{})
+		resp, err := cc.ListConversations(ctx, &conversationSpec.ListConversationsRequest{})
 		if err != nil {
 			t.Fatalf("Failed to list conversations: %v", err)
 		}
@@ -528,7 +528,7 @@ func TestConversationCollectionListing(t *testing.T) {
 		if resp.Body.NextPageToken != nil && *resp.Body.NextPageToken != "" {
 			resp2, err := cc.ListConversations(
 				ctx,
-				&spec.ListConversationsRequest{PageToken: *resp.Body.NextPageToken},
+				&conversationSpec.ListConversationsRequest{PageToken: *resp.Body.NextPageToken},
 			)
 			if err != nil {
 				t.Fatalf("Failed to list next page: %v", err)
@@ -540,10 +540,10 @@ func TestConversationCollectionListing(t *testing.T) {
 	})
 }
 
-func getNewPutRequestFromConversation(c *spec.Conversation) *spec.PutConversationRequest {
-	return &spec.PutConversationRequest{
+func getNewPutRequestFromConversation(c *conversationSpec.Conversation) *conversationSpec.PutConversationRequest {
+	return &conversationSpec.PutConversationRequest{
 		ID: c.ID,
-		Body: &spec.PutConversationRequestBody{
+		Body: &conversationSpec.PutConversationRequestBody{
 			Title:      c.Title,
 			CreatedAt:  c.CreatedAt,
 			ModifiedAt: c.ModifiedAt,
@@ -552,9 +552,9 @@ func getNewPutRequestFromConversation(c *spec.Conversation) *spec.PutConversatio
 	}
 }
 
-func newTextTurn(id string, role inferenceSpec.RoleEnum, txt string) spec.ConversationMessage {
+func newTextTurn(id string, role inferenceSpec.RoleEnum, txt string) conversationSpec.ConversationMessage {
 	now := time.Now().UTC()
-	return spec.ConversationMessage{
+	return conversationSpec.ConversationMessage{
 		ID:        id,
 		CreatedAt: now,
 		Role:      role,
@@ -576,7 +576,7 @@ func newTextTurn(id string, role inferenceSpec.RoleEnum, txt string) spec.Conver
 	}
 }
 
-func initConversation(title string) (*spec.Conversation, error) {
+func initConversation(title string) (*conversationSpec.Conversation, error) {
 	if title == "" {
 		title = "New Conversation"
 	}
@@ -584,9 +584,9 @@ func initConversation(title string) (*spec.Conversation, error) {
 		title = title[:64]
 	}
 
-	c := spec.Conversation{
-		SchemaVersion: spec.ConversationSchemaVersion,
-		Messages:      []spec.ConversationMessage{},
+	c := conversationSpec.Conversation{
+		SchemaVersion: conversationSpec.ConversationSchemaVersion,
+		Messages:      []conversationSpec.ConversationMessage{},
 	}
 	u := uuidutil.NewUUIDv7()
 	c.ID = u

@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -16,12 +16,12 @@ import (
 
 func (c *Components) RegisterCompiledPackages(
 	ctx context.Context,
-	values []topology.CompiledRegistration,
+	values []installModel.CompiledRegistration,
 ) error {
 	if c == nil || c.Refresh == nil {
 		return spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 
@@ -51,7 +51,7 @@ func (c *Components) RegisterCompiledPackages(
 
 func (c *Components) HydrateCompiledPackages(
 	ctx context.Context,
-	plans []topology.CompiledPackagePlan,
+	plans []installModel.CompiledPackagePlan,
 ) error {
 	if c == nil ||
 		c.SourceRuntime == nil ||
@@ -61,11 +61,11 @@ func (c *Components) HydrateCompiledPackages(
 		c.managedSources == nil {
 		return spec.ErrClosed
 	}
-	if err := install.RequirePrivileged(ctx); err != nil {
+	if err := installFlow.RequirePrivileged(ctx); err != nil {
 		return err
 	}
 	type lifecyclePlan struct {
-		plan  topology.CompiledPackagePlan
+		plan  installModel.CompiledPackagePlan
 		state any
 	}
 	lifecyclePlans := make([]lifecyclePlan, 0, len(plans))
@@ -92,7 +92,7 @@ func (c *Components) HydrateCompiledPackages(
 	type sourceBatch struct {
 		publications []sourceModel.ManagedPackagePublication
 		removals     []sourceModel.ManagedPackageAddress
-		verify       []topology.CompiledPackage
+		verify       []installModel.CompiledPackage
 	}
 
 	batches := make(map[sourceKey]*sourceBatch)
@@ -110,7 +110,7 @@ func (c *Components) HydrateCompiledPackages(
 			batches[key] = batch
 		}
 
-		byScope := make(map[spec.Locator]topology.CompiledPackage)
+		byScope := make(map[spec.Locator]installModel.CompiledPackage)
 		for _, packageValue := range set.Packages {
 			scope, err := packageValue.Address.Directory()
 			if err != nil {
@@ -253,7 +253,7 @@ func (c *Components) verifyCompiledPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	value topology.CompiledPackage,
+	value installModel.CompiledPackage,
 ) error {
 	for _, document := range value.Documents {
 		locator, err := value.Address.FileLocator(document.Locator)
@@ -293,7 +293,7 @@ func (c *Components) verifyCompiledPackage(
 
 func readCompiledPackageFiles(
 	ctx context.Context,
-	value topology.CompiledPackage,
+	value installModel.CompiledPackage,
 ) ([]sourceModel.ManagedPackageFile, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: compiled package context is nil", spec.ErrInvalid)

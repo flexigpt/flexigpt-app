@@ -7,7 +7,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -75,7 +75,7 @@ type builtinTopologyWire struct {
 }
 
 type builtinTopologyConfig struct {
-	declaration          topology.Declaration
+	declaration          installModel.Declaration
 	sourcesByName        map[string]sourceModel.Draft
 	sourceNameByRole     map[string]string
 	embeddedPackageRoots map[string]spec.Locator
@@ -92,7 +92,7 @@ var configuredBuiltinTopology = mustLoadBuiltinTopology(
 	configuredContractTopology,
 )
 
-func BuiltinTopologyDeclaration() topology.Declaration {
+func BuiltinTopologyDeclaration() installModel.Declaration {
 	return cloneBuiltinTopologyDeclaration(
 		configuredBuiltinTopology.declaration,
 	)
@@ -335,7 +335,7 @@ func loadBuiltinTopology(
 		)
 	}
 
-	declaration := topology.Declaration{
+	declaration := installModel.Declaration{
 		Root: rootModel.RootDraft{
 			ID:          wire.Builtin.Root.ID,
 			StorageKey:  wire.Builtin.Root.StorageKey,
@@ -609,8 +609,8 @@ func parseApplicationStorage(
 }
 
 func cloneBuiltinTopologyDeclaration(
-	value topology.Declaration,
-) topology.Declaration {
+	value installModel.Declaration,
+) installModel.Declaration {
 	output := value
 	output.Sources = make([]sourceModel.Draft, len(value.Sources))
 	for index, sourceValue := range value.Sources {

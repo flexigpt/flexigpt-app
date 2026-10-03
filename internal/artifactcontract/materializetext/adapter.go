@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -30,10 +30,10 @@ type Document struct {
 }
 
 type Adapter struct {
-	resources resource.API
+	resources resourceFlow.API
 }
 
-func NewAdapter(resources resource.API) (*Adapter, error) {
+func NewAdapter(resources resourceFlow.API) (*Adapter, error) {
 	if resources == nil {
 		return nil, fmt.Errorf(
 			"%w: Text materializer ResourceAPI is nil",

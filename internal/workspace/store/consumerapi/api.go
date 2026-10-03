@@ -14,8 +14,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -35,9 +35,9 @@ type StoreAPI struct {
 	roots            root.API
 	cat              catalog.API
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	artifacts        artifact.API
-	resources        resource.API
+	resources        resourceFlow.API
 	workspaceSources workspaceSourceRegistry
 	policy           defaultpolicy.Policy
 
@@ -50,9 +50,9 @@ type StoreAPI struct {
 
 func NewStoreAPI(
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
-	resources resource.API,
+	resources resourceFlow.API,
 	roots root.API,
 	cat catalog.API,
 	config Config,
@@ -548,11 +548,11 @@ func (a *StoreAPI) ensureWorkspaceSources(
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
-	directory, err := refresh.EnsureAndRefreshSource(
+	directory, err := refreshFlow.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		refresh.EnsureAndRefreshSourceRequest{
+		refreshFlow.EnsureAndRefreshSourceRequest{
 			RootID: rootID,
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
@@ -580,11 +580,11 @@ func (a *StoreAPI) ensureWorkspaceSources(
 	if err != nil {
 		return sourceModel.Summary{}, sourceModel.Summary{}, err
 	}
-	policy, err = refresh.EnsureAndRefreshSource(
+	policy, err = refreshFlow.EnsureAndRefreshSource(
 		ctx,
 		a.sources,
 		a.discovery,
-		refresh.EnsureAndRefreshSourceRequest{
+		refreshFlow.EnsureAndRefreshSourceRequest{
 			RootID: rootID,
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),

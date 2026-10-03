@@ -16,7 +16,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
-	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
+	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
 	toolAggregate "github.com/flexigpt/flexigpt-app/internal/tool/aggregate"
@@ -159,8 +159,8 @@ func (ps *ProviderSetAPI) GetDebugConfig() *debugclient.DebugConfig {
 // AddProvider forwards to inference-go ProviderSetAPI.AddProvider.
 func (ps *ProviderSetAPI) AddProvider(
 	ctx context.Context,
-	req *spec.AddProviderRequest,
-) (*spec.AddProviderResponse, error) {
+	req *inferencewrapperSpec.AddProviderRequest,
+) (*inferencewrapperSpec.AddProviderResponse, error) {
 	if req == nil || req.Body == nil || req.Provider == "" || strings.TrimSpace(req.Body.Origin) == "" {
 		return nil, errors.New("invalid params")
 	}
@@ -176,14 +176,14 @@ func (ps *ProviderSetAPI) AddProvider(
 		return nil, err
 	}
 
-	return &spec.AddProviderResponse{}, nil
+	return &inferencewrapperSpec.AddProviderResponse{}, nil
 }
 
 // DeleteProvider forwards to inference-go ProviderSetAPI.DeleteProvider.
 func (ps *ProviderSetAPI) DeleteProvider(
 	ctx context.Context,
-	req *spec.DeleteProviderRequest,
-) (*spec.DeleteProviderResponse, error) {
+	req *inferencewrapperSpec.DeleteProviderRequest,
+) (*inferencewrapperSpec.DeleteProviderResponse, error) {
 	if req == nil || req.Provider == "" {
 		return nil, errors.New("got empty provider input")
 	}
@@ -191,29 +191,29 @@ func (ps *ProviderSetAPI) DeleteProvider(
 		return nil, err
 	}
 
-	return &spec.DeleteProviderResponse{}, nil
+	return &inferencewrapperSpec.DeleteProviderResponse{}, nil
 }
 
 // SetProviderAPIKey forwards to inference-go ProviderSetAPI.SetProviderAPIKey.
 func (ps *ProviderSetAPI) SetProviderAPIKey(
 	ctx context.Context,
-	req *spec.SetProviderAPIKeyRequest,
-) (*spec.SetProviderAPIKeyResponse, error) {
+	req *inferencewrapperSpec.SetProviderAPIKeyRequest,
+) (*inferencewrapperSpec.SetProviderAPIKeyResponse, error) {
 	if req == nil || req.Body == nil {
 		return nil, errors.New("got empty provider input")
 	}
 	if err := ps.inner.SetProviderAPIKey(ctx, req.Provider, req.Body.APIKey); err != nil {
 		return nil, err
 	}
-	return &spec.SetProviderAPIKeyResponse{}, nil
+	return &inferencewrapperSpec.SetProviderAPIKeyResponse{}, nil
 }
 
 // FetchCompletion builds a normalized inference-go FetchCompletionRequest from
 // app-level conversation types and calls inference-go's FetchCompletion.
 func (ps *ProviderSetAPI) FetchCompletion(
 	ctx context.Context,
-	req *spec.CompletionRequest,
-) (*spec.CompletionResponse, error) {
+	req *inferencewrapperSpec.CompletionRequest,
+) (*inferencewrapperSpec.CompletionResponse, error) {
 	if req == nil {
 		return nil, errors.New("got empty completion input")
 	}
@@ -271,8 +271,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		currentMessage.WorkspaceSelection,
 		currentMessage.EnabledSkillRefs,
 	); err != nil {
-		return &spec.CompletionResponse{
-			Body: &spec.CompletionResponseBody{
+		return &inferencewrapperSpec.CompletionResponse{
+			Body: &inferencewrapperSpec.CompletionResponseBody{
 				InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 					Error: &inferenceSpec.Error{
 						Code:    "workspace_selection_invalid",
@@ -301,8 +301,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 			}
 		}
 		if workspaceErr != nil {
-			return &spec.CompletionResponse{
-				Body: &spec.CompletionResponseBody{
+			return &inferencewrapperSpec.CompletionResponse{
+				Body: &inferencewrapperSpec.CompletionResponseBody{
 					InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 						Error: &inferenceSpec.Error{
 							Code:    "workspace_unavailable",
@@ -593,7 +593,7 @@ func (ps *ProviderSetAPI) FetchCompletion(
 		b.DebugDetails = mergeCompletionDebugDetails(b.DebugDetails, "mcp", mcpDebugDetails)
 	}
 
-	resp := &spec.CompletionResponse{Body: &spec.CompletionResponseBody{
+	resp := &inferencewrapperSpec.CompletionResponse{Body: &inferencewrapperSpec.CompletionResponseBody{
 		InferenceResponse:     b,
 		HydratedCurrentInputs: currentInputs,
 		MCPToolMappings:       mcpToolMappings,
@@ -607,9 +607,9 @@ func workspaceUnavailableCompletionResponse(
 	currentInputs []inferenceSpec.InputUnion,
 	workspaceUsage *workspaceConversation.ConversationUsage,
 	message string,
-) *spec.CompletionResponse {
-	return &spec.CompletionResponse{
-		Body: &spec.CompletionResponseBody{
+) *inferencewrapperSpec.CompletionResponse {
+	return &inferencewrapperSpec.CompletionResponse{
+		Body: &inferencewrapperSpec.CompletionResponseBody{
 			InferenceResponse: &inferenceSpec.FetchCompletionResponse{
 				Error: &inferenceSpec.Error{
 					Code:    "workspace_unavailable",

@@ -16,9 +16,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
@@ -31,11 +31,11 @@ type API struct {
 	roots            root.API
 	cat              catalog.API
 	sources          source.API
-	discovery        refresh.API
+	discovery        refreshFlow.API
 	artifacts        artifact.API
-	resources        resource.API
+	resources        resourceFlow.API
 	protection       root.ProtectionAPI
-	managedArtifacts managedpackage.API
+	managedArtifacts managedpackageFlow.API
 	definitions      definition.API
 	texts            *materializetext.Adapter
 
@@ -123,11 +123,11 @@ func WithManagedAgentImportSigner(
 
 func New(
 	sources source.API,
-	discovery refresh.API,
+	discovery refreshFlow.API,
 	artifacts artifact.API,
 	cat catalog.API,
-	resources resource.API,
-	managedArtifacts managedpackage.API,
+	resources resourceFlow.API,
+	managedArtifacts managedpackageFlow.API,
 	protection root.ProtectionAPI,
 	definitions definition.API,
 	options ...Option,

@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	mcpAuth "github.com/modelcontextprotocol/go-sdk/auth"
+	mcpSDKAuth "github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
 )
@@ -74,7 +74,7 @@ func (s *trackingTokenSource) Token() (*oauth2.Token, error) {
 // It never touches the HTTP request/response body itself; body lifecycle is
 // owned by the wrapped SDK handler.
 type trackedOAuthHandler struct {
-	inner           mcpAuth.OAuthHandler
+	inner           mcpSDKAuth.OAuthHandler
 	sink            AuthStatusSink
 	status          MCPAuthStatus
 	sensitiveValues []string

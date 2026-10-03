@@ -4,7 +4,7 @@ import (
 	"context"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -29,7 +29,7 @@ func (a *API) ResolveSkillCollection(
 		a.collections == nil {
 		return collection.CollectionCapabilityPlan{}, spec.ErrClosed
 	}
-	return resource.WithVerificationSession(
+	return resourceFlow.WithVerificationSession(
 		ctx,
 		a.resources,
 		func(sessionCtx context.Context) (collection.CollectionCapabilityPlan, error) {

@@ -6,14 +6,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 )
 
 type InstallerDependencies struct {
-	Hydrator topology.CompiledHydrationCoordinator
+	Hydrator installModel.CompiledHydrationCoordinator
 	Cleanup  mcpConsumerAPI.BuiltinPackageCleanup
 }
 
@@ -60,7 +60,7 @@ func NewInstaller(
 
 func (l lifecycle) PrepareCompiledHydration(
 	ctx context.Context,
-	plan topology.CompiledPackagePlan,
+	plan installModel.CompiledPackagePlan,
 ) (any, error) {
 	// Protected topology reset now removes overlays and queues secret cleanup
 	// inside Artifact Store. There is no external settings Root purge.
@@ -86,7 +86,7 @@ func (l lifecycle) PrepareCompiledHydration(
 
 func (l lifecycle) CompleteCompiledHydration(
 	ctx context.Context,
-	_ topology.CompiledPackagePlan,
+	_ installModel.CompiledPackagePlan,
 	state any,
 ) error {
 	value, ok := state.(lifecycleState)
@@ -103,7 +103,7 @@ func (l lifecycle) CompleteCompiledHydration(
 }
 
 func addressesForPlan(
-	plan topology.CompiledPackagePlan,
+	plan installModel.CompiledPackagePlan,
 ) ([]sourceModel.ManagedPackageAddress, error) {
 	output := make(
 		[]sourceModel.ManagedPackageAddress,

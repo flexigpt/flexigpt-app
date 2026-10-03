@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/conversation/spec"
+	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/mapstore-go"
 	"github.com/flexigpt/mapstore-go/ftsengine"
 )
@@ -101,7 +101,7 @@ func processFTSDataForFile(
 		return skipSyncDecision, nil
 	}
 
-	pt := spec.Conversation{}
+	pt := conversationSpec.Conversation{}
 	if err := json.Unmarshal(raw, &pt); err != nil {
 		slog.Error("conversation sync fts", "file", fullPath, "non conversation file error", err)
 		return skipSyncDecision, nil
