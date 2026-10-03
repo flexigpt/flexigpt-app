@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
@@ -18,12 +18,12 @@ const (
 )
 
 type TargetV1 struct {
-	ModelArtifact            artifact.ArtifactRef `json:"modelArtifact"`
-	ModelDefinitionDigest    cryptoutil.Digest    `json:"modelDefinitionDigest"`
-	ProviderArtifact         artifact.ArtifactRef `json:"providerArtifact"`
-	ProviderDefinitionDigest cryptoutil.Digest    `json:"providerDefinitionDigest"`
-	ConfigurationFingerprint cryptoutil.Digest    `json:"configurationFingerprint"`
-	Name                     spec.LogicalName     `json:"name"`
+	ModelArtifact            artifactModel.ArtifactRef `json:"modelArtifact"`
+	ModelDefinitionDigest    cryptoutil.Digest         `json:"modelDefinitionDigest"`
+	ProviderArtifact         artifactModel.ArtifactRef `json:"providerArtifact"`
+	ProviderDefinitionDigest cryptoutil.Digest         `json:"providerDefinitionDigest"`
+	ConfigurationFingerprint cryptoutil.Digest         `json:"configurationFingerprint"`
+	Name                     spec.LogicalName          `json:"name"`
 }
 
 func (t TargetV1) Validate() error {

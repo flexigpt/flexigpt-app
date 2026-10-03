@@ -8,10 +8,10 @@ import (
 	"reflect"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -23,18 +23,18 @@ const definitionColumns = `
 
 func (s *Store) getDefinition(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	values, err := s.getDefinitions(
 		ctx,
-		[]definition.Key{{
+		[]definitionModel.Key{{
 			RootID: rootID,
 			Digest: digest,
 		}},
 	)
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	return values[0], nil
 }
@@ -42,11 +42,11 @@ func (s *Store) getDefinition(
 func putDefinitionTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
-	value definition.Definition,
+	rootID rootModel.RootID,
+	value definitionModel.Definition,
 	createdAt time.Time,
 ) error {
-	canonical, err := definition.Canonicalize(value)
+	canonical, err := definitionModel.Canonicalize(value)
 	if err != nil {
 		return err
 	}
@@ -130,9 +130,9 @@ type definitionQueryer interface {
 func getDefinitionTx(
 	ctx context.Context,
 	queryer definitionQueryer,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	return scanDefinition(queryer.QueryRowContext(
 		ctx,
 		`SELECT `+definitionColumns+`
@@ -145,7 +145,7 @@ func getDefinitionTx(
 
 func scanDefinition(
 	row scanner,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	var (
 		rootID, digest, kind, schemaID, schemaVersion string
 		logicalName, logicalVersion                   string
@@ -154,7 +154,7 @@ func scanDefinition(
 		createdAt                                     int64
 	)
 	if row == nil {
-		return definition.Definition{}, fmt.Errorf(
+		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: Definition row is nil",
 			spec.ErrInvalid,
 		)
@@ -174,31 +174,31 @@ func scanDefinition(
 		&dependenciesRaw,
 		&createdAt,
 	); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
-	var value definition.Definition
+	var value definitionModel.Definition
 	if err := decodeJSON(labelsRaw, &value.Labels); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	if err := decodeJSON(
 		dependenciesRaw,
 		&value.Dependencies,
 	); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	value.Digest = cryptoutil.Digest(digest)
-	value.Kind = artifact.ArtifactKind(kind)
-	value.SchemaID = schema.SchemaID(schemaID)
+	value.Kind = artifactModel.ArtifactKind(kind)
+	value.SchemaID = schemaModel.SchemaID(schemaID)
 	value.SchemaVersion = schemaVersion
 	value.LogicalName = spec.LogicalName(logicalName)
 	value.LogicalVersion = spec.LogicalVersion(logicalVersion)
 	value.DisplayName = displayName
 	value.Description = description
 	value.Body = append([]byte(nil), bodyRaw...)
-	canonical, err := definition.Canonicalize(value)
+	canonical, err := definitionModel.Canonicalize(value)
 	if err != nil {
-		return definition.Definition{}, fmt.Errorf(
+		return definitionModel.Definition{}, fmt.Errorf(
 			"invalid persisted Definition %q/%q: %w",
 			rootID,
 			digest,
@@ -209,8 +209,8 @@ func scanDefinition(
 }
 
 func equalDefinitions(
-	left definition.Definition,
-	right definition.Definition,
+	left definitionModel.Definition,
+	right definitionModel.Definition,
 ) bool {
 	return left.Digest == right.Digest &&
 		left.Kind == right.Kind &&

@@ -8,8 +8,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -68,9 +68,9 @@ func (v Slot) Validate() error {
 
 // BindingKey identifies one Artifact-local secret reference.
 type BindingKey struct {
-	Artifact  artifact.ArtifactRef `json:"artifact"`
-	Namespace overlay.Namespace    `json:"namespace"`
-	Slot      Slot                 `json:"slot"`
+	Artifact  artifactModel.ArtifactRef `json:"artifact"`
+	Namespace overlayModel.Namespace    `json:"namespace"`
+	Slot      Slot                      `json:"slot"`
 }
 
 func (k BindingKey) Validate() error {

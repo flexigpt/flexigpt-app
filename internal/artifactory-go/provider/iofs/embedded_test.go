@@ -9,7 +9,7 @@ import (
 	"testing/fstest"
 	"time"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -89,14 +89,14 @@ func TestEmbeddedAdapterRejectsUnavailableProviders(t *testing.T) {
 	}
 }
 
-func embeddedTestSource(config json.RawMessage) source.Source {
+func embeddedTestSource(config json.RawMessage) sourceModel.Source {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return source.Source{
+	return sourceModel.Source{
 		ID:             "019d3150-6a1e-7a6b-a34e-d9032342bc31",
 		RootID:         "019d3150-6a1f-7a6b-a34e-d9032342bc31",
 		RootStorageKey: "test-root",
 		StorageKey:     "embedded-fixture",
-		Kind:           source.SourceKindEmbeddedDirectory,
+		Kind:           sourceModel.SourceKindEmbeddedDirectory,
 		DisplayName:    "Embedded fixture",
 		Enabled:        true,
 		Config:         config,

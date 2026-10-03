@@ -5,22 +5,22 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 	const (
-		userRoot    root.RootID = "0192c4c0-0000-7000-8000-000000000002"
-		builtinRoot root.RootID = "0192c4c0-0000-7000-8000-000000000001"
+		userRoot    rootModel.RootID = "0192c4c0-0000-7000-8000-000000000002"
+		builtinRoot rootModel.RootID = "0192c4c0-0000-7000-8000-000000000001"
 	)
 
 	tests := []struct {
 		name      string
 		reference declaration.ArtifactNameReference
-		current   root.RootID
-		builtin   root.RootID
-		want      []root.RootID
+		current   rootModel.RootID
+		builtin   rootModel.RootID
+		want      []rootModel.RootID
 		wantErr   bool
 	}{
 		{
@@ -30,7 +30,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 			},
 			current: userRoot,
 			builtin: builtinRoot,
-			want:    []root.RootID{userRoot, builtinRoot},
+			want:    []rootModel.RootID{userRoot, builtinRoot},
 		},
 		{
 			name: "builtin scope searches only builtin",
@@ -40,7 +40,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 			},
 			current: userRoot,
 			builtin: builtinRoot,
-			want:    []root.RootID{builtinRoot},
+			want:    []rootModel.RootID{builtinRoot},
 		},
 		{
 			name: "current builtin root is not repeated",
@@ -49,7 +49,7 @@ func TestArtifactNameReferenceLookupRoots(t *testing.T) {
 			},
 			current: builtinRoot,
 			builtin: builtinRoot,
-			want:    []root.RootID{builtinRoot},
+			want:    []rootModel.RootID{builtinRoot},
 		},
 		{
 			name: "builtin scope requires configured builtin root",

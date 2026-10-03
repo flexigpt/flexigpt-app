@@ -3,9 +3,9 @@ package internal
 import (
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -21,13 +21,13 @@ const (
 // Observation is transient Source refresh staging data. It is deliberately
 // not a public Catalog entity and is never persisted as a current occurrence.
 type Observation struct {
-	RootID  root.RootID            `json:"rootID"`
-	Binding artifact.SourceBinding `json:"binding"`
+	RootID  rootModel.RootID            `json:"rootID"`
+	Binding artifactModel.SourceBinding `json:"binding"`
 
-	Kind           artifact.ArtifactKind  `json:"kind,omitempty"`
-	LogicalName    spec.LogicalName       `json:"logicalName,omitempty"`
-	LogicalVersion spec.LogicalVersion    `json:"logicalVersion,omitempty"`
-	Definition     *definition.Definition `json:"-"`
+	Kind           artifactModel.ArtifactKind  `json:"kind,omitempty"`
+	LogicalName    spec.LogicalName            `json:"logicalName,omitempty"`
+	LogicalVersion spec.LogicalVersion         `json:"logicalVersion,omitempty"`
+	Definition     *definitionModel.Definition `json:"-"`
 
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
 	DecoderID           spec.DecoderID          `json:"decoderID,omitempty"`
@@ -126,8 +126,8 @@ func (o Observation) Clone() Observation {
 }
 
 type typedOrigin struct {
-	Binding artifact.SourceBinding
-	Kind    artifact.ArtifactKind
+	Binding artifactModel.SourceBinding
+	Kind    artifactModel.ArtifactKind
 }
 
 func (o Observation) TypedOrigin() typedOrigin {

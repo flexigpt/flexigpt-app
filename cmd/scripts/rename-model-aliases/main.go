@@ -14,16 +14,36 @@ import (
 	"strconv"
 )
 
+// # Preview which files would change:
+//     go run ./cmd/scripts/rename-model-aliases -root .
+
+// # Apply changes:
+//     go run ./cmd/scripts/rename-model-aliases -root . -write
+
+// # Review and validate:
+//     git diff
+//     go test ./...
+
+// # Limit it to your target directory:
+//     go run ./cmd/scripts/rename-model-aliases \
+//       -root ./internal/artifactory-go \
+//       -write
+
 const prefix = "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/"
 
 // Exact import path -> existing alias.
 // Each alias becomes existingAlias + "Model".
 var targets = map[string]string{
-	prefix + "artifact/model":         "artifact",
-	prefix + "root/model":             "root",
-	prefix + "source/model":           "source",
-	prefix + "artifact/catalog/model": "catalog",
-	prefix + "definition/model":       "definition",
+	prefix + "secret/model":            "secret",
+	prefix + "overlay/model":           "overlay",
+	prefix + "artifact/model":          "artifact",
+	prefix + "root/model":              "root",
+	prefix + "source/model":            "source",
+	prefix + "artifact/catalog/model":  "catalog",
+	prefix + "definition/model":        "definition",
+	prefix + "definition/schema/model": "schema",
+	prefix + "flow/resource/model":     "resource",
+	prefix + "flow/refresh/model":      "refresh",
 }
 
 type change struct {

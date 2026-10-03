@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -152,8 +152,8 @@ type contractTopology struct {
 	documentSets              map[string][]documentAlias
 	documentUses              map[string]documentUse
 	markdownRules             map[string]markdownRule
-	discoveryProfiles         map[string]source.DiscoverySpec
-	discoveryUses             map[string]source.DiscoverySpec
+	discoveryProfiles         map[string]sourceModel.DiscoverySpec
+	discoveryUses             map[string]sourceModel.DiscoverySpec
 	resolverTypePolicies      []ResolverTypePolicy
 	unversionedPackageVersion spec.LogicalVersion
 }
@@ -376,10 +376,10 @@ func ResolverTypePolicies() []ResolverTypePolicy {
 	)
 }
 
-func DiscoverySpecForUse(name string) (source.DiscoverySpec, error) {
+func DiscoverySpecForUse(name string) (sourceModel.DiscoverySpec, error) {
 	value, found := configuredContractTopology.discoveryUses[name]
 	if !found {
-		return source.DiscoverySpec{}, fmt.Errorf(
+		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: contract topology has no discovery use %q",
 			spec.ErrNotFound,
 			name,
@@ -391,17 +391,17 @@ func DiscoverySpecForUse(name string) (source.DiscoverySpec, error) {
 func DiscoverySpecAtForUse(
 	name string,
 	root spec.Locator,
-) (source.DiscoverySpec, error) {
+) (sourceModel.DiscoverySpec, error) {
 	if err := root.Validate(true); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 
 	value, err := DiscoverySpecForUse(name)
 	if err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	if len(value.DirectoryRoots) != 1 {
-		return source.DiscoverySpec{}, fmt.Errorf(
+		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery use %q cannot be rooted dynamically",
 			spec.ErrInvalid,
 			name,
@@ -411,7 +411,7 @@ func DiscoverySpecAtForUse(
 	value.DirectoryRoots[0].Root = root
 	value = value.Normalized()
 	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return value, nil
 }
@@ -419,26 +419,26 @@ func DiscoverySpecAtForUse(
 func DiscoverySpecForLocatorForUse(
 	name string,
 	locator spec.Locator,
-) (source.DiscoverySpec, error) {
+) (sourceModel.DiscoverySpec, error) {
 	if err := locator.Validate(false); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 
 	profile, err := DiscoverySpecForUse(name)
 	if err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	if len(profile.AllowedDecoderIDs) != 1 {
-		return source.DiscoverySpec{}, fmt.Errorf(
+		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery use %q must define exactly one decoder",
 			spec.ErrInvalid,
 			name,
 		)
 	}
 
-	value := source.DiscoverySpec{
+	value := sourceModel.DiscoverySpec{
 		ExplicitLocators: []spec.Locator{locator},
-		DecoderHints: []source.DecoderHint{{
+		DecoderHints: []sourceModel.DecoderHint{{
 			Locator:    locator,
 			Recursive:  false,
 			DecoderIDs: append([]spec.DecoderID(nil), profile.AllowedDecoderIDs...),
@@ -448,7 +448,7 @@ func DiscoverySpecForLocatorForUse(
 	}
 	value = value.Normalized()
 	if err := value.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return value, nil
 }
@@ -994,7 +994,7 @@ func validateMarkdownRuleGraph(
 func parseDiscoveryProfiles(
 	values map[string]discoveryProfileWire,
 	documentSets map[string][]documentAlias,
-) (map[string]source.DiscoverySpec, error) {
+) (map[string]sourceModel.DiscoverySpec, error) {
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no discovery profiles",
@@ -1002,7 +1002,7 @@ func parseDiscoveryProfiles(
 		)
 	}
 
-	output := make(map[string]source.DiscoverySpec, len(values))
+	output := make(map[string]sourceModel.DiscoverySpec, len(values))
 	for name, value := range values {
 		if err := spec.ValidateIdentifier(
 			"discovery profile name",
@@ -1028,9 +1028,9 @@ func parseDiscoveryProfile(
 	name string,
 	value discoveryProfileWire,
 	documentSets map[string][]documentAlias,
-) (source.DiscoverySpec, error) {
+) (sourceModel.DiscoverySpec, error) {
 	if err := value.Root.Validate(true); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 
 	var basePatterns []string
@@ -1041,21 +1041,21 @@ func parseDiscoveryProfile(
 			value.IncludePatterns,
 		)
 		if err != nil {
-			return source.DiscoverySpec{}, err
+			return sourceModel.DiscoverySpec{}, err
 		}
 	}
 	if err := spec.ValidatePathPatterns(
 		name+" discovery exclude patterns",
 		value.ExcludePatterns,
 	); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 
 	seenSets := make(map[string]struct{}, len(value.DocumentSets))
 	selectedAliases := make([]documentAlias, 0)
 	for _, setName := range value.DocumentSets {
 		if _, duplicate := seenSets[setName]; duplicate {
-			return source.DiscoverySpec{}, fmt.Errorf(
+			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery profile %q repeats document set %q",
 				spec.ErrInvalid,
 				name,
@@ -1066,7 +1066,7 @@ func parseDiscoveryProfile(
 
 		aliases, found := documentSets[setName]
 		if !found {
-			return source.DiscoverySpec{}, fmt.Errorf(
+			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery profile %q references unknown document set %q",
 				spec.ErrInvalid,
 				name,
@@ -1078,24 +1078,24 @@ func parseDiscoveryProfile(
 
 	includePatterns := discoveryPatterns(basePatterns, selectedAliases)
 	if len(includePatterns) == 0 {
-		return source.DiscoverySpec{}, fmt.Errorf(
+		return sourceModel.DiscoverySpec{}, fmt.Errorf(
 			"%w: discovery profile %q has no include patterns",
 			spec.ErrInvalid,
 			name,
 		)
 	}
 
-	hints := make([]source.DecoderHint, 0, len(value.DecoderHints))
+	hints := make([]sourceModel.DecoderHint, 0, len(value.DecoderHints))
 	for _, hint := range value.DecoderHints {
-		hints = append(hints, source.DecoderHint{
+		hints = append(hints, sourceModel.DecoderHint{
 			Locator:    hint.Locator,
 			Recursive:  hint.Recursive,
 			DecoderIDs: append([]spec.DecoderID(nil), hint.DecoderIDs...),
 		})
 	}
 
-	output := source.DiscoverySpec{
-		DirectoryRoots: []source.DirectoryRoot{{
+	output := sourceModel.DiscoverySpec{
+		DirectoryRoots: []sourceModel.DirectoryRoot{{
 			Root:            value.Root,
 			Recursive:       value.Recursive,
 			IncludePatterns: includePatterns,
@@ -1107,7 +1107,7 @@ func parseDiscoveryProfile(
 	}
 	output = output.Normalized()
 	if err := output.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return output, nil
 }
@@ -1139,8 +1139,8 @@ func parseDiscoveryPatterns(
 
 func parseDiscoveryUses(
 	values map[string]discoveryUseWire,
-	profiles map[string]source.DiscoverySpec,
-) (map[string]source.DiscoverySpec, error) {
+	profiles map[string]sourceModel.DiscoverySpec,
+) (map[string]sourceModel.DiscoverySpec, error) {
 	if len(values) == 0 {
 		return nil, fmt.Errorf(
 			"%w: contract topology has no discovery uses",
@@ -1148,7 +1148,7 @@ func parseDiscoveryUses(
 		)
 	}
 
-	output := make(map[string]source.DiscoverySpec, len(values))
+	output := make(map[string]sourceModel.DiscoverySpec, len(values))
 	for name, value := range values {
 		if err := spec.ValidateIdentifier(
 			"discovery use name",
@@ -1166,7 +1166,7 @@ func parseDiscoveryUses(
 		}
 
 		seen := make(map[string]struct{}, len(value.Profiles))
-		selected := make([]source.DiscoverySpec, 0, len(value.Profiles))
+		selected := make([]sourceModel.DiscoverySpec, 0, len(value.Profiles))
 		for _, profileName := range value.Profiles {
 			if _, duplicate := seen[profileName]; duplicate {
 				return nil, fmt.Errorf(
@@ -1200,10 +1200,10 @@ func parseDiscoveryUses(
 
 func mergeDiscoveryProfiles(
 	name string,
-	profiles []source.DiscoverySpec,
-) (source.DiscoverySpec, error) {
+	profiles []sourceModel.DiscoverySpec,
+) (sourceModel.DiscoverySpec, error) {
 	var (
-		output        source.DiscoverySpec
+		output        sourceModel.DiscoverySpec
 		authoritative *bool
 	)
 	for _, profile := range profiles {
@@ -1212,7 +1212,7 @@ func mergeDiscoveryProfiles(
 			next := value.Authoritative
 			authoritative = &next
 		} else if *authoritative != value.Authoritative {
-			return source.DiscoverySpec{}, fmt.Errorf(
+			return sourceModel.DiscoverySpec{}, fmt.Errorf(
 				"%w: discovery use %q mixes authoritative and non-authoritative profiles",
 				spec.ErrInvalid,
 				name,
@@ -1234,7 +1234,7 @@ func mergeDiscoveryProfiles(
 	}
 	output = output.Normalized()
 	if err := output.Validate(); err != nil {
-		return source.DiscoverySpec{}, err
+		return sourceModel.DiscoverySpec{}, err
 	}
 	return output, nil
 }

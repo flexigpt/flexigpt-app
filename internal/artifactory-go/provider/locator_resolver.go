@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -23,7 +23,7 @@ import (
 // and registry resolvers are intentionally future provider extensions.
 type LocatorResolverFactory interface {
 	LocatorKind() string
-	ArtifactKinds() []artifact.ArtifactKind
+	ArtifactKinds() []artifactModel.ArtifactKind
 	Revision() string
 
 	BindLocatorRuntime(
@@ -38,7 +38,7 @@ type BoundLocatorResolver interface {
 	ResolveLocator(
 		ctx context.Context,
 		request LocatorResolutionRequest,
-	) (artifact.ArtifactRef, error)
+	) (artifactModel.ArtifactRef, error)
 }
 
 // LocatorRuntime is the current Source-index read capability available to a
@@ -49,22 +49,22 @@ type BoundLocatorResolver interface {
 type LocatorRuntime interface {
 	ListArtifactsBySource(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) ([]catalog.Entry, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+	) ([]catalogModel.Entry, error)
 }
 
 // LocatorResolutionRequest is generic provider input. LocatorJSON and
 // EntryJSON preserve the portable declaration data without making
 // artifactory/providerapi import artifact declaration contracts.
 type LocatorResolutionRequest struct {
-	RootID root.RootID
-	From   *artifact.Artifact
+	RootID rootModel.RootID
+	From   *artifactModel.Artifact
 
 	LocatorJSON json.RawMessage
 	EntryJSON   json.RawMessage
 
-	ExpectedKind        artifact.ArtifactKind
+	ExpectedKind        artifactModel.ArtifactKind
 	ExpectedLogicalName spec.LogicalName
 }
 
@@ -114,7 +114,7 @@ func (r LocatorResolutionRequest) Validate() error {
 // resolver slot.
 type LocatorResolverKey struct {
 	LocatorKind  string
-	ArtifactKind artifact.ArtifactKind
+	ArtifactKind artifactModel.ArtifactKind
 }
 
 func (k LocatorResolverKey) Validate() error {
@@ -158,7 +158,7 @@ func ValidateLocatorResolverFactory(
 		)
 	}
 
-	seen := make(map[artifact.ArtifactKind]struct{}, len(kinds))
+	seen := make(map[artifactModel.ArtifactKind]struct{}, len(kinds))
 	for index, kind := range kinds {
 		if err := kind.Validate(); err != nil {
 			return fmt.Errorf(

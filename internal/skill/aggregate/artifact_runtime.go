@@ -12,8 +12,8 @@ import (
 	"github.com/flexigpt/agentskills-go/provider"
 	agentskillsRuntime "github.com/flexigpt/agentskills-go/runtime"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
@@ -25,7 +25,7 @@ type Service struct {
 	lifecycleMu    sync.RWMutex
 	closed         bool
 	catalogSyncMu  sync.Mutex
-	catalogSyncing map[root.RootID]*rootCatalogSync
+	catalogSyncing map[rootModel.RootID]*rootCatalogSync
 }
 
 type rootCatalogSync struct {
@@ -46,7 +46,7 @@ func New(
 	return &Service{
 		resolver:       resolver,
 		runtime:        runtimeService,
-		catalogSyncing: make(map[root.RootID]*rootCatalogSync),
+		catalogSyncing: make(map[rootModel.RootID]*rootCatalogSync),
 	}, nil
 }
 
@@ -68,14 +68,14 @@ func (s *Service) Close() {
 
 func (s *Service) ResolveArtifactSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedArtifactSkill, error) {
 	if err := ref.Validate(); err != nil {
 		return ResolvedArtifactSkill{}, err
 	}
 	values, err := s.ResolveArtifactSkills(
 		ctx,
-		[]artifact.ArtifactRef{ref},
+		[]artifactModel.ArtifactRef{ref},
 	)
 	if err != nil {
 		return ResolvedArtifactSkill{}, err
@@ -95,7 +95,7 @@ func (s *Service) ResolveArtifactSkill(
 // repeatedly calling ResolveArtifactSkill.
 func (s *Service) ResolveArtifactSkills(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) ([]ResolvedArtifactSkill, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err
@@ -112,7 +112,7 @@ func (s *Service) ResolveArtifactSkills(
 // useful during startup after protected topology hydration has completed.
 func (s *Service) SyncRootCatalog(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	if err := s.ensureConfigured(); err != nil {
 		return err
@@ -154,7 +154,7 @@ func (s *Service) GetArtifactSkillsPrompt(
 func (s *Service) ListArtifactSkillRefs(
 	ctx context.Context,
 	filter ArtifactSkillFilter,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return nil, err
 	}
@@ -185,7 +185,7 @@ func (s *Service) ListArtifactSkillRefs(
 		return nil, err
 	}
 
-	output := make([]artifact.ArtifactRef, 0, len(records))
+	output := make([]artifactModel.ArtifactRef, 0, len(records))
 	for _, record := range records {
 		if ref, found := resolved.DefToArtifacts[record.Def]; found {
 			output = append(output, ref)
@@ -200,7 +200,7 @@ func (s *Service) ListArtifactSkillRefs(
 
 func (s *Service) DescribeArtifactSkill(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ArtifactSkillSummary, error) {
 	if err := s.ensureConfigured(); err != nil {
 		return ArtifactSkillSummary{}, err
@@ -243,7 +243,7 @@ func (s *Service) DescribeArtifactSkill(
 
 func (s *Service) resyncRoot(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	catalogID, err := RootCatalogID(rootID)
 	if err != nil {
@@ -256,7 +256,7 @@ func (s *Service) resyncRoot(
 // from independently materializing the same Root at the same time.
 func (s *Service) syncRootCatalog(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	catalogID skillRuntime.CatalogID,
 ) error {
 	s.catalogSyncMu.Lock()
@@ -308,34 +308,34 @@ func (s *Service) isClosed() bool {
 }
 
 type resolvedArtifactSkills struct {
-	DefToArtifacts map[provider.SkillDef]artifact.ArtifactRef
+	DefToArtifacts map[provider.SkillDef]artifactModel.ArtifactRef
 	AllowDefs      []provider.SkillDef
 	Values         []ResolvedArtifactSkill
 }
 
 type unavailableArtifactSkill struct {
-	ref   artifact.ArtifactRef
+	ref   artifactModel.ArtifactRef
 	cause error
 }
 
 func (s *Service) resolveArtifactSkills(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (resolvedArtifactSkills, error) {
 	if err := validateArtifactRefs(refs); err != nil {
 		return resolvedArtifactSkills{}, err
 	}
 	output := resolvedArtifactSkills{
 		DefToArtifacts: make(
-			map[provider.SkillDef]artifact.ArtifactRef,
+			map[provider.SkillDef]artifactModel.ArtifactRef,
 		),
 	}
-	resynced := map[root.RootID]error{}
+	resynced := map[rootModel.RootID]error{}
 	unavailable := make([]unavailableArtifactSkill, 0)
-	readyRefs := make([]artifact.ArtifactRef, 0, len(refs))
+	readyRefs := make([]artifactModel.ArtifactRef, 0, len(refs))
 
 	recordUnavailable := func(
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		cause error,
 	) {
 		unavailable = append(unavailable, unavailableArtifactSkill{
@@ -483,7 +483,7 @@ func unavailableArtifactSkillsError(
 	)
 }
 
-func validateArtifactRefs(values []artifact.ArtifactRef) error {
+func validateArtifactRefs(values []artifactModel.ArtifactRef) error {
 	seen := map[string]struct{}{}
 	for _, value := range values {
 		if err := value.Validate(); err != nil {
@@ -520,6 +520,6 @@ func sortSkillDefs(values []provider.SkillDef) {
 	})
 }
 
-func artifactRefKey(ref artifact.ArtifactRef) string {
+func artifactRefKey(ref artifactModel.ArtifactRef) string {
 	return string(ref.RootID) + "\x00" + string(ref.ArtifactID)
 }

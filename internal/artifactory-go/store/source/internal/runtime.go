@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -20,19 +20,19 @@ import (
 type Runtime interface {
 	Get(
 		ctx context.Context,
-		rootID root.RootID,
-		id source.SourceID,
-	) (source.Source, error)
+		rootID rootModel.RootID,
+		id sourceModel.SourceID,
+	) (sourceModel.Source, error)
 
 	Open(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) (Snapshot, error)
 
 	List(
 		ctx context.Context,
-		rootID root.RootID,
-	) ([]source.Source, error)
+		rootID rootModel.RootID,
+	) ([]sourceModel.Source, error)
 }
 
 // LocalPathRuntime is an optional extension implemented by the trusted source
@@ -43,12 +43,12 @@ type Runtime interface {
 type LocalPathRuntime interface {
 	ResolveLocalPath(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 		locator spec.Locator,
 	) (string, error)
 
 	SupportsLocalPath(
-		kind source.SourceKind,
+		kind sourceModel.SourceKind,
 	) bool
 }
 
@@ -90,7 +90,7 @@ func NewRuntime(
 func ReadSnapshotEntry(
 	ctx context.Context,
 	snapshot Snapshot,
-	entry source.Entry,
+	entry sourceModel.Entry,
 	maximumBytes int64,
 ) ([]byte, error) {
 	if ctx == nil {
@@ -177,7 +177,7 @@ func ReadSnapshotEntry(
 func ReadVerifiedSnapshotEntry(
 	ctx context.Context,
 	runtime Runtime,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 	expectedGeneration string,
 	maximumBytes int64,
@@ -254,7 +254,7 @@ func ReadVerifiedSnapshotEntry(
 func VerifySnapshotContentDigest(
 	ctx context.Context,
 	runtime Runtime,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,
@@ -293,33 +293,33 @@ func VerifySnapshotContentDigest(
 
 func (r *runtime) Get(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
-) (source.Source, error) {
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
+) (sourceModel.Source, error) {
 	if r == nil || r.reader == nil {
-		return source.Source{}, spec.ErrClosed
+		return sourceModel.Source{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: source runtime context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if err := id.Validate(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	value, err := r.reader.Get(ctx, rootID, id)
 	if err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if value.ID != id {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: source reader returned %q for requested source %q",
 			spec.ErrInvalid,
 			value.ID,
@@ -327,7 +327,7 @@ func (r *runtime) Get(
 		)
 	}
 	if value.RootID != rootID {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: source reader returned root %q for requested root %q",
 			spec.ErrInvalid,
 			value.RootID,
@@ -335,15 +335,15 @@ func (r *runtime) Get(
 		)
 	}
 	if err := value.Validate(); err != nil {
-		return source.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
+		return sourceModel.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
 	}
 	return value.Clone(), nil
 }
 
 func (r *runtime) List(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]source.Source, error) {
+	rootID rootModel.RootID,
+) ([]sourceModel.Source, error) {
 	if r == nil || r.reader == nil {
 		return nil, spec.ErrClosed
 	}
@@ -364,7 +364,7 @@ func (r *runtime) List(
 	if err != nil {
 		return nil, err
 	}
-	output := make([]source.Source, len(values))
+	output := make([]sourceModel.Source, len(values))
 	for index, value := range values {
 		if value.RootID != rootID {
 			return nil, fmt.Errorf(
@@ -383,7 +383,7 @@ func (r *runtime) List(
 
 func (r *runtime) Open(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) (Snapshot, error) {
 	if r == nil || r.opener == nil {
 		return nil, spec.ErrClosed
@@ -418,7 +418,7 @@ func (r *runtime) Open(
 // become path-backed implicitly.
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
 	if ctx == nil {
@@ -452,7 +452,7 @@ func (r *runtime) ResolveLocalPath(
 }
 
 func (r *runtime) SupportsLocalPath(
-	kind source.SourceKind,
+	kind sourceModel.SourceKind,
 ) bool {
 	if r == nil || r.localKinds == nil {
 		return false

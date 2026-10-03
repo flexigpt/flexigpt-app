@@ -8,11 +8,11 @@ import (
 	"sort"
 	"sync"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -20,13 +20,13 @@ import (
 type verificationSessionContextKey struct{}
 
 type verificationSessionSourceKey struct {
-	rootID   root.RootID
-	sourceID source.SourceID
+	rootID   rootModel.RootID
+	sourceID sourceModel.SourceID
 }
 
 type verificationSessionSource struct {
-	source     source.Source
-	inspection source.RefreshInspection
+	source     sourceModel.Source
+	inspection sourceModel.RefreshInspection
 	snapshot   sourceimpl.Snapshot
 }
 
@@ -52,7 +52,7 @@ func (borrowedVerificationSession) Close(context.Context) error {
 // simply use the existing per-call path.
 func (s *Service) BeginVerificationSession(
 	ctx context.Context,
-) (context.Context, resource.VerificationSession, error) {
+) (context.Context, resourceModel.VerificationSession, error) {
 	if err := validateContext(ctx, "resource verification session"); err != nil {
 		return nil, nil, err
 	}
@@ -278,11 +278,11 @@ func readVerificationSessionEntry(
 func (s *Service) resolveArtifactInSession(
 	ctx context.Context,
 	session *verificationSession,
-	record artifact.Artifact,
-) (resource.ResolvedArtifact, error) {
+	record artifactModel.Artifact,
+) (resourceModel.ResolvedArtifact, error) {
 	if record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {
-		return resource.ResolvedArtifact{}, fmt.Errorf(
+		return resourceModel.ResolvedArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not currently available",
 			spec.ErrReferenceUnresolved,
 			record.ID,
@@ -295,12 +295,12 @@ func (s *Service) resolveArtifactInSession(
 		*record.ResolvedDefinition,
 	)
 	if err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 
 	var (
-		sourceValue source.Source
-		state       source.RefreshState
+		sourceValue sourceModel.Source
+		state       sourceModel.RefreshState
 	)
 	err = session.withSource(
 		ctx,
@@ -333,17 +333,17 @@ func (s *Service) resolveArtifactInSession(
 		},
 	)
 	if err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 
-	output := resource.ResolvedArtifact{
+	output := resourceModel.ResolvedArtifact{
 		Artifact:     record.Clone(),
 		Definition:   definitionValue.Clone(),
 		Source:       sourceValue.Summary(),
 		RefreshState: state,
 	}
 	if err := output.Validate(); err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 	return output.Clone(), nil
 }
@@ -351,12 +351,12 @@ func (s *Service) resolveArtifactInSession(
 func (s *Service) readSourceEntryInSession(
 	ctx context.Context,
 	session *verificationSession,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	locator spec.Locator,
 	maximumBytes int64,
-) (resource.VerifiedEntry, error) {
-	var output resource.VerifiedEntry
+) (resourceModel.VerifiedEntry, error) {
+	var output resourceModel.VerifiedEntry
 
 	err := session.withSource(
 		ctx,
@@ -375,7 +375,7 @@ func (s *Service) readSourceEntryInSession(
 				return err
 			}
 
-			output = resource.VerifiedEntry{
+			output = resourceModel.VerifiedEntry{
 				RootID:           rootID,
 				SourceID:         sourceID,
 				Locator:          locator,
@@ -388,7 +388,7 @@ func (s *Service) readSourceEntryInSession(
 		},
 	)
 	if err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	return output, nil
 }
@@ -396,7 +396,7 @@ func (s *Service) readSourceEntryInSession(
 func (s *Service) resolveVerifiedLocalPathInSession(
 	ctx context.Context,
 	session *verificationSession,
-	resolved resource.ResolvedArtifact,
+	resolved resourceModel.ResolvedArtifact,
 	localLocator spec.Locator,
 ) (string, error) {
 	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)

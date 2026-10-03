@@ -3,7 +3,7 @@ package provider
 import (
 	"fmt"
 
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -52,7 +52,7 @@ func (d Descriptor) Validate() error {
 		)
 	}
 
-	seenSchemas := make(map[schema.Key]struct{}, len(d.Schemas))
+	seenSchemas := make(map[schemaModel.Key]struct{}, len(d.Schemas))
 	for index, codec := range d.Schemas {
 		if codec == nil {
 			return fmt.Errorf(

@@ -7,10 +7,10 @@ import (
 	"path"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
@@ -23,14 +23,14 @@ import (
 type BuiltinPackageCleanup interface {
 	CaptureBuiltInPackageServers(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		addresses []source.ManagedPackageAddress,
-	) ([]artifact.ArtifactRef, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		addresses []sourceModel.ManagedPackageAddress,
+	) ([]artifactModel.ArtifactRef, error)
 
 	CleanupRemovedBuiltInPackageServers(
 		ctx context.Context,
-		refs []artifact.ArtifactRef,
+		refs []artifactModel.ArtifactRef,
 	) error
 }
 
@@ -52,10 +52,10 @@ func NewBuiltinPackageCleanup(
 
 func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	addresses []source.ManagedPackageAddress,
-) ([]artifact.ArtifactRef, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	addresses []sourceModel.ManagedPackageAddress,
+) ([]artifactModel.ArtifactRef, error) {
 	if c == nil || c.api == nil {
 		return nil, spec.ErrClosed
 	}
@@ -78,23 +78,23 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 		directories[directory] = struct{}{}
 	}
 	if len(directories) == 0 {
-		return []artifact.ArtifactRef{}, nil
+		return []artifactModel.ArtifactRef{}, nil
 	}
 
 	entries, err := c.api.cat.ListBySource(
 		ctx,
 		rootID,
 		sourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	refs := make([]artifact.ArtifactRef, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
+	refs := make([]artifactModel.ArtifactRef, 0)
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 	for _, entry := range entries {
-		if entry.State != artifact.StateAvailable ||
+		if entry.State != artifactModel.StateAvailable ||
 			entry.Kind != mcpDomain.MCPArtifactKind {
 			continue
 		}
@@ -118,7 +118,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 
 func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) error {
 	if c == nil || c.api == nil {
 		return spec.ErrClosed
@@ -131,7 +131,7 @@ func (c *builtinPackageCleanup) CleanupRemovedBuiltInPackageServers(
 			!errors.Is(err, spec.ErrRootNotFound) {
 			return err
 		}
-		if err == nil && record.State == artifact.StateAvailable {
+		if err == nil && record.State == artifactModel.StateAvailable {
 			continue
 		}
 		if err := c.api.purgeBuiltInServerInstallation(ctx, ref); err != nil {

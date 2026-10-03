@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -16,7 +16,7 @@ import (
 //
 // It is a storage identity, not a consumer request or transport projection.
 type Key struct {
-	RootID root.RootID
+	RootID rootModel.RootID
 	Digest cryptoutil.Digest
 }
 
@@ -33,17 +33,17 @@ func (k Key) Validate() error {
 // source-state reconciliation, and immutable Root-local persistence. It is
 // not a semantic name or an Artifact address.
 type Definition struct {
-	Digest         cryptoutil.Digest     `json:"digest"`
-	Kind           artifact.ArtifactKind `json:"kind"`
-	SchemaID       schema.SchemaID       `json:"schemaID"`
-	SchemaVersion  string                `json:"schemaVersion"`
-	LogicalName    spec.LogicalName      `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion   `json:"logicalVersion,omitempty"`
-	DisplayName    string                `json:"displayName,omitempty"`
-	Description    string                `json:"description,omitempty"`
-	Labels         map[string]string     `json:"labels,omitempty"`
-	Body           json.RawMessage       `json:"body"`
-	Dependencies   []Selector            `json:"dependencies,omitempty"`
+	Digest         cryptoutil.Digest          `json:"digest"`
+	Kind           artifactModel.ArtifactKind `json:"kind"`
+	SchemaID       schemaModel.SchemaID       `json:"schemaID"`
+	SchemaVersion  string                     `json:"schemaVersion"`
+	LogicalName    spec.LogicalName           `json:"logicalName"`
+	LogicalVersion spec.LogicalVersion        `json:"logicalVersion,omitempty"`
+	DisplayName    string                     `json:"displayName,omitempty"`
+	Description    string                     `json:"description,omitempty"`
+	Labels         map[string]string          `json:"labels,omitempty"`
+	Body           json.RawMessage            `json:"body"`
+	Dependencies   []Selector                 `json:"dependencies,omitempty"`
 }
 
 func (d Definition) Validate() error {

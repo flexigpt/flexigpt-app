@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -16,7 +16,7 @@ const rootColumns = `
 
 func (s *Store) createRoot(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -41,8 +41,8 @@ func (s *Store) createRoot(
 
 func (s *Store) getRoot(
 	ctx context.Context,
-	id root.RootID,
-) (root.Root, error) {
+	id rootModel.RootID,
+) (rootModel.Root, error) {
 	value, err := scanRoot(s.db.QueryRowContext(
 		ctx,
 		`SELECT `+rootColumns+`
@@ -51,7 +51,7 @@ func (s *Store) getRoot(
 		string(id),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q",
 			spec.ErrRootNotFound,
 			id,
@@ -62,7 +62,7 @@ func (s *Store) getRoot(
 
 func (s *Store) listRoots(
 	ctx context.Context,
-) ([]root.Root, error) {
+) ([]rootModel.Root, error) {
 	rows, err := s.db.QueryContext(
 		ctx,
 		`SELECT `+rootColumns+`
@@ -75,7 +75,7 @@ func (s *Store) listRoots(
 	}
 	defer rows.Close()
 
-	output := make([]root.Root, 0)
+	output := make([]rootModel.Root, 0)
 	for rows.Next() {
 		value, err := scanRoot(rows)
 		if err != nil {
@@ -88,7 +88,7 @@ func (s *Store) listRoots(
 
 func (s *Store) updateRoot(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -122,7 +122,7 @@ func (s *Store) updateRoot(
 
 func (s *Store) retireRoot(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -173,7 +173,7 @@ func (s *Store) retireRoot(
 
 func (s *Store) purgeRoot(
 	ctx context.Context,
-	id root.RootID,
+	id rootModel.RootID,
 	expectedRevision uint64,
 ) error {
 	if expectedRevision == 0 {
@@ -216,7 +216,7 @@ func (s *Store) purgeRoot(
 
 func (s *Store) requireActiveRoot(
 	ctx context.Context,
-	id root.RootID,
+	id rootModel.RootID,
 ) error {
 	var marker int
 	err := s.db.QueryRowContext(
@@ -234,8 +234,8 @@ func (s *Store) requireActiveRoot(
 func getActiveRootTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	id root.RootID,
-) (root.Root, error) {
+	id rootModel.RootID,
+) (rootModel.Root, error) {
 	value, err := scanRoot(tx.QueryRowContext(
 		ctx,
 		`SELECT `+rootColumns+`
@@ -244,7 +244,7 @@ func getActiveRootTx(
 		string(id),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q",
 			spec.ErrRootNotFound,
 			id,
@@ -256,7 +256,7 @@ func getActiveRootTx(
 func rootHasActiveChildrenTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	id root.RootID,
+	id rootModel.RootID,
 ) (bool, error) {
 	var exists int
 	err := tx.QueryRowContext(
@@ -279,7 +279,7 @@ func rootHasActiveChildrenTx(
 	return exists != 0, nil
 }
 
-func scanRoot(row scanner) (root.Root, error) {
+func scanRoot(row scanner) (rootModel.Root, error) {
 	var (
 		id, storageKey, displayName, description string
 		revision                                 uint64
@@ -287,7 +287,7 @@ func scanRoot(row scanner) (root.Root, error) {
 		retiredAt                                sql.NullInt64
 	)
 	if row == nil {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: Root row is nil",
 			spec.ErrInvalid,
 		)
@@ -302,10 +302,10 @@ func scanRoot(row scanner) (root.Root, error) {
 		&modifiedAt,
 		&retiredAt,
 	); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
-	value := root.Root{
-		ID:          root.RootID(id),
+	value := rootModel.Root{
+		ID:          rootModel.RootID(id),
 		StorageKey:  spec.StorageKey(storageKey),
 		DisplayName: displayName,
 		Description: description,
@@ -315,7 +315,7 @@ func scanRoot(row scanner) (root.Root, error) {
 		RetiredAt:   parseNullableTime(retiredAt),
 	}
 	if err := value.Validate(); err != nil {
-		return root.Root{}, fmt.Errorf("invalid persisted root %q: %w", id, err)
+		return rootModel.Root{}, fmt.Errorf("invalid persisted root %q: %w", id, err)
 	}
 	return value, nil
 }

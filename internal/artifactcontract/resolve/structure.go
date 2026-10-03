@@ -14,8 +14,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/teamv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workflowv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -354,9 +354,9 @@ func decodeStoredStructure[T any](entry declaration.Entry) (T, error) {
 func (r *Resolver) resolveSingleMember(
 	ctx context.Context,
 	state *resolutionState,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	member declaration.Entry,
-	from *artifact.Artifact,
+	from *artifactModel.Artifact,
 	depth int,
 	relationshipPath []string,
 ) (ResolvedRelationship, error) {

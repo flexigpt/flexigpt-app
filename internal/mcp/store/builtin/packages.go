@@ -12,10 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -31,16 +31,16 @@ import (
 // refreshing the managed built-in Source.
 type PreparedPackage struct {
 	EmbeddedPackageRoot spec.Locator
-	PackageAddress      source.ManagedPackageAddress
+	PackageAddress      sourceModel.ManagedPackageAddress
 	DocumentFile        spec.Locator
-	PackageFiles        []source.ManagedPackageFile
+	PackageFiles        []sourceModel.ManagedPackageFile
 	Expectations        []ArtifactExpectation
 }
 
 type ArtifactExpectation struct {
 	Locator          spec.Locator
 	Subresource      spec.SubresourceLocator
-	Kind             artifact.ArtifactKind
+	Kind             artifactModel.ArtifactKind
 	LogicalName      spec.LogicalName
 	LogicalVersion   spec.LogicalVersion
 	DefinitionDigest cryptoutil.Digest
@@ -104,12 +104,12 @@ func preparePackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	files, err = source.NormalizeManagedPackageFiles(files)
+	files, err = sourceModel.NormalizeManagedPackageFiles(files)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 
-	documentFile, document, found, err := source.PackageFileContentOneOf(
+	documentFile, document, found, err := sourceModel.PackageFileContentOneOf(
 		files,
 		documentTopology.CollectionDocumentFiles(),
 	)
@@ -141,7 +141,7 @@ func preparePackage(
 	if err := packageName.Validate(); err != nil {
 		return PreparedPackage{}, err
 	}
-	address, err := source.NewManagedPackageAddress(
+	address, err := sourceModel.NewManagedPackageAddress(
 		mcpDomain.MCPCollectionPackageKind,
 		packageName,
 		documentTopology.UnversionedPackageVersion(),
@@ -206,7 +206,7 @@ func canonicalCollectionExpectations(
 
 	output := make([]ArtifactExpectation, 0, len(named))
 	for _, value := range named {
-		var definitionValue definition.Definition
+		var definitionValue definitionModel.Definition
 		if value.SubresourceLocator == "" {
 			definitionValue, err = decoder.DefinitionForEntry(value.Entry)
 		} else {
@@ -252,7 +252,7 @@ func canonicalCollectionExpectations(
 }
 
 type preparedArtifactIdentity struct {
-	kind artifact.ArtifactKind
+	kind artifactModel.ArtifactKind
 	name spec.LogicalName
 }
 

@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -51,8 +51,8 @@ func (s *Store) GetTopologyHydration(
 
 	value := topology.Hydration{
 		InstallerName: installerName,
-		RootID:        root.RootID(rootID),
-		SourceID:      source.SourceID(sourceID),
+		RootID:        rootModel.RootID(rootID),
+		SourceID:      sourceModel.SourceID(sourceID),
 		Fingerprint:   cryptoutil.Digest(fingerprint),
 	}
 	if err := value.Validate(); err != nil {
@@ -138,8 +138,8 @@ func (s *Store) ListTopologyPackageHydrations(
 				InstallerName: installerName,
 				Scope:         spec.Locator(scope),
 			},
-			RootID:      root.RootID(rootID),
-			SourceID:    source.SourceID(sourceID),
+			RootID:      rootModel.RootID(rootID),
+			SourceID:    sourceModel.SourceID(sourceID),
 			Fingerprint: cryptoutil.Digest(fingerprint),
 		}
 		if err := value.Validate(); err != nil {
@@ -205,7 +205,7 @@ func (s *Store) DeleteTopologyPackageHydration(
 // established by assembly.Components.ResetTopologyHydration.
 func (s *Store) PurgeTopologyRoot(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	if s == nil || s.db == nil {
 		return spec.ErrClosed

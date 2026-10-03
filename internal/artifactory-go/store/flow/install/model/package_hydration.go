@@ -6,8 +6,8 @@ import (
 	"maps"
 	"slices"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -26,8 +26,8 @@ func (k PackageHydrationKey) Validate() error {
 
 type PackageHydration struct {
 	Key         PackageHydrationKey
-	RootID      root.RootID
-	SourceID    source.SourceID
+	RootID      rootModel.RootID
+	SourceID    sourceModel.SourceID
 	Fingerprint cryptoutil.Digest
 }
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
@@ -14,13 +14,13 @@ import (
 type Service struct {
 	repository Repository
 	clock      clockutil.Clock
-	policy     root.RootPolicy
+	policy     rootModel.RootPolicy
 }
 
 func NewService(
 	repository Repository,
 	timeClock clockutil.Clock,
-	policy root.RootPolicy,
+	policy rootModel.RootPolicy,
 ) (*Service, error) {
 	if repository == nil || timeClock == nil {
 		return nil, fmt.Errorf(
@@ -37,10 +37,10 @@ func NewService(
 
 func (s *Service) Create(
 	ctx context.Context,
-	draft root.RootDraft,
-) (root.Root, error) {
+	draft rootModel.RootDraft,
+) (rootModel.Root, error) {
 	if err := RequireMutableRoot(ctx, s.policy, draft.ID); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	return s.create(ctx, draft)
 }
@@ -49,58 +49,58 @@ func (s *Service) Create(
 // Artifact Store does not assign any feature meaning to the Root.
 func (s *Service) EnsureSystem(
 	ctx context.Context,
-	draft root.RootDraft,
-) (root.Root, error) {
+	draft rootModel.RootDraft,
+) (rootModel.Root, error) {
 	if err := draft.ID.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if s.policy == nil || !s.policy.IsProtectedRoot(draft.ID) {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: Root %q is not declared as protected application topology",
 			spec.ErrProtected,
 			draft.ID,
 		)
 	}
 	if err := install.RequirePrivileged(ctx); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	return s.create(ctx, draft)
 }
 
 func (s *Service) Get(
 	ctx context.Context,
-	id root.RootID,
-) (root.Root, error) {
+	id rootModel.RootID,
+) (rootModel.Root, error) {
 	if err := id.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	return s.repository.Get(ctx, id)
 }
 
-func (s *Service) List(ctx context.Context) ([]root.Root, error) {
+func (s *Service) List(ctx context.Context) ([]rootModel.Root, error) {
 	return s.repository.List(ctx)
 }
 
 func (s *Service) Update(
 	ctx context.Context,
-	id root.RootID,
-	update root.RootUpdate,
-) (root.Root, error) {
+	id rootModel.RootID,
+	update rootModel.RootUpdate,
+) (rootModel.Root, error) {
 	if err := RequireMutableRoot(ctx, s.policy, id); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
 			spec.ErrConflict,
 			id,
@@ -117,37 +117,37 @@ func (s *Service) Update(
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	return next, nil
 }
 
 func (s *Service) Retire(
 	ctx context.Context,
-	id root.RootID,
+	id rootModel.RootID,
 	expectedRevision uint64,
-) (root.Root, error) {
+) (rootModel.Root, error) {
 	if err := id.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if err := requireRootDeletion(ctx, s.policy, id); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if expectedRevision == 0 {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: expected root revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, id)
 	if err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if current.Revision != expectedRevision {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q changed since it was read",
 			spec.ErrConflict,
 			id,
@@ -159,17 +159,17 @@ func (s *Service) Retire(
 	next.ModifiedAt = modifiedAt
 	next.Revision++
 	if err := next.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	if err := s.repository.Retire(ctx, next, expectedRevision); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	return next, nil
 }
 
 func (s *Service) Purge(
 	ctx context.Context,
-	id root.RootID,
+	id rootModel.RootID,
 	expectedRevision uint64,
 ) error {
 	if err := id.Validate(); err != nil {
@@ -189,13 +189,13 @@ func (s *Service) Purge(
 
 func (s *Service) create(
 	ctx context.Context,
-	draft root.RootDraft,
-) (root.Root, error) {
+	draft rootModel.RootDraft,
+) (rootModel.Root, error) {
 	if err := draft.ID.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	now := clockutil.NowUTC(s.clock)
-	value := root.Root{
+	value := rootModel.Root{
 		ID:          draft.ID,
 		StorageKey:  draft.StorageKey,
 		DisplayName: draft.DisplayName,
@@ -205,24 +205,24 @@ func (s *Service) create(
 		ModifiedAt:  now,
 	}
 	if err := value.Validate(); err != nil {
-		return root.Root{}, err
+		return rootModel.Root{}, err
 	}
 	createErr := s.repository.Create(ctx, value)
 	if createErr == nil {
 		return value, nil
 	}
 	if !errors.Is(createErr, spec.ErrConflict) {
-		return root.Root{}, createErr
+		return rootModel.Root{}, createErr
 	}
 
 	existing, err := s.repository.Get(ctx, draft.ID)
 	if err != nil {
-		return root.Root{}, createErr
+		return rootModel.Root{}, createErr
 	}
 	if existing.DisplayName != draft.DisplayName ||
 		existing.StorageKey != draft.StorageKey ||
 		existing.Description != draft.Description {
-		return root.Root{}, fmt.Errorf(
+		return rootModel.Root{}, fmt.Errorf(
 			"%w: root %q creation intent differs",
 			spec.ErrConflict,
 			draft.ID,
@@ -237,10 +237,10 @@ func (s *Service) create(
 // policy rather than protected-topology installation access.
 func requireRootDeletion(
 	ctx context.Context,
-	policy root.RootPolicy,
-	rootID root.RootID,
+	policy rootModel.RootPolicy,
+	rootID rootModel.RootID,
 ) error {
-	if deletionPolicy, supported := policy.(root.RootDeletionPolicy); supported &&
+	if deletionPolicy, supported := policy.(rootModel.RootDeletionPolicy); supported &&
 		deletionPolicy.IsRootDeletionProtected(rootID) {
 		return fmt.Errorf(
 			"%w: root %q is retained and cannot be retired or purged",
@@ -253,8 +253,8 @@ func requireRootDeletion(
 
 func RequireMutableRoot(
 	ctx context.Context,
-	policy root.RootPolicy,
-	rootID root.RootID,
+	policy rootModel.RootPolicy,
+	rootID rootModel.RootID,
 ) error {
 	if policy == nil || !policy.IsProtectedRoot(rootID) {
 		return nil

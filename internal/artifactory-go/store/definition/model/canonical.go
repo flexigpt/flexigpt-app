@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -38,16 +38,16 @@ func Canonicalize(input Definition) (Definition, error) {
 	}
 
 	payload := struct {
-		Kind           artifact.ArtifactKind `json:"kind"`
-		SchemaID       schema.SchemaID       `json:"schemaID"`
-		SchemaVersion  string                `json:"schemaVersion"`
-		LogicalName    spec.LogicalName      `json:"logicalName"`
-		LogicalVersion spec.LogicalVersion   `json:"logicalVersion,omitempty"`
-		DisplayName    string                `json:"displayName,omitempty"`
-		Description    string                `json:"description,omitempty"`
-		Labels         map[string]string     `json:"labels,omitempty"`
-		Body           json.RawMessage       `json:"body"`
-		Dependencies   []Selector            `json:"dependencies,omitempty"`
+		Kind           artifactModel.ArtifactKind `json:"kind"`
+		SchemaID       schemaModel.SchemaID       `json:"schemaID"`
+		SchemaVersion  string                     `json:"schemaVersion"`
+		LogicalName    spec.LogicalName           `json:"logicalName"`
+		LogicalVersion spec.LogicalVersion        `json:"logicalVersion,omitempty"`
+		DisplayName    string                     `json:"displayName,omitempty"`
+		Description    string                     `json:"description,omitempty"`
+		Labels         map[string]string          `json:"labels,omitempty"`
+		Body           json.RawMessage            `json:"body"`
+		Dependencies   []Selector                 `json:"dependencies,omitempty"`
 	}{
 		Kind:           output.Kind,
 		SchemaID:       output.SchemaID,

@@ -4,13 +4,13 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/workspacev1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
+const WorkspaceArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 	workspacev1.WorkspaceType,
 )
 
@@ -18,21 +18,21 @@ const WorkspaceArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
 // workspacev1 Definition. It is a consumer value, not an Artifact Store
 // aggregate, portable declaration, or consumer wire projection.
 type Workspace struct {
-	Artifact            artifact.Artifact             `json:"-"`
-	Definition          definition.Definition         `json:"-"`
+	Artifact            artifactModel.Artifact        `json:"-"`
+	Definition          definitionModel.Definition    `json:"-"`
 	Document            workspacev1.WorkspaceDocument `json:"-"`
-	CompositionSourceID source.SourceID               `json:"-"`
+	CompositionSourceID sourceModel.SourceID          `json:"-"`
 }
 
 // WorkspaceView is the consumer-facing Workspace projection. Artifact is
 // intentionally exposed as the Artifact Store's stable public base record.
 // Definition.Body and WorkspaceDocument.Members remain internal.
 type WorkspaceView struct {
-	Artifact    artifact.Artifact `json:"artifact"`
-	Description string            `json:"description,omitempty"`
+	Artifact    artifactModel.Artifact `json:"artifact"`
+	Description string                 `json:"description,omitempty"`
 }
 
-func (v WorkspaceView) Ref() artifact.ArtifactRef {
+func (v WorkspaceView) Ref() artifactModel.ArtifactRef {
 	return v.Artifact.Ref()
 }
 
@@ -48,8 +48,8 @@ func (v WorkspaceView) Validate() error {
 }
 
 func NewWorkspace(
-	record artifact.Artifact,
-	value definition.Definition,
+	record artifactModel.Artifact,
+	value definitionModel.Definition,
 ) (Workspace, error) {
 	if err := record.Validate(); err != nil {
 		return Workspace{}, err
@@ -116,7 +116,7 @@ func (w Workspace) View() WorkspaceView {
 	}
 }
 
-func (w Workspace) Ref() artifact.ArtifactRef {
+func (w Workspace) Ref() artifactModel.ArtifactRef {
 	return w.Artifact.Ref()
 }
 

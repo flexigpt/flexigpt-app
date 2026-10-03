@@ -9,8 +9,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 )
 
 type apiOptions struct {
@@ -72,8 +72,8 @@ type mcpLocatorRuntime struct {
 
 func (r mcpLocatorRuntime) ListArtifactsBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 ) ([]catalogModel.Entry, error) {
 	return r.cat.ListBySource(
 		ctx,

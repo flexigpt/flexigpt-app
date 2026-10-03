@@ -9,8 +9,8 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
@@ -144,8 +144,8 @@ func createManagedSkillInCollection(
 func managedSkillFiles(
 	document []byte,
 	checklist string,
-) []source.ManagedPackageFile {
-	return []source.ManagedPackageFile{
+) []sourceModel.ManagedPackageFile {
+	return []sourceModel.ManagedPackageFile{
 		{
 			Locator: spec.Locator("SKILL.md"),
 			Content: append([]byte(nil), document...),
@@ -203,8 +203,8 @@ func findCollectionByName(
 
 func skillRevisionSnapshot(
 	values []skillConsumerAPI.SkillListItem,
-) map[artifact.ArtifactRef]uint64 {
-	output := make(map[artifact.ArtifactRef]uint64, len(values))
+) map[artifactModel.ArtifactRef]uint64 {
+	output := make(map[artifactModel.ArtifactRef]uint64, len(values))
 	for _, value := range values {
 		output[value.Ref] = value.Revision
 	}

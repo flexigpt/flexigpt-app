@@ -5,14 +5,14 @@ import (
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func ModelProviderPackageAddress(
 	name spec.LogicalName,
-) (source.ManagedPackageAddress, error) {
-	return source.NewManagedPackageAddress(
+) (sourceModel.ManagedPackageAddress, error) {
+	return sourceModel.NewManagedPackageAddress(
 		ModelProviderPackageKind,
 		name,
 		topology.UnversionedPackageVersion(),
@@ -21,8 +21,8 @@ func ModelProviderPackageAddress(
 
 func ModelPackageAddress(
 	name spec.LogicalName,
-) (source.ManagedPackageAddress, error) {
-	return source.NewManagedPackageAddress(
+) (sourceModel.ManagedPackageAddress, error) {
+	return sourceModel.NewManagedPackageAddress(
 		ModelPackageKind,
 		name,
 		topology.UnversionedPackageVersion(),
@@ -30,7 +30,7 @@ func ModelPackageAddress(
 }
 
 func ModelProviderPackageLocator(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	if err := validateModelProviderPackageAddress(address); err != nil {
 		return "", err
@@ -39,7 +39,7 @@ func ModelProviderPackageLocator(
 }
 
 func ModelPackageLocator(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	if err := validateModelPackageAddress(address); err != nil {
 		return "", err
@@ -49,7 +49,7 @@ func ModelPackageLocator(
 
 func ModelProviderPackageAddressFromLocator(
 	locator spec.Locator,
-) (source.ManagedPackageAddress, error) {
+) (sourceModel.ManagedPackageAddress, error) {
 	return packageAddressFromLocator(
 		ModelProviderPackageKind,
 		ModelProviderDocumentFile(),
@@ -59,7 +59,7 @@ func ModelProviderPackageAddressFromLocator(
 
 func ModelPackageAddressFromLocator(
 	locator spec.Locator,
-) (source.ManagedPackageAddress, error) {
+) (sourceModel.ManagedPackageAddress, error) {
 	return packageAddressFromLocator(
 		ModelPackageKind,
 		ModelDocumentFile(),
@@ -68,7 +68,7 @@ func ModelPackageAddressFromLocator(
 }
 
 func validateModelProviderPackageAddress(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) error {
 	if err := address.Validate(); err != nil {
 		return err
@@ -91,7 +91,7 @@ func validateModelProviderPackageAddress(
 }
 
 func validateModelPackageAddress(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) error {
 	if err := address.Validate(); err != nil {
 		return err
@@ -114,15 +114,15 @@ func validateModelPackageAddress(
 }
 
 func packageAddressFromLocator(
-	kind source.PackageKind,
+	kind sourceModel.PackageKind,
 	documentFile spec.Locator,
 	locator spec.Locator,
-) (source.ManagedPackageAddress, error) {
+) (sourceModel.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 	if path.Base(string(locator)) != string(documentFile) {
-		return source.ManagedPackageAddress{}, fmt.Errorf(
+		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Model package locator %q is not %q",
 			spec.ErrInvalid,
 			locator,
@@ -130,14 +130,14 @@ func packageAddressFromLocator(
 		)
 	}
 
-	address, err := source.ParseManagedPackageAddressDirectory(
+	address, err := sourceModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 	if address.Kind != kind {
-		return source.ManagedPackageAddress{}, fmt.Errorf(
+		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Model package kind is %q, expected %q",
 			spec.ErrInvalid,
 			address.Kind,
@@ -145,7 +145,7 @@ func packageAddressFromLocator(
 		)
 	}
 	if address.Version != topology.UnversionedPackageVersion() {
-		return source.ManagedPackageAddress{}, fmt.Errorf(
+		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Model packages must use the unversioned layout",
 			spec.ErrInvalid,
 		)

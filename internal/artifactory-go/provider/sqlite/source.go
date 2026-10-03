@@ -7,9 +7,9 @@ import (
 	"fmt"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -21,7 +21,7 @@ const sourceColumns = `
 
 func (s *Store) createSource(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -77,11 +77,11 @@ func (s *Store) createSource(
 
 func (s *Store) getSource(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
-) (source.Source, error) {
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
+) (sourceModel.Source, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	value, err := scanSource(s.db.QueryRowContext(
 		ctx,
@@ -94,7 +94,7 @@ func (s *Store) getSource(
 		string(id),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
 			spec.ErrSourceNotFound,
 			id,
@@ -106,17 +106,17 @@ func (s *Store) getSource(
 
 func (s *Store) findSourceByStorageKey(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	storageKey spec.StorageKey,
-) (source.Source, error) {
+) (sourceModel.Source, error) {
 	if err := rootID.Validate(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if err := storageKey.Validate(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 
 	value, err := scanSource(s.db.QueryRowContext(
@@ -128,7 +128,7 @@ func (s *Store) findSourceByStorageKey(
 		string(storageKey),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source storage key %q in Root %q",
 			spec.ErrSourceNotFound,
 			storageKey,
@@ -140,8 +140,8 @@ func (s *Store) findSourceByStorageKey(
 
 func (s *Store) listSources(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]source.Source, error) {
+	rootID rootModel.RootID,
+) ([]sourceModel.Source, error) {
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
 		return nil, err
 	}
@@ -159,7 +159,7 @@ func (s *Store) listSources(
 	}
 	defer rows.Close()
 
-	output := make([]source.Source, 0)
+	output := make([]sourceModel.Source, 0)
 	for rows.Next() {
 		value, err := scanSource(rows)
 		if err != nil {
@@ -172,7 +172,7 @@ func (s *Store) listSources(
 
 func (s *Store) updateSource(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -281,7 +281,7 @@ func (s *Store) updateSource(
 
 func (s *Store) retireSource(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -380,8 +380,8 @@ func (s *Store) retireSource(
 
 func (s *Store) discardSource(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	if err := rootID.Validate(); err != nil {
@@ -444,8 +444,8 @@ func (s *Store) discardSource(
 
 func (s *Store) purgeSource(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	if err := rootID.Validate(); err != nil {
@@ -483,8 +483,8 @@ func (s *Store) purgeSource(
 func requireActiveSourceTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 ) error {
 	_, err := getActiveSourceTx(ctx, tx, rootID, sourceID)
 	return err
@@ -493,9 +493,9 @@ func requireActiveSourceTx(
 func getActiveSourceTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (source.Source, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.Source, error) {
 	value, err := scanSource(tx.QueryRowContext(
 		ctx,
 		`SELECT `+sourceColumns+`
@@ -507,7 +507,7 @@ func getActiveSourceTx(
 		string(sourceID),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
 			spec.ErrSourceNotFound,
 			sourceID,
@@ -520,8 +520,8 @@ func getActiveSourceTx(
 func markSourceArtifactsMissingTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	modifiedAt time.Time,
 	code string,
 	message string,
@@ -556,13 +556,13 @@ func markSourceArtifactsMissingTx(
 			OR resolved_definition_digest IS NOT NULL
 			OR source_content_digest IS NOT NULL
 		   )`,
-		string(artifact.StateMissing),
+		string(artifactModel.StateMissing),
 		diagnostics,
 		timeValue(modifiedAt),
 		timeValue(modifiedAt),
 		string(rootID),
 		string(sourceID),
-		string(artifact.StateMissing),
+		string(artifactModel.StateMissing),
 	)
 	return sqliteError(err)
 }
@@ -573,7 +573,7 @@ type scanner interface {
 
 func scanSource(
 	row scanner,
-) (source.Source, error) {
+) (sourceModel.Source, error) {
 	var (
 		id, rootID, rootStorageKey, storageKey, kind, displayName string
 		enabled                                                   int
@@ -583,7 +583,7 @@ func scanSource(
 		retiredAt                                                 sql.NullInt64
 	)
 	if row == nil {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: Source row is nil",
 			spec.ErrInvalid,
 		)
@@ -603,18 +603,18 @@ func scanSource(
 		&modifiedAt,
 		&retiredAt,
 	); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
-	var discovery source.DiscoverySpec
+	var discovery sourceModel.DiscoverySpec
 	if err := decodeJSON(discoveryRaw, &discovery); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
-	value := source.Source{
-		ID:             source.SourceID(id),
-		RootID:         root.RootID(rootID),
+	value := sourceModel.Source{
+		ID:             sourceModel.SourceID(id),
+		RootID:         rootModel.RootID(rootID),
 		RootStorageKey: spec.StorageKey(rootStorageKey),
 		StorageKey:     spec.StorageKey(storageKey),
-		Kind:           source.SourceKind(kind),
+		Kind:           sourceModel.SourceKind(kind),
 		DisplayName:    displayName,
 		Enabled:        enabled != 0,
 		Config:         append([]byte(nil), config...),
@@ -625,7 +625,7 @@ func scanSource(
 		RetiredAt:      parseNullableTime(retiredAt),
 	}
 	if err := value.Validate(); err != nil {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"invalid persisted Source %q: %w",
 			id,
 			err,

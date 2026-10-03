@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -12,7 +12,7 @@ import (
 type BaselineEnsurer interface {
 	EnsureSkillBaselineCollection(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) (collection.CollectionView, error)
 }
 
@@ -32,7 +32,7 @@ func NewBaselineEnsurer(api *API) (BaselineEnsurer, error) {
 
 func (s *baselineEnsurer) EnsureSkillBaselineCollection(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (collection.CollectionView, error) {
 	if s == nil || s.api == nil {
 		return collection.CollectionView{}, spec.ErrClosed

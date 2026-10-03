@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	toolRuntime "github.com/flexigpt/flexigpt-app/internal/tool/runtime"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
@@ -43,7 +43,7 @@ func New(
 
 func (s *Service) MapToolTarget(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (resolve.MappedTarget, error) {
 	if err := s.ready(ctx); err != nil {
 		return resolve.MappedTarget{}, err

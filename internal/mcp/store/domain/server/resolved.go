@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -26,7 +26,7 @@ type EnvironmentResolver interface {
 type Resolver interface {
 	ResolveMCPServer(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (Resolved, error)
 }
 

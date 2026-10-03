@@ -1,7 +1,7 @@
 package model
 
 import (
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -14,7 +14,7 @@ import (
 // This permits one physical declaration origin to later emit a different
 // kind while retaining the prior Artifact as incompatible for diagnostics.
 type SourceBinding struct {
-	SourceID           source.SourceID         `json:"sourceID"`
+	SourceID           sourceModel.SourceID    `json:"sourceID"`
 	Locator            spec.Locator            `json:"locator"`
 	SubresourceLocator spec.SubresourceLocator `json:"subresourceLocator,omitempty"`
 }

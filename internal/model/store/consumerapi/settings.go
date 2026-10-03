@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -37,7 +37,7 @@ func (a *API) SaveProviderSettings(
 	if err != nil {
 		return ProviderView{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return ProviderView{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -127,7 +127,7 @@ func (a *API) SaveProviderSettings(
 
 func (a *API) ResetProviderSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
 ) (ProviderView, error) {
@@ -170,7 +170,7 @@ func (a *API) ResetProviderSettings(
 
 func (a *API) GetProviderAPIKeyStatus(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ProviderAPIKeyStatus, error) {
 	if err := a.ready(ctx); err != nil {
 		return ProviderAPIKeyStatus{}, err
@@ -184,7 +184,7 @@ func (a *API) GetProviderAPIKeyStatus(
 	if err != nil {
 		return ProviderAPIKeyStatus{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -237,7 +237,7 @@ func (a *API) SetProviderAPIKey(
 	if err != nil {
 		return ProviderAPIKeyStatus{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -250,7 +250,7 @@ func (a *API) SetProviderAPIKey(
 
 	if _, err := a.overlays.ReplaceProviderCredential(
 		ctx,
-		secret.ReplaceBindingRequest{
+		secretModel.ReplaceBindingRequest{
 			Key: modelOverlay.ProviderCredentialBindingKey(
 				request.Provider,
 			),
@@ -267,7 +267,7 @@ func (a *API) SetProviderAPIKey(
 
 func (a *API) ClearProviderAPIKey(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
 ) (ProviderAPIKeyStatus, error) {
@@ -291,7 +291,7 @@ func (a *API) ClearProviderAPIKey(
 	if err != nil {
 		return ProviderAPIKeyStatus{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return ProviderAPIKeyStatus{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -320,7 +320,7 @@ func (a *API) ClearProviderAPIKey(
 
 	if err := a.overlays.ClearProviderCredential(
 		ctx,
-		secret.ClearBindingRequest{
+		secretModel.ClearBindingRequest{
 			Key:                      modelOverlay.ProviderCredentialBindingKey(ref),
 			ExpectedArtifactRevision: expectedProviderRevision,
 			ExpectedBindingRevision:  expectedAPIKeyRevision,
@@ -356,7 +356,7 @@ func (a *API) SaveModelSettings(
 	if err != nil {
 		return ModelView{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return ModelView{}, fmt.Errorf(
 			"%w: Model Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -432,7 +432,7 @@ func (a *API) SaveModelSettings(
 
 func (a *API) ResetModelSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedModelRevision uint64,
 	expectedSettingsRevision uint64,
 ) (ModelView, error) {
@@ -471,7 +471,7 @@ func (a *API) ResetModelSettings(
 
 func (a *API) providerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ProviderSettings, error) {
 	value, found, err := a.overlays.GetProviderOverlay(ctx, ref)
 	if err != nil {
@@ -516,7 +516,7 @@ func (a *API) providerSettings(
 
 func (a *API) modelSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ModelSettings, error) {
 	value, found, err := a.overlays.GetModelOverlay(ctx, ref)
 	if err != nil {
@@ -590,14 +590,14 @@ func decodeOptionalObject[T any](
 
 func (a *API) purgeProviderLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return a.overlays.PurgeProviderLocalState(ctx, ref)
 }
 
 func (a *API) purgeModelLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return a.overlays.PurgeModelLocalState(ctx, ref)
 }

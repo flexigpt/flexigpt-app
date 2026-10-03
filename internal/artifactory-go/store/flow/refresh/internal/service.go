@@ -7,14 +7,14 @@ import (
 	"sort"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	refresh "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -29,7 +29,7 @@ type Service struct {
 	synchronizer *artifactimpl.Synchronizer
 	publisher    Publisher
 	clock        clockutil.Clock
-	policy       root.RootPolicy
+	policy       rootModel.RootPolicy
 }
 
 func NewService(
@@ -40,7 +40,7 @@ func NewService(
 	synchronizer *artifactimpl.Synchronizer,
 	publisher Publisher,
 	timeClock clockutil.Clock,
-	policy root.RootPolicy,
+	policy rootModel.RootPolicy,
 ) (*Service, error) {
 	if sources == nil ||
 		artifacts == nil ||
@@ -68,42 +68,42 @@ func NewService(
 
 func (s *Service) RefreshRoot(
 	ctx context.Context,
-	rootID root.RootID,
-) (refresh.RefreshRootResult, error) {
+	rootID rootModel.RootID,
+) (refreshModel.RefreshRootResult, error) {
 	if s == nil {
-		return refresh.RefreshRootResult{}, spec.ErrClosed
+		return refreshModel.RefreshRootResult{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return refresh.RefreshRootResult{}, fmt.Errorf(
+		return refreshModel.RefreshRootResult{}, fmt.Errorf(
 			"%w: Root refresh context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return refresh.RefreshRootResult{}, err
+		return refreshModel.RefreshRootResult{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return refresh.RefreshRootResult{}, err
+		return refreshModel.RefreshRootResult{}, err
 	}
 	if err := rootimpl.RequireMutableRoot(
 		ctx,
 		s.policy,
 		rootID,
 	); err != nil {
-		return refresh.RefreshRootResult{}, err
+		return refreshModel.RefreshRootResult{}, err
 	}
 
 	values, err := s.sources.List(ctx, rootID)
 	if err != nil {
-		return refresh.RefreshRootResult{}, err
+		return refreshModel.RefreshRootResult{}, err
 	}
 	sort.Slice(values, func(left, right int) bool {
 		return values[left].ID < values[right].ID
 	})
 
-	result := refresh.RefreshRootResult{
+	result := refreshModel.RefreshRootResult{
 		RootID:  rootID,
-		Sources: make([]refresh.RefreshSourceResult, 0),
+		Sources: make([]refreshModel.RefreshSourceResult, 0),
 	}
 	for _, value := range values {
 		if !value.Enabled || value.Discovery.Empty() {
@@ -115,7 +115,7 @@ func (s *Service) RefreshRoot(
 			value.ID,
 		)
 		if err != nil {
-			return refresh.RefreshRootResult{}, err
+			return refreshModel.RefreshRootResult{}, err
 		}
 		result.Sources = append(result.Sources, refreshed)
 		result.Diagnostics = diagnostic.Append(
@@ -124,55 +124,55 @@ func (s *Service) RefreshRoot(
 		)
 	}
 	if err := result.Validate(); err != nil {
-		return refresh.RefreshRootResult{}, err
+		return refreshModel.RefreshRootResult{}, err
 	}
 	return result.Clone(), nil
 }
 
 func (s *Service) RefreshSource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (refresh.RefreshSourceResult, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (refreshModel.RefreshSourceResult, error) {
 	if s == nil {
-		return refresh.RefreshSourceResult{}, spec.ErrClosed
+		return refreshModel.RefreshSourceResult{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return refresh.RefreshSourceResult{}, fmt.Errorf(
+		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source refresh context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := rootimpl.RequireMutableRoot(
 		ctx,
 		s.policy,
 		rootID,
 	); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if !value.Enabled {
-		return refresh.RefreshSourceResult{}, fmt.Errorf(
+		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source %q is disabled",
 			spec.ErrConflict,
 			sourceID,
 		)
 	}
 	if value.Discovery.Empty() {
-		return refresh.RefreshSourceResult{}, fmt.Errorf(
+		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: Source %q has no declaration discovery configuration",
 			spec.ErrRefreshRequired,
 			sourceID,
@@ -190,12 +190,12 @@ func (s *Service) RefreshSource(
 		expectedRefreshRevision = previous.Revision
 	case errors.Is(stateErr, spec.ErrRefreshStateNotFound):
 	default:
-		return refresh.RefreshSourceResult{}, stateErr
+		return refreshModel.RefreshSourceResult{}, stateErr
 	}
 
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	snapshotOpen := true
 	defer func() {
@@ -211,7 +211,7 @@ func (s *Service) RefreshSource(
 		snapshot,
 	)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	existing, err := s.artifacts.ListBySource(
 		ctx,
@@ -219,7 +219,7 @@ func (s *Service) RefreshSource(
 		sourceID,
 	)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	synchronization, err := s.synchronizer.Synchronize(
 		ctx,
@@ -230,29 +230,29 @@ func (s *Service) RefreshSource(
 		existing,
 	)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := snapshot.Close(); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	snapshotOpen = false
 
 	discoveryFingerprint, err := value.Discovery.Fingerprint()
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	definitions, err := definitionsFromObservations(
 		discovered.Observations,
 	)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 
 	publication := Publication{
@@ -274,17 +274,17 @@ func (s *Service) RefreshSource(
 	}
 	published, err := s.publisher.Publish(ctx, publication)
 	if err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	if err := published.Validate(); err != nil {
-		return refresh.RefreshSourceResult{}, fmt.Errorf(
+		return refreshModel.RefreshSourceResult{}, fmt.Errorf(
 			"%w: refresh publisher returned invalid state: %w",
 			spec.ErrInvalid,
 			err,
 		)
 	}
 
-	result := refresh.RefreshSourceResult{
+	result := refreshModel.RefreshSourceResult{
 		State:       published,
 		Diagnostics: append([]diagnostic.Diagnostic(nil), publication.Diagnostics...),
 		Candidates:  discovered.Candidates,
@@ -301,17 +301,17 @@ func (s *Service) RefreshSource(
 			value.ArtifactID,
 		)
 		switch value.State {
-		case artifact.StateMissing:
+		case artifactModel.StateMissing:
 			result.MissingArtifacts = append(
 				result.MissingArtifacts,
 				value.ArtifactID,
 			)
-		case artifact.StateInvalid:
+		case artifactModel.StateInvalid:
 			result.InvalidArtifacts = append(
 				result.InvalidArtifacts,
 				value.ArtifactID,
 			)
-		case artifact.StateIncompatible:
+		case artifactModel.StateIncompatible:
 			result.IncompatibleArtifacts = append(
 				result.IncompatibleArtifacts,
 				value.ArtifactID,
@@ -320,42 +320,42 @@ func (s *Service) RefreshSource(
 		}
 	}
 	if err := result.Validate(); err != nil {
-		return refresh.RefreshSourceResult{}, err
+		return refreshModel.RefreshSourceResult{}, err
 	}
 	return result.Clone(), nil
 }
 
 func (s *Service) InspectSource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (source.RefreshInspection, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.RefreshInspection, error) {
 	if s == nil {
-		return source.RefreshInspection{}, spec.ErrClosed
+		return sourceModel.RefreshInspection{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return source.RefreshInspection{}, fmt.Errorf(
+		return sourceModel.RefreshInspection{}, fmt.Errorf(
 			"%w: Source refresh inspection context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	result, err := s.InspectSourceMetadata(ctx, value)
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 
 	// A metadata difference already makes the Source stale. Do not open and
@@ -372,31 +372,31 @@ func (s *Service) InspectSource(
 
 func (s *Service) InspectSourceMetadata(
 	ctx context.Context,
-	value source.Source,
-) (source.RefreshInspection, error) {
+	value sourceModel.Source,
+) (sourceModel.RefreshInspection, error) {
 	if s == nil {
-		return source.RefreshInspection{}, spec.ErrClosed
+		return sourceModel.RefreshInspection{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return source.RefreshInspection{}, spec.ErrInvalid
+		return sourceModel.RefreshInspection{}, spec.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	state, err := s.states.GetRefreshState(ctx, value.RootID, value.ID)
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	discoveryFingerprint, err := value.Discovery.Fingerprint()
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 
-	return source.RefreshInspection{
+	return sourceModel.RefreshInspection{
 		State:                 state,
 		SourceRevisionChanged: state.SourceRevision != value.Revision,
 		DiscoveryChanged:      state.DiscoveryFingerprint != discoveryFingerprint,
@@ -406,18 +406,18 @@ func (s *Service) InspectSourceMetadata(
 
 func (s *Service) inspectSourceGeneration(
 	ctx context.Context,
-	value source.Source,
-	result source.RefreshInspection,
-) (source.RefreshInspection, error) {
+	value sourceModel.Source,
+	result sourceModel.RefreshInspection,
+) (sourceModel.RefreshInspection, error) {
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 	generation := snapshot.Generation()
 	confirmErr := snapshot.Confirm(ctx)
 	closeErr := snapshot.Close()
 	if err := errors.Join(confirmErr, closeErr); err != nil {
-		return source.RefreshInspection{}, err
+		return sourceModel.RefreshInspection{}, err
 	}
 
 	result.SourceGenerationChanged = result.State.SourceGeneration != generation
@@ -426,9 +426,9 @@ func (s *Service) inspectSourceGeneration(
 
 func definitionsFromObservations(
 	observations []ingestimpl.Observation,
-) ([]definition.Definition, error) {
+) ([]definitionModel.Definition, error) {
 	seen := make(map[cryptoutil.Digest]struct{})
-	output := make([]definition.Definition, 0)
+	output := make([]definitionModel.Definition, 0)
 	for _, observation := range observations {
 		if observation.State != ingestimpl.ObservationValid {
 			continue

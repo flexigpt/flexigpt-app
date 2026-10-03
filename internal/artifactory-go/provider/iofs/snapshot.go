@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -28,24 +28,24 @@ func (s *snapshot) Generation() string {
 func (s *snapshot) Stat(
 	ctx context.Context,
 	locator spec.Locator,
-) (source.Entry, error) {
+) (sourceModel.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	name, err := fsName(locator)
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	info, err := fs.Stat(s.provider, name)
 	if errors.Is(err, fs.ErrNotExist) {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: embedded locator %q",
 			spec.ErrNotFound,
 			locator,
 		)
 	}
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	return entryFromInfo(locator, info), nil
 }
@@ -53,7 +53,7 @@ func (s *snapshot) Stat(
 func (s *snapshot) ReadDir(
 	ctx context.Context,
 	locator spec.Locator,
-) ([]source.Entry, error) {
+) ([]sourceModel.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (s *snapshot) ReadDir(
 		return nil, err
 	}
 
-	output := make([]source.Entry, 0, len(values))
+	output := make([]sourceModel.Entry, 0, len(values))
 	for _, value := range values {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -182,14 +182,14 @@ func joinLocator(
 func entryFromInfo(
 	locator spec.Locator,
 	info fs.FileInfo,
-) source.Entry {
+) sourceModel.Entry {
 	name := info.Name()
 	if locator != "." {
 		// Entry identity is source-relative and must not depend on a provider
 		// returning a target or implementation-specific FileInfo name.
 		name = path.Base(string(locator))
 	}
-	return source.Entry{
+	return sourceModel.Entry{
 		Locator:     locator,
 		Name:        name,
 		SizeBytes:   info.Size(),

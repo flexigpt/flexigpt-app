@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 )
 
 // ArtifactReader is intentionally narrow. Local state is attached to exact
@@ -15,19 +15,19 @@ import (
 type ArtifactReader interface {
 	Get(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (artifact.Artifact, error)
+		ref artifactModel.ArtifactRef,
+	) (artifactModel.Artifact, error)
 }
 
 // AttachBindingRequest describes the SQLite transaction that publishes a
 // staged physical secret value as the active ref for one binding.
 type AttachBindingRequest struct {
-	Key secret.BindingKey
+	Key secretModel.BindingKey
 
 	ExpectedArtifactRevision uint64
 	ExpectedBindingRevision  uint64
 
-	Record secret.Record
+	Record secretModel.Record
 }
 
 // Repository is the metadata persistence port for protected overlays and
@@ -38,37 +38,37 @@ type AttachBindingRequest struct {
 type Repository interface {
 	GetOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-		namespace overlay.Namespace,
-	) (overlay.Record, bool, error)
+		ref artifactModel.ArtifactRef,
+		namespace overlayModel.Namespace,
+	) (overlayModel.Record, bool, error)
 
 	GetStoreOverlay(
 		ctx context.Context,
-		namespace overlay.Namespace,
-	) (overlay.StoreRecord, bool, error)
+		namespace overlayModel.Namespace,
+	) (overlayModel.StoreRecord, bool, error)
 
 	PutStoreOverlay(
 		ctx context.Context,
-		request overlay.StorePutRequest,
+		request overlayModel.StorePutRequest,
 		now time.Time,
-	) (overlay.StoreRecord, error)
+	) (overlayModel.StoreRecord, error)
 
 	DeleteStoreOverlay(
 		ctx context.Context,
-		namespace overlay.Namespace,
+		namespace overlayModel.Namespace,
 		expectedRevision uint64,
 	) error
 
 	PutOverlay(
 		ctx context.Context,
-		request overlay.PutRequest,
+		request overlayModel.PutRequest,
 		now time.Time,
-	) (overlay.Record, error)
+	) (overlayModel.Record, error)
 
 	DeleteOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-		namespace overlay.Namespace,
+		ref artifactModel.ArtifactRef,
+		namespace overlayModel.Namespace,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 		now time.Time,
@@ -76,35 +76,35 @@ type Repository interface {
 
 	GetBinding(
 		ctx context.Context,
-		key secret.BindingKey,
-	) (secret.Binding, bool, error)
+		key secretModel.BindingKey,
+	) (secretModel.Binding, bool, error)
 
 	CreatePendingSecret(
 		ctx context.Context,
-		record secret.Record,
+		record secretModel.Record,
 	) error
 
 	AttachSecretBinding(
 		ctx context.Context,
 		request AttachBindingRequest,
 		now time.Time,
-	) (secret.Binding, error)
+	) (secretModel.Binding, error)
 
 	ClearSecretBinding(
 		ctx context.Context,
-		request secret.ClearBindingRequest,
+		request secretModel.ClearBindingRequest,
 		now time.Time,
 	) error
 
 	QueueSecretForCleanup(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 		now time.Time,
 	) error
 
 	PurgeArtifactLocalState(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		now time.Time,
 	) error
 
@@ -116,16 +116,16 @@ type Repository interface {
 	ListSecretCleanup(
 		ctx context.Context,
 		maximum int,
-	) ([]secret.Cleanup, error)
+	) ([]secretModel.Cleanup, error)
 
 	CompleteSecretCleanup(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 	) error
 
 	RecordSecretCleanupFailure(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 		reason string,
 		now time.Time,
 	) error

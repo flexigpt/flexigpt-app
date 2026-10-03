@@ -3,9 +3,9 @@ package model
 import (
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -15,14 +15,14 @@ import (
 // It belongs outside basespec/source because Artifact imports SourceBinding
 // from basespec/source. Keeping result values here avoids an import cycle.
 type RefreshSourceResult struct {
-	State                 source.RefreshState     `json:"state"`
-	CreatedArtifacts      []artifact.ArtifactID   `json:"createdArtifacts,omitempty"`
-	UpdatedArtifacts      []artifact.ArtifactID   `json:"updatedArtifacts,omitempty"`
-	MissingArtifacts      []artifact.ArtifactID   `json:"missingArtifacts,omitempty"`
-	InvalidArtifacts      []artifact.ArtifactID   `json:"invalidArtifacts,omitempty"`
-	IncompatibleArtifacts []artifact.ArtifactID   `json:"incompatibleArtifacts,omitempty"`
-	Diagnostics           []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
-	Candidates            int                     `json:"candidates"`
+	State                 sourceModel.RefreshState   `json:"state"`
+	CreatedArtifacts      []artifactModel.ArtifactID `json:"createdArtifacts,omitempty"`
+	UpdatedArtifacts      []artifactModel.ArtifactID `json:"updatedArtifacts,omitempty"`
+	MissingArtifacts      []artifactModel.ArtifactID `json:"missingArtifacts,omitempty"`
+	InvalidArtifacts      []artifactModel.ArtifactID `json:"invalidArtifacts,omitempty"`
+	IncompatibleArtifacts []artifactModel.ArtifactID `json:"incompatibleArtifacts,omitempty"`
+	Diagnostics           []diagnostic.Diagnostic    `json:"diagnostics,omitempty"`
+	Candidates            int                        `json:"candidates"`
 }
 
 func (r RefreshSourceResult) Validate() error {
@@ -39,7 +39,7 @@ func (r RefreshSourceResult) Validate() error {
 		return err
 	}
 
-	created := make(map[artifact.ArtifactID]struct{})
+	created := make(map[artifactModel.ArtifactID]struct{})
 	for _, artifactID := range r.CreatedArtifacts {
 		if err := artifactID.Validate(); err != nil {
 			return err
@@ -54,7 +54,7 @@ func (r RefreshSourceResult) Validate() error {
 		created[artifactID] = struct{}{}
 	}
 
-	updated := make(map[artifact.ArtifactID]struct{})
+	updated := make(map[artifactModel.ArtifactID]struct{})
 	for _, artifactID := range r.UpdatedArtifacts {
 		if err := artifactID.Validate(); err != nil {
 			return err
@@ -76,8 +76,8 @@ func (r RefreshSourceResult) Validate() error {
 		updated[artifactID] = struct{}{}
 	}
 
-	stateChanged := make(map[artifact.ArtifactID]struct{})
-	for _, group := range [][]artifact.ArtifactID{
+	stateChanged := make(map[artifactModel.ArtifactID]struct{})
+	for _, group := range [][]artifactModel.ArtifactID{
 		r.MissingArtifacts,
 		r.InvalidArtifacts,
 		r.IncompatibleArtifacts,
@@ -110,23 +110,23 @@ func (r RefreshSourceResult) Clone() RefreshSourceResult {
 	output := r
 	output.State = r.State.Clone()
 	output.CreatedArtifacts = append(
-		[]artifact.ArtifactID(nil),
+		[]artifactModel.ArtifactID(nil),
 		r.CreatedArtifacts...,
 	)
 	output.UpdatedArtifacts = append(
-		[]artifact.ArtifactID(nil),
+		[]artifactModel.ArtifactID(nil),
 		r.UpdatedArtifacts...,
 	)
 	output.MissingArtifacts = append(
-		[]artifact.ArtifactID(nil),
+		[]artifactModel.ArtifactID(nil),
 		r.MissingArtifacts...,
 	)
 	output.InvalidArtifacts = append(
-		[]artifact.ArtifactID(nil),
+		[]artifactModel.ArtifactID(nil),
 		r.InvalidArtifacts...,
 	)
 	output.IncompatibleArtifacts = append(
-		[]artifact.ArtifactID(nil),
+		[]artifactModel.ArtifactID(nil),
 		r.IncompatibleArtifacts...,
 	)
 	output.Diagnostics = diagnostic.Clone(r.Diagnostics)
@@ -134,7 +134,7 @@ func (r RefreshSourceResult) Clone() RefreshSourceResult {
 }
 
 type RefreshRootResult struct {
-	RootID      root.RootID             `json:"rootID"`
+	RootID      rootModel.RootID        `json:"rootID"`
 	Sources     []RefreshSourceResult   `json:"sources"`
 	Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
@@ -147,7 +147,7 @@ func (r RefreshRootResult) Validate() error {
 		return err
 	}
 
-	seen := make(map[source.SourceID]struct{}, len(r.Sources))
+	seen := make(map[sourceModel.SourceID]struct{}, len(r.Sources))
 	for index, result := range r.Sources {
 		if err := result.Validate(); err != nil {
 			return fmt.Errorf(

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 
 	_ "github.com/glebarez/go-sqlite"
@@ -19,7 +19,7 @@ type Store struct {
 	db *sql.DB
 
 	definitionMu    sync.RWMutex
-	definitionCache map[definition.Key]definition.Definition
+	definitionCache map[definitionModel.Key]definitionModel.Definition
 	definitionBytes int
 }
 

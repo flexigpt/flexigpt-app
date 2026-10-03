@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -15,15 +15,15 @@ import (
 // not describe package bytes, collection kinds, artifact kinds, feature roles,
 // or any built-in product semantics.
 type Declaration struct {
-	Root    root.RootDraft `json:"root"`
-	Sources []source.Draft `json:"sources"`
+	Root    rootModel.RootDraft `json:"root"`
+	Sources []sourceModel.Draft `json:"sources"`
 }
 
 // Installed is the verified local protected topology created from a
 // Declaration. It is application metadata, never portable package data.
 type Installed struct {
-	Root    root.Root
-	Sources []source.Summary
+	Root    rootModel.Root
+	Sources []sourceModel.Summary
 }
 
 // Ensurer is implemented by Artifact Store composition. Feature installers
@@ -63,7 +63,7 @@ func (d Declaration) Validate() error {
 		)
 	}
 
-	seen := make(map[source.SourceID]struct{}, len(d.Sources))
+	seen := make(map[sourceModel.SourceID]struct{}, len(d.Sources))
 	for index, draft := range d.Sources {
 		if err := draft.ID.Validate(); err != nil {
 			return fmt.Errorf("protected Sources[%d]: %w", index, err)

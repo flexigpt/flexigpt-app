@@ -9,13 +9,13 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func materializeValidated(
 	ctx context.Context,
-	_ artifact.ArtifactRef,
+	_ artifactModel.ArtifactRef,
 	document ServerDocument,
 	data ServerData,
 	secrets SecretResolver,

@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -15,10 +15,10 @@ import (
 // the record must survive removal of an old Root until replacement hydration
 // succeeds and commits a new record.
 type Hydration struct {
-	InstallerName string            `json:"installerName"`
-	RootID        root.RootID       `json:"rootID"`
-	SourceID      source.SourceID   `json:"sourceID"`
-	Fingerprint   cryptoutil.Digest `json:"fingerprint"`
+	InstallerName string               `json:"installerName"`
+	RootID        rootModel.RootID     `json:"rootID"`
+	SourceID      sourceModel.SourceID `json:"sourceID"`
+	Fingerprint   cryptoutil.Digest    `json:"fingerprint"`
 }
 
 func (h Hydration) Validate() error {

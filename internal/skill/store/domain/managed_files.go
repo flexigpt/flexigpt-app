@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"path"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -15,8 +15,8 @@ import (
 // its exact SKILL.md bytes.
 func NormalizeManagedSkillFiles(
 	skillMD []byte,
-	input []source.ManagedPackageFile,
-) ([]source.ManagedPackageFile, []byte, error) {
+	input []sourceModel.ManagedPackageFile,
+) ([]sourceModel.ManagedPackageFile, []byte, error) {
 	if len(input) == 0 {
 		if len(skillMD) == 0 {
 			return nil, nil, fmt.Errorf(
@@ -24,13 +24,13 @@ func NormalizeManagedSkillFiles(
 				spec.ErrInvalid,
 			)
 		}
-		return []source.ManagedPackageFile{{
+		return []sourceModel.ManagedPackageFile{{
 			Locator: SkillDefinitionFileName(),
 			Content: append([]byte(nil), skillMD...),
 		}}, append([]byte(nil), skillMD...), nil
 	}
 
-	normalized, err := source.NormalizeManagedPackageFiles(input)
+	normalized, err := sourceModel.NormalizeManagedPackageFiles(input)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -78,21 +78,21 @@ func NormalizeManagedSkillFiles(
 //	<skill-name>/references/example.md
 //	<skill-name>/scripts/check.py
 func ManagedSkillStorageFiles(
-	address source.ManagedPackageAddress,
-	input []source.ManagedPackageFile,
-) ([]source.ManagedPackageFile, error) {
+	address sourceModel.ManagedPackageAddress,
+	input []sourceModel.ManagedPackageFile,
+) ([]sourceModel.ManagedPackageFile, error) {
 	if err := validateManagedSkillPackageAddress(address); err != nil {
 		return nil, err
 	}
 
-	files, err := source.NormalizeManagedPackageFiles(input)
+	files, err := sourceModel.NormalizeManagedPackageFiles(input)
 	if err != nil {
 		return nil, err
 	}
 
 	documentFile := SkillDefinitionFileName()
 	documentFound := false
-	output := make([]source.ManagedPackageFile, 0, len(files))
+	output := make([]sourceModel.ManagedPackageFile, 0, len(files))
 	for _, file := range files {
 		if file.Locator == documentFile {
 			documentFound = true
@@ -106,7 +106,7 @@ func ManagedSkillStorageFiles(
 			return nil, err
 		}
 
-		output = append(output, source.ManagedPackageFile{
+		output = append(output, sourceModel.ManagedPackageFile{
 			Locator: locator,
 			Content: append([]byte(nil), file.Content...),
 		})
@@ -119,13 +119,13 @@ func ManagedSkillStorageFiles(
 		)
 	}
 
-	return source.NormalizeManagedPackageFiles(output)
+	return sourceModel.NormalizeManagedPackageFiles(output)
 }
 
 func PackageDigest(
-	files []source.ManagedPackageFile,
+	files []sourceModel.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
-	normalized, err := source.NormalizeManagedPackageFiles(files)
+	normalized, err := sourceModel.NormalizeManagedPackageFiles(files)
 	if err != nil {
 		return "", err
 	}

@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -79,7 +79,7 @@ func (r Result) Validate() error {
 	}
 
 	seenTyped := make(map[typedOrigin]struct{})
-	seenInvalid := make(map[artifact.SourceBinding]struct{})
+	seenInvalid := make(map[artifactModel.SourceBinding]struct{})
 	for index, observation := range r.Observations {
 		if err := observation.Validate(); err != nil {
 			return fmt.Errorf(
@@ -143,7 +143,7 @@ func (e *Engine) DecoderFingerprint() (
 
 func (e *Engine) Discover(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	snapshot sourceimpl.Snapshot,
 ) (Result, error) {
 	if e == nil || e.decoders == nil {
@@ -226,7 +226,7 @@ func (e *Engine) Discover(
 
 	seenLocators := make(map[spec.Locator]struct{}, len(entries))
 	validOrigins := make(map[typedOrigin]Observation)
-	invalidBindings := make(map[artifact.SourceBinding]struct{})
+	invalidBindings := make(map[artifactModel.SourceBinding]struct{})
 	var consumed int64
 
 	for _, entry := range entries {
@@ -351,7 +351,7 @@ func (e *Engine) Discover(
 					result.Observations,
 					Observation{
 						RootID: value.RootID,
-						Binding: artifact.SourceBinding{
+						Binding: artifactModel.SourceBinding{
 							SourceID:           value.ID,
 							Locator:            entry.Locator,
 							SubresourceLocator: item.Subresource,
@@ -506,7 +506,7 @@ func (e *Engine) Discover(
 				)
 				continue
 			}
-			canonical, err := definition.Canonicalize(item.Definition)
+			canonical, err := definitionModel.Canonicalize(item.Definition)
 			if err != nil {
 				definitionDiagnostic := diagnostic.Diagnostic{
 					Severity: diagnostic.SeverityError,
@@ -672,7 +672,7 @@ func (e *Engine) Discover(
 
 func removeObservationsForBinding(
 	values []Observation,
-	binding artifact.SourceBinding,
+	binding artifactModel.SourceBinding,
 ) []Observation {
 	output := values[:0]
 	for _, value := range values {
@@ -685,14 +685,14 @@ func removeObservationsForBinding(
 }
 
 func decodedBinding(
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	candidateLocator spec.Locator,
 	candidateDigest cryptoutil.Digest,
 	item provider.Decoded,
-) (artifact.SourceBinding, *cryptoutil.Digest, error) {
+) (artifactModel.SourceBinding, *cryptoutil.Digest, error) {
 	if (item.OriginLocator == "") !=
 		(item.OriginContentDigest == nil) {
-		return artifact.SourceBinding{}, nil, fmt.Errorf(
+		return artifactModel.SourceBinding{}, nil, fmt.Errorf(
 			"%w: declaration origin locator and digest must be supplied together",
 			spec.ErrInvalid,
 		)
@@ -701,7 +701,7 @@ func decodedBinding(
 	originLocator := candidateLocator
 	if item.OriginLocator != "" {
 		if err := item.OriginLocator.Validate(false); err != nil {
-			return artifact.SourceBinding{}, nil, fmt.Errorf(
+			return artifactModel.SourceBinding{}, nil, fmt.Errorf(
 				"%w: decoder emitted invalid declaration origin: %w",
 				spec.ErrInvalid,
 				err,
@@ -713,12 +713,12 @@ func decodedBinding(
 	originDigest := candidateDigest
 	if item.OriginContentDigest != nil {
 		if err := cryptoutil.ValidateDigest(*item.OriginContentDigest); err != nil {
-			return artifact.SourceBinding{}, nil, err
+			return artifactModel.SourceBinding{}, nil, err
 		}
 		originDigest = *item.OriginContentDigest
 	}
 
-	return artifact.SourceBinding{
+	return artifactModel.SourceBinding{
 		SourceID:           sourceID,
 		Locator:            originLocator,
 		SubresourceLocator: item.SubresourceLocator,
@@ -727,7 +727,7 @@ func decodedBinding(
 
 func equivalentObservedOrigin(
 	previous Observation,
-	current definition.Definition,
+	current definitionModel.Definition,
 	currentDigest *cryptoutil.Digest,
 ) bool {
 	return previous.Definition != nil &&
@@ -740,7 +740,7 @@ func equivalentObservedOrigin(
 
 func deleteValidOriginsForBinding(
 	values map[typedOrigin]Observation,
-	binding artifact.SourceBinding,
+	binding artifactModel.SourceBinding,
 ) {
 	for key := range values {
 		if key.Binding == binding {
@@ -780,7 +780,7 @@ func (r snapshotEntryReader) ReadSourceEntry(
 
 func appendInvalid(
 	r *Result,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 	sourceDigest *cryptoutil.Digest,
 	decoderID spec.DecoderID,
@@ -789,7 +789,7 @@ func appendInvalid(
 	appendInvalidBinding(
 		r,
 		value,
-		artifact.SourceBinding{
+		artifactModel.SourceBinding{
 			SourceID: value.ID,
 			Locator:  locator,
 		},
@@ -801,8 +801,8 @@ func appendInvalid(
 
 func appendInvalidBinding(
 	r *Result,
-	value source.Source,
-	binding artifact.SourceBinding,
+	value sourceModel.Source,
+	binding artifactModel.SourceBinding,
 	sourceDigest *cryptoutil.Digest,
 	decoderID spec.DecoderID,
 	diagnostics []diagnostic.Diagnostic,
@@ -818,7 +818,7 @@ func appendInvalidBinding(
 }
 
 func (e *Engine) allowedDecoders(
-	sp source.DiscoverySpec,
+	sp sourceModel.DiscoverySpec,
 ) (map[spec.DecoderID]struct{}, error) {
 	allowed := make(
 		map[spec.DecoderID]struct{},
@@ -924,12 +924,12 @@ func (e *Engine) selectDecoder(
 func collectCandidates(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
-	sp source.DiscoverySpec,
-) ([]source.Entry, error) {
-	found := make(map[spec.Locator]source.Entry)
+	sp sourceModel.DiscoverySpec,
+) ([]sourceModel.Entry, error) {
+	found := make(map[spec.Locator]sourceModel.Entry)
 	visited := make(map[spec.Locator]struct{})
 
-	add := func(entry source.Entry) error {
+	add := func(entry sourceModel.Entry) error {
 		if err := entry.Validate(); err != nil {
 			return err
 		}
@@ -1058,7 +1058,7 @@ func collectCandidates(
 		}
 	}
 
-	output := make([]source.Entry, 0, len(found))
+	output := make([]sourceModel.Entry, 0, len(found))
 	for _, value := range found {
 		output = append(output, value)
 	}
@@ -1072,16 +1072,16 @@ func statEntry(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
 	locator spec.Locator,
-) (source.Entry, error) {
+) (sourceModel.Entry, error) {
 	entry, err := snapshot.Stat(ctx, locator)
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if err := entry.Validate(); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if entry.Locator != locator {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: Source snapshot stat for %q returned %q",
 			spec.ErrInvalid,
 			locator,
@@ -1095,13 +1095,13 @@ func readDirectoryEntries(
 	ctx context.Context,
 	snapshot sourceimpl.Snapshot,
 	directory spec.Locator,
-) ([]source.Entry, error) {
+) ([]sourceModel.Entry, error) {
 	values, err := snapshot.ReadDir(ctx, directory)
 	if err != nil {
 		return nil, err
 	}
 	seen := make(map[spec.Locator]struct{}, len(values))
-	output := make([]source.Entry, 0, len(values))
+	output := make([]sourceModel.Entry, 0, len(values))
 	for _, entry := range values {
 		if err := entry.Validate(); err != nil {
 			return nil, err

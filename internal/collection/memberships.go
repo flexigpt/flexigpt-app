@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -14,21 +14,21 @@ import (
 // declared type and name match a selected Artifact. It remains visible when
 // that relationship is unavailable or ambiguous.
 type ArtifactMembershipView struct {
-	Collection         artifact.ArtifactRef     `json:"collection"`
-	CollectionName     spec.LogicalName         `json:"collectionName"`
-	CollectionRevision uint64                   `json:"collectionRevision"`
-	MemberIndex        int                      `json:"memberIndex"`
-	Member             MemberReference          `json:"member"`
-	Status             resolve.ResolutionStatus `json:"status"`
-	ResolvedArtifact   *artifact.ArtifactRef    `json:"resolvedArtifact,omitempty"`
-	ResolvedToArtifact bool                     `json:"resolvedToArtifact"`
-	Code               string                   `json:"code,omitempty"`
-	Message            string                   `json:"message,omitempty"`
+	Collection         artifactModel.ArtifactRef  `json:"collection"`
+	CollectionName     spec.LogicalName           `json:"collectionName"`
+	CollectionRevision uint64                     `json:"collectionRevision"`
+	MemberIndex        int                        `json:"memberIndex"`
+	Member             MemberReference            `json:"member"`
+	Status             resolve.ResolutionStatus   `json:"status"`
+	ResolvedArtifact   *artifactModel.ArtifactRef `json:"resolvedArtifact,omitempty"`
+	ResolvedToArtifact bool                       `json:"resolvedToArtifact"`
+	Code               string                     `json:"code,omitempty"`
+	Message            string                     `json:"message,omitempty"`
 }
 
 func (a *API) ListMembershipsForArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]ArtifactMembershipView, error) {
 	if a == nil || a.resolver == nil {
 		return nil, fmt.Errorf(

@@ -8,11 +8,11 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -21,7 +21,7 @@ import (
 // It contains only domain-owned listing choices. Generic Artifact Store query
 // details remain inside the Collection API.
 type ListRequest struct {
-	RootID root.RootID `json:"rootID"`
+	RootID rootModel.RootID `json:"rootID"`
 }
 
 // ListItem is a lightweight Collection projection.
@@ -30,16 +30,16 @@ type ListRequest struct {
 // for management pages to determine whether deletion can be offered. Read
 // returns CollectionView when a caller explicitly selects one Collection.
 type ListItem struct {
-	Ref      artifact.ArtifactRef `json:"ref"`
-	SourceID source.SourceID      `json:"sourceID"`
+	Ref      artifactModel.ArtifactRef `json:"ref"`
+	SourceID sourceModel.SourceID      `json:"sourceID"`
 
 	Name        spec.LogicalName `json:"name"`
 	DisplayName string           `json:"displayName"`
 	Description string           `json:"description,omitempty"`
 
-	State    artifact.State `json:"state"`
-	Enabled  bool           `json:"enabled"`
-	Revision uint64         `json:"revision"`
+	State    artifactModel.State `json:"state"`
+	Enabled  bool                `json:"enabled"`
+	Revision uint64              `json:"revision"`
 
 	MemberCount int  `json:"memberCount"`
 	BuiltIn     bool `json:"builtIn"`
@@ -82,7 +82,7 @@ func (a *API) listCollections(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{Kind: artifact.ArtifactKind(pluginv1.PluginType)},
+		catalogModel.ListOptions{Kind: artifactModel.ArtifactKind(pluginv1.PluginType)},
 	)
 	if err != nil {
 		return nil, err
@@ -95,18 +95,18 @@ func (a *API) listCollections(
 
 	output := make([]ListItem, 0)
 	for _, entry := range entries {
-		if entry.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-			entry.State != artifact.StateAvailable ||
+		if entry.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
+			entry.State != artifactModel.StateAvailable ||
 			entry.Binding.SubresourceLocator != "" ||
 			entry.Definition == nil {
 			continue
 		}
 
-		key := definition.Key{
+		key := definitionModel.Key{
 			RootID: entry.RootID,
 			Digest: entry.Definition.Digest,
 		}
-		var document *definition.Definition
+		var document *definitionModel.Definition
 		if value, found := documents[key]; found {
 			copyValue := value.Clone()
 			document = &copyValue
@@ -176,16 +176,16 @@ func (a *API) listCollections(
 
 func (a *API) collectionDocuments(
 	ctx context.Context,
-	entries []catalog.Entry,
-) (map[definition.Key]definition.Definition, error) {
-	keys := make([]definition.Key, 0)
+	entries []catalogModel.Entry,
+) (map[definitionModel.Key]definitionModel.Definition, error) {
+	keys := make([]definitionModel.Key, 0)
 	for _, entry := range entries {
-		if entry.State != artifact.StateAvailable ||
+		if entry.State != artifactModel.StateAvailable ||
 			entry.Binding.SubresourceLocator != "" ||
 			entry.Definition == nil {
 			continue
 		}
-		key := definition.Key{
+		key := definitionModel.Key{
 			RootID: entry.RootID,
 			Digest: entry.Definition.Digest,
 		}
@@ -195,7 +195,7 @@ func (a *API) collectionDocuments(
 		keys = append(keys, key)
 	}
 	if len(keys) == 0 {
-		return map[definition.Key]definition.Definition{}, nil
+		return map[definitionModel.Key]definitionModel.Definition{}, nil
 	}
 
 	values, err := a.definitions.GetDefinitions(ctx, keys)
@@ -209,7 +209,7 @@ func (a *API) collectionDocuments(
 		)
 	}
 
-	output := make(map[definition.Key]definition.Definition, len(values))
+	output := make(map[definitionModel.Key]definitionModel.Definition, len(values))
 	for index, value := range values {
 		if value.Digest != keys[index].Digest {
 			return nil, fmt.Errorf(
@@ -223,8 +223,8 @@ func (a *API) collectionDocuments(
 }
 
 func (a *API) collectionProjectionFor(
-	entry catalog.Entry,
-	loaded *definition.Definition,
+	entry catalogModel.Entry,
+	loaded *definitionModel.Definition,
 ) (collectionProjection, error) {
 	if entry.Definition == nil {
 		return collectionProjection{}, fmt.Errorf(
@@ -233,7 +233,7 @@ func (a *API) collectionProjectionFor(
 		)
 	}
 
-	key := definition.Key{
+	key := definitionModel.Key{
 		RootID: entry.RootID,
 		Digest: entry.Definition.Digest,
 	}
@@ -284,7 +284,7 @@ func (a *API) collectionProjectionFor(
 }
 
 func (a *API) collectionVisibleInList(
-	entry catalog.Entry,
+	entry catalogModel.Entry,
 	projection collectionProjection,
 ) (bool, error) {
 	if a.domain == nil {
@@ -292,7 +292,7 @@ func (a *API) collectionVisibleInList(
 	}
 
 	if a.domain.ReadOnly {
-		if entry.Source.Kind != source.SourceKindManagedDirectory ||
+		if entry.Source.Kind != sourceModel.SourceKindManagedDirectory ||
 			entry.Binding.SubresourceLocator != "" {
 			return false, nil
 		}
@@ -321,11 +321,11 @@ func (a *API) collectionVisibleInList(
 }
 
 func (a *API) collectionListEditability(
-	entry catalog.Entry,
+	entry catalogModel.Entry,
 	projection collectionProjection,
 ) (editable, baseline bool) {
 	if entry.Ref().RootID == documentTopology.BuiltinRootID() ||
-		entry.Source.Kind != source.SourceKindManagedDirectory ||
+		entry.Source.Kind != sourceModel.SourceKindManagedDirectory ||
 		!entry.Source.Enabled ||
 		entry.Binding.SubresourceLocator != "" ||
 		(a.domain != nil &&

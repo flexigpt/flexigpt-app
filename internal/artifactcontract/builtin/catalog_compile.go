@@ -15,7 +15,7 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -63,44 +63,44 @@ func Compile(
 	ctx context.Context,
 	temporaryDirectory string,
 	config Config,
-) (topology.CompiledPackageSet, error) {
+) (installModel.CompiledPackageSet, error) {
 	if ctx == nil {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog compilation context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 	if temporaryDirectory == "" {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog compilation directory is empty",
 			spec.ErrInvalid,
 		)
 	}
 	if config.SetName == "" {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog set name is empty",
 			spec.ErrInvalid,
 		)
 	}
 	if config.SchemaVersion == "" {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog schema version is empty",
 			spec.ErrInvalid,
 		)
 	}
-	if err := topology.ValidateHydrationInstallerName(
+	if err := installModel.ValidateHydrationInstallerName(
 		config.InstallerName,
 	); err != nil {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"built-in catalog installer name: %w",
 			err,
 		)
 	}
 	if len(config.Packages) == 0 {
-		return topology.CompiledPackageSet{}, fmt.Errorf(
+		return installModel.CompiledPackageSet{}, fmt.Errorf(
 			"%w: built-in catalog set %q has no packages",
 			spec.ErrInvalid,
 			config.SetName,
@@ -109,7 +109,7 @@ func Compile(
 
 	canonicalProvider, err := providercanonical.New()
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	providers := make(
@@ -120,7 +120,7 @@ func Compile(
 	providers = append(providers, canonicalProvider)
 	for index, provider := range config.AdditionalProviders {
 		if provider == nil {
-			return topology.CompiledPackageSet{}, fmt.Errorf(
+			return installModel.CompiledPackageSet{}, fmt.Errorf(
 				"%w: built-in catalog provider %d is nil",
 				spec.ErrInvalid,
 				index,
@@ -131,7 +131,7 @@ func Compile(
 
 	validation, err := validationFingerprint(providers)
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	declaration := documentTopology.BuiltinTopologyDeclaration()
@@ -141,20 +141,20 @@ func Compile(
 		declaration,
 	)
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
-	output := topology.CompiledPackageSet{
-		Format: topology.CompiledPackageSetFormat,
+	output := installModel.CompiledPackageSet{
+		Format: installModel.CompiledPackageSetFormat,
 		Name:   config.SetName,
-		Hydration: topology.Hydration{
+		Hydration: installModel.Hydration{
 			InstallerName: config.InstallerName,
 			RootID:        declaration.Root.ID,
 			SourceID:      documentTopology.BuiltinPackageSourceID(),
 			Fingerprint:   hydrationFingerprint,
 		},
 		Packages: make(
-			[]topology.CompiledPackage,
+			[]installModel.CompiledPackage,
 			0,
 			len(config.Packages),
 		),
@@ -181,7 +181,7 @@ func Compile(
 		ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
 	})
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 	defer store.Close()
 
@@ -190,19 +190,19 @@ func Compile(
 		ctx,
 		declaration,
 	); err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	sourceID := documentTopology.BuiltinPackageSourceID()
 	for _, input := range inputs {
 		rootExpectation, err := input.rootExpectation()
 		if err != nil {
-			return topology.CompiledPackageSet{}, err
+			return installModel.CompiledPackageSet{}, err
 		}
 
 		locator, err := input.Address.FileLocator(input.DocumentFile)
 		if err != nil {
-			return topology.CompiledPackageSet{}, err
+			return installModel.CompiledPackageSet{}, err
 		}
 
 		if _, err := store.ManagedPackages.Publish(
@@ -223,7 +223,7 @@ func Compile(
 				AllowProtected: true,
 			},
 		); err != nil {
-			return topology.CompiledPackageSet{}, err
+			return installModel.CompiledPackageSet{}, err
 		}
 	}
 
@@ -234,7 +234,7 @@ func Compile(
 		catalogModel.ListOptions{},
 	)
 	if err != nil {
-		return topology.CompiledPackageSet{}, err
+		return installModel.CompiledPackageSet{}, err
 	}
 
 	for _, input := range inputs {
@@ -246,7 +246,7 @@ func Compile(
 			validation,
 		)
 		if err != nil {
-			return topology.CompiledPackageSet{}, err
+			return installModel.CompiledPackageSet{}, err
 		}
 		output.Packages = append(output.Packages, value)
 	}
@@ -301,24 +301,24 @@ func compilePackage(
 	input PackageInput,
 	entries []catalogModel.Entry,
 	validation cryptoutil.Digest,
-) (topology.CompiledPackage, error) {
+) (installModel.CompiledPackage, error) {
 	scope, err := input.Address.Directory()
 	if err != nil {
-		return topology.CompiledPackage{}, err
+		return installModel.CompiledPackage{}, err
 	}
 
-	output := topology.CompiledPackage{
+	output := installModel.CompiledPackage{
 		EmbeddedRoot: input.EmbeddedRoot,
 		Address:      input.Address,
-		Files:        make([]topology.CompiledFile, 0, len(input.Files)),
-		Documents:    make([]topology.CompiledDocument, 0),
+		Files:        make([]installModel.CompiledFile, 0, len(input.Files)),
+		Documents:    make([]installModel.CompiledDocument, 0),
 	}
 
 	fileDigests := make(map[spec.Locator]cryptoutil.Digest)
 	for _, file := range input.Files {
 		digest := cryptoutil.DigestBytes(file.Content)
 		fileDigests[file.Locator] = digest
-		output.Files = append(output.Files, topology.CompiledFile{
+		output.Files = append(output.Files, installModel.CompiledFile{
 			Locator: file.Locator,
 			Size:    int64(len(file.Content)),
 			Digest:  digest,
@@ -341,7 +341,7 @@ func compilePackage(
 		}] = value
 	}
 
-	documents := make(map[spec.Locator]*topology.CompiledDocument)
+	documents := make(map[spec.Locator]*installModel.CompiledDocument)
 	for _, entry := range entries {
 		relative, found := cutPackageRelativeLocator(
 			scope,
@@ -358,7 +358,7 @@ func compilePackage(
 		}
 		wanted, found := expected[key]
 		if !found {
-			return topology.CompiledPackage{}, fmt.Errorf(
+			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: package %q emitted undeclared Artifact %q",
 				spec.ErrInvalid,
 				scope,
@@ -371,7 +371,7 @@ func compilePackage(
 			entry.LogicalName != wanted.LogicalName ||
 			entry.LogicalVersion != wanted.LogicalVersion ||
 			entry.Definition.Digest != wanted.DefinitionDigest {
-			return topology.CompiledPackage{}, fmt.Errorf(
+			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: admitted Artifact differs from package expectation",
 				spec.ErrDigestMismatch,
 			)
@@ -379,11 +379,11 @@ func compilePackage(
 
 		record, err := store.Artifacts.Get(ctx, entry.Ref())
 		if err != nil {
-			return topology.CompiledPackage{}, err
+			return installModel.CompiledPackage{}, err
 		}
 		if record.SourceContentDigest == nil ||
 			*record.SourceContentDigest != fileDigests[relative] {
-			return topology.CompiledPackage{}, fmt.Errorf(
+			return installModel.CompiledPackage{}, fmt.Errorf(
 				"%w: source digest differs from embedded package file",
 				spec.ErrDigestMismatch,
 			)
@@ -394,12 +394,12 @@ func compilePackage(
 			entry.Ref(),
 		)
 		if err != nil {
-			return topology.CompiledPackage{}, err
+			return installModel.CompiledPackage{}, err
 		}
 
 		document := documents[relative]
 		if document == nil {
-			document = &topology.CompiledDocument{
+			document = &installModel.CompiledDocument{
 				Locator: relative,
 				Digest:  fileDigests[relative],
 			}
@@ -408,7 +408,7 @@ func compilePackage(
 
 		document.Artifacts = append(
 			document.Artifacts,
-			topology.CompiledArtifact{
+			installModel.CompiledArtifact{
 				Subresource: entry.Binding.SubresourceLocator,
 				Definition:  definitionValue,
 				Diagnostics: record.Diagnostics,
@@ -418,7 +418,7 @@ func compilePackage(
 	}
 
 	if len(expected) != 0 {
-		return topology.CompiledPackage{}, fmt.Errorf(
+		return installModel.CompiledPackage{}, fmt.Errorf(
 			"%w: package %q has unfulfilled Artifact expectations",
 			spec.ErrReferenceUnresolved,
 			scope,
@@ -447,8 +447,8 @@ func compilePackage(
 	})
 
 	output.Fingerprint, err = cryptoutil.CanonicalDigest(struct {
-		Validation cryptoutil.Digest        `json:"validation"`
-		Package    topology.CompiledPackage `json:"package"`
+		Validation cryptoutil.Digest            `json:"validation"`
+		Package    installModel.CompiledPackage `json:"package"`
 	}{
 		Validation: validation,
 		Package:    output,
@@ -471,14 +471,14 @@ func cutPackageRelativeLocator(
 func generatedHydrationFingerprint(
 	schemaVersion string,
 	setName string,
-	declaration topology.Declaration,
+	declaration installModel.Declaration,
 ) (cryptoutil.Digest, error) {
 	// Schema/decoder changes belong to package admission fingerprints.
 	// They must not destroy the shared Root and its local Artifact state.
 	return cryptoutil.CanonicalDigest(struct {
-		SchemaVersion string               `json:"schemaVersion"`
-		SetName       string               `json:"setName"`
-		Topology      topology.Declaration `json:"topology"`
+		SchemaVersion string                   `json:"schemaVersion"`
+		SetName       string                   `json:"setName"`
+		Topology      installModel.Declaration `json:"topology"`
 	}{
 		SchemaVersion: schemaVersion,
 		SetName:       setName,

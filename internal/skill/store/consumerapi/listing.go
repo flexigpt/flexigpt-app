@@ -6,9 +6,9 @@ import (
 	"sort"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -38,7 +38,7 @@ func (a *API) ListSkills(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
+		catalogModel.ListOptions{
 			Kind:    skillDomain.SkillArtifactKind,
 			Enabled: request.Enabled,
 		},
@@ -71,7 +71,7 @@ func (a *API) ListSkills(
 }
 
 func skillListItem(
-	entry catalog.Entry,
+	entry catalogModel.Entry,
 ) SkillListItem {
 	digest := cryptoutil.Digest("")
 	description := ""
@@ -81,8 +81,8 @@ func skillListItem(
 	}
 
 	managed := false
-	if entry.State == artifact.StateAvailable &&
-		entry.Source.Kind == source.SourceKindManagedDirectory &&
+	if entry.State == artifactModel.StateAvailable &&
+		entry.Source.Kind == sourceModel.SourceKindManagedDirectory &&
 		entry.Source.StorageKey == collection.SkillManagedSourceStorageKey &&
 		entry.Binding.SubresourceLocator == "" {
 		_, err := skillDomain.ManagedPackageAddressFromSkillLocator(

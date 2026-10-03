@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -20,17 +20,17 @@ type Publisher struct {
 
 func (s *Store) getRefreshState(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (source.RefreshState, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.RefreshState, error) {
 	if err := rootID.Validate(); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	value, err := scanRefreshState(s.db.QueryRowContext(
 		ctx,
@@ -43,7 +43,7 @@ func (s *Store) getRefreshState(
 		string(sourceID),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source %q in Root %q",
 			spec.ErrRefreshStateNotFound,
 			sourceID,
@@ -51,7 +51,7 @@ func (s *Store) getRefreshState(
 		)
 	}
 	if err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	return value.Clone(), nil
 }
@@ -59,17 +59,17 @@ func (s *Store) getRefreshState(
 func (p *Publisher) Publish(
 	ctx context.Context,
 	publication refreshimpl.Publication,
-) (source.RefreshState, error) {
+) (sourceModel.RefreshState, error) {
 	if p == nil || p.store == nil {
-		return source.RefreshState{}, spec.ErrClosed
+		return sourceModel.RefreshState{}, spec.ErrClosed
 	}
 	if err := publication.Validate(); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 
 	tx, err := p.store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -78,7 +78,7 @@ func (p *Publisher) Publish(
 		tx,
 		publication.RootID,
 	); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	currentSource, err := getActiveSourceTx(
 		ctx,
@@ -87,24 +87,24 @@ func (p *Publisher) Publish(
 		publication.SourceID,
 	)
 	if err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	if !currentSource.Enabled ||
 		currentSource.Revision != publication.ExpectedSourceRevision {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source changed or was disabled during refresh",
 			spec.ErrConflict,
 		)
 	}
 	if currentSource.RootID != publication.RootID ||
 		currentSource.ID != publication.SourceID {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh publisher loaded another Source",
 			spec.ErrInvalid,
 		)
 	}
 	if currentSource.Discovery.Empty() {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source has no declaration discovery configuration",
 			spec.ErrRefreshRequired,
 		)
@@ -121,16 +121,16 @@ func (p *Publisher) Publish(
 	if errors.Is(err, sql.ErrNoRows) {
 		currentRefreshRevision = 0
 	} else if err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	if currentRefreshRevision != publication.ExpectedRefreshRevision {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh state changed during refresh",
 			spec.ErrConflict,
 		)
 	}
 	if currentRefreshRevision == ^uint64(0) {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh revision is exhausted",
 			spec.ErrInvalid,
 		)
@@ -144,7 +144,7 @@ func (p *Publisher) Publish(
 			value,
 			publication.RefreshedAt,
 		); err != nil {
-			return source.RefreshState{}, err
+			return sourceModel.RefreshState{}, err
 		}
 	}
 	// Publication validation checks Artifact state. SQLite foreign keys
@@ -152,7 +152,7 @@ func (p *Publisher) Publish(
 	// liveness. Neither requires decoding the same entities once per row.
 	for _, value := range publication.ArtifactCreates {
 		if err := insertArtifactTx(ctx, tx, value); err != nil {
-			return source.RefreshState{}, err
+			return sourceModel.RefreshState{}, err
 		}
 	}
 	for _, update := range publication.ArtifactUpdates {
@@ -161,13 +161,13 @@ func (p *Publisher) Publish(
 			tx,
 			update,
 		); err != nil {
-			return source.RefreshState{}, err
+			return sourceModel.RefreshState{}, err
 		}
 	}
 
 	diagnostics, err := encodeJSON(publication.Diagnostics)
 	if err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	nextRevision := currentRefreshRevision + 1
 	_, err = tx.ExecContext(
@@ -196,13 +196,13 @@ func (p *Publisher) Publish(
 		diagnostics,
 	)
 	if err != nil {
-		return source.RefreshState{}, sqliteError(err)
+		return sourceModel.RefreshState{}, sqliteError(err)
 	}
 	if err := tx.Commit(); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 
-	output := source.RefreshState{
+	output := sourceModel.RefreshState{
 		RootID:               publication.RootID,
 		SourceID:             publication.SourceID,
 		SourceRevision:       publication.ExpectedSourceRevision,
@@ -214,14 +214,14 @@ func (p *Publisher) Publish(
 		Diagnostics:          publication.Diagnostics,
 	}
 	if err := output.Validate(); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	return output.Clone(), nil
 }
 
 func scanRefreshState(
 	row scanner,
-) (source.RefreshState, error) {
+) (sourceModel.RefreshState, error) {
 	var (
 		rootID, sourceID, generation             string
 		discoveryFingerprint, decoderFingerprint string
@@ -230,7 +230,7 @@ func scanRefreshState(
 		diagnosticsRaw                           []byte
 	)
 	if row == nil {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"%w: Source refresh state row is nil",
 			spec.ErrInvalid,
 		)
@@ -246,15 +246,15 @@ func scanRefreshState(
 		&refreshedAt,
 		&diagnosticsRaw,
 	); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
 	var diagnostics []diagnostic.Diagnostic
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
-		return source.RefreshState{}, err
+		return sourceModel.RefreshState{}, err
 	}
-	value := source.RefreshState{
-		RootID:               root.RootID(rootID),
-		SourceID:             source.SourceID(sourceID),
+	value := sourceModel.RefreshState{
+		RootID:               rootModel.RootID(rootID),
+		SourceID:             sourceModel.SourceID(sourceID),
 		SourceRevision:       sourceRevision,
 		SourceGeneration:     generation,
 		DiscoveryFingerprint: cryptoutil.Digest(discoveryFingerprint),
@@ -264,7 +264,7 @@ func scanRefreshState(
 		Diagnostics:          diagnostics,
 	}
 	if err := value.Validate(); err != nil {
-		return source.RefreshState{}, fmt.Errorf(
+		return sourceModel.RefreshState{}, fmt.Errorf(
 			"invalid persisted Source refresh state: %w",
 			err,
 		)

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
@@ -48,18 +48,18 @@ func TestSkillStoreWorkflowAddsAndRefreshesFilesystemSkill(
 	)
 	requireNoError(t, err)
 
-	if registered.Source.Kind != source.SourceKindFilesystemDirectory {
+	if registered.Source.Kind != sourceModel.SourceKindFilesystemDirectory {
 		t.Fatalf(
 			"filesystem Skill Source kind=%q, want %q",
 			registered.Source.Kind,
-			source.SourceKindFilesystemDirectory,
+			sourceModel.SourceKindFilesystemDirectory,
 		)
 	}
-	if registered.Artifact.State != artifact.StateAvailable {
+	if registered.Artifact.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"filesystem Skill state=%q, want %q",
 			registered.Artifact.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if !registered.Artifact.Enabled {

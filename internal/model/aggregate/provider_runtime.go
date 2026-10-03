@@ -7,7 +7,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
@@ -81,7 +81,7 @@ func (s *Service) SaveProviderSettings(
 
 func (s *Service) ResetProviderSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
 ) (modelConsumerAPI.ProviderView, error) {
@@ -162,7 +162,7 @@ func (s *Service) SetProviderAPIKey(
 
 func (s *Service) ClearProviderAPIKey(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
 ) (modelConsumerAPI.ProviderAPIKeyStatus, error) {
@@ -272,7 +272,7 @@ func (s *Service) UpdateProvider(
 
 func (s *Service) DeleteProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 ) error {
 	if err := s.ready(ctx); err != nil {
@@ -300,26 +300,26 @@ func (s *Service) DeleteProvider(
 
 func (s *Service) SetProviderEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if err := s.ready(ctx); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if enabled {
 		if _, err := s.providerRuntimePublisher(); err != nil {
-			return artifact.Artifact{}, err
+			return artifactModel.Artifact{}, err
 		}
 	}
 
 	current, err := s.store.GetProvider(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	previous, err := s.clearEnabledProvider(ctx, current)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 
 	updated, err := s.store.SetProviderEnabled(
@@ -329,7 +329,7 @@ func (s *Service) SetProviderEnabled(
 		enabled,
 	)
 	if err != nil {
-		return artifact.Artifact{}, s.restoreProviderRuntime(
+		return artifactModel.Artifact{}, s.restoreProviderRuntime(
 			ctx,
 			previous,
 			err,
@@ -380,7 +380,7 @@ func (s *Service) clearEnabledProvider(
 
 func (s *Service) publishProviderRuntime(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	publisher, err := s.providerRuntimePublisher()
 	if err != nil {
@@ -395,7 +395,7 @@ func (s *Service) publishProviderRuntime(
 
 func (s *Service) resolveProviderRuntime(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (inferenceSpec.ProviderParam, error) {
 	resolved, err := s.store.ResolveProvider(ctx, ref)
 	if err != nil {

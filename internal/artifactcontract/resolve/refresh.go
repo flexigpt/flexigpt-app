@@ -6,44 +6,44 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (r *Resolver) RefreshPlugin(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.refreshTyped(ctx, ref, declaration.TypePlugin)
 }
 
 func (r *Resolver) RefreshAgent(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.refreshTyped(ctx, ref, declaration.TypeAgent)
 }
 
 func (r *Resolver) RefreshTeam(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.refreshTyped(ctx, ref, declaration.TypeTeam)
 }
 
 func (r *Resolver) RefreshWorkspace(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	return r.refreshTyped(ctx, ref, declaration.TypeWorkspace)
 }
 
 func (r *Resolver) RefreshWorkspaceWithCompositionSource(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	compositionSourceID source.SourceID,
+	ref artifactModel.ArtifactRef,
+	compositionSourceID sourceModel.SourceID,
 ) error {
 	if err := compositionSourceID.Validate(); err != nil {
 		return err
@@ -58,7 +58,7 @@ func (r *Resolver) RefreshWorkspaceWithCompositionSource(
 
 func (r *Resolver) refreshTyped(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expected declaration.Type,
 ) error {
 	return r.refreshTypedWithCompositionSource(ctx, ref, expected, "")
@@ -66,9 +66,9 @@ func (r *Resolver) refreshTyped(
 
 func (r *Resolver) refreshTypedWithCompositionSource(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expected declaration.Type,
-	compositionSourceID source.SourceID,
+	compositionSourceID sourceModel.SourceID,
 ) error {
 	if r == nil || r.refresh == nil {
 		return fmt.Errorf(
@@ -113,7 +113,7 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 			resolver:   r,
 			rootID:     rootID,
 			directives: make(map[RefreshTarget]bool),
-			visited:    make(map[artifact.ArtifactRef]struct{}),
+			visited:    make(map[artifactModel.ArtifactRef]struct{}),
 		}
 		if err := walker.visitEntry(ctx, rootEntry); err != nil {
 			return err
@@ -161,9 +161,9 @@ func (r *Resolver) refreshTypedWithCompositionSource(
 
 type refreshWalker struct {
 	resolver   *Resolver
-	rootID     root.RootID
+	rootID     rootModel.RootID
 	directives map[RefreshTarget]bool
-	visited    map[artifact.ArtifactRef]struct{}
+	visited    map[artifactModel.ArtifactRef]struct{}
 }
 
 func (w *refreshWalker) visitEntry(

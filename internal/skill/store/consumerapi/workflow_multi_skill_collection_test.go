@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -94,7 +94,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	refs, err := aggregateService.ListArtifactSkillRefs(
 		ctx,
 		skillAggregate.ArtifactSkillFilter{
-			AllowArtifacts: []artifact.ArtifactRef{
+			AllowArtifacts: []artifactModel.ArtifactRef{
 				first.Artifact.Ref(),
 				second.Artifact.Ref(),
 			},
@@ -103,7 +103,7 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 	requireNoError(t, err)
 	if !artifactRefSetEquals(
 		refs,
-		[]artifact.ArtifactRef{
+		[]artifactModel.ArtifactRef{
 			first.Artifact.Ref(),
 			second.Artifact.Ref(),
 		},
@@ -274,11 +274,11 @@ func TestSkillStoreWorkflowKeepsRemainingManagedSkillAvailableDuringPartialClean
 		second.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if secondAfterFirstPurge.State != artifact.StateAvailable {
+	if secondAfterFirstPurge.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"second Skill state after first purge=%q, want %q",
 			secondAfterFirstPurge.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 
@@ -367,7 +367,7 @@ func collectionMemberIndexByName(
 
 func capabilityPlanContainsArtifact(
 	values []collection.CollectionCapabilityOccurrence,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {
 		if value.Artifact != nil && *value.Artifact == ref {
@@ -378,14 +378,14 @@ func capabilityPlanContainsArtifact(
 }
 
 func artifactRefSetEquals(
-	actual []artifact.ArtifactRef,
-	expected []artifact.ArtifactRef,
+	actual []artifactModel.ArtifactRef,
+	expected []artifactModel.ArtifactRef,
 ) bool {
 	if len(actual) != len(expected) {
 		return false
 	}
 
-	found := make(map[artifact.ArtifactRef]struct{}, len(actual))
+	found := make(map[artifactModel.ArtifactRef]struct{}, len(actual))
 	for _, value := range actual {
 		found[value] = struct{}{}
 	}

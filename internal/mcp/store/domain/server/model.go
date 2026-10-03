@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -25,9 +25,9 @@ type InputBinding struct {
 type ServerData struct {
 	SchemaVersion string `json:"schemaVersion"`
 
-	SelectedConnectionProfile string                  `json:"selectedConnectionProfile,omitempty"`
-	Inputs                    map[string]InputBinding `json:"inputs,omitempty"`
-	AdditionalPolicies        []artifact.ArtifactRef  `json:"additionalPolicies,omitempty"`
+	SelectedConnectionProfile string                      `json:"selectedConnectionProfile,omitempty"`
+	Inputs                    map[string]InputBinding     `json:"inputs,omitempty"`
+	AdditionalPolicies        []artifactModel.ArtifactRef `json:"additionalPolicies,omitempty"`
 }
 
 func DefaultServerData() ServerData {
@@ -55,13 +55,13 @@ func MergeServerData(
 	value := input
 	value.Inputs = maps.Clone(input.Inputs)
 	value.AdditionalPolicies = append(
-		[]artifact.ArtifactRef(nil),
+		[]artifactModel.ArtifactRef(nil),
 		input.AdditionalPolicies...,
 	)
 	if err := value.Validate(); err != nil {
 		return nil, err
 	}
-	fields, err := artifact.DecodeDataObject(raw)
+	fields, err := artifactModel.DecodeDataObject(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -73,13 +73,13 @@ func MergeServerData(
 		return nil, err
 	}
 	fields[installationDataNamespace] = payload
-	return artifact.EncodeDataObject(fields)
+	return artifactModel.EncodeDataObject(fields)
 }
 
 func DecodeServerData(
 	raw json.RawMessage,
 ) (ServerData, error) {
-	fields, err := artifact.DecodeDataObject(raw)
+	fields, err := artifactModel.DecodeDataObject(raw)
 	if err != nil {
 		return ServerData{}, err
 	}
@@ -125,7 +125,7 @@ func decodeServerDataPayload(
 	}
 	value.Inputs = maps.Clone(value.Inputs)
 	value.AdditionalPolicies = append(
-		[]artifact.ArtifactRef(nil),
+		[]artifactModel.ArtifactRef(nil),
 		value.AdditionalPolicies...,
 	)
 	return value, nil
@@ -164,7 +164,7 @@ func (value ServerData) Validate() error {
 			spec.ErrInvalid,
 		)
 	}
-	seen := make(map[artifact.ArtifactRef]struct{})
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 	for name, binding := range value.Inputs {
 		if !installationInputNamePattern.MatchString(name) {
 			return fmt.Errorf(
@@ -232,7 +232,7 @@ func (value ServerData) SecretReferences() ([]string, error) {
 }
 
 func (value ServerData) ValidateFor(
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	document ServerDocument,
 ) error {
 	if err := server.Validate(); err != nil {
@@ -345,7 +345,7 @@ func (value ServerData) ValidateFor(
 		}
 	}
 
-	seen := make(map[artifact.ArtifactRef]struct{}, len(value.AdditionalPolicies))
+	seen := make(map[artifactModel.ArtifactRef]struct{}, len(value.AdditionalPolicies))
 	for _, ref := range value.AdditionalPolicies {
 		if err := ref.Validate(); err != nil {
 			return err

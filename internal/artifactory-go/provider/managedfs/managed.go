@@ -18,7 +18,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/internal/mapstoreio"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -85,13 +85,13 @@ func New(
 	}, nil
 }
 
-func (*Adapter) Kind() source.SourceKind {
-	return source.SourceKindManagedDirectory
+func (*Adapter) Kind() sourceModel.SourceKind {
+	return sourceModel.SourceKindManagedDirectory
 }
 
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
 	if err := a.validateSource(ctx, value); err != nil {
@@ -110,7 +110,7 @@ func (a *Adapter) ResolveLocalPath(
 
 func (a *Adapter) BootstrapManagedSource(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -166,7 +166,7 @@ func (a *Adapter) RemoveManagedRoot(
 
 func (a *Adapter) DiscardBootstrappedManagedSource(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -234,8 +234,8 @@ func (a *Adapter) DiscardBootstrappedManagedSource(
 
 func (a *Adapter) PublishPackage(
 	ctx context.Context,
-	value source.Source,
-	publication source.ManagedPackagePublication,
+	value sourceModel.Source,
+	publication sourceModel.ManagedPackagePublication,
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -401,8 +401,8 @@ func (a *Adapter) PublishPackage(
 
 func (a *Adapter) RemovePackage(
 	ctx context.Context,
-	value source.Source,
-	address source.ManagedPackageAddress,
+	value sourceModel.Source,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if err := ctx.Err(); err != nil {
@@ -529,7 +529,7 @@ func (*Adapter) NormalizeConfig(
 
 func (a *Adapter) Open(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) (sourceimpl.Snapshot, error) {
 	if err := a.validateSource(ctx, value); err != nil {
 		return nil, err
@@ -545,14 +545,14 @@ func (a *Adapter) Open(
 	return a.filesystem.Open(ctx, filesystemValue)
 }
 
-func (a *Adapter) validateSource(ctx context.Context, value source.Source) error {
+func (a *Adapter) validateSource(ctx context.Context, value sourceModel.Source) error {
 	if a == nil || a.filesystem == nil {
 		return spec.ErrClosed
 	}
 	if err := value.Validate(); err != nil {
 		return err
 	}
-	if value.Kind != source.SourceKindManagedDirectory {
+	if value.Kind != sourceModel.SourceKindManagedDirectory {
 		return fmt.Errorf(
 			"%w: managed adapter received source kind %q",
 			spec.ErrInvalid,
@@ -570,7 +570,7 @@ func (a *Adapter) validateSource(ctx context.Context, value source.Source) error
 }
 
 func (a *Adapter) sourceRootPath(
-	value source.Source,
+	value sourceModel.Source,
 	create bool,
 ) (string, error) {
 	// Every caller has already passed value through validateSource.
@@ -589,7 +589,7 @@ func (a *Adapter) sourceRootPath(
 }
 
 func (a *Adapter) sourceStagingPath(
-	value source.Source,
+	value sourceModel.Source,
 	create bool,
 ) (string, error) {
 	// Every caller has already passed value through validateSource.
@@ -654,24 +654,24 @@ func (a *Adapter) managedStagingRootPath(
 }
 
 func (a *Adapter) filesystemSource(
-	value source.Source,
+	value sourceModel.Source,
 	root string,
-) (source.Source, error) {
+) (sourceModel.Source, error) {
 	raw, err := json.Marshal(fsdir.Config{
 		RootPath: root,
 	})
 	if err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	output := value.Clone()
-	output.Kind = source.SourceKindFilesystemDirectory
+	output.Kind = sourceModel.SourceKindFilesystemDirectory
 	output.Config = raw
 	return output, nil
 }
 
 func (a *Adapter) confirmedGeneration(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) (string, error) {
 	snapshot, err := a.Open(ctx, value)
 	if err != nil {
@@ -733,7 +733,7 @@ func pruneEmptyManagedParents(root, start string) error {
 
 func equivalentPackage(
 	root string,
-	expected []source.ManagedPackageFile,
+	expected []sourceModel.ManagedPackageFile,
 ) (exists, equivalent bool, err error) {
 	info, err := os.Stat(root)
 	if errors.Is(err, os.ErrNotExist) {
@@ -901,7 +901,7 @@ func (*packagePartitionProvider) ListPartitions(
 func writeManagedPackageFiles(
 	ctx context.Context,
 	root string,
-	files []source.ManagedPackageFile,
+	files []sourceModel.ManagedPackageFile,
 ) error {
 	directoryStore, err := mapstore.NewMapDirectoryStore(
 		root,

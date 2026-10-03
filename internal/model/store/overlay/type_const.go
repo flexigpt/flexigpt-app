@@ -8,9 +8,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -24,30 +24,30 @@ const (
 
 	// Protected Model Artifacts store non-secret runtime state in Artifact Store protected overlay records.
 
-	ProviderRuntimeNamespace overlay.Namespace = "model.provider.runtime"
-	ModelRuntimeNamespace    overlay.Namespace = "model.runtime"
-	PreferencesNamespace     overlay.Namespace = "model.preferences"
+	ProviderRuntimeNamespace overlayModel.Namespace = "model.provider.runtime"
+	ModelRuntimeNamespace    overlayModel.Namespace = "model.runtime"
+	PreferencesNamespace     overlayModel.Namespace = "model.preferences"
 
-	ProviderCredentialSlot secret.Slot = "apiKey"
+	ProviderCredentialSlot secretModel.Slot = "apiKey"
 )
 
-func Namespaces() []overlay.Namespace {
-	return []overlay.Namespace{
+func Namespaces() []overlayModel.Namespace {
+	return []overlayModel.Namespace{
 		ProviderRuntimeNamespace,
 		ModelRuntimeNamespace,
 	}
 }
 
-func StoreNamespaces() []overlay.Namespace {
-	return []overlay.Namespace{
+func StoreNamespaces() []overlayModel.Namespace {
+	return []overlayModel.Namespace{
 		PreferencesNamespace,
 	}
 }
 
 func ProviderCredentialBindingKey(
-	ref artifact.ArtifactRef,
-) secret.BindingKey {
-	return secret.BindingKey{
+	ref artifactModel.ArtifactRef,
+) secretModel.BindingKey {
+	return secretModel.BindingKey{
 		Artifact:  ref,
 		Namespace: ProviderRuntimeNamespace,
 		Slot:      ProviderCredentialSlot,
@@ -200,12 +200,12 @@ func cloneReference(
 type OverlayRepository interface {
 	GetProviderOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (ProviderOverlay, bool, error)
 
 	PutProviderOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 		value ProviderOverlay,
@@ -213,19 +213,19 @@ type OverlayRepository interface {
 
 	DeleteProviderOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 	) error
 
 	GetModelOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (ModelOverlay, bool, error)
 
 	PutModelOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 		value ModelOverlay,
@@ -233,33 +233,33 @@ type OverlayRepository interface {
 
 	DeleteModelOverlay(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedArtifactRevision uint64,
 		expectedOverlayRevision uint64,
 	) error
 
 	GetProviderCredential(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (secret.Binding, bool, error)
+		ref artifactModel.ArtifactRef,
+	) (secretModel.Binding, bool, error)
 
 	ReplaceProviderCredential(
 		ctx context.Context,
-		request secret.ReplaceBindingRequest,
-	) (secret.Binding, error)
+		request secretModel.ReplaceBindingRequest,
+	) (secretModel.Binding, error)
 
 	ClearProviderCredential(
 		ctx context.Context,
-		request secret.ClearBindingRequest,
+		request secretModel.ClearBindingRequest,
 	) error
 
 	PurgeProviderLocalState(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) error
 
 	PurgeModelLocalState(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) error
 }

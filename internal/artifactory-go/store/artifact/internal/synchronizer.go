@@ -7,10 +7,10 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -19,8 +19,8 @@ import (
 )
 
 type typedBinding struct {
-	Binding artifact.SourceBinding
-	Kind    artifact.ArtifactKind
+	Binding artifactModel.SourceBinding
+	Kind    artifactModel.ArtifactKind
 }
 
 type Synchronizer struct {
@@ -51,11 +51,11 @@ func NewSynchronizer(
 // pinning, or suppression policy is involved.
 func (s *Synchronizer) Synchronize(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceValue source.Source,
+	rootID rootModel.RootID,
+	sourceValue sourceModel.Source,
 	observations []ingestimpl.Observation,
 	seenLocators []spec.Locator,
-	existing []artifact.Artifact,
+	existing []artifactModel.Artifact,
 ) (Synchronization, error) {
 	if s == nil || s.clock == nil || s.ids == nil {
 		return Synchronization{}, spec.ErrClosed
@@ -85,10 +85,10 @@ func (s *Synchronizer) Synchronize(
 		len(observations),
 	)
 	validByBinding := make(
-		map[artifact.SourceBinding][]ingestimpl.Observation,
+		map[artifactModel.SourceBinding][]ingestimpl.Observation,
 	)
 	invalidByBinding := make(
-		map[artifact.SourceBinding]ingestimpl.Observation,
+		map[artifactModel.SourceBinding]ingestimpl.Observation,
 	)
 
 	for index, observation := range observations {
@@ -156,11 +156,11 @@ func (s *Synchronizer) Synchronize(
 	}
 
 	existingByTypedBinding := make(
-		map[typedBinding]artifact.Artifact,
+		map[typedBinding]artifactModel.Artifact,
 		len(existing),
 	)
-	seenIDs := make(map[artifact.ArtifactID]struct{}, len(existing))
-	orderedExisting := append([]artifact.Artifact(nil), existing...)
+	seenIDs := make(map[artifactModel.ArtifactID]struct{}, len(existing))
+	orderedExisting := append([]artifactModel.Artifact(nil), existing...)
 	sort.Slice(orderedExisting, func(left, right int) bool {
 		return orderedExisting[left].ID < orderedExisting[right].ID
 	})
@@ -313,7 +313,7 @@ func (s *Synchronizer) Synchronize(
 			displayName = string(observation.LogicalName)
 		}
 		resolved := observation.Definition.Digest
-		created := artifact.Artifact{
+		created := artifactModel.Artifact{
 			ID:      id,
 			RootID:  rootID,
 			Binding: observation.Binding,
@@ -326,7 +326,7 @@ func (s *Synchronizer) Synchronize(
 			SourceContentDigest: cryptoutil.CloneDigest(
 				observation.SourceContentDigest,
 			),
-			State:       artifact.StateAvailable,
+			State:       artifactModel.StateAvailable,
 			Diagnostics: diagnostic.Clone(observation.Diagnostics),
 
 			DisplayName: displayName,
@@ -348,13 +348,13 @@ func (s *Synchronizer) Synchronize(
 }
 
 func deriveCurrentArtifact(
-	current artifact.Artifact,
+	current artifactModel.Artifact,
 	validByTypedBinding map[typedBinding]ingestimpl.Observation,
-	validByBinding map[artifact.SourceBinding][]ingestimpl.Observation,
-	invalidByBinding map[artifact.SourceBinding]ingestimpl.Observation,
+	validByBinding map[artifactModel.SourceBinding][]ingestimpl.Observation,
+	invalidByBinding map[artifactModel.SourceBinding]ingestimpl.Observation,
 	seenLocators map[spec.Locator]struct{},
-	discoverySpec source.DiscoverySpec,
-) (artifact.Artifact, bool, error) {
+	discoverySpec sourceModel.DiscoverySpec,
+) (artifactModel.Artifact, bool, error) {
 	next := current.Clone()
 	key := typedBinding{
 		Binding: current.Binding,
@@ -364,7 +364,7 @@ func deriveCurrentArtifact(
 	if observation, found := validByTypedBinding[key]; found {
 		if observation.Definition == nil ||
 			observation.SourceContentDigest == nil {
-			return artifact.Artifact{}, false, fmt.Errorf(
+			return artifactModel.Artifact{}, false, fmt.Errorf(
 				"%w: valid Source observation is incomplete",
 				spec.ErrInvalid,
 			)
@@ -376,7 +376,7 @@ func deriveCurrentArtifact(
 		next.SourceContentDigest = cryptoutil.CloneDigest(
 			observation.SourceContentDigest,
 		)
-		next.State = artifact.StateAvailable
+		next.State = artifactModel.StateAvailable
 		next.Diagnostics = diagnostic.Clone(observation.Diagnostics)
 		return next, !equivalentSourceState(current, next), nil
 	}
@@ -389,7 +389,7 @@ func deriveCurrentArtifact(
 		next.SourceContentDigest = cryptoutil.CloneDigest(
 			observation.SourceContentDigest,
 		)
-		next.State = artifact.StateInvalid
+		next.State = artifactModel.StateInvalid
 		next.Diagnostics = diagnostic.Clone(observation.Diagnostics)
 		return next, !equivalentSourceState(current, next), nil
 	}
@@ -398,7 +398,7 @@ func deriveCurrentArtifact(
 		alternative := alternatives[0]
 		if alternative.Definition == nil ||
 			alternative.SourceContentDigest == nil {
-			return artifact.Artifact{}, false, fmt.Errorf(
+			return artifactModel.Artifact{}, false, fmt.Errorf(
 				"%w: incompatible Source observation is incomplete",
 				spec.ErrInvalid,
 			)
@@ -408,7 +408,7 @@ func deriveCurrentArtifact(
 		next.SourceContentDigest = cryptoutil.CloneDigest(
 			alternative.SourceContentDigest,
 		)
-		next.State = artifact.StateIncompatible
+		next.State = artifactModel.StateIncompatible
 		next.Diagnostics = diagnostic.Append(
 			alternative.Diagnostics,
 			diagnostic.Diagnostic{
@@ -430,14 +430,14 @@ func deriveCurrentArtifact(
 		current.Binding.Locator,
 	)
 	if err != nil {
-		return artifact.Artifact{}, false, err
+		return artifactModel.Artifact{}, false, err
 	}
 	if sourceEntryObserved ||
 		inScope ||
 		discoverySpec.Authoritative {
 		next.ResolvedDefinition = nil
 		next.SourceContentDigest = nil
-		next.State = artifact.StateMissing
+		next.State = artifactModel.StateMissing
 		next.Diagnostics = []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityWarning,
 			Code:     "artifact.source-missing",
@@ -455,8 +455,8 @@ func deriveCurrentArtifact(
 }
 
 func invalidForArtifact(
-	current artifact.Artifact,
-	invalidByBinding map[artifact.SourceBinding]ingestimpl.Observation,
+	current artifactModel.Artifact,
+	invalidByBinding map[artifactModel.SourceBinding]ingestimpl.Observation,
 ) (ingestimpl.Observation, bool) {
 	if value, exact := invalidByBinding[current.Binding]; exact {
 		return value, true
@@ -471,8 +471,8 @@ func invalidForArtifact(
 }
 
 func equivalentSourceState(
-	left artifact.Artifact,
-	right artifact.Artifact,
+	left artifactModel.Artifact,
+	right artifactModel.Artifact,
 ) bool {
 	return left.LogicalName == right.LogicalName &&
 		left.LogicalVersion == right.LogicalVersion &&

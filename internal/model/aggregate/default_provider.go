@@ -5,7 +5,7 @@ import (
 
 	"github.com/flexigpt/inference-go/modelpreset"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -16,15 +16,15 @@ const baseDefaultProviderName = spec.LogicalName(
 // DefaultProviderPreferences stores only the user's optional preference.
 // It does not check Provider availability or resolve Models.
 type DefaultProviderPreferences interface {
-	GetDefaultProvider(ctx context.Context) (*artifact.ArtifactRef, error)
-	SetDefaultProvider(ctx context.Context, ref *artifact.ArtifactRef) error
+	GetDefaultProvider(ctx context.Context) (*artifactModel.ArtifactRef, error)
+	SetDefaultProvider(ctx context.Context, ref *artifactModel.ArtifactRef) error
 }
 
 // GetDefaultProvider returns the effective Provider without resolving Models,
 // credentials, capabilities, or runtime configuration.
 func (s *Service) GetDefaultProvider(
 	ctx context.Context,
-) (*artifact.ArtifactRef, error) {
+) (*artifactModel.ArtifactRef, error) {
 	if err := s.ready(ctx); err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (s *Service) GetDefaultProvider(
 // written back over the saved preference.
 func (s *Service) SetDefaultProvider(
 	ctx context.Context,
-	provider artifact.ArtifactRef,
+	provider artifactModel.ArtifactRef,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err

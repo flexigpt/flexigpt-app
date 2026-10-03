@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -18,14 +18,14 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 ) {
 	t.Parallel()
 
-	rootID := root.RootID(
+	rootID := rootModel.RootID(
 		"0192c4c0-0000-7000-8000-000000000001",
 	)
-	sourceID := source.SourceID(
+	sourceID := sourceModel.SourceID(
 		"0192c4c0-0001-7000-8000-000000000001",
 	)
 	policy, err := rootimpl.NewSetRootPolicy(
-		[]root.RootID{rootID},
+		[]rootModel.RootID{rootID},
 		nil,
 	)
 	if err != nil {

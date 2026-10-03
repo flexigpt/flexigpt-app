@@ -4,8 +4,8 @@ import (
 	"io/fs"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 )
 
@@ -23,10 +23,10 @@ type Config struct {
 
 	Providers []provider.Provider
 
-	ProtectedRootIDs []root.RootID
-	RetainedRoots    []root.RootDraft
+	ProtectedRootIDs []rootModel.RootID
+	RetainedRoots    []rootModel.RootDraft
 
-	ProtectedOverlayNamespaces []overlay.Namespace
-	StoreOverlayNamespaces     []overlay.Namespace
+	ProtectedOverlayNamespaces []overlayModel.Namespace
+	StoreOverlayNamespaces     []overlayModel.Namespace
 	SecretValues               value.ValueStore
 }

@@ -3,8 +3,8 @@ package topology
 import (
 	"context"
 
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -48,9 +48,9 @@ func (s CompiledPackageSet) Clone() CompiledPackageSet {
 }
 
 type CompiledPackage struct {
-	EmbeddedRoot spec.Locator                 `json:"embeddedRoot"`
-	Address      source.ManagedPackageAddress `json:"address"`
-	Fingerprint  cryptoutil.Digest            `json:"fingerprint"`
+	EmbeddedRoot spec.Locator                      `json:"embeddedRoot"`
+	Address      sourceModel.ManagedPackageAddress `json:"address"`
+	Fingerprint  cryptoutil.Digest                 `json:"fingerprint"`
 
 	Files     []CompiledFile     `json:"files"`
 	Documents []CompiledDocument `json:"documents"`
@@ -93,9 +93,9 @@ func (d CompiledDocument) Clone() CompiledDocument {
 }
 
 type CompiledArtifact struct {
-	Subresource spec.SubresourceLocator `json:"subresource,omitempty"`
-	Definition  definition.Definition   `json:"definition"`
-	Diagnostics []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
+	Subresource spec.SubresourceLocator    `json:"subresource,omitempty"`
+	Definition  definitionModel.Definition `json:"definition"`
+	Diagnostics []diagnostic.Diagnostic    `json:"diagnostics,omitempty"`
 }
 
 func (a CompiledArtifact) Clone() CompiledArtifact {

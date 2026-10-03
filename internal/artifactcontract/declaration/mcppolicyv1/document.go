@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -23,9 +23,9 @@ var schemaJSON []byte
 
 var compiledMCPPolicySchema = jsonutil.MustCompileJSONSchema(schemaJSON)
 
-var MCPPolicySchemaKey = schema.ArtifactKey(
-	artifact.ArtifactKind(MCPPolicyType),
-	schema.SchemaID(MCPPolicySchemaID),
+var MCPPolicySchemaKey = schemaModel.ArtifactKey(
+	artifactModel.ArtifactKind(MCPPolicyType),
+	schemaModel.SchemaID(MCPPolicySchemaID),
 	MCPPolicySchemaVersion,
 )
 

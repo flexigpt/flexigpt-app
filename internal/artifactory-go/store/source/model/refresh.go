@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -15,7 +15,7 @@ import (
 // It is Source freshness bookkeeping only. It does not own Artifacts,
 // Definitions, typed relationships, or consumer graph state.
 type RefreshState struct {
-	RootID               root.RootID             `json:"rootID"`
+	RootID               rootModel.RootID        `json:"rootID"`
 	SourceID             SourceID                `json:"sourceID"`
 	SourceRevision       uint64                  `json:"sourceRevision"`
 	SourceGeneration     string                  `json:"sourceGeneration"`

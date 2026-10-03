@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -45,7 +45,7 @@ func TestReadOnlyDomainRejectsAuthoringBeforeStoreAccess(t *testing.T) {
 	}
 	if _, err := api.loadEditableCollection(
 		ctx,
-		artifact.ArtifactRef{},
+		artifactModel.ArtifactRef{},
 		1,
 	); !errors.Is(err, spec.ErrUnsupported) {
 		t.Fatalf("loadEditableCollection error = %v", err)

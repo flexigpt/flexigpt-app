@@ -7,14 +7,14 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type Decoded struct {
 	SubresourceLocator spec.SubresourceLocator
-	Definition         definition.Definition
+	Definition         definitionModel.Definition
 }
 
 type configDocument struct {

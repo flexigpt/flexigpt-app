@@ -7,8 +7,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
@@ -46,7 +46,7 @@ func (a *API) ListToolCollections(
 
 func (a *API) GetToolCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	if err := a.ready(ctx); err != nil {
 		return collection.CollectionView{}, err
@@ -67,7 +67,7 @@ func (a *API) GetToolCollection(
 
 func (a *API) SetToolCollectionEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -93,17 +93,17 @@ func (a *API) collectionForTool(
 	entries, err := a.cat.FindByIdentity(
 		ctx,
 		a.builtinRoot,
-		artifact.ArtifactKind(pluginv1.PluginType),
+		artifactModel.ArtifactKind(pluginv1.PluginType),
 		collectionName,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return collection.CollectionView{}, err
 	}
 
-	matches := make([]artifact.ArtifactRef, 0, 1)
+	matches := make([]artifactModel.ArtifactRef, 0, 1)
 	for _, entry := range entries {
-		if entry.State != artifact.StateAvailable ||
+		if entry.State != artifactModel.StateAvailable ||
 			entry.Binding.SourceID != a.builtinSource ||
 			entry.Binding.SubresourceLocator != "" {
 			continue

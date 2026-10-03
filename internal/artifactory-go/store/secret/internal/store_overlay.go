@@ -4,41 +4,41 @@ import (
 	"context"
 	"fmt"
 
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
 func (s *Service) GetStoreOverlay(
 	ctx context.Context,
-	namespace overlay.Namespace,
-) (overlay.StoreRecord, bool, error) {
+	namespace overlayModel.Namespace,
+) (overlayModel.StoreRecord, bool, error) {
 	if err := s.ready(ctx); err != nil {
-		return overlay.StoreRecord{}, false, err
+		return overlayModel.StoreRecord{}, false, err
 	}
 	if err := s.requireStoreNamespace(namespace); err != nil {
-		return overlay.StoreRecord{}, false, err
+		return overlayModel.StoreRecord{}, false, err
 	}
 	return s.repository.GetStoreOverlay(ctx, namespace)
 }
 
 func (s *Service) PutStoreOverlay(
 	ctx context.Context,
-	request overlay.StorePutRequest,
-) (overlay.StoreRecord, error) {
+	request overlayModel.StorePutRequest,
+) (overlayModel.StoreRecord, error) {
 	if err := s.ready(ctx); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	if err := request.Validate(); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	if err := s.requireStoreNamespace(request.Namespace); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 
-	payload, err := overlay.CanonicalPayload(request.Payload)
+	payload, err := overlayModel.CanonicalPayload(request.Payload)
 	if err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	request.Payload = payload
 
@@ -51,7 +51,7 @@ func (s *Service) PutStoreOverlay(
 
 func (s *Service) DeleteStoreOverlay(
 	ctx context.Context,
-	namespace overlay.Namespace,
+	namespace overlayModel.Namespace,
 	expectedRevision uint64,
 ) error {
 	if err := s.ready(ctx); err != nil {
@@ -74,7 +74,7 @@ func (s *Service) DeleteStoreOverlay(
 }
 
 func (s *Service) requireStoreNamespace(
-	namespace overlay.Namespace,
+	namespace overlayModel.Namespace,
 ) error {
 	if err := namespace.Validate(); err != nil {
 		return err

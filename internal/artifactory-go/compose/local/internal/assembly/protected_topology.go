@@ -6,8 +6,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -43,7 +43,7 @@ func (c *Components) EnsureProtectedTopology(
 
 	output := topology.Installed{
 		Root:    rootValue,
-		Sources: make([]source.Summary, 0, len(declaration.Sources)),
+		Sources: make([]sourceModel.Summary, 0, len(declaration.Sources)),
 	}
 	for _, draft := range declaration.Sources {
 		value, err := c.Sources.Create(ctx, rootValue.ID, draft)
@@ -63,9 +63,9 @@ func (c *Components) EnsureProtectedTopology(
 }
 
 func protectedSourceIntentMatches(
-	value source.Summary,
-	rootID root.RootID,
-	draft source.Draft,
+	value sourceModel.Summary,
+	rootID rootModel.RootID,
+	draft sourceModel.Draft,
 ) bool {
 	return value.ID == draft.ID &&
 		value.RootID == rootID &&

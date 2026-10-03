@@ -10,9 +10,9 @@ import (
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -67,13 +67,13 @@ func (a *API) AddSkillPath(
 		a.discovery,
 		refresh.EnsureAndRefreshSourceRequest{
 			RootID: request.RootID,
-			Draft: source.Draft{
-				ID: source.SourceID(uuidutil.NewUUIDv7()),
+			Draft: sourceModel.Draft{
+				ID: sourceModel.SourceID(uuidutil.NewUUIDv7()),
 				StorageKey: fsdir.FilesystemSourceStorageKey(
 					"skill-path",
 					rootPath,
 				),
-				Kind:        source.SourceKindFilesystemDirectory,
+				Kind:        sourceModel.SourceKindFilesystemDirectory,
 				DisplayName: displayName,
 				Enabled:     true,
 				Config:      config,
@@ -88,7 +88,7 @@ func (a *API) AddSkillPath(
 	record, err := a.artifacts.FindByOrigin(
 		ctx,
 		request.RootID,
-		artifact.SourceBinding{
+		artifactModel.SourceBinding{
 			SourceID: summary.ID,
 			Locator:  skillLocator,
 		},
@@ -97,7 +97,7 @@ func (a *API) AddSkillPath(
 	if err != nil {
 		return SkillPathRegistrationResult{}, err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return SkillPathRegistrationResult{}, fmt.Errorf(
 			"%w: Skill path did not produce an available Artifact",
 			spec.ErrReferenceUnresolved,
@@ -203,7 +203,7 @@ func findSkillDefinitionPath(
 
 func skillFileDiscovery(
 	locator spec.Locator,
-) (source.DiscoverySpec, error) {
+) (sourceModel.DiscoverySpec, error) {
 	return documentTopology.DiscoverySpecForLocatorForUse(
 		documentTopology.DiscoveryUseSkill,
 		locator,

@@ -5,22 +5,22 @@ import (
 	"encoding/json"
 	"io"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Reader interface {
 	Get(
 		ctx context.Context,
-		rootID root.RootID,
-		id source.SourceID,
-	) (source.Source, error)
+		rootID rootModel.RootID,
+		id sourceModel.SourceID,
+	) (sourceModel.Source, error)
 
 	List(
 		ctx context.Context,
-		rootID root.RootID,
-	) ([]source.Source, error)
+		rootID rootModel.RootID,
+	) ([]sourceModel.Source, error)
 }
 
 type Repository interface {
@@ -28,38 +28,38 @@ type Repository interface {
 
 	FindByStorageKey(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 		storageKey spec.StorageKey,
-	) (source.Source, error)
+	) (sourceModel.Source, error)
 
 	Create(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) error
 
 	Update(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 		expectedRevision uint64,
 	) error
 
 	Retire(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 		expectedRevision uint64,
 	) error
 
 	Discard(
 		ctx context.Context,
-		rootID root.RootID,
-		id source.SourceID,
+		rootID rootModel.RootID,
+		id sourceModel.SourceID,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		rootID root.RootID,
-		id source.SourceID,
+		rootID rootModel.RootID,
+		id sourceModel.SourceID,
 		expectedRevision uint64,
 	) error
 }
@@ -70,12 +70,12 @@ type Snapshot interface {
 	Stat(
 		ctx context.Context,
 		locator spec.Locator,
-	) (source.Entry, error)
+	) (sourceModel.Entry, error)
 
 	ReadDir(
 		ctx context.Context,
 		locator spec.Locator,
-	) ([]source.Entry, error)
+	) ([]sourceModel.Entry, error)
 
 	Open(
 		ctx context.Context,
@@ -89,7 +89,7 @@ type Snapshot interface {
 type Opener interface {
 	Open(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) (Snapshot, error)
 }
 
@@ -103,7 +103,7 @@ type Opener interface {
 type LocalPathResolver interface {
 	ResolveLocalPath(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 		locator spec.Locator,
 	) (string, error)
 }
@@ -112,7 +112,7 @@ type LocalPathResolver interface {
 // native paths. It avoids consumer hard-coding of concrete adapter kinds.
 type LocalPathCapability interface {
 	SupportsLocalPath(
-		kind source.SourceKind,
+		kind sourceModel.SourceKind,
 	) bool
 }
 
@@ -126,14 +126,14 @@ type LocalPathCapability interface {
 type ManagedPackageWriter interface {
 	PublishPackage(
 		ctx context.Context,
-		value source.Source,
-		publication source.ManagedPackagePublication,
+		value sourceModel.Source,
+		publication sourceModel.ManagedPackagePublication,
 	) (generation string, err error)
 
 	RemovePackage(
 		ctx context.Context,
-		value source.Source,
-		address source.ManagedPackageAddress,
+		value sourceModel.Source,
+		address sourceModel.ManagedPackageAddress,
 		expectedGeneration string,
 	) error
 }
@@ -149,12 +149,12 @@ type ManagedPackageWriter interface {
 type ManagedSourceBootstrapper interface {
 	BootstrapManagedSource(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) error
 
 	DiscardBootstrappedManagedSource(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) error
 }
 
@@ -172,7 +172,7 @@ type ManagedRootRemover interface {
 }
 
 type Adapter interface {
-	Kind() source.SourceKind
+	Kind() sourceModel.SourceKind
 
 	NormalizeConfig(
 		ctx context.Context,
@@ -181,6 +181,6 @@ type Adapter interface {
 
 	Open(
 		ctx context.Context,
-		value source.Source,
+		value sourceModel.Source,
 	) (Snapshot, error)
 }

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"slices"
 
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -25,14 +25,14 @@ const getDefinitionsByRootSQL = `
 
 func (s *Store) getDefinitions(
 	ctx context.Context,
-	keys []definition.Key,
-) ([]definition.Definition, error) {
+	keys []definitionModel.Key,
+) ([]definitionModel.Definition, error) {
 	if len(keys) == 0 {
-		return []definition.Definition{}, nil
+		return []definitionModel.Definition{}, nil
 	}
 
-	roots := make(map[root.RootID]struct{})
-	unique := make(map[definition.Key]struct{}, len(keys))
+	roots := make(map[rootModel.RootID]struct{})
+	unique := make(map[definitionModel.Key]struct{}, len(keys))
 	for _, key := range keys {
 		if err := key.Validate(); err != nil {
 			return nil, err
@@ -41,7 +41,7 @@ func (s *Store) getDefinitions(
 		unique[key] = struct{}{}
 	}
 
-	rootIDs := make([]root.RootID, 0, len(roots))
+	rootIDs := make([]rootModel.RootID, 0, len(roots))
 	for rootID := range roots {
 		rootIDs = append(rootIDs, rootID)
 	}
@@ -52,8 +52,8 @@ func (s *Store) getDefinitions(
 		}
 	}
 
-	found := make(map[definition.Key]definition.Definition, len(unique))
-	missingByRoot := make(map[root.RootID][]cryptoutil.Digest)
+	found := make(map[definitionModel.Key]definitionModel.Definition, len(unique))
+	missingByRoot := make(map[rootModel.RootID][]cryptoutil.Digest)
 	for key := range unique {
 		if value, foundInCache := s.cachedDefinition(key); foundInCache {
 			found[key] = value
@@ -91,7 +91,7 @@ func (s *Store) getDefinitions(
 					rows.Close()
 					return nil, err
 				}
-				key := definition.Key{
+				key := definitionModel.Key{
 					RootID: rootID,
 					Digest: value.Digest,
 				}
@@ -109,7 +109,7 @@ func (s *Store) getDefinitions(
 		}
 	}
 
-	output := make([]definition.Definition, len(keys))
+	output := make([]definitionModel.Definition, len(keys))
 	for index, key := range keys {
 		value, exists := found[key]
 		if !exists {
@@ -126,14 +126,14 @@ func (s *Store) getDefinitions(
 }
 
 func (s *Store) cachedDefinition(
-	key definition.Key,
-) (definition.Definition, bool) {
+	key definitionModel.Key,
+) (definitionModel.Definition, bool) {
 	s.definitionMu.RLock()
 	defer s.definitionMu.RUnlock()
 
 	value, found := s.definitionCache[key]
 	if !found {
-		return definition.Definition{}, false
+		return definitionModel.Definition{}, false
 	}
 	// Private immutable view. GetDefinitions clones each outgoing result.
 	// No caller of this helper may mutate the borrowed value.
@@ -141,8 +141,8 @@ func (s *Store) cachedDefinition(
 }
 
 func (s *Store) rememberDefinition(
-	key definition.Key,
-	value definition.Definition,
+	key definitionModel.Key,
+	value definitionModel.Definition,
 ) {
 	size := len(value.Body)
 	if size > definitionCacheMaxBytes {
@@ -158,7 +158,7 @@ func (s *Store) rememberDefinition(
 	if s.definitionCache == nil ||
 		s.definitionBytes+size > definitionCacheMaxBytes {
 		s.definitionCache = make(
-			map[definition.Key]definition.Definition,
+			map[definitionModel.Key]definitionModel.Definition,
 		)
 		s.definitionBytes = 0
 	}

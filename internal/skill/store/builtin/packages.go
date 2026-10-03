@@ -12,9 +12,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -25,9 +25,9 @@ import (
 // publication through the shared managed built-in Source.
 type PreparedPackage struct {
 	EmbeddedPackageRoot spec.Locator
-	PackageAddress      source.ManagedPackageAddress
+	PackageAddress      sourceModel.ManagedPackageAddress
 	DocumentFile        spec.Locator
-	PackageFiles        []source.ManagedPackageFile
+	PackageFiles        []sourceModel.ManagedPackageFile
 	Expectations        []ArtifactExpectation
 }
 
@@ -36,7 +36,7 @@ type PreparedPackage struct {
 type ArtifactExpectation struct {
 	Locator          spec.Locator
 	Subresource      spec.SubresourceLocator
-	Kind             artifact.ArtifactKind
+	Kind             artifactModel.ArtifactKind
 	LogicalName      spec.LogicalName
 	DefinitionDigest cryptoutil.Digest
 }
@@ -101,12 +101,12 @@ func preparePackage(
 	if err != nil {
 		return PreparedPackage{}, err
 	}
-	files, err = source.NormalizeManagedPackageFiles(files)
+	files, err = sourceModel.NormalizeManagedPackageFiles(files)
 	if err != nil {
 		return PreparedPackage{}, err
 	}
 
-	documentFile, document, found, err := source.PackageFileContentOneOf(
+	documentFile, document, found, err := sourceModel.PackageFileContentOneOf(
 		files,
 		documentTopology.CollectionDocumentFiles(),
 	)
@@ -149,7 +149,7 @@ func preparePackage(
 		)
 	}
 
-	address, err := source.NewManagedPackageAddress(
+	address, err := sourceModel.NewManagedPackageAddress(
 		skillDomain.BuiltinSkillCollectionPackageKind,
 		packageName,
 		documentTopology.UnversionedPackageVersion(),
@@ -170,7 +170,7 @@ func preparePackage(
 func canonicalCollectionPackage(
 	documentFile spec.Locator,
 	document []byte,
-	files []source.ManagedPackageFile,
+	files []sourceModel.ManagedPackageFile,
 ) (
 	pluginv1.PluginDocument,
 	[]ArtifactExpectation,
@@ -339,7 +339,7 @@ func canonicalCollectionPackage(
 }
 
 type preparedArtifactIdentity struct {
-	kind artifact.ArtifactKind
+	kind artifactModel.ArtifactKind
 	name spec.LogicalName
 }
 

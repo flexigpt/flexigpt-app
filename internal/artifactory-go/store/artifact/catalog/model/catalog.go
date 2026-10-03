@@ -9,11 +9,11 @@
 package catalog
 
 import (
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -26,7 +26,7 @@ import (
 // Source state, local enablement, or list filtering semantics.
 type ListOptions struct {
 	IncludeDocument bool
-	Kind            artifact.ArtifactKind
+	Kind            artifactModel.ArtifactKind
 	Enabled         *bool
 	LogicalNames    []spec.LogicalName
 }
@@ -36,7 +36,7 @@ type ListOptions struct {
 // present unless ListOptions.IncludeDocument is true.
 type DefinitionMetadata struct {
 	Digest        cryptoutil.Digest
-	SchemaID      schema.SchemaID
+	SchemaID      schemaModel.SchemaID
 	SchemaVersion string
 	Description   string
 }
@@ -44,8 +44,8 @@ type DefinitionMetadata struct {
 // SourceMetadata is the small Source projection needed by domain list
 // classification such as managed versus built-in.
 type SourceMetadata struct {
-	ID         source.SourceID
-	Kind       source.SourceKind
+	ID         sourceModel.SourceID
+	Kind       sourceModel.SourceKind
 	StorageKey spec.StorageKey
 	Enabled    bool
 }
@@ -56,16 +56,16 @@ type SourceMetadata struct {
 // Metadata reads deliberately do not reconstruct Artifact.Data, diagnostics,
 // complete Definitions, schema validation, or source verification.
 type Entry struct {
-	ID      artifact.ArtifactID
-	RootID  root.RootID
-	Binding artifact.SourceBinding
+	ID      artifactModel.ArtifactID
+	RootID  rootModel.RootID
+	Binding artifactModel.SourceBinding
 
-	Kind           artifact.ArtifactKind
+	Kind           artifactModel.ArtifactKind
 	LogicalName    spec.LogicalName
 	LogicalVersion spec.LogicalVersion
 
 	DisplayName string
-	State       artifact.State
+	State       artifactModel.State
 	Enabled     bool
 	Revision    uint64
 
@@ -74,11 +74,11 @@ type Entry struct {
 
 	// Document is populated only when ListOptions.IncludeDocument is true.
 	// It is immutable Store data selected by Ref.RootID and Definition.Digest.
-	Document *definition.Definition
+	Document *definitionModel.Definition
 }
 
-func (e Entry) Ref() artifact.ArtifactRef {
-	return artifact.ArtifactRef{
+func (e Entry) Ref() artifactModel.ArtifactRef {
+	return artifactModel.ArtifactRef{
 		RootID:     e.RootID,
 		ArtifactID: e.ID,
 	}

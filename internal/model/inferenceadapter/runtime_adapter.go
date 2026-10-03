@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/inference-go/capabilityoverride"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -35,7 +35,7 @@ type Credential struct {
 type CredentialResolver interface {
 	ResolveModelCredential(
 		ctx context.Context,
-		binding secret.Binding,
+		binding secretModel.Binding,
 	) (Credential, error)
 }
 

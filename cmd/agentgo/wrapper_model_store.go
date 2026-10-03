@@ -11,7 +11,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
-	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
@@ -49,7 +49,7 @@ func initModelWrappers(
 	secretRuntime secret.RuntimeAPI,
 	localState artifactcleanup.API,
 	storeOverlays overlay.StoreAPI,
-	hydrator topology.CompiledHydrationCoordinator,
+	hydrator installModel.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
 	if storeWrapper == nil || aggregateWrapper == nil {
 		return nil, errors.New("model wrapper receivers are incomplete")

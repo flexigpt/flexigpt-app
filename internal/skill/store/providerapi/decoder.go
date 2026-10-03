@@ -5,7 +5,7 @@ import (
 	"path"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -80,7 +80,7 @@ func expectedSkillName(locator spec.Locator) string {
 	if parent == "." {
 		return ""
 	}
-	if address, err := source.ParseManagedPackageAddressDirectory(
+	if address, err := sourceModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(parent),
 	); err == nil &&
 		address.Kind == skillDomain.ManagedSkillPackageKind {

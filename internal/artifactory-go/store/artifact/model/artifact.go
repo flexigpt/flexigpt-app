@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -37,8 +37,8 @@ func (v ArtifactKind) Validate() error {
 }
 
 type ArtifactRef struct {
-	RootID     root.RootID `json:"rootID"`
-	ArtifactID ArtifactID  `json:"artifactID"`
+	RootID     rootModel.RootID `json:"rootID"`
+	ArtifactID ArtifactID       `json:"artifactID"`
 }
 
 func (r ArtifactRef) Validate() error {
@@ -49,7 +49,7 @@ func (r ArtifactRef) Validate() error {
 }
 
 type ArtifactAddress struct {
-	RootID      root.RootID      `json:"rootID"`
+	RootID      rootModel.RootID `json:"rootID"`
 	ArtifactID  ArtifactID       `json:"artifactID"`
 	Kind        ArtifactKind     `json:"kind"`
 	LogicalName spec.LogicalName `json:"logicalName"`
@@ -78,9 +78,9 @@ func (a ArtifactAddress) Validate() error {
 // Roots. Protected Root policy continues to protect source, package, display,
 // generic data, and purge mutation.
 type Artifact struct {
-	ID      ArtifactID    `json:"id"`
-	RootID  root.RootID   `json:"rootID"`
-	Binding SourceBinding `json:"binding"`
+	ID      ArtifactID       `json:"id"`
+	RootID  rootModel.RootID `json:"rootID"`
+	Binding SourceBinding    `json:"binding"`
 
 	Kind           ArtifactKind        `json:"kind"`
 	LogicalName    spec.LogicalName    `json:"logicalName"`

@@ -6,7 +6,7 @@ import (
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -276,8 +276,8 @@ func TestWorkflow_AgentCollectionCanAddAndRemoveBuiltinReference(
 func requireCollectionContainsAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifact.ArtifactRef,
-	agentRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
+	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 
@@ -301,8 +301,8 @@ func requireCollectionContainsAgent(
 func requireCollectionCapabilityContainsAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifact.ArtifactRef,
-	agentRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
+	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 
@@ -332,8 +332,8 @@ func requireCollectionCapabilityContainsAgent(
 func assertCollectionDoesNotContainAgent(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifact.ArtifactRef,
-	agentRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
+	agentRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 
@@ -357,7 +357,7 @@ func assertCollectionDoesNotContainAgent(
 func requireCollectionPlanComplete(
 	t *testing.T,
 	harness *workflowHarness,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 	expected bool,
 ) {
 	t.Helper()
@@ -381,7 +381,7 @@ func requireCollectionPlanComplete(
 func requireRestoredMembership(
 	t *testing.T,
 	values []agentConsumerAPI.AgentRestoredMembership,
-	collectionRef artifact.ArtifactRef,
+	collectionRef artifactModel.ArtifactRef,
 ) {
 	t.Helper()
 

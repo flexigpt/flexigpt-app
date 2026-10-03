@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 )
@@ -12,7 +12,7 @@ import (
 func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 	t *testing.T,
 ) {
-	address, err := source.NewManagedPackageAddress(
+	address, err := sourceModel.NewManagedPackageAddress(
 		skillDomain.ManagedSkillPackageKind,
 		"release-notes",
 		"unversioned",
@@ -69,7 +69,7 @@ func TestManagedSkillStorageLayoutUsesNamedRuntimeDirectory(
 
 	files, err := skillDomain.ManagedSkillStorageFiles(
 		address,
-		[]source.ManagedPackageFile{
+		[]sourceModel.ManagedPackageFile{
 			{
 				Locator: "SKILL.md",
 				Content: []byte(

@@ -5,18 +5,18 @@ import (
 	"fmt"
 	"slices"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Registry struct {
-	adapters map[source.SourceKind]Adapter
-	kinds    []source.SourceKind
+	adapters map[sourceModel.SourceKind]Adapter
+	kinds    []sourceModel.SourceKind
 }
 
 func NewRegistry(adapters ...Adapter) (*Registry, error) {
-	values := make(map[source.SourceKind]Adapter, len(adapters))
-	kinds := make([]source.SourceKind, 0, len(adapters))
+	values := make(map[sourceModel.SourceKind]Adapter, len(adapters))
+	kinds := make([]sourceModel.SourceKind, 0, len(adapters))
 
 	for _, adapter := range adapters {
 		if adapter == nil {
@@ -42,7 +42,7 @@ func NewRegistry(adapters ...Adapter) (*Registry, error) {
 
 func (r *Registry) Open(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) (Snapshot, error) {
 	if ctx == nil {
 		return nil, spec.ErrInvalid
@@ -75,7 +75,7 @@ func (r *Registry) Open(
 }
 
 func (r *Registry) SupportsLocalPath(
-	kind source.SourceKind,
+	kind sourceModel.SourceKind,
 ) bool {
 	adapter, exists := r.adapter(kind)
 	if !exists {
@@ -86,7 +86,7 @@ func (r *Registry) SupportsLocalPath(
 }
 
 func (r *Registry) SupportsManagedPackages(
-	kind source.SourceKind,
+	kind sourceModel.SourceKind,
 ) bool {
 	adapter, exists := r.adapter(kind)
 	if !exists {
@@ -104,7 +104,7 @@ func (r *Registry) SupportsManagedPackages(
 // continue to expose Summary values only and never reveal source paths.
 func (r *Registry) ResolveLocalPath(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
 	if ctx == nil {
@@ -148,8 +148,8 @@ func (r *Registry) ResolveLocalPath(
 
 func (r *Registry) PublishPackage(
 	ctx context.Context,
-	value source.Source,
-	publication source.ManagedPackagePublication,
+	value sourceModel.Source,
+	publication sourceModel.ManagedPackagePublication,
 ) (string, error) {
 	if ctx == nil {
 		return "", fmt.Errorf(
@@ -163,7 +163,7 @@ func (r *Registry) PublishPackage(
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	normalized, err := source.NormalizeManagedPackagePublication(publication)
+	normalized, err := sourceModel.NormalizeManagedPackagePublication(publication)
 	if err != nil {
 		return "", err
 	}
@@ -204,8 +204,8 @@ func (r *Registry) PublishPackage(
 
 func (r *Registry) RemovePackage(
 	ctx context.Context,
-	value source.Source,
-	address source.ManagedPackageAddress,
+	value sourceModel.Source,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if ctx == nil {
@@ -294,15 +294,15 @@ func (r *Registry) RemoveManagedRoot(
 	return nil
 }
 
-func (r *Registry) Kinds() []source.SourceKind {
+func (r *Registry) Kinds() []sourceModel.SourceKind {
 	if r == nil {
 		return nil
 	}
-	return append([]source.SourceKind(nil), r.kinds...)
+	return append([]sourceModel.SourceKind(nil), r.kinds...)
 }
 
 func (r *Registry) adapter(
-	kind source.SourceKind,
+	kind sourceModel.SourceKind,
 ) (Adapter, bool) {
 	if r == nil {
 		return nil, false

@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -17,9 +17,9 @@ import (
 // not supported.
 func ArtifactNameReferenceLookupRoots(
 	reference declaration.ArtifactNameReference,
-	currentRoot root.RootID,
-	builtinRoot root.RootID,
-) ([]root.RootID, error) {
+	currentRoot rootModel.RootID,
+	builtinRoot rootModel.RootID,
+) ([]rootModel.RootID, error) {
 	if err := reference.Validate(); err != nil {
 		return nil, err
 	}
@@ -38,10 +38,10 @@ func ArtifactNameReferenceLookupRoots(
 		if err := builtinRoot.Validate(); err != nil {
 			return nil, err
 		}
-		return []root.RootID{builtinRoot}, nil
+		return []rootModel.RootID{builtinRoot}, nil
 
 	case "":
-		output := make([]root.RootID, 0, 2)
+		output := make([]rootModel.RootID, 0, 2)
 		output = append(output, currentRoot)
 
 		if builtinRoot == "" || builtinRoot == currentRoot {

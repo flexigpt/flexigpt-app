@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
@@ -30,7 +30,7 @@ type SecretInputTarget struct {
 }
 
 func (target SecretInputTarget) matches(
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	raw string,
 ) error {
 	ref, err := mcpDomainSecret.ParseMCPSecretRef(raw)

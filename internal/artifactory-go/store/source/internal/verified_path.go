@@ -7,8 +7,8 @@ import (
 	"sort"
 	"sync"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -16,10 +16,10 @@ import (
 type verificationSessionContextKey struct{}
 
 type verificationSessionKey struct {
-	RootID         root.RootID
-	SourceID       source.SourceID
+	RootID         rootModel.RootID
+	SourceID       sourceModel.SourceID
 	SourceRevision uint64
-	SourceKind     source.SourceKind
+	SourceKind     sourceModel.SourceKind
 	Generation     string
 }
 
@@ -114,7 +114,7 @@ func (s *VerificationSession) Close(ctx context.Context) error {
 func ResolveVerifiedLocalPath(
 	ctx context.Context,
 	runtime Runtime,
-	value source.Source,
+	value sourceModel.Source,
 	verifiedLocator spec.Locator,
 	localLocator spec.Locator,
 	expectedGeneration string,
@@ -197,7 +197,7 @@ func ResolveVerifiedLocalPath(
 func (s *VerificationSession) verify(
 	ctx context.Context,
 	runtime Runtime,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 	expectedGeneration string,
 	expectedDigest cryptoutil.Digest,

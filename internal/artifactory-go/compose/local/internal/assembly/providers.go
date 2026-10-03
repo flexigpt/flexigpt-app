@@ -4,15 +4,15 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	providerregistry "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/registry"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/registry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func providerRegistryFromConfig(
 	config Config,
-) (*providerregistry.Registry, error) {
-	registry, err := providerregistry.New(
+) (*registry.Registry, error) {
+	r, err := registry.New(
 		config.ArtifactProviders...,
 	)
 	if err != nil {
@@ -21,7 +21,7 @@ func providerRegistryFromConfig(
 			err,
 		)
 	}
-	return registry, nil
+	return r, nil
 }
 
 // bindProviderSchemas supplies the narrow schema catalog required by modern
@@ -39,7 +39,7 @@ func bindProviderSchemas(
 	}
 
 	available := make(
-		map[schema.Key]struct{},
+		map[schemaModel.Key]struct{},
 	)
 	for _, key := range schemas.Keys() {
 		available[key] = struct{}{}
@@ -53,7 +53,7 @@ func bindProviderSchemas(
 
 		required := binder.RequiredSchemaKeys()
 		seen := make(
-			map[schema.Key]struct{},
+			map[schemaModel.Key]struct{},
 			len(required),
 		)
 		for requiredIndex, key := range required {

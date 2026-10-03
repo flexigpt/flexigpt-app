@@ -3,15 +3,15 @@ package model
 import (
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Selector struct {
-	Kind              artifact.ArtifactKind `json:"kind"`
-	LogicalName       spec.LogicalName      `json:"logicalName,omitempty"`
-	VersionConstraint string                `json:"versionConstraint,omitempty"`
-	Labels            map[string]string     `json:"labels,omitempty"`
+	Kind              artifactModel.ArtifactKind `json:"kind"`
+	LogicalName       spec.LogicalName           `json:"logicalName,omitempty"`
+	VersionConstraint string                     `json:"versionConstraint,omitempty"`
+	Labels            map[string]string          `json:"labels,omitempty"`
 }
 
 func (s Selector) Validate() error {

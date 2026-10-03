@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -68,11 +68,11 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		documentTopology.BuiltinPackageSourceID(),
 	)
 	requireNoError(t, err)
-	if builtinSource.Kind != source.SourceKindManagedDirectory {
+	if builtinSource.Kind != sourceModel.SourceKindManagedDirectory {
 		t.Fatalf(
 			"built-in Source kind=%q, want %q",
 			builtinSource.Kind,
-			source.SourceKindManagedDirectory,
+			sourceModel.SourceKindManagedDirectory,
 		)
 	}
 	if !builtinSource.Enabled {
@@ -97,11 +97,11 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 	if !found {
 		t.Fatal("embedded markdown-output Skill was not installed")
 	}
-	if markdownOutput.State != artifact.StateAvailable {
+	if markdownOutput.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"markdown-output state=%q, want %q",
 			markdownOutput.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if !markdownOutput.Enabled {

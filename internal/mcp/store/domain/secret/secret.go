@@ -6,21 +6,21 @@ import (
 	"fmt"
 	"strings"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
 
 type mcpSecretRefWire struct {
-	Server artifact.ArtifactRef `json:"server"`
-	Kind   MCPSecretKind        `json:"kind"`
-	Slot   string               `json:"slot"`
+	Server artifactModel.ArtifactRef `json:"server"`
+	Kind   MCPSecretKind             `json:"kind"`
+	Slot   string                    `json:"slot"`
 }
 
 func NewMCPSecretRefString(
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	kind MCPSecretKind,
 	slot string,
 ) (string, error) {
@@ -36,7 +36,7 @@ func NewMCPSecretRefString(
 }
 
 func NewMCPSecretRef(
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	kind MCPSecretKind,
 	slot string,
 ) (MCPSecretRef, error) {
@@ -92,7 +92,7 @@ func ParseMCPSecretRef(raw string) (MCPSecretRef, error) {
 }
 
 func (ref MCPSecretRef) Matches(
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	kind MCPSecretKind,
 	slot string,
 ) error {
@@ -135,7 +135,7 @@ func GetMCPSecretRefStorageKey(r MCPSecretRef) string {
 // stable identity across runtime resolution and secret updates.
 func ArtifactBindingSlot(
 	ref MCPSecretRef,
-) (secret.Slot, error) {
+) (secretModel.Slot, error) {
 	storageKey := GetMCPSecretRefStorageKey(ref)
 	if storageKey == "" {
 		return "", fmt.Errorf(
@@ -144,7 +144,7 @@ func ArtifactBindingSlot(
 		)
 	}
 
-	slot := secret.Slot(
+	slot := secretModel.Slot(
 		"mcpSecret" + strings.TrimPrefix(storageKey, SecretRefVersion+":"),
 	)
 	if err := slot.Validate(); err != nil {
@@ -166,9 +166,9 @@ func canonicalSecret(r MCPSecretRef) ([]byte, error) {
 		return nil, err
 	}
 	wire := struct {
-		Server artifact.ArtifactRef `json:"server"`
-		Kind   MCPSecretKind        `json:"kind"`
-		Slot   string               `json:"slot"`
+		Server artifactModel.ArtifactRef `json:"server"`
+		Kind   MCPSecretKind             `json:"kind"`
+		Slot   string                    `json:"slot"`
 	}{
 		Server: r.Server,
 		Kind:   r.Kind,

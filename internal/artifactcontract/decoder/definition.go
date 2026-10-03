@@ -7,9 +7,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -20,9 +20,9 @@ import (
 // declaration type but retains those exact canonical bytes as Definition.Body.
 func DefinitionForEntry(
 	entry declaration.Entry,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := ValidateEntryTree(entry); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	return definitionForEntry(entry)
 }
@@ -32,12 +32,12 @@ func DefinitionForEntry(
 // containing declaration and walking its named entries.
 func DefinitionForNamedEntry(
 	named declaration.NamedEntry,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := named.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	if err := ValidateEntryTree(named.Entry); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	return definitionForNamedEntry(named)
 }
@@ -46,29 +46,29 @@ func DefinitionForNamedEntry(
 // containing document has already passed ValidateEntryTree.
 func definitionForNamedEntry(
 	named declaration.NamedEntry,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := named.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	return definitionForEntry(named.Entry)
 }
 
 func definitionForEntry(
 	entry declaration.Entry,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := entry.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
 	header := entry.Header()
 	body, err := entry.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
 	key, found := codec.SchemaKeyForType(header.Type)
 	if !found {
-		return definition.Definition{}, fmt.Errorf(
+		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: unsupported canonical declaration type %q",
 			spec.ErrUnsupported,
 			header.Type,
@@ -79,7 +79,7 @@ func definitionForEntry(
 	if header.Type == declaration.TypeText {
 		text, err := textv1.DecodeTextEntry(entry)
 		if err != nil {
-			return definition.Definition{}, err
+			return definitionModel.Definition{}, err
 		}
 		// Artifact Store's generic identity includes LogicalVersion. Text uses
 		// that internal slot to index its contract identity tuple
@@ -97,12 +97,12 @@ func definitionForEntry(
 
 func definitionForDocument(
 	header declaration.Header,
-	key schema.Key,
+	key schemaModel.Key,
 	logicalVersion spec.LogicalVersion,
 	body []byte,
-) (definition.Definition, error) {
-	value := definition.Definition{
-		Kind:           artifact.ArtifactKind(key.Kind),
+) (definitionModel.Definition, error) {
+	value := definitionModel.Definition{
+		Kind:           artifactModel.ArtifactKind(key.Kind),
 		SchemaID:       key.SchemaID,
 		SchemaVersion:  key.SchemaVersion,
 		LogicalName:    spec.LogicalName(header.Name),
@@ -115,5 +115,5 @@ func definitionForDocument(
 	if value.DisplayName == "" {
 		value.DisplayName = header.Name
 	}
-	return definition.Canonicalize(value)
+	return definitionModel.Canonicalize(value)
 }

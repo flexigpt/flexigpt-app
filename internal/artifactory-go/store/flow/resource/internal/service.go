@@ -9,11 +9,11 @@ import (
 	"strings"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	resource "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -21,8 +21,8 @@ import (
 type sourceRefreshInspector interface {
 	InspectSourceMetadata(
 		ctx context.Context,
-		value source.Source,
-	) (source.RefreshInspection, error)
+		value sourceModel.Source,
+	) (sourceModel.RefreshInspection, error)
 }
 
 type Service struct {
@@ -57,27 +57,27 @@ func NewService(
 
 func (s *Service) ResolveArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	_ resource.ResolveOptions,
-) (resource.ResolvedArtifact, error) {
+	ref artifactModel.ArtifactRef,
+	_ resourceModel.ResolveOptions,
+) (resourceModel.ResolvedArtifact, error) {
 	if err := validateContext(ctx, "Artifact resolution"); err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 	if s == nil {
-		return resource.ResolvedArtifact{}, spec.ErrClosed
+		return resourceModel.ResolvedArtifact{}, spec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 
 	record, err := s.artifacts.Get(ctx, ref)
 	if err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
-	if record.State != artifact.StateAvailable ||
+	if record.State != artifactModel.StateAvailable ||
 		record.ResolvedDefinition == nil ||
 		record.SourceContentDigest == nil {
-		return resource.ResolvedArtifact{}, fmt.Errorf(
+		return resourceModel.ResolvedArtifact{}, fmt.Errorf(
 			"%w: Artifact %q is not currently available",
 			spec.ErrReferenceUnresolved,
 			record.ID,
@@ -85,7 +85,7 @@ func (s *Service) ResolveArtifact(
 	}
 	if session := verificationSessionFromContext(ctx); session != nil {
 		if session.service != s {
-			return resource.ResolvedArtifact{}, fmt.Errorf(
+			return resourceModel.ResolvedArtifact{}, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
 				spec.ErrInvalid,
 			)
@@ -95,7 +95,7 @@ func (s *Service) ResolveArtifact(
 
 	sessionCtx, lease, err := s.BeginVerificationSession(ctx)
 	if err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 	output, resolveErr := s.resolveArtifactInSession(
 		sessionCtx,
@@ -104,14 +104,14 @@ func (s *Service) ResolveArtifact(
 	)
 	closeErr := lease.Close(context.WithoutCancel(sessionCtx))
 	if err := errors.Join(resolveErr, closeErr); err != nil {
-		return resource.ResolvedArtifact{}, err
+		return resourceModel.ResolvedArtifact{}, err
 	}
 	return output, nil
 }
 
 func (s *Service) ResolveVerifiedLocalPath(
 	ctx context.Context,
-	resolved resource.ResolvedArtifact,
+	resolved resourceModel.ResolvedArtifact,
 	localLocator spec.Locator,
 ) (string, error) {
 	if err := validateContext(
@@ -174,35 +174,35 @@ func (s *Service) ResolveVerifiedLocalPath(
 
 func (s *Service) ReadSourceEntry(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	locator spec.Locator,
 	maximumBytes int64,
-) (_ resource.VerifiedEntry, returnErr error) {
+) (_ resourceModel.VerifiedEntry, returnErr error) {
 	if err := validateContext(ctx, "Source entry read"); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if s == nil {
-		return resource.VerifiedEntry{}, spec.ErrClosed
+		return resourceModel.VerifiedEntry{}, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if err := locator.Validate(false); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if maximumBytes <= 0 || maximumBytes > spec.MaxScanBytes {
-		return resource.VerifiedEntry{}, fmt.Errorf(
+		return resourceModel.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source entry read limit is invalid",
 			spec.ErrInvalid,
 		)
 	}
 	if session := verificationSessionFromContext(ctx); session != nil {
 		if session.service != s {
-			return resource.VerifiedEntry{}, fmt.Errorf(
+			return resourceModel.VerifiedEntry{}, fmt.Errorf(
 				"%w: verification session belongs to another resource service",
 				spec.ErrInvalid,
 			)
@@ -212,10 +212,10 @@ func (s *Service) ReadSourceEntry(
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if !value.Enabled {
-		return resource.VerifiedEntry{}, fmt.Errorf(
+		return resourceModel.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source %q is disabled",
 			spec.ErrSourceUnavailable,
 			value.ID,
@@ -223,7 +223,7 @@ func (s *Service) ReadSourceEntry(
 	}
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	defer func() {
 		returnErr = errors.Join(returnErr, snapshot.Close())
@@ -231,13 +231,13 @@ func (s *Service) ReadSourceEntry(
 
 	entry, err := snapshot.Stat(ctx, locator)
 	if err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if err := entry.Validate(); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if entry.Locator != locator {
-		return resource.VerifiedEntry{}, fmt.Errorf(
+		return resourceModel.VerifiedEntry{}, fmt.Errorf(
 			"%w: Source stat for %q returned %q",
 			spec.ErrInvalid,
 			locator,
@@ -251,12 +251,12 @@ func (s *Service) ReadSourceEntry(
 		maximumBytes,
 	)
 	if err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
 	if err := snapshot.Confirm(ctx); err != nil {
-		return resource.VerifiedEntry{}, err
+		return resourceModel.VerifiedEntry{}, err
 	}
-	output := resource.VerifiedEntry{
+	output := resourceModel.VerifiedEntry{
 		RootID:           rootID,
 		SourceID:         sourceID,
 		Locator:          locator,
@@ -272,32 +272,32 @@ func (s *Service) ReadSourceEntry(
 // metadata. It is used for declaration planning, not as a Resource substitute.
 func (s *Service) StatSourceEntry(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	locator spec.Locator,
-) (source.Entry, error) {
+) (sourceModel.Entry, error) {
 	if err := validateContext(ctx, "Source entry stat"); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if s == nil {
-		return source.Entry{}, spec.ErrClosed
+		return sourceModel.Entry{}, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if err := locator.Validate(true); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if !value.Enabled {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: Source %q is disabled",
 			spec.ErrSourceUnavailable,
 			sourceID,
@@ -305,20 +305,20 @@ func (s *Service) StatSourceEntry(
 	}
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 
 	entry, statErr := snapshot.Stat(ctx, locator)
 	confirmErr := snapshot.Confirm(ctx)
 	closeErr := snapshot.Close()
 	if err := errors.Join(statErr, confirmErr, closeErr); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if err := entry.Validate(); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if entry.Locator != locator {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: Source stat for %q returned %q",
 			spec.ErrInvalid,
 			locator,
@@ -336,14 +336,14 @@ func (s *Service) StatSourceEntry(
 // bounded reads, source containment, and deterministic locator ordering.
 func (s *Service) ReadSourceTree(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	base spec.Locator,
 	include []string,
 	exclude []string,
 	maximumEntries int,
 	maximumBytes int64,
-) (_ []resource.VerifiedEntry, returnErr error) {
+) (_ []resourceModel.VerifiedEntry, returnErr error) {
 	if err := validateContext(ctx, "Source tree read"); err != nil {
 		return nil, err
 	}
@@ -418,14 +418,14 @@ func (s *Service) ReadSourceTree(
 	}
 
 	type selectedEntry struct {
-		entry    source.Entry
+		entry    sourceModel.Entry
 		relative string
 	}
 	selected := make([]selectedEntry, 0)
 	visited := 0
 
 	appendSelected := func(
-		entry source.Entry,
+		entry sourceModel.Entry,
 		relative string,
 	) error {
 		if !entry.IsRegular {
@@ -545,7 +545,7 @@ func (s *Service) ReadSourceTree(
 	})
 
 	output := make(
-		[]resource.VerifiedEntry,
+		[]resourceModel.VerifiedEntry,
 		0,
 		len(selected),
 	)
@@ -572,7 +572,7 @@ func (s *Service) ReadSourceTree(
 			return nil, err
 		}
 		consumed += int64(len(content))
-		output = append(output, resource.VerifiedEntry{
+		output = append(output, resourceModel.VerifiedEntry{
 			RootID:           rootID,
 			SourceID:         sourceID,
 			Locator:          selectedEntry.entry.Locator,
@@ -629,7 +629,7 @@ func sourceTreeRelativeLocator(
 }
 
 func (s *Service) SupportsLocalPath(
-	kind source.SourceKind,
+	kind sourceModel.SourceKind,
 ) bool {
 	if s == nil {
 		return false

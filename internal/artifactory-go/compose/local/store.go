@@ -7,48 +7,48 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/assembly"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	artifactapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	catalogapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
-	definitionapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	schemaapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-	artifactcleanupapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	managedpackageapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
-	refreshapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	resourceapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
-	overlayapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	rootapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	secretapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
-	sourceapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type Store struct {
-	Roots     rootapi.API
-	Sources   sourceapi.API
-	Refresh   refreshapi.API
-	Artifacts artifactapi.API
-	Catalog   catalogapi.API
+	Roots     root.API
+	Sources   source.API
+	Refresh   refresh.API
+	Artifacts artifact.API
+	Catalog   catalog.API
 
-	Definitions definitionapi.API
-	Schemas     schemaapi.API
-	Resources   resourceapi.API
+	Definitions definition.API
+	Schemas     schema.API
+	Resources   resource.API
 
-	ManagedPackages managedpackageapi.API
+	ManagedPackages managedpackage.API
 
-	ProtectedOverlays overlayapi.API
-	StoreOverlays     overlayapi.StoreAPI
+	ProtectedOverlays overlay.API
+	StoreOverlays     overlay.StoreAPI
 
-	SecretBindings  secretapi.API
-	SecretRuntime   secretapi.RuntimeAPI
-	SecretLifecycle secretapi.LifecycleAPI
+	SecretBindings  secret.API
+	SecretRuntime   secret.RuntimeAPI
+	SecretLifecycle secret.LifecycleAPI
 
-	ArtifactCleanup artifactcleanupapi.API
-	Protection      rootapi.ProtectionAPI
+	ArtifactCleanup artifactcleanup.API
+	Protection      root.ProtectionAPI
 	Topology        install.API
 
 	// Temporary. Remove in Phase 2 when generic provider descriptors and
@@ -128,11 +128,11 @@ func Open(
 			),
 			RootMutationPolicy: rootPolicy,
 			ProtectedOverlayNamespaces: append(
-				[]overlay.Namespace(nil),
+				[]overlayModel.Namespace(nil),
 				config.ProtectedOverlayNamespaces...,
 			),
 			StoreOverlayNamespaces: append(
-				[]overlay.Namespace(nil),
+				[]overlayModel.Namespace(nil),
 				config.StoreOverlayNamespaces...,
 			),
 			SecretValues: config.SecretValues,
@@ -190,17 +190,17 @@ func Open(
 
 func (s *Store) EnsureProtectedTopology(
 	ctx context.Context,
-	declaration topology.Declaration,
-) (topology.Installed, error) {
+	declaration installModel.Declaration,
+) (installModel.Installed, error) {
 	if s == nil || s.components == nil {
-		return topology.Installed{}, spec.ErrClosed
+		return installModel.Installed{}, spec.ErrClosed
 	}
 	return s.components.EnsureProtectedTopology(ctx, declaration)
 }
 
 func (s *Store) PrepareTopologyHydrations(
 	ctx context.Context,
-	desired []topology.Hydration,
+	desired []installModel.Hydration,
 ) (map[string]bool, error) {
 	if s == nil || s.components == nil {
 		return nil, spec.ErrClosed
@@ -210,7 +210,7 @@ func (s *Store) PrepareTopologyHydrations(
 
 func (s *Store) CommitTopologyHydration(
 	ctx context.Context,
-	desired topology.Hydration,
+	desired installModel.Hydration,
 ) error {
 	if s == nil || s.components == nil {
 		return spec.ErrClosed
@@ -221,10 +221,10 @@ func (s *Store) CommitTopologyHydration(
 func (s *Store) PrepareTopologyPackageHydrations(
 	ctx context.Context,
 	installerNames []string,
-	desired []topology.PackageHydration,
-) (topology.PackageHydrationPreparation, error) {
+	desired []installModel.PackageHydration,
+) (installModel.PackageHydrationPreparation, error) {
 	if s == nil || s.components == nil {
-		return topology.PackageHydrationPreparation{}, spec.ErrClosed
+		return installModel.PackageHydrationPreparation{}, spec.ErrClosed
 	}
 	return s.components.PrepareTopologyPackageHydrations(
 		ctx,
@@ -235,7 +235,7 @@ func (s *Store) PrepareTopologyPackageHydrations(
 
 func (s *Store) CommitTopologyPackageHydration(
 	ctx context.Context,
-	desired topology.PackageHydration,
+	desired installModel.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
 		return spec.ErrClosed
@@ -245,7 +245,7 @@ func (s *Store) CommitTopologyPackageHydration(
 
 func (s *Store) DeleteTopologyPackageHydration(
 	ctx context.Context,
-	value topology.PackageHydration,
+	value installModel.PackageHydration,
 ) error {
 	if s == nil || s.components == nil {
 		return spec.ErrClosed

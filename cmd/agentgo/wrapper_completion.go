@@ -13,7 +13,7 @@ import (
 
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper"
 	inferencewrapperSpec "github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
@@ -142,7 +142,7 @@ func SetWrappedProviderAppContext(w *CompletionWrapper, ctx context.Context) {
 
 // FetchCompletion handles the completion request and streams data back to the frontend.
 func (w *CompletionWrapper) FetchCompletion(
-	model artifact.ArtifactRef,
+	model artifactModel.ArtifactRef,
 	completionData *CompletionRequestBody,
 	textCallbackID string,
 	thinkingCallbackID string,

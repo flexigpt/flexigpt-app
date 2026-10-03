@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
@@ -25,7 +25,7 @@ type lifecycle struct {
 }
 
 type lifecycleState struct {
-	addresses []source.ManagedPackageAddress
+	addresses []sourceModel.ManagedPackageAddress
 	previous  []modelConsumerAPI.BuiltinArtifactSnapshot
 }
 
@@ -106,8 +106,8 @@ func (l lifecycle) CompleteCompiledHydration(
 
 func addressesForPlan(
 	plan topology.CompiledPackagePlan,
-) ([]source.ManagedPackageAddress, error) {
-	byScope := make(map[spec.Locator]source.ManagedPackageAddress)
+) ([]sourceModel.ManagedPackageAddress, error) {
+	byScope := make(map[spec.Locator]sourceModel.ManagedPackageAddress)
 	for _, packageValue := range plan.Registration.Set.Packages {
 		scope, err := packageValue.Address.Directory()
 		if err != nil {
@@ -117,11 +117,11 @@ func addressesForPlan(
 	}
 
 	output := make(
-		[]source.ManagedPackageAddress,
+		[]sourceModel.ManagedPackageAddress,
 		0,
 		len(plan.Changed)+len(plan.Stale),
 	)
-	seen := make(map[source.ManagedPackageAddress]struct{})
+	seen := make(map[sourceModel.ManagedPackageAddress]struct{})
 
 	for _, scope := range plan.Changed {
 		address, found := byScope[scope]
@@ -140,7 +140,7 @@ func addressesForPlan(
 	}
 
 	for _, stale := range plan.Stale {
-		address, err := source.ParseManagedPackageAddressDirectory(
+		address, err := sourceModel.ParseManagedPackageAddressDirectory(
 			stale.Key.Scope,
 		)
 		if err != nil {

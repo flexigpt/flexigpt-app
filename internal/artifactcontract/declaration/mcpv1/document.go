@@ -7,9 +7,9 @@ import (
 	"regexp"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -45,9 +45,9 @@ var schemaJSON []byte
 
 var compiledMCPSchema = jsonutil.MustCompileJSONSchema(schemaJSON)
 
-var MCPSchemaKey = schema.ArtifactKey(
-	artifact.ArtifactKind(MCPType),
-	schema.SchemaID(MCPSchemaID),
+var MCPSchemaKey = schemaModel.ArtifactKey(
+	artifactModel.ArtifactKind(MCPType),
+	schemaModel.SchemaID(MCPSchemaID),
 	MCPSchemaVersion,
 )
 
@@ -164,13 +164,13 @@ func DecodeMCPEntry(
 // preserves locator, server, include, metadata, and transport data in Body.
 func DefinitionForDeclaration(
 	input MCPDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := input.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	body, err := input.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
 	name := input.DisplayName
@@ -178,8 +178,8 @@ func DefinitionForDeclaration(
 		name = input.Name
 	}
 
-	return definition.Canonicalize(definition.Definition{
-		Kind:          artifact.ArtifactKind(MCPType),
+	return definitionModel.Canonicalize(definitionModel.Definition{
+		Kind:          artifactModel.ArtifactKind(MCPType),
 		SchemaID:      MCPSchemaKey.SchemaID,
 		SchemaVersion: MCPSchemaKey.SchemaVersion,
 		LogicalName:   spec.LogicalName(input.Name),

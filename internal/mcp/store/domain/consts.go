@@ -3,33 +3,33 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
-	MCPArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
+	MCPArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 		mcpv1.MCPType,
 	)
-	MCPPolicyArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
+	MCPPolicyArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 		mcppolicyv1.MCPPolicyType,
 	)
 
-	ManagedMCPPackageKind       source.PackageKind = "mcp"
-	ManagedMCPPolicyPackageKind source.PackageKind = "mcp-policy"
-	MCPCollectionPackageKind    source.PackageKind = "mcp-collection"
-	SourceDecoderID             spec.DecoderID     = "artifact.mcp-json"
+	ManagedMCPPackageKind       sourceModel.PackageKind = "mcp"
+	ManagedMCPPolicyPackageKind sourceModel.PackageKind = "mcp-policy"
+	MCPCollectionPackageKind    sourceModel.PackageKind = "mcp-collection"
+	SourceDecoderID             spec.DecoderID          = "artifact.mcp-json"
 
 	InstallationDataSchemaVersion = "v1"
 	BuiltInInstallerName          = "mcp"
 	HydrationSchemaVersion        = "mcp.builtin-hydration/v1"
 )
 
-func IsMCPKind(value artifact.ArtifactKind) bool {
+func IsMCPKind(value artifactModel.ArtifactKind) bool {
 	return value == MCPArtifactKind
 }
 
-func IsMCPPolicyKind(value artifact.ArtifactKind) bool {
+func IsMCPPolicyKind(value artifactModel.ArtifactKind) bool {
 	return value == MCPPolicyArtifactKind
 }

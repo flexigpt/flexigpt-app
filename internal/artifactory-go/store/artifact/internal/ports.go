@@ -3,11 +3,11 @@ package internal
 import (
 	"context"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -15,33 +15,33 @@ import (
 type Reader interface {
 	Get(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (artifact.Artifact, error)
+		ref artifactModel.ArtifactRef,
+	) (artifactModel.Artifact, error)
 
 	ListByRoot(
 		ctx context.Context,
-		rootID root.RootID,
-	) ([]artifact.Artifact, error)
+		rootID rootModel.RootID,
+	) ([]artifactModel.Artifact, error)
 
 	ListBySource(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) ([]artifact.Artifact, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+	) ([]artifactModel.Artifact, error)
 
 	FindByIdentity(
 		ctx context.Context,
-		rootID root.RootID,
-		kind artifact.ArtifactKind,
+		rootID rootModel.RootID,
+		kind artifactModel.ArtifactKind,
 		logicalName spec.LogicalName,
-	) ([]artifact.Artifact, error)
+	) ([]artifactModel.Artifact, error)
 
 	FindByOrigin(
 		ctx context.Context,
-		rootID root.RootID,
-		binding artifact.SourceBinding,
-		kind artifact.ArtifactKind,
-	) (artifact.Artifact, error)
+		rootID rootModel.RootID,
+		binding artifactModel.SourceBinding,
+		kind artifactModel.ArtifactKind,
+	) (artifactModel.Artifact, error)
 }
 
 // CatalogReader returns committed lightweight catalog rows. It deliberately
@@ -49,29 +49,29 @@ type Reader interface {
 type CatalogReader interface {
 	ListCatalogByRoot(
 		ctx context.Context,
-		rootID root.RootID,
-		options catalog.ListOptions,
-	) ([]catalog.Entry, error)
+		rootID rootModel.RootID,
+		options catalogModel.ListOptions,
+	) ([]catalogModel.Entry, error)
 
 	ListCatalogBySource(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		options catalog.ListOptions,
-	) ([]catalog.Entry, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		options catalogModel.ListOptions,
+	) ([]catalogModel.Entry, error)
 
 	FindCatalogByIdentity(
 		ctx context.Context,
-		rootID root.RootID,
-		kind artifact.ArtifactKind,
+		rootID rootModel.RootID,
+		kind artifactModel.ArtifactKind,
 		logicalName spec.LogicalName,
-		options catalog.ListOptions,
-	) ([]catalog.Entry, error)
+		options catalogModel.ListOptions,
+	) ([]catalogModel.Entry, error)
 
 	GetMany(
 		ctx context.Context,
-		refs []artifact.ArtifactRef,
-	) ([]artifact.Artifact, error)
+		refs []artifactModel.ArtifactRef,
+	) ([]artifactModel.Artifact, error)
 }
 
 type Repository interface {
@@ -80,12 +80,12 @@ type Repository interface {
 
 	Create(
 		ctx context.Context,
-		value artifact.Artifact,
+		value artifactModel.Artifact,
 	) error
 
 	UpdateLocal(
 		ctx context.Context,
-		value artifact.Artifact,
+		value artifactModel.Artifact,
 		expectedRevision uint64,
 	) error
 
@@ -96,7 +96,7 @@ type Repository interface {
 
 	Purge(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 		expectedRevision uint64,
 	) error
 }
@@ -104,12 +104,12 @@ type Repository interface {
 type DefinitionReader interface {
 	GetDefinitions(
 		ctx context.Context,
-		keys []definition.Key,
-	) ([]definition.Definition, error)
+		keys []definitionModel.Key,
+	) ([]definitionModel.Definition, error)
 
 	GetDefinition(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 		digest cryptoutil.Digest,
-	) (definition.Definition, error)
+	) (definitionModel.Definition, error)
 }

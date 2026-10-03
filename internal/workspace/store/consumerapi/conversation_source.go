@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
@@ -30,7 +30,7 @@ func NewConversationSource(
 
 func (s *ConversationSource) ResolveWorkspace(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (workspaceDomain.WorkspaceView, error) {
 	if s == nil || s.api == nil {
 		return workspaceDomain.WorkspaceView{}, spec.ErrClosed
@@ -44,8 +44,8 @@ func (s *ConversationSource) ResolveWorkspace(
 
 func (s *ConversationSource) ComposeWorkspacePrompt(
 	ctx context.Context,
-	workspace artifact.ArtifactRef,
-	artifacts []artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
+	artifacts []artifactModel.ArtifactRef,
 ) (WorkspacePromptPlan, error) {
 	if s == nil || s.api == nil {
 		return WorkspacePromptPlan{}, spec.ErrClosed
@@ -55,8 +55,8 @@ func (s *ConversationSource) ComposeWorkspacePrompt(
 
 func (s *ConversationSource) LoadWorkspaceSkills(
 	ctx context.Context,
-	workspace artifact.ArtifactRef,
-	artifacts []artifact.ArtifactRef,
+	workspace artifactModel.ArtifactRef,
+	artifacts []artifactModel.ArtifactRef,
 ) (WorkspaceSkillLoadPlan, error) {
 	if s == nil || s.api == nil {
 		return WorkspaceSkillLoadPlan{}, spec.ErrClosed

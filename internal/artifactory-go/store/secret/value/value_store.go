@@ -10,7 +10,7 @@ import (
 	"context"
 	"fmt"
 
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -23,19 +23,19 @@ type ValueStore interface {
 
 	Put(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 		value string,
 	) error
 
 	Get(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 	) (string, error)
 
 	// Delete must be idempotent. Deleting an already absent ref returns nil.
 	Delete(
 		ctx context.Context,
-		ref secret.Ref,
+		ref secretModel.Ref,
 	) error
 
 	// Close must be safe to call more than once.

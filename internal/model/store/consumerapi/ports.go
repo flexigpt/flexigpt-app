@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
@@ -32,7 +32,7 @@ func NewManagementStore(
 
 func (s *ManagementStoreFacade) ResolveModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedModel, error) {
 	if s == nil || s.api == nil {
 		return ResolvedModel{}, spec.ErrClosed
@@ -42,7 +42,7 @@ func (s *ManagementStoreFacade) ResolveModel(
 
 func (s *ManagementStoreFacade) ResolveProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedProvider, error) {
 	if s == nil || s.api == nil {
 		return ResolvedProvider{}, spec.ErrClosed
@@ -52,7 +52,7 @@ func (s *ManagementStoreFacade) ResolveProvider(
 
 func (s *ManagementStoreFacade) ResolveProviderDefaultModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (DefaultModelResolution, error) {
 	if s == nil || s.api == nil {
 		return DefaultModelResolution{}, spec.ErrClosed
@@ -82,7 +82,7 @@ func (s *ManagementStoreFacade) ReplaceProvider(
 
 func (s *ManagementStoreFacade) DeleteProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
 	if s == nil || s.api == nil {
@@ -113,7 +113,7 @@ func (s *ManagementStoreFacade) ReplaceModel(
 
 func (s *ManagementStoreFacade) DeleteModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedArtifactRevision uint64,
 ) error {
 	if s == nil || s.api == nil {
@@ -124,24 +124,24 @@ func (s *ManagementStoreFacade) DeleteModel(
 
 func (s *ManagementStoreFacade) SetProviderEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if s == nil || s.api == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return s.api.SetProviderEnabled(ctx, ref, expectedRevision, enabled)
 }
 
 func (s *ManagementStoreFacade) SetModelEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if s == nil || s.api == nil {
-		return artifact.Artifact{}, spec.ErrClosed
+		return artifactModel.Artifact{}, spec.ErrClosed
 	}
 	return s.api.SetModelEnabled(ctx, ref, expectedRevision, enabled)
 }
@@ -158,7 +158,7 @@ func (s *ManagementStoreFacade) SaveProviderSettings(
 
 func (s *ManagementStoreFacade) ResetProviderSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedSettingsRevision uint64,
 ) (ProviderView, error) {
@@ -185,7 +185,7 @@ func (s *ManagementStoreFacade) SetProviderAPIKey(
 
 func (s *ManagementStoreFacade) ClearProviderAPIKey(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedProviderRevision uint64,
 	expectedAPIKeyRevision uint64,
 ) (ProviderAPIKeyStatus, error) {
@@ -202,7 +202,7 @@ func (s *ManagementStoreFacade) ClearProviderAPIKey(
 
 func (s *ManagementStoreFacade) GetProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ProviderView, error) {
 	if s == nil || s.api == nil {
 		return ProviderView{}, spec.ErrClosed
@@ -212,7 +212,7 @@ func (s *ManagementStoreFacade) GetProvider(
 
 func (s *ManagementStoreFacade) GetModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ModelView, error) {
 	if s == nil || s.api == nil {
 		return ModelView{}, spec.ErrClosed
@@ -238,7 +238,7 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 
 func (s *CatalogStore) ListProviders(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]ProviderListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed
@@ -250,7 +250,7 @@ func (s *CatalogStore) ListProviders(
 
 func (s *CatalogStore) ListModels(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]ModelListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed
@@ -262,7 +262,7 @@ func (s *CatalogStore) ListModels(
 
 func (s *CatalogStore) ListModelsByProvider(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	provider declaration.ArtifactNameReference,
 ) ([]ModelListItem, error) {
 	if s == nil || s.api == nil {

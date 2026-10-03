@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
@@ -32,7 +32,7 @@ func NewWorkspaceServerResolver(
 
 func (r *WorkspaceServerResolver) ResolveMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpDomainServer.Resolved, error) {
 	if r == nil || r.api == nil {
 		return mcpDomainServer.Resolved{}, spec.ErrClosed
@@ -47,7 +47,7 @@ func (r *WorkspaceServerResolver) ResolveMCPServer(
 type BaselineEnsurer interface {
 	EnsureMCPBaselineCollection(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) (collection.CollectionView, error)
 }
 
@@ -67,7 +67,7 @@ func NewBaselineEnsurer(api *API) (BaselineEnsurer, error) {
 
 func (s *baselineEnsurer) EnsureMCPBaselineCollection(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (collection.CollectionView, error) {
 	if s == nil || s.api == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -95,7 +95,7 @@ func NewManagementStore(
 
 func (s *ManagementStoreFacade) ResolveMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerRead, error) {
 	if s == nil || s.api == nil {
 		return ServerRead{}, spec.ErrClosed
@@ -105,30 +105,30 @@ func (s *ManagementStoreFacade) ResolveMCPServer(
 
 func (s *ManagementStoreFacade) GetServerSettings(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ServerInstallationView, error) {
 	return s.api.GetServerSettings(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) GetMCPPolicy(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (PolicyView, error) {
 	return s.api.GetMCPPolicy(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) ListMCPCollectionServers(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]ServerRead, error) {
 	return s.api.ListMCPCollectionServers(ctx, ref)
 }
 
 func (s *ManagementStoreFacade) ListMCPServersReferencingPolicy(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	policyName spec.LogicalName,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	return s.api.ListMCPServersReferencingPolicy(ctx, rootID, policyName)
 }
 
@@ -148,7 +148,7 @@ func (s *ManagementStoreFacade) UpdateMCPServer(
 
 func (s *ManagementStoreFacade) DeleteMCPServer(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return s.api.DeleteMCPServer(ctx, ref, expectedRevision)
@@ -163,7 +163,7 @@ func (s *ManagementStoreFacade) SaveMCPPolicy(
 
 func (s *ManagementStoreFacade) DeleteMCPPolicy(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return s.api.DeleteMCPPolicy(ctx, ref, expectedRevision)
@@ -187,7 +187,7 @@ func NewCatalogStore(api *API) (*CatalogStore, error) {
 
 func (s *CatalogStore) ListMCPCollections(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed
@@ -197,7 +197,7 @@ func (s *CatalogStore) ListMCPCollections(
 
 func (s *CatalogStore) ListServers(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]ServerListItem, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed

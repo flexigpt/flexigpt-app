@@ -10,7 +10,7 @@ import (
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -49,8 +49,8 @@ type RuntimeResolver interface {
 // RuntimeModelRequest identifies the Model to resolve and the final portable
 // request-level runtime patch.
 type RuntimeModelRequest struct {
-	Model        artifact.ArtifactRef `json:"model"`
-	RequestPatch *RuntimeRequestPatch `json:"requestPatch,omitempty"`
+	Model        artifactModel.ArtifactRef `json:"model"`
+	RequestPatch *RuntimeRequestPatch      `json:"requestPatch,omitempty"`
 }
 
 func (r RuntimeModelRequest) Validate() error {

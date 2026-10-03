@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -36,7 +36,7 @@ func (*YAMLDecoder) Revision() string {
 	return "artifact-declaration-yaml/v1"
 }
 
-func (*YAMLDecoder) RequiredSchemaKeys() []schema.Key {
+func (*YAMLDecoder) RequiredSchemaKeys() []schemaModel.Key {
 	return newCanonicalDecoder().RequiredSchemaKeys()
 }
 

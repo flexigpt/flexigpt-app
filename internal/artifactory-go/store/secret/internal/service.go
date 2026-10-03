@@ -7,11 +7,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -32,11 +32,11 @@ type Service struct {
 	repository Repository
 	artifacts  ArtifactReader
 	clock      clockutil.Clock
-	policy     root.RootPolicy
+	policy     rootModel.RootPolicy
 	values     value.ValueStore
 
-	namespaces      map[overlay.Namespace]struct{}
-	storeNamespaces map[overlay.Namespace]struct{}
+	namespaces      map[overlayModel.Namespace]struct{}
+	storeNamespaces map[overlayModel.Namespace]struct{}
 
 	closed    atomic.Bool
 	closeOnce sync.Once
@@ -47,9 +47,9 @@ func NewService(
 	repository Repository,
 	artifacts ArtifactReader,
 	timeClock clockutil.Clock,
-	policy root.RootPolicy,
-	namespaces []overlay.Namespace,
-	storeNamespaces []overlay.Namespace,
+	policy rootModel.RootPolicy,
+	namespaces []overlayModel.Namespace,
+	storeNamespaces []overlayModel.Namespace,
 	values value.ValueStore,
 ) (*Service, error) {
 	if repository == nil || artifacts == nil || timeClock == nil {
@@ -65,7 +65,7 @@ func NewService(
 	}
 
 	registered := make(
-		map[overlay.Namespace]struct{},
+		map[overlayModel.Namespace]struct{},
 		len(namespaces),
 	)
 	for index, namespace := range namespaces {
@@ -87,7 +87,7 @@ func NewService(
 	}
 
 	storeRegistered := make(
-		map[overlay.Namespace]struct{},
+		map[overlayModel.Namespace]struct{},
 		len(storeNamespaces),
 	)
 	for index, namespace := range storeNamespaces {
@@ -121,25 +121,25 @@ func NewService(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
-) (overlay.Record, bool, error) {
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
+) (overlayModel.Record, bool, error) {
 	if err := s.ready(ctx); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	if err := ref.Validate(); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	if err := s.requireNamespace(namespace); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 
 	target, err := s.availableArtifact(ctx, ref)
 	if err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	if err := s.requireProtected(target); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 
 	return s.repository.GetOverlay(ctx, ref, namespace)
@@ -147,32 +147,32 @@ func (s *Service) Get(
 
 func (s *Service) Put(
 	ctx context.Context,
-	request overlay.PutRequest,
-) (overlay.Record, error) {
+	request overlayModel.PutRequest,
+) (overlayModel.Record, error) {
 	if err := s.ready(ctx); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	if err := request.Validate(); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	if err := s.requireNamespace(request.Namespace); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 
 	target, err := s.availableArtifact(ctx, request.Artifact)
 	if err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	if err := s.requireProtected(target); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return overlay.Record{}, spec.ErrConflict
+		return overlayModel.Record{}, spec.ErrConflict
 	}
 
-	payload, err := overlay.CanonicalPayload(request.Payload)
+	payload, err := overlayModel.CanonicalPayload(request.Payload)
 	if err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	request.Payload = payload
 
@@ -188,8 +188,8 @@ func (s *Service) Put(
 // in the durable cleanup queue before the metadata transaction commits.
 func (s *Service) Delete(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 ) error {
@@ -237,19 +237,19 @@ func (s *Service) Delete(
 
 func (s *Service) GetBinding(
 	ctx context.Context,
-	key secret.BindingKey,
-) (secret.Binding, bool, error) {
+	key secretModel.BindingKey,
+) (secretModel.Binding, bool, error) {
 	if err := s.ready(ctx); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 	if err := key.Validate(); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 	if err := s.requireNamespace(key.Namespace); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 	if _, err := s.availableArtifact(ctx, key.Artifact); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 
 	return s.repository.GetBinding(ctx, key)
@@ -257,19 +257,19 @@ func (s *Service) GetBinding(
 
 func (s *Service) ReplaceBinding(
 	ctx context.Context,
-	request secret.ReplaceBindingRequest,
-) (secret.Binding, error) {
+	request secretModel.ReplaceBindingRequest,
+) (secretModel.Binding, error) {
 	if err := s.ready(ctx); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if err := request.Validate(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if err := s.requireNamespace(request.Key.Namespace); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if s.values == nil {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
 			spec.ErrUnsupported,
 		)
@@ -277,32 +277,32 @@ func (s *Service) ReplaceBinding(
 
 	target, err := s.availableArtifact(ctx, request.Key.Artifact)
 	if err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if target.Revision != request.ExpectedArtifactRevision {
-		return secret.Binding{}, spec.ErrConflict
+		return secretModel.Binding{}, spec.ErrConflict
 	}
 
 	now := clockutil.NowUTC(s.clock)
-	record := secret.Record{
-		Ref:        secret.NewRef(),
+	record := secretModel.Record{
+		Ref:        secretModel.NewRef(),
 		StoreName:  s.values.Name(),
-		SHA256:     secret.SHA256(request.Value),
-		State:      secret.RecordStatePending,
+		SHA256:     secretModel.SHA256(request.Value),
+		State:      secretModel.RecordStatePending,
 		CreatedAt:  now,
 		ModifiedAt: now,
 	}
 	if err := record.Validate(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	if err := s.repository.CreatePendingSecret(ctx, record); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	if err := s.values.Put(ctx, record.Ref, request.Value); err != nil {
 		s.queuePendingBestEffort(ctx, record.Ref)
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	binding, err := s.repository.AttachSecretBinding(
@@ -317,7 +317,7 @@ func (s *Service) ReplaceBinding(
 	)
 	if err != nil {
 		s.queuePendingBestEffort(ctx, record.Ref)
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	s.drainBestEffort(ctx)
@@ -326,7 +326,7 @@ func (s *Service) ReplaceBinding(
 
 func (s *Service) ClearBinding(
 	ctx context.Context,
-	request secret.ClearBindingRequest,
+	request secretModel.ClearBindingRequest,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err
@@ -361,43 +361,43 @@ func (s *Service) ClearBinding(
 // secret backend. It is intended only for trusted runtime composition.
 func (s *Service) ReadBinding(
 	ctx context.Context,
-	key secret.BindingKey,
-	expectedRef secret.Ref,
-) (string, secret.Binding, error) {
+	key secretModel.BindingKey,
+	expectedRef secretModel.Ref,
+) (string, secretModel.Binding, error) {
 	if err := s.ready(ctx); err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 	if err := key.Validate(); err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 	if err := expectedRef.Validate(); err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 	if err := s.requireNamespace(key.Namespace); err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 	if s.values == nil {
-		return "", secret.Binding{}, fmt.Errorf(
+		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: Artifact Store secret value backend is not configured",
 			spec.ErrUnsupported,
 		)
 	}
 	if _, err := s.availableArtifact(ctx, key.Artifact); err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 
 	binding, found, err := s.repository.GetBinding(ctx, key)
 	if err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
 	if !found || !binding.Active() {
-		return "", secret.Binding{}, fmt.Errorf(
+		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding is not configured",
 			spec.ErrReferenceUnresolved,
 		)
 	}
 	if *binding.Ref != expectedRef {
-		return "", secret.Binding{}, fmt.Errorf(
+		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding changed during runtime resolution",
 			spec.ErrConflict,
 		)
@@ -405,10 +405,10 @@ func (s *Service) ReadBinding(
 
 	v, err := s.values.Get(ctx, expectedRef)
 	if err != nil {
-		return "", secret.Binding{}, err
+		return "", secretModel.Binding{}, err
 	}
-	if secret.SHA256(v) != binding.SHA256 {
-		return "", secret.Binding{}, fmt.Errorf(
+	if secretModel.SHA256(v) != binding.SHA256 {
+		return "", secretModel.Binding{}, fmt.Errorf(
 			"%w: physical secret value does not match binding SHA-256",
 			spec.ErrDigestMismatch,
 		)
@@ -424,7 +424,7 @@ func (s *Service) ReadBinding(
 // Protected Roots require trusted installer privilege.
 func (s *Service) PurgeArtifactLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err
@@ -573,14 +573,14 @@ func (s *Service) ready(ctx context.Context) error {
 
 func (s *Service) availableArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	v, err := s.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
-	if v.State != artifact.StateAvailable {
-		return artifact.Artifact{}, fmt.Errorf(
+	if v.State != artifactModel.StateAvailable {
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
 			v.ID,
@@ -590,7 +590,7 @@ func (s *Service) availableArtifact(
 }
 
 func (s *Service) requireProtected(
-	v artifact.Artifact,
+	v artifactModel.Artifact,
 ) error {
 	if s.policy == nil ||
 		!s.policy.IsProtectedRoot(v.RootID) {
@@ -603,7 +603,7 @@ func (s *Service) requireProtected(
 }
 
 func (s *Service) requireNamespace(
-	namespace overlay.Namespace,
+	namespace overlayModel.Namespace,
 ) error {
 	if err := namespace.Validate(); err != nil {
 		return err
@@ -620,7 +620,7 @@ func (s *Service) requireNamespace(
 
 func (s *Service) queuePendingBestEffort(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 ) {
 	_ = s.repository.QueueSecretForCleanup(
 		context.WithoutCancel(ctx),

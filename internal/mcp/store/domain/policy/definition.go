@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -13,7 +13,7 @@ import (
 )
 
 func BodyFromDefinition(
-	input definition.Definition,
+	input definitionModel.Definition,
 ) (mcpPolicy.MCPPolicy, error) {
 	if err := input.Validate(); err != nil {
 		return mcpPolicy.MCPPolicy{}, err
@@ -73,15 +73,15 @@ func BodyFromDocument(
 
 func DefinitionForDocument(
 	input mcppolicyv1.MCPPolicyDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := input.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	body, err := input.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
-	value := definition.Definition{
+	value := definitionModel.Definition{
 		Kind:          mcpDomain.MCPPolicyArtifactKind,
 		SchemaID:      mcppolicyv1.MCPPolicySchemaKey.SchemaID,
 		SchemaVersion: mcppolicyv1.MCPPolicySchemaKey.SchemaVersion,
@@ -92,7 +92,7 @@ func DefinitionForDocument(
 		Body:          body,
 		Dependencies:  nil,
 	}
-	return definition.Canonicalize(value)
+	return definitionModel.Canonicalize(value)
 }
 
 func DocumentFromPolicy(

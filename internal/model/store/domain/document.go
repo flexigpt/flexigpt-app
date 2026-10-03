@@ -5,8 +5,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -14,8 +14,8 @@ import (
 // Artifact. It deliberately contains no credentials, local runtime overlay,
 // effective capability profile, or inference-go value.
 type Provider struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
+	Artifact   artifactModel.Artifact
+	Definition definitionModel.Definition
 	Document   modelproviderv1.ProviderDocument
 }
 
@@ -23,14 +23,14 @@ type Provider struct {
 // deliberately contains no resolved provider, credentials, local runtime
 // overlay, effective capability profile, or inference-go value.
 type Model struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
+	Artifact   artifactModel.Artifact
+	Definition definitionModel.Definition
 	Document   modelv1.ModelDocument
 }
 
 func DecodeProvider(
-	record artifact.Artifact,
-	value definition.Definition,
+	record artifactModel.Artifact,
+	value definitionModel.Definition,
 ) (Provider, error) {
 	if record.Kind != ModelProviderArtifactKind {
 		return Provider{}, fmt.Errorf(
@@ -39,7 +39,7 @@ func DecodeProvider(
 			record.ID,
 		)
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return Provider{}, fmt.Errorf(
 			"%w: Model Provider Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
@@ -85,8 +85,8 @@ func DecodeProvider(
 }
 
 func DecodeModel(
-	record artifact.Artifact,
-	value definition.Definition,
+	record artifactModel.Artifact,
+	value definitionModel.Definition,
 ) (Model, error) {
 	if record.Kind != ModelArtifactKind {
 		return Model{}, fmt.Errorf(
@@ -95,7 +95,7 @@ func DecodeModel(
 			record.ID,
 		)
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return Model{}, fmt.Errorf(
 			"%w: Model Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,

@@ -3,12 +3,12 @@ package sqlite
 import (
 	"context"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -61,37 +61,37 @@ func (s *Store) Publisher() *Publisher {
 
 func (r *SourceRepository) Create(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) error {
 	return r.store.createSource(ctx, value)
 }
 
 func (r *SourceRepository) Get(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
-) (source.Source, error) {
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
+) (sourceModel.Source, error) {
 	return r.store.getSource(ctx, rootID, id)
 }
 
 func (r *SourceRepository) FindByStorageKey(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	storageKey spec.StorageKey,
-) (source.Source, error) {
+) (sourceModel.Source, error) {
 	return r.store.findSourceByStorageKey(ctx, rootID, storageKey)
 }
 
 func (r *SourceRepository) List(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]source.Source, error) {
+	rootID rootModel.RootID,
+) ([]sourceModel.Source, error) {
 	return r.store.listSources(ctx, rootID)
 }
 
 func (r *SourceRepository) Update(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	expectedRevision uint64,
 ) error {
 	return r.store.updateSource(ctx, value, expectedRevision)
@@ -99,7 +99,7 @@ func (r *SourceRepository) Update(
 
 func (r *SourceRepository) Retire(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	expectedRevision uint64,
 ) error {
 	return r.store.retireSource(ctx, value, expectedRevision)
@@ -107,8 +107,8 @@ func (r *SourceRepository) Retire(
 
 func (r *SourceRepository) Discard(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	return r.store.discardSource(
@@ -121,8 +121,8 @@ func (r *SourceRepository) Discard(
 
 func (r *SourceRepository) Purge(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeSource(
@@ -135,27 +135,27 @@ func (r *SourceRepository) Purge(
 
 func (r *RootRepository) Create(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 ) error {
 	return r.store.createRoot(ctx, value)
 }
 
 func (r *RootRepository) Get(
 	ctx context.Context,
-	id root.RootID,
-) (root.Root, error) {
+	id rootModel.RootID,
+) (rootModel.Root, error) {
 	return r.store.getRoot(ctx, id)
 }
 
 func (r *RootRepository) List(
 	ctx context.Context,
-) ([]root.Root, error) {
+) ([]rootModel.Root, error) {
 	return r.store.listRoots(ctx)
 }
 
 func (r *RootRepository) Update(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
 	return r.store.updateRoot(ctx, value, expectedRevision)
@@ -163,7 +163,7 @@ func (r *RootRepository) Update(
 
 func (r *RootRepository) Retire(
 	ctx context.Context,
-	value root.Root,
+	value rootModel.Root,
 	expectedRevision uint64,
 ) error {
 	return r.store.retireRoot(ctx, value, expectedRevision)
@@ -171,7 +171,7 @@ func (r *RootRepository) Retire(
 
 func (r *RootRepository) Purge(
 	ctx context.Context,
-	id root.RootID,
+	id rootModel.RootID,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeRoot(ctx, id, expectedRevision)
@@ -179,23 +179,23 @@ func (r *RootRepository) Purge(
 
 func (r *ArtifactRepository) Get(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	return r.store.getArtifact(ctx, ref)
 }
 
 func (r *ArtifactRepository) ListByRoot(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
+	rootID rootModel.RootID,
+) ([]artifactModel.Artifact, error) {
 	return r.store.listArtifactsByRoot(ctx, rootID)
 }
 
 func (r *ArtifactRepository) ListBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) ([]artifactModel.Artifact, error) {
 	return r.store.listArtifactsBySource(
 		ctx,
 		rootID,
@@ -205,18 +205,18 @@ func (r *ArtifactRepository) ListBySource(
 
 func (r *ArtifactRepository) ListCatalogByRoot(
 	ctx context.Context,
-	rootID root.RootID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	return r.store.listArtifactCatalogByRoot(ctx, rootID, options)
 }
 
 func (r *ArtifactRepository) ListCatalogBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	return r.store.listArtifactCatalogBySource(
 		ctx,
 		rootID,
@@ -227,11 +227,11 @@ func (r *ArtifactRepository) ListCatalogBySource(
 
 func (r *ArtifactRepository) FindCatalogByIdentity(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	return r.store.findArtifactCatalogByIdentity(
 		ctx,
 		rootID,
@@ -243,17 +243,17 @@ func (r *ArtifactRepository) FindCatalogByIdentity(
 
 func (r *ArtifactRepository) GetMany(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
+	refs []artifactModel.ArtifactRef,
+) ([]artifactModel.Artifact, error) {
 	return r.store.getArtifactsByReferences(ctx, refs)
 }
 
 func (r *ArtifactRepository) FindByIdentity(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
-) ([]artifact.Artifact, error) {
+) ([]artifactModel.Artifact, error) {
 	return r.store.findArtifactsByIdentity(
 		ctx,
 		rootID,
@@ -264,10 +264,10 @@ func (r *ArtifactRepository) FindByIdentity(
 
 func (r *ArtifactRepository) FindByOrigin(
 	ctx context.Context,
-	rootID root.RootID,
-	binding artifact.SourceBinding,
-	kind artifact.ArtifactKind,
-) (artifact.Artifact, error) {
+	rootID rootModel.RootID,
+	binding artifactModel.SourceBinding,
+	kind artifactModel.ArtifactKind,
+) (artifactModel.Artifact, error) {
 	return r.store.findArtifactByOrigin(
 		ctx,
 		rootID,
@@ -278,14 +278,14 @@ func (r *ArtifactRepository) FindByOrigin(
 
 func (r *ArtifactRepository) Create(
 	ctx context.Context,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) error {
 	return r.store.createArtifact(ctx, value)
 }
 
 func (r *ArtifactRepository) UpdateLocal(
 	ctx context.Context,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 	expectedRevision uint64,
 ) error {
 	return r.store.updateArtifactLocal(
@@ -304,7 +304,7 @@ func (r *ArtifactRepository) UpdateSourceState(
 
 func (r *ArtifactRepository) Purge(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return r.store.purgeArtifact(
@@ -316,23 +316,23 @@ func (r *ArtifactRepository) Purge(
 
 func (r *DefinitionRepository) GetDefinition(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	return r.store.getDefinition(ctx, rootID, digest)
 }
 
 func (r *DefinitionRepository) GetDefinitions(
 	ctx context.Context,
-	keys []definition.Key,
-) ([]definition.Definition, error) {
+	keys []definitionModel.Key,
+) ([]definitionModel.Definition, error) {
 	return r.store.getDefinitions(ctx, keys)
 }
 
 func (r *RefreshStateRepository) GetRefreshState(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (source.RefreshState, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.RefreshState, error) {
 	return r.store.getRefreshState(ctx, rootID, sourceID)
 }

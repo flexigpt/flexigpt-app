@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -272,15 +272,15 @@ type MaterializedServer struct {
 // domain-specific views and must not serialize connection or installation
 // internals directly.
 type Resolved struct {
-	Server               artifact.ArtifactRef `json:"-"`
-	ArtifactRevision     uint64               `json:"-"`
-	DefinitionDigest     cryptoutil.Digest    `json:"-"`
-	SourceContentDigest  cryptoutil.Digest    `json:"-"`
-	SourceGeneration     string               `json:"-"`
-	Document             ServerDocument       `json:"-"`
-	Installation         ServerData           `json:"-"`
-	Policy               mcpPolicy.Effective  `json:"-"`
-	InstallationRevision uint64               `json:"-"`
-	BuiltIn              bool                 `json:"-"`
-	Version              cryptoutil.Digest    `json:"-"`
+	Server               artifactModel.ArtifactRef `json:"-"`
+	ArtifactRevision     uint64                    `json:"-"`
+	DefinitionDigest     cryptoutil.Digest         `json:"-"`
+	SourceContentDigest  cryptoutil.Digest         `json:"-"`
+	SourceGeneration     string                    `json:"-"`
+	Document             ServerDocument            `json:"-"`
+	Installation         ServerData                `json:"-"`
+	Policy               mcpPolicy.Effective       `json:"-"`
+	InstallationRevision uint64                    `json:"-"`
+	BuiltIn              bool                      `json:"-"`
+	Version              cryptoutil.Digest         `json:"-"`
 }

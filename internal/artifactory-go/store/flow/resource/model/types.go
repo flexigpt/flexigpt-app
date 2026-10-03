@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -31,10 +31,10 @@ type VerificationSession interface {
 //
 // Typed graph expansion remains outside this generic Store value.
 type ResolvedArtifact struct {
-	Artifact     artifact.Artifact     `json:"-"`
-	Definition   definition.Definition `json:"-"`
-	Source       source.Summary        `json:"-"`
-	RefreshState source.RefreshState   `json:"-"`
+	Artifact     artifactModel.Artifact     `json:"-"`
+	Definition   definitionModel.Definition `json:"-"`
+	Source       sourceModel.Summary        `json:"-"`
+	RefreshState sourceModel.RefreshState   `json:"-"`
 }
 
 func (r ResolvedArtifact) Validate() error {
@@ -50,7 +50,7 @@ func (r ResolvedArtifact) Validate() error {
 	if err := r.RefreshState.Validate(); err != nil {
 		return err
 	}
-	if r.Artifact.State != artifact.StateAvailable ||
+	if r.Artifact.State != artifactModel.StateAvailable ||
 		r.Artifact.ResolvedDefinition == nil ||
 		r.Artifact.SourceContentDigest == nil {
 		return fmt.Errorf(
@@ -97,13 +97,13 @@ func (r ResolvedArtifact) Clone() ResolvedArtifact {
 // VerifiedEntry is a bounded, generation-confirmed Source read. It can be
 // used by consumers that need source material without creating an Artifact.
 type VerifiedEntry struct {
-	RootID           root.RootID       `json:"-"`
-	SourceID         source.SourceID   `json:"-"`
-	Locator          spec.Locator      `json:"-"`
-	SourceRevision   uint64            `json:"-"`
-	SourceGeneration string            `json:"-"`
-	Content          []byte            `json:"-"`
-	Digest           cryptoutil.Digest `json:"-"`
+	RootID           rootModel.RootID     `json:"-"`
+	SourceID         sourceModel.SourceID `json:"-"`
+	Locator          spec.Locator         `json:"-"`
+	SourceRevision   uint64               `json:"-"`
+	SourceGeneration string               `json:"-"`
+	Content          []byte               `json:"-"`
+	Digest           cryptoutil.Digest    `json:"-"`
 }
 
 func (e VerifiedEntry) Validate() error {

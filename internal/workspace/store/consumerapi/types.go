@@ -3,9 +3,9 @@ package consumerapi
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -20,7 +20,7 @@ const (
 )
 
 type WorkspaceDirectoryRef struct {
-	RootID root.RootID `json:"rootID"`
+	RootID rootModel.RootID `json:"rootID"`
 }
 
 type WorkspaceDirectoryOrigin string
@@ -38,8 +38,8 @@ type WorkspaceDirectoryWorkspace struct {
 
 type WorkspaceDirectoryView struct {
 	Ref             WorkspaceDirectoryRef         `json:"ref"`
-	Root            root.Root                     `json:"root"`
-	DirectorySource source.Summary                `json:"directorySource"`
+	Root            rootModel.Root                `json:"root"`
+	DirectorySource sourceModel.Summary           `json:"directorySource"`
 	Enabled         bool                          `json:"enabled"`
 	PolicyID        string                        `json:"policyID"`
 	PolicyVersion   string                        `json:"policyVersion"`
@@ -54,13 +54,13 @@ type WorkspaceDirectoryView struct {
 type WorkspaceDirectoryListItem struct {
 	Ref WorkspaceDirectoryRef `json:"ref"`
 
-	RootID          root.RootID `json:"rootID"`
-	RootDisplayName string      `json:"rootDisplayName"`
+	RootID          rootModel.RootID `json:"rootID"`
+	RootDisplayName string           `json:"rootDisplayName"`
 
 	Enabled bool `json:"enabled"`
 
-	DirectorySourceID       source.SourceID `json:"directorySourceID"`
-	DirectorySourceRevision uint64          `json:"directorySourceRevision"`
+	DirectorySourceID       sourceModel.SourceID `json:"directorySourceID"`
+	DirectorySourceRevision uint64               `json:"directorySourceRevision"`
 
 	PolicyID      string            `json:"policyID"`
 	PolicyVersion string            `json:"policyVersion"`
@@ -85,28 +85,28 @@ type WorkspaceDefaultPolicyView struct {
 }
 
 type WorkspaceRuntimeSelection struct {
-	PromptArtifacts []artifact.ArtifactRef `json:"promptArtifacts,omitempty"`
-	SkillArtifacts  []artifact.ArtifactRef `json:"skillArtifacts,omitempty"`
-	MCPArtifacts    []artifact.ArtifactRef `json:"mcpArtifacts,omitempty"`
-	RequireComplete bool                   `json:"requireComplete,omitempty"`
+	PromptArtifacts []artifactModel.ArtifactRef `json:"promptArtifacts,omitempty"`
+	SkillArtifacts  []artifactModel.ArtifactRef `json:"skillArtifacts,omitempty"`
+	MCPArtifacts    []artifactModel.ArtifactRef `json:"mcpArtifacts,omitempty"`
+	RequireComplete bool                        `json:"requireComplete,omitempty"`
 }
 
 type WorkspacePromptContribution struct {
-	Artifact         artifact.ArtifactRef     `json:"artifact"`
-	ArtifactRevision uint64                   `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
-	Kind             artifact.ArtifactKind    `json:"kind"`
-	Name             string                   `json:"name"`
-	Insert           declaration.InsertTarget `json:"insert"`
-	MediaType        string                   `json:"mediaType,omitempty"`
-	Locator          spec.Locator             `json:"locator,omitempty"`
-	OriginalBytes    int                      `json:"originalBytes"`
-	IncludedBytes    int                      `json:"includedBytes"`
-	Truncated        bool                     `json:"truncated"`
+	Artifact         artifactModel.ArtifactRef  `json:"artifact"`
+	ArtifactRevision uint64                     `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest          `json:"definitionDigest"`
+	Kind             artifactModel.ArtifactKind `json:"kind"`
+	Name             string                     `json:"name"`
+	Insert           declaration.InsertTarget   `json:"insert"`
+	MediaType        string                     `json:"mediaType,omitempty"`
+	Locator          spec.Locator               `json:"locator,omitempty"`
+	OriginalBytes    int                        `json:"originalBytes"`
+	IncludedBytes    int                        `json:"includedBytes"`
+	Truncated        bool                       `json:"truncated"`
 }
 
 type WorkspacePromptDecision struct {
-	Artifact      artifact.ArtifactRef               `json:"artifact"`
+	Artifact      artifactModel.ArtifactRef          `json:"artifact"`
 	Status        workspaceRuntime.CompositionStatus `json:"status"`
 	Code          string                             `json:"code,omitempty"`
 	OriginalBytes int                                `json:"originalBytes"`
@@ -114,7 +114,7 @@ type WorkspacePromptDecision struct {
 }
 
 type WorkspacePromptPlan struct {
-	Workspace     artifact.ArtifactRef          `json:"workspace"`
+	Workspace     artifactModel.ArtifactRef     `json:"workspace"`
 	Contributions []WorkspacePromptContribution `json:"contributions"`
 	Instructions  string                        `json:"instructions"`
 	UserMessage   string                        `json:"userMessage"`
@@ -123,34 +123,34 @@ type WorkspacePromptPlan struct {
 }
 
 type WorkspaceSkill struct {
-	Artifact         artifact.ArtifactRef     `json:"artifact"`
-	ArtifactRevision uint64                   `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
-	Name             string                   `json:"name"`
-	DisplayName      string                   `json:"displayName,omitempty"`
-	Insert           declaration.InsertTarget `json:"insert,omitempty"`
-	Locator          spec.Locator             `json:"locator,omitempty"`
-	Version          string                   `json:"version"`
+	Artifact         artifactModel.ArtifactRef `json:"artifact"`
+	ArtifactRevision uint64                    `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	Name             string                    `json:"name"`
+	DisplayName      string                    `json:"displayName,omitempty"`
+	Insert           declaration.InsertTarget  `json:"insert,omitempty"`
+	Locator          spec.Locator              `json:"locator,omitempty"`
+	Version          string                    `json:"version"`
 }
 
 type WorkspaceSkillLoadPlan struct {
-	Workspace artifact.ArtifactRef `json:"workspace"`
-	Skills    []WorkspaceSkill     `json:"skills"`
+	Workspace artifactModel.ArtifactRef `json:"workspace"`
+	Skills    []WorkspaceSkill          `json:"skills"`
 }
 
 type WorkspaceMCPServer struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"`
-	ArtifactRevision uint64               `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest"`
-	Name             spec.LogicalName     `json:"name"`
-	DisplayName      string               `json:"displayName,omitempty"`
-	BuiltIn          bool                 `json:"builtIn"`
-	Version          cryptoutil.Digest    `json:"version"`
+	Artifact         artifactModel.ArtifactRef `json:"artifact"`
+	ArtifactRevision uint64                    `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	Name             spec.LogicalName          `json:"name"`
+	DisplayName      string                    `json:"displayName,omitempty"`
+	BuiltIn          bool                      `json:"builtIn"`
+	Version          cryptoutil.Digest         `json:"version"`
 }
 
 type WorkspaceMCPServerLoadPlan struct {
-	Workspace artifact.ArtifactRef `json:"workspace"`
-	Servers   []WorkspaceMCPServer `json:"servers"`
+	Workspace artifactModel.ArtifactRef `json:"workspace"`
+	Servers   []WorkspaceMCPServer      `json:"servers"`
 }
 
 // WorkspaceRuntimePlan contains consumer-safe runtime planning output.
@@ -165,15 +165,15 @@ type WorkspaceRuntimePlan struct {
 }
 
 type WorkspaceArtifactView struct {
-	Artifact           artifact.ArtifactRef    `json:"artifact"`
-	Revision           uint64                  `json:"revision"`
-	DisplayName        string                  `json:"displayName"`
-	Kind               artifact.ArtifactKind   `json:"kind"`
-	LogicalName        spec.LogicalName        `json:"logicalName"`
-	LogicalVersion     spec.LogicalVersion     `json:"logicalVersion,omitempty"`
-	Enabled            bool                    `json:"enabled"`
-	State              artifact.State          `json:"state"`
-	SourceID           source.SourceID         `json:"sourceID"`
-	Locator            spec.Locator            `json:"locator"`
-	SubresourceLocator spec.SubresourceLocator `json:"subresourceLocator,omitempty"`
+	Artifact           artifactModel.ArtifactRef  `json:"artifact"`
+	Revision           uint64                     `json:"revision"`
+	DisplayName        string                     `json:"displayName"`
+	Kind               artifactModel.ArtifactKind `json:"kind"`
+	LogicalName        spec.LogicalName           `json:"logicalName"`
+	LogicalVersion     spec.LogicalVersion        `json:"logicalVersion,omitempty"`
+	Enabled            bool                       `json:"enabled"`
+	State              artifactModel.State        `json:"state"`
+	SourceID           sourceModel.SourceID       `json:"sourceID"`
+	Locator            spec.Locator               `json:"locator"`
+	SubresourceLocator spec.SubresourceLocator    `json:"subresourceLocator,omitempty"`
 }

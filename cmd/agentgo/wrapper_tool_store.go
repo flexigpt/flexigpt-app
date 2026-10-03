@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
-	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
@@ -57,7 +57,7 @@ func InitToolStoreWrapper(
 }
 
 func NewToolBuiltInInstaller(
-	hydrator topology.CompiledHydrationCoordinator,
+	hydrator installModel.CompiledHydrationCoordinator,
 ) (builtin.HydrationInstaller, error) {
 	if hydrator == nil {
 		return nil, errors.New("tool generated catalog installer hydrator is required")

@@ -8,8 +8,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -25,12 +25,12 @@ func IsAgentDeclarationDocument(locator spec.Locator) bool {
 
 func ManagedPackageAddressForAgent(
 	name spec.LogicalName,
-) (source.ManagedPackageAddress, error) {
+) (sourceModel.ManagedPackageAddress, error) {
 	if err := name.Validate(); err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 
-	return source.NewManagedPackageAddress(
+	return sourceModel.NewManagedPackageAddress(
 		ManagedAgentPackageKind,
 		name,
 		documentTopology.UnversionedPackageVersion(),
@@ -38,7 +38,7 @@ func ManagedPackageAddressForAgent(
 }
 
 func ManagedPackageLocatorForAgent(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	if err := ValidateManagedAgentPackageAddress(address); err != nil {
 		return "", err
@@ -48,12 +48,12 @@ func ManagedPackageLocatorForAgent(
 
 func ManagedPackageAddressFromAgentLocator(
 	locator spec.Locator,
-) (source.ManagedPackageAddress, error) {
+) (sourceModel.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 	if path.Base(string(locator)) != string(ManagedAgentDocumentFile()) {
-		return source.ManagedPackageAddress{}, fmt.Errorf(
+		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Agent locator %q is not %q",
 			spec.ErrInvalid,
 			locator,
@@ -61,20 +61,20 @@ func ManagedPackageAddressFromAgentLocator(
 		)
 	}
 
-	address, err := source.ParseManagedPackageAddressDirectory(
+	address, err := sourceModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 	if err := ValidateManagedAgentPackageAddress(address); err != nil {
-		return source.ManagedPackageAddress{}, err
+		return sourceModel.ManagedPackageAddress{}, err
 	}
 	return address, nil
 }
 
 func ValidateManagedAgentPackageAddress(
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 ) error {
 	if err := address.Validate(); err != nil {
 		return err
@@ -104,36 +104,36 @@ func ValidateManagedAgentPackageAddress(
 // concrete Agent declaration rather than a source-selected alias.
 func ManagedAgentEntryPayload(
 	entry declaration.Entry,
-) ([]byte, definition.Definition, error) {
+) ([]byte, definitionModel.Definition, error) {
 	if err := declaration.ValidateEntryType(
 		entry,
 		declaration.TypeAgent,
 	); err != nil {
-		return nil, definition.Definition{}, err
+		return nil, definitionModel.Definition{}, err
 	}
 
 	document, err := agentv1.DecodeAgentEntry(entry)
 	if err != nil {
-		return nil, definition.Definition{}, err
+		return nil, definitionModel.Definition{}, err
 	}
 	if document.Locator != nil {
-		return nil, definition.Definition{}, fmt.Errorf(
+		return nil, definitionModel.Definition{}, fmt.Errorf(
 			"%w: managed Agent declaration cannot be a source-selected alias",
 			spec.ErrUnsupported,
 		)
 	}
 	raw, err := entry.CanonicalJSON()
 	if err != nil {
-		return nil, definition.Definition{}, err
+		return nil, definitionModel.Definition{}, err
 	}
 	value, err := decoder.DefinitionForEntry(entry)
 	if err != nil {
-		return nil, definition.Definition{}, err
+		return nil, definitionModel.Definition{}, err
 	}
 	if value.Kind != AgentArtifactKind ||
 		value.LogicalName != spec.LogicalName(document.Name) ||
 		value.LogicalVersion != "" {
-		return nil, definition.Definition{}, fmt.Errorf(
+		return nil, definitionModel.Definition{}, fmt.Errorf(
 			"%w: managed Agent Definition identity is invalid",
 			spec.ErrInvalid,
 		)

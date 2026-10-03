@@ -13,7 +13,7 @@ import (
 	"time"
 
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -47,8 +47,8 @@ func NewWithTraversalPolicy(policy *TraversalPolicy) (*Adapter, error) {
 	return &Adapter{traversalPolicy: normalized}, nil
 }
 
-func (a *Adapter) Kind() source.SourceKind {
-	return source.SourceKindFilesystemDirectory
+func (a *Adapter) Kind() sourceModel.SourceKind {
+	return sourceModel.SourceKindFilesystemDirectory
 }
 
 func (a *Adapter) NormalizeConfig(
@@ -86,9 +86,9 @@ func (a *Adapter) NormalizeConfig(
 
 func (a *Adapter) Open(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) (sourceimpl.Snapshot, error) {
-	if value.Kind != source.SourceKindFilesystemDirectory {
+	if value.Kind != sourceModel.SourceKindFilesystemDirectory {
 		return nil, fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			spec.ErrInvalid,
@@ -118,13 +118,13 @@ func (a *Adapter) Open(
 // projection.
 func (a *Adapter) ResolveLocalPath(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 	locator spec.Locator,
 ) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if value.Kind != source.SourceKindFilesystemDirectory {
+	if value.Kind != sourceModel.SourceKindFilesystemDirectory {
 		return "", fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			spec.ErrInvalid,

@@ -5,9 +5,9 @@ import (
 	"maps"
 	"sync"
 
-	install "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -15,27 +15,27 @@ import (
 const compiledDecoderID spec.DecoderID = "artifact.builtin-compiled"
 
 type compiledDocumentKey struct {
-	rootID   root.RootID
-	sourceID source.SourceID
+	rootID   rootModel.RootID
+	sourceID sourceModel.SourceID
 	locator  spec.Locator
 }
 
 type compiledDocumentRegistry struct {
 	mu     sync.RWMutex
-	values map[compiledDocumentKey]install.CompiledDocument
+	values map[compiledDocumentKey]installModel.CompiledDocument
 }
 
 func (e *Engine) RegisterCompiledDocuments(
-	rootID root.RootID,
-	sourceID source.SourceID,
-	packages []install.CompiledPackage,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	packages []installModel.CompiledPackage,
 ) error {
 	if e == nil {
 		return spec.ErrClosed
 	}
 
 	pending := make(
-		map[compiledDocumentKey]install.CompiledDocument,
+		map[compiledDocumentKey]installModel.CompiledDocument,
 	)
 	for _, packageValue := range packages {
 		for _, document := range packageValue.Documents {
@@ -70,7 +70,7 @@ func (e *Engine) RegisterCompiledDocuments(
 
 	if e.compiled.values == nil {
 		e.compiled.values = make(
-			map[compiledDocumentKey]install.CompiledDocument,
+			map[compiledDocumentKey]installModel.CompiledDocument,
 		)
 	}
 	maps.Copy(e.compiled.values, pending)
@@ -78,10 +78,10 @@ func (e *Engine) RegisterCompiledDocuments(
 }
 
 func (e *Engine) compiledDocument(
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	locator spec.Locator,
-) (install.CompiledDocument, bool) {
+) (installModel.CompiledDocument, bool) {
 	e.compiled.mu.RLock()
 	defer e.compiled.mu.RUnlock()
 
@@ -91,7 +91,7 @@ func (e *Engine) compiledDocument(
 		locator:  locator,
 	}]
 	if !found {
-		return install.CompiledDocument{}, false
+		return installModel.CompiledDocument{}, false
 	}
 	// Private immutable view. Discovery clones emitted Definitions before
 	// handing them to the rest of the refresh pipeline.

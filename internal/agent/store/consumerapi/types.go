@@ -3,25 +3,25 @@ package consumerapi
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 type AgentView struct {
-	Ref artifact.ArtifactRef `json:"ref"`
+	Ref artifactModel.ArtifactRef `json:"ref"`
 
 	Name        spec.LogicalName `json:"name"`
 	DisplayName string           `json:"displayName"`
 	Description string           `json:"description,omitempty"`
 
-	State            artifact.State    `json:"state"`
-	Enabled          bool              `json:"enabled"`
-	Revision         uint64            `json:"revision"`
-	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
-	BuiltIn          bool              `json:"builtIn"`
-	Managed          bool              `json:"managed"`
+	State            artifactModel.State `json:"state"`
+	Enabled          bool                `json:"enabled"`
+	Revision         uint64              `json:"revision"`
+	DefinitionDigest cryptoutil.Digest   `json:"definitionDigest,omitempty"`
+	BuiltIn          bool                `json:"builtIn"`
+	Managed          bool                `json:"managed"`
 }
 
 // AgentListItem is the consumer-facing Agent list projection. Declaration
@@ -45,13 +45,13 @@ type AgentCapabilityOccurrence struct {
 	Status   resolve.ResolutionStatus `json:"status"`
 	Required bool                     `json:"required"`
 
-	Artifact            *artifact.ArtifactRef `json:"artifact,omitempty"`
-	Mapped              *resolve.MappedTarget `json:"mapped,omitempty"`
-	AutoExecute         *bool                 `json:"autoExecute,omitempty"`
-	IncludeSystemPrompt *bool                 `json:"includeSystemPrompt,omitempty"`
-	SkillUseMode        AgentSkillUseMode     `json:"skillUseMode,omitempty"`
-	Code                string                `json:"code,omitempty"`
-	Message             string                `json:"message,omitempty"`
+	Artifact            *artifactModel.ArtifactRef `json:"artifact,omitempty"`
+	Mapped              *resolve.MappedTarget      `json:"mapped,omitempty"`
+	AutoExecute         *bool                      `json:"autoExecute,omitempty"`
+	IncludeSystemPrompt *bool                      `json:"includeSystemPrompt,omitempty"`
+	SkillUseMode        AgentSkillUseMode          `json:"skillUseMode,omitempty"`
+	Code                string                     `json:"code,omitempty"`
+	Message             string                     `json:"message,omitempty"`
 }
 
 type AgentCapabilityPlan struct {
@@ -65,25 +65,25 @@ type AgentResolution struct {
 }
 
 type AgentTextMaterialization struct {
-	Artifact         artifact.ArtifactRef     `json:"artifact"`
-	ArtifactRevision uint64                   `json:"artifactRevision"`
-	DefinitionDigest cryptoutil.Digest        `json:"definitionDigest"`
-	Name             spec.LogicalName         `json:"name"`
-	Insert           declaration.InsertTarget `json:"insert"`
-	MediaType        string                   `json:"mediaType,omitempty"`
-	Content          string                   `json:"content"`
-	Locator          spec.Locator             `json:"locator"`
-	BuiltIn          bool                     `json:"builtIn"`
+	Artifact         artifactModel.ArtifactRef `json:"artifact"`
+	ArtifactRevision uint64                    `json:"artifactRevision"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
+	Name             spec.LogicalName          `json:"name"`
+	Insert           declaration.InsertTarget  `json:"insert"`
+	MediaType        string                    `json:"mediaType,omitempty"`
+	Content          string                    `json:"content"`
+	Locator          spec.Locator              `json:"locator"`
+	BuiltIn          bool                      `json:"builtIn"`
 }
 
 type ListAgentsRequest struct {
-	RootID root.RootID `json:"rootID"`
+	RootID rootModel.RootID `json:"rootID"`
 
 	LogicalNames []spec.LogicalName `json:"logicalNames,omitempty"`
 
 	// Collection limits the result to currently available direct Agent
 	// relationships selected by one Agent Collection Plugin.
-	Collection *artifact.ArtifactRef `json:"collection,omitempty"`
+	Collection *artifactModel.ArtifactRef `json:"collection,omitempty"`
 
 	// IncludeBuiltin appends Agent Artifacts from the protected built-in Root
 	// when RootID is not already the protected Root.
@@ -94,6 +94,6 @@ type ListAgentsRequest struct {
 }
 
 type ManagedAgentDeleteRequest struct {
-	Agent            artifact.ArtifactRef `json:"agent"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
+	Agent            artifactModel.ArtifactRef `json:"agent"`
+	ExpectedRevision uint64                    `json:"expectedRevision"`
 }

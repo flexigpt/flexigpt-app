@@ -16,7 +16,7 @@ import (
 	"github.com/flexigpt/mapstore-go/jsonencdec"
 	"github.com/flexigpt/mapstore-go/keyringencdec"
 
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -133,7 +133,7 @@ func (*Store) Name() string {
 // as corruption and accidental-replay protection.
 func (s *Store) Put(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 	v string,
 ) error {
 	if err := s.ready(ctx); err != nil {
@@ -142,7 +142,7 @@ func (s *Store) Put(
 	if err := ref.Validate(); err != nil {
 		return err
 	}
-	if err := secret.ValidateValue(v); err != nil {
+	if err := secretModel.ValidateValue(v); err != nil {
 		return err
 	}
 
@@ -178,7 +178,7 @@ func (s *Store) Put(
 
 func (s *Store) Get(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 ) (string, error) {
 	if err := s.ready(ctx); err != nil {
 		return "", err
@@ -213,7 +213,7 @@ func (s *Store) Get(
 			ref,
 		)
 	}
-	if err := secret.ValidateValue(v); err != nil {
+	if err := secretModel.ValidateValue(v); err != nil {
 		return "", err
 	}
 	return v, nil
@@ -224,7 +224,7 @@ func (s *Store) Get(
 // Artifact Store SQLite before this method is called.
 func (s *Store) Delete(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 ) error {
 	if err := s.ready(ctx); err != nil {
 		return err

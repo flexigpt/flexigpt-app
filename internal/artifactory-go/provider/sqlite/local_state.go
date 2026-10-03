@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -25,20 +25,20 @@ type LocalStateRepository struct {
 
 func (r *LocalStateRepository) GetOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
-) (overlay.Record, bool, error) {
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
+) (overlayModel.Record, bool, error) {
 	if r == nil || r.store == nil {
-		return overlay.Record{}, false, spec.ErrClosed
+		return overlayModel.Record{}, false, spec.ErrClosed
 	}
 	if err := ref.Validate(); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	if err := namespace.Validate(); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	if err := r.store.requireActiveRoot(ctx, ref.RootID); err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 
 	value, err := getProtectedOverlayTx(
@@ -48,41 +48,41 @@ func (r *LocalStateRepository) GetOverlay(
 		namespace,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return overlay.Record{}, false, nil
+		return overlayModel.Record{}, false, nil
 	}
 	if err != nil {
-		return overlay.Record{}, false, err
+		return overlayModel.Record{}, false, err
 	}
 	return value.Clone(), true, nil
 }
 
 func (r *LocalStateRepository) PutOverlay(
 	ctx context.Context,
-	request overlay.PutRequest,
+	request overlayModel.PutRequest,
 	now time.Time,
-) (overlay.Record, error) {
+) (overlayModel.Record, error) {
 	if r == nil || r.store == nil {
-		return overlay.Record{}, spec.ErrClosed
+		return overlayModel.Record{}, spec.ErrClosed
 	}
 	if err := request.Validate(); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	if now.IsZero() {
-		return overlay.Record{}, fmt.Errorf(
+		return overlayModel.Record{}, fmt.Errorf(
 			"%w: protected overlay time is required",
 			spec.ErrInvalid,
 		)
 	}
 
-	payload, err := overlay.CanonicalPayload(request.Payload)
+	payload, err := overlayModel.CanonicalPayload(request.Payload)
 	if err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	request.Payload = payload
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -93,7 +93,7 @@ func (r *LocalStateRepository) PutOverlay(
 		request.ExpectedArtifactRevision,
 		true,
 	); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 
 	current, err := getProtectedOverlayTx(
@@ -103,13 +103,13 @@ func (r *LocalStateRepository) PutOverlay(
 		request.Namespace,
 	)
 
-	var output overlay.Record
+	var output overlayModel.Record
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if request.ExpectedOverlayRevision != 0 {
-			return overlay.Record{}, spec.ErrConflict
+			return overlayModel.Record{}, spec.ErrConflict
 		}
-		output = overlay.Record{
+		output = overlayModel.Record{
 			Artifact:      request.Artifact,
 			Namespace:     request.Namespace,
 			SchemaVersion: request.SchemaVersion,
@@ -119,7 +119,7 @@ func (r *LocalStateRepository) PutOverlay(
 			ModifiedAt:    now.UTC(),
 		}
 		if err := output.Validate(); err != nil {
-			return overlay.Record{}, err
+			return overlayModel.Record{}, err
 		}
 
 		_, err = tx.ExecContext(
@@ -138,18 +138,18 @@ func (r *LocalStateRepository) PutOverlay(
 			timeValue(output.ModifiedAt),
 		)
 		if err != nil {
-			return overlay.Record{}, sqliteError(err)
+			return overlayModel.Record{}, sqliteError(err)
 		}
 
 	case err != nil:
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 
 	default:
 		if current.Revision != request.ExpectedOverlayRevision {
-			return overlay.Record{}, spec.ErrConflict
+			return overlayModel.Record{}, spec.ErrConflict
 		}
 		if current.Revision == ^uint64(0) {
-			return overlay.Record{}, fmt.Errorf(
+			return overlayModel.Record{}, fmt.Errorf(
 				"%w: protected overlay revision is exhausted",
 				spec.ErrInvalid,
 			)
@@ -162,7 +162,7 @@ func (r *LocalStateRepository) PutOverlay(
 		output.ModifiedAt = now.UTC()
 
 		if err := output.Validate(); err != nil {
-			return overlay.Record{}, err
+			return overlayModel.Record{}, err
 		}
 
 		result, err := tx.ExecContext(
@@ -186,26 +186,26 @@ func (r *LocalStateRepository) PutOverlay(
 			current.Revision,
 		)
 		if err != nil {
-			return overlay.Record{}, sqliteError(err)
+			return overlayModel.Record{}, sqliteError(err)
 		}
 		if err := requireOneChanged(
 			result,
 			"protected overlay changed during update",
 		); err != nil {
-			return overlay.Record{}, err
+			return overlayModel.Record{}, err
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 	return output.Clone(), nil
 }
 
 func (r *LocalStateRepository) DeleteOverlay(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
 	expectedArtifactRevision uint64,
 	expectedOverlayRevision uint64,
 	now time.Time,
@@ -310,34 +310,34 @@ func (r *LocalStateRepository) DeleteOverlay(
 
 func (r *LocalStateRepository) GetBinding(
 	ctx context.Context,
-	key secret.BindingKey,
-) (secret.Binding, bool, error) {
+	key secretModel.BindingKey,
+) (secretModel.Binding, bool, error) {
 	if r == nil || r.store == nil {
-		return secret.Binding{}, false, spec.ErrClosed
+		return secretModel.Binding{}, false, spec.ErrClosed
 	}
 	if err := key.Validate(); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 	if err := r.store.requireActiveRoot(
 		ctx,
 		key.Artifact.RootID,
 	); err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 
 	value, err := getSecretBindingTx(ctx, r.store.db, key)
 	if errors.Is(err, sql.ErrNoRows) {
-		return secret.Binding{}, false, nil
+		return secretModel.Binding{}, false, nil
 	}
 	if err != nil {
-		return secret.Binding{}, false, err
+		return secretModel.Binding{}, false, err
 	}
 	return value.Clone(), true, nil
 }
 
 func (r *LocalStateRepository) CreatePendingSecret(
 	ctx context.Context,
-	record secret.Record,
+	record secretModel.Record,
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
@@ -345,7 +345,7 @@ func (r *LocalStateRepository) CreatePendingSecret(
 	if err := record.Validate(); err != nil {
 		return err
 	}
-	if record.State != secret.RecordStatePending {
+	if record.State != secretModel.RecordStatePending {
 		return fmt.Errorf(
 			"%w: new secret record must begin pending",
 			spec.ErrInvalid,
@@ -371,30 +371,30 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	ctx context.Context,
 	request localstate.AttachBindingRequest,
 	now time.Time,
-) (secret.Binding, error) {
+) (secretModel.Binding, error) {
 	if r == nil || r.store == nil {
-		return secret.Binding{}, spec.ErrClosed
+		return secretModel.Binding{}, spec.ErrClosed
 	}
 	if err := request.Key.Validate(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if request.ExpectedArtifactRevision == 0 {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: expected Artifact revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	if err := request.Record.Validate(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
-	if request.Record.State != secret.RecordStatePending {
-		return secret.Binding{}, fmt.Errorf(
+	if request.Record.State != secretModel.RecordStatePending {
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: attached secret record must be pending",
 			spec.ErrInvalid,
 		)
 	}
 	if now.IsZero() {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding time is required",
 			spec.ErrInvalid,
 		)
@@ -402,7 +402,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -413,7 +413,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 		request.ExpectedArtifactRevision,
 		true,
 	); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	record, err := getSecretRecordTx(
@@ -422,18 +422,18 @@ func (r *LocalStateRepository) AttachSecretBinding(
 		request.Record.Ref,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: staged secret record is unavailable",
 			spec.ErrSecretNotFound,
 		)
 	}
 	if err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
-	if record.State != secret.RecordStatePending ||
+	if record.State != secretModel.RecordStatePending ||
 		record.StoreName != request.Record.StoreName ||
 		record.SHA256 != request.Record.SHA256 {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: staged secret record changed before binding publication",
 			spec.ErrConflict,
 		)
@@ -446,14 +446,14 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	)
 	found := err == nil
 	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if found {
 		if current.Revision != request.ExpectedBindingRevision {
-			return secret.Binding{}, spec.ErrConflict
+			return secretModel.Binding{}, spec.ErrConflict
 		}
 	} else if request.ExpectedBindingRevision != 0 {
-		return secret.Binding{}, spec.ErrConflict
+		return secretModel.Binding{}, spec.ErrConflict
 	}
 
 	if found && current.Ref != nil {
@@ -463,15 +463,15 @@ func (r *LocalStateRepository) AttachSecretBinding(
 			*current.Ref,
 			now.UTC(),
 		); err != nil {
-			return secret.Binding{}, err
+			return secretModel.Binding{}, err
 		}
 	}
 
 	ref := request.Record.Ref
-	var output secret.Binding
+	var output secretModel.Binding
 	if found {
 		if current.Revision == ^uint64(0) {
-			return secret.Binding{}, fmt.Errorf(
+			return secretModel.Binding{}, fmt.Errorf(
 				"%w: secret binding revision is exhausted",
 				spec.ErrInvalid,
 			)
@@ -503,16 +503,16 @@ func (r *LocalStateRepository) AttachSecretBinding(
 			current.Revision,
 		)
 		if err != nil {
-			return secret.Binding{}, sqliteError(err)
+			return secretModel.Binding{}, sqliteError(err)
 		}
 		if err := requireOneChanged(
 			result,
 			"secret binding changed during replacement",
 		); err != nil {
-			return secret.Binding{}, err
+			return secretModel.Binding{}, err
 		}
 	} else {
-		output = secret.Binding{
+		output = secretModel.Binding{
 			Key:        request.Key,
 			Ref:        &ref,
 			SHA256:     request.Record.SHA256,
@@ -536,7 +536,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 			timeValue(output.ModifiedAt),
 		)
 		if err != nil {
-			return secret.Binding{}, sqliteError(err)
+			return secretModel.Binding{}, sqliteError(err)
 		}
 	}
 
@@ -547,33 +547,33 @@ func (r *LocalStateRepository) AttachSecretBinding(
 		     modified_at = ?
 		 WHERE ref = ?
 		   AND state = ?`,
-		string(secret.RecordStateActive),
+		string(secretModel.RecordStateActive),
 		timeValue(now.UTC()),
 		string(ref),
-		string(secret.RecordStatePending),
+		string(secretModel.RecordStatePending),
 	)
 	if err != nil {
-		return secret.Binding{}, sqliteError(err)
+		return secretModel.Binding{}, sqliteError(err)
 	}
 	if err := requireOneChanged(
 		result,
 		"staged secret record changed during binding publication",
 	); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
 	if err := output.Validate(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	if err := tx.Commit(); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 	return output.Clone(), nil
 }
 
 func (r *LocalStateRepository) ClearSecretBinding(
 	ctx context.Context,
-	request secret.ClearBindingRequest,
+	request secretModel.ClearBindingRequest,
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
@@ -670,7 +670,7 @@ func (r *LocalStateRepository) ClearSecretBinding(
 
 func (r *LocalStateRepository) QueueSecretForCleanup(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
@@ -700,7 +700,7 @@ func (r *LocalStateRepository) QueueSecretForCleanup(
 
 func (r *LocalStateRepository) PurgeArtifactLocalState(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	now time.Time,
 ) error {
 	if r == nil || r.store == nil {
@@ -759,20 +759,20 @@ func (r *LocalStateRepository) RecoverPendingSecrets(
 		 FROM artifact_secret_records
 		 WHERE state = ?
 		 ORDER BY ref`,
-		string(secret.RecordStatePending),
+		string(secretModel.RecordStatePending),
 	)
 	if err != nil {
 		return err
 	}
 	defer rows.Close()
 
-	refs := make([]secret.Ref, 0)
+	refs := make([]secretModel.Ref, 0)
 	for rows.Next() {
 		var ref string
 		if err := rows.Scan(&ref); err != nil {
 			return err
 		}
-		refs = append(refs, secret.Ref(ref))
+		refs = append(refs, secretModel.Ref(ref))
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -794,7 +794,7 @@ func (r *LocalStateRepository) RecoverPendingSecrets(
 func (r *LocalStateRepository) ListSecretCleanup(
 	ctx context.Context,
 	maximum int,
-) ([]secret.Cleanup, error) {
+) ([]secretModel.Cleanup, error) {
 	if r == nil || r.store == nil {
 		return nil, spec.ErrClosed
 	}
@@ -819,7 +819,7 @@ func (r *LocalStateRepository) ListSecretCleanup(
 	}
 	defer rows.Close()
 
-	output := make([]secret.Cleanup, 0)
+	output := make([]secretModel.Cleanup, 0)
 	for rows.Next() {
 		var (
 			ref, storeName, lastError string
@@ -837,8 +837,8 @@ func (r *LocalStateRepository) ListSecretCleanup(
 			return nil, err
 		}
 
-		value := secret.Cleanup{
-			Ref:        secret.Ref(ref),
+		value := secretModel.Cleanup{
+			Ref:        secretModel.Ref(ref),
 			StoreName:  storeName,
 			Attempts:   attempts,
 			LastError:  lastError,
@@ -861,7 +861,7 @@ func (r *LocalStateRepository) ListSecretCleanup(
 
 func (r *LocalStateRepository) CompleteSecretCleanup(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 ) error {
 	if r == nil || r.store == nil {
 		return spec.ErrClosed
@@ -883,7 +883,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 	if err != nil {
 		return err
 	}
-	if record.State != secret.RecordStateCleanup {
+	if record.State != secretModel.RecordStateCleanup {
 		return spec.ErrConflict
 	}
 
@@ -907,7 +907,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 		 WHERE ref = ?
 		   AND state = ?`,
 		string(ref),
-		string(secret.RecordStateCleanup),
+		string(secretModel.RecordStateCleanup),
 	)
 	if err != nil {
 		return sqliteError(err)
@@ -923,7 +923,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 
 func (r *LocalStateRepository) RecordSecretCleanupFailure(
 	ctx context.Context,
-	ref secret.Ref,
+	ref secretModel.Ref,
 	reason string,
 	now time.Time,
 ) error {
@@ -972,9 +972,9 @@ type localStateQueryer interface {
 func getProtectedOverlayTx(
 	ctx context.Context,
 	queryer localStateQueryer,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
-) (overlay.Record, error) {
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
+) (overlayModel.Record, error) {
 	return scanProtectedOverlay(queryer.QueryRowContext(
 		ctx,
 		`SELECT `+protectedOverlayColumns+`
@@ -990,9 +990,9 @@ func getProtectedOverlayTx(
 
 func scanProtectedOverlay(
 	row scanner,
-) (overlay.Record, error) {
+) (overlayModel.Record, error) {
 	if row == nil {
-		return overlay.Record{}, fmt.Errorf(
+		return overlayModel.Record{}, fmt.Errorf(
 			"%w: protected overlay row is nil",
 			spec.ErrInvalid,
 		)
@@ -1014,15 +1014,15 @@ func scanProtectedOverlay(
 		&createdAt,
 		&modifiedAt,
 	); err != nil {
-		return overlay.Record{}, err
+		return overlayModel.Record{}, err
 	}
 
-	value := overlay.Record{
-		Artifact: artifact.ArtifactRef{
-			RootID:     root.RootID(rootID),
-			ArtifactID: artifact.ArtifactID(artifactID),
+	value := overlayModel.Record{
+		Artifact: artifactModel.ArtifactRef{
+			RootID:     rootModel.RootID(rootID),
+			ArtifactID: artifactModel.ArtifactID(artifactID),
 		},
-		Namespace:     overlay.Namespace(namespace),
+		Namespace:     overlayModel.Namespace(namespace),
 		SchemaVersion: schemaVersion,
 		Payload:       append([]byte(nil), payload...),
 		Revision:      revision,
@@ -1030,7 +1030,7 @@ func scanProtectedOverlay(
 		ModifiedAt:    parseTime(modifiedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return overlay.Record{}, fmt.Errorf(
+		return overlayModel.Record{}, fmt.Errorf(
 			"invalid persisted protected overlay: %w",
 			err,
 		)
@@ -1041,8 +1041,8 @@ func scanProtectedOverlay(
 func getSecretBindingTx(
 	ctx context.Context,
 	queryer localStateQueryer,
-	key secret.BindingKey,
-) (secret.Binding, error) {
+	key secretModel.BindingKey,
+) (secretModel.Binding, error) {
 	return scanSecretBinding(queryer.QueryRowContext(
 		ctx,
 		`SELECT b.root_id,
@@ -1070,9 +1070,9 @@ func getSecretBindingTx(
 
 func scanSecretBinding(
 	row scanner,
-) (secret.Binding, error) {
+) (secretModel.Binding, error) {
 	if row == nil {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"%w: secret binding row is nil",
 			spec.ErrInvalid,
 		)
@@ -1095,17 +1095,17 @@ func scanSecretBinding(
 		&modifiedAt,
 		&sha256Value,
 	); err != nil {
-		return secret.Binding{}, err
+		return secretModel.Binding{}, err
 	}
 
-	value := secret.Binding{
-		Key: secret.BindingKey{
-			Artifact: artifact.ArtifactRef{
-				RootID:     root.RootID(rootID),
-				ArtifactID: artifact.ArtifactID(artifactID),
+	value := secretModel.Binding{
+		Key: secretModel.BindingKey{
+			Artifact: artifactModel.ArtifactRef{
+				RootID:     rootModel.RootID(rootID),
+				ArtifactID: artifactModel.ArtifactID(artifactID),
 			},
-			Namespace: overlay.Namespace(namespace),
-			Slot:      secret.Slot(slot),
+			Namespace: overlayModel.Namespace(namespace),
+			Slot:      secretModel.Slot(slot),
 		},
 		Revision:   revision,
 		CreatedAt:  parseTime(createdAt),
@@ -1113,17 +1113,17 @@ func scanSecretBinding(
 	}
 	if secretRef.Valid {
 		if !sha256Value.Valid {
-			return secret.Binding{}, fmt.Errorf(
+			return secretModel.Binding{}, fmt.Errorf(
 				"%w: active secret binding has no secret record",
 				spec.ErrInvalid,
 			)
 		}
-		ref := secret.Ref(secretRef.String)
+		ref := secretModel.Ref(secretRef.String)
 		value.Ref = &ref
 		value.SHA256 = sha256Value.String
 	}
 	if err := value.Validate(); err != nil {
-		return secret.Binding{}, fmt.Errorf(
+		return secretModel.Binding{}, fmt.Errorf(
 			"invalid persisted secret binding: %w",
 			err,
 		)
@@ -1134,8 +1134,8 @@ func scanSecretBinding(
 func getSecretRecordTx(
 	ctx context.Context,
 	queryer localStateQueryer,
-	ref secret.Ref,
-) (secret.Record, error) {
+	ref secretModel.Ref,
+) (secretModel.Record, error) {
 	return scanSecretRecord(queryer.QueryRowContext(
 		ctx,
 		`SELECT ref, store_name, sha256, state, created_at, modified_at
@@ -1147,9 +1147,9 @@ func getSecretRecordTx(
 
 func scanSecretRecord(
 	row scanner,
-) (secret.Record, error) {
+) (secretModel.Record, error) {
 	if row == nil {
-		return secret.Record{}, fmt.Errorf(
+		return secretModel.Record{}, fmt.Errorf(
 			"%w: secret record row is nil",
 			spec.ErrInvalid,
 		)
@@ -1167,19 +1167,19 @@ func scanSecretRecord(
 		&createdAt,
 		&modifiedAt,
 	); err != nil {
-		return secret.Record{}, err
+		return secretModel.Record{}, err
 	}
 
-	value := secret.Record{
-		Ref:        secret.Ref(ref),
+	value := secretModel.Record{
+		Ref:        secretModel.Ref(ref),
 		StoreName:  storeName,
 		SHA256:     sha256Value,
-		State:      secret.RecordState(state),
+		State:      secretModel.RecordState(state),
 		CreatedAt:  parseTime(createdAt),
 		ModifiedAt: parseTime(modifiedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return secret.Record{}, fmt.Errorf(
+		return secretModel.Record{}, fmt.Errorf(
 			"invalid persisted secret record: %w",
 			err,
 		)
@@ -1190,24 +1190,24 @@ func scanSecretRecord(
 func ensureLocalStateArtifactTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	requireAvailable bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if _, err := getActiveRootTx(ctx, tx, ref.RootID); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 
 	value, err := getArtifactTx(ctx, tx, ref)
 	if err != nil {
-		return artifact.Artifact{}, artifactNotFound(err, ref)
+		return artifactModel.Artifact{}, artifactNotFound(err, ref)
 	}
 	if expectedRevision != 0 &&
 		value.Revision != expectedRevision {
-		return artifact.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, spec.ErrConflict
 	}
-	if requireAvailable && value.State != artifact.StateAvailable {
-		return artifact.Artifact{}, fmt.Errorf(
+	if requireAvailable && value.State != artifactModel.StateAvailable {
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,
 			value.ID,
@@ -1219,7 +1219,7 @@ func ensureLocalStateArtifactTx(
 func enqueueSecretRecordTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref secret.Ref,
+	ref secretModel.Ref,
 	now time.Time,
 ) error {
 	record, err := getSecretRecordTx(ctx, tx, ref)
@@ -1240,7 +1240,7 @@ func enqueueSecretRecordTx(
 		 SET state = ?,
 		     modified_at = ?
 		 WHERE ref = ?`,
-		string(secret.RecordStateCleanup),
+		string(secretModel.RecordStateCleanup),
 		timeValue(now),
 		string(record.Ref),
 	)
@@ -1266,8 +1266,8 @@ func enqueueSecretRecordTx(
 func queueNamespaceBindingSecretsTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifact.ArtifactRef,
-	namespace overlay.Namespace,
+	ref artifactModel.ArtifactRef,
+	namespace overlayModel.Namespace,
 	now time.Time,
 ) error {
 	return queueBindingSecretsTx(
@@ -1291,7 +1291,7 @@ func queueNamespaceBindingSecretsTx(
 func queueArtifactBindingSecretsTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	now time.Time,
 ) error {
 	return queueBindingSecretsTx(
@@ -1313,7 +1313,7 @@ func queueArtifactBindingSecretsTx(
 func queueRootBindingSecretsTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	now time.Time,
 ) error {
 	return queueBindingSecretsTx(
@@ -1341,13 +1341,13 @@ func queueBindingSecretsTx(
 	}
 	defer rows.Close()
 
-	refs := make([]secret.Ref, 0)
+	refs := make([]secretModel.Ref, 0)
 	for rows.Next() {
 		var ref string
 		if err := rows.Scan(&ref); err != nil {
 			return err
 		}
-		refs = append(refs, secret.Ref(ref))
+		refs = append(refs, secretModel.Ref(ref))
 	}
 	if err := rows.Err(); err != nil {
 		return err
@@ -1364,7 +1364,7 @@ func queueBindingSecretsTx(
 func purgeArtifactLocalStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	now time.Time,
 ) error {
 	if _, err := ensureLocalStateArtifactTx(
@@ -1414,7 +1414,7 @@ func purgeArtifactLocalStateTx(
 func purgeRootLocalStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 	now time.Time,
 ) error {
 	if err := queueRootBindingSecretsTx(

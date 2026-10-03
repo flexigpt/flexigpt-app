@@ -11,9 +11,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
@@ -22,10 +22,10 @@ import (
 
 type PreparedPackage struct {
 	EmbeddedPackageRoot    spec.Locator
-	Address                source.ManagedPackageAddress
+	Address                sourceModel.ManagedPackageAddress
 	DocumentFile           spec.Locator
-	PackageFiles           []source.ManagedPackageFile
-	ExpectedKind           artifact.ArtifactKind
+	PackageFiles           []sourceModel.ManagedPackageFile
+	ExpectedKind           artifactModel.ArtifactKind
 	ExpectedLogicalName    spec.LogicalName
 	ExpectedLogicalVersion spec.LogicalVersion
 	ExpectedDefinition     cryptoutil.Digest
@@ -335,11 +335,11 @@ func prepareCollectionPackage(
 		EmbeddedPackageRoot: packageRoot,
 		Address:             address,
 		DocumentFile:        toolDomain.ToolCollectionDocumentFile(),
-		PackageFiles: []source.ManagedPackageFile{{
+		PackageFiles: []sourceModel.ManagedPackageFile{{
 			Locator: toolDomain.ToolCollectionDocumentFile(),
 			Content: raw,
 		}},
-		ExpectedKind: artifact.ArtifactKind(
+		ExpectedKind: artifactModel.ArtifactKind(
 			pluginv1.PluginType,
 		),
 		ExpectedLogicalName:    spec.LogicalName(document.Name),
@@ -379,7 +379,7 @@ func prepareToolPackage(
 		EmbeddedPackageRoot: collectionRoot,
 		Address:             address,
 		DocumentFile:        toolDomain.ToolDocumentFile(),
-		PackageFiles: []source.ManagedPackageFile{{
+		PackageFiles: []sourceModel.ManagedPackageFile{{
 			Locator: toolDomain.ToolDocumentFile(),
 			Content: raw,
 		}},
@@ -393,7 +393,7 @@ func prepareToolPackage(
 func normalizePreparedPackages(
 	values []PreparedPackage,
 ) ([]PreparedPackage, error) {
-	seen := make(map[source.ManagedPackageAddress]struct{}, len(values))
+	seen := make(map[sourceModel.ManagedPackageAddress]struct{}, len(values))
 	output := make([]PreparedPackage, len(values))
 
 	for index, value := range values {
@@ -429,7 +429,7 @@ func (p PreparedPackage) Validate() error {
 	if err := p.DocumentFile.ValidatePortable(false); err != nil {
 		return err
 	}
-	if _, err := source.NormalizeManagedPackageFiles(
+	if _, err := sourceModel.NormalizeManagedPackageFiles(
 		p.PackageFiles,
 	); err != nil {
 		return err
@@ -458,10 +458,10 @@ func (p PreparedPackage) Fingerprint() (
 		p.Address,
 		p.DocumentFile,
 		struct {
-			Kind       artifact.ArtifactKind `json:"kind"`
-			Name       spec.LogicalName      `json:"name"`
-			Version    spec.LogicalVersion   `json:"version"`
-			Definition cryptoutil.Digest     `json:"definition"`
+			Kind       artifactModel.ArtifactKind `json:"kind"`
+			Name       spec.LogicalName           `json:"name"`
+			Version    spec.LogicalVersion        `json:"version"`
+			Definition cryptoutil.Digest          `json:"definition"`
 		}{
 			Kind:       p.ExpectedKind,
 			Name:       p.ExpectedLogicalName,

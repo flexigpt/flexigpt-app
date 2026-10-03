@@ -8,8 +8,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -26,9 +26,9 @@ var schemaJSON []byte
 
 var compiledModelProviderSchema = jsonutil.MustCompileJSONSchema(schemaJSON)
 
-var ModelProviderSchemaKey = schema.ArtifactKey(
-	artifact.ArtifactKind(ModelProviderType),
-	schema.SchemaID(ModelProviderSchemaID),
+var ModelProviderSchemaKey = schemaModel.ArtifactKey(
+	artifactModel.ArtifactKind(ModelProviderType),
+	schemaModel.SchemaID(ModelProviderSchemaID),
 	ModelProviderSchemaVersion,
 )
 

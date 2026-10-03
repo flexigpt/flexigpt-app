@@ -3,8 +3,8 @@ package consumerapi
 import (
 	"context"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -21,7 +21,7 @@ func (a *API) CreateMCPCollection(
 
 func (a *API) ensureMCPBaselineCollection(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -31,7 +31,7 @@ func (a *API) ensureMCPBaselineCollection(
 
 func (a *API) GetMCPCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionView, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionView{}, spec.ErrClosed
@@ -41,7 +41,7 @@ func (a *API) GetMCPCollection(
 
 func (a *API) SetMCPCollectionEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
 ) (collection.CollectionView, error) {
@@ -58,7 +58,7 @@ func (a *API) SetMCPCollectionEnabled(
 
 func (a *API) ResolveMCPCollection(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (collection.CollectionCapabilityPlan, error) {
 	if a == nil || a.collections == nil {
 		return collection.CollectionCapabilityPlan{}, spec.ErrClosed
@@ -68,7 +68,7 @@ func (a *API) ResolveMCPCollection(
 
 func (a *API) ListMCPCollections(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) ([]collection.ListItem, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed
@@ -80,7 +80,7 @@ func (a *API) ListMCPCollections(
 
 func (a *API) ListMCPCollectionMemberships(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]collection.ArtifactMembershipView, error) {
 	if a == nil || a.collections == nil {
 		return nil, spec.ErrClosed

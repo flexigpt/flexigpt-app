@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"sort"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -86,12 +86,12 @@ func (c *Components) HydrateCompiledPackages(
 		})
 	}
 	type sourceKey struct {
-		rootID   root.RootID
-		sourceID source.SourceID
+		rootID   rootModel.RootID
+		sourceID sourceModel.SourceID
 	}
 	type sourceBatch struct {
-		publications []source.ManagedPackagePublication
-		removals     []source.ManagedPackageAddress
+		publications []sourceModel.ManagedPackagePublication
+		removals     []sourceModel.ManagedPackageAddress
 		verify       []topology.CompiledPackage
 	}
 
@@ -138,7 +138,7 @@ func (c *Components) HydrateCompiledPackages(
 			}
 			batch.publications = append(
 				batch.publications,
-				source.ManagedPackagePublication{
+				sourceModel.ManagedPackagePublication{
 					Address: packageValue.Address,
 					Files:   files,
 				},
@@ -147,7 +147,7 @@ func (c *Components) HydrateCompiledPackages(
 		}
 
 		for _, stale := range plan.Stale {
-			address, err := source.ParseManagedPackageAddressDirectory(
+			address, err := sourceModel.ParseManagedPackageAddressDirectory(
 				stale.Key.Scope,
 			)
 			if err != nil {
@@ -183,7 +183,7 @@ func (c *Components) HydrateCompiledPackages(
 		if err != nil {
 			return err
 		}
-		if sourceValue.Kind != source.SourceKindManagedDirectory ||
+		if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
 			!sourceValue.Enabled {
 			return fmt.Errorf(
 				"%w: compiled hydration requires an enabled managed Source",
@@ -251,8 +251,8 @@ func (c *Components) HydrateCompiledPackages(
 
 func (c *Components) verifyCompiledPackage(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	value topology.CompiledPackage,
 ) error {
 	for _, document := range value.Documents {
@@ -264,7 +264,7 @@ func (c *Components) verifyCompiledPackage(
 			record, err := c.Artifacts.FindByOrigin(
 				ctx,
 				rootID,
-				artifact.SourceBinding{
+				artifactModel.SourceBinding{
 					SourceID:           sourceID,
 					Locator:            locator,
 					SubresourceLocator: expected.Subresource,
@@ -274,7 +274,7 @@ func (c *Components) verifyCompiledPackage(
 			if err != nil {
 				return err
 			}
-			if record.State != artifact.StateAvailable ||
+			if record.State != artifactModel.StateAvailable ||
 				record.LogicalName != expected.Definition.LogicalName ||
 				record.LogicalVersion != expected.Definition.LogicalVersion ||
 				record.ResolvedDefinition == nil ||
@@ -294,7 +294,7 @@ func (c *Components) verifyCompiledPackage(
 func readCompiledPackageFiles(
 	ctx context.Context,
 	value topology.CompiledPackage,
-) ([]source.ManagedPackageFile, error) {
+) ([]sourceModel.ManagedPackageFile, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: compiled package context is nil", spec.ErrInvalid)
 	}
@@ -306,7 +306,7 @@ func readCompiledPackageFiles(
 	}
 
 	var total int64
-	output := make([]source.ManagedPackageFile, 0, len(value.Files))
+	output := make([]sourceModel.ManagedPackageFile, 0, len(value.Files))
 	for _, file := range value.Files {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -336,7 +336,7 @@ func readCompiledPackageFiles(
 		}
 		total += file.Size
 
-		output = append(output, source.ManagedPackageFile{
+		output = append(output, sourceModel.ManagedPackageFile{
 			Locator: file.Locator,
 			Content: append([]byte(nil), file.Content...),
 		})

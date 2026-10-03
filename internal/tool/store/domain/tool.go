@@ -7,22 +7,22 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 // Tool is internal decoded Store material. Consumer and Wails APIs expose
 // explicit views instead of serializing this value.
 type Tool struct {
-	Artifact   artifact.Artifact
-	Definition definition.Definition
+	Artifact   artifactModel.Artifact
+	Definition definitionModel.Definition
 	Document   toolv1.ToolDocument
 }
 
 func DecodeTool(
-	record artifact.Artifact,
-	value definition.Definition,
+	record artifactModel.Artifact,
+	value definitionModel.Definition,
 ) (Tool, error) {
 	if record.Kind != ToolArtifactKind {
 		return Tool{}, fmt.Errorf(
@@ -31,7 +31,7 @@ func DecodeTool(
 			record.ID,
 		)
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return Tool{}, fmt.Errorf(
 			"%w: Tool Artifact %q is unavailable",
 			spec.ErrReferenceUnresolved,

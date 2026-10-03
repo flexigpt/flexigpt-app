@@ -1,10 +1,10 @@
-package providerregistry
+package registry
 
 import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -26,7 +26,7 @@ func New(
 	}
 
 	seenProviderNames := make(map[string]struct{}, len(providers))
-	schemaOwners := make(map[schema.Key]string)
+	schemaOwners := make(map[schemaModel.Key]string)
 	decoderOwners := make(map[spec.DecoderID]string)
 	locatorResolverOwners := make(map[provider.LocatorResolverKey]string)
 

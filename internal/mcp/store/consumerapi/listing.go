@@ -4,7 +4,7 @@ import (
 	"context"
 	"sort"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
 
@@ -19,7 +19,7 @@ func (a *API) listServers(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
+		catalogModel.ListOptions{
 			Kind:    mcpDomain.MCPArtifactKind,
 			Enabled: request.Enabled,
 		},
@@ -74,7 +74,7 @@ func (a *API) listPolicies(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		request.RootID,
-		catalog.ListOptions{
+		catalogModel.ListOptions{
 			Kind:    mcpDomain.MCPPolicyArtifactKind,
 			Enabled: request.Enabled,
 		},

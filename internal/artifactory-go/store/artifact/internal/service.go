@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -19,14 +19,14 @@ type Service struct {
 	repository  Repository
 	definitions DefinitionReader
 	clock       clockutil.Clock
-	policy      root.RootPolicy
+	policy      rootModel.RootPolicy
 }
 
 func NewService(
 	repository Repository,
 	definitions DefinitionReader,
 	timeClock clockutil.Clock,
-	policy root.RootPolicy,
+	policy rootModel.RootPolicy,
 ) (*Service, error) {
 	if repository == nil ||
 		definitions == nil ||
@@ -46,28 +46,28 @@ func NewService(
 
 func (s *Service) Get(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	if err := ref.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return s.repository.Get(ctx, ref)
 }
 
 func (s *Service) FindByOrigin(
 	ctx context.Context,
-	rootID root.RootID,
-	binding artifact.SourceBinding,
-	kind artifact.ArtifactKind,
-) (artifact.Artifact, error) {
+	rootID rootModel.RootID,
+	binding artifactModel.SourceBinding,
+	kind artifactModel.ArtifactKind,
+) (artifactModel.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := binding.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := kind.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return s.repository.FindByOrigin(
 		ctx,
@@ -79,14 +79,14 @@ func (s *Service) FindByOrigin(
 
 func (s *Service) GetDefinition(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (definition.Definition, error) {
+	ref artifactModel.ArtifactRef,
+) (definitionModel.Definition, error) {
 	record, err := s.Get(ctx, ref)
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	if record.ResolvedDefinition == nil {
-		return definition.Definition{}, fmt.Errorf(
+		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: Artifact %q has no current Definition",
 			spec.ErrDefinitionNotFound,
 			record.ID,
@@ -98,12 +98,12 @@ func (s *Service) GetDefinition(
 		*record.ResolvedDefinition,
 	)
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	if value.Digest != *record.ResolvedDefinition ||
-		(record.State != artifact.StateIncompatible &&
+		(record.State != artifactModel.StateIncompatible &&
 			value.Kind != record.Kind) {
-		return definition.Definition{}, fmt.Errorf(
+		return definitionModel.Definition{}, fmt.Errorf(
 			"%w: Artifact Definition does not match Artifact state",
 			spec.ErrDigestMismatch,
 		)
@@ -113,10 +113,10 @@ func (s *Service) GetDefinition(
 
 func (s *Service) SetEnabled(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	enabled bool,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	// Enablement is universal local Artifact metadata. In particular, a user
 	// may disable a protected built-in Artifact without receiving write access
 	// to its source package, Definition, display metadata, generic Data, or
@@ -126,7 +126,7 @@ func (s *Service) SetEnabled(
 		ref,
 		expectedRevision,
 		false,
-		func(value *artifact.Artifact) {
+		func(value *artifactModel.Artifact) {
 			value.Enabled = enabled
 		},
 	)
@@ -134,23 +134,23 @@ func (s *Service) SetEnabled(
 
 func (s *Service) SetDisplayName(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	displayName string,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	if err := spec.ValidateRequiredText(
 		"Artifact display name",
 		displayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return s.updateLocal(
 		ctx,
 		ref,
 		expectedRevision,
 		true,
-		func(value *artifact.Artifact) {
+		func(value *artifactModel.Artifact) {
 			value.DisplayName = displayName
 		},
 	)
@@ -158,23 +158,23 @@ func (s *Service) SetDisplayName(
 
 func (s *Service) UpdateData(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	data json.RawMessage,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	canonical, err := jsonutil.CanonicalizeObject(
 		data,
 		spec.MaxLocalDataBytes,
 	)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return s.updateLocal(
 		ctx,
 		ref,
 		expectedRevision,
 		true,
-		func(value *artifact.Artifact) {
+		func(value *artifactModel.Artifact) {
 			value.Data = json.RawMessage(canonical)
 		},
 	)
@@ -182,7 +182,7 @@ func (s *Service) UpdateData(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -209,7 +209,7 @@ func (s *Service) Purge(
 	if current.Revision != expectedRevision {
 		return spec.ErrConflict
 	}
-	if current.State != artifact.StateMissing {
+	if current.State != artifactModel.StateMissing {
 		return fmt.Errorf(
 			"%w: source-backed Artifact %q must be missing before purge",
 			spec.ErrConflict,
@@ -222,25 +222,25 @@ func (s *Service) Purge(
 
 func (s *Service) updateLocal(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 	requireMutableRoot bool,
-	mutate func(*artifact.Artifact),
-) (artifact.Artifact, error) {
+	mutate func(*artifactModel.Artifact),
+) (artifactModel.Artifact, error) {
 	if requireMutableRoot {
 		if err := rootimpl.RequireMutableRoot(
 			ctx,
 			s.policy,
 			ref.RootID,
 		); err != nil {
-			return artifact.Artifact{}, err
+			return artifactModel.Artifact{}, err
 		}
 	}
 	if err := ref.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if expectedRevision == 0 {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: expected Artifact revision is required",
 			spec.ErrInvalid,
 		)
@@ -248,10 +248,10 @@ func (s *Service) updateLocal(
 
 	current, err := s.repository.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if current.Revision != expectedRevision {
-		return artifact.Artifact{}, spec.ErrConflict
+		return artifactModel.Artifact{}, spec.ErrConflict
 	}
 
 	next := current.Clone()
@@ -262,7 +262,7 @@ func (s *Service) updateLocal(
 		return current, nil
 	}
 	if current.Revision == ^uint64(0) {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact revision is exhausted",
 			spec.ErrInvalid,
 		)
@@ -270,14 +270,14 @@ func (s *Service) updateLocal(
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := s.repository.UpdateLocal(
 		ctx,
 		next,
 		expectedRevision,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return next.Clone(), nil
 }

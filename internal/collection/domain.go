@@ -12,9 +12,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
 )
@@ -34,7 +34,7 @@ type DomainPolicy struct {
 	BaselineName        spec.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
-	PackageKind         source.PackageKind
+	PackageKind         sourceModel.PackageKind
 	DocumentUse         string
 	AllowedMemberTypes  []declaration.Type
 	AllowedMemberForms  []declaration.MemberForm
@@ -177,7 +177,7 @@ func (p DomainPolicy) allowsMemberForm(
 	return slices.Contains(p.AllowedMemberForms, value)
 }
 
-func (p DomainPolicy) managedCollectionPackageKind() source.PackageKind {
+func (p DomainPolicy) managedCollectionPackageKind() sourceModel.PackageKind {
 	if p.PackageKind != "" {
 		return p.PackageKind
 	}
@@ -204,7 +204,7 @@ func (p DomainPolicy) allows(value declaration.Type) bool {
 
 func (a *API) EnsureBaseline(
 	ctx context.Context,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (CollectionView, error) {
 	if a == nil || a.domain == nil {
 		return CollectionView{}, fmt.Errorf(
@@ -252,25 +252,25 @@ func (a *API) EnsureBaseline(
 	existing, err := a.artifacts.FindByOrigin(
 		ctx,
 		rootID,
-		artifact.SourceBinding{
+		artifactModel.SourceBinding{
 			SourceID: sourceValue.ID,
 			Locator:  locator,
 		},
-		artifact.ArtifactKind(pluginv1.PluginType),
+		artifactModel.ArtifactKind(pluginv1.PluginType),
 	)
 	if err != nil && !errors.Is(err, spec.ErrArtifactNotFound) && !errors.Is(err, spec.ErrNotFound) {
 		return CollectionView{}, err
-	} else if existing.State == artifact.StateAvailable {
+	} else if existing.State == artifactModel.StateAvailable {
 		return a.Read(ctx, existing.Ref())
 	}
 
 	existing, err = a.artifacts.FindByOrigin(
-		ctx, rootID, artifact.SourceBinding{SourceID: sourceValue.ID, Locator: locator},
-		artifact.ArtifactKind(pluginv1.PluginType),
+		ctx, rootID, artifactModel.SourceBinding{SourceID: sourceValue.ID, Locator: locator},
+		artifactModel.ArtifactKind(pluginv1.PluginType),
 	)
 	switch {
 	case err == nil:
-		if existing.State == artifact.StateAvailable {
+		if existing.State == artifactModel.StateAvailable {
 			return a.Read(ctx, existing.Ref())
 		}
 		document := pluginv1.PluginDocument{
@@ -314,29 +314,29 @@ func (a *API) EnsureBaseline(
 
 func (a *API) domainManagedSource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) (source.Summary, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) (sourceModel.Summary, error) {
 	if a == nil || a.domain == nil {
-		return source.Summary{}, spec.ErrClosed
+		return sourceModel.Summary{}, spec.ErrClosed
 	}
 	if err := a.requireDeclarationAuthoring(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if sourceID != "" {
 		value, err := a.sources.Get(ctx, rootID, sourceID)
 		if err != nil {
-			return source.Summary{}, err
+			return sourceModel.Summary{}, err
 		}
-		if value.Kind != source.SourceKindManagedDirectory ||
+		if value.Kind != sourceModel.SourceKindManagedDirectory ||
 			value.StorageKey != a.domain.SourceStorageKey {
-			return source.Summary{}, fmt.Errorf(
+			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Collection belongs to another managed domain Source",
 				spec.ErrUnsupported,
 			)
 		}
 		if !value.Enabled {
-			return source.Summary{}, fmt.Errorf(
+			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Collection domain Source is disabled",
 				spec.ErrConflict,
 			)
@@ -347,18 +347,18 @@ func (a *API) domainManagedSource(
 	value, _, err := a.sources.Ensure(
 		ctx,
 		rootID,
-		source.Draft{
-			ID:          source.SourceID(uuidutil.NewUUIDv7()),
+		sourceModel.Draft{
+			ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 			StorageKey:  a.domain.SourceStorageKey,
-			Kind:        source.SourceKindManagedDirectory,
+			Kind:        sourceModel.SourceKindManagedDirectory,
 			DisplayName: a.domain.SourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(`{}`),
-			Discovery:   source.DiscoverySpec{},
+			Discovery:   sourceModel.DiscoverySpec{},
 		},
 	)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if value.Enabled && value.DisplayName == a.domain.SourceDisplayName {
 		return value, nil
@@ -367,7 +367,7 @@ func (a *API) domainManagedSource(
 		ctx,
 		rootID,
 		value.ID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: value.Revision,
 			DisplayName:      a.domain.SourceDisplayName,
 			Enabled:          true,
@@ -450,9 +450,9 @@ func (a *API) validateEditableDomainDocument(
 }
 
 func IsBaselineCollectionArtifact(
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) bool {
-	if value.Kind != artifact.ArtifactKind(pluginv1.PluginType) {
+	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) {
 		return false
 	}
 	address, err := managedCollectionAddressFromLocator(
@@ -468,13 +468,13 @@ func IsBaselineCollectionArtifact(
 }
 
 func IsBaselineCollectionArtifactForSource(
-	value artifact.Artifact,
-	sourceValue source.Summary,
+	value artifactModel.Artifact,
+	sourceValue sourceModel.Summary,
 ) bool {
-	if value.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
+	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
 		value.RootID != sourceValue.RootID ||
 		value.Binding.SourceID != sourceValue.ID ||
-		sourceValue.Kind != source.SourceKindManagedDirectory {
+		sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
 		return false
 	}
 	address, err := managedCollectionAddressFromLocator(
@@ -493,15 +493,15 @@ func IsBaselineCollectionArtifactForSource(
 
 func (a *API) readCollectionDocument(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, pluginv1.PluginDocument, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, pluginv1.PluginDocument, error) {
 	record, err := a.artifacts.Get(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, err
 	}
-	if record.Kind != artifact.ArtifactKind(pluginv1.PluginType) ||
-		record.State != artifact.StateAvailable {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+	if record.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
+		record.State != artifactModel.StateAvailable {
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Artifact %q is not an available Plugin",
 			spec.ErrReferenceUnresolved,
 			record.ID,
@@ -510,30 +510,30 @@ func (a *API) readCollectionDocument(
 	if a.domain != nil &&
 		a.domain.ReadOnly &&
 		!a.readOnlyDomainOrigin(record) {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Collection does not belong to this read-only domain",
 			spec.ErrUnsupported,
 		)
 	}
 	definitionValue, err := a.artifacts.GetDefinition(ctx, ref)
 	if err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, err
 	}
 
 	if record.ResolvedDefinition == nil ||
 		*record.ResolvedDefinition != definitionValue.Digest {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Collection definition changed during read",
 			spec.ErrRefreshRequired,
 		)
 	}
 	document, err := pluginv1.DecodePluginJSON(definitionValue.Body)
 	if err != nil {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, err
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, err
 	}
 
 	if document.Name != string(record.LogicalName) {
-		return artifact.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
+		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, fmt.Errorf(
 			"%w: Plugin declaration name differs from Artifact identity",
 			spec.ErrInvalid,
 		)
@@ -543,7 +543,7 @@ func (a *API) readCollectionDocument(
 
 func (a *API) domainCollectionVisible(
 	ctx context.Context,
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 ) (bool, error) {
 	if a.domain == nil {
@@ -559,7 +559,7 @@ func (a *API) domainCollectionVisible(
 		return false, err
 	}
 	if a.domain.ReadOnly {
-		if sourceValue.Kind != source.SourceKindManagedDirectory ||
+		if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
 			!a.readOnlyDomainOrigin(record) {
 			return false, nil
 		}
@@ -581,7 +581,7 @@ func (a *API) domainCollectionVisible(
 
 func (a *API) Read(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CollectionView, error) {
 	if a == nil {
 		return CollectionView{}, spec.ErrClosed
@@ -621,7 +621,7 @@ func (a *API) Read(
 	}
 	if record.Binding.SubresourceLocator == "" &&
 		(a.domain == nil || !a.domain.ReadOnly) &&
-		sourceValue.Kind == source.SourceKindManagedDirectory &&
+		sourceValue.Kind == sourceModel.SourceKindManagedDirectory &&
 		(a.domain == nil ||
 			sourceValue.StorageKey == a.domain.SourceStorageKey) {
 		if _, err := a.managedCollectionAddressFromLocator(
@@ -653,7 +653,7 @@ func (a *API) ListDomain(
 }
 
 func readCollectionViewOf(
-	record artifact.Artifact,
+	record artifactModel.Artifact,
 	document pluginv1.PluginDocument,
 	editable bool,
 	deletable bool,

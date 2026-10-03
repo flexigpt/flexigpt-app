@@ -9,10 +9,10 @@ import (
 	"strings"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
@@ -20,8 +20,8 @@ import (
 // BuiltinArtifactSnapshot records the identity and kind of an Artifact that
 // existed before one generated package hydration plan mutates package bytes.
 type BuiltinArtifactSnapshot struct {
-	Ref  artifact.ArtifactRef
-	Kind artifact.ArtifactKind
+	Ref  artifactModel.ArtifactRef
+	Kind artifactModel.ArtifactKind
 }
 
 // BuiltinPackageCleanup is the narrow lifecycle port used by the generated
@@ -33,16 +33,16 @@ type BuiltinArtifactSnapshot struct {
 type BuiltinPackageCleanup interface {
 	CaptureBuiltInPackageArtifacts(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		addresses []source.ManagedPackageAddress,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		addresses []sourceModel.ManagedPackageAddress,
 	) ([]BuiltinArtifactSnapshot, error)
 
 	ReconcileBuiltInPackageArtifacts(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-		addresses []source.ManagedPackageAddress,
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+		addresses []sourceModel.ManagedPackageAddress,
 		previous []BuiltinArtifactSnapshot,
 	) error
 }
@@ -65,9 +65,9 @@ func NewBuiltinPackageCleanup(
 
 func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	addresses []source.ManagedPackageAddress,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	addresses []sourceModel.ManagedPackageAddress,
 ) ([]BuiltinArtifactSnapshot, error) {
 	if c == nil || c.api == nil {
 		return nil, spec.ErrClosed
@@ -91,16 +91,16 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 		ctx,
 		rootID,
 		sourceID,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
 	output := make([]BuiltinArtifactSnapshot, 0)
-	seen := make(map[artifact.ArtifactRef]struct{})
+	seen := make(map[artifactModel.ArtifactRef]struct{})
 	for _, entry := range entries {
-		if entry.State != artifact.StateAvailable ||
+		if entry.State != artifactModel.StateAvailable ||
 			!modelBuiltinArtifactKind(entry.Kind) ||
 			!entryBelongsToPackageScope(entry, scopes) {
 			continue
@@ -128,9 +128,9 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 
 func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	addresses []source.ManagedPackageAddress,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	addresses []sourceModel.ManagedPackageAddress,
 	previous []BuiltinArtifactSnapshot,
 ) error {
 	if c == nil || c.api == nil {
@@ -159,7 +159,7 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	}
 
 	previousByRef := make(
-		map[artifact.ArtifactRef]BuiltinArtifactSnapshot,
+		map[artifactModel.ArtifactRef]BuiltinArtifactSnapshot,
 		len(previous),
 	)
 	for _, value := range previous {
@@ -167,7 +167,7 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	}
 
 	currentByRef := make(
-		map[artifact.ArtifactRef]BuiltinArtifactSnapshot,
+		map[artifactModel.ArtifactRef]BuiltinArtifactSnapshot,
 		len(current),
 	)
 	for _, value := range current {
@@ -206,7 +206,7 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 
 func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	record, err := c.api.artifacts.Get(ctx, ref)
 	if err != nil {
@@ -216,7 +216,7 @@ func (c *builtinPackageCleanup) applyInitialBuiltInEnablement(
 		}
 		return err
 	}
-	if record.State != artifact.StateAvailable {
+	if record.State != artifactModel.StateAvailable {
 		return nil
 	}
 
@@ -266,7 +266,7 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 		!errors.Is(err, spec.ErrRootNotFound) {
 		return err
 	}
-	if err == nil && record.State == artifact.StateAvailable {
+	if err == nil && record.State == artifactModel.StateAvailable {
 		return nil
 	}
 
@@ -281,7 +281,7 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 }
 
 func managedPackageScopes(
-	addresses []source.ManagedPackageAddress,
+	addresses []sourceModel.ManagedPackageAddress,
 ) (map[spec.Locator]struct{}, error) {
 	output := make(map[spec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {
@@ -299,7 +299,7 @@ func managedPackageScopes(
 }
 
 func entryBelongsToPackageScope(
-	entry catalog.Entry,
+	entry catalogModel.Entry,
 	scopes map[spec.Locator]struct{},
 ) bool {
 	if len(scopes) == 0 {
@@ -311,7 +311,7 @@ func entryBelongsToPackageScope(
 }
 
 func modelBuiltinArtifactKind(
-	kind artifact.ArtifactKind,
+	kind artifactModel.ArtifactKind,
 ) bool {
 	return kind == modelDomain.ModelProviderArtifactKind ||
 		kind == modelDomain.ModelArtifactKind

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -19,29 +19,29 @@ type ToolImplementationView struct {
 }
 
 type ToolListItem struct {
-	Ref artifact.ArtifactRef `json:"ref"`
+	Ref artifactModel.ArtifactRef `json:"ref"`
 
 	Name        spec.LogicalName `json:"name"`
 	DisplayName string           `json:"displayName"`
 	Description string           `json:"description,omitempty"`
 
-	State            artifact.State    `json:"state"`
-	Enabled          bool              `json:"enabled"`
-	Revision         uint64            `json:"revision"`
-	DefinitionDigest cryptoutil.Digest `json:"definitionDigest,omitempty"`
-	BuiltIn          bool              `json:"builtIn"`
+	State            artifactModel.State `json:"state"`
+	Enabled          bool                `json:"enabled"`
+	Revision         uint64              `json:"revision"`
+	DefinitionDigest cryptoutil.Digest   `json:"definitionDigest,omitempty"`
+	BuiltIn          bool                `json:"builtIn"`
 }
 
 type ToolView struct {
-	Artifact         artifact.Artifact   `json:"artifact"`
-	DefinitionDigest cryptoutil.Digest   `json:"definitionDigest"`
-	Name             spec.LogicalName    `json:"name"`
-	Version          spec.LogicalVersion `json:"version"`
-	DisplayName      string              `json:"displayName"`
-	Description      string              `json:"description,omitempty"`
-	Tags             []string            `json:"tags,omitempty"`
-	AutoExecute      bool                `json:"autoExecute"`
-	BuiltIn          bool                `json:"builtIn"`
+	Artifact         artifactModel.Artifact `json:"artifact"`
+	DefinitionDigest cryptoutil.Digest      `json:"definitionDigest"`
+	Name             spec.LogicalName       `json:"name"`
+	Version          spec.LogicalVersion    `json:"version"`
+	DisplayName      string                 `json:"displayName"`
+	Description      string                 `json:"description,omitempty"`
+	Tags             []string               `json:"tags,omitempty"`
+	AutoExecute      bool                   `json:"autoExecute"`
+	BuiltIn          bool                   `json:"builtIn"`
 
 	InputSchema   json.RawMessage  `json:"inputSchema"`
 	UserArgSchema *json.RawMessage `json:"userArgSchema,omitempty"`
@@ -56,8 +56,8 @@ type ResolvedToolView struct {
 }
 
 func (v ResolvedToolView) Enabled() bool {
-	return v.Tool.Artifact.State == artifact.StateAvailable &&
-		v.Collection.Artifact.State == artifact.StateAvailable &&
+	return v.Tool.Artifact.State == artifactModel.StateAvailable &&
+		v.Collection.Artifact.State == artifactModel.StateAvailable &&
 		v.Tool.Artifact.Enabled &&
 		v.Collection.Artifact.Enabled
 }

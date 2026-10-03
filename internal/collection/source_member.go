@@ -4,16 +4,16 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type EnsureMemberForCollectionSourceRequest struct {
-	Collection       artifact.ArtifactRef `json:"collection"`
-	ExpectedRevision uint64               `json:"expectedRevision"`
-	Type             declaration.Type     `json:"type"`
-	Name             spec.LogicalName     `json:"name"`
-	Locator          spec.Locator         `json:"locator"`
+	Collection       artifactModel.ArtifactRef `json:"collection"`
+	ExpectedRevision uint64                    `json:"expectedRevision"`
+	Type             declaration.Type          `json:"type"`
+	Name             spec.LogicalName          `json:"name"`
+	Locator          spec.Locator              `json:"locator"`
 }
 
 func (a *API) EnsureMemberForCollectionSource(

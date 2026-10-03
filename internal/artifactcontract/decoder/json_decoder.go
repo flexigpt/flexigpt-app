@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -35,7 +35,7 @@ func (*JSONDecoder) Revision() string {
 	return "artifact-declaration-json/v1"
 }
 
-func (*JSONDecoder) RequiredSchemaKeys() []schema.Key {
+func (*JSONDecoder) RequiredSchemaKeys() []schemaModel.Key {
 	return newCanonicalDecoder().RequiredSchemaKeys()
 }
 

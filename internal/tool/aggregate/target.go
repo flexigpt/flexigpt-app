@@ -6,7 +6,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/toolv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	toolConsumerAPI "github.com/flexigpt/flexigpt-app/internal/tool/store/consumerapi"
@@ -18,7 +18,7 @@ const (
 )
 
 type TargetV1 struct {
-	ToolArtifact     artifact.ArtifactRef      `json:"toolArtifact"`
+	ToolArtifact     artifactModel.ArtifactRef `json:"toolArtifact"`
 	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest"`
 	Name             spec.LogicalName          `json:"name"`
 	Version          spec.LogicalVersion       `json:"version"`

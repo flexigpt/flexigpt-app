@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillRuntime "github.com/flexigpt/flexigpt-app/internal/skill/runtime"
 )
@@ -60,7 +60,7 @@ func (s *CatalogSource) Skills(
 }
 
 func RootCatalogID(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) (skillRuntime.CatalogID, error) {
 	if err := rootID.Validate(); err != nil {
 		return "", err
@@ -72,7 +72,7 @@ func RootCatalogID(
 
 func RootCatalogIDRoot(
 	catalogID skillRuntime.CatalogID,
-) (root.RootID, error) {
+) (rootModel.RootID, error) {
 	raw, found := strings.CutPrefix(
 		string(catalogID),
 		artifactRootCatalogPrefix,
@@ -84,7 +84,7 @@ func RootCatalogIDRoot(
 			catalogID,
 		)
 	}
-	rootID := root.RootID(raw)
+	rootID := rootModel.RootID(raw)
 	if err := rootID.Validate(); err != nil {
 		return "", err
 	}

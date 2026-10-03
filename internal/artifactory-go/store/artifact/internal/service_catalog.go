@@ -4,19 +4,19 @@ import (
 	"context"
 	"fmt"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func (s *Service) ListByRoot(
 	ctx context.Context,
-	rootID root.RootID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if s == nil || s.repository == nil {
 		return nil, spec.ErrClosed
 	}
@@ -45,10 +45,10 @@ func (s *Service) ListByRoot(
 
 func (s *Service) ListBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if s == nil || s.repository == nil {
 		return nil, spec.ErrClosed
 	}
@@ -85,11 +85,11 @@ func (s *Service) ListBySource(
 
 func (s *Service) FindByIdentity(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if s == nil || s.repository == nil {
 		return nil, spec.ErrClosed
 	}
@@ -130,8 +130,8 @@ func (s *Service) FindByIdentity(
 
 func (s *Service) GetMany(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
+	refs []artifactModel.ArtifactRef,
+) ([]artifactModel.Artifact, error) {
 	if s == nil || s.repository == nil {
 		return nil, spec.ErrClosed
 	}
@@ -145,7 +145,7 @@ func (s *Service) GetMany(
 		return nil, err
 	}
 	if len(refs) == 0 {
-		return []artifact.Artifact{}, nil
+		return []artifactModel.Artifact{}, nil
 	}
 
 	for _, ref := range refs {
@@ -158,8 +158,8 @@ func (s *Service) GetMany(
 
 func (s *Service) GetDefinitions(
 	ctx context.Context,
-	keys []definition.Key,
-) ([]definition.Definition, error) {
+	keys []definitionModel.Key,
+) ([]definitionModel.Definition, error) {
 	if s == nil || s.definitions == nil {
 		return nil, spec.ErrClosed
 	}
@@ -173,17 +173,17 @@ func (s *Service) GetDefinitions(
 		return nil, err
 	}
 	if len(keys) == 0 {
-		return []definition.Definition{}, nil
+		return []definitionModel.Definition{}, nil
 	}
 	return s.definitions.GetDefinitions(ctx, keys)
 }
 
 func (s *Service) attachDocuments(
 	ctx context.Context,
-	values []catalog.Entry,
+	values []catalogModel.Entry,
 	includeDocument bool,
-) ([]catalog.Entry, error) {
-	output := make([]catalog.Entry, len(values))
+) ([]catalogModel.Entry, error) {
+	output := make([]catalogModel.Entry, len(values))
 	for index, value := range values {
 		output[index] = value.Clone()
 	}
@@ -191,13 +191,13 @@ func (s *Service) attachDocuments(
 		return output, nil
 	}
 
-	keys := make([]definition.Key, 0, len(output))
-	seen := make(map[definition.Key]struct{}, len(output))
+	keys := make([]definitionModel.Key, 0, len(output))
+	seen := make(map[definitionModel.Key]struct{}, len(output))
 	for _, value := range output {
 		if value.Definition == nil {
 			continue
 		}
-		key := definition.Key{
+		key := definitionModel.Key{
 			RootID: value.RootID,
 			Digest: value.Definition.Digest,
 		}
@@ -215,7 +215,7 @@ func (s *Service) attachDocuments(
 	if err != nil {
 		return nil, err
 	}
-	byKey := make(map[definition.Key]definition.Definition, len(documents))
+	byKey := make(map[definitionModel.Key]definitionModel.Definition, len(documents))
 	for index, value := range documents {
 		byKey[keys[index]] = value
 	}
@@ -224,7 +224,7 @@ func (s *Service) attachDocuments(
 		if output[index].Definition == nil {
 			continue
 		}
-		key := definition.Key{
+		key := definitionModel.Key{
 			RootID: output[index].RootID,
 			Digest: output[index].Definition.Digest,
 		}
@@ -242,7 +242,7 @@ func (s *Service) attachDocuments(
 }
 
 func validateCatalogListOptions(
-	options catalog.ListOptions,
+	options catalogModel.ListOptions,
 ) error {
 	if options.Kind != "" {
 		if err := options.Kind.Validate(); err != nil {

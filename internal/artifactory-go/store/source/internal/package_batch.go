@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -17,17 +17,17 @@ import (
 type PackageBatchWriter interface {
 	ApplyPackageBatch(
 		ctx context.Context,
-		value source.Source,
-		publications []source.ManagedPackagePublication,
-		removals []source.ManagedPackageAddress,
+		value sourceModel.Source,
+		publications []sourceModel.ManagedPackagePublication,
+		removals []sourceModel.ManagedPackageAddress,
 	) error
 }
 
 func (r *Registry) ApplyPackageBatch(
 	ctx context.Context,
-	value source.Source,
-	publications []source.ManagedPackagePublication,
-	removals []source.ManagedPackageAddress,
+	value sourceModel.Source,
+	publications []sourceModel.ManagedPackagePublication,
+	removals []sourceModel.ManagedPackageAddress,
 ) error {
 	if r == nil {
 		return spec.ErrClosed

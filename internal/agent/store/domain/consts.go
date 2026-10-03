@@ -4,24 +4,24 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
 
 const (
-	AgentArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
+	AgentArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 		agentv1.AgentType,
 	)
 
-	ManagedAgentPackageKind           source.PackageKind = "agent"
-	BuiltinAgentCollectionPackageKind source.PackageKind = "agent-collection"
-	AgentManagedSourceStorageKey      spec.StorageKey    = "user-agents"
-	AgentManagedCollectionPackageKind source.PackageKind = "plugin"
-	AgentBaselineCollectionName       spec.LogicalName   = "agent-baseline"
-	AgentSchemaID                     schema.SchemaID    = agentv1.AgentSchemaID
+	ManagedAgentPackageKind           sourceModel.PackageKind = "agent"
+	BuiltinAgentCollectionPackageKind sourceModel.PackageKind = "agent-collection"
+	AgentManagedSourceStorageKey      spec.StorageKey         = "user-agents"
+	AgentManagedCollectionPackageKind sourceModel.PackageKind = "plugin"
+	AgentBaselineCollectionName       spec.LogicalName        = "agent-baseline"
+	AgentSchemaID                     schemaModel.SchemaID    = agentv1.AgentSchemaID
 
 	AgentSchemaVersion            = agentv1.AgentSchemaVersion
 	AgentManagedSourceDisplayName = "User-managed Agents"
@@ -31,13 +31,13 @@ const (
 	HydrationSchemaVersion        = "agent.agent.builtin-hydration/v1"
 )
 
-func IsAgentKind(value artifact.ArtifactKind) bool {
+func IsAgentKind(value artifactModel.ArtifactKind) bool {
 	return value == AgentArtifactKind
 }
 
-func IsAgentSchema(value schema.Key) bool {
-	return value.Entity == schema.EntityArtifact &&
-		value.Kind == schema.Kind(AgentArtifactKind) &&
+func IsAgentSchema(value schemaModel.Key) bool {
+	return value.Entity == schemaModel.EntityArtifact &&
+		value.Kind == schemaModel.Kind(AgentArtifactKind) &&
 		value.SchemaID == AgentSchemaID &&
 		value.SchemaVersion == AgentSchemaVersion
 }

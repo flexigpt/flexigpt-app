@@ -8,8 +8,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -17,7 +17,7 @@ import (
 // ManagedSkillDocument is a source-backed editable Skill document. It is
 // produced only after the caller has selected a managed Skill Artifact.
 type ManagedSkillDocument struct {
-	Artifact artifact.Artifact      `json:"artifact"`
+	Artifact artifactModel.Artifact `json:"artifact"`
 	Document document.SkillDocument `json:"document"`
 }
 
@@ -51,18 +51,18 @@ func ParseSkillDocument(
 func DecodeSkillDocument(
 	content []byte,
 	expectedName string,
-) (definition.Definition, []diagnostic.Diagnostic, error) {
+) (definitionModel.Definition, []diagnostic.Diagnostic, error) {
 	doc, warnings, err := ParseSkillDocument(content, expectedName)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	value, err := definitionForSkillDocument(doc)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
-	canonical, err := definition.Canonicalize(value)
+	canonical, err := definitionModel.Canonicalize(value)
 	if err != nil {
-		return definition.Definition{}, nil, err
+		return definitionModel.Definition{}, nil, err
 	}
 	return canonical, warnings, nil
 }
@@ -71,19 +71,19 @@ func DecodeSkillDocument(
 // declaration into the generic Artifact Store Definition value.
 func DefinitionForSkillDeclaration(
 	doc skillv1.SkillDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := doc.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	body, err := doc.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	displayName := doc.DisplayName
 	if displayName == "" {
 		displayName = doc.Name
 	}
-	value := definition.Definition{
+	value := definitionModel.Definition{
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,
@@ -94,13 +94,13 @@ func DefinitionForSkillDeclaration(
 		Body:          body,
 		Dependencies:  nil,
 	}
-	return definition.Canonicalize(value)
+	return definitionModel.Canonicalize(value)
 }
 
 // SkillDeclarationFromDefinition validates and decodes the canonical skillv1
 // declaration stored inside one generic Definition.
 func SkillDeclarationFromDefinition(
-	value definition.Definition,
+	value definitionModel.Definition,
 ) (skillv1.SkillDocument, error) {
 	if err := ValidateDefinition(value); err != nil {
 		return skillv1.SkillDocument{}, err
@@ -112,7 +112,7 @@ func SkillDeclarationFromDefinition(
 // reopening its source package. Runtime source loading remains source-backed
 // through Artifact Store Resource resolution.
 func ValidateDefinition(
-	value definition.Definition,
+	value definitionModel.Definition,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -166,7 +166,7 @@ func ValidateDefinition(
 
 func definitionForSkillDocument(
 	doc document.SkillDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	documentFile := SkillDefinitionFileName()
 	sourceLocator := declaration.ScalarLocator(
 		"./" + string(documentFile),
@@ -183,10 +183,10 @@ func definitionForSkillDocument(
 	}
 	body, err := decl.CanonicalJSON()
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
-	return definition.Definition{
+	return definitionModel.Definition{
 		Kind:          SkillArtifactKind,
 		SchemaID:      SkillSchemaID,
 		SchemaVersion: SkillSchemaVersion,

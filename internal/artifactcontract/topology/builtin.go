@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/yamlutil"
@@ -41,24 +41,24 @@ const (
 )
 
 type builtinRootWire struct {
-	ID          root.RootID     `json:"id"`
-	StorageKey  spec.StorageKey `json:"storageKey"`
-	DisplayName string          `json:"displayName"`
-	Description string          `json:"description"`
-	Protected   bool            `json:"protected"`
-	Retained    bool            `json:"retained"`
+	ID          rootModel.RootID `json:"id"`
+	StorageKey  spec.StorageKey  `json:"storageKey"`
+	DisplayName string           `json:"displayName"`
+	Description string           `json:"description"`
+	Protected   bool             `json:"protected"`
+	Retained    bool             `json:"retained"`
 }
 
 type builtinSourceWire struct {
-	Name        string               `json:"name"`
-	Roles       []string             `json:"roles"`
-	ID          source.SourceID      `json:"id"`
-	StorageKey  spec.StorageKey      `json:"storageKey"`
-	Kind        source.SourceKind    `json:"kind"`
-	DisplayName string               `json:"displayName"`
-	Enabled     bool                 `json:"enabled"`
-	Config      json.RawMessage      `json:"config"`
-	Discovery   discoveryProfileWire `json:"discovery"`
+	Name        string                 `json:"name"`
+	Roles       []string               `json:"roles"`
+	ID          sourceModel.SourceID   `json:"id"`
+	StorageKey  spec.StorageKey        `json:"storageKey"`
+	Kind        sourceModel.SourceKind `json:"kind"`
+	DisplayName string                 `json:"displayName"`
+	Enabled     bool                   `json:"enabled"`
+	Config      json.RawMessage        `json:"config"`
+	Discovery   discoveryProfileWire   `json:"discovery"`
 }
 
 type builtinTopologyWire struct {
@@ -76,12 +76,12 @@ type builtinTopologyWire struct {
 
 type builtinTopologyConfig struct {
 	declaration          topology.Declaration
-	sourcesByName        map[string]source.Draft
+	sourcesByName        map[string]sourceModel.Draft
 	sourceNameByRole     map[string]string
 	embeddedPackageRoots map[string]spec.Locator
 	applicationStorage   map[ApplicationStorageKey]string
 
-	userRoot         root.RootDraft
+	userRoot         rootModel.RootDraft
 	userRootRetained bool
 	builtinProtected bool
 	builtinRetained  bool
@@ -98,28 +98,28 @@ func BuiltinTopologyDeclaration() topology.Declaration {
 	)
 }
 
-func BuiltinRootID() root.RootID {
+func BuiltinRootID() rootModel.RootID {
 	return configuredBuiltinTopology.declaration.Root.ID
 }
 
-func UserRootDraft() root.RootDraft {
+func UserRootDraft() rootModel.RootDraft {
 	return configuredBuiltinTopology.userRoot
 }
 
-func UserRootID() root.RootID {
+func UserRootID() rootModel.RootID {
 	return configuredBuiltinTopology.userRoot.ID
 }
 
-func ManagementRootIDs() []root.RootID {
-	return []root.RootID{BuiltinRootID(), UserRootID()}
+func ManagementRootIDs() []rootModel.RootID {
+	return []rootModel.RootID{BuiltinRootID(), UserRootID()}
 }
 
 func BuiltinSource(
 	role string,
-) (source.Draft, error) {
+) (sourceModel.Draft, error) {
 	name, found := configuredBuiltinTopology.sourceNameByRole[role]
 	if !found {
-		return source.Draft{}, fmt.Errorf(
+		return sourceModel.Draft{}, fmt.Errorf(
 			"%w: built-in topology has no source role %q",
 			spec.ErrNotFound,
 			role,
@@ -127,7 +127,7 @@ func BuiltinSource(
 	}
 	value, found := configuredBuiltinTopology.sourcesByName[name]
 	if !found {
-		return source.Draft{}, fmt.Errorf(
+		return sourceModel.Draft{}, fmt.Errorf(
 			"%w: built-in topology source role %q is invalid",
 			spec.ErrInvalid,
 			role,
@@ -136,7 +136,7 @@ func BuiltinSource(
 	return cloneBuiltinSource(value), nil
 }
 
-func BuiltinPackageSourceID() source.SourceID {
+func BuiltinPackageSourceID() sourceModel.SourceID {
 	value, err := BuiltinSource(BuiltinSourceRolePackages)
 	if err != nil {
 		panic(err)
@@ -145,8 +145,8 @@ func BuiltinPackageSourceID() source.SourceID {
 }
 
 func IsBuiltinPackageSource(
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 ) bool {
 	return rootID == BuiltinRootID() &&
 		sourceID == BuiltinPackageSourceID()
@@ -224,15 +224,15 @@ func ApplicationStorageNames() []string {
 	return output
 }
 
-func ProtectedRootIDs() []root.RootID {
+func ProtectedRootIDs() []rootModel.RootID {
 	if !configuredBuiltinTopology.builtinProtected {
 		return nil
 	}
-	return []root.RootID{BuiltinRootID()}
+	return []rootModel.RootID{BuiltinRootID()}
 }
 
-func RetainedRootDrafts() []root.RootDraft {
-	output := make([]root.RootDraft, 0, 2)
+func RetainedRootDrafts() []rootModel.RootDraft {
+	output := make([]rootModel.RootDraft, 0, 2)
 	if configuredBuiltinTopology.builtinRetained {
 		output = append(
 			output,
@@ -248,9 +248,9 @@ func RetainedRootDrafts() []root.RootDraft {
 	return output
 }
 
-func RetainedRootIDs() []root.RootID {
+func RetainedRootIDs() []rootModel.RootID {
 	drafts := RetainedRootDrafts()
-	output := make([]root.RootID, 0, len(drafts))
+	output := make([]rootModel.RootID, 0, len(drafts))
 	for _, draft := range drafts {
 		output = append(output, draft.ID)
 	}
@@ -297,7 +297,7 @@ func loadBuiltinTopology(
 		return builtinTopologyConfig{}, err
 	}
 
-	userRoot := root.RootDraft{
+	userRoot := rootModel.RootDraft{
 		ID:          wire.Application.UserRoot.ID,
 		StorageKey:  wire.Application.UserRoot.StorageKey,
 		DisplayName: wire.Application.UserRoot.DisplayName,
@@ -336,15 +336,15 @@ func loadBuiltinTopology(
 	}
 
 	declaration := topology.Declaration{
-		Root: root.RootDraft{
+		Root: rootModel.RootDraft{
 			ID:          wire.Builtin.Root.ID,
 			StorageKey:  wire.Builtin.Root.StorageKey,
 			DisplayName: wire.Builtin.Root.DisplayName,
 			Description: wire.Builtin.Root.Description,
 		},
-		Sources: make([]source.Draft, 0, len(wire.Builtin.Sources)),
+		Sources: make([]sourceModel.Draft, 0, len(wire.Builtin.Sources)),
 	}
-	sourcesByName := make(map[string]source.Draft, len(wire.Builtin.Sources))
+	sourcesByName := make(map[string]sourceModel.Draft, len(wire.Builtin.Sources))
 	sourceNameByRole := make(map[string]string)
 
 	for index, value := range wire.Builtin.Sources {
@@ -391,7 +391,7 @@ func loadBuiltinTopology(
 			return builtinTopologyConfig{}, err
 		}
 
-		draft := source.Draft{
+		draft := sourceModel.Draft{
 			ID:          value.ID,
 			StorageKey:  value.StorageKey,
 			Kind:        value.Kind,
@@ -445,8 +445,8 @@ func loadBuiltinTopology(
 		)
 	}
 	for _, sourceValue := range declaration.Sources {
-		if declaration.Root.ID == root.RootID(sourceValue.ID) ||
-			userRoot.ID == root.RootID(sourceValue.ID) {
+		if declaration.Root.ID == rootModel.RootID(sourceValue.ID) ||
+			userRoot.ID == rootModel.RootID(sourceValue.ID) {
 			return builtinTopologyConfig{}, fmt.Errorf(
 				"%w: application Root and Source IDs must differ",
 				spec.ErrConflict,
@@ -461,7 +461,7 @@ func loadBuiltinTopology(
 		)
 	}
 	packageSource := sourcesByName[packageSourceName]
-	if packageSource.Kind != source.SourceKindManagedDirectory {
+	if packageSource.Kind != sourceModel.SourceKindManagedDirectory {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in package Source must be managed",
 			spec.ErrInvalid,
@@ -515,7 +515,7 @@ func loadBuiltinTopology(
 
 func validateConfiguredRoot(
 	label string,
-	value root.RootDraft,
+	value rootModel.RootDraft,
 ) error {
 	if err := value.ID.Validate(); err != nil {
 		return fmt.Errorf("%s: %w", label, err)
@@ -612,14 +612,14 @@ func cloneBuiltinTopologyDeclaration(
 	value topology.Declaration,
 ) topology.Declaration {
 	output := value
-	output.Sources = make([]source.Draft, len(value.Sources))
+	output.Sources = make([]sourceModel.Draft, len(value.Sources))
 	for index, sourceValue := range value.Sources {
 		output.Sources[index] = cloneBuiltinSource(sourceValue)
 	}
 	return output
 }
 
-func cloneBuiltinSource(value source.Draft) source.Draft {
+func cloneBuiltinSource(value sourceModel.Draft) sourceModel.Draft {
 	output := value
 	output.Config = append(json.RawMessage(nil), value.Config...)
 	output.Discovery = value.Discovery.Clone()

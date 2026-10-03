@@ -7,7 +7,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelConsumerAPI "github.com/flexigpt/flexigpt-app/internal/model/store/consumerapi"
 )
@@ -57,13 +57,13 @@ func (s *Service) InitializeProviderRuntime(
 	// Inference registration is keyed by logical name, not ArtifactRef. Do not
 	// silently choose one Root's settings or credentials for a colliding name.
 	candidates := make([]modelConsumerAPI.ProviderListItem, 0, len(providers))
-	seen := make(map[artifact.ArtifactRef]struct{}, len(providers))
+	seen := make(map[artifactModel.ArtifactRef]struct{}, len(providers))
 	names := make(map[spec.LogicalName]int)
 	for _, provider := range providers {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		if !provider.Enabled || provider.State != artifact.StateAvailable {
+		if !provider.Enabled || provider.State != artifactModel.StateAvailable {
 			continue
 		}
 		if _, duplicate := seen[provider.Ref]; duplicate {
@@ -110,7 +110,7 @@ func (s *Service) InitializeProviderRuntime(
 
 func (s *Service) ResolveRuntimeModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (RuntimeConfiguration, error) {
 	return s.ResolveRuntimeConfiguration(ctx, RuntimeModelRequest{
 		Model: ref,
@@ -119,7 +119,7 @@ func (s *Service) ResolveRuntimeModel(
 
 func (s *Service) ResolveRuntimeModelWithRequestPatch(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	requestPatch *RuntimeRequestPatch,
 ) (RuntimeConfiguration, error) {
 	return s.ResolveRuntimeConfiguration(ctx, RuntimeModelRequest{
@@ -156,7 +156,7 @@ func (s *Service) ResolveRuntimeConfiguration(
 
 func (s *Service) MapModelTarget(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (resolve.MappedTarget, error) {
 	if err := s.ready(ctx); err != nil {
 		return resolve.MappedTarget{}, err

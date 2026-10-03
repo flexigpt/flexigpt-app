@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
 )
@@ -16,9 +16,9 @@ import (
 // Root or resolving any Models.
 func (s *ManagementStoreFacade) SelectDefaultProvider(
 	ctx context.Context,
-	preferred *artifact.ArtifactRef,
+	preferred *artifactModel.ArtifactRef,
 	baseName spec.LogicalName,
-) (*artifact.ArtifactRef, error) {
+) (*artifactModel.ArtifactRef, error) {
 	if s == nil || s.api == nil {
 		return nil, spec.ErrClosed
 	}
@@ -35,7 +35,7 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 				return nil, err
 			}
 		} else if record.Kind == modelDomain.ModelProviderArtifactKind &&
-			record.State == artifact.StateAvailable &&
+			record.State == artifactModel.StateAvailable &&
 			record.Enabled {
 			ref := record.Ref()
 			return &ref, nil
@@ -43,7 +43,7 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 	}
 
 	enabled := true
-	options := catalog.ListOptions{
+	options := catalogModel.ListOptions{
 		Kind:    modelDomain.ModelProviderArtifactKind,
 		Enabled: &enabled,
 	}
@@ -82,7 +82,7 @@ func (s *ManagementStoreFacade) SelectDefaultProvider(
 // preference. Default-provider reads retain their normal fallback behavior.
 func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	if s == nil || s.api == nil {
 		return spec.ErrClosed
@@ -102,7 +102,7 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 	if err != nil {
 		return err
 	}
-	if record.State != artifact.StateAvailable || !record.Enabled {
+	if record.State != artifactModel.StateAvailable || !record.Enabled {
 		return fmt.Errorf(
 			"%w: Model Provider %q must be enabled before it can be selected as default",
 			spec.ErrReferenceUnresolved,
@@ -128,13 +128,13 @@ func (s *ManagementStoreFacade) RequireSettableDefaultProvider(
 }
 
 func firstAvailableProviderRef(
-	entries []catalog.Entry,
-) *artifact.ArtifactRef {
-	var first *catalog.Entry
+	entries []catalogModel.Entry,
+) *artifactModel.ArtifactRef {
+	var first *catalogModel.Entry
 	for index := range entries {
 		entry := &entries[index]
 		if entry.Kind != modelDomain.ModelProviderArtifactKind ||
-			entry.State != artifact.StateAvailable ||
+			entry.State != artifactModel.StateAvailable ||
 			!entry.Enabled {
 			continue
 		}

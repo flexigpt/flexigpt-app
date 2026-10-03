@@ -7,7 +7,7 @@ import (
 	"slices"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 )
@@ -44,20 +44,20 @@ func NewDocument(
 
 func DefinitionForDocument(
 	input ServerDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	if err := input.Validate(); err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 
 	decl, err := declarationForDocument(input)
 	if err != nil {
-		return definition.Definition{}, err
+		return definitionModel.Definition{}, err
 	}
 	return mcpv1.DefinitionForDeclaration(decl)
 }
 
 func ServerDocumentFromDefinition(
-	input definition.Definition,
+	input definitionModel.Definition,
 ) (ServerDocument, error) {
 	if err := input.Validate(); err != nil {
 		return ServerDocument{}, err
@@ -116,7 +116,7 @@ func ServerDocumentFromDefinition(
 
 func DefinitionForMCPDeclaration(
 	input mcpv1.MCPDocument,
-) (definition.Definition, error) {
+) (definitionModel.Definition, error) {
 	return mcpv1.DefinitionForDeclaration(input)
 }
 
@@ -204,8 +204,8 @@ func configurationFromDeclaration(
 
 func PolicyReferenceSelector(
 	name spec.LogicalName,
-) definition.Selector {
-	return definition.Selector{
+) definitionModel.Selector {
+	return definitionModel.Selector{
 		Kind:        mcpDomain.MCPPolicyArtifactKind,
 		LogicalName: name,
 	}

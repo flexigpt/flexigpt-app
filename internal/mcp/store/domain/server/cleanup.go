@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sort"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainSecret "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/secret"
 )
@@ -30,7 +30,7 @@ type SecretCleaner interface {
 // previous Artifact.Data or overlay value.
 func CleanupUnboundServerSecrets(
 	ctx context.Context,
-	server artifact.ArtifactRef,
+	server artifactModel.ArtifactRef,
 	document ServerDocument,
 	data ServerData,
 	cleaner SecretCleaner,

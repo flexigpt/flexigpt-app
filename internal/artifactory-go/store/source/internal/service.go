@@ -8,8 +8,8 @@ import (
 	"fmt"
 
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -18,8 +18,8 @@ import (
 type rootReader interface {
 	Get(
 		ctx context.Context,
-		id root.RootID,
-	) (root.Root, error)
+		id rootModel.RootID,
+	) (rootModel.Root, error)
 }
 
 type Service struct {
@@ -27,7 +27,7 @@ type Service struct {
 	registry   *Registry
 	roots      rootReader
 	clock      clockutil.Clock
-	policy     root.RootPolicy
+	policy     rootModel.RootPolicy
 }
 
 func NewService(
@@ -35,7 +35,7 @@ func NewService(
 	registry *Registry,
 	roots rootReader,
 	timeClock clockutil.Clock,
-	policy root.RootPolicy,
+	policy rootModel.RootPolicy,
 ) (*Service, error) {
 	if repository == nil || registry == nil || roots == nil || timeClock == nil {
 		return nil, fmt.Errorf(
@@ -54,9 +54,9 @@ func NewService(
 
 func (s *Service) Create(
 	ctx context.Context,
-	rootID root.RootID,
-	draft source.Draft,
-) (source.Summary, error) {
+	rootID rootModel.RootID,
+	draft sourceModel.Draft,
+) (sourceModel.Summary, error) {
 	value, _, err := s.CreateWithStatus(ctx, rootID, draft)
 	return value, err
 }
@@ -66,48 +66,48 @@ func (s *Service) Create(
 // compared because the owner may reconcile them after ensure.
 func (s *Service) Ensure(
 	ctx context.Context,
-	rootID root.RootID,
-	draft source.Draft,
-) (source.Summary, bool, error) {
+	rootID rootModel.RootID,
+	draft sourceModel.Draft,
+) (sourceModel.Summary, bool, error) {
 	if ctx == nil {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: Source ensure context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.ID.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.StorageKey.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.Kind.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := spec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 
 	rootValue, err := s.roots.Get(ctx, rootID)
 	if err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	adapter, found := s.registry.adapter(draft.Kind)
 	if !found {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source adapter %q",
 			spec.ErrSourceUnavailable,
 			draft.Kind,
@@ -115,17 +115,17 @@ func (s *Service) Ensure(
 	}
 	normalizedConfig, err := adapter.NormalizeConfig(ctx, draft.Config)
 	if err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	normalizedConfig, err = jsonutil.CanonicalizeObject(
 		normalizedConfig,
 		spec.MaxConfigBytes,
 	)
 	if err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.Discovery.Normalized().Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 
 	existing, err := s.repository.FindByStorageKey(
@@ -135,7 +135,7 @@ func (s *Service) Ensure(
 	)
 	if err == nil {
 		if existing.RetiredAt != nil {
-			return source.Summary{}, false, fmt.Errorf(
+			return sourceModel.Summary{}, false, fmt.Errorf(
 				"%w: Source %q is retired",
 				spec.ErrRetired,
 				existing.ID,
@@ -148,7 +148,7 @@ func (s *Service) Ensure(
 			draft,
 			normalizedConfig,
 		) {
-			return source.Summary{}, false, fmt.Errorf(
+			return sourceModel.Summary{}, false, fmt.Errorf(
 				"%w: Source storage key %q identifies another physical Source",
 				spec.ErrConflict,
 				draft.StorageKey,
@@ -158,7 +158,7 @@ func (s *Service) Ensure(
 	}
 	if !errors.Is(err, spec.ErrSourceNotFound) &&
 		!errors.Is(err, spec.ErrNotFound) {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 
 	return s.CreateWithStatus(ctx, rootID, draft)
@@ -172,47 +172,47 @@ func (s *Service) Ensure(
 // discarding a Source that existed before the current request.
 func (s *Service) CreateWithStatus(
 	ctx context.Context,
-	rootID root.RootID,
-	draft source.Draft,
-) (source.Summary, bool, error) {
+	rootID rootModel.RootID,
+	draft sourceModel.Draft,
+) (sourceModel.Summary, bool, error) {
 	if ctx == nil {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source creation context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	rootValue, err := s.roots.Get(ctx, rootID)
 	if err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.ID.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.StorageKey.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := draft.Kind.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	if err := spec.ValidateRequiredText(
 		"source display name",
 		draft.DisplayName,
 		spec.MaxDisplayNameBytes,
 	); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	adapter, exists := s.registry.adapter(draft.Kind)
 	if !exists {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source adapter %q",
 			spec.ErrSourceUnavailable,
 			draft.Kind,
@@ -220,26 +220,26 @@ func (s *Service) CreateWithStatus(
 	}
 	config, err := adapter.NormalizeConfig(ctx, draft.Config)
 	if err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 	config, err = jsonutil.CanonicalizeObject(
 		config,
 		spec.MaxConfigBytes,
 	)
 	if err != nil {
-		return source.Summary{}, false, fmt.Errorf("%w: source config: %w", spec.ErrInvalid, err)
+		return sourceModel.Summary{}, false, fmt.Errorf("%w: source config: %w", spec.ErrInvalid, err)
 	}
 
 	discovery := draft.Discovery.Normalized()
 	if err := discovery.Validate(); err != nil {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"source discovery: %w",
 			err,
 		)
 	}
 
 	now := clockutil.NowUTC(s.clock)
-	value := source.Source{
+	value := sourceModel.Source{
 		ID:             draft.ID,
 		RootID:         rootID,
 		RootStorageKey: rootValue.StorageKey,
@@ -254,7 +254,7 @@ func (s *Service) CreateWithStatus(
 		ModifiedAt:     now,
 	}
 	if err := value.Validate(); err != nil {
-		return source.Summary{}, false, err
+		return sourceModel.Summary{}, false, err
 	}
 
 	// A caller-supplied Source ID is the create replay identity. Check for a
@@ -266,7 +266,7 @@ func (s *Service) CreateWithStatus(
 		if sourceCreationIntentMatches(existing, value) {
 			return existing.Summary(), false, nil
 		}
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
 			spec.ErrConflict,
 			draft.ID,
@@ -274,7 +274,7 @@ func (s *Service) CreateWithStatus(
 
 	case !errors.Is(lookupErr, spec.ErrSourceNotFound) &&
 		!errors.Is(lookupErr, spec.ErrNotFound):
-		return source.Summary{}, false, lookupErr
+		return sourceModel.Summary{}, false, lookupErr
 	}
 
 	var bootstrapper ManagedSourceBootstrapper
@@ -297,7 +297,7 @@ func (s *Service) CreateWithStatus(
 			ctx,
 			value.Clone(),
 		); err != nil {
-			return source.Summary{}, false, cleanupBootstrap(err)
+			return sourceModel.Summary{}, false, cleanupBootstrap(err)
 		}
 	}
 
@@ -310,7 +310,7 @@ func (s *Service) CreateWithStatus(
 		// bootstrapped directory after attempting metadata publication:
 		// the Source row may already be durable and must never point to
 		// deleted managed content.
-		return source.Summary{}, false, createErr
+		return sourceModel.Summary{}, false, createErr
 	}
 
 	existing, lookupErr = s.repository.Get(ctx, rootID, draft.ID)
@@ -321,16 +321,16 @@ func (s *Service) CreateWithStatus(
 		// created for this failed attempt can be safely compensated.
 		if errors.Is(lookupErr, spec.ErrSourceNotFound) ||
 			errors.Is(lookupErr, spec.ErrNotFound) {
-			return source.Summary{}, false, cleanupBootstrap(createErr)
+			return sourceModel.Summary{}, false, cleanupBootstrap(createErr)
 		}
 
 		// A non-not-found lookup failure may follow an ambiguous repository
 		// result. Preserve the bootstrapped directory rather than risking
 		// deletion of content referenced by a durable Source row.
-		return source.Summary{}, false, createErr
+		return sourceModel.Summary{}, false, createErr
 	}
 	if !sourceCreationIntentMatches(existing, value) {
-		return source.Summary{}, false, fmt.Errorf(
+		return sourceModel.Summary{}, false, fmt.Errorf(
 			"%w: source %q creation intent differs",
 			spec.ErrConflict,
 			draft.ID,
@@ -340,8 +340,8 @@ func (s *Service) CreateWithStatus(
 }
 
 func sourceCreationIntentMatches(
-	existing source.Source,
-	requested source.Source,
+	existing sourceModel.Source,
+	requested sourceModel.Source,
 ) bool {
 	return existing.ID == requested.ID &&
 		existing.RootID == requested.RootID &&
@@ -355,10 +355,10 @@ func sourceCreationIntentMatches(
 }
 
 func sameEnsuredSource(
-	existing source.Source,
-	rootID root.RootID,
+	existing sourceModel.Source,
+	rootID rootModel.RootID,
 	rootStorageKey spec.StorageKey,
-	draft source.Draft,
+	draft sourceModel.Draft,
 	normalizedConfig json.RawMessage,
 ) bool {
 	return existing.RootID == rootID &&
@@ -370,26 +370,26 @@ func sameEnsuredSource(
 
 func (s *Service) Get(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
-) (source.Summary, error) {
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
+) (sourceModel.Summary, error) {
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := id.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	value, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return value.Summary(), nil
 }
 
 func (s *Service) List(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]source.Summary, error) {
+	rootID rootModel.RootID,
+) ([]sourceModel.Summary, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -397,7 +397,7 @@ func (s *Service) List(
 	if err != nil {
 		return nil, err
 	}
-	output := make([]source.Summary, len(values))
+	output := make([]sourceModel.Summary, len(values))
 	for index, value := range values {
 		output[index] = value.Summary()
 	}
@@ -406,31 +406,31 @@ func (s *Service) List(
 
 func (s *Service) Update(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
-	update source.Update,
-) (source.Summary, error) {
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
+	update sourceModel.Update,
+) (sourceModel.Summary, error) {
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := id.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if update.ExpectedRevision == 0 {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if current.Revision != update.ExpectedRevision {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
 			spec.ErrConflict,
 			id,
@@ -439,7 +439,7 @@ func (s *Service) Update(
 
 	adapter, exists := s.registry.adapter(current.Kind)
 	if !exists {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: source adapter %q",
 			spec.ErrSourceUnavailable,
 			current.Kind,
@@ -453,14 +453,14 @@ func (s *Service) Update(
 			append(json.RawMessage(nil), update.Config...),
 		)
 		if err != nil {
-			return source.Summary{}, err
+			return sourceModel.Summary{}, err
 		}
 		normalized, err = jsonutil.CanonicalizeObject(
 			normalized,
 			spec.MaxConfigBytes,
 		)
 		if err != nil {
-			return source.Summary{}, err
+			return sourceModel.Summary{}, err
 		}
 		config = normalized
 	}
@@ -469,7 +469,7 @@ func (s *Service) Update(
 	if update.Discovery != nil {
 		discovery = update.Discovery.Normalized()
 		if err := discovery.Validate(); err != nil {
-			return source.Summary{}, fmt.Errorf(
+			return sourceModel.Summary{}, fmt.Errorf(
 				"source discovery: %w",
 				err,
 			)
@@ -491,53 +491,53 @@ func (s *Service) Update(
 	}
 
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
 	}
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := s.repository.Update(ctx, next, update.ExpectedRevision); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return next.Summary(), nil
 }
 
 func (s *Service) Retire(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
-) (source.Summary, error) {
+) (sourceModel.Summary, error) {
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := id.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if expectedRevision == 0 {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: source %q changed since it was read",
 			spec.ErrConflict,
 			id,
 		)
 	}
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
 	}
 	now := clockutil.Next(s.clock, current.ModifiedAt)
 	next := current
@@ -546,10 +546,10 @@ func (s *Service) Retire(
 	next.ModifiedAt = now
 	next.Revision++
 	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := s.repository.Retire(ctx, next, expectedRevision); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return next.Summary(), nil
 }
@@ -559,8 +559,8 @@ func (s *Service) Retire(
 // limited to active Sources with no Artifact or refresh-state records.
 func (s *Service) Discard(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	if ctx == nil {
@@ -616,8 +616,8 @@ func (s *Service) Discard(
 
 func (s *Service) Purge(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
 ) error {
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
@@ -643,30 +643,30 @@ func (s *Service) Purge(
 // read from a confirmed snapshot when needed.
 func (s *Service) MarkContentChanged(
 	ctx context.Context,
-	rootID root.RootID,
-	id source.SourceID,
+	rootID rootModel.RootID,
+	id sourceModel.SourceID,
 	expectedRevision uint64,
-) (source.Summary, error) {
+) (sourceModel.Summary, error) {
 	if err := rootimpl.RequireMutableRoot(ctx, s.policy, rootID); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if ctx == nil {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: source content-change context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := id.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if expectedRevision == 0 {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: expected source revision is required",
 			spec.ErrInvalid,
 		)
@@ -674,34 +674,34 @@ func (s *Service) MarkContentChanged(
 
 	current, err := s.repository.Get(ctx, rootID, id)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if current.Revision != expectedRevision {
-		return source.Summary{}, spec.ErrConflict
+		return sourceModel.Summary{}, spec.ErrConflict
 	}
 	if current.Revision == ^uint64(0) {
-		return source.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
+		return sourceModel.Summary{}, fmt.Errorf("%w: source revision is exhausted", spec.ErrInvalid)
 	}
 
 	next := current.Clone()
 	next.Revision++
 	next.ModifiedAt = clockutil.Next(s.clock, current.ModifiedAt)
 	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := s.repository.Update(ctx, next, expectedRevision); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	return next.Summary(), nil
 }
 
-func (s *Service) Kinds() []source.SourceKind {
+func (s *Service) Kinds() []sourceModel.SourceKind {
 	return s.registry.Kinds()
 }
 
 func (s *Service) discardManagedStorage(
 	ctx context.Context,
-	value source.Source,
+	value sourceModel.Source,
 ) error {
 	adapter, exists := s.registry.adapter(value.Kind)
 	if !exists {

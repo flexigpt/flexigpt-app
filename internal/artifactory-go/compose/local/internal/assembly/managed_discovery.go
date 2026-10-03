@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -16,8 +16,8 @@ import (
 // refresh, avoiding a second refresh after every managed deletion.
 func (c *Components) pruneManagedDeclarationDiscovery(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
 	locator spec.Locator,
 ) (managedpackageimpl.SourceState, error) {
@@ -106,7 +106,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	}
 	if !inScope {
 		hints := make(
-			[]source.DecoderHint,
+			[]sourceModel.DecoderHint,
 			0,
 			len(next.DecoderHints),
 		)
@@ -132,7 +132,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 	}
 
 	if next.Empty() {
-		next = source.DiscoverySpec{}
+		next = sourceModel.DiscoverySpec{}
 	} else {
 		next = next.Normalized()
 	}
@@ -144,7 +144,7 @@ func (c *Components) pruneManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: current.Revision,
 			DisplayName:      current.DisplayName,
 			Enabled:          current.Enabled,

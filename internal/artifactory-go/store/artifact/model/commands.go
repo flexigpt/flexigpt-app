@@ -1,8 +1,8 @@
 package model
 
 import (
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -13,31 +13,31 @@ import (
 // content, refreshes the Source, and verifies that the expected source-backed
 // Artifact exists with the requested identity and Definition digest.
 type PublishArtifactRequest struct {
-	RootID                  root.RootID                      `json:"rootID"`
-	Binding                 SourceBinding                    `json:"binding"`
-	ExpectedKind            ArtifactKind                     `json:"expectedKind"`
-	ExpectedLogicalName     spec.LogicalName                 `json:"expectedLogicalName"`
-	ExpectedDefinition      cryptoutil.Digest                `json:"expectedDefinition"`
-	Package                 source.ManagedPackagePublication `json:"package"`
-	AllowPackageReplacement bool                             `json:"allowPackageReplacement,omitempty"`
-	AllowProtected          bool                             `json:"allowProtected"`
+	RootID                  rootModel.RootID                      `json:"rootID"`
+	Binding                 SourceBinding                         `json:"binding"`
+	ExpectedKind            ArtifactKind                          `json:"expectedKind"`
+	ExpectedLogicalName     spec.LogicalName                      `json:"expectedLogicalName"`
+	ExpectedDefinition      cryptoutil.Digest                     `json:"expectedDefinition"`
+	Package                 sourceModel.ManagedPackagePublication `json:"package"`
+	AllowPackageReplacement bool                                  `json:"allowPackageReplacement,omitempty"`
+	AllowProtected          bool                                  `json:"allowProtected"`
 }
 
 type PublishArtifactResult struct {
-	Artifact   Artifact       `json:"artifact"`
-	Source     source.Summary `json:"source"`
-	Generation string         `json:"generation"`
-	Refreshed  bool           `json:"refreshed"`
+	Artifact   Artifact            `json:"artifact"`
+	Source     sourceModel.Summary `json:"source"`
+	Generation string              `json:"generation"`
+	Refreshed  bool                `json:"refreshed"`
 }
 
 // RemoveArtifactRequest removes one managed Source package. The Artifact
 // record remains in the Store as missing local state until explicitly purged.
 type RemoveArtifactRequest struct {
-	RootID             root.RootID                  `json:"rootID"`
-	SourceID           source.SourceID              `json:"sourceID"`
-	Package            source.ManagedPackageAddress `json:"package"`
-	ExpectedGeneration string                       `json:"expectedGeneration,omitempty"`
-	ExpectedArtifact   *ArtifactRef                 `json:"expectedArtifact,omitempty"`
+	RootID             rootModel.RootID                  `json:"rootID"`
+	SourceID           sourceModel.SourceID              `json:"sourceID"`
+	Package            sourceModel.ManagedPackageAddress `json:"package"`
+	ExpectedGeneration string                            `json:"expectedGeneration,omitempty"`
+	ExpectedArtifact   *ArtifactRef                      `json:"expectedArtifact,omitempty"`
 
 	// PruneDiscoveryLocator removes one exact explicit declaration candidate
 	// after source-side package removal and before the final Source refresh.

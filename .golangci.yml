@@ -85,7 +85,7 @@ linters:
     - govet
 
     # Checks import alias consistency.
-    # - importas
+    - importas
 
     # Reports interfaces with unnamed method parameters.
     - inamedparam

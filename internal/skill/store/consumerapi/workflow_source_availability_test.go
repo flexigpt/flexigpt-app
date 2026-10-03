@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 )
@@ -73,7 +73,7 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		ctx,
 		registered.Source.RootID,
 		registered.Source.ID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: registered.Source.Revision,
 			DisplayName:      registered.Source.DisplayName,
 			Enabled:          false,
@@ -89,11 +89,11 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		registered.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if missing.State != artifact.StateMissing {
+	if missing.State != artifactModel.StateMissing {
 		t.Fatalf(
 			"Skill state after Source disable=%q, want %q",
 			missing.State,
-			artifact.StateMissing,
+			artifactModel.StateMissing,
 		)
 	}
 	if missing.ResolvedDefinition != nil {
@@ -114,11 +114,11 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 	if !found {
 		t.Fatalf("missing Skill %q disappeared from ListSkills", skillName)
 	}
-	if listedMissing.State != artifact.StateMissing {
+	if listedMissing.State != artifactModel.StateMissing {
 		t.Fatalf(
 			"listed missing Skill state=%q, want %q",
 			listedMissing.State,
-			artifact.StateMissing,
+			artifactModel.StateMissing,
 		)
 	}
 
@@ -134,7 +134,7 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 		ctx,
 		disabledSource.RootID,
 		disabledSource.ID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: disabledSource.Revision,
 			DisplayName:      disabledSource.DisplayName,
 			Enabled:          true,
@@ -156,11 +156,11 @@ func TestSkillStoreWorkflowRecoversAfterSourceDisableAndReenable(
 
 	restored, err := fixture.api.GetSkill(ctx, missing.Ref())
 	requireNoError(t, err)
-	if restored.State != artifact.StateAvailable {
+	if restored.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"Skill state after Source recovery=%q, want %q",
 			restored.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if restored.ResolvedDefinition == nil {

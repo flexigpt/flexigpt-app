@@ -6,14 +6,14 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
 )
 
 func (a *StoreAPI) resolveCurrentWorkspace(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (
 	workspaceDomain.Workspace,
 	*resolve.ResolvedEntry,
@@ -52,7 +52,7 @@ func (a *StoreAPI) resolveCurrentWorkspace(
 // effective and enabled Workspace. Management projections use workspaceForRef.
 func (a *StoreAPI) resolveWorkspace(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
 	if err := ref.Validate(); err != nil {
 		return workspaceDomain.Workspace{}, err
@@ -69,7 +69,7 @@ func (a *StoreAPI) resolveWorkspace(
 
 func (a *StoreAPI) workspaceForRef(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (workspaceDomain.Workspace, error) {
 	if a.resolver != nil {
 		terminal, err := a.resolver.ResolveTerminalArtifact(ctx, ref)

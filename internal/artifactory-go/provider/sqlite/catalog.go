@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"sort"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -142,9 +142,9 @@ const artifactGetManyChunkSize = 256
 
 func (s *Store) listArtifactCatalogByRoot(
 	ctx context.Context,
-	rootID root.RootID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -172,10 +172,10 @@ func (s *Store) listArtifactCatalogByRoot(
 
 func (s *Store) listArtifactCatalogBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -209,11 +209,11 @@ func (s *Store) listArtifactCatalogBySource(
 
 func (s *Store) findArtifactCatalogByIdentity(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
-	options catalog.ListOptions,
-) ([]catalog.Entry, error) {
+	options catalogModel.ListOptions,
+) ([]catalogModel.Entry, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -250,13 +250,13 @@ func (s *Store) findArtifactCatalogByIdentity(
 
 func (s *Store) getArtifactsByReferences(
 	ctx context.Context,
-	refs []artifact.ArtifactRef,
-) ([]artifact.Artifact, error) {
+	refs []artifactModel.ArtifactRef,
+) ([]artifactModel.Artifact, error) {
 	if len(refs) == 0 {
-		return []artifact.Artifact{}, nil
+		return []artifactModel.Artifact{}, nil
 	}
 
-	output := make([]artifact.Artifact, 0, len(refs))
+	output := make([]artifactModel.Artifact, 0, len(refs))
 	for start := 0; start < len(refs); start += artifactGetManyChunkSize {
 		end := min(start+artifactGetManyChunkSize, len(refs))
 
@@ -294,7 +294,7 @@ func (s *Store) getArtifactsByReferences(
 }
 
 func catalogListFilterArguments(
-	options catalog.ListOptions,
+	options catalogModel.ListOptions,
 ) ([]any, error) {
 	if options.Kind != "" {
 		if err := options.Kind.Validate(); err != nil {
@@ -344,8 +344,8 @@ func catalogListFilterArguments(
 
 func scanArtifactCatalogEntries(
 	rows *sql.Rows,
-) ([]catalog.Entry, error) {
-	output := make([]catalog.Entry, 0)
+) ([]catalogModel.Entry, error) {
+	output := make([]catalogModel.Entry, 0)
 	for rows.Next() {
 		value, err := scanArtifactCatalogEntry(rows)
 		if err != nil {
@@ -361,7 +361,7 @@ func scanArtifactCatalogEntries(
 
 func scanArtifactCatalogEntry(
 	row scanner,
-) (catalog.Entry, error) {
+) (catalogModel.Entry, error) {
 	var (
 		id, rootID, sourceID, locator, subresource string
 		kind, logicalName, logicalVersion          string
@@ -397,35 +397,35 @@ func scanArtifactCatalogEntry(
 		&schemaVersion,
 		&description,
 	); err != nil {
-		return catalog.Entry{}, err
+		return catalogModel.Entry{}, err
 	}
 
-	value := catalog.Entry{
-		ID:     artifact.ArtifactID(id),
-		RootID: root.RootID(rootID),
-		Binding: artifact.SourceBinding{
-			SourceID:           source.SourceID(sourceID),
+	value := catalogModel.Entry{
+		ID:     artifactModel.ArtifactID(id),
+		RootID: rootModel.RootID(rootID),
+		Binding: artifactModel.SourceBinding{
+			SourceID:           sourceModel.SourceID(sourceID),
 			Locator:            spec.Locator(locator),
 			SubresourceLocator: spec.SubresourceLocator(subresource),
 		},
-		Kind:           artifact.ArtifactKind(kind),
+		Kind:           artifactModel.ArtifactKind(kind),
 		LogicalName:    spec.LogicalName(logicalName),
 		LogicalVersion: spec.LogicalVersion(logicalVersion),
 		DisplayName:    displayName,
-		State:          artifact.State(state),
+		State:          artifactModel.State(state),
 		Enabled:        enabled != 0,
 		Revision:       revision,
-		Source: catalog.SourceMetadata{
-			ID:         source.SourceID(sourceID),
-			Kind:       source.SourceKind(sourceKind),
+		Source: catalogModel.SourceMetadata{
+			ID:         sourceModel.SourceID(sourceID),
+			Kind:       sourceModel.SourceKind(sourceKind),
 			StorageKey: spec.StorageKey(sourceStorageKey),
 			Enabled:    sourceEnabled != 0,
 		},
 	}
 	if definitionDigest.Valid {
-		value.Definition = &catalog.DefinitionMetadata{
+		value.Definition = &catalogModel.DefinitionMetadata{
 			Digest:        cryptoutil.Digest(definitionDigest.String),
-			SchemaID:      schema.SchemaID(schemaID.String),
+			SchemaID:      schemaModel.SchemaID(schemaID.String),
 			SchemaVersion: schemaVersion.String,
 			Description:   description.String,
 		}

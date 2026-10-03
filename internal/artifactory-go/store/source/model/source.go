@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -35,15 +35,15 @@ func (v SourceKind) Validate() error {
 }
 
 type Source struct {
-	ID             SourceID        `json:"id"`
-	RootID         root.RootID     `json:"rootID"`
-	RootStorageKey spec.StorageKey `json:"rootStorageKey"`
-	StorageKey     spec.StorageKey `json:"storageKey"`
-	Kind           SourceKind      `json:"kind"`
-	DisplayName    string          `json:"displayName"`
-	Enabled        bool            `json:"enabled"`
-	Config         json.RawMessage `json:"-"`
-	Discovery      DiscoverySpec   `json:"discovery"`
+	ID             SourceID         `json:"id"`
+	RootID         rootModel.RootID `json:"rootID"`
+	RootStorageKey spec.StorageKey  `json:"rootStorageKey"`
+	StorageKey     spec.StorageKey  `json:"storageKey"`
+	Kind           SourceKind       `json:"kind"`
+	DisplayName    string           `json:"displayName"`
+	Enabled        bool             `json:"enabled"`
+	Config         json.RawMessage  `json:"-"`
+	Discovery      DiscoverySpec    `json:"discovery"`
 
 	Revision   uint64     `json:"revision"`
 	CreatedAt  time.Time  `json:"createdAt"`

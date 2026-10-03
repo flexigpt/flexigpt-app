@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
-	topology "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
@@ -58,7 +58,7 @@ func initMCPWrappers(
 	secretBindings secret.API,
 	secretRuntime secret.RuntimeAPI,
 	localState artifactcleanup.API,
-	hydrator topology.CompiledHydrationCoordinator,
+	hydrator installModel.CompiledHydrationCoordinator,
 	locatorResolvers []provider.LocatorResolverFactory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
@@ -270,7 +270,7 @@ func initMCPWrappers(
 }
 
 func newMCPBuiltInInstaller(
-	hydrator topology.CompiledHydrationCoordinator,
+	hydrator installModel.CompiledHydrationCoordinator,
 	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
 ) (builtin.HydrationInstaller, error) {
 	if hydrator == nil || cleanup == nil {

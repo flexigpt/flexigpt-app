@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -16,16 +16,16 @@ import (
 // Local DisplayName, Enabled, and Data are intentionally absent so refresh
 // cannot overwrite consumer-controlled local state.
 type SourceStateUpdate struct {
-	ArtifactID artifact.ArtifactID `json:"artifactID"`
-	RootID     root.RootID         `json:"rootID"`
+	ArtifactID artifactModel.ArtifactID `json:"artifactID"`
+	RootID     rootModel.RootID         `json:"rootID"`
 
-	Binding        artifact.SourceBinding `json:"binding"`
-	LogicalName    spec.LogicalName       `json:"logicalName"`
-	LogicalVersion spec.LogicalVersion    `json:"logicalVersion,omitempty"`
+	Binding        artifactModel.SourceBinding `json:"binding"`
+	LogicalName    spec.LogicalName            `json:"logicalName"`
+	LogicalVersion spec.LogicalVersion         `json:"logicalVersion,omitempty"`
 
 	ResolvedDefinition  *cryptoutil.Digest      `json:"resolvedDefinition,omitempty"`
 	SourceContentDigest *cryptoutil.Digest      `json:"sourceContentDigest,omitempty"`
-	State               artifact.State          `json:"state"`
+	State               artifactModel.State     `json:"state"`
 	Diagnostics         []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 
 	Revision         uint64    `json:"revision"`
@@ -82,14 +82,14 @@ func (u SourceStateUpdate) Clone() SourceStateUpdate {
 }
 
 type Synchronization struct {
-	Creates     []artifact.Artifact
+	Creates     []artifactModel.Artifact
 	Updates     []SourceStateUpdate
 	Diagnostics []diagnostic.Diagnostic
 }
 
 func (s Synchronization) Clone() Synchronization {
 	output := s
-	output.Creates = make([]artifact.Artifact, len(s.Creates))
+	output.Creates = make([]artifactModel.Artifact, len(s.Creates))
 	for index, value := range s.Creates {
 		output.Creates[index] = value.Clone()
 	}

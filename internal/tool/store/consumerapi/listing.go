@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	toolDomain "github.com/flexigpt/flexigpt-app/internal/tool/store/domain"
@@ -25,7 +25,7 @@ func (a *API) listCollectionTools(
 	entries, err := a.cat.ListByRoot(
 		ctx,
 		a.builtinRoot,
-		catalog.ListOptions{Kind: toolDomain.ToolArtifactKind},
+		catalogModel.ListOptions{Kind: toolDomain.ToolArtifactKind},
 	)
 	if err != nil {
 		return nil, err
@@ -34,7 +34,7 @@ func (a *API) listCollectionTools(
 	output := make([]ToolListItem, 0, len(allowed))
 	for _, entry := range entries {
 		if entry.Kind != toolDomain.ToolArtifactKind ||
-			entry.State != artifact.StateAvailable {
+			entry.State != artifactModel.StateAvailable {
 			continue
 		}
 		if _, found := allowed[entry.LogicalName]; !found {

@@ -4,9 +4,9 @@ import (
 	"context"
 	"slices"
 
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -26,8 +26,8 @@ const (
 // calculation, and source generation confirmation. A decoder receives only
 // the candidate bytes and generic source identity.
 type Candidate struct {
-	SourceID            source.SourceID
-	SourceKind          source.SourceKind
+	SourceID            sourceModel.SourceID
+	SourceKind          sourceModel.SourceKind
 	Locator             spec.Locator
 	SourceContentDigest cryptoutil.Digest
 	Content             []byte
@@ -68,7 +68,7 @@ type Decoded struct {
 	OriginLocator       spec.Locator
 	OriginContentDigest *cryptoutil.Digest
 
-	Definition  definition.Definition
+	Definition  definitionModel.Definition
 	Diagnostics []diagnostic.Diagnostic
 }
 
@@ -110,7 +110,7 @@ type SourceAwareDecoder interface {
 //
 // This replaces direct decoder dependencies on *jsonschema.Registry.
 type SchemaCanonicalizerBinder interface {
-	RequiredSchemaKeys() []schema.Key
+	RequiredSchemaKeys() []schemaModel.Key
 
 	BindExpectedCanonicalizer(
 		schemas SchemaCatalog,

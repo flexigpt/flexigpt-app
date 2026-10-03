@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -280,11 +280,11 @@ func TestSkillStoreWorkflowAttachesExternalSkillWithoutTakingOwnership(
 		external.Artifact.Ref(),
 	)
 	requireNoError(t, err)
-	if externalAfterCleanup.State != artifact.StateAvailable {
+	if externalAfterCleanup.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"external Skill state after Collection cleanup=%q, want %q",
 			externalAfterCleanup.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 }

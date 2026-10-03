@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -37,7 +37,7 @@ func (c *Components) PrepareTopologyHydrations(
 
 	currentByInstaller := make(map[string]bool, len(desiredValues))
 	seenInstallers := make(map[string]struct{}, len(desiredValues))
-	resetInstallerByRoot := make(map[root.RootID]string)
+	resetInstallerByRoot := make(map[rootModel.RootID]string)
 
 	for _, desired := range desiredValues {
 		if err := desired.Validate(); err != nil {
@@ -86,7 +86,7 @@ func (c *Components) PrepareTopologyHydrations(
 		}
 	}
 
-	orderedRoots := make([]root.RootID, 0, len(resetInstallerByRoot))
+	orderedRoots := make([]rootModel.RootID, 0, len(resetInstallerByRoot))
 	for rootID := range resetInstallerByRoot {
 		orderedRoots = append(orderedRoots, rootID)
 	}
@@ -193,7 +193,7 @@ func equalTopologyHydration(
 func (c *Components) ResetTopologyHydration(
 	ctx context.Context,
 	installerName string,
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) error {
 	if c == nil ||
 		c.metadata == nil ||

@@ -8,7 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -21,7 +21,7 @@ func newCanonicalDecoder() *canonicalDecoder {
 	return &canonicalDecoder{}
 }
 
-func (d *canonicalDecoder) RequiredSchemaKeys() []schema.Key {
+func (d *canonicalDecoder) RequiredSchemaKeys() []schemaModel.Key {
 	return codec.SchemaKeys()
 }
 

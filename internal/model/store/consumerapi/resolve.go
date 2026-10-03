@@ -7,10 +7,10 @@ import (
 	"sort"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	catalog "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	secret "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
+	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -19,7 +19,7 @@ import (
 
 func (a *API) ResolveProvider(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedProvider, error) {
 	if err := a.ready(ctx); err != nil {
 		return ResolvedProvider{}, err
@@ -34,7 +34,7 @@ func (a *API) ResolveProvider(
 
 func (a *API) ResolveModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (ResolvedModel, error) {
 	if err := a.ready(ctx); err != nil {
 		return ResolvedModel{}, err
@@ -150,7 +150,7 @@ func (a *API) resolveProvider(
 		return ResolvedProvider{}, err
 	}
 
-	var activeCredential *secret.Binding
+	var activeCredential *secretModel.Binding
 	if found && credential.Active() {
 		value := credential.Clone()
 		activeCredential = &value
@@ -166,7 +166,7 @@ func (a *API) resolveProvider(
 
 func (a *API) resolveProviderReference(
 	ctx context.Context,
-	modelRoot root.RootID,
+	modelRoot rootModel.RootID,
 	reference declaration.ArtifactNameReference,
 ) (modelDomain.Provider, error) {
 	roots, err := modelDomain.ArtifactNameReferenceLookupRoots(
@@ -214,25 +214,25 @@ func (a *API) resolveProviderReference(
 
 func (a *API) availableIdentityCandidates(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	name spec.LogicalName,
-) ([]artifact.ArtifactRef, error) {
+) ([]artifactModel.ArtifactRef, error) {
 	entries, err := a.cat.FindByIdentity(
 		ctx,
 		rootID,
 		kind,
 		name,
-		catalog.ListOptions{},
+		catalogModel.ListOptions{},
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	seen := make(map[artifact.ArtifactRef]struct{}, len(entries))
-	output := make([]artifact.ArtifactRef, 0, len(entries))
+	seen := make(map[artifactModel.ArtifactRef]struct{}, len(entries))
+	output := make([]artifactModel.ArtifactRef, 0, len(entries))
 	for _, entry := range entries {
-		if entry.State != artifact.StateAvailable {
+		if entry.State != artifactModel.StateAvailable {
 			continue
 		}
 		if _, duplicate := seen[entry.Ref()]; duplicate {
@@ -254,7 +254,7 @@ func (a *API) availableIdentityCandidates(
 // possible.
 func (a *API) ResolveProviderDefaultModel(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (DefaultModelResolution, error) {
 	if err := a.ready(ctx); err != nil {
 		return DefaultModelResolution{}, err
@@ -407,7 +407,7 @@ func (a *API) firstEnabledModelForProvider(
 	}
 
 	for _, item := range items {
-		if item.State != artifact.StateAvailable || !item.Enabled {
+		if item.State != artifactModel.StateAvailable || !item.Enabled {
 			continue
 		}
 		resolved, err := a.ResolveModel(ctx, item.Ref)
@@ -439,15 +439,15 @@ func bestEffortDefaultFailure(err error) bool {
 }
 
 type resolveModel struct {
-	Ref        artifact.ArtifactRef `json:"ref"`
-	Revision   uint64               `json:"revision"`
-	Definition cryptoutil.Digest    `json:"definition"`
+	Ref        artifactModel.ArtifactRef `json:"ref"`
+	Revision   uint64                    `json:"revision"`
+	Definition cryptoutil.Digest         `json:"definition"`
 }
 
 type resolveProvider struct {
-	Ref        artifact.ArtifactRef `json:"ref"`
-	Revision   uint64               `json:"revision"`
-	Definition cryptoutil.Digest    `json:"definition"`
+	Ref        artifactModel.ArtifactRef `json:"ref"`
+	Revision   uint64                    `json:"revision"`
+	Definition cryptoutil.Digest         `json:"definition"`
 }
 
 type resolveProviderOverlay struct {
@@ -468,7 +468,7 @@ func resolvedFingerprint(
 	m modelDomain.Model,
 	provider modelDomain.Provider,
 	providerOverlay modelOverlay.ProviderOverlay,
-	providerCredential *secret.Binding,
+	providerCredential *secretModel.Binding,
 	modelOverlayValue modelOverlay.ModelOverlay,
 	adapter AdapterDescriptor,
 ) (cryptoutil.Digest, error) {

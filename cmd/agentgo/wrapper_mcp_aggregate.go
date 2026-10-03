@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpAggregate "github.com/flexigpt/flexigpt-app/internal/mcp/aggregate"
 	mcpServer "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/server"
@@ -41,7 +41,7 @@ func withMCPAggregateError(
 }
 
 func (w *MCPAggregateWrapper) GetMCPServer(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
 		w,
@@ -52,7 +52,7 @@ func (w *MCPAggregateWrapper) GetMCPServer(
 }
 
 func (w *MCPAggregateWrapper) ListMCPCollectionServers(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) ([]mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
 		w,
@@ -74,7 +74,7 @@ func (w *MCPAggregateWrapper) GetMCPServersForRuntimeServers(
 }
 
 func (w *MCPAggregateWrapper) SaveMCPServerSettings(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedSettingsRevision uint64,
 	data mcpDomainServer.ServerData,
 ) (mcpAggregate.MCPServerDetails, error) {
@@ -92,7 +92,7 @@ func (w *MCPAggregateWrapper) SaveMCPServerSettings(
 }
 
 func (w *MCPAggregateWrapper) SetMCPServerSecret(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	input string,
 	value string,
 ) (mcpAggregate.MCPServerDetails, error) {
@@ -110,7 +110,7 @@ func (w *MCPAggregateWrapper) SetMCPServerSecret(
 }
 
 func (w *MCPAggregateWrapper) ClearMCPServerSecret(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	input string,
 ) (mcpAggregate.MCPServerDetails, error) {
 	return withMCPAggregate(
@@ -148,7 +148,7 @@ func (w *MCPAggregateWrapper) UpdateMCPServer(
 }
 
 func (w *MCPAggregateWrapper) DeleteMCPServer(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {
@@ -172,7 +172,7 @@ func (w *MCPAggregateWrapper) SaveMCPPolicy(
 }
 
 func (w *MCPAggregateWrapper) DeleteMCPPolicy(
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	return withMCPAggregateError(w, func(service *mcpAggregate.Service) error {

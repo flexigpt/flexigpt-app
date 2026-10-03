@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"sort"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 )
@@ -32,18 +32,18 @@ type ServerPage struct {
 }
 
 type RootStore interface {
-	List(ctx context.Context) ([]root.Root, error)
+	List(ctx context.Context) ([]rootModel.Root, error)
 }
 
 type Store interface {
 	ListMCPCollections(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) ([]collection.ListItem, error)
 
 	ListServers(
 		ctx context.Context,
-		rootID root.RootID,
+		rootID rootModel.RootID,
 	) ([]ServerListItem, error)
 }
 
@@ -77,9 +77,9 @@ type pageCursor struct {
 }
 
 type pageKey struct {
-	rootID root.RootID
+	rootID rootModel.RootID
 	name   spec.LogicalName
-	id     artifact.ArtifactID
+	id     artifactModel.ArtifactID
 }
 
 func (s *MCPListService) ListCollectionsPage(
@@ -104,7 +104,7 @@ func (s *MCPListService) ListCollectionsPage(
 		ctx,
 		roots,
 		cursor,
-		func(ctx context.Context, rootID root.RootID) ([]collection.ListItem, error) {
+		func(ctx context.Context, rootID rootModel.RootID) ([]collection.ListItem, error) {
 			return s.store.ListMCPCollections(ctx, rootID)
 		},
 		func(value collection.ListItem) pageKey {
@@ -149,7 +149,7 @@ func (s *MCPListService) ListServersPage(
 		ctx,
 		roots,
 		cursor,
-		func(ctx context.Context, rootID root.RootID) ([]ServerListItem, error) {
+		func(ctx context.Context, rootID rootModel.RootID) ([]ServerListItem, error) {
 			return s.store.ListServers(ctx, rootID)
 		},
 		func(value ServerListItem) pageKey {
@@ -174,7 +174,7 @@ func (s *MCPListService) ListServersPage(
 
 func (s *MCPListService) orderedRoots(
 	ctx context.Context,
-) ([]root.Root, error) {
+) ([]rootModel.Root, error) {
 	if s == nil || s.roots == nil {
 		return nil, spec.ErrClosed
 	}
@@ -200,9 +200,9 @@ func (s *MCPListService) orderedRoots(
 
 func pageAcrossRoots[T any](
 	ctx context.Context,
-	roots []root.Root,
+	roots []rootModel.Root,
 	cursor pageCursor,
-	list func(context.Context, root.RootID) ([]T, error),
+	list func(context.Context, rootModel.RootID) ([]T, error),
 	key func(T) pageKey,
 ) (items []T, next string, err error) {
 	output := make([]T, 0, cursor.PageSize)
@@ -212,7 +212,7 @@ func pageAcrossRoots[T any](
 		// their Store list calls entirely instead of relisting them on every
 		// subsequent management page.
 		if cursor.AfterRoot != "" &&
-			rootValue.ID < root.RootID(cursor.AfterRoot) {
+			rootValue.ID < rootModel.RootID(cursor.AfterRoot) {
 			continue
 		}
 
@@ -267,9 +267,9 @@ func afterCursor(value pageKey, cursor pageCursor) bool {
 	}
 	return lessPageKey(
 		pageKey{
-			rootID: root.RootID(cursor.AfterRoot),
+			rootID: rootModel.RootID(cursor.AfterRoot),
 			name:   spec.LogicalName(cursor.AfterName),
-			id:     artifact.ArtifactID(cursor.AfterID),
+			id:     artifactModel.ArtifactID(cursor.AfterID),
 		},
 		value,
 	)
@@ -324,13 +324,13 @@ func decodeCursor(
 			spec.ErrInvalid,
 		)
 	}
-	if err := root.RootID(cursor.AfterRoot).Validate(); err != nil {
+	if err := rootModel.RootID(cursor.AfterRoot).Validate(); err != nil {
 		return pageCursor{}, err
 	}
 	if err := spec.LogicalName(cursor.AfterName).Validate(); err != nil {
 		return pageCursor{}, err
 	}
-	if err := artifact.ArtifactID(cursor.AfterID).Validate(); err != nil {
+	if err := artifactModel.ArtifactID(cursor.AfterID).Validate(); err != nil {
 		return pageCursor{}, err
 	}
 	return cursor, nil

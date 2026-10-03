@@ -3,7 +3,7 @@ package internal
 import (
 	"fmt"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 )
 
 // SetRootPolicy supports multiple protected topology Roots and multiple
@@ -12,17 +12,17 @@ import (
 // Protected Roots reject ordinary descendant mutations. Retained Roots reject
 // only Root retirement and purge.
 type SetRootPolicy struct {
-	protected map[root.RootID]struct{}
-	retained  map[root.RootID]struct{}
+	protected map[rootModel.RootID]struct{}
+	retained  map[rootModel.RootID]struct{}
 }
 
 func NewSetRootPolicy(
-	protected []root.RootID,
-	retained []root.RootID,
+	protected []rootModel.RootID,
+	retained []rootModel.RootID,
 ) (*SetRootPolicy, error) {
 	value := &SetRootPolicy{
-		protected: make(map[root.RootID]struct{}, len(protected)),
-		retained:  make(map[root.RootID]struct{}, len(retained)),
+		protected: make(map[rootModel.RootID]struct{}, len(protected)),
+		retained:  make(map[rootModel.RootID]struct{}, len(retained)),
 	}
 
 	for _, rootID := range protected {
@@ -41,7 +41,7 @@ func NewSetRootPolicy(
 }
 
 func (p *SetRootPolicy) IsProtectedRoot(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) bool {
 	if p == nil {
 		return false
@@ -51,7 +51,7 @@ func (p *SetRootPolicy) IsProtectedRoot(
 }
 
 func (p *SetRootPolicy) IsRootDeletionProtected(
-	rootID root.RootID,
+	rootID rootModel.RootID,
 ) bool {
 	if p == nil {
 		return false

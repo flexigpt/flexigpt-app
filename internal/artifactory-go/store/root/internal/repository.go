@@ -3,37 +3,37 @@ package internal
 import (
 	"context"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 )
 
 type Repository interface {
 	Create(
 		ctx context.Context,
-		value root.Root,
+		value rootModel.Root,
 	) error
 
 	Get(
 		ctx context.Context,
-		id root.RootID,
-	) (root.Root, error)
+		id rootModel.RootID,
+	) (rootModel.Root, error)
 
-	List(ctx context.Context) ([]root.Root, error)
+	List(ctx context.Context) ([]rootModel.Root, error)
 
 	Update(
 		ctx context.Context,
-		value root.Root,
+		value rootModel.Root,
 		expectedRevision uint64,
 	) error
 
 	Retire(
 		ctx context.Context,
-		value root.Root,
+		value rootModel.Root,
 		expectedRevision uint64,
 	) error
 
 	Purge(
 		ctx context.Context,
-		id root.RootID,
+		id rootModel.RootID,
 		expectedRevision uint64,
 	) error
 }

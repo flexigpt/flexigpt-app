@@ -8,7 +8,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -125,11 +125,11 @@ func TestSkillStoreWorkflowManagedCollectionAndSkillLifecycle(
 	if !created.MembershipCreated {
 		t.Fatal("creating a new managed Skill did not create Collection membership")
 	}
-	if created.Artifact.State != artifact.StateAvailable {
+	if created.Artifact.State != artifactModel.StateAvailable {
 		t.Fatalf(
 			"created Skill state=%q, want %q",
 			created.Artifact.State,
-			artifact.StateAvailable,
+			artifactModel.StateAvailable,
 		)
 	}
 	if !created.Artifact.Enabled {

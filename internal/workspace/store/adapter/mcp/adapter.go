@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomainServer "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain/server"
 	workspaceDomain "github.com/flexigpt/flexigpt-app/internal/workspace/store/domain"
@@ -14,8 +14,8 @@ import (
 type ArtifactReader interface {
 	Get(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
-	) (artifact.Artifact, error)
+		ref artifactModel.ArtifactRef,
+	) (artifactModel.Artifact, error)
 }
 
 // ServerResolver is satisfied by mcp/store/consumerapi.API. Workspace only
@@ -24,18 +24,18 @@ type ArtifactReader interface {
 type ServerResolver interface {
 	ResolveMCPServer(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (mcpDomainServer.Resolved, error)
 }
 
 type WorkspaceServer struct {
-	Artifact artifact.ArtifactRef     `json:"-"`
-	Server   mcpDomainServer.Resolved `json:"-"`
+	Artifact artifactModel.ArtifactRef `json:"-"`
+	Server   mcpDomainServer.Resolved  `json:"-"`
 }
 
 type LoadPlan struct {
-	Workspace artifact.ArtifactRef `json:"-"`
-	Servers   []WorkspaceServer    `json:"-"`
+	Workspace artifactModel.ArtifactRef `json:"-"`
+	Servers   []WorkspaceServer         `json:"-"`
 }
 
 type Adapter struct {
@@ -65,7 +65,7 @@ func New(
 func (a *Adapter) Load(
 	ctx context.Context,
 	workspace workspaceDomain.Workspace,
-	refs []artifact.ArtifactRef,
+	refs []artifactModel.ArtifactRef,
 ) (LoadPlan, error) {
 	if a == nil ||
 		a.artifacts == nil ||
@@ -85,7 +85,7 @@ func (a *Adapter) Load(
 			}
 			continue
 		}
-		if record.State != artifact.StateAvailable {
+		if record.State != artifactModel.StateAvailable {
 			continue
 		}
 		if !record.Enabled {

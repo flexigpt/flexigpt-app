@@ -3,7 +3,7 @@ package collection
 import (
 	"fmt"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -55,7 +55,7 @@ func (a *API) requireDeclarationAuthoring() error {
 // A read-only domain has no managed user Source or baseline through which
 // an empty Collection can be classified. Its declared package origin is
 // therefore part of domain visibility.
-func (a *API) readOnlyDomainOrigin(record artifact.Artifact) bool {
+func (a *API) readOnlyDomainOrigin(record artifactModel.Artifact) bool {
 	if a == nil || a.domain == nil || !a.domain.ReadOnly {
 		return false
 	}

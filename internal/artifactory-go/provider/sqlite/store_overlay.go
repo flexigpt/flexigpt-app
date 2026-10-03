@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -17,13 +17,13 @@ const storeOverlayColumns = `
 
 func (r *LocalStateRepository) GetStoreOverlay(
 	ctx context.Context,
-	namespace overlay.Namespace,
-) (overlay.StoreRecord, bool, error) {
+	namespace overlayModel.Namespace,
+) (overlayModel.StoreRecord, bool, error) {
 	if r == nil || r.store == nil {
-		return overlay.StoreRecord{}, false, spec.ErrClosed
+		return overlayModel.StoreRecord{}, false, spec.ErrClosed
 	}
 	if err := namespace.Validate(); err != nil {
-		return overlay.StoreRecord{}, false, err
+		return overlayModel.StoreRecord{}, false, err
 	}
 
 	value, err := getStoreOverlayTx(
@@ -32,41 +32,41 @@ func (r *LocalStateRepository) GetStoreOverlay(
 		namespace,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
-		return overlay.StoreRecord{}, false, nil
+		return overlayModel.StoreRecord{}, false, nil
 	}
 	if err != nil {
-		return overlay.StoreRecord{}, false, err
+		return overlayModel.StoreRecord{}, false, err
 	}
 	return value.Clone(), true, nil
 }
 
 func (r *LocalStateRepository) PutStoreOverlay(
 	ctx context.Context,
-	request overlay.StorePutRequest,
+	request overlayModel.StorePutRequest,
 	now time.Time,
-) (overlay.StoreRecord, error) {
+) (overlayModel.StoreRecord, error) {
 	if r == nil || r.store == nil {
-		return overlay.StoreRecord{}, spec.ErrClosed
+		return overlayModel.StoreRecord{}, spec.ErrClosed
 	}
 	if err := request.Validate(); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	if now.IsZero() {
-		return overlay.StoreRecord{}, fmt.Errorf(
+		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay time is required",
 			spec.ErrInvalid,
 		)
 	}
 
-	payload, err := overlay.CanonicalPayload(request.Payload)
+	payload, err := overlayModel.CanonicalPayload(request.Payload)
 	if err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	request.Payload = payload
 
 	tx, err := r.store.db.BeginTx(ctx, nil)
 	if err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	defer func() { _ = tx.Rollback() }()
 
@@ -76,14 +76,14 @@ func (r *LocalStateRepository) PutStoreOverlay(
 		request.Namespace,
 	)
 
-	var output overlay.StoreRecord
+	var output overlayModel.StoreRecord
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
 		if request.ExpectedRevision != 0 {
-			return overlay.StoreRecord{}, spec.ErrConflict
+			return overlayModel.StoreRecord{}, spec.ErrConflict
 		}
 
-		output = overlay.StoreRecord{
+		output = overlayModel.StoreRecord{
 			Namespace:     request.Namespace,
 			SchemaVersion: request.SchemaVersion,
 			Payload:       append([]byte(nil), request.Payload...),
@@ -92,7 +92,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 			ModifiedAt:    now.UTC(),
 		}
 		if err := output.Validate(); err != nil {
-			return overlay.StoreRecord{}, err
+			return overlayModel.StoreRecord{}, err
 		}
 
 		_, err = tx.ExecContext(
@@ -109,18 +109,18 @@ func (r *LocalStateRepository) PutStoreOverlay(
 			timeValue(output.ModifiedAt),
 		)
 		if err != nil {
-			return overlay.StoreRecord{}, sqliteError(err)
+			return overlayModel.StoreRecord{}, sqliteError(err)
 		}
 
 	case err != nil:
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 
 	default:
 		if current.Revision != request.ExpectedRevision {
-			return overlay.StoreRecord{}, spec.ErrConflict
+			return overlayModel.StoreRecord{}, spec.ErrConflict
 		}
 		if current.Revision == ^uint64(0) {
-			return overlay.StoreRecord{}, fmt.Errorf(
+			return overlayModel.StoreRecord{}, fmt.Errorf(
 				"%w: store overlay revision is exhausted",
 				spec.ErrInvalid,
 			)
@@ -133,7 +133,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 		output.ModifiedAt = now.UTC()
 
 		if err := output.Validate(); err != nil {
-			return overlay.StoreRecord{}, err
+			return overlayModel.StoreRecord{}, err
 		}
 
 		result, err := tx.ExecContext(
@@ -153,25 +153,25 @@ func (r *LocalStateRepository) PutStoreOverlay(
 			current.Revision,
 		)
 		if err != nil {
-			return overlay.StoreRecord{}, sqliteError(err)
+			return overlayModel.StoreRecord{}, sqliteError(err)
 		}
 		if err := requireOneChanged(
 			result,
 			"store overlay changed during update",
 		); err != nil {
-			return overlay.StoreRecord{}, err
+			return overlayModel.StoreRecord{}, err
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 	return output.Clone(), nil
 }
 
 func (r *LocalStateRepository) DeleteStoreOverlay(
 	ctx context.Context,
-	namespace overlay.Namespace,
+	namespace overlayModel.Namespace,
 	expectedRevision uint64,
 ) error {
 	if r == nil || r.store == nil {
@@ -215,8 +215,8 @@ type storeOverlayQueryer interface {
 func getStoreOverlayTx(
 	ctx context.Context,
 	queryer storeOverlayQueryer,
-	namespace overlay.Namespace,
-) (overlay.StoreRecord, error) {
+	namespace overlayModel.Namespace,
+) (overlayModel.StoreRecord, error) {
 	return scanStoreOverlay(queryer.QueryRowContext(
 		ctx,
 		`SELECT `+storeOverlayColumns+`
@@ -228,9 +228,9 @@ func getStoreOverlayTx(
 
 func scanStoreOverlay(
 	row scanner,
-) (overlay.StoreRecord, error) {
+) (overlayModel.StoreRecord, error) {
 	if row == nil {
-		return overlay.StoreRecord{}, fmt.Errorf(
+		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"%w: store overlay row is nil",
 			spec.ErrInvalid,
 		)
@@ -250,11 +250,11 @@ func scanStoreOverlay(
 		&createdAt,
 		&modifiedAt,
 	); err != nil {
-		return overlay.StoreRecord{}, err
+		return overlayModel.StoreRecord{}, err
 	}
 
-	value := overlay.StoreRecord{
-		Namespace:     overlay.Namespace(namespace),
+	value := overlayModel.StoreRecord{
+		Namespace:     overlayModel.Namespace(namespace),
 		SchemaVersion: schemaVersion,
 		Payload:       append([]byte(nil), payload...),
 		Revision:      revision,
@@ -262,7 +262,7 @@ func scanStoreOverlay(
 		ModifiedAt:    parseTime(modifiedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return overlay.StoreRecord{}, fmt.Errorf(
+		return overlayModel.StoreRecord{}, fmt.Errorf(
 			"invalid persisted store overlay: %w",
 			err,
 		)

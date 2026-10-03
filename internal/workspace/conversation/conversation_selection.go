@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -42,18 +42,18 @@ const (
 )
 
 type ConversationResourceSelectionRef struct {
-	Artifact         artifact.ArtifactRef `json:"artifact"`
-	Name             string               `json:"name,omitempty"`
-	Locator          spec.Locator         `json:"locator,omitempty"`
-	DefinitionDigest cryptoutil.Digest    `json:"definitionDigest,omitempty"`
-	ArtifactRevision uint64               `json:"artifactRevision,omitempty"`
+	Artifact         artifactModel.ArtifactRef `json:"artifact"`
+	Name             string                    `json:"name,omitempty"`
+	Locator          spec.Locator              `json:"locator,omitempty"`
+	DefinitionDigest cryptoutil.Digest         `json:"definitionDigest,omitempty"`
+	ArtifactRevision uint64                    `json:"artifactRevision,omitempty"`
 }
 
 // ConversationSelection stores one user-selected Workspace Artifact and the
 // explicitly selected Root-scoped Artifact resources for one conversation
 // turn. No Collection or Catalog identity is persisted.
 type ConversationSelection struct {
-	Workspace         artifact.ArtifactRef               `json:"workspace"`
+	Workspace         artifactModel.ArtifactRef          `json:"workspace"`
 	DisplayName       string                             `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                             `json:"workspaceRevision,omitempty"`
 	ContextRefs       []ConversationResourceSelectionRef `json:"contextRefs,omitempty"`
@@ -61,7 +61,7 @@ type ConversationSelection struct {
 }
 
 type ConversationContextUsage struct {
-	Artifact                 artifact.ArtifactRef           `json:"artifact"`
+	Artifact                 artifactModel.ArtifactRef      `json:"artifact"`
 	Name                     string                         `json:"name,omitempty"`
 	Locator                  spec.Locator                   `json:"locator,omitempty"`
 	SelectedDefinitionDigest cryptoutil.Digest              `json:"selectedDefinitionDigest,omitempty"`
@@ -76,7 +76,7 @@ type ConversationContextUsage struct {
 }
 
 type ConversationSkillUsage struct {
-	Artifact                 artifact.ArtifactRef         `json:"artifact"`
+	Artifact                 artifactModel.ArtifactRef    `json:"artifact"`
 	Name                     string                       `json:"name,omitempty"`
 	DisplayName              string                       `json:"displayName,omitempty"`
 	Locator                  spec.Locator                 `json:"locator,omitempty"`
@@ -92,7 +92,7 @@ type ConversationSkillUsage struct {
 }
 
 type ConversationUsage struct {
-	Workspace         artifact.ArtifactRef        `json:"workspace"`
+	Workspace         artifactModel.ArtifactRef   `json:"workspace"`
 	DisplayName       string                      `json:"displayName,omitempty"`
 	WorkspaceRevision uint64                      `json:"workspaceRevision,omitempty"`
 	Status            ConversationSelectionStatus `json:"status"`
@@ -112,19 +112,19 @@ type ConversationResolution struct {
 type WorkspaceSource interface {
 	ResolveWorkspace(
 		ctx context.Context,
-		ref artifact.ArtifactRef,
+		ref artifactModel.ArtifactRef,
 	) (workspaceDomain.WorkspaceView, error)
 
 	ComposeWorkspacePrompt(
 		ctx context.Context,
-		workspace artifact.ArtifactRef,
-		artifacts []artifact.ArtifactRef,
+		workspace artifactModel.ArtifactRef,
+		artifacts []artifactModel.ArtifactRef,
 	) (workspaceConsumerAPI.WorkspacePromptPlan, error)
 
 	LoadWorkspaceSkills(
 		ctx context.Context,
-		workspace artifact.ArtifactRef,
-		artifacts []artifact.ArtifactRef,
+		workspace artifactModel.ArtifactRef,
+		artifacts []artifactModel.ArtifactRef,
 	) (workspaceConsumerAPI.WorkspaceSkillLoadPlan, error)
 }
 
@@ -264,9 +264,9 @@ func (r *ConversationResolver) ResolveConversationSelection(
 func initializeContextUsage(
 	selection ConversationSelection,
 	usage *ConversationUsage,
-) ([]artifact.ArtifactRef, map[artifact.ArtifactRef]int, error) {
-	index := make(map[artifact.ArtifactRef]int, len(selection.ContextRefs))
-	refs := make([]artifact.ArtifactRef, 0, len(selection.ContextRefs))
+) ([]artifactModel.ArtifactRef, map[artifactModel.ArtifactRef]int, error) {
+	index := make(map[artifactModel.ArtifactRef]int, len(selection.ContextRefs))
+	refs := make([]artifactModel.ArtifactRef, 0, len(selection.ContextRefs))
 	for _, selected := range selection.ContextRefs {
 		if err := selected.Artifact.Validate(); err != nil {
 			return nil, nil, err
@@ -293,9 +293,9 @@ func initializeContextUsage(
 func initializeSkillUsage(
 	selection ConversationSelection,
 	usage *ConversationUsage,
-) ([]artifact.ArtifactRef, map[artifact.ArtifactRef]int, error) {
-	index := make(map[artifact.ArtifactRef]int, len(selection.SkillRefs))
-	refs := make([]artifact.ArtifactRef, 0, len(selection.SkillRefs))
+) ([]artifactModel.ArtifactRef, map[artifactModel.ArtifactRef]int, error) {
+	index := make(map[artifactModel.ArtifactRef]int, len(selection.SkillRefs))
+	refs := make([]artifactModel.ArtifactRef, 0, len(selection.SkillRefs))
 	for _, selected := range selection.SkillRefs {
 		if err := selected.Artifact.Validate(); err != nil {
 			return nil, nil, err
@@ -323,7 +323,7 @@ func applyContextPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
 	plan workspaceConsumerAPI.WorkspacePromptPlan,
-	index map[artifact.ArtifactRef]int,
+	index map[artifactModel.ArtifactRef]int,
 ) {
 	usage.Diagnostics = diagnostic.Append(
 		usage.Diagnostics,
@@ -372,7 +372,7 @@ func applySkillPlan(
 	usage *ConversationUsage,
 	selection ConversationSelection,
 	plan workspaceConsumerAPI.WorkspaceSkillLoadPlan,
-	index map[artifact.ArtifactRef]int,
+	index map[artifactModel.ArtifactRef]int,
 ) {
 	for _, skill := range plan.Skills {
 		position, found := index[skill.Artifact]

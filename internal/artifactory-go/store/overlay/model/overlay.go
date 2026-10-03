@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
@@ -31,13 +31,13 @@ func (v Namespace) Validate() error {
 // Payload must never contain a secret value. Secret references and hashes are
 // persisted through the separate Artifact Store secret-binding extension.
 type Record struct {
-	Artifact      artifact.ArtifactRef `json:"artifact"`
-	Namespace     Namespace            `json:"namespace"`
-	SchemaVersion string               `json:"schemaVersion"`
-	Payload       json.RawMessage      `json:"payload"`
-	Revision      uint64               `json:"revision"`
-	CreatedAt     time.Time            `json:"createdAt"`
-	ModifiedAt    time.Time            `json:"modifiedAt"`
+	Artifact      artifactModel.ArtifactRef `json:"artifact"`
+	Namespace     Namespace                 `json:"namespace"`
+	SchemaVersion string                    `json:"schemaVersion"`
+	Payload       json.RawMessage           `json:"payload"`
+	Revision      uint64                    `json:"revision"`
+	CreatedAt     time.Time                 `json:"createdAt"`
+	ModifiedAt    time.Time                 `json:"modifiedAt"`
 }
 
 func (r Record) Validate() error {
@@ -99,7 +99,7 @@ func (r Record) Clone() Record {
 // whose source-derived identity or local state changed after the caller read
 // it. ExpectedOverlayRevision is zero only when creating a new overlay.
 type PutRequest struct {
-	Artifact artifact.ArtifactRef `json:"artifact"`
+	Artifact artifactModel.ArtifactRef `json:"artifact"`
 
 	Namespace     Namespace       `json:"namespace"`
 	SchemaVersion string          `json:"schemaVersion"`

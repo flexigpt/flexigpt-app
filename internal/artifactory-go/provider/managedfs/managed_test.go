@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 )
 
 func TestManagedPackagePublicationUsesSemanticAddress(t *testing.T) {
@@ -25,13 +25,13 @@ func TestManagedPackagePublicationUsesSemanticAddress(t *testing.T) {
 	_, err = adapter.PublishPackage(
 		t.Context(),
 		value,
-		source.ManagedPackagePublication{
-			Address: source.ManagedPackageAddress{
+		sourceModel.ManagedPackagePublication{
+			Address: sourceModel.ManagedPackageAddress{
 				Kind:    "agent.skill",
 				Name:    "example",
 				Version: "unversioned",
 			},
-			Files: []source.ManagedPackageFile{{
+			Files: []sourceModel.ManagedPackageFile{{
 				Locator: "SKILL.md",
 				Content: []byte("name: example"),
 			}},
@@ -65,14 +65,14 @@ func TestManagedPackagePublicationUsesSemanticAddress(t *testing.T) {
 	}
 }
 
-func managedTestSource() source.Source {
+func managedTestSource() sourceModel.Source {
 	now := time.Date(2026, 3, 25, 12, 0, 0, 0, time.UTC)
-	return source.Source{
+	return sourceModel.Source{
 		ID:             "019d3150-6a20-7a6b-a34e-d9032342bc31",
 		RootID:         "019d3150-6a21-7a6b-a34e-d9032342bc31",
 		RootStorageKey: "test-root",
 		StorageKey:     "managed-fixture",
-		Kind:           source.SourceKindManagedDirectory,
+		Kind:           sourceModel.SourceKindManagedDirectory,
 		DisplayName:    "Managed fixture",
 		Enabled:        true,
 		Config:         []byte(`{}`),

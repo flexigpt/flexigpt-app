@@ -12,7 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -30,12 +30,12 @@ func (s *snapshot) Generation() string {
 func (s *snapshot) Stat(
 	ctx context.Context,
 	locator spec.Locator,
-) (source.Entry, error) {
+) (sourceModel.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	if s.traversalPolicy.excludesLocator(string(locator)) {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: source locator %q is excluded by traversal policy",
 			spec.ErrNotFound,
 			locator,
@@ -43,18 +43,18 @@ func (s *snapshot) Stat(
 	}
 	p, err := s.resolve(locator)
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	info, err := os.Stat(p)
 	if errors.Is(err, os.ErrNotExist) {
-		return source.Entry{}, fmt.Errorf(
+		return sourceModel.Entry{}, fmt.Errorf(
 			"%w: source locator %q",
 			spec.ErrNotFound,
 			locator,
 		)
 	}
 	if err != nil {
-		return source.Entry{}, err
+		return sourceModel.Entry{}, err
 	}
 	return entryFromInfo(locator, info), nil
 }
@@ -62,19 +62,19 @@ func (s *snapshot) Stat(
 func (s *snapshot) ReadDir(
 	ctx context.Context,
 	locator spec.Locator,
-) ([]source.Entry, error) {
+) ([]sourceModel.Entry, error) {
 	if err := s.ensureOpen(ctx); err != nil {
 		return nil, err
 	}
 	if s.traversalPolicy.excludesLocator(string(locator)) {
-		return []source.Entry{}, nil
+		return []sourceModel.Entry{}, nil
 	}
 	p, err := s.resolveDirectory(locator)
 	if err != nil {
 		return nil, err
 	}
 	if locator != "." && s.traversalPolicy.isGitSubmoduleDirectory(p) {
-		return []source.Entry{}, nil
+		return []sourceModel.Entry{}, nil
 	}
 
 	values, err := readDirectoryEntries(p)
@@ -89,7 +89,7 @@ func (s *snapshot) ReadDir(
 		return nil, err
 	}
 
-	output := make([]source.Entry, 0, len(values))
+	output := make([]sourceModel.Entry, 0, len(values))
 	for _, value := range values {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -309,13 +309,13 @@ func resolveWithinRoot(
 func entryFromInfo(
 	locator spec.Locator,
 	info os.FileInfo,
-) source.Entry {
+) sourceModel.Entry {
 	name := info.Name()
 	if locator != "." {
 		// Persist source-relative identity rather than host filesystem naming.
 		name = path.Base(string(locator))
 	}
-	return source.Entry{
+	return sourceModel.Entry{
 		Locator:     locator,
 		Name:        name,
 		SizeBytes:   info.Size(),

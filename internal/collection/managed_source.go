@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -19,36 +19,36 @@ import (
 // owns the resulting Source refresh.
 func (a *API) EnsureManagedDeclarationDiscovery(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
 	locator spec.Locator,
 	requiredDecoder spec.DecoderID,
-) (source.Summary, error) {
+) (sourceModel.Summary, error) {
 	if a == nil {
-		return source.Summary{}, spec.ErrClosed
+		return sourceModel.Summary{}, spec.ErrClosed
 	}
 	if err := rootID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := locator.Validate(false); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if err := requiredDecoder.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
 	current, err := a.managedSource(ctx, rootID, sourceID)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 
 	next := current.Discovery.Clone()
 	inScope, err := next.InScope(locator)
 	if err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if !inScope {
 		next.ExplicitLocators = append(next.ExplicitLocators, locator)
@@ -70,7 +70,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 		}
 	}
 	if !hintFound {
-		next.DecoderHints = append(next.DecoderHints, source.DecoderHint{
+		next.DecoderHints = append(next.DecoderHints, sourceModel.DecoderHint{
 			Locator:    locator,
 			Recursive:  false,
 			DecoderIDs: []spec.DecoderID{requiredDecoder},
@@ -87,7 +87,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 
 	next = next.Normalized()
 	if err := next.Validate(); err != nil {
-		return source.Summary{}, err
+		return sourceModel.Summary{}, err
 	}
 	if current.Discovery.Equal(next) {
 		return current, nil
@@ -97,7 +97,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 		ctx,
 		rootID,
 		sourceID,
-		source.Update{
+		sourceModel.Update{
 			ExpectedRevision: current.Revision,
 			DisplayName:      current.DisplayName,
 			Enabled:          current.Enabled,
@@ -105,7 +105,7 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 		},
 	)
 	if err != nil {
-		return source.Summary{}, fmt.Errorf(
+		return sourceModel.Summary{}, fmt.Errorf(
 			"update managed declaration discovery: %w",
 			err,
 		)

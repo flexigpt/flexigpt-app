@@ -9,9 +9,9 @@ import (
 	"time"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -26,17 +26,17 @@ const artifactColumns = `
 
 func (s *Store) getArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	if err := ref.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := s.requireActiveRoot(ctx, ref.RootID); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	value, err := getArtifactTx(ctx, s.db, ref)
 	if errors.Is(err, sql.ErrNoRows) {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact %q in Root %q",
 			spec.ErrArtifactNotFound,
 			ref.ArtifactID,
@@ -44,15 +44,15 @@ func (s *Store) getArtifact(
 		)
 	}
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return value.Clone(), nil
 }
 
 func (s *Store) listArtifactsByRoot(
 	ctx context.Context,
-	rootID root.RootID,
-) ([]artifact.Artifact, error) {
+	rootID rootModel.RootID,
+) ([]artifactModel.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -76,9 +76,9 @@ func (s *Store) listArtifactsByRoot(
 
 func (s *Store) listArtifactsBySource(
 	ctx context.Context,
-	rootID root.RootID,
-	sourceID source.SourceID,
-) ([]artifact.Artifact, error) {
+	rootID rootModel.RootID,
+	sourceID sourceModel.SourceID,
+) ([]artifactModel.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -106,10 +106,10 @@ func (s *Store) listArtifactsBySource(
 
 func (s *Store) findArtifactsByIdentity(
 	ctx context.Context,
-	rootID root.RootID,
-	kind artifact.ArtifactKind,
+	rootID rootModel.RootID,
+	kind artifactModel.ArtifactKind,
 	logicalName spec.LogicalName,
-) ([]artifact.Artifact, error) {
+) ([]artifactModel.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
@@ -143,21 +143,21 @@ func (s *Store) findArtifactsByIdentity(
 
 func (s *Store) findArtifactByOrigin(
 	ctx context.Context,
-	rootID root.RootID,
-	binding artifact.SourceBinding,
-	kind artifact.ArtifactKind,
-) (artifact.Artifact, error) {
+	rootID rootModel.RootID,
+	binding artifactModel.SourceBinding,
+	kind artifactModel.ArtifactKind,
+) (artifactModel.Artifact, error) {
 	if err := rootID.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := binding.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := kind.Validate(); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	if err := s.requireActiveRoot(ctx, rootID); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	value, err := scanArtifact(s.db.QueryRowContext(
 		ctx,
@@ -175,7 +175,7 @@ func (s *Store) findArtifactByOrigin(
 		string(kind),
 	))
 	if errors.Is(err, sql.ErrNoRows) {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact origin %q/%q/%q",
 			spec.ErrArtifactNotFound,
 			binding.SourceID,
@@ -184,14 +184,14 @@ func (s *Store) findArtifactByOrigin(
 		)
 	}
 	if err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	return value.Clone(), nil
 }
 
 func (s *Store) createArtifact(
 	ctx context.Context,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -226,7 +226,7 @@ func (s *Store) createArtifact(
 
 func (s *Store) updateArtifactLocal(
 	ctx context.Context,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 	expectedRevision uint64,
 ) error {
 	if err := value.Validate(); err != nil {
@@ -334,12 +334,12 @@ func updateArtifactSourceStateTx(
 	tx *sql.Tx,
 	update artifactimpl.SourceStateUpdate,
 ) error {
-	current, err := getArtifactTx(ctx, tx, artifact.ArtifactRef{
+	current, err := getArtifactTx(ctx, tx, artifactModel.ArtifactRef{
 		RootID:     update.RootID,
 		ArtifactID: update.ArtifactID,
 	})
 	if err != nil {
-		return artifactNotFound(err, artifact.ArtifactRef{
+		return artifactNotFound(err, artifactModel.ArtifactRef{
 			RootID:     update.RootID,
 			ArtifactID: update.ArtifactID,
 		})
@@ -425,7 +425,7 @@ func updateArtifactSourceStateTx(
 
 func (s *Store) purgeArtifact(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 	expectedRevision uint64,
 ) error {
 	if err := ref.Validate(); err != nil {
@@ -478,7 +478,7 @@ func (s *Store) purgeArtifact(
 func insertArtifactTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	value artifact.Artifact,
+	value artifactModel.Artifact,
 ) error {
 	if err := value.Validate(); err != nil {
 		return err
@@ -529,8 +529,8 @@ type artifactQueryer interface {
 func getArtifactTx(
 	ctx context.Context,
 	queryer artifactQueryer,
-	ref artifact.ArtifactRef,
-) (artifact.Artifact, error) {
+	ref artifactModel.ArtifactRef,
+) (artifactModel.Artifact, error) {
 	return scanArtifact(queryer.QueryRowContext(
 		ctx,
 		`SELECT `+artifactColumns+`
@@ -543,8 +543,8 @@ func getArtifactTx(
 
 func scanArtifacts(
 	rows *sql.Rows,
-) ([]artifact.Artifact, error) {
-	output := make([]artifact.Artifact, 0)
+) ([]artifactModel.Artifact, error) {
+	output := make([]artifactModel.Artifact, 0)
 	for rows.Next() {
 		value, err := scanArtifact(rows)
 		if err != nil {
@@ -560,7 +560,7 @@ func scanArtifacts(
 
 func scanArtifact(
 	row scanner,
-) (artifact.Artifact, error) {
+) (artifactModel.Artifact, error) {
 	var (
 		id, rootID, sourceID, locator, subresource string
 		kind, logicalName, logicalVersion          string
@@ -572,7 +572,7 @@ func scanArtifact(
 		createdAt, modifiedAt                      int64
 	)
 	if row == nil {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"%w: Artifact row is nil",
 			spec.ErrInvalid,
 		)
@@ -597,26 +597,26 @@ func scanArtifact(
 		&createdAt,
 		&modifiedAt,
 	); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
 	var diagnostics []diagnostic.Diagnostic
 	if err := decodeJSON(diagnosticsRaw, &diagnostics); err != nil {
-		return artifact.Artifact{}, err
+		return artifactModel.Artifact{}, err
 	}
-	value := artifact.Artifact{
-		ID:     artifact.ArtifactID(id),
-		RootID: root.RootID(rootID),
-		Binding: artifact.SourceBinding{
-			SourceID:           source.SourceID(sourceID),
+	value := artifactModel.Artifact{
+		ID:     artifactModel.ArtifactID(id),
+		RootID: rootModel.RootID(rootID),
+		Binding: artifactModel.SourceBinding{
+			SourceID:           sourceModel.SourceID(sourceID),
 			Locator:            spec.Locator(locator),
 			SubresourceLocator: spec.SubresourceLocator(subresource),
 		},
-		Kind:                artifact.ArtifactKind(kind),
+		Kind:                artifactModel.ArtifactKind(kind),
 		LogicalName:         spec.LogicalName(logicalName),
 		LogicalVersion:      spec.LogicalVersion(logicalVersion),
 		ResolvedDefinition:  parseDigest(resolvedDefinition),
 		SourceContentDigest: parseDigest(sourceContent),
-		State:               artifact.State(state),
+		State:               artifactModel.State(state),
 		Diagnostics:         diagnostics,
 		DisplayName:         displayName,
 		Enabled:             enabled != 0,
@@ -626,7 +626,7 @@ func scanArtifact(
 		ModifiedAt:          parseTime(modifiedAt),
 	}
 	if err := value.Validate(); err != nil {
-		return artifact.Artifact{}, fmt.Errorf(
+		return artifactModel.Artifact{}, fmt.Errorf(
 			"invalid persisted Artifact %q: %w",
 			id,
 			err,
@@ -636,8 +636,8 @@ func scanArtifact(
 }
 
 func sameArtifactSourceFields(
-	left artifact.Artifact,
-	right artifact.Artifact,
+	left artifactModel.Artifact,
+	right artifactModel.Artifact,
 ) bool {
 	return left.ID == right.ID &&
 		left.RootID == right.RootID &&
@@ -660,7 +660,7 @@ func sameArtifactSourceFields(
 
 func artifactNotFound(
 	err error,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) error {
 	if !errors.Is(err, sql.ErrNoRows) {
 		return err

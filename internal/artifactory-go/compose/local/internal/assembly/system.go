@@ -15,19 +15,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/sqlite"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	definitionapi "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
 	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/impl"
-	overlay "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
+	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
@@ -45,13 +45,13 @@ type Config struct {
 	RootMutationPolicy        rootModel.RootPolicy
 	FilesystemTraversalPolicy *fsdir.TraversalPolicy
 
-	ProtectedOverlayNamespaces []overlay.Namespace
-	StoreOverlayNamespaces     []overlay.Namespace
+	ProtectedOverlayNamespaces []overlayModel.Namespace
+	StoreOverlayNamespaces     []overlayModel.Namespace
 	SecretValues               value.ValueStore
 }
 
 type ManagedPackageResult struct {
-	Source     source.Summary
+	Source     sourceModel.Summary
 	Generation string
 }
 
@@ -59,7 +59,7 @@ type Components struct {
 	Roots            *rootimpl.Service
 	Sources          *sourceimpl.Service
 	Artifacts        *artifactimpl.Service
-	Definitions      definitionapi.API
+	Definitions      definition.API
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
 	ShareableSchemas *jsonschema.Registry
@@ -328,7 +328,7 @@ func Open(
 			GetSourceState: func(
 				ctx context.Context,
 				rootID rootModel.RootID,
-				sourceID source.SourceID,
+				sourceID sourceModel.SourceID,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.getManagedSourceState(
 					ctx,
@@ -346,9 +346,9 @@ func Open(
 			PublishPackage: func(
 				ctx context.Context,
 				rootID rootModel.RootID,
-				sourceID source.SourceID,
+				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
-				publication source.ManagedPackagePublication,
+				publication sourceModel.ManagedPackagePublication,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.publishManagedPackageForMutableRoot(
 					ctx,
@@ -368,9 +368,9 @@ func Open(
 			PublishProtectedPackage: func(
 				ctx context.Context,
 				rootID rootModel.RootID,
-				sourceID source.SourceID,
+				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
-				publication source.ManagedPackagePublication,
+				publication sourceModel.ManagedPackagePublication,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.publishProtectedManagedPackage(
 					ctx,
@@ -428,7 +428,7 @@ func (c *Components) Close() error {
 func (c *Components) getManagedSourceState(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 ) (ManagedPackageResult, error) {
 	if c == nil ||
 		c.SourceRuntime == nil ||
@@ -479,9 +479,9 @@ func (c *Components) getManagedSourceState(
 func (c *Components) publishManagedPackageForMutableRoot(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication source.ManagedPackagePublication,
+	publication sourceModel.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
 	return c.publishManagedPackage(
 		ctx,
@@ -500,9 +500,9 @@ func (c *Components) publishManagedPackageForMutableRoot(
 func (c *Components) publishProtectedManagedPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication source.ManagedPackagePublication,
+	publication sourceModel.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
 	if c == nil || !c.isProtectedRoot(rootID) {
 		return ManagedPackageResult{}, fmt.Errorf(
@@ -529,9 +529,9 @@ func (c *Components) publishProtectedManagedPackage(
 func (c *Components) removeManagedPackageForMutableRoot(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	return c.removeManagedPackage(
@@ -550,9 +550,9 @@ func (c *Components) removeManagedPackageForMutableRoot(
 func (c *Components) removeProtectedManagedPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	if c == nil || !c.isProtectedRoot(rootID) {
@@ -579,9 +579,9 @@ func (c *Components) removeProtectedManagedPackage(
 func (c *Components) publishManagedPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication source.ManagedPackagePublication,
+	publication sourceModel.ManagedPackagePublication,
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
 	if c == nil {
@@ -658,9 +658,9 @@ func (c *Components) publishManagedPackage(
 func (c *Components) removeManagedPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
@@ -771,8 +771,8 @@ func (c *Components) removeManagedPackage(
 func managedPackageExists(
 	ctx context.Context,
 	runtime sourceimpl.Runtime,
-	v source.Source,
-	address source.ManagedPackageAddress,
+	v sourceModel.Source,
+	address sourceModel.ManagedPackageAddress,
 ) (bool, error) {
 	snapshot, err := runtime.Open(ctx, v)
 	if err != nil {
@@ -815,39 +815,39 @@ func (c *Components) isProtectedRoot(
 func (c *Components) managedSource(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-) (source.Source, error) {
+) (sourceModel.Source, error) {
 	if c == nil ||
 		c.Sources == nil ||
 		c.SourceRuntime == nil ||
 		c.managedSources == nil {
-		return source.Source{}, spec.ErrClosed
+		return sourceModel.Source{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: managed Source context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if expectedSourceRevision == 0 {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: expected source revision is required",
 			spec.ErrInvalid,
 		)
 	}
 	v, err := c.SourceRuntime.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return source.Source{}, err
+		return sourceModel.Source{}, err
 	}
 	if v.Revision != expectedSourceRevision {
-		return source.Source{}, spec.ErrConflict
+		return sourceModel.Source{}, spec.ErrConflict
 	}
 	if !c.managedSources.SupportsManagedPackages(v.Kind) {
-		return source.Source{}, fmt.Errorf(
+		return sourceModel.Source{}, fmt.Errorf(
 			"%w: source kind %q is not writable",
 			spec.ErrUnsupported,
 			v.Kind,
@@ -859,7 +859,7 @@ func (c *Components) managedSource(
 func sourceSnapshotGeneration(
 	ctx context.Context,
 	runtime sourceimpl.Runtime,
-	v source.Source,
+	v sourceModel.Source,
 ) (string, error) {
 	snapshot, err := runtime.Open(ctx, v)
 	if err != nil {
@@ -877,9 +877,9 @@ func sourceSnapshotGeneration(
 func (c *Components) removeManagedArtifactPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedRevision uint64,
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedpackageimpl.SourceState, error) {
 	result, err := c.removeManagedPackageForMutableRoot(
@@ -902,9 +902,9 @@ func (c *Components) removeManagedArtifactPackage(
 func (c *Components) removeProtectedManagedArtifactPackage(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	sourceID source.SourceID,
+	sourceID sourceModel.SourceID,
 	expectedRevision uint64,
-	address source.ManagedPackageAddress,
+	address sourceModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedpackageimpl.SourceState, error) {
 	result, err := c.removeProtectedManagedPackage(

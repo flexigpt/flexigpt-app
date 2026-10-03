@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillAggregate "github.com/flexigpt/flexigpt-app/internal/skill/aggregate"
@@ -107,7 +107,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	refs, err := aggregateService.ListArtifactSkillRefs(
 		ctx,
 		skillAggregate.ArtifactSkillFilter{
-			AllowArtifacts: []artifact.ArtifactRef{
+			AllowArtifacts: []artifactModel.ArtifactRef{
 				created.Artifact.Ref(),
 			},
 		},
@@ -140,7 +140,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	prompt, err := aggregateService.GetArtifactSkillsPrompt(
 		ctx,
 		skillAggregate.ArtifactSkillFilter{
-			AllowArtifacts: []artifact.ArtifactRef{
+			AllowArtifacts: []artifactModel.ArtifactRef{
 				created.Artifact.Ref(),
 			},
 		},
@@ -264,7 +264,7 @@ func TestSkillStoreWorkflowAggregateCatalogFollowsSkillLifecycle(
 	refs, err = aggregateService.ListArtifactSkillRefs(
 		ctx,
 		skillAggregate.ArtifactSkillFilter{
-			AllowArtifacts: []artifact.ArtifactRef{
+			AllowArtifacts: []artifactModel.ArtifactRef{
 				replaced.Artifact.Ref(),
 			},
 		},

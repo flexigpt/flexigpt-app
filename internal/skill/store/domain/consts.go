@@ -3,20 +3,20 @@ package domain
 import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/skillv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 const (
-	SkillArtifactKind artifact.ArtifactKind = artifact.ArtifactKind(
+	SkillArtifactKind artifactModel.ArtifactKind = artifactModel.ArtifactKind(
 		skillv1.SkillType,
 	)
-	ManagedSkillPackageKind           source.PackageKind = "skill"
-	BuiltinSkillCollectionPackageKind source.PackageKind = "skill-collection"
-	SkillSchemaID                     schema.SchemaID    = skillv1.SkillSchemaID
-	MarkdownDecoderID                 spec.DecoderID     = "agent.skill-markdown"
+	ManagedSkillPackageKind           sourceModel.PackageKind = "skill"
+	BuiltinSkillCollectionPackageKind sourceModel.PackageKind = "skill-collection"
+	SkillSchemaID                     schemaModel.SchemaID    = skillv1.SkillSchemaID
+	MarkdownDecoderID                 spec.DecoderID          = "agent.skill-markdown"
 
 	SkillSchemaVersion     = skillv1.SkillSchemaVersion
 	InsertLabelKey         = "skill.insert"
@@ -36,15 +36,15 @@ func IsSkillDefinitionFile(locator spec.Locator) bool {
 	return documentTopology.IsSkillPackageDocument(locator)
 }
 
-func IsSkillKind(value artifact.ArtifactKind) bool {
+func IsSkillKind(value artifactModel.ArtifactKind) bool {
 	return value == SkillArtifactKind
 }
 
 func IsSkillSchema(
-	value schema.Key,
+	value schemaModel.Key,
 ) bool {
-	return value.Entity == schema.EntityArtifact &&
-		value.Kind == schema.Kind(SkillArtifactKind) &&
+	return value.Entity == schemaModel.EntityArtifact &&
+		value.Kind == schemaModel.Kind(SkillArtifactKind) &&
 		value.SchemaID == SkillSchemaID &&
 		value.SchemaVersion == SkillSchemaVersion
 }

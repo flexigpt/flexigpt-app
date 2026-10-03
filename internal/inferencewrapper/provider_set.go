@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/inference-go/debugclient"
 	inferenceSpec "github.com/flexigpt/inference-go/spec"
 
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	conversationSpec "github.com/flexigpt/flexigpt-app/internal/conversation/spec"
 	"github.com/flexigpt/flexigpt-app/internal/inferencewrapper/spec"
 	mcpConversation "github.com/flexigpt/flexigpt-app/internal/mcp/conversation"
@@ -388,8 +388,8 @@ func (ps *ProviderSetAPI) FetchCompletion(
 	}
 
 	if ps.artifactSkills != nil && len(enabledSkillRefs) > 0 {
-		var availableSkillRefs []artifact.ArtifactRef
-		var activeSkillRefs []artifact.ArtifactRef
+		var availableSkillRefs []artifactModel.ArtifactRef
+		var activeSkillRefs []artifactModel.ArtifactRef
 		if skillSessionID == "" {
 			if workspaceUsage != nil && len(workspaceUsage.Skills) > 0 {
 				markWorkspaceSkillSessionUsage(

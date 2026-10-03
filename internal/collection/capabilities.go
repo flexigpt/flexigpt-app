@@ -6,7 +6,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -20,7 +20,7 @@ type CollectionCapabilityPlan struct {
 
 func (a *API) ResolveCapabilities(
 	ctx context.Context,
-	ref artifact.ArtifactRef,
+	ref artifactModel.ArtifactRef,
 ) (CollectionCapabilityPlan, error) {
 	if a == nil || a.resolver == nil {
 		return CollectionCapabilityPlan{}, fmt.Errorf(

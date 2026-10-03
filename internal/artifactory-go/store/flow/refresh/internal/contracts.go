@@ -6,10 +6,10 @@ import (
 	"time"
 
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-	artifact "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definition "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	root "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	source "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -18,23 +18,23 @@ import (
 type RefreshStateReader interface {
 	GetRefreshState(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) (source.RefreshState, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+	) (sourceModel.RefreshState, error)
 }
 
 type ArtifactReader interface {
 	ListBySource(
 		ctx context.Context,
-		rootID root.RootID,
-		sourceID source.SourceID,
-	) ([]artifact.Artifact, error)
+		rootID rootModel.RootID,
+		sourceID sourceModel.SourceID,
+	) ([]artifactModel.Artifact, error)
 }
 
 type Publication struct {
-	RootID root.RootID
+	RootID rootModel.RootID
 
-	SourceID                source.SourceID
+	SourceID                sourceModel.SourceID
 	ExpectedSourceRevision  uint64
 	ExpectedRefreshRevision uint64
 
@@ -42,8 +42,8 @@ type Publication struct {
 	DiscoveryFingerprint cryptoutil.Digest
 	DecoderFingerprint   cryptoutil.Digest
 
-	Definitions     []definition.Definition
-	ArtifactCreates []artifact.Artifact
+	Definitions     []definitionModel.Definition
+	ArtifactCreates []artifactModel.Artifact
 	ArtifactUpdates []artifactimpl.SourceStateUpdate
 	Diagnostics     []diagnostic.Diagnostic
 	RefreshedAt     time.Time
@@ -107,7 +107,7 @@ func (p Publication) Validate() error {
 		seenDefinitions[value.Digest] = struct{}{}
 	}
 
-	seenArtifacts := make(map[artifact.ArtifactID]struct{})
+	seenArtifacts := make(map[artifactModel.ArtifactID]struct{})
 	for index, value := range p.ArtifactCreates {
 		if err := value.Validate(); err != nil {
 			return fmt.Errorf("artifact create %d: %w", index, err)
@@ -115,7 +115,7 @@ func (p Publication) Validate() error {
 		if value.RootID != p.RootID ||
 			value.Binding.SourceID != p.SourceID ||
 			value.Revision != 1 ||
-			value.State != artifact.StateAvailable {
+			value.State != artifactModel.StateAvailable {
 			return fmt.Errorf(
 				"%w: invalid source-created Artifact",
 				spec.ErrInvalid,
@@ -157,5 +157,5 @@ type Publisher interface {
 	Publish(
 		ctx context.Context,
 		publication Publication,
-	) (source.RefreshState, error)
+	) (sourceModel.RefreshState, error)
 }
