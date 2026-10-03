@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"time"
 
-	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -309,7 +309,7 @@ func (s *Store) updateArtifactLocal(
 
 func (s *Store) updateArtifactSourceState(
 	ctx context.Context,
-	update artifactimpl.SourceStateUpdate,
+	update artifact.SourceStateUpdate,
 ) error {
 	if err := update.Validate(); err != nil {
 		return err
@@ -332,7 +332,7 @@ func (s *Store) updateArtifactSourceState(
 func updateArtifactSourceStateTx(
 	ctx context.Context,
 	tx *sql.Tx,
-	update artifactimpl.SourceStateUpdate,
+	update artifact.SourceStateUpdate,
 ) error {
 	current, err := getArtifactTx(ctx, tx, artifactModel.ArtifactRef{
 		RootID:     update.RootID,

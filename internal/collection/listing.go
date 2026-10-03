@@ -8,6 +8,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
@@ -292,7 +293,7 @@ func (a *API) collectionVisibleInList(
 	}
 
 	if a.domain.ReadOnly {
-		if entry.Source.Kind != sourceModel.SourceKindManagedDirectory ||
+		if entry.Source.Kind != managedfs.Kind ||
 			entry.Binding.SubresourceLocator != "" {
 			return false, nil
 		}
@@ -325,7 +326,7 @@ func (a *API) collectionListEditability(
 	projection collectionProjection,
 ) (editable, baseline bool) {
 	if entry.Ref().RootID == documentTopology.BuiltinRootID() ||
-		entry.Source.Kind != sourceModel.SourceKindManagedDirectory ||
+		entry.Source.Kind != managedfs.Kind ||
 		!entry.Source.Enabled ||
 		entry.Binding.SubresourceLocator != "" ||
 		(a.domain != nil &&

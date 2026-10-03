@@ -5,8 +5,8 @@ import (
 	"errors"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -34,7 +34,7 @@ func InitWorkspaceWrappers(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
-	locatorResolvers []provider.LocatorResolverFactory,
+	locatorResolvers []locator.Factory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
 	mcpServers mcp.ServerResolver,
@@ -50,7 +50,7 @@ func InitWorkspaceWrappers(
 
 	config := workspaceConsumerAPI.DefaultConfig()
 	config.LocatorResolvers = append(
-		[]provider.LocatorResolverFactory(nil),
+		[]locator.Factory(nil),
 		locatorResolvers...,
 	)
 	config.FallbackProviders = fallbackProviders

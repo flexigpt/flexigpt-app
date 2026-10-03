@@ -12,8 +12,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/uuidutil"
@@ -34,7 +36,7 @@ type DomainPolicy struct {
 	BaselineName        spec.LogicalName
 	BaselineDisplayName string
 	BaselineDescription string
-	PackageKind         sourceModel.PackageKind
+	PackageKind         managedpackageModel.PackageKind
 	DocumentUse         string
 	AllowedMemberTypes  []declaration.Type
 	AllowedMemberForms  []declaration.MemberForm
@@ -177,7 +179,7 @@ func (p DomainPolicy) allowsMemberForm(
 	return slices.Contains(p.AllowedMemberForms, value)
 }
 
-func (p DomainPolicy) managedCollectionPackageKind() sourceModel.PackageKind {
+func (p DomainPolicy) managedCollectionPackageKind() managedpackageModel.PackageKind {
 	if p.PackageKind != "" {
 		return p.PackageKind
 	}
@@ -328,7 +330,7 @@ func (a *API) domainManagedSource(
 		if err != nil {
 			return sourceModel.Summary{}, err
 		}
-		if value.Kind != sourceModel.SourceKindManagedDirectory ||
+		if value.Kind != managedfs.Kind ||
 			value.StorageKey != a.domain.SourceStorageKey {
 			return sourceModel.Summary{}, fmt.Errorf(
 				"%w: Collection belongs to another managed domain Source",
@@ -350,7 +352,7 @@ func (a *API) domainManagedSource(
 		sourceModel.Draft{
 			ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 			StorageKey:  a.domain.SourceStorageKey,
-			Kind:        sourceModel.SourceKindManagedDirectory,
+			Kind:        managedfs.Kind,
 			DisplayName: a.domain.SourceDisplayName,
 			Enabled:     true,
 			Config:      json.RawMessage(`{}`),
@@ -474,7 +476,7 @@ func IsBaselineCollectionArtifactForSource(
 	if value.Kind != artifactModel.ArtifactKind(pluginv1.PluginType) ||
 		value.RootID != sourceValue.RootID ||
 		value.Binding.SourceID != sourceValue.ID ||
-		sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+		sourceValue.Kind != managedfs.Kind {
 		return false
 	}
 	address, err := managedCollectionAddressFromLocator(
@@ -559,7 +561,7 @@ func (a *API) domainCollectionVisible(
 		return false, err
 	}
 	if a.domain.ReadOnly {
-		if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
+		if sourceValue.Kind != managedfs.Kind ||
 			!a.readOnlyDomainOrigin(record) {
 			return false, nil
 		}
@@ -621,7 +623,7 @@ func (a *API) Read(
 	}
 	if record.Binding.SubresourceLocator == "" &&
 		(a.domain == nil || !a.domain.ReadOnly) &&
-		sourceValue.Kind == sourceModel.SourceKindManagedDirectory &&
+		sourceValue.Kind == managedfs.Kind &&
 		(a.domain == nil ||
 			sourceValue.StorageKey == a.domain.SourceStorageKey) {
 		if _, err := a.managedCollectionAddressFromLocator(

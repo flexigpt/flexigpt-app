@@ -15,15 +15,16 @@ type workspaceLocatorRuntime struct {
 	cat catalog.API
 }
 
-func (r workspaceLocatorRuntime) ListArtifactsBySource(
+func (r workspaceLocatorRuntime) ListBySource(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
 	return r.cat.ListBySource(
 		ctx,
 		rootID,
 		sourceID,
-		catalogModel.ListOptions{},
+		options,
 	)
 }

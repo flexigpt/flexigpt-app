@@ -3,10 +3,11 @@ package sqlite
 import (
 	"context"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
-	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -297,7 +298,7 @@ func (r *ArtifactRepository) UpdateLocal(
 
 func (r *ArtifactRepository) UpdateSourceState(
 	ctx context.Context,
-	value artifactimpl.SourceStateUpdate,
+	value artifact.SourceStateUpdate,
 ) error {
 	return r.store.updateArtifactSourceState(ctx, value)
 }
@@ -333,6 +334,6 @@ func (r *RefreshStateRepository) GetRefreshState(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-) (sourceModel.RefreshState, error) {
+) (refreshModel.State, error) {
 	return r.store.getRefreshState(ctx, rootID, sourceID)
 }

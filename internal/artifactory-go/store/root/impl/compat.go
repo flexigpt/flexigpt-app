@@ -4,10 +4,11 @@
 // contracts and Root compose capabilities rather than this package.
 package rootimpl
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/internal"
+import (
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/internal"
+)
 
 type (
-	Repository    = internal.Repository
 	Service       = internal.Service
 	SetRootPolicy = internal.SetRootPolicy
 )

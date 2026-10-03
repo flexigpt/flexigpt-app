@@ -1,7 +1,7 @@
 package model
 
 import (
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -37,10 +37,10 @@ func HydrationFingerprint(
 // Artifact Store topology intentionally does not know domain expectation types.
 func PackageFingerprint(
 	packageRoot spec.Locator,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	documentFile spec.Locator,
 	expectations any,
-	packageFiles []sourceModel.ManagedPackageFile,
+	packageFiles []managedpackageModel.ManagedPackageFile,
 ) (cryptoutil.Digest, error) {
 	if err := packageRoot.ValidatePortable(false); err != nil {
 		return "", err
@@ -51,7 +51,7 @@ func PackageFingerprint(
 	if err := documentFile.ValidatePortable(false); err != nil {
 		return "", err
 	}
-	files, err := sourceModel.NormalizeManagedPackageFiles(packageFiles)
+	files, err := managedpackageModel.NormalizeManagedPackageFiles(packageFiles)
 	if err != nil {
 		return "", err
 	}
@@ -71,11 +71,11 @@ func PackageFingerprint(
 	}
 
 	return cryptoutil.CanonicalDigest(struct {
-		PackageRoot  spec.Locator                      `json:"packageRoot"`
-		Address      sourceModel.ManagedPackageAddress `json:"address"`
-		DocumentFile spec.Locator                      `json:"documentFile"`
-		Expectations any                               `json:"expectations"`
-		Files        []file                            `json:"files"`
+		PackageRoot  spec.Locator                              `json:"packageRoot"`
+		Address      managedpackageModel.ManagedPackageAddress `json:"address"`
+		DocumentFile spec.Locator                              `json:"documentFile"`
+		Expectations any                                       `json:"expectations"`
+		Files        []file                                    `json:"files"`
 	}{
 		PackageRoot:  packageRoot,
 		Address:      address,

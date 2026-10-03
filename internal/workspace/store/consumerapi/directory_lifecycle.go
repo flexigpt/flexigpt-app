@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -75,7 +77,7 @@ func (r workspaceSourceRegistry) load(
 	}
 
 	if output.HasDirectory &&
-		output.Directory.Kind != sourceModel.SourceKindFilesystemDirectory {
+		output.Directory.Kind != fsdir.Kind {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace directory Source has kind %q",
 			spec.ErrInvalid,
@@ -83,7 +85,7 @@ func (r workspaceSourceRegistry) load(
 		)
 	}
 	if output.HasPolicy &&
-		output.Policy.Kind != sourceModel.SourceKindEmbeddedDirectory {
+		output.Policy.Kind != iofs.Kind {
 		return workspaceSourceSet{}, fmt.Errorf(
 			"%w: Workspace policy Source has kind %q",
 			spec.ErrInvalid,

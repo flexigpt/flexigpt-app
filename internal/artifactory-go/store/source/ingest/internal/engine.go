@@ -8,10 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
@@ -144,7 +146,7 @@ func (e *Engine) DecoderFingerprint() (
 func (e *Engine) Discover(
 	ctx context.Context,
 	value sourceModel.Source,
-	snapshot sourceimpl.Snapshot,
+	snapshot driver.Snapshot,
 ) (Result, error) {
 	if e == nil || e.decoders == nil {
 		return Result{}, spec.ErrClosed
@@ -370,7 +372,7 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		candidate := provider.Candidate{
+		candidate := ingestModel.Candidate{
 			SourceID:            value.ID,
 			SourceKind:          value.Kind,
 			Locator:             entry.Locator,
@@ -404,9 +406,9 @@ func (e *Engine) Discover(
 			continue
 		}
 
-		var decoded []provider.Decoded
+		var decoded []ingestModel.Decoded
 		var decoderDiagnostics []diagnostic.Diagnostic
-		if sourceAware, supported := decoder.(provider.SourceAwareDecoder); supported {
+		if sourceAware, supported := decoder.(ingest.SourceAwareDecoder); supported {
 			decoded, decoderDiagnostics = sourceAware.DecodeWithSource(
 				ctx,
 				cloneCandidate(candidate),
@@ -688,7 +690,7 @@ func decodedBinding(
 	sourceID sourceModel.SourceID,
 	candidateLocator spec.Locator,
 	candidateDigest cryptoutil.Digest,
-	item provider.Decoded,
+	item ingestModel.Decoded,
 ) (artifactModel.SourceBinding, *cryptoutil.Digest, error) {
 	if (item.OriginLocator == "") !=
 		(item.OriginContentDigest == nil) {
@@ -750,17 +752,17 @@ func deleteValidOriginsForBinding(
 }
 
 type snapshotEntryReader struct {
-	snapshot     sourceimpl.Snapshot
+	snapshot     driver.Snapshot
 	maximumBytes int64
 }
 
 func (r snapshotEntryReader) ReadSourceEntry(
 	ctx context.Context,
 	locator spec.Locator,
-) (provider.SourceContent, error) {
+) (ingestModel.SourceContent, error) {
 	entry, err := statEntry(ctx, r.snapshot, locator)
 	if err != nil {
-		return provider.SourceContent{}, err
+		return ingestModel.SourceContent{}, err
 	}
 	content, err := sourceimpl.ReadSnapshotEntry(
 		ctx,
@@ -769,9 +771,9 @@ func (r snapshotEntryReader) ReadSourceEntry(
 		r.maximumBytes,
 	)
 	if err != nil {
-		return provider.SourceContent{}, err
+		return ingestModel.SourceContent{}, err
 	}
-	return provider.SourceContent{
+	return ingestModel.SourceContent{
 		Locator: entry.Locator,
 		Content: content,
 		Digest:  cryptoutil.DigestBytes(content),
@@ -859,11 +861,11 @@ func (e *Engine) allowedDecoders(
 
 func (e *Engine) selectDecoder(
 	ctx context.Context,
-	candidate provider.Candidate,
+	candidate ingestModel.Candidate,
 	allowed map[spec.DecoderID]struct{},
-) (provider.Decoder, []diagnostic.Diagnostic) {
-	var selected provider.Decoder
-	best := provider.RecognitionNone
+) (ingest.Decoder, []diagnostic.Diagnostic) {
+	var selected ingest.Decoder
+	best := ingestModel.RecognitionNone
 	tied := make([]spec.DecoderID, 0)
 
 	for _, decoder := range e.decoders.registered() {
@@ -876,8 +878,8 @@ func (e *Engine) selectDecoder(
 			ctx,
 			cloneCandidate(candidate),
 		)
-		if recognition < provider.RecognitionNone ||
-			recognition > provider.RecognitionPreferred {
+		if recognition < ingestModel.RecognitionNone ||
+			recognition > ingestModel.RecognitionPreferred {
 			return nil, []diagnostic.Diagnostic{{
 				Severity: diagnostic.SeverityError,
 				Code:     DiagnosticCodeDecoderInvalidRecognition,
@@ -898,7 +900,7 @@ func (e *Engine) selectDecoder(
 			continue
 		}
 		if recognition == best &&
-			recognition != provider.RecognitionNone {
+			recognition != ingestModel.RecognitionNone {
 			tied = append(tied, decoder.ID())
 		}
 	}
@@ -923,7 +925,7 @@ func (e *Engine) selectDecoder(
 
 func collectCandidates(
 	ctx context.Context,
-	snapshot sourceimpl.Snapshot,
+	snapshot driver.Snapshot,
 	sp sourceModel.DiscoverySpec,
 ) ([]sourceModel.Entry, error) {
 	found := make(map[spec.Locator]sourceModel.Entry)
@@ -1070,7 +1072,7 @@ func collectCandidates(
 
 func statEntry(
 	ctx context.Context,
-	snapshot sourceimpl.Snapshot,
+	snapshot driver.Snapshot,
 	locator spec.Locator,
 ) (sourceModel.Entry, error) {
 	entry, err := snapshot.Stat(ctx, locator)
@@ -1093,7 +1095,7 @@ func statEntry(
 
 func readDirectoryEntries(
 	ctx context.Context,
-	snapshot sourceimpl.Snapshot,
+	snapshot driver.Snapshot,
 	directory spec.Locator,
 ) ([]sourceModel.Entry, error) {
 	values, err := snapshot.ReadDir(ctx, directory)
@@ -1151,8 +1153,8 @@ func isDirectChild(
 }
 
 func cloneCandidate(
-	value provider.Candidate,
-) provider.Candidate {
+	value ingestModel.Candidate,
+) ingestModel.Candidate {
 	output := value
 	output.Content = append([]byte(nil), value.Content...)
 	output.RequestedDecoderIDs = append(

@@ -1,28 +1,34 @@
-// Package sourceimpl is a temporary compatibility facade.
-//
-// Deprecated: source driver, repository, runtime, and composition contracts
-// will move to source-owned public packages in the next split.
 package sourceimpl
 
-import "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/internal"
+import (
+	sourceStore "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/internal"
+	managedpackage "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
+)
 
+// Package sourceimpl is a temporary compatibility facade.
+//
+// Deprecated: import source, source/driver, and source/managedpackage public
+// contracts directly. This package disappears in Phase 3.
 type (
-	Reader                    = internal.Reader
-	Repository                = internal.Repository
-	Snapshot                  = internal.Snapshot
-	Opener                    = internal.Opener
-	LocalPathResolver         = internal.LocalPathResolver
-	LocalPathCapability       = internal.LocalPathCapability
-	ManagedPackageWriter      = internal.ManagedPackageWriter
-	ManagedSourceBootstrapper = internal.ManagedSourceBootstrapper
-	ManagedRootRemover        = internal.ManagedRootRemover
-	Adapter                   = internal.Adapter
-	PackageBatchWriter        = internal.PackageBatchWriter
-	Registry                  = internal.Registry
-	Runtime                   = internal.Runtime
-	LocalPathRuntime          = internal.LocalPathRuntime
-	VerificationSession       = internal.VerificationSession
-	Service                   = internal.Service
+	Reader                    = sourceStore.Reader
+	Repository                = sourceStore.Repository
+	Runtime                   = sourceStore.Runtime
+	LocalPathRuntime          = sourceStore.LocalPathRuntime
+	Snapshot                  = driver.Snapshot
+	Opener                    = driver.Opener
+	LocalPathResolver         = driver.LocalPathResolver
+	LocalPathCapability       = driver.LocalPathCapability
+	ManagedPackageWriter      = managedpackage.Writer
+	PackageBatchWriter        = managedpackage.BatchWriter
+	ManagedSourceBootstrapper = driver.ManagedSourceBootstrapper
+	ManagedRootRemover        = driver.ManagedRootRemover
+	Adapter                   = driver.Driver
+
+	Registry            = internal.Registry
+	VerificationSession = internal.VerificationSession
+	Service             = internal.Service
 )
 
 var (

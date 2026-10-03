@@ -26,5 +26,5 @@ type API interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-	) (sourceModel.RefreshInspection, error)
+	) (refreshModel.Inspection, error)
 }

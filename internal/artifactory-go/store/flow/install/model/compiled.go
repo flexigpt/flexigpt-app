@@ -4,7 +4,7 @@ import (
 	"context"
 
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -48,9 +48,9 @@ func (s CompiledPackageSet) Clone() CompiledPackageSet {
 }
 
 type CompiledPackage struct {
-	EmbeddedRoot spec.Locator                      `json:"embeddedRoot"`
-	Address      sourceModel.ManagedPackageAddress `json:"address"`
-	Fingerprint  cryptoutil.Digest                 `json:"fingerprint"`
+	EmbeddedRoot spec.Locator                              `json:"embeddedRoot"`
+	Address      managedpackageModel.ManagedPackageAddress `json:"address"`
+	Fingerprint  cryptoutil.Digest                         `json:"fingerprint"`
 
 	Files     []CompiledFile     `json:"files"`
 	Documents []CompiledDocument `json:"documents"`

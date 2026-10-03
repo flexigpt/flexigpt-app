@@ -14,7 +14,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
@@ -45,18 +45,18 @@ func (*AgentMarkdownDecoder) Revision() string {
 
 func (*AgentMarkdownDecoder) Recognize(
 	_ context.Context,
-	candidate provider.Candidate,
-) provider.Recognition {
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
 	if !isAgentMarkdownCandidate(candidate.Locator) {
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
-	return provider.RecognitionPreferred
+	return ingestModel.RecognitionPreferred
 }
 
 func (*AgentMarkdownDecoder) Decode(
 	_ context.Context,
-	candidate provider.Candidate,
-) ([]provider.Decoded, []diagnostic.Diagnostic) {
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	document, body, err := decodeAgentMarkdown(
 		candidate.Content,
 		candidate.Locator,
@@ -108,7 +108,7 @@ func (*AgentMarkdownDecoder) Decode(
 		return nil, agentMarkdownDiagnostics(candidate.Locator, err)
 	}
 
-	output := make([]provider.Decoded, 0, len(namedEntries))
+	output := make([]ingestModel.Decoded, 0, len(namedEntries))
 	for index, named := range namedEntries {
 		value := definitionValue
 		if index != 0 {
@@ -120,7 +120,7 @@ func (*AgentMarkdownDecoder) Decode(
 				)
 			}
 		}
-		output = append(output, provider.Decoded{
+		output = append(output, ingestModel.Decoded{
 			SubresourceLocator: named.SubresourceLocator,
 			Definition:         value,
 		})

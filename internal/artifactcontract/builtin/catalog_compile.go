@@ -11,12 +11,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -36,9 +38,9 @@ type Expectation struct {
 // domain-owned. This package only performs generic Artifact Store admission.
 type PackageInput struct {
 	EmbeddedRoot spec.Locator
-	Address      sourceModel.ManagedPackageAddress
+	Address      managedpackageModel.ManagedPackageAddress
 	DocumentFile spec.Locator
-	Files        []sourceModel.ManagedPackageFile
+	Files        []managedpackageModel.ManagedPackageFile
 	Expectations []Expectation
 }
 
@@ -47,11 +49,14 @@ type PackageInput struct {
 // AdditionalProviders excludes the canonical declaration provider. Compile
 // always installs that provider because every built-in declaration requires it.
 type Config struct {
-	SetName             string
-	SchemaVersion       string
-	InstallerName       string
-	AdditionalProviders []provider.Provider
-	Packages            []PackageInput
+	SetName       string
+	SchemaVersion string
+	InstallerName string
+
+	AdditionalSchemaCodecs []schema.Codec
+	AdditionalDecoders     []ingest.Decoder
+
+	Packages []PackageInput
 }
 
 // Compile admits one domain-owned built-in package set through the ordinary
@@ -107,29 +112,35 @@ func Compile(
 		)
 	}
 
-	canonicalProvider, err := providercanonical.New()
+	canonicalRegistration, err := providercanonical.NewRegistration()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	providers := make(
-		[]provider.Provider,
-		0,
-		1+len(config.AdditionalProviders),
+	schemaCodecs := canonicalRegistration.SchemaCodecs()
+	schemaCodecs = append(
+		schemaCodecs,
+		config.AdditionalSchemaCodecs...,
 	)
-	providers = append(providers, canonicalProvider)
-	for index, provider := range config.AdditionalProviders {
-		if provider == nil {
-			return installModel.CompiledPackageSet{}, fmt.Errorf(
-				"%w: built-in catalog provider %d is nil",
-				spec.ErrInvalid,
-				index,
-			)
-		}
-		providers = append(providers, provider)
+	schemaCodecs, err = schema.NormalizeCodecs(schemaCodecs)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
 	}
 
-	validation, err := validationFingerprint(providers)
+	decoders := canonicalRegistration.Decoders()
+	decoders = append(
+		decoders,
+		config.AdditionalDecoders...,
+	)
+	decoders, err = ingest.NormalizeDecoders(decoders)
+	if err != nil {
+		return installModel.CompiledPackageSet{}, err
+	}
+
+	validation, err := validationFingerprint(
+		schemaCodecs,
+		decoders,
+	)
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
@@ -177,7 +188,9 @@ func Compile(
 			temporaryDirectory,
 			"artifact-store",
 		),
-		Providers:        providers,
+		SchemaCodecs: schemaCodecs,
+		Decoders:     decoders,
+
 		ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
 	})
 	if err != nil {
@@ -207,7 +220,7 @@ func Compile(
 
 		if _, err := store.ManagedPackages.Publish(
 			ctx,
-			artifactModel.PublishArtifactRequest{
+			managedpackageFlowModel.PublishRequest{
 				RootID: declaration.Root.ID,
 				Binding: artifactModel.SourceBinding{
 					SourceID: sourceID,
@@ -216,7 +229,7 @@ func Compile(
 				ExpectedKind:        rootExpectation.Kind,
 				ExpectedLogicalName: rootExpectation.LogicalName,
 				ExpectedDefinition:  rootExpectation.DefinitionDigest,
-				Package: sourceModel.ManagedPackagePublication{
+				Package: managedpackageModel.ManagedPackagePublication{
 					Address: input.Address,
 					Files:   input.Files,
 				},
@@ -263,9 +276,9 @@ func Compile(
 // normalizePackageFileLineEndings makes generated package bytes independent
 // of CRLF checkout conversion before publication and content hashing.
 func normalizePackageFileLineEndings(
-	files []sourceModel.ManagedPackageFile,
-) []sourceModel.ManagedPackageFile {
-	normalized := append([]sourceModel.ManagedPackageFile(nil), files...)
+	files []managedpackageModel.ManagedPackageFile,
+) []managedpackageModel.ManagedPackageFile {
+	normalized := append([]managedpackageModel.ManagedPackageFile(nil), files...)
 	for index := range normalized {
 		content := normalized[index].Content
 		if !bytes.Contains(content, []byte("\r\n")) {
@@ -487,7 +500,8 @@ func generatedHydrationFingerprint(
 }
 
 func validationFingerprint(
-	providers []provider.Provider,
+	schemaCodecs []schema.Codec,
+	decoders []ingest.Decoder,
 ) (cryptoutil.Digest, error) {
 	type schemaValue struct {
 		Identity string            `json:"identity"`
@@ -498,36 +512,31 @@ func validationFingerprint(
 		Revision string         `json:"revision"`
 	}
 
-	schemas := make([]schemaValue, 0)
-	decoders := make([]decoderValue, 0)
+	schemas := make([]schemaValue, 0, len(schemaCodecs))
+	for _, codec := range schemaCodecs {
+		key := codec.Key()
+		schemas = append(schemas, schemaValue{
+			Identity: string(key.Entity) + "/" +
+				string(key.Kind) + "/" +
+				string(key.SchemaID) + "/" +
+				key.SchemaVersion,
+			Digest: cryptoutil.DigestBytes(codec.JSONSchema()),
+		})
+	}
 
-	for _, provider := range providers {
-		descriptor := provider.Descriptor()
-
-		for _, codec := range descriptor.Schemas {
-			key := codec.Key()
-			schemas = append(schemas, schemaValue{
-				Identity: string(key.Entity) + "/" +
-					string(key.Kind) + "/" +
-					string(key.SchemaID) + "/" +
-					key.SchemaVersion,
-				Digest: cryptoutil.DigestBytes(codec.JSONSchema()),
-			})
-		}
-
-		for _, decoder := range descriptor.Decoders {
-			decoders = append(decoders, decoderValue{
-				ID:       decoder.ID(),
-				Revision: decoder.Revision(),
-			})
-		}
+	decoderValues := make([]decoderValue, 0, len(decoders))
+	for _, decoder := range decoders {
+		decoderValues = append(decoderValues, decoderValue{
+			ID:       decoder.ID(),
+			Revision: decoder.Revision(),
+		})
 	}
 
 	sort.Slice(schemas, func(left, right int) bool {
 		return schemas[left].Identity < schemas[right].Identity
 	})
-	sort.Slice(decoders, func(left, right int) bool {
-		return decoders[left].ID < decoders[right].ID
+	sort.Slice(decoderValues, func(left, right int) bool {
+		return decoderValues[left].ID < decoderValues[right].ID
 	})
 
 	return cryptoutil.CanonicalDigest(struct {
@@ -535,6 +544,6 @@ func validationFingerprint(
 		Decoders []decoderValue `json:"decoders"`
 	}{
 		Schemas:  schemas,
-		Decoders: decoders,
+		Decoders: decoderValues,
 	})
 }

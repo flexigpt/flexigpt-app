@@ -8,10 +8,12 @@ import (
 	"sort"
 	"strings"
 
-	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -22,21 +24,21 @@ type sourceRefreshInspector interface {
 	InspectSourceMetadata(
 		ctx context.Context,
 		value sourceModel.Source,
-	) (sourceModel.RefreshInspection, error)
+	) (refreshModel.Inspection, error)
 }
 
 type Service struct {
-	artifacts   artifactimpl.Reader
-	definitions artifactimpl.DefinitionReader
+	artifacts   artifact.Reader
+	definitions artifact.DefinitionReader
 	refresh     sourceRefreshInspector
-	sources     sourceimpl.Runtime
+	sources     source.Runtime
 }
 
 func NewService(
-	artifacts artifactimpl.Reader,
-	definitions artifactimpl.DefinitionReader,
+	artifacts artifact.Reader,
+	definitions artifact.DefinitionReader,
 	refresh sourceRefreshInspector,
-	sources sourceimpl.Runtime,
+	sources source.Runtime,
 ) (*Service, error) {
 	if artifacts == nil ||
 		definitions == nil ||

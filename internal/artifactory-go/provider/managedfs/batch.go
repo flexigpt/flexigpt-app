@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -14,8 +15,8 @@ import (
 func (a *Adapter) ApplyPackageBatch(
 	ctx context.Context,
 	value sourceModel.Source,
-	publications []sourceModel.ManagedPackagePublication,
-	removals []sourceModel.ManagedPackageAddress,
+	publications []managedpackageModel.ManagedPackagePublication,
+	removals []managedpackageModel.ManagedPackageAddress,
 ) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -37,7 +38,7 @@ func (a *Adapter) ApplyPackageBatch(
 	}
 
 	type stagedPackage struct {
-		address   sourceModel.ManagedPackageAddress
+		address   managedpackageModel.ManagedPackageAddress
 		target    string
 		temporary string
 	}
@@ -49,7 +50,7 @@ func (a *Adapter) ApplyPackageBatch(
 		}
 	}()
 
-	published := make(map[sourceModel.ManagedPackageAddress]struct{})
+	published := make(map[managedpackageModel.ManagedPackageAddress]struct{})
 	for _, publication := range publications {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -121,7 +122,7 @@ func (a *Adapter) ApplyPackageBatch(
 		}
 	}
 
-	removed := make(map[sourceModel.ManagedPackageAddress]struct{})
+	removed := make(map[managedpackageModel.ManagedPackageAddress]struct{})
 	for _, address := range removals {
 		if _, replaced := published[address]; replaced {
 			continue
@@ -172,7 +173,7 @@ func (a *Adapter) ApplyPackageBatch(
 func writeStagedPackageFiles(
 	ctx context.Context,
 	root string,
-	files []sourceModel.ManagedPackageFile,
+	files []managedpackageModel.ManagedPackageFile,
 ) error {
 	for _, file := range files {
 		if err := ctx.Err(); err != nil {

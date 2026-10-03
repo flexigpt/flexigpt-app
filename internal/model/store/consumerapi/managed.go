@@ -7,11 +7,14 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -60,7 +63,7 @@ func (a *API) CreateProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: request.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
@@ -69,9 +72,9 @@ func (a *API) CreateProvider(
 			ExpectedKind:        modelDomain.ModelProviderArtifactKind,
 			ExpectedLogicalName: name,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelProviderDocumentFile(),
 					Content: raw,
 				}},
@@ -196,7 +199,7 @@ func (a *API) ReplaceProvider(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -206,10 +209,10 @@ func (a *API) ReplaceProvider(
 			ExpectedLogicalName:     current.LogicalName,
 			ExpectedDefinition:      definitionValue.Digest,
 			AllowPackageReplacement: true,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelProviderDocumentFile(),
 					Content: raw,
 				}},
@@ -297,7 +300,7 @@ func (a *API) DeleteProvider(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifactModel.RemoveArtifactRequest{
+		managedpackageFlowModel.RemoveRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,
@@ -375,7 +378,7 @@ func (a *API) CreateModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: request.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceValue.ID,
@@ -384,9 +387,9 @@ func (a *API) CreateModel(
 			ExpectedKind:        modelDomain.ModelArtifactKind,
 			ExpectedLogicalName: name,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelDocumentFile(),
 					Content: raw,
 				}},
@@ -511,7 +514,7 @@ func (a *API) ReplaceModel(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -521,10 +524,10 @@ func (a *API) ReplaceModel(
 			ExpectedLogicalName:     current.LogicalName,
 			ExpectedDefinition:      definitionValue.Digest,
 			AllowPackageReplacement: true,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: generation,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: modelDomain.ModelDocumentFile(),
 					Content: raw,
 				}},
@@ -610,7 +613,7 @@ func (a *API) DeleteModel(
 	locator := record.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifactModel.RemoveArtifactRequest{
+		managedpackageFlowModel.RemoveRequest{
 			RootID:                record.RootID,
 			SourceID:              record.Binding.SourceID,
 			Package:               address,
@@ -663,7 +666,7 @@ func (a *API) ensureManagedSource(
 	}
 	if summary.ID != draft.ID ||
 		summary.StorageKey != draft.StorageKey ||
-		summary.Kind != sourceModel.SourceKindManagedDirectory {
+		summary.Kind != managedfs.Kind {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: Root %q has an incompatible managed Model Source",
 			spec.ErrConflict,
@@ -783,7 +786,7 @@ func (a *API) managedRecord(
 	if err != nil {
 		return artifactModel.Artifact{}, sourceModel.Summary{}, err
 	}
-	if summary.Kind != sourceModel.SourceKindManagedDirectory ||
+	if summary.Kind != managedfs.Kind ||
 		summary.StorageKey != modelDomain.ManagedSourceStorageKey {
 		return artifactModel.Artifact{}, sourceModel.Summary{}, fmt.Errorf(
 			"%w: Model Artifact is not backed by the expected managed Source",

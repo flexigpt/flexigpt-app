@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -68,11 +68,11 @@ func TestSkillStoreWorkflowBootstrapsBuiltinsAndUserBaseline(
 		documentTopology.BuiltinPackageSourceID(),
 	)
 	requireNoError(t, err)
-	if builtinSource.Kind != sourceModel.SourceKindManagedDirectory {
+	if builtinSource.Kind != managedfs.Kind {
 		t.Fatalf(
 			"built-in Source kind=%q, want %q",
 			builtinSource.Kind,
-			sourceModel.SourceKindManagedDirectory,
+			managedfs.Kind,
 		)
 	}
 	if !builtinSource.Enabled {

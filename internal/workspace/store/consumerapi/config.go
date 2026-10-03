@@ -4,8 +4,8 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	workspaceRuntime "github.com/flexigpt/flexigpt-app/internal/workspace/runtime"
 	"github.com/flexigpt/flexigpt-app/internal/workspace/store/adapter/mcp"
@@ -13,7 +13,7 @@ import (
 
 type Config struct {
 	ContextComposition workspaceRuntime.CompositionPolicy
-	LocatorResolvers   []provider.LocatorResolverFactory
+	LocatorResolvers   []locator.Factory
 	ResolverLimits     resolve.Limits
 	FallbackProviders  map[declaration.Type]resolve.FallbackProvider
 	TargetMappers      map[declaration.Type]resolve.ArtifactTargetMapper
@@ -29,7 +29,7 @@ func (c Config) normalized() Config {
 	output := c
 	output.ContextComposition = output.ContextComposition.Normalized()
 	output.LocatorResolvers = append(
-		[]provider.LocatorResolverFactory(nil),
+		[]locator.Factory(nil),
 		c.LocatorResolvers...,
 	)
 	if c.FallbackProviders != nil {

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -234,7 +235,7 @@ func (s *Synchronizer) Synchronize(
 		if err := next.Validate(); err != nil {
 			return Synchronization{}, err
 		}
-		result.Updates = append(result.Updates, SourceStateUpdate{
+		result.Updates = append(result.Updates, artifact.SourceStateUpdate{
 			ArtifactID:          next.ID,
 			RootID:              next.RootID,
 			Binding:             next.Binding,

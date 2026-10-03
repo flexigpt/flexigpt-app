@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -90,8 +92,8 @@ func (c *Components) HydrateCompiledPackages(
 		sourceID sourceModel.SourceID
 	}
 	type sourceBatch struct {
-		publications []sourceModel.ManagedPackagePublication
-		removals     []sourceModel.ManagedPackageAddress
+		publications []managedpackageModel.ManagedPackagePublication
+		removals     []managedpackageModel.ManagedPackageAddress
 		verify       []installModel.CompiledPackage
 	}
 
@@ -138,7 +140,7 @@ func (c *Components) HydrateCompiledPackages(
 			}
 			batch.publications = append(
 				batch.publications,
-				sourceModel.ManagedPackagePublication{
+				managedpackageModel.ManagedPackagePublication{
 					Address: packageValue.Address,
 					Files:   files,
 				},
@@ -147,7 +149,7 @@ func (c *Components) HydrateCompiledPackages(
 		}
 
 		for _, stale := range plan.Stale {
-			address, err := sourceModel.ParseManagedPackageAddressDirectory(
+			address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 				stale.Key.Scope,
 			)
 			if err != nil {
@@ -183,7 +185,7 @@ func (c *Components) HydrateCompiledPackages(
 		if err != nil {
 			return err
 		}
-		if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
+		if sourceValue.Kind != managedfs.Kind ||
 			!sourceValue.Enabled {
 			return fmt.Errorf(
 				"%w: compiled hydration requires an enabled managed Source",
@@ -294,7 +296,7 @@ func (c *Components) verifyCompiledPackage(
 func readCompiledPackageFiles(
 	ctx context.Context,
 	value installModel.CompiledPackage,
-) ([]sourceModel.ManagedPackageFile, error) {
+) ([]managedpackageModel.ManagedPackageFile, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf("%w: compiled package context is nil", spec.ErrInvalid)
 	}
@@ -306,7 +308,7 @@ func readCompiledPackageFiles(
 	}
 
 	var total int64
-	output := make([]sourceModel.ManagedPackageFile, 0, len(value.Files))
+	output := make([]managedpackageModel.ManagedPackageFile, 0, len(value.Files))
 	for _, file := range value.Files {
 		if err := ctx.Err(); err != nil {
 			return nil, err
@@ -336,7 +338,7 @@ func readCompiledPackageFiles(
 		}
 		total += file.Size
 
-		output = append(output, sourceModel.ManagedPackageFile{
+		output = append(output, managedpackageModel.ManagedPackageFile{
 			Locator: file.Locator,
 			Content: append([]byte(nil), file.Content...),
 		})

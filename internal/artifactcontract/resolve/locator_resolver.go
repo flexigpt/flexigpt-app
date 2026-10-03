@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -15,12 +15,12 @@ import (
 // ProviderLocatorResolver adapts provider-owned locator resolver factories to
 // the typed contract resolver locator boundary.
 type ProviderLocatorResolver struct {
-	resolvers map[provider.LocatorResolverKey]provider.BoundLocatorResolver
+	resolvers map[locator.FactoryKey]locator.Resolver
 }
 
 func NewProviderLocatorResolver(
-	factories []provider.LocatorResolverFactory,
-	runtime provider.LocatorRuntime,
+	factories []locator.Factory,
+	runtime locator.Runtime,
 ) (*ProviderLocatorResolver, error) {
 	if runtime == nil {
 		return nil, fmt.Errorf(
@@ -31,18 +31,18 @@ func NewProviderLocatorResolver(
 
 	output := &ProviderLocatorResolver{
 		resolvers: make(
-			map[provider.LocatorResolverKey]provider.BoundLocatorResolver,
+			map[locator.FactoryKey]locator.Resolver,
 		),
 	}
 	for index, factory := range factories {
-		if err := provider.ValidateLocatorResolverFactory(factory); err != nil {
+		if err := locator.ValidateFactory(factory); err != nil {
 			return nil, fmt.Errorf(
 				"locator resolver factory %d: %w",
 				index,
 				err,
 			)
 		}
-		bound, err := factory.BindLocatorRuntime(runtime)
+		bound, err := factory.Bind(runtime)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"bind locator resolver %q: %w",
@@ -58,7 +58,7 @@ func NewProviderLocatorResolver(
 			)
 		}
 		for _, artifactKind := range factory.ArtifactKinds() {
-			key := provider.LocatorResolverKey{
+			key := locator.FactoryKey{
 				LocatorKind:  factory.LocatorKind(),
 				ArtifactKind: artifactKind,
 			}
@@ -99,7 +99,7 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
-	key := provider.LocatorResolverKey{
+	key := locator.FactoryKey{
 		LocatorKind:  locatorKind,
 		ArtifactKind: artifactModel.ArtifactKind(request.ExpectedType),
 	}
@@ -121,9 +121,9 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 	if err != nil {
 		return artifactModel.ArtifactRef{}, err
 	}
-	ref, err := resolver.ResolveLocator(
+	ref, err := resolver.Resolve(
 		ctx,
-		provider.LocatorResolutionRequest{
+		locator.Request{
 			RootID:              request.RootID,
 			From:                cloneArtifactPointer(request.From),
 			LocatorJSON:         locatorJSON,
@@ -148,16 +148,16 @@ func (r *ProviderLocatorResolver) ResolveArtifactLocator(
 }
 
 func providerLocatorKind(
-	locator declaration.Locator,
+	loc declaration.Locator,
 ) (string, error) {
-	if err := locator.Validate(); err != nil {
+	if err := loc.Validate(); err != nil {
 		return "", err
 	}
-	if locator.Kind != "" {
-		return string(locator.Kind), nil
+	if loc.Kind != "" {
+		return string(loc.Kind), nil
 	}
 
-	parsed, err := url.Parse(locator.Scalar)
+	parsed, err := url.Parse(loc.Scalar)
 	if err != nil {
 		return "", err
 	}

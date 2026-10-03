@@ -12,46 +12,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-// Runtime is a trusted internal capability for consumers that need an
-// operational source, including its normalized adapter configuration.
-//
-// It is intentionally separate from Service, whose query methods return
-// Summary values and do not expose opaque source configuration.
-type Runtime interface {
-	Get(
-		ctx context.Context,
-		rootID rootModel.RootID,
-		id sourceModel.SourceID,
-	) (sourceModel.Source, error)
-
-	Open(
-		ctx context.Context,
-		value sourceModel.Source,
-	) (Snapshot, error)
-
-	List(
-		ctx context.Context,
-		rootID rootModel.RootID,
-	) ([]sourceModel.Source, error)
-}
-
-// LocalPathRuntime is an optional extension implemented by the trusted source
-// runtime when its opener supports LocalPathResolver.
-//
-// It intentionally accepts a full Source rather than a public Summary because
-// source configuration remains internal to Artifact Store consumers.
-type LocalPathRuntime interface {
-	ResolveLocalPath(
-		ctx context.Context,
-		value sourceModel.Source,
-		locator spec.Locator,
-	) (string, error)
-
-	SupportsLocalPath(
-		kind sourceModel.SourceKind,
-	) bool
-}
-
 type runtime struct {
 	reader     Reader
 	opener     Opener

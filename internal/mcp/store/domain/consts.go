@@ -4,7 +4,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcpv1"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -16,10 +16,10 @@ const (
 		mcppolicyv1.MCPPolicyType,
 	)
 
-	ManagedMCPPackageKind       sourceModel.PackageKind = "mcp"
-	ManagedMCPPolicyPackageKind sourceModel.PackageKind = "mcp-policy"
-	MCPCollectionPackageKind    sourceModel.PackageKind = "mcp-collection"
-	SourceDecoderID             spec.DecoderID          = "artifact.mcp-json"
+	ManagedMCPPackageKind       managedpackageModel.PackageKind = "mcp"
+	ManagedMCPPolicyPackageKind managedpackageModel.PackageKind = "mcp-policy"
+	MCPCollectionPackageKind    managedpackageModel.PackageKind = "mcp-collection"
+	SourceDecoderID             spec.DecoderID                  = "artifact.mcp-json"
 
 	InstallationDataSchemaVersion = "v1"
 	BuiltInInstallerName          = "mcp"

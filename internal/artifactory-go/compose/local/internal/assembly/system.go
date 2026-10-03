@@ -7,7 +7,6 @@ import (
 	"io/fs"
 	"path/filepath"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/jsonschema"
@@ -16,6 +15,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
 	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	managedpackageimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/impl"
 	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
@@ -25,8 +25,12 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -35,11 +39,11 @@ import (
 type Config struct {
 	BaseDirectory     string
 	EmbeddedProviders map[string]fs.FS
-	AdditionalSources []sourceimpl.Adapter
+	AdditionalSources []driver.Driver
 
-	ArtifactProviders []provider.Provider
-	// ArtifactIDProvider creates IDs for deterministic source synchronization.
-	// It never reaches a provider or consumer.
+	SchemaCodecs []schema.Codec
+	Decoders     []ingest.Decoder
+
 	ArtifactIDProvider        idprovider.Provider
 	Clock                     clockutil.Clock
 	RootMutationPolicy        rootModel.RootPolicy
@@ -63,10 +67,8 @@ type Components struct {
 	Refresh          *refreshimpl.Service
 	Resources        *resourceimpl.Service
 	ShareableSchemas *jsonschema.Registry
-	LocatorResolvers []provider.LocatorResolverFactory
-
 	ManagedArtifacts *managedpackageimpl.Service
-	SourceRuntime    sourceimpl.Runtime
+	SourceRuntime    source.Runtime
 	LocalState       *secretimpl.Service
 
 	metadata           *sqlite.Store
@@ -98,7 +100,12 @@ func Open(
 	if config.ArtifactIDProvider == nil {
 		config.ArtifactIDProvider = idprovider.NewUUIDProvider()
 	}
-	providerRegistry, err := providerRegistryFromConfig(config)
+	schemaCodecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
+	if err != nil {
+		return nil, err
+	}
+
+	decoders, err := ingest.NormalizeDecoders(config.Decoders)
 	if err != nil {
 		return nil, err
 	}
@@ -123,18 +130,15 @@ func Open(
 		return nil, err
 	}
 
-	registeredSchemas := providerRegistry.Schemas()
-	registeredDecoders := providerRegistry.Decoders()
-
 	shareableRegistry, err := jsonschema.NewRegistry(
-		registeredSchemas...,
+		schemaCodecs...,
 	)
 	if err != nil {
 		_ = metadata.Close()
 		return nil, err
 	}
 
-	if err := bindProviderSchemas(registeredDecoders, shareableRegistry); err != nil {
+	if err := ingest.BindSchemaCatalog(decoders, shareableRegistry); err != nil {
 		_ = metadata.Close()
 		return nil, err
 	}
@@ -168,7 +172,11 @@ func Open(
 		return nil, err
 	}
 
-	sourceAdapters := make([]sourceimpl.Adapter, 0, 3+len(config.AdditionalSources))
+	sourceAdapters := make(
+		[]driver.Driver,
+		0,
+		3+len(config.AdditionalSources),
+	)
 	sourceAdapters = append(
 		sourceAdapters,
 		filesystemAdapter,
@@ -184,8 +192,8 @@ func Open(
 		return nil, err
 	}
 	decoderRegistry, err := ingestimpl.NewDecoderRegistry(
-		registeredSchemas,
-		registeredDecoders...,
+		schemaCodecs,
+		decoders...,
 	)
 	if err != nil {
 
@@ -313,7 +321,6 @@ func Open(
 		Refresh:            refreshService,
 		Resources:          resourceService,
 		ShareableSchemas:   shareableRegistry,
-		LocatorResolvers:   providerRegistry.LocatorResolvers(),
 		SourceRuntime:      sourceRuntime,
 		LocalState:         localStateService,
 		metadata:           metadata,
@@ -348,7 +355,7 @@ func Open(
 				rootID rootModel.RootID,
 				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
-				publication sourceModel.ManagedPackagePublication,
+				publication managedpackageModel.ManagedPackagePublication,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.publishManagedPackageForMutableRoot(
 					ctx,
@@ -370,7 +377,7 @@ func Open(
 				rootID rootModel.RootID,
 				sourceID sourceModel.SourceID,
 				expectedRevision uint64,
-				publication sourceModel.ManagedPackagePublication,
+				publication managedpackageModel.ManagedPackagePublication,
 			) (managedpackageimpl.SourceState, error) {
 				result, err := components.publishProtectedManagedPackage(
 					ctx,
@@ -481,7 +488,7 @@ func (c *Components) publishManagedPackageForMutableRoot(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication sourceModel.ManagedPackagePublication,
+	publication managedpackageModel.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
 	return c.publishManagedPackage(
 		ctx,
@@ -502,7 +509,7 @@ func (c *Components) publishProtectedManagedPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication sourceModel.ManagedPackagePublication,
+	publication managedpackageModel.ManagedPackagePublication,
 ) (ManagedPackageResult, error) {
 	if c == nil || !c.isProtectedRoot(rootID) {
 		return ManagedPackageResult{}, fmt.Errorf(
@@ -531,7 +538,7 @@ func (c *Components) removeManagedPackageForMutableRoot(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	return c.removeManagedPackage(
@@ -552,7 +559,7 @@ func (c *Components) removeProtectedManagedPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (ManagedPackageResult, error) {
 	if c == nil || !c.isProtectedRoot(rootID) {
@@ -581,7 +588,7 @@ func (c *Components) publishManagedPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication sourceModel.ManagedPackagePublication,
+	publication managedpackageModel.ManagedPackagePublication,
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
 	if c == nil {
@@ -660,7 +667,7 @@ func (c *Components) removeManagedPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 	allowProtected bool,
 ) (ManagedPackageResult, error) {
@@ -770,9 +777,9 @@ func (c *Components) removeManagedPackage(
 
 func managedPackageExists(
 	ctx context.Context,
-	runtime sourceimpl.Runtime,
+	runtime source.Runtime,
 	v sourceModel.Source,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) (bool, error) {
 	snapshot, err := runtime.Open(ctx, v)
 	if err != nil {
@@ -858,7 +865,7 @@ func (c *Components) managedSource(
 
 func sourceSnapshotGeneration(
 	ctx context.Context,
-	runtime sourceimpl.Runtime,
+	runtime source.Runtime,
 	v sourceModel.Source,
 ) (string, error) {
 	snapshot, err := runtime.Open(ctx, v)
@@ -879,7 +886,7 @@ func (c *Components) removeManagedArtifactPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedpackageimpl.SourceState, error) {
 	result, err := c.removeManagedPackageForMutableRoot(
@@ -904,7 +911,7 @@ func (c *Components) removeProtectedManagedArtifactPackage(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (managedpackageimpl.SourceState, error) {
 	result, err := c.removeProtectedManagedPackage(

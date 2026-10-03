@@ -1,4 +1,4 @@
-package model
+package managedpackage
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -26,7 +26,7 @@ func ReadPackageFiles(
 	ctx context.Context,
 	packages fs.FS,
 	packageRoot spec.Locator,
-) ([]sourceModel.ManagedPackageFile, error) {
+) ([]managedpackageModel.ManagedPackageFile, error) {
 	if ctx == nil {
 		return nil, fmt.Errorf(
 			"%w: embedded package context is nil",
@@ -70,7 +70,7 @@ func ReadPackageFiles(
 		)
 	}
 
-	files := make([]sourceModel.ManagedPackageFile, 0)
+	files := make([]managedpackageModel.ManagedPackageFile, 0)
 	seen := make(map[spec.Locator]struct{})
 	var totalBytes int64
 
@@ -144,7 +144,7 @@ func ReadPackageFiles(
 				return err
 			}
 			totalBytes += int64(len(content))
-			files = append(files, sourceModel.ManagedPackageFile{
+			files = append(files, managedpackageModel.ManagedPackageFile{
 				Locator: relative,
 				Content: append([]byte(nil), content...),
 			})

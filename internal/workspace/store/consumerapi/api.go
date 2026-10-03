@@ -10,6 +10,8 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
@@ -557,7 +559,7 @@ func (a *StoreAPI) ensureWorkspaceSources(
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 				StorageKey:  WorkspaceDirectorySourceStorageKey,
-				Kind:        sourceModel.SourceKindFilesystemDirectory,
+				Kind:        fsdir.Kind,
 				DisplayName: "Workspace directory source",
 				Enabled:     true,
 				Config:      directoryConfig,
@@ -589,7 +591,7 @@ func (a *StoreAPI) ensureWorkspaceSources(
 			Draft: sourceModel.Draft{
 				ID:          sourceModel.SourceID(uuidutil.NewUUIDv7()),
 				StorageKey:  WorkspaceBasePolicySourceStorageKey,
-				Kind:        sourceModel.SourceKindEmbeddedDirectory,
+				Kind:        iofs.Kind,
 				DisplayName: "Workspace base policy source",
 				Enabled:     true,
 				Config:      policyConfig,

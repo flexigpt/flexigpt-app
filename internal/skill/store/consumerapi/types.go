@@ -3,6 +3,7 @@ package consumerapi
 import (
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -60,9 +61,9 @@ type ManagedSkillCreateRequest struct {
 	// SKILLMD and Files describe the logical Agent Skill directory supplied by
 	// the caller. Files must contain SKILL.md at the logical package root.
 	// The Store owns physical managed-package layout beneath that directory.
-	SKILLMD []byte                           `json:"skillMD,omitempty"`
-	Files   []sourceModel.ManagedPackageFile `json:"files,omitempty"`
-	Enabled bool                             `json:"enabled"`
+	SKILLMD []byte                                   `json:"skillMD,omitempty"`
+	Files   []managedpackageModel.ManagedPackageFile `json:"files,omitempty"`
+	Enabled bool                                     `json:"enabled"`
 }
 
 type ManagedSkillCreateResult struct {
@@ -82,9 +83,9 @@ type ManagedSkillReplaceRequest struct {
 	// SKILLMD and Files describe the logical Agent Skill directory supplied by
 	// the caller. Files must contain SKILL.md at the logical package root.
 	// The Store owns physical managed-package layout beneath that directory.
-	SKILLMD []byte                           `json:"skillMD,omitempty"`
-	Files   []sourceModel.ManagedPackageFile `json:"files,omitempty"`
-	Enabled bool                             `json:"enabled"`
+	SKILLMD []byte                                   `json:"skillMD,omitempty"`
+	Files   []managedpackageModel.ManagedPackageFile `json:"files,omitempty"`
+	Enabled bool                                     `json:"enabled"`
 }
 
 type ManagedSkillReplaceResult struct {

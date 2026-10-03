@@ -6,6 +6,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
+	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -34,7 +35,7 @@ type ResolvedArtifact struct {
 	Artifact     artifactModel.Artifact     `json:"-"`
 	Definition   definitionModel.Definition `json:"-"`
 	Source       sourceModel.Summary        `json:"-"`
-	RefreshState sourceModel.RefreshState   `json:"-"`
+	RefreshState refreshModel.State         `json:"-"`
 }
 
 func (r ResolvedArtifact) Validate() error {

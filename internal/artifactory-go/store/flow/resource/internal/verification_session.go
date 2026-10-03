@@ -9,8 +9,10 @@ import (
 	"sync"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -26,8 +28,8 @@ type verificationSessionSourceKey struct {
 
 type verificationSessionSource struct {
 	source     sourceModel.Source
-	inspection sourceModel.RefreshInspection
-	snapshot   sourceimpl.Snapshot
+	inspection refreshModel.Inspection
+	snapshot   driver.Snapshot
 }
 
 type verificationSession struct {
@@ -248,7 +250,7 @@ func (s *verificationSession) sourceLocked(
 
 func readVerificationSessionEntry(
 	ctx context.Context,
-	snapshot sourceimpl.Snapshot,
+	snapshot driver.Snapshot,
 	locator spec.Locator,
 	maximumBytes int64,
 ) ([]byte, error) {
@@ -300,7 +302,7 @@ func (s *Service) resolveArtifactInSession(
 
 	var (
 		sourceValue sourceModel.Source
-		state       sourceModel.RefreshState
+		state       refreshModel.State
 	)
 	err = session.withSource(
 		ctx,

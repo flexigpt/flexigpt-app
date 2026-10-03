@@ -6,8 +6,10 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -93,7 +95,7 @@ func (a *API) CreateMCPServer(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -102,9 +104,9 @@ func (a *API) CreateMCPServer(
 			ExpectedKind:        mcpDomain.MCPArtifactKind,
 			ExpectedLogicalName: request.Document.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: mcpDomain.ManagedMCPDocumentFile(),
 					Content: append([]byte(nil), definitionValue.Body...),
 				}},
@@ -225,7 +227,7 @@ func (a *API) UpdateMCPServer(
 	if err != nil {
 		return ManagedMCPReplaceResult{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return ManagedMCPReplaceResult{}, fmt.Errorf(
 			"%w: MCP Server is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -341,7 +343,7 @@ func (a *API) UpdateMCPServer(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -350,10 +352,10 @@ func (a *API) UpdateMCPServer(
 			ExpectedKind:        mcpDomain.MCPArtifactKind,
 			ExpectedLogicalName: current.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: inspection.State.SourceGeneration,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: mcpDomain.ManagedMCPDocumentFile(),
 					Content: append([]byte(nil), definitionValue.Body...),
 				}},
@@ -445,7 +447,7 @@ func (a *API) DeleteMCPServer(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return fmt.Errorf(
 			"%w: MCP Server is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -458,7 +460,7 @@ func (a *API) DeleteMCPServer(
 		return err
 	}
 
-	removeRequest := artifactModel.RemoveArtifactRequest{
+	removeRequest := managedpackageFlowModel.RemoveRequest{
 		RootID:           record.RootID,
 		SourceID:         record.Binding.SourceID,
 		Package:          address,

@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -22,6 +22,8 @@ import (
 const (
 	directoryReadBatchSize = 256
 )
+
+const Kind sourceModel.SourceKind = "fs-directory"
 
 type Config struct {
 	RootPath string `json:"rootPath"`
@@ -48,7 +50,7 @@ func NewWithTraversalPolicy(policy *TraversalPolicy) (*Adapter, error) {
 }
 
 func (a *Adapter) Kind() sourceModel.SourceKind {
-	return sourceModel.SourceKindFilesystemDirectory
+	return Kind
 }
 
 func (a *Adapter) NormalizeConfig(
@@ -87,8 +89,8 @@ func (a *Adapter) NormalizeConfig(
 func (a *Adapter) Open(
 	ctx context.Context,
 	value sourceModel.Source,
-) (sourceimpl.Snapshot, error) {
-	if value.Kind != sourceModel.SourceKindFilesystemDirectory {
+) (driver.Snapshot, error) {
+	if value.Kind != Kind {
 		return nil, fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			spec.ErrInvalid,
@@ -124,7 +126,7 @@ func (a *Adapter) ResolveLocalPath(
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if value.Kind != sourceModel.SourceKindFilesystemDirectory {
+	if value.Kind != Kind {
 		return "", fmt.Errorf(
 			"%w: filesystem adapter received source kind %q",
 			spec.ErrInvalid,

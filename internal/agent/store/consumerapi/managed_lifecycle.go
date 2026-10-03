@@ -6,15 +6,17 @@ import (
 
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type editableManagedAgent struct {
 	artifact   artifactModel.Artifact
-	address    sourceModel.ManagedPackageAddress
+	address    managedpackageModel.ManagedPackageAddress
 	generation string
 }
 
@@ -48,7 +50,7 @@ func (a *API) DeleteManagedAgent(
 	locator := current.artifact.Binding.Locator
 	if err := a.managedArtifacts.Remove(
 		ctx,
-		artifactModel.RemoveArtifactRequest{
+		managedpackageFlowModel.RemoveRequest{
 			RootID:                current.artifact.RootID,
 			SourceID:              current.artifact.Binding.SourceID,
 			Package:               current.address,
@@ -191,7 +193,7 @@ func (a *API) loadManagedAgent(
 	if err != nil {
 		return editableManagedAgent{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
+	if sourceValue.Kind != managedfs.Kind ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
 		return editableManagedAgent{}, fmt.Errorf(
 			"%w: Agent is not backed by the managed Agent Source",

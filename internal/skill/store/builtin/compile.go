@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
@@ -25,19 +24,17 @@ func Compile(
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	sourceProvider, err := skillProviderAPI.NewProvider()
+	sourceProvider, err := skillProviderAPI.NewRegistration()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
 	return builtin.Compile(ctx, temporaryDirectory, builtin.Config{
-		SetName:       documentTopology.BuiltinEmbeddedPackageSkills,
-		SchemaVersion: skillDomain.HydrationSchemaVersion,
-		InstallerName: skillDomain.BuiltInInstallerName,
-		AdditionalProviders: []provider.Provider{
-			sourceProvider,
-		},
-		Packages: packageInputs(prepared),
+		SetName:            documentTopology.BuiltinEmbeddedPackageSkills,
+		SchemaVersion:      skillDomain.HydrationSchemaVersion,
+		InstallerName:      skillDomain.BuiltInInstallerName,
+		AdditionalDecoders: sourceProvider.Decoders(),
+		Packages:           packageInputs(prepared),
 	})
 }
 

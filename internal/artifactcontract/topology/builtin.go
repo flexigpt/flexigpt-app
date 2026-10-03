@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -461,7 +462,7 @@ func loadBuiltinTopology(
 		)
 	}
 	packageSource := sourcesByName[packageSourceName]
-	if packageSource.Kind != sourceModel.SourceKindManagedDirectory {
+	if packageSource.Kind != managedfs.Kind {
 		return builtinTopologyConfig{}, fmt.Errorf(
 			"%w: built-in package Source must be managed",
 			spec.ErrInvalid,

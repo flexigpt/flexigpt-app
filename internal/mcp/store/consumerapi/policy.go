@@ -6,9 +6,11 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/mcppolicyv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	mcpPolicy "github.com/flexigpt/flexigpt-app/internal/mcp/runtime/policy"
@@ -62,7 +64,7 @@ func (a *API) SaveMCPPolicy(
 		return ManagedMCPPolicyUpsertResult{}, err
 	}
 
-	address, err := sourceModel.NewManagedPackageAddress(
+	address, err := managedpackageModel.NewManagedPackageAddress(
 		mcpDomain.ManagedMCPPolicyPackageKind,
 		request.Name,
 		documentTopology.UnversionedPackageVersion(),
@@ -115,7 +117,7 @@ func (a *API) SaveMCPPolicy(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -124,9 +126,9 @@ func (a *API) SaveMCPPolicy(
 			ExpectedKind:        mcpDomain.MCPPolicyArtifactKind,
 			ExpectedLogicalName: request.Name,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: mcpDomain.ManagedMCPPolicyDocumentFile(),
 					Content: raw,
 				}},
@@ -205,7 +207,7 @@ func (a *API) DeleteMCPPolicy(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return fmt.Errorf(
 			"%w: MCP Policy is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -217,7 +219,7 @@ func (a *API) DeleteMCPPolicy(
 	if err != nil {
 		return err
 	}
-	removeRequest := artifactModel.RemoveArtifactRequest{
+	removeRequest := managedpackageFlowModel.RemoveRequest{
 		RootID:           record.RootID,
 		SourceID:         record.Binding.SourceID,
 		Package:          address,

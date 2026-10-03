@@ -6,9 +6,11 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -30,7 +32,7 @@ type PublishPackageFunc func(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	publication sourceModel.ManagedPackagePublication,
+	publication managedpackageModel.ManagedPackagePublication,
 ) (SourceState, error)
 
 type RemovePackageFunc func(
@@ -38,7 +40,7 @@ type RemovePackageFunc func(
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
 	expectedSourceRevision uint64,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) (SourceState, error)
 
@@ -79,7 +81,7 @@ type SourceRunner interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-	) (sourceModel.RefreshInspection, error)
+	) (refreshModel.Inspection, error)
 }
 
 type Dependencies struct {
@@ -121,41 +123,41 @@ func NewService(
 
 func (s *Service) Publish(
 	ctx context.Context,
-	request artifactModel.PublishArtifactRequest,
-) (artifactModel.PublishArtifactResult, error) {
+	request managedpackageFlowModel.PublishRequest,
+) (managedpackageFlowModel.PublishResult, error) {
 	if s == nil {
-		return artifactModel.PublishArtifactResult{}, spec.ErrClosed
+		return managedpackageFlowModel.PublishResult{}, spec.ErrClosed
 	}
 	if err := request.RootID.Validate(); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := request.Binding.Validate(); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := request.ExpectedKind.Validate(); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := request.ExpectedLogicalName.Validate(); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := cryptoutil.ValidateDigest(
 		request.ExpectedDefinition,
 	); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := s.requireMutable(
 		ctx,
 		request.RootID,
 		request.AllowProtected,
 	); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 
-	publication, err := sourceModel.NormalizeManagedPackagePublication(
+	publication, err := managedpackageModel.NormalizeManagedPackagePublication(
 		request.Package,
 	)
 	if err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	state, err := s.dependencies.GetSourceState(
 		ctx,
@@ -163,7 +165,7 @@ func (s *Service) Publish(
 		request.Binding.SourceID,
 	)
 	if err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := validateManagedSourceState(
 		state,
@@ -171,7 +173,7 @@ func (s *Service) Publish(
 		request.Binding.SourceID,
 		true,
 	); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if publication.ExpectedGeneration == "" &&
 		request.AllowPackageReplacement {
@@ -190,7 +192,7 @@ func (s *Service) Publish(
 		publication,
 	)
 	if err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if err := validateManagedSourceState(
 		published,
@@ -198,7 +200,7 @@ func (s *Service) Publish(
 		request.Binding.SourceID,
 		true,
 	); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 
 	if published.Source.Revision == state.Source.Revision &&
@@ -217,7 +219,7 @@ func (s *Service) Publish(
 			)
 			if findErr == nil &&
 				matchesPublishExpectation(resolved, request) {
-				return artifactModel.PublishArtifactResult{
+				return managedpackageFlowModel.PublishResult{
 					Artifact:   resolved,
 					Source:     published.Source,
 					Generation: published.Generation,
@@ -232,7 +234,7 @@ func (s *Service) Publish(
 		request.RootID,
 		request.Binding.SourceID,
 	); err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	resolved, err := s.dependencies.Artifacts.FindByOrigin(
 		ctx,
@@ -241,18 +243,18 @@ func (s *Service) Publish(
 		request.ExpectedKind,
 	)
 	if err != nil {
-		return artifactModel.PublishArtifactResult{}, err
+		return managedpackageFlowModel.PublishResult{}, err
 	}
 	if resolved.State != artifactModel.StateAvailable ||
 		resolved.LogicalName != request.ExpectedLogicalName ||
 		resolved.ResolvedDefinition == nil ||
 		*resolved.ResolvedDefinition != request.ExpectedDefinition {
-		return artifactModel.PublishArtifactResult{}, fmt.Errorf(
+		return managedpackageFlowModel.PublishResult{}, fmt.Errorf(
 			"%w: managed package did not resolve to its expected Artifact",
 			spec.ErrReferenceUnresolved,
 		)
 	}
-	return artifactModel.PublishArtifactResult{
+	return managedpackageFlowModel.PublishResult{
 		Artifact:   resolved,
 		Source:     published.Source,
 		Generation: published.Generation,
@@ -262,7 +264,7 @@ func (s *Service) Publish(
 
 func matchesPublishExpectation(
 	value artifactModel.Artifact,
-	request artifactModel.PublishArtifactRequest,
+	request managedpackageFlowModel.PublishRequest,
 ) bool {
 	return value.State == artifactModel.StateAvailable &&
 		value.LogicalName == request.ExpectedLogicalName &&
@@ -272,7 +274,7 @@ func matchesPublishExpectation(
 
 func (s *Service) Remove(
 	ctx context.Context,
-	request artifactModel.RemoveArtifactRequest,
+	request managedpackageFlowModel.RemoveRequest,
 ) error {
 	if s == nil {
 		return spec.ErrClosed

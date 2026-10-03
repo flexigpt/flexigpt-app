@@ -5,8 +5,8 @@ import (
 	"maps"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -14,7 +14,7 @@ import (
 )
 
 type apiOptions struct {
-	locatorResolvers  []provider.LocatorResolverFactory
+	locatorResolvers  []locator.Factory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 }
@@ -22,11 +22,11 @@ type apiOptions struct {
 type Option func(*apiOptions)
 
 func WithLocatorResolvers(
-	values []provider.LocatorResolverFactory,
+	values []locator.Factory,
 ) Option {
 	return func(options *apiOptions) {
 		options.locatorResolvers = append(
-			[]provider.LocatorResolverFactory(nil),
+			[]locator.Factory(nil),
 			values...,
 		)
 	}
@@ -70,10 +70,11 @@ type skillLocatorRuntime struct {
 	cat catalog.API
 }
 
-func (r skillLocatorRuntime) ListArtifactsBySource(
+func (r skillLocatorRuntime) ListBySource(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
-	return r.cat.ListBySource(ctx, rootID, sourceID, catalogModel.ListOptions{})
+	return r.cat.ListBySource(ctx, rootID, sourceID, options)
 }

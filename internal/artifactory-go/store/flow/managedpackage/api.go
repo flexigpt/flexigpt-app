@@ -3,17 +3,17 @@ package managedpackage
 import (
 	"context"
 
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 )
 
 type API interface {
 	Publish(
 		ctx context.Context,
-		request artifactModel.PublishArtifactRequest,
-	) (artifactModel.PublishArtifactResult, error)
+		request managedpackageFlowModel.PublishRequest,
+	) (managedpackageFlowModel.PublishResult, error)
 
 	Remove(
 		ctx context.Context,
-		request artifactModel.RemoveArtifactRequest,
+		request managedpackageFlowModel.RemoveRequest,
 	) error
 }

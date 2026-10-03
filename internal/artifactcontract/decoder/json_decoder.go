@@ -9,8 +9,9 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -40,7 +41,7 @@ func (*JSONDecoder) RequiredSchemaKeys() []schemaModel.Key {
 }
 
 func (d *JSONDecoder) BindExpectedCanonicalizer(
-	catalog provider.SchemaCatalog,
+	catalog schema.Catalog,
 ) error {
 	if d == nil || d.core == nil {
 		return fmt.Errorf(
@@ -53,8 +54,8 @@ func (d *JSONDecoder) BindExpectedCanonicalizer(
 
 func (*JSONDecoder) Recognize(
 	_ context.Context,
-	candidate provider.Candidate,
-) provider.Recognition {
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
 	requested := candidate.RequestsDecoder(JSONDecoderID)
 	declared := documentTopology.IsCanonicalJSONDocument(
 		candidate.Locator,
@@ -64,7 +65,7 @@ func (*JSONDecoder) Recognize(
 	)
 	if (extension == ".yaml" || extension == ".yml") && !requested &&
 		!declared {
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
 
 	var header struct {
@@ -72,23 +73,23 @@ func (*JSONDecoder) Recognize(
 	}
 	if err := json.Unmarshal(candidate.Content, &header); err != nil {
 		if requested || declared {
-			return provider.RecognitionPossible
+			return ingestModel.RecognitionPossible
 		}
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
 	if !supportsType(header.Type) {
 		if requested || declared {
-			return provider.RecognitionPossible
+			return ingestModel.RecognitionPossible
 		}
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
-	return provider.RecognitionPreferred
+	return ingestModel.RecognitionPreferred
 }
 
 func (d *JSONDecoder) Decode(
 	ctx context.Context,
-	candidate provider.Candidate,
-) ([]provider.Decoded, []diagnostic.Diagnostic) {
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	if d == nil || d.core == nil {
 		return nil, []diagnostic.Diagnostic{{
 			Severity: diagnostic.SeverityError,

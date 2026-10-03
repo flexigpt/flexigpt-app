@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -28,22 +28,22 @@ func (*Decoder) Revision() string {
 
 func (*Decoder) Recognize(
 	_ context.Context,
-	candidate provider.Candidate,
-) provider.Recognition {
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
 	switch {
 	case sourceformat.IsRetiredMCPCollection(candidate.Content):
-		return provider.RecognitionPreferred
+		return ingestModel.RecognitionPreferred
 	case sourceformat.IsMCPConfig(candidate.Content):
-		return provider.RecognitionPreferred
+		return ingestModel.RecognitionPreferred
 	case isMCPConfigCandidate(candidate):
-		return provider.RecognitionPossible
+		return ingestModel.RecognitionPossible
 	default:
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
 }
 
 func isMCPConfigCandidate(
-	candidate provider.Candidate,
+	candidate ingestModel.Candidate,
 ) bool {
 	if candidate.RequestsDecoder(mcpDomain.SourceDecoderID) {
 		return true
@@ -55,8 +55,8 @@ func isMCPConfigCandidate(
 
 func (d *Decoder) Decode(
 	ctx context.Context,
-	candidate provider.Candidate,
-) ([]provider.Decoded, []diagnostic.Diagnostic) {
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	switch {
 	case sourceformat.IsRetiredMCPCollection(candidate.Content):
 		return nil, decoderError(
@@ -93,10 +93,10 @@ func (d *Decoder) Decode(
 
 func decodedValues(
 	values []sourceformat.Decoded,
-) []provider.Decoded {
-	output := make([]provider.Decoded, 0, len(values))
+) []ingestModel.Decoded {
+	output := make([]ingestModel.Decoded, 0, len(values))
 	for _, value := range values {
-		output = append(output, provider.Decoded{
+		output = append(output, ingestModel.Decoded{
 			SubresourceLocator: value.SubresourceLocator,
 			Definition:         value.Definition,
 		})

@@ -8,10 +8,10 @@ import (
 	agentDomain "github.com/flexigpt/flexigpt-app/internal/agent/store/domain"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/materializetext"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/signer"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
@@ -49,7 +49,7 @@ type API struct {
 
 type apiOptions struct {
 	roots             root.API
-	locatorResolvers  []provider.LocatorResolverFactory
+	locatorResolvers  []locator.Factory
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider
 	targetMappers     map[declaration.Type]resolve.ArtifactTargetMapper
 	importSigner      *signer.Signer
@@ -69,11 +69,11 @@ func WithRoots(
 }
 
 func WithLocatorResolvers(
-	values []provider.LocatorResolverFactory,
+	values []locator.Factory,
 ) Option {
 	return func(options *apiOptions) {
 		options.locatorResolvers = append(
-			[]provider.LocatorResolverFactory(nil),
+			[]locator.Factory(nil),
 			values...,
 		)
 	}
@@ -265,13 +265,14 @@ type agentLocatorRuntime struct {
 	catalog catalog.API
 }
 
-func (r agentLocatorRuntime) ListArtifactsBySource(
+func (r agentLocatorRuntime) ListBySource(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
+	options catalogModel.ListOptions,
 ) ([]catalogModel.Entry, error) {
 	if r.catalog == nil {
 		return nil, spec.ErrClosed
 	}
-	return r.catalog.ListBySource(ctx, rootID, sourceID, catalogModel.ListOptions{})
+	return r.catalog.ListBySource(ctx, rootID, sourceID, options)
 }

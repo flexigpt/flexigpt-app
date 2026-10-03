@@ -1,67 +1,46 @@
-package assembly
+package ingest
 
 import (
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	schema "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/registry"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-func providerRegistryFromConfig(
-	config Config,
-) (*registry.Registry, error) {
-	r, err := registry.New(
-		config.ArtifactProviders...,
-	)
-	if err != nil {
-		return nil, fmt.Errorf(
-			"register Artifact Store providers: %w",
-			err,
-		)
-	}
-	return r, nil
-}
-
-// bindProviderSchemas supplies the narrow schema catalog required by modern
-// decoders. It validates required schema keys before Artifact Store begins
-// discovery, rather than deferring a configuration error until decoding.
-func bindProviderSchemas(
-	decoders []provider.Decoder,
-	schemas provider.SchemaCatalog,
+// BindSchemaCatalog validates decoder schema dependencies and supplies the
+// narrow expected-canonicalization capability required by bound decoders.
+func BindSchemaCatalog(
+	decoders []Decoder,
+	schemas schema.Catalog,
 ) error {
 	if schemas == nil {
 		return fmt.Errorf(
-			"%w: provider schema catalog is nil",
+			"%w: schema catalog is nil",
 			spec.ErrInvalid,
 		)
 	}
 
-	available := make(
-		map[schemaModel.Key]struct{},
-	)
+	available := make(map[schemaModel.Key]struct{})
 	for _, key := range schemas.Keys() {
 		available[key] = struct{}{}
 	}
 
 	for _, decoder := range decoders {
-		binder, supported := decoder.(provider.SchemaCanonicalizerBinder)
+		binder, supported := decoder.(SchemaCanonicalizerBinder)
 		if !supported {
 			continue
 		}
 
 		required := binder.RequiredSchemaKeys()
-		seen := make(
-			map[schemaModel.Key]struct{},
-			len(required),
-		)
-		for requiredIndex, key := range required {
+		seen := make(map[schemaModel.Key]struct{}, len(required))
+
+		for index, key := range required {
 			if err := key.Validate(); err != nil {
 				return fmt.Errorf(
 					"decoder %q required schema %d: %w",
 					decoder.ID(),
-					requiredIndex,
+					index,
 					err,
 				)
 			}
@@ -91,7 +70,7 @@ func bindProviderSchemas(
 
 		if err := binder.BindExpectedCanonicalizer(schemas); err != nil {
 			return fmt.Errorf(
-				"bind provider schema catalog to decoder %q: %w",
+				"bind schema catalog to decoder %q: %w",
 				decoder.ID(),
 				err,
 			)

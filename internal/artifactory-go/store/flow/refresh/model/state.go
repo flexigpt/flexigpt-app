@@ -5,18 +5,16 @@ import (
 	"time"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-// RefreshState records one successfully published Source scan.
-//
-// It is Source freshness bookkeeping only. It does not own Artifacts,
-// Definitions, typed relationships, or consumer graph state.
-type RefreshState struct {
+// State records one successfully published Source refresh.
+type State struct {
 	RootID               rootModel.RootID        `json:"rootID"`
-	SourceID             SourceID                `json:"sourceID"`
+	SourceID             sourceModel.SourceID    `json:"sourceID"`
 	SourceRevision       uint64                  `json:"sourceRevision"`
 	SourceGeneration     string                  `json:"sourceGeneration"`
 	DiscoveryFingerprint cryptoutil.Digest       `json:"discoveryFingerprint"`
@@ -26,7 +24,7 @@ type RefreshState struct {
 	Diagnostics          []diagnostic.Diagnostic `json:"diagnostics,omitempty"`
 }
 
-func (s RefreshState) Validate() error {
+func (s State) Validate() error {
 	if err := s.RootID.Validate(); err != nil {
 		return err
 	}
@@ -35,28 +33,22 @@ func (s RefreshState) Validate() error {
 	}
 	if s.SourceRevision == 0 || s.Revision == 0 {
 		return fmt.Errorf(
-			"%w: Source refresh revisions must be positive",
+			"%w: source refresh revisions must be positive",
 			spec.ErrInvalid,
 		)
 	}
-	if err := spec.ValidateSourceGeneration(
-		s.SourceGeneration,
-	); err != nil {
+	if err := spec.ValidateSourceGeneration(s.SourceGeneration); err != nil {
 		return err
 	}
-	if err := cryptoutil.ValidateDigest(
-		s.DiscoveryFingerprint,
-	); err != nil {
+	if err := cryptoutil.ValidateDigest(s.DiscoveryFingerprint); err != nil {
 		return fmt.Errorf(
-			"Source discovery fingerprint: %w",
+			"source discovery fingerprint: %w",
 			err,
 		)
 	}
-	if err := cryptoutil.ValidateDigest(
-		s.DecoderFingerprint,
-	); err != nil {
+	if err := cryptoutil.ValidateDigest(s.DecoderFingerprint); err != nil {
 		return fmt.Errorf(
-			"Source decoder fingerprint: %w",
+			"source decoder fingerprint: %w",
 			err,
 		)
 	}
@@ -69,33 +61,8 @@ func (s RefreshState) Validate() error {
 	return diagnostic.Validate(s.Diagnostics)
 }
 
-func (s RefreshState) Clone() RefreshState {
+func (s State) Clone() State {
 	output := s
 	output.Diagnostics = diagnostic.Clone(s.Diagnostics)
 	return output
-}
-
-type RefreshInspection struct {
-	State                   RefreshState `json:"state"`
-	SourceRevisionChanged   bool         `json:"sourceRevisionChanged"`
-	DiscoveryChanged        bool         `json:"discoveryChanged"`
-	DecoderChanged          bool         `json:"decoderChanged"`
-	SourceGenerationChanged bool         `json:"sourceGenerationChanged"`
-}
-
-func (i RefreshInspection) Validate() error {
-	return i.State.Validate()
-}
-
-func (i RefreshInspection) Clone() RefreshInspection {
-	output := i
-	output.State = i.State.Clone()
-	return output
-}
-
-func (i RefreshInspection) IsCurrent() bool {
-	return !i.SourceRevisionChanged &&
-		!i.DiscoveryChanged &&
-		!i.DecoderChanged &&
-		!i.SourceGenerationChanged
 }

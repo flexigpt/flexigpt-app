@@ -6,19 +6,20 @@ import (
 	"fmt"
 
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
 type Service struct {
-	repository Repository
+	repository root.Repository
 	clock      clockutil.Clock
 	policy     rootModel.RootPolicy
 }
 
 func NewService(
-	repository Repository,
+	repository root.Repository,
 	timeClock clockutil.Clock,
 	policy rootModel.RootPolicy,
 ) (*Service, error) {

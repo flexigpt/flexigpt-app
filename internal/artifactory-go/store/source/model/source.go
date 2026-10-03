@@ -16,12 +16,6 @@ type (
 	SourceKind string
 )
 
-const (
-	SourceKindFilesystemDirectory SourceKind = "fs-directory"
-	SourceKindEmbeddedDirectory   SourceKind = "embedded-directory"
-	SourceKindManagedDirectory    SourceKind = "managed-directory"
-)
-
 func (v SourceID) Validate() error {
 	err := uuidutil.ValidateUUIDv7(string(v))
 	if err != nil {

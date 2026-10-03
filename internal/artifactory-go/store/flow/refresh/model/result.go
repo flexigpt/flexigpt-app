@@ -15,7 +15,7 @@ import (
 // It belongs outside basespec/source because Artifact imports SourceBinding
 // from basespec/source. Keeping result values here avoids an import cycle.
 type RefreshSourceResult struct {
-	State                 sourceModel.RefreshState   `json:"state"`
+	State                 State                      `json:"state"`
 	CreatedArtifacts      []artifactModel.ArtifactID `json:"createdArtifacts,omitempty"`
 	UpdatedArtifacts      []artifactModel.ArtifactID `json:"updatedArtifacts,omitempty"`
 	MissingArtifacts      []artifactModel.ArtifactID `json:"missingArtifacts,omitempty"`

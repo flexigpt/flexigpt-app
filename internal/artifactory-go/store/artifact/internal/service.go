@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
@@ -16,15 +17,15 @@ import (
 )
 
 type Service struct {
-	repository  Repository
-	definitions DefinitionReader
+	repository  artifact.Repository
+	definitions artifact.DefinitionReader
 	clock       clockutil.Clock
 	policy      rootModel.RootPolicy
 }
 
 func NewService(
-	repository Repository,
-	definitions DefinitionReader,
+	repository artifact.Repository,
+	definitions artifact.DefinitionReader,
 	timeClock clockutil.Clock,
 	policy rootModel.RootPolicy,
 ) (*Service, error) {

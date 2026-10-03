@@ -19,21 +19,24 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
 const (
-	ManagedCollectionPackageKind sourceModel.PackageKind = "plugin"
+	ManagedCollectionPackageKind managedpackageModel.PackageKind = "plugin"
 )
 
 type API struct {
@@ -194,7 +197,7 @@ type MemberMutationResult struct {
 type editableCollection struct {
 	artifact   artifactModel.Artifact
 	document   pluginv1.PluginDocument
-	address    sourceModel.ManagedPackageAddress
+	address    managedpackageModel.ManagedPackageAddress
 	generation string
 }
 
@@ -559,7 +562,7 @@ func (a *API) Delete(
 		)
 	}
 
-	removeRequest := artifactModel.RemoveArtifactRequest{
+	removeRequest := managedpackageFlowModel.RemoveRequest{
 		RootID:             value.artifact.RootID,
 		SourceID:           value.artifact.Binding.SourceID,
 		Package:            value.address,
@@ -847,11 +850,11 @@ func (a *API) managedSource(
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-	if value.Kind != sourceModel.SourceKindManagedDirectory {
+	if value.Kind != managedfs.Kind {
 		return sourceModel.Summary{}, fmt.Errorf(
 			"%w: editable Collection Source must have kind %q",
 			spec.ErrUnsupported,
-			sourceModel.SourceKindManagedDirectory,
+			managedfs.Kind,
 		)
 	}
 	if !value.Enabled {
@@ -867,7 +870,7 @@ func (a *API) publishDocument(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	document pluginv1.PluginDocument,
 	expectedGeneration string,
 	allowPackageReplacement bool,
@@ -898,7 +901,7 @@ func (a *API) publishDocument(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -909,10 +912,10 @@ func (a *API) publishDocument(
 			),
 			ExpectedLogicalName: spec.LogicalName(document.Name),
 			ExpectedDefinition:  digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            address,
 				ExpectedGeneration: expectedGeneration,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: documentFile,
 					Content: raw,
 				}},
@@ -974,7 +977,7 @@ func (a *API) loadEditableCollection(
 	if err != nil {
 		return editableCollection{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return editableCollection{}, fmt.Errorf(
 			"%w: Collection is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -1057,7 +1060,7 @@ func (a *API) loadEditableCollection(
 
 func (a *API) managedCollectionAddress(
 	name spec.LogicalName,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	return managedCollectionAddressFor(
 		a.managedCollectionPackageKind(),
 		name,
@@ -1065,10 +1068,10 @@ func (a *API) managedCollectionAddress(
 }
 
 func managedCollectionAddressFor(
-	packageKind sourceModel.PackageKind,
+	packageKind managedpackageModel.PackageKind,
 	name spec.LogicalName,
-) (sourceModel.ManagedPackageAddress, error) {
-	return sourceModel.NewManagedPackageAddress(
+) (managedpackageModel.ManagedPackageAddress, error) {
+	return managedpackageModel.NewManagedPackageAddress(
 		packageKind,
 		name,
 		documentTopology.UnversionedPackageVersion(),
@@ -1077,7 +1080,7 @@ func managedCollectionAddressFor(
 
 func (a *API) managedCollectionAddressFromLocator(
 	locator spec.Locator,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		a.managedCollectionPackageKind(),
 		a.managedCollectionDocumentFile(),
@@ -1085,7 +1088,7 @@ func (a *API) managedCollectionAddressFromLocator(
 	)
 }
 
-func (a *API) managedCollectionPackageKind() sourceModel.PackageKind {
+func (a *API) managedCollectionPackageKind() managedpackageModel.PackageKind {
 	if a != nil && a.domain != nil && a.domain.PackageKind != "" {
 		return a.domain.PackageKind
 	}
@@ -1113,7 +1116,7 @@ func (a *API) managedCollectionDecoderID() (spec.DecoderID, error) {
 
 func managedCollectionAddressFromLocator(
 	locator spec.Locator,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	return managedCollectionAddressFromLocatorFor(
 		ManagedCollectionPackageKind,
 		documentTopology.MustDefaultDocumentFile(documentTopology.DocumentUseManagedCollection),
@@ -1122,35 +1125,35 @@ func managedCollectionAddressFromLocator(
 }
 
 func managedCollectionAddressFromLocatorFor(
-	packageKind sourceModel.PackageKind,
+	packageKind managedpackageModel.PackageKind,
 	documentFile spec.Locator,
 	locator spec.Locator,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if err := packageKind.Validate(); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if err := documentFile.ValidatePortable(false); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if path.Base(string(locator)) != string(documentFile) {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Collection locator %q is not %q",
 			spec.ErrUnsupported,
 			locator,
 			documentFile,
 		)
 	}
-	address, err := sourceModel.ParseManagedPackageAddressDirectory(
+	address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if address.Kind != packageKind {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Collection package kind must be %q",
 			spec.ErrUnsupported,
 			packageKind,

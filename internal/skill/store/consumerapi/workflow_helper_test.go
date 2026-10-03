@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	skillBuiltin "github.com/flexigpt/flexigpt-app/internal/skill/store/builtin"
@@ -29,20 +29,32 @@ type skillWorkflowFixture struct {
 func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	t.Helper()
 
-	canonicalProvider, err := providercanonical.New()
+	canonicalRegistration, err := providercanonical.NewRegistration()
 	requireNoError(t, err)
 
-	skillProvider, err := skillProviderAPI.NewProvider()
+	skillRegistration, err := skillProviderAPI.NewRegistration()
 	requireNoError(t, err)
+
+	locatorRegistry, err := locator.NewRegistry(
+		canonicalRegistration.LocatorFactories()...,
+	)
+	requireNoError(t, err)
+
+	schemaCodecs := canonicalRegistration.SchemaCodecs()
+
+	decoders := canonicalRegistration.Decoders()
+	decoders = append(
+		decoders,
+		skillRegistration.Decoders()...,
+	)
 
 	store, err := local.Open(
 		t.Context(),
 		local.Config{
 			BaseDirectory: t.TempDir(),
-			Providers: []provider.Provider{
-				canonicalProvider,
-				skillProvider,
-			},
+			SchemaCodecs:  schemaCodecs,
+			Decoders:      decoders,
+
 			ProtectedRootIDs: documentTopology.ProtectedRootIDs(),
 			RetainedRoots:    documentTopology.RetainedRootDrafts(),
 		},
@@ -64,7 +76,7 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 		store.Catalog,
 		store.Definitions,
 		skillConsumerAPI.WithLocatorResolvers(
-			store.LocatorResolvers,
+			locatorRegistry.Factories(),
 		),
 	)
 	requireNoError(t, err)
@@ -144,8 +156,8 @@ func createManagedSkillInCollection(
 func managedSkillFiles(
 	document []byte,
 	checklist string,
-) []sourceModel.ManagedPackageFile {
-	return []sourceModel.ManagedPackageFile{
+) []managedpackageModel.ManagedPackageFile {
+	return []managedpackageModel.ManagedPackageFile{
 		{
 			Locator: spec.Locator("SKILL.md"),
 			Content: append([]byte(nil), document...),

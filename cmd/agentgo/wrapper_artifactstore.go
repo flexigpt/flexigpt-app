@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	artifactLocator "github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providermarkdown"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
@@ -23,41 +23,57 @@ import (
 func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
-) (*local.Store, error) {
+) (*local.Store, []artifactLocator.Factory, error) {
 	if err := documentTopology.ValidateApplicationTopology(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	canonicalProvider, err := providercanonical.New()
+	canonicalRegistration, err := providercanonical.NewRegistration()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	markdownProvider, err := providermarkdown.NewProvider()
+	markdownRegistration, err := providermarkdown.NewRegistration()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	skillProvider, err := skillProviderAPI.NewProvider()
+	skillRegistration, err := skillProviderAPI.NewRegistration()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	mcpProvider, err := mcpProviderAPI.NewProvider()
+	mcpRegistration, err := mcpProviderAPI.NewRegistration()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	locatorRegistry, err := artifactLocator.NewRegistry(
+		canonicalRegistration.LocatorFactories()...,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	schemaCodecs := canonicalRegistration.SchemaCodecs()
+
+	decoders := canonicalRegistration.Decoders()
+	decoders = append(
+		decoders,
+		markdownRegistration.Decoders()...,
+	)
+	decoders = append(
+		decoders,
+		skillRegistration.Decoders()...,
+	)
+	decoders = append(
+		decoders,
+		mcpRegistration.Decoders()...,
+	)
 
 	workspaceFS, err := builtin.EmbeddedWorkspacePackages()
 	if err != nil {
-		return nil, err
-	}
-
-	providers := []provider.Provider{
-		canonicalProvider,
-		markdownProvider,
-		skillProvider,
-		mcpProvider,
+		return nil, nil, err
 	}
 
 	secretValues, err := keyringmapstore.New(
@@ -68,7 +84,7 @@ func composeArtifactStore(
 		keyringmapstore.Config{},
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	protectedOverlayNamespaces := append(
@@ -80,14 +96,16 @@ func composeArtifactStore(
 		mcpOverlay.StoreNamespaces()...,
 	)
 
-	return local.Open(
+	store, err := local.Open(
 		ctx,
 		local.Config{
 			BaseDirectory: baseDirectory,
 			EmbeddedProviders: map[string]fs.FS{
 				defaultpolicy.ProviderKey: workspaceFS,
 			},
-			Providers:                  providers,
+			SchemaCodecs: schemaCodecs,
+			Decoders:     decoders,
+
 			ProtectedRootIDs:           documentTopology.ProtectedRootIDs(),
 			RetainedRoots:              documentTopology.RetainedRootDrafts(),
 			ProtectedOverlayNamespaces: protectedOverlayNamespaces,
@@ -95,4 +113,9 @@ func composeArtifactStore(
 			SecretValues:               secretValues,
 		},
 	)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return store, locatorRegistry.Factories(), nil
 }

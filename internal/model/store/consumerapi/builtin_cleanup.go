@@ -12,6 +12,7 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -35,14 +36,14 @@ type BuiltinPackageCleanup interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		addresses []sourceModel.ManagedPackageAddress,
+		addresses []managedpackageModel.ManagedPackageAddress,
 	) ([]BuiltinArtifactSnapshot, error)
 
 	ReconcileBuiltInPackageArtifacts(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		addresses []sourceModel.ManagedPackageAddress,
+		addresses []managedpackageModel.ManagedPackageAddress,
 		previous []BuiltinArtifactSnapshot,
 	) error
 }
@@ -67,7 +68,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageArtifacts(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	addresses []sourceModel.ManagedPackageAddress,
+	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]BuiltinArtifactSnapshot, error) {
 	if c == nil || c.api == nil {
 		return nil, spec.ErrClosed
@@ -130,7 +131,7 @@ func (c *builtinPackageCleanup) ReconcileBuiltInPackageArtifacts(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	addresses []sourceModel.ManagedPackageAddress,
+	addresses []managedpackageModel.ManagedPackageAddress,
 	previous []BuiltinArtifactSnapshot,
 ) error {
 	if c == nil || c.api == nil {
@@ -281,7 +282,7 @@ func (c *builtinPackageCleanup) purgeRemovedBuiltInArtifactOverlay(
 }
 
 func managedPackageScopes(
-	addresses []sourceModel.ManagedPackageAddress,
+	addresses []managedpackageModel.ManagedPackageAddress,
 ) (map[spec.Locator]struct{}, error) {
 	output := make(map[spec.Locator]struct{}, len(addresses))
 	for _, address := range addresses {

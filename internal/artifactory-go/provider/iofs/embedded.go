@@ -9,12 +9,14 @@ import (
 	"io/fs"
 	"strings"
 
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	"github.com/flexigpt/flexigpt-app/internal/jsonutil"
 )
+
+const Kind sourceModel.SourceKind = "embedded-directory"
 
 type Config struct {
 	ProviderKey string       `json:"providerKey"`
@@ -48,7 +50,7 @@ func New(providers map[string]fs.FS) (*Adapter, error) {
 }
 
 func (*Adapter) Kind() sourceModel.SourceKind {
-	return sourceModel.SourceKindEmbeddedDirectory
+	return Kind
 }
 
 func (a *Adapter) NormalizeConfig(
@@ -79,8 +81,8 @@ func (a *Adapter) NormalizeConfig(
 func (a *Adapter) Open(
 	ctx context.Context,
 	value sourceModel.Source,
-) (sourceimpl.Snapshot, error) {
-	if value.Kind != sourceModel.SourceKindEmbeddedDirectory {
+) (driver.Snapshot, error) {
+	if value.Kind != Kind {
 		return nil, fmt.Errorf(
 			"%w: embedded adapter received source kind %q",
 			spec.ErrInvalid,

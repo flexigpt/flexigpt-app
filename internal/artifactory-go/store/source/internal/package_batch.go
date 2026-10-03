@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -18,16 +19,16 @@ type PackageBatchWriter interface {
 	ApplyPackageBatch(
 		ctx context.Context,
 		value sourceModel.Source,
-		publications []sourceModel.ManagedPackagePublication,
-		removals []sourceModel.ManagedPackageAddress,
+		publications []managedpackageModel.ManagedPackagePublication,
+		removals []managedpackageModel.ManagedPackageAddress,
 	) error
 }
 
 func (r *Registry) ApplyPackageBatch(
 	ctx context.Context,
 	value sourceModel.Source,
-	publications []sourceModel.ManagedPackagePublication,
-	removals []sourceModel.ManagedPackageAddress,
+	publications []managedpackageModel.ManagedPackagePublication,
+	removals []managedpackageModel.ManagedPackageAddress,
 ) error {
 	if r == nil {
 		return spec.ErrClosed

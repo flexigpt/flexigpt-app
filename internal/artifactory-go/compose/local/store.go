@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local/internal/assembly"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
@@ -24,6 +23,7 @@ import (
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -50,10 +50,6 @@ type Store struct {
 	ArtifactCleanup artifactcleanupFlow.API
 	Protection      root.ProtectionAPI
 	Topology        installFlow.API
-
-	// Temporary. Remove in Phase 2 when generic provider descriptors and
-	// generic locator resolver registration leave artifactory-go.
-	LocatorResolvers []provider.LocatorResolverFactory
 
 	components *assembly.Components
 	closeOnce  sync.Once
@@ -122,9 +118,13 @@ func Open(
 		assembly.Config{
 			BaseDirectory:     config.BaseDirectory,
 			EmbeddedProviders: config.EmbeddedProviders,
-			ArtifactProviders: append(
-				[]provider.Provider(nil),
-				config.Providers...,
+			SchemaCodecs: append(
+				[]schema.Codec(nil),
+				config.SchemaCodecs...,
+			),
+			Decoders: append(
+				[]ingest.Decoder(nil),
+				config.Decoders...,
 			),
 			RootMutationPolicy: rootPolicy,
 			ProtectedOverlayNamespaces: append(
@@ -165,11 +165,6 @@ func Open(
 		Protection: protectionAPI{
 			policy: rootPolicy,
 		},
-
-		LocatorResolvers: append(
-			[]provider.LocatorResolverFactory(nil),
-			components.LocatorResolvers...,
-		),
 
 		components: components,
 	}

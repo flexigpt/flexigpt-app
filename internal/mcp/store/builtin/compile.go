@@ -5,7 +5,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
@@ -25,19 +24,17 @@ func Compile(
 		return installModel.CompiledPackageSet{}, err
 	}
 
-	sourceProvider, err := mcpProviderAPI.NewProvider()
+	sourceProvider, err := mcpProviderAPI.NewRegistration()
 	if err != nil {
 		return installModel.CompiledPackageSet{}, err
 	}
 
 	return builtin.Compile(ctx, temporaryDirectory, builtin.Config{
-		SetName:       documentTopology.BuiltinEmbeddedPackageMCPs,
-		SchemaVersion: mcpDomain.HydrationSchemaVersion,
-		InstallerName: mcpDomain.BuiltInInstallerName,
-		AdditionalProviders: []provider.Provider{
-			sourceProvider,
-		},
-		Packages: packageInputs(prepared),
+		SetName:            documentTopology.BuiltinEmbeddedPackageMCPs,
+		SchemaVersion:      mcpDomain.HydrationSchemaVersion,
+		InstallerName:      mcpDomain.BuiltInInstallerName,
+		AdditionalDecoders: sourceProvider.Decoders(),
+		Packages:           packageInputs(prepared),
 	})
 }
 

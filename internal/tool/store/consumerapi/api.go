@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
@@ -72,7 +73,7 @@ func New(
 	if err != nil {
 		return nil, err
 	}
-	if builtinSource.Kind != sourceModel.SourceKindManagedDirectory {
+	if builtinSource.Kind != managedfs.Kind {
 		return nil, fmt.Errorf(
 			"%w: built-in Tool Source must be managed",
 			spec.ErrInvalid,

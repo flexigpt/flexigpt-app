@@ -9,17 +9,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	managedpackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -180,7 +183,7 @@ func (a *API) RegisterSkillDirectory(
 					"skill-path",
 					rootPath,
 				),
-				Kind:        sourceModel.SourceKindFilesystemDirectory,
+				Kind:        fsdir.Kind,
 				DisplayName: request.SourceDisplayName,
 				Enabled:     true,
 				Config:      config,
@@ -347,7 +350,7 @@ func (a *API) CreateManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -356,7 +359,7 @@ func (a *API) CreateManagedSkill(
 			ExpectedKind:        skillDomain.SkillArtifactKind,
 			ExpectedLogicalName: definitionValue.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: packageAddress,
 				Files:   storageFiles,
 			},
@@ -467,7 +470,7 @@ func (a *API) ReplaceManagedSkill(
 	if err != nil {
 		return ManagedSkillReplaceResult{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return ManagedSkillReplaceResult{}, fmt.Errorf(
 			"%w: Skill is not backed by a managed Source",
 			spec.ErrUnsupported,
@@ -564,7 +567,7 @@ func (a *API) ReplaceManagedSkill(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: current.RootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: current.Binding.SourceID,
@@ -573,7 +576,7 @@ func (a *API) ReplaceManagedSkill(
 			ExpectedKind:        skillDomain.SkillArtifactKind,
 			ExpectedLogicalName: current.LogicalName,
 			ExpectedDefinition:  definitionValue.Digest,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address:            currentAddress,
 				ExpectedGeneration: inspection.State.SourceGeneration,
 				Files:              storageFiles,
@@ -662,7 +665,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return fmt.Errorf(
 			"%w: source-backed Skill removal must update or unregister its Source",
 			spec.ErrUnsupported,
@@ -684,7 +687,7 @@ func (a *API) PurgeSkill(
 	if err != nil {
 		return err
 	}
-	removeRequest := artifactModel.RemoveArtifactRequest{
+	removeRequest := managedpackageFlowModel.RemoveRequest{
 		RootID:           value.RootID,
 		SourceID:         value.Binding.SourceID,
 		Package:          packageAddress,
@@ -755,7 +758,7 @@ func (a *API) getManagedSkillDocument(
 	if err != nil {
 		return skillDomain.ManagedSkillDocument{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory {
+	if sourceValue.Kind != managedfs.Kind {
 		return skillDomain.ManagedSkillDocument{}, fmt.Errorf(
 			"%w: only managed Skills expose editable Skill documents",
 			spec.ErrUnsupported,

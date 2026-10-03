@@ -16,9 +16,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	managedpackageFlowModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managedpackage/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
@@ -52,8 +55,8 @@ type preparedAgentImport struct {
 	ExpectedCollectionRevision uint64                    `json:"expectedCollectionRevision"`
 	ExpectedSourceGeneration   string                    `json:"expectedSourceGeneration"`
 
-	Address      sourceModel.ManagedPackageAddress `json:"address"`
-	AgentLocator spec.Locator                      `json:"agentLocator"`
+	Address      managedpackageModel.ManagedPackageAddress `json:"address"`
+	AgentLocator spec.Locator                              `json:"agentLocator"`
 
 	RestoredMemberships       []AgentRestoredMembership `json:"restoredMemberships"`
 	MCPSetupDescriptors       []AgentMCPSetupDescriptor `json:"mcpSetupDescriptors"`
@@ -739,7 +742,7 @@ func (a *API) agentImportDestination(
 	if err != nil {
 		return agentImportDestinationState{}, err
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
+	if sourceValue.Kind != managedfs.Kind ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey ||
 		!sourceValue.Enabled {
 		return agentImportDestinationState{}, fmt.Errorf(
@@ -880,7 +883,7 @@ func (a *API) managedAgentPackageConflict(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) (*AgentImportConflict, error) {
 	if a == nil || a.resources == nil {
 		return nil, spec.ErrClosed
@@ -1300,7 +1303,7 @@ func (a *API) publishPreparedManagedAgent(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	raw []byte,
 	expectedDefinition cryptoutil.Digest,
 ) (artifactModel.Artifact, error) {
@@ -1333,7 +1336,7 @@ func (a *API) publishPreparedManagedAgent(
 
 	published, err := a.managedArtifacts.Publish(
 		ctx,
-		artifactModel.PublishArtifactRequest{
+		managedpackageFlowModel.PublishRequest{
 			RootID: rootID,
 			Binding: artifactModel.SourceBinding{
 				SourceID: sourceID,
@@ -1342,9 +1345,9 @@ func (a *API) publishPreparedManagedAgent(
 			ExpectedKind:        agentDomain.AgentArtifactKind,
 			ExpectedLogicalName: address.Name,
 			ExpectedDefinition:  expectedDefinition,
-			Package: sourceModel.ManagedPackagePublication{
+			Package: managedpackageModel.ManagedPackagePublication{
 				Address: address,
-				Files: []sourceModel.ManagedPackageFile{{
+				Files: []managedpackageModel.ManagedPackageFile{{
 					Locator: agentDomain.ManagedAgentDocumentFile(),
 					Content: append([]byte(nil), raw...),
 				}},

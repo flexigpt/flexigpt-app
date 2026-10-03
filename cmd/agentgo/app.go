@@ -10,6 +10,7 @@ import (
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
@@ -54,6 +55,7 @@ type App struct {
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
 	artifactStoreComposition *local.Store
+	artifactLocatorFactories []locator.Factory
 
 	dataBasePath string
 
@@ -204,7 +206,7 @@ func (a *App) initManagers() {
 	}
 	slog.Info("conversation store initialized", "directory", a.conversationsDirPath)
 
-	artifactComposition, err := composeArtifactStore(
+	artifactComposition, locatorFactories, err := composeArtifactStore(
 		context.Background(),
 		a.artifactStoreDirPath,
 	)
@@ -220,7 +222,7 @@ func (a *App) initManagers() {
 		)
 	}
 	a.artifactStoreComposition = artifactComposition
-
+	a.artifactLocatorFactories = locatorFactories
 	slog.Info("artifact store initialized", "directory", a.artifactStoreDirPath)
 
 	err = InitSettingStoreWrapper(a.settingStoreAPI, a.settingsDirPath)
@@ -364,7 +366,7 @@ func (a *App) initManagers() {
 		artifactComposition.Definitions,
 		fallbackProviders,
 		targetMappers,
-		artifactComposition.LocatorResolvers...,
+		a.artifactLocatorFactories...,
 	)
 	if err != nil {
 		slog.Error(
@@ -407,7 +409,7 @@ func (a *App) initManagers() {
 		artifactComposition.Definitions,
 		fallbackProviders,
 		targetMappers,
-		artifactComposition.LocatorResolvers...,
+		a.artifactLocatorFactories...,
 	)
 	if err != nil {
 		slog.Error(
@@ -481,7 +483,7 @@ func (a *App) initManagers() {
 		artifactComposition.SecretRuntime,
 		artifactComposition.ArtifactCleanup,
 		artifactComposition.Topology,
-		artifactComposition.LocatorResolvers,
+		a.artifactLocatorFactories,
 		fallbackProviders,
 		targetMappers,
 	)
@@ -517,7 +519,7 @@ func (a *App) initManagers() {
 		artifactComposition.Artifacts,
 		artifactComposition.Catalog,
 		artifactComposition.Resources,
-		artifactComposition.LocatorResolvers,
+		a.artifactLocatorFactories,
 		fallbackProviders,
 		targetMappers,
 		mcpWorkspaceResolver,
@@ -732,6 +734,7 @@ func (a *App) shutdown(ctx context.Context) { //nolint:all
 			)
 		}
 		a.artifactStoreComposition = nil
+		a.artifactLocatorFactories = nil
 	}
 
 	if a.conversationStoreAPI != nil {

@@ -12,7 +12,7 @@ import (
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -22,7 +22,7 @@ import (
 )
 
 type Service struct {
-	sources      sourceimpl.Runtime
+	sources      source.Runtime
 	artifacts    ArtifactReader
 	states       RefreshStateReader
 	discovery    *ingestimpl.Engine
@@ -33,7 +33,7 @@ type Service struct {
 }
 
 func NewService(
-	sources sourceimpl.Runtime,
+	sources source.Runtime,
 	artifacts ArtifactReader,
 	states RefreshStateReader,
 	discoveryEngine *ingestimpl.Engine,
@@ -329,33 +329,33 @@ func (s *Service) InspectSource(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-) (sourceModel.RefreshInspection, error) {
+) (refreshModel.Inspection, error) {
 	if s == nil {
-		return sourceModel.RefreshInspection{}, spec.ErrClosed
+		return refreshModel.Inspection{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return sourceModel.RefreshInspection{}, fmt.Errorf(
+		return refreshModel.Inspection{}, fmt.Errorf(
 			"%w: Source refresh inspection context is nil",
 			spec.ErrInvalid,
 		)
 	}
 	if err := ctx.Err(); err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	if err := rootID.Validate(); err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	if err := sourceID.Validate(); err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 
 	value, err := s.sources.Get(ctx, rootID, sourceID)
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	result, err := s.InspectSourceMetadata(ctx, value)
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 
 	// A metadata difference already makes the Source stale. Do not open and
@@ -373,30 +373,30 @@ func (s *Service) InspectSource(
 func (s *Service) InspectSourceMetadata(
 	ctx context.Context,
 	value sourceModel.Source,
-) (sourceModel.RefreshInspection, error) {
+) (refreshModel.Inspection, error) {
 	if s == nil {
-		return sourceModel.RefreshInspection{}, spec.ErrClosed
+		return refreshModel.Inspection{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return sourceModel.RefreshInspection{}, spec.ErrInvalid
+		return refreshModel.Inspection{}, spec.ErrInvalid
 	}
 	if err := ctx.Err(); err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	state, err := s.states.GetRefreshState(ctx, value.RootID, value.ID)
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	discoveryFingerprint, err := value.Discovery.Fingerprint()
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	decoderFingerprint, err := s.discovery.DecoderFingerprint()
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 
-	return sourceModel.RefreshInspection{
+	return refreshModel.Inspection{
 		State:                 state,
 		SourceRevisionChanged: state.SourceRevision != value.Revision,
 		DiscoveryChanged:      state.DiscoveryFingerprint != discoveryFingerprint,
@@ -407,17 +407,17 @@ func (s *Service) InspectSourceMetadata(
 func (s *Service) inspectSourceGeneration(
 	ctx context.Context,
 	value sourceModel.Source,
-	result sourceModel.RefreshInspection,
-) (sourceModel.RefreshInspection, error) {
+	result refreshModel.Inspection,
+) (refreshModel.Inspection, error) {
 	snapshot, err := s.sources.Open(ctx, value)
 	if err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 	generation := snapshot.Generation()
 	confirmErr := snapshot.Confirm(ctx)
 	closeErr := snapshot.Close()
 	if err := errors.Join(confirmErr, closeErr); err != nil {
-		return sourceModel.RefreshInspection{}, err
+		return refreshModel.Inspection{}, err
 	}
 
 	result.SourceGenerationChanged = result.State.SourceGeneration != generation

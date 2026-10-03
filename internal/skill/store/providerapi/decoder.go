@@ -4,8 +4,8 @@ import (
 	"context"
 	"path"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
@@ -29,21 +29,21 @@ func (*Decoder) Revision() string {
 
 func (*Decoder) Recognize(
 	_ context.Context,
-	candidate provider.Candidate,
-) provider.Recognition {
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
 	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
-		return provider.RecognitionNone
+		return ingestModel.RecognitionNone
 	}
 	if candidate.RequestsDecoder(skillDomain.MarkdownDecoderID) {
-		return provider.RecognitionPreferred
+		return ingestModel.RecognitionPreferred
 	}
-	return provider.RecognitionPossible
+	return ingestModel.RecognitionPossible
 }
 
 func (*Decoder) Decode(
 	_ context.Context,
-	candidate provider.Candidate,
-) ([]provider.Decoded, []diagnostic.Diagnostic) {
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	if !skillDomain.IsSkillDefinitionFile(candidate.Locator) {
 		return nil, nil
 	}
@@ -70,7 +70,7 @@ func (*Decoder) Decode(
 		}
 	}
 
-	return []provider.Decoded{{
+	return []ingestModel.Decoded{{
 		Definition: value,
 	}}, warnings
 }
@@ -80,7 +80,7 @@ func expectedSkillName(locator spec.Locator) string {
 	if parent == "." {
 		return ""
 	}
-	if address, err := sourceModel.ParseManagedPackageAddressDirectory(
+	if address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(parent),
 	); err == nil &&
 		address.Kind == skillDomain.ManagedSkillPackageKind {

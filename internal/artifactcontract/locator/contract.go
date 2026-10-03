@@ -1,4 +1,4 @@
-package provider
+package locator
 
 import (
 	"context"
@@ -12,52 +12,43 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// LocatorResolverFactory declares one owner-provided portable declaration
-// locator resolver.
+// Factory creates a declaration-locator resolver bound to one narrow Artifact
+// catalog runtime.
 //
-// Artifact Store validates and distributes these factories but does not invoke
-// them itself. Artifact Resolver or owner APIs bind a factory to narrow Store
-// lifecycle operations when they need to resolve a declaration locator.
-//
-// Current built-in support is limited to `path`. URL, Git, package, archive,
-// and registry resolvers are intentionally future provider extensions.
-type LocatorResolverFactory interface {
+// This contract belongs to artifactcontract because locator syntax, declaration
+// entry selection, subresource conventions, and artifact-family-specific
+// resolution behavior do not belong to generic Artifact Store.
+type Factory interface {
 	LocatorKind() string
 	ArtifactKinds() []artifactModel.ArtifactKind
 	Revision() string
 
-	BindLocatorRuntime(
-		runtime LocatorRuntime,
-	) (BoundLocatorResolver, error)
+	Bind(
+		runtime Runtime,
+	) (Resolver, error)
 }
 
-// BoundLocatorResolver is a per-owner resolver instance. Binding keeps Store
-// lifecycle operations explicit and prevents providers from retaining global
-// Store service references.
-type BoundLocatorResolver interface {
-	ResolveLocator(
+// Resolver resolves one declaration locator to one source-backed Artifact.
+type Resolver interface {
+	Resolve(
 		ctx context.Context,
-		request LocatorResolutionRequest,
+		request Request,
 	) (artifactModel.ArtifactRef, error)
 }
 
-// LocatorRuntime is the current Source-index read capability available to a
-// bound declaration locator resolver.
-//
-// Locator resolution is intentionally read-only. Workspace refresh owns
-// Source discovery expansion and Source refresh.
-type LocatorRuntime interface {
-	ListArtifactsBySource(
+// Runtime is deliberately narrow, artifact/catalog.API satisfies this interface directly.
+type Runtime interface {
+	ListBySource(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
+		options catalogModel.ListOptions,
 	) ([]catalogModel.Entry, error)
 }
 
-// LocatorResolutionRequest is generic provider input. LocatorJSON and
-// EntryJSON preserve the portable declaration data without making
-// artifactory/providerapi import artifact declaration contracts.
-type LocatorResolutionRequest struct {
+// Request preserves declaration-owned JSON without requiring generic
+// Artifact Store to know declaration vocabulary.
+type Request struct {
 	RootID rootModel.RootID
 	From   *artifactModel.Artifact
 
@@ -68,10 +59,11 @@ type LocatorResolutionRequest struct {
 	ExpectedLogicalName spec.LogicalName
 }
 
-func (r LocatorResolutionRequest) Validate() error {
+func (r Request) Validate() error {
 	if err := r.RootID.Validate(); err != nil {
 		return err
 	}
+
 	if r.From != nil {
 		if err := r.From.Validate(); err != nil {
 			return err
@@ -83,22 +75,25 @@ func (r LocatorResolutionRequest) Validate() error {
 			)
 		}
 	}
+
 	if len(r.LocatorJSON) == 0 ||
 		len(r.LocatorJSON) > spec.MaxDefinitionBodyBytes ||
 		!json.Valid(r.LocatorJSON) {
 		return fmt.Errorf(
-			"%w: locator resolver request has invalid locator JSON",
+			"%w: locator request has invalid locator JSON",
 			spec.ErrInvalid,
 		)
 	}
+
 	if len(r.EntryJSON) != 0 &&
 		(len(r.EntryJSON) > spec.MaxDefinitionBodyBytes ||
 			!json.Valid(r.EntryJSON)) {
 		return fmt.Errorf(
-			"%w: locator resolver request has invalid declaration JSON",
+			"%w: locator request has invalid declaration JSON",
 			spec.ErrInvalid,
 		)
 	}
+
 	if err := r.ExpectedKind.Validate(); err != nil {
 		return err
 	}
@@ -107,19 +102,19 @@ func (r LocatorResolutionRequest) Validate() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
-// LocatorResolverKey identifies one provider-owned declaration locator
-// resolver slot.
-type LocatorResolverKey struct {
+// FactoryKey identifies one locator-kind/artifact-kind registration slot.
+type FactoryKey struct {
 	LocatorKind  string
 	ArtifactKind artifactModel.ArtifactKind
 }
 
-func (k LocatorResolverKey) Validate() error {
+func (k FactoryKey) Validate() error {
 	if err := spec.ValidateIdentifier(
-		"locator resolver locator kind",
+		"locator resolver kind",
 		k.LocatorKind,
 		spec.MaxKindBytes,
 	); err != nil {
@@ -128,12 +123,16 @@ func (k LocatorResolverKey) Validate() error {
 	return k.ArtifactKind.Validate()
 }
 
-func ValidateLocatorResolverFactory(
-	value LocatorResolverFactory,
+func ValidateFactory(
+	value Factory,
 ) error {
 	if value == nil {
-		return spec.ErrInvalid
+		return fmt.Errorf(
+			"%w: declaration locator factory is nil",
+			spec.ErrInvalid,
+		)
 	}
+
 	if err := spec.ValidateIdentifier(
 		"locator resolver kind",
 		value.LocatorKind(),
@@ -141,6 +140,7 @@ func ValidateLocatorResolverFactory(
 	); err != nil {
 		return err
 	}
+
 	if err := spec.ValidateRequiredText(
 		"locator resolver revision",
 		value.Revision(),
@@ -178,5 +178,6 @@ func ValidateLocatorResolverFactory(
 		}
 		seen[kind] = struct{}{}
 	}
+
 	return nil
 }

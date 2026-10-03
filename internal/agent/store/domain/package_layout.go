@@ -9,7 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -25,12 +25,12 @@ func IsAgentDeclarationDocument(locator spec.Locator) bool {
 
 func ManagedPackageAddressForAgent(
 	name spec.LogicalName,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := name.Validate(); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 
-	return sourceModel.NewManagedPackageAddress(
+	return managedpackageModel.NewManagedPackageAddress(
 		ManagedAgentPackageKind,
 		name,
 		documentTopology.UnversionedPackageVersion(),
@@ -38,7 +38,7 @@ func ManagedPackageAddressForAgent(
 }
 
 func ManagedPackageLocatorForAgent(
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	if err := ValidateManagedAgentPackageAddress(address); err != nil {
 		return "", err
@@ -48,12 +48,12 @@ func ManagedPackageLocatorForAgent(
 
 func ManagedPackageAddressFromAgentLocator(
 	locator spec.Locator,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if path.Base(string(locator)) != string(ManagedAgentDocumentFile()) {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Agent locator %q is not %q",
 			spec.ErrInvalid,
 			locator,
@@ -61,20 +61,20 @@ func ManagedPackageAddressFromAgentLocator(
 		)
 	}
 
-	address, err := sourceModel.ParseManagedPackageAddressDirectory(
+	address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		spec.Locator(path.Dir(string(locator))),
 	)
 	if err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if err := ValidateManagedAgentPackageAddress(address); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	return address, nil
 }
 
 func ValidateManagedAgentPackageAddress(
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) error {
 	if err := address.Validate(); err != nil {
 		return err

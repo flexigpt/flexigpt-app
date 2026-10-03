@@ -10,6 +10,7 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpDomain "github.com/flexigpt/flexigpt-app/internal/mcp/store/domain"
@@ -25,7 +26,7 @@ type BuiltinPackageCleanup interface {
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		addresses []sourceModel.ManagedPackageAddress,
+		addresses []managedpackageModel.ManagedPackageAddress,
 	) ([]artifactModel.ArtifactRef, error)
 
 	CleanupRemovedBuiltInPackageServers(
@@ -54,7 +55,7 @@ func (c *builtinPackageCleanup) CaptureBuiltInPackageServers(
 	ctx context.Context,
 	rootID rootModel.RootID,
 	sourceID sourceModel.SourceID,
-	addresses []sourceModel.ManagedPackageAddress,
+	addresses []managedpackageModel.ManagedPackageAddress,
 ) ([]artifactModel.ArtifactRef, error) {
 	if c == nil || c.api == nil {
 		return nil, spec.ErrClosed

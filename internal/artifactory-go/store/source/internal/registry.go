@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"slices"
 
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -149,7 +150,7 @@ func (r *Registry) ResolveLocalPath(
 func (r *Registry) PublishPackage(
 	ctx context.Context,
 	value sourceModel.Source,
-	publication sourceModel.ManagedPackagePublication,
+	publication managedpackageModel.ManagedPackagePublication,
 ) (string, error) {
 	if ctx == nil {
 		return "", fmt.Errorf(
@@ -163,7 +164,7 @@ func (r *Registry) PublishPackage(
 	if err := value.Validate(); err != nil {
 		return "", err
 	}
-	normalized, err := sourceModel.NormalizeManagedPackagePublication(publication)
+	normalized, err := managedpackageModel.NormalizeManagedPackagePublication(publication)
 	if err != nil {
 		return "", err
 	}
@@ -205,7 +206,7 @@ func (r *Registry) PublishPackage(
 func (r *Registry) RemovePackage(
 	ctx context.Context,
 	value sourceModel.Source,
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 	expectedGeneration string,
 ) error {
 	if ctx == nil {

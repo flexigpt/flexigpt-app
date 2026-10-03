@@ -73,7 +73,7 @@ func (a *API) AddSkillPath(
 					"skill-path",
 					rootPath,
 				),
-				Kind:        sourceModel.SourceKindFilesystemDirectory,
+				Kind:        fsdir.Kind,
 				DisplayName: displayName,
 				Enabled:     true,
 				Config:      config,

@@ -6,7 +6,9 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelproviderv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -19,8 +21,8 @@ const (
 		modelv1.ModelType,
 	)
 
-	ModelProviderPackageKind sourceModel.PackageKind = "model-provider"
-	ModelPackageKind         sourceModel.PackageKind = "model"
+	ModelProviderPackageKind managedpackageModel.PackageKind = "model-provider"
+	ModelPackageKind         managedpackageModel.PackageKind = "model"
 
 	BuiltInInitialEnabledLabel = "model.initialEnabled"
 
@@ -45,7 +47,7 @@ func ManagedSourceDraft() sourceModel.Draft {
 	return sourceModel.Draft{
 		ID:          ManagedSourceID,
 		StorageKey:  ManagedSourceStorageKey,
-		Kind:        sourceModel.SourceKindManagedDirectory,
+		Kind:        managedfs.Kind,
 		DisplayName: "Managed Model Artifacts",
 		Enabled:     true,
 		Config:      json.RawMessage(`{}`),

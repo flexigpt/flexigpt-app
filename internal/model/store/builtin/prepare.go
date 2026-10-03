@@ -10,7 +10,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/modelv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 	modelDomain "github.com/flexigpt/flexigpt-app/internal/model/store/domain"
@@ -22,9 +22,9 @@ const generatedCatalogName = "models"
 // ready for generic Artifact Store built-in compilation.
 type PreparedPackage struct {
 	EmbeddedPackageRoot spec.Locator
-	Address             sourceModel.ManagedPackageAddress
+	Address             managedpackageModel.ManagedPackageAddress
 	DocumentFile        spec.Locator
-	PackageFiles        []sourceModel.ManagedPackageFile
+	PackageFiles        []managedpackageModel.ManagedPackageFile
 
 	ExpectedKind           artifactModel.ArtifactKind
 	ExpectedLogicalName    spec.LogicalName
@@ -71,7 +71,7 @@ func PrepareProviderPackage(
 		EmbeddedPackageRoot: root,
 		Address:             address,
 		DocumentFile:        modelDomain.ModelProviderDocumentFile(),
-		PackageFiles: []sourceModel.ManagedPackageFile{{
+		PackageFiles: []managedpackageModel.ManagedPackageFile{{
 			Locator: modelDomain.ModelProviderDocumentFile(),
 			Content: raw,
 		}},
@@ -121,7 +121,7 @@ func PrepareModelPackage(
 		EmbeddedPackageRoot: root,
 		Address:             address,
 		DocumentFile:        modelDomain.ModelDocumentFile(),
-		PackageFiles: []sourceModel.ManagedPackageFile{{
+		PackageFiles: []managedpackageModel.ManagedPackageFile{{
 			Locator: modelDomain.ModelDocumentFile(),
 			Content: raw,
 		}},
@@ -142,7 +142,7 @@ func NormalizePreparedPackages(
 		)
 	}
 
-	seen := make(map[sourceModel.ManagedPackageAddress]struct{}, len(values))
+	seen := make(map[managedpackageModel.ManagedPackageAddress]struct{}, len(values))
 	output := make([]PreparedPackage, len(values))
 	for index, value := range values {
 		if err := value.Validate(); err != nil {
@@ -181,7 +181,7 @@ func (p PreparedPackage) Validate() error {
 	if err := p.DocumentFile.ValidatePortable(false); err != nil {
 		return err
 	}
-	if _, err := sourceModel.NormalizeManagedPackageFiles(
+	if _, err := managedpackageModel.NormalizeManagedPackageFiles(
 		p.PackageFiles,
 	); err != nil {
 		return err
@@ -201,11 +201,11 @@ func (p PreparedPackage) Validate() error {
 func clonePreparedPackage(value PreparedPackage) PreparedPackage {
 	output := value
 	output.PackageFiles = make(
-		[]sourceModel.ManagedPackageFile,
+		[]managedpackageModel.ManagedPackageFile,
 		len(value.PackageFiles),
 	)
 	for index, file := range value.PackageFiles {
-		output.PackageFiles[index] = sourceModel.ManagedPackageFile{
+		output.PackageFiles[index] = managedpackageModel.ManagedPackageFile{
 			Locator: file.Locator,
 			Content: append([]byte(nil), file.Content...),
 		}

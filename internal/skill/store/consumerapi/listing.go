@@ -6,9 +6,9 @@ import (
 	"sort"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -82,7 +82,7 @@ func skillListItem(
 
 	managed := false
 	if entry.State == artifactModel.StateAvailable &&
-		entry.Source.Kind == sourceModel.SourceKindManagedDirectory &&
+		entry.Source.Kind == managedfs.Kind &&
 		entry.Source.StorageKey == collection.SkillManagedSourceStorageKey &&
 		entry.Binding.SubresourceLocator == "" {
 		_, err := skillDomain.ManagedPackageAddressFromSkillLocator(

@@ -5,18 +5,18 @@ import (
 	"path"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
+	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 func ManagedPackageAddressForSkill(
 	name spec.LogicalName,
 	version spec.LogicalVersion,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	if version == "" {
 		version = documentTopology.UnversionedPackageVersion()
 	}
-	return sourceModel.NewManagedPackageAddress(
+	return managedpackageModel.NewManagedPackageAddress(
 		ManagedSkillPackageKind,
 		name,
 		version,
@@ -35,7 +35,7 @@ func ManagedPackageAddressForSkill(
 //
 //	skill/<skill-name>/<version>/<skill-name>
 func ManagedSkillDirectoryLocator(
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	if err := validateManagedSkillPackageAddress(address); err != nil {
 		return "", err
@@ -56,7 +56,7 @@ func ManagedSkillDirectoryLocator(
 }
 
 func ManagedPackageLocatorForSkill(
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) (spec.Locator, error) {
 	directory, err := ManagedSkillDirectoryLocator(address)
 	if err != nil {
@@ -74,12 +74,12 @@ func ManagedPackageLocatorForSkill(
 
 func ManagedPackageAddressFromSkillLocator(
 	locator spec.Locator,
-) (sourceModel.ManagedPackageAddress, error) {
+) (managedpackageModel.ManagedPackageAddress, error) {
 	if err := locator.ValidatePortable(false); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if !IsSkillDefinitionFile(locator) {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: Skill locator %q is not a configured Skill package document",
 			spec.ErrInvalid,
 			locator,
@@ -91,18 +91,18 @@ func ManagedPackageAddressFromSkillLocator(
 		string(skillDirectory),
 	))
 
-	address, err := sourceModel.ParseManagedPackageAddressDirectory(
+	address, err := managedpackageModel.ParseManagedPackageAddressDirectory(
 		packageDirectory,
 	)
 	if err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if err := validateManagedSkillPackageAddress(address); err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 
 	if path.Base(string(skillDirectory)) != string(address.Name) {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Skill directory %q must match Skill name %q",
 			spec.ErrInvalid,
 			skillDirectory,
@@ -112,10 +112,10 @@ func ManagedPackageAddressFromSkillLocator(
 
 	expected, err := ManagedPackageLocatorForSkill(address)
 	if err != nil {
-		return sourceModel.ManagedPackageAddress{}, err
+		return managedpackageModel.ManagedPackageAddress{}, err
 	}
 	if locator != expected {
-		return sourceModel.ManagedPackageAddress{}, fmt.Errorf(
+		return managedpackageModel.ManagedPackageAddress{}, fmt.Errorf(
 			"%w: managed Skill locator %q must be %q",
 			spec.ErrInvalid,
 			locator,
@@ -126,7 +126,7 @@ func ManagedPackageAddressFromSkillLocator(
 }
 
 func validateManagedSkillPackageAddress(
-	address sourceModel.ManagedPackageAddress,
+	address managedpackageModel.ManagedPackageAddress,
 ) error {
 	if err := address.Validate(); err != nil {
 		return err

@@ -9,6 +9,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/agentv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -345,7 +346,7 @@ func (a *API) agentManaged(
 			sourceCache[key] = sourceValue
 		}
 	}
-	if sourceValue.Kind != sourceModel.SourceKindManagedDirectory ||
+	if sourceValue.Kind != managedfs.Kind ||
 		sourceValue.StorageKey != agentDomain.AgentManagedSourceStorageKey {
 		return false, nil
 	}

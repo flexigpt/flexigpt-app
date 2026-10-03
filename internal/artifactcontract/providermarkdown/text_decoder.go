@@ -7,7 +7,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/textv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider"
+	ingestModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
 )
@@ -30,23 +30,23 @@ func (*TextDecoder) Revision() string {
 
 func (*TextDecoder) Recognize(
 	_ context.Context,
-	candidate provider.Candidate,
-) provider.Recognition {
+	candidate ingestModel.Candidate,
+) ingestModel.Recognition {
 	if isInstructionFile(candidate.Locator) ||
 		isDefaultTextFile(candidate.Locator) {
-		return provider.RecognitionPreferred
+		return ingestModel.RecognitionPreferred
 	}
 	if candidate.RequestsDecoder(TextMarkdownDecoderID) &&
 		isTextCandidate(candidate.Locator) {
-		return provider.RecognitionPossible
+		return ingestModel.RecognitionPossible
 	}
-	return provider.RecognitionNone
+	return ingestModel.RecognitionNone
 }
 
 func (*TextDecoder) Decode(
 	_ context.Context,
-	candidate provider.Candidate,
-) ([]provider.Decoded, []diagnostic.Diagnostic) {
+	candidate ingestModel.Candidate,
+) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
 	if !isTextCandidate(candidate.Locator) {
 		return nil, nil
 	}
@@ -77,7 +77,7 @@ func (*TextDecoder) Decode(
 	if err != nil {
 		return nil, textDiagnostics(candidate.Locator, err)
 	}
-	return []provider.Decoded{{Definition: value}}, nil
+	return []ingestModel.Decoded{{Definition: value}}, nil
 }
 
 func isTextCandidate(locator spec.Locator) bool {
