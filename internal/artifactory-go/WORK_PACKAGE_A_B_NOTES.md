@@ -1,19 +1,15 @@
-# Work Package A completion notes
+# Work Package completion notes
+
+## Package A checkpoint
 
 Scope completed: owner-service split and capability segregation only.
-
-Deliberately not performed here:
-
-- Work Package B aggregate `store/compose` and local deployment collapse.
-- Work Package C source lifecycle invalidation publication redesign.
-- Work Package D JSON Schema declaration-dispatch and remaining LLM/generic separation.
 
 Any file deletion is blocked in this environment. Use the manual removal block shell commands in the delivery
 report after caller migration.
 
 `compose/local` still exists in this Work Package because aggregate assembly collapse is Work Package B. It now uses the named owner constructors above.
 
-## Local opener migration
+## Package B checkpoint: Local opener migration
 
 `compose/local.Open` now returns `*store/compose.Store` directly.
 
@@ -28,7 +24,7 @@ report after caller migration.
 - Close the returned handle once. It owns locally opened SQLite and any
   caller-provided `SecretValues` only after a successful open.
 
-## Generic Artifact Store assembly
+## Package B checkpoint: Generic Artifact Store assembly
 
 `store/compose.Open` is the sole generic aggregate construction entry. Its
 configuration is deliberately a list of named entity and flow contracts:
@@ -44,7 +40,7 @@ transfers only after successful assembly.
 The returned `Store` is the one public aggregate surface. It publishes entity
 and flow APIs only; provider repositories remain construction dependencies.
 
-## Local Artifact Store assembly
+## Package B checkpoint: Local Artifact Store assembly
 
 `compose/local.Open` is the local deployment entrypoint. It owns local layout,
 SQLite opening, local source-driver construction, JSON Schema provider
