@@ -8,6 +8,7 @@ Deliberately not performed here:
 - Work Package C source lifecycle invalidation publication redesign.
 - Work Package D JSON Schema declaration-dispatch and remaining LLM/generic separation.
 
-The obsolete bridge paths remain as inert package files only because file deletion
-is blocked in this environment. Use the manual removal block in the delivery
+Any file deletion is blocked in this environment. Use the manual removal block shell commands in the delivery
 report after caller migration.
+
+`compose/local` still exists in this Work Package because aggregate assembly collapse is Work Package B. It now uses the named owner constructors above.
