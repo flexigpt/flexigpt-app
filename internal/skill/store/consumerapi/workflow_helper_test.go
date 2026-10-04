@@ -10,6 +10,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -19,7 +20,7 @@ import (
 )
 
 type skillWorkflowFixture struct {
-	store *local.Store
+	store *compose.Store
 	api   *skillConsumerAPI.API
 
 	bootstrap       *builtin.BootstrapRegistry

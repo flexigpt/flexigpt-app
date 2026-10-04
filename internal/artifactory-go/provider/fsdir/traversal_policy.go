@@ -6,8 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
 type TraversalPolicy struct {
@@ -75,7 +73,7 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 
 	gitFile := filepath.Join(
 		directory,
-		spec.ExternalGitMetadataDirectoryName,
+		gitMetadataDirectoryName,
 	)
 	info, err := os.Stat(gitFile)
 	if err != nil || !info.Mode().IsRegular() {
@@ -100,7 +98,10 @@ func (p normalizedTraversalPolicy) isGitSubmoduleDirectory(directory string) boo
 
 func DefaultTraversalPolicy() TraversalPolicy {
 	return TraversalPolicy{
-		ExcludedDirectoryNames: spec.ExternalTraversalExcludedDirectoryNames,
-		SkipGitSubmodules:      true,
+		ExcludedDirectoryNames: append(
+			[]string(nil),
+			defaultTraversalExcludedDirectoryNames...,
+		),
+		SkipGitSubmodules: true,
 	}
 }

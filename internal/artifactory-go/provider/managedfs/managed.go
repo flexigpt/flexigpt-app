@@ -1,3 +1,8 @@
+// Package managedfs provides the managed writable filesystem Source driver.
+//
+// It owns managed-root layout, staging names, physical file modes, and atomic
+// complete-package replacement. Artifact-family package contents remain
+// outside this provider.
 package managedfs
 
 import (
@@ -313,13 +318,13 @@ func (a *Adapter) PublishPackage(
 	if err != nil {
 		return "", err
 	}
-	if err := os.MkdirAll(stagingRoot, spec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return "", err
 	}
 
 	temporary, err := os.MkdirTemp(
 		stagingRoot,
-		spec.ManagedPackageTemporaryPrefix,
+		managedPackageTemporaryPrefix,
 	)
 	if err != nil {
 		return "", err
@@ -343,7 +348,7 @@ func (a *Adapter) PublishPackage(
 	if exists {
 		previousPackage, err = os.MkdirTemp(
 			stagingRoot,
-			spec.ManagedPackagePreviousPrefix,
+			managedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return "", err
@@ -469,13 +474,13 @@ func (a *Adapter) RemovePackage(
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll(stagingRoot, spec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(stagingRoot, managedDirectoryMode); err != nil {
 		return err
 	}
 
 	tombstone, err := os.MkdirTemp(
 		stagingRoot,
-		spec.ManagedPackageRemovalPrefix,
+		managedPackageRemovalPrefix,
 	)
 	if err != nil {
 		return err
@@ -586,7 +591,7 @@ func (a *Adapter) sourceRootPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, spec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -605,7 +610,7 @@ func (a *Adapter) sourceStagingPath(
 	if !create {
 		return root, nil
 	}
-	if err := os.MkdirAll(root, spec.ArtifactStoreDirectoryMode); err != nil {
+	if err := os.MkdirAll(root, managedDirectoryMode); err != nil {
 		return "", err
 	}
 	return root, nil
@@ -700,7 +705,7 @@ func managedPackagePath(
 	if parent != "." {
 		parentPath = filepath.Join(root, filepath.FromSlash(parent))
 		if createParent {
-			if err := os.MkdirAll(parentPath, spec.ArtifactStoreDirectoryMode); err != nil {
+			if err := os.MkdirAll(parentPath, managedDirectoryMode); err != nil {
 				return "", err
 			}
 		}

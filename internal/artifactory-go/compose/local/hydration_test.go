@@ -1,4 +1,4 @@
-package assembly
+package local
 
 import (
 	"errors"
@@ -12,37 +12,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
-	t *testing.T,
-) {
+func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(t *testing.T) {
 	t.Parallel()
 
-	rootID := rootModel.RootID(
-		"0192c4c0-0000-7000-8000-000000000001",
-	)
-	sourceID := sourceModel.SourceID(
-		"0192c4c0-0001-7000-8000-000000000001",
-	)
-	policy, err := root.NewSetRootPolicy(
-		[]rootModel.RootID{rootID},
-		nil,
-	)
-	if err != nil {
-		t.Fatalf("NewSetRootPolicy: %v", err)
-	}
-
-	components, err := Open(
-		t.Context(),
-		Config{
-			BaseDirectory:      t.TempDir(),
-			RootMutationPolicy: policy,
-		},
-	)
+	rootID := rootModel.RootID("0192c4c0-0000-7000-8000-000000000001")
+	sourceID := sourceModel.SourceID("0192c4c0-0001-7000-8000-000000000001")
+	store, err := Open(t.Context(), Config{
+		BaseDirectory:    t.TempDir(),
+		ProtectedRootIDs: []rootModel.RootID{rootID},
+	})
 	if err != nil {
 		t.Fatalf("Open: %v", err)
 	}
 	t.Cleanup(func() {
-		if closeErr := components.Close(); closeErr != nil {
+		if closeErr := store.Close(); closeErr != nil {
 			t.Errorf("Close: %v", closeErr)
 		}
 	})
@@ -55,10 +38,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 	}
 	ctx := root.WithInstallerPrivilege(t.Context())
 
-	current, err := components.Install.PrepareTopologyHydrations(
-		ctx,
-		[]installModel.Hydration{desired},
-	)
+	current, err := store.Topology.PrepareTopologyHydrations(ctx, []installModel.Hydration{desired})
 	if err != nil {
 		t.Fatalf("PrepareTopologyHydrations: %v", err)
 	}
@@ -66,10 +46,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 		t.Fatal("fresh topology hydration was unexpectedly current")
 	}
 
-	if _, err := components.Roots.Get(ctx, rootID); !errors.Is(
-		err,
-		spec.ErrRootNotFound,
-	) {
+	if _, err := store.Roots.Get(ctx, rootID); !errors.Is(err, spec.ErrRootNotFound) {
 		t.Fatalf("fresh protected root read error=%v, want ErrRootNotFound", err)
 	}
 }

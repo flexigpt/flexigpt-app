@@ -13,9 +13,8 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
 	workspaceConsumerAPI "github.com/flexigpt/flexigpt-app/internal/workspace/store/consumerapi"
@@ -25,7 +24,8 @@ import (
 )
 
 const (
-	AppTitle = "FlexiGPT"
+	AppTitle                = "FlexiGPT"
+	appPrivateDirectoryMode = 0o700
 )
 
 type App struct {
@@ -54,7 +54,7 @@ type App struct {
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper
 
-	artifactStoreComposition *local.Store
+	artifactStoreComposition *compose.Store
 	artifactLocatorFactories []locator.Factory
 
 	dataBasePath string
@@ -190,7 +190,7 @@ func (a *App) GetArtifactInitializationError() string {
 func ensureAppPrivateDirectory(location string) error {
 	return os.MkdirAll(
 		location,
-		os.FileMode(spec.ApplicationDirectoryMode),
+		os.FileMode(appPrivateDirectoryMode),
 	)
 }
 

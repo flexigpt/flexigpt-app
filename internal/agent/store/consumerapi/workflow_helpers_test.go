@@ -24,6 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -36,7 +37,7 @@ import (
 const workflowDependencySourceID sourceModel.SourceID = "0192c4c0-00f0-7000-8000-000000000001"
 
 type workflowHarness struct {
-	store *local.Store
+	store *compose.Store
 	api   *agentConsumerAPI.API
 
 	dependencyDirectory     string

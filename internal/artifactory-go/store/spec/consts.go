@@ -1,8 +1,6 @@
 package spec
 
-import (
-	"regexp"
-)
+import "regexp"
 
 const (
 	MaxKindBytes             = 128
@@ -39,41 +37,6 @@ const (
 	MaxDiscoveryEntries    = 1_000_000
 	MaxDiscoveryDepth      = 256
 )
-
-const (
-	ApplicationDirectoryMode = 0o700
-
-	ArtifactStoreManifestFileName      = "store.json"
-	ArtifactStoreMetadataFileName      = "app.sqlite"
-	ArtifactStoreContentDirectoryName  = "content"
-	ArtifactStoreStagingDirectoryName  = "staging"
-	ArtifactStoreSecretDirectoryName   = "secrets"
-	ArtifactStoreSecretValuesFileName  = "secrets.json"
-	ArtifactStoreManifestTemporaryName = "store.json.tmp-"
-
-	ArtifactStoreFormat        = "flexigpt-artifactstore/v1"
-	ArtifactStoreContentLayout = "source-packages/v1"
-
-	ArtifactStoreDirectoryMode       = 0o750
-	ArtifactStoreSecretDirectoryMode = 0o700
-	ArtifactStoreSecretFileMode      = 0o600
-	ArtifactStoreManifestMode        = 0o600
-
-	ManagedPackageTemporaryPrefix = "package-"
-	ManagedPackagePreviousPrefix  = "previous-package-"
-	ManagedPackageRemovalPrefix   = "remove-"
-
-	ExternalGitMetadataDirectoryName = ".git"
-)
-
-var ExternalTraversalExcludedDirectoryNames = []string{
-	".git",
-	".hg",
-	".svn",
-	"node_modules",
-	"vendor",
-	"bower_components",
-}
 
 // identifierPattern accepts lower-camel identifiers with optional dotted or
 // hyphenated lower-camel segments. Each segment must begin with a lowercase

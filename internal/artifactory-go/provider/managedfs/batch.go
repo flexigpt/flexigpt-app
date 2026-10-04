@@ -88,7 +88,7 @@ func (a *Adapter) ApplyPackageBatch(
 
 		temporary, err := os.MkdirTemp(
 			stagingRoot,
-			spec.ManagedPackageTemporaryPrefix,
+			managedPackageTemporaryPrefix,
 		)
 		if err != nil {
 			return err
@@ -189,7 +189,7 @@ func writeStagedPackageFiles(
 		)
 		if err := os.MkdirAll(
 			filepath.Dir(location),
-			spec.ArtifactStoreDirectoryMode,
+			managedDirectoryMode,
 		); err != nil {
 			return err
 		}
@@ -218,7 +218,7 @@ func replaceStagedPackage(
 		}
 		previous, err = os.MkdirTemp(
 			stagingRoot,
-			spec.ManagedPackagePreviousPrefix,
+			managedPackagePreviousPrefix,
 		)
 		if err != nil {
 			return err

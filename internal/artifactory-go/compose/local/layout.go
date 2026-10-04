@@ -1,4 +1,4 @@
-package assembly
+package local
 
 import (
 	"encoding/json"
@@ -18,27 +18,20 @@ type storeManifest struct {
 }
 
 func ensureStoreLayout(base string) error {
-	if err := os.MkdirAll(
-		base,
-		os.FileMode(spec.ArtifactStoreDirectoryMode),
-	); err != nil {
+	if err := os.MkdirAll(base, os.FileMode(storeDirectoryMode)); err != nil {
 		return err
 	}
 
-	manifestPath := filepath.Join(
-		base,
-		spec.ArtifactStoreManifestFileName,
-	)
+	manifestPath := filepath.Join(base, storeManifestFileName)
 	raw, err := os.ReadFile(manifestPath)
 	switch {
 	case errors.Is(err, os.ErrNotExist):
 		if err := removeStaleManifestTemporaryFiles(base); err != nil {
 			return err
 		}
-
 		raw, err = json.Marshal(storeManifest{
-			Format:        spec.ArtifactStoreFormat,
-			ContentLayout: spec.ArtifactStoreContentLayout,
+			Format:        storeFormat,
+			ContentLayout: storeContentLayout,
 		})
 		if err != nil {
 			return err
@@ -47,7 +40,6 @@ func ensureStoreLayout(base string) error {
 		if err := writeNewStoreManifest(manifestPath, raw); err != nil {
 			return err
 		}
-
 	case err != nil:
 		return err
 	}
@@ -56,8 +48,7 @@ func ensureStoreLayout(base string) error {
 	if err != nil {
 		return err
 	}
-	if manifest.Format != spec.ArtifactStoreFormat ||
-		manifest.ContentLayout != spec.ArtifactStoreContentLayout {
+	if manifest.Format != storeFormat || manifest.ContentLayout != storeContentLayout {
 		return fmt.Errorf(
 			"%w: unsupported Artifact Store layout %q/%q",
 			spec.ErrUnsupported,
@@ -66,14 +57,8 @@ func ensureStoreLayout(base string) error {
 		)
 	}
 
-	for _, directory := range []string{
-		spec.ArtifactStoreContentDirectoryName,
-		spec.ArtifactStoreStagingDirectoryName,
-	} {
-		if err := os.MkdirAll(
-			filepath.Join(base, directory),
-			os.FileMode(spec.ArtifactStoreDirectoryMode),
-		); err != nil {
+	for _, directory := range []string{storeContentDirectoryName, storeStagingDirectoryName} {
+		if err := os.MkdirAll(filepath.Join(base, directory), os.FileMode(storeDirectoryMode)); err != nil {
 			return err
 		}
 	}
@@ -86,10 +71,7 @@ func removeStaleManifestTemporaryFiles(base string) error {
 		return err
 	}
 	for _, entry := range entries {
-		if !strings.HasPrefix(
-			entry.Name(),
-			spec.ArtifactStoreManifestTemporaryName,
-		) {
+		if !strings.HasPrefix(entry.Name(), storeManifestTemporaryName) {
 			continue
 		}
 		if entry.IsDir() {
@@ -106,15 +88,9 @@ func removeStaleManifestTemporaryFiles(base string) error {
 	return nil
 }
 
-func writeNewStoreManifest(
-	manifestPath string,
-	raw []byte,
-) error {
+func writeNewStoreManifest(manifestPath string, raw []byte) error {
 	base := filepath.Dir(manifestPath)
-	temporary, err := os.CreateTemp(
-		base,
-		spec.ArtifactStoreManifestTemporaryName,
-	)
+	temporary, err := os.CreateTemp(base, storeManifestTemporaryName)
 	if err != nil {
 		return err
 	}
@@ -125,10 +101,7 @@ func writeNewStoreManifest(
 		_ = os.Remove(temporaryPath)
 		return cause
 	}
-
-	if err := temporary.Chmod(
-		os.FileMode(spec.ArtifactStoreManifestMode),
-	); err != nil {
+	if err := temporary.Chmod(os.FileMode(storeManifestMode)); err != nil {
 		return cleanup(err)
 	}
 	if _, err := temporary.Write(raw); err != nil {
@@ -146,16 +119,9 @@ func writeNewStoreManifest(
 }
 
 func decodeStoreManifest(raw []byte) (storeManifest, error) {
-	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](
-		raw,
-		spec.MaxConfigBytes,
-	)
+	manifest, err := jsonutil.DecodeCanonicalObject[storeManifest](raw, spec.MaxConfigBytes)
 	if err != nil {
-		return storeManifest{}, fmt.Errorf(
-			"%w: decode artifact store layout manifest: %w",
-			spec.ErrInvalid,
-			err,
-		)
+		return storeManifest{}, fmt.Errorf("%w: decode artifact store layout manifest: %w", spec.ErrInvalid, err)
 	}
 	return manifest, nil
 }

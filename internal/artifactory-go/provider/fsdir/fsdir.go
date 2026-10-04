@@ -1,3 +1,7 @@
+// Package fsdir provides the native filesystem Source driver.
+//
+// It owns filesystem-root normalization, traversal exclusions, symlink-aware
+// snapshot behavior, and optional trusted native-path resolution.
 package fsdir
 
 import (

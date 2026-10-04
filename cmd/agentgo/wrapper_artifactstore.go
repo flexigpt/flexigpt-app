@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"io/fs"
 	"path/filepath"
 
@@ -12,7 +13,7 @@ import (
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/keyringmapstore"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	mcpOverlay "github.com/flexigpt/flexigpt-app/internal/mcp/store/overlay"
 	mcpProviderAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/providerapi"
 	modelOverlay "github.com/flexigpt/flexigpt-app/internal/model/store/overlay"
@@ -20,10 +21,12 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/workspace/defaultpolicy"
 )
 
+const artifactStoreSecretValuesFileName = "secrets.json"
+
 func composeArtifactStore(
 	ctx context.Context,
 	baseDirectory string,
-) (*local.Store, []locator.Factory, error) {
+) (*compose.Store, []locator.Factory, error) {
 	if err := documentTopology.ValidateApplicationTopology(); err != nil {
 		return nil, nil, err
 	}
@@ -79,7 +82,7 @@ func composeArtifactStore(
 	secretValues, err := keyringmapstore.New(
 		filepath.Join(
 			baseDirectory,
-			spec.ArtifactStoreSecretValuesFileName,
+			artifactStoreSecretValuesFileName,
 		),
 		keyringmapstore.Config{},
 	)
@@ -114,7 +117,9 @@ func composeArtifactStore(
 		},
 	)
 	if err != nil {
-		return nil, nil, err
+		// "local.Open" retains caller ownership of a supplied backend on a
+		// failed open. This composition owns it until successful assembly.
+		return nil, nil, errors.Join(err, secretValues.Close())
 	}
 
 	return store, locatorRegistry.Factories(), nil

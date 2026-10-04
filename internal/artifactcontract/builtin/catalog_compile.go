@@ -13,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
@@ -309,7 +310,7 @@ func (p PackageInput) rootExpectation() (Expectation, error) {
 
 func compilePackage(
 	ctx context.Context,
-	store *local.Store,
+	store *compose.Store,
 	input PackageInput,
 	entries []catalogModel.Entry,
 	validation cryptoutil.Digest,
