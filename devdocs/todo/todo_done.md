@@ -1116,3 +1116,7 @@
   - [x] easier preset import bundles and flows. e.g: just import a preset bundle that has assistant, models, prompts etc.
     - [x] may be as a json import bundle or jsonc format
     - [x] better thing is to establish a jsonschema format for each thing, and then ship corresponding json as individual outputs.
+
+- [x] diff now has inspect path and then review again. we want Review first and then on that click review should already be done. should not cause perf regression.
+- [x] in case where manually path is entered, even if we put the target, the review doesn't work.
+- [x] need font mono in header things properly

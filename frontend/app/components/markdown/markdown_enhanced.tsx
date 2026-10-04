@@ -37,7 +37,9 @@ const strictSchema = {
 	},
 };
 
-const streamingRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
+// Keep structural parsing, but postpone non-essential tree transforms.
+// In particular, inline-code math can walk the entire tree twice.
+const streamingRemarkPlugins: PluggableList = [remarkGfm, remarkMath];
 const richRemarkPlugins: PluggableList = [remarkGfm, remarkMath, remarkInlineCodeMath, supersub, remarkGemoji];
 
 const rehypeKatexOptions = {
@@ -251,7 +253,7 @@ export const EnhancedMarkdown = memo(function EnhancedMarkdown({
 	);
 
 	return (
-		<MdErrorBoundary source={processedText}>
+		<MdErrorBoundary source={text} resetKey={isBusy}>
 			<MarkdownPresentationContext.Provider value={presentation}>
 				<MarkdownCodeRendererContext.Provider value={codeRendererSettings}>
 					<MarkdownDocument text={processedText} isBusy={isBusy} />

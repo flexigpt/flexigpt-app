@@ -1,9 +1,5 @@
 // LaTeX processing function
 const testLatexRegex = /[$\\]/;
-const containsLatexRegex =
-	/\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$[\s\S]*?\$|\\begin\{equation\}[\s\S]*?\\end\{equation\}/;
-const inlineLatex = /\\\(([\s\S]+?)\\\)/g;
-const blockLatex = /\\\[([\s\S]+?)\\\]/g;
 
 interface MarkdownAstNode {
 	type?: string;
@@ -278,24 +274,41 @@ function getInlineMathHastData(value: string): NonNullable<MarkdownAstNode['data
 	};
 }
 
+function replaceLatexDelimiters(
+	content: string,
+	opening: string,
+	closing: string,
+	render: (equation: string) => string
+): string {
+	const parts: string[] = [];
+	let cursor = 0;
+	let start = content.indexOf(opening);
+	while (start >= 0) {
+		const end = content.indexOf(closing, start + opening.length);
+		if (end < 0) {
+			break;
+		}
+		const matchEnd = end + closing.length;
+		const equation = content.slice(start + opening.length, end);
+		parts.push(content.slice(cursor, start), render(equation) || content.slice(start, matchEnd));
+		cursor = matchEnd;
+		start = content.indexOf(opening, cursor);
+	}
+	parts.push(content.slice(cursor));
+	return parts.join('');
+}
+
 function SanitizeLaTeX(content: string) {
 	if (!testLatexRegex.test(content)) {
 		return content;
 	}
-	let processedContent = content.replaceAll(/(\$)(?=\s?\d)/g, '\\$');
+	const processedContent = content.replaceAll(/(\$)(?=\s?\d)/g, '\\$');
 
-	if (!containsLatexRegex.test(processedContent)) {
-		return processedContent;
-	}
-
-	processedContent = processedContent
-		.replace(inlineLatex, (match: string, equation: string) => {
-			const trimmed = trimMathDelimiterPadding(equation);
-			return trimmed ? `$${trimmed}$` : match;
-		})
-		.replace(blockLatex, (match: string, equation: string) => renderDisplayMathFence(equation) || match);
-
-	return processedContent;
+	const withInlineMath = replaceLatexDelimiters(processedContent, '\\(', '\\)', equation => {
+		const trimmed = trimMathDelimiterPadding(equation);
+		return trimmed ? `$${trimmed}$` : '';
+	});
+	return replaceLatexDelimiters(withInlineMath, '\\[', '\\]', renderDisplayMathFence);
 }
 
 export function sanitizeLaTeXOutsideFences(md: string) {

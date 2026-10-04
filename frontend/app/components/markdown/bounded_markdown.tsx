@@ -1,12 +1,67 @@
 // oxlint-disable unicorn/prefer-code-point
 import type { ComponentProps, ReactNode } from 'react';
-import { memo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 
 import { EnhancedMarkdown } from '@/components/markdown/markdown_enhanced';
 
 const MAX_STREAMING_MARKDOWN_CHARACTERS = 16_000;
-const MAX_AUTOMATIC_MARKDOWN_CHARACTERS = 128_000;
+const MAX_STREAMING_MARKDOWN_LINES = 8192;
+const MAX_STREAMING_MARKDOWN_MARKERS = 8192;
+const STREAMING_MARKDOWN_INTERVAL_MS = 32;
+const STREAMING_MARKUP_CHARACTERS = '*_~`|<>[]$\\';
 const TEXT_CHUNK_CHARACTERS = 8192;
+
+function exceedsStreamingMarkdownBudget(text: string): boolean {
+	if (text.length > MAX_STREAMING_MARKDOWN_CHARACTERS) {
+		return true;
+	}
+
+	let lines = 1;
+	let markers = 0;
+	for (const character of text) {
+		if (character === '\n' && ++lines > MAX_STREAMING_MARKDOWN_LINES) {
+			return true;
+		}
+		if (STREAMING_MARKUP_CHARACTERS.includes(character) && ++markers > MAX_STREAMING_MARKDOWN_MARKERS) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function useCoalescedMarkdownText(text: string, enabled: boolean): string {
+	const [snapshot, setSnapshot] = useState(() => (enabled ? text : ''));
+	const latestTextRef = useRef('');
+	const timerRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		if (!enabled) {
+			return;
+		}
+		latestTextRef.current = text;
+		if (timerRef.current !== null || text === snapshot) {
+			return;
+		}
+		timerRef.current = window.setTimeout(() => {
+			timerRef.current = null;
+			setSnapshot(latestTextRef.current);
+		}, STREAMING_MARKDOWN_INTERVAL_MS);
+	}, [enabled, snapshot, text]);
+
+	useEffect(
+		() => () => {
+			if (timerRef.current !== null) {
+				window.clearTimeout(timerRef.current);
+				timerRef.current = null;
+			}
+		},
+		[enabled]
+	);
+
+	// Coalesce append-only streaming updates; replacements and final text
+	// must never show a snapshot from a different source.
+	return enabled && snapshot !== '' && text.startsWith(snapshot) ? snapshot : text;
+}
 
 const TextChunk = memo(function TextChunk({ value }: { value: string }) {
 	return <span>{value}</span>;
@@ -33,34 +88,19 @@ export const PlainMessageText = memo(function PlainMessageText({ text, align = '
 
 export const BoundedMarkdown = memo(function BoundedMarkdown(props: ComponentProps<typeof EnhancedMarkdown>) {
 	const { text, isBusy = false, align } = props;
-	const [approvedSource, setApprovedSource] = useState<string | null>(null);
-	const limit = isBusy ? MAX_STREAMING_MARKDOWN_CHARACTERS : MAX_AUTOMATIC_MARKDOWN_CHARACTERS;
-	const useSourcePreview = text.length > limit && (isBusy || approvedSource !== text);
+	const useSourcePreview = useMemo(() => isBusy && exceedsStreamingMarkdownBudget(text), [isBusy, text]);
+	const renderedText = useCoalescedMarkdownText(text, isBusy && !useSourcePreview);
 
 	if (!useSourcePreview) {
-		return <EnhancedMarkdown {...props} />;
+		return <EnhancedMarkdown {...props} text={renderedText} />;
 	}
 
 	return (
 		<div>
 			<div className="border-base-300 text-base-content/70 mb-2 flex flex-wrap items-center gap-2 rounded-lg border p-2 text-xs">
 				<span>
-					{isBusy
-						? 'Large response: showing source while streaming. All text is retained.'
-						: 'Large response: source preview avoids expensive automatic formatting.'}
+					Large or complex response: showing source while streaming. Markdown renders automatically when complete.
 				</span>
-				{!isBusy ? (
-					<button
-						type="button"
-						className="btn btn-xs"
-						title="Formatting a very large response may temporarily slow the UI."
-						onClick={() => {
-							setApprovedSource(text);
-						}}
-					>
-						Render formatted Markdown
-					</button>
-				) : null}
 			</div>
 			<PlainMessageText text={text} align={align} />
 		</div>

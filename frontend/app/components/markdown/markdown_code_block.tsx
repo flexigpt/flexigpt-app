@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { createElement, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { createElement, memo, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { FiAlertTriangle, FiChevronDown, FiChevronUp } from 'react-icons/fi';
 
 import { useHighlight } from '@/hooks/use_highlight';
@@ -35,8 +35,6 @@ interface ExpansionOverrideState {
 
 const getCodeBlockKey = (language: string, value: string) => `${language.toLowerCase()}\u0000${value}`;
 
-const MAX_HIGHLIGHT_CHARACTERS = 128_000;
-const MAX_HIGHLIGHT_LINES = 16384;
 const shikiAllowedTags = new Set(['code', 'pre', 'span']);
 
 function renderShikiNode(node: Node, key: string): ReactNode {
@@ -127,7 +125,7 @@ function useNearViewport(enabled: boolean) {
 	return { elementRef, activated };
 }
 
-export function CodeBlock({
+export const CodeBlock = memo(function CodeBlock({
 	language,
 	value,
 	isBusy,
@@ -141,7 +139,7 @@ export function CodeBlock({
 
 	const normalizedLanguage = language.toLowerCase();
 	const isMermaid = normalizedLanguage === 'mermaid';
-	const codeBlockKey = getCodeBlockKey(language, value);
+	const codeBlockKey = useMemo(() => getCodeBlockKey(language, value), [language, value]);
 
 	const [mermaidResult, setMermaidResult] = useState<MermaidResultState | null>(null);
 	const [expansionOverride, setExpansionOverride] = useState<ExpansionOverrideState | null>(null);
@@ -166,26 +164,10 @@ export function CodeBlock({
 
 	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isBusy);
 	// Shiki replaces the complete code subtree whenever a result arrives.
-	// Deferring does not coalesce token updates, so keep its input stable and
-	// render the current raw value until the stream has settled.
-	const withinHighlightBudget = useMemo(() => {
-		if (isBusy || value.length > MAX_HIGHLIGHT_CHARACTERS) {
-			return false;
-		}
-		let lines = 1;
-		for (let index = 0; index < value.length; index += 1) {
-			// oxlint-disable-next-line unicorn/prefer-code-point
-			if (value.charCodeAt(index) === 10) {
-				lines += 1;
-				if (lines > MAX_HIGHLIGHT_LINES) {
-					return false;
-				}
-			}
-		}
-		return true;
-	}, [isBusy, value]);
-	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded && withinHighlightBudget;
-	const valueForHighlight = isBusy || !withinHighlightBudget ? '' : value;
+	// Never feed token-by-token values to it. Once settled, highlight expanded
+	// blocks near the viewport without a permanent character/line cutoff.
+	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded;
+	const valueForHighlight = isBusy ? '' : value;
 	const html = useHighlight(valueForHighlight, language, shouldHighlight);
 
 	const isDiffLike = useMemo(
@@ -194,7 +176,7 @@ export function CodeBlock({
 	);
 
 	const highlightedHtml = html ?? '';
-	const showFallback = !withinHighlightBudget || isBusy || !value.trim() || html === null || html === '';
+	const showFallback = isBusy || !value.trim() || html === null || html === '';
 
 	const headerLabel = hasMermaidSyntaxError
 		? 'Mermaid syntax error'
@@ -312,4 +294,4 @@ export function CodeBlock({
 			) : null}
 		</>
 	);
-}
+});

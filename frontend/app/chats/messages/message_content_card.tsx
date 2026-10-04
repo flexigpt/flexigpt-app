@@ -1,6 +1,8 @@
-import { memo, useSyncExternalStore } from 'react';
+import { memo, useEffect, useState, useSyncExternalStore } from 'react';
 
 import { BoundedMarkdown, PlainMessageText } from '@/components/markdown/bounded_markdown';
+
+const MAX_INITIAL_RICH_RENDER_DELAY_MS = 150;
 
 export interface MessageStreamSource {
 	subscribe: (callback: () => void) => () => void;
@@ -95,14 +97,31 @@ export const MessageContentCard = memo(function MessageContentCard({
 	streamingText,
 	defaultCodeBlockExpanded = true,
 }: MessageContentCardProps) {
+	const [richRenderingReady, setRichRenderingReady] = useState(!deferRichRendering);
+
+	useEffect(() => {
+		if (richRenderingReady || !renderAsMarkdown) {
+			return;
+		}
+		const timeout = window.setTimeout(
+			() => {
+				setRichRenderingReady(true);
+			},
+			deferRichRendering ? MAX_INITIAL_RICH_RENDER_DELAY_MS : 0
+		);
+		return () => {
+			window.clearTimeout(timeout);
+		};
+	}, [deferRichRendering, renderAsMarkdown, richRenderingReady]);
+
 	const textToRender = isBusy && streamingText !== undefined ? streamingText : content;
 
 	if (!/\S/.test(textToRender)) {
 		return null;
 	}
 
-	// Deferral is separate from the user's Markdown preference.
-	if (!renderAsMarkdown || (deferRichRendering && !isBusy)) {
+	// Deferral is an initial scheduling hint, not a permanent veto on final Markdown.
+	if (!renderAsMarkdown || (deferRichRendering && !isBusy && !richRenderingReady)) {
 		return <PlainMessageText text={textToRender} align={align} />;
 	}
 

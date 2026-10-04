@@ -3,25 +3,33 @@ import { Component } from 'react';
 
 interface MdErrProps {
 	source: string; // <-- raw markdown
+	resetKey?: unknown;
 	children: ReactElement;
 }
 interface MdErrState {
 	failedSource: string | null;
+	failedResetKey?: unknown;
 }
 
 export class MdErrorBoundary extends Component<MdErrProps, MdErrState> {
 	public state: MdErrState = { failedSource: null };
 
 	public static getDerivedStateFromProps(props: MdErrProps, state: MdErrState): Partial<MdErrState> | null {
-		if (state.failedSource !== null && state.failedSource !== props.source) {
-			return { failedSource: null };
+		if (
+			state.failedSource !== null &&
+			(state.failedSource !== props.source || state.failedResetKey !== props.resetKey)
+		) {
+			return { failedSource: null, failedResetKey: undefined };
 		}
 		return null;
 	}
 
 	public componentDidCatch(err: Error, info: ErrorInfo) {
 		console.error('Markdown render error', err, info);
-		this.setState({ failedSource: this.props.source });
+		this.setState({
+			failedSource: this.props.source,
+			failedResetKey: this.props.resetKey,
+		});
 	}
 
 	public render() {

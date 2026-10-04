@@ -2,10 +2,6 @@
 
 ## Laundry list
 
-- [ ] diff now has inspect path and then review again. we want Review first and then on that click review should already be done. should not cause perf regression.
-- [ ] in case where manually path is entered, even if we put the target, the review doesn't work.
-- [ ] need font mono in header things properly
-
 - Testing
   - [ ] test enhanced mcp apps.
   - [ ] test web search etc and pending user args etc after bottom bar migration.
@@ -15,7 +11,8 @@
 
 ## M-3
 
-- [ ] see if artifactory needs to be a repo. same with llm artifacts. and then complete it with agentruntime repo.
+- [x] see if artifactory needs to be a repo.
+- [ ] same with llm artifacts. and then complete it with agentruntime repo.
 - [ ] Docs clean: positioning wrt repeatable workflows and enhanced guidance
   - [x] setup steps for local or custom models
   - recommended models
