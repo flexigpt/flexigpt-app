@@ -254,5 +254,9 @@ func (s *Store) PurgeTopologyRoot(
 
 	// Do not remove artifact_topology_hydrations here. The previous record is
 	// the authorization and retry marker until the new hydration succeeds.
-	return sqliteError(tx.Commit())
+	if err := sqliteError(tx.Commit()); err != nil {
+		return err
+	}
+	s.forgetDefinitionsForRoot(rootID)
+	return nil
 }

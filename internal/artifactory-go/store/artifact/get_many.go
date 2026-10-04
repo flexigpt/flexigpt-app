@@ -41,15 +41,16 @@ func (s *Service) GetMany(ctx context.Context, refs []artifactModel.ArtifactRef)
 			len(owned),
 		)
 	}
-	output := make([]artifactModel.Artifact, len(values))
 	for index, value := range values {
-		if err := value.Validate(); err != nil {
+		if err := value.ValidateRead(); err != nil {
 			return nil, fmt.Errorf("%w: artifact repository returned invalid Artifact: %w", spec.ErrInvalid, err)
 		}
 		if value.Ref() != owned[index] {
 			return nil, fmt.Errorf("%w: artifact repository did not preserve requested ordering", spec.ErrInvalid)
 		}
-		output[index] = value.Clone()
 	}
-	return output, nil
+	// Repository values are contractually independently owned. Returning them
+	// directly avoids a second deep copy and JSON canonicalization on complete
+	// Artifact batch reads.
+	return values, nil
 }

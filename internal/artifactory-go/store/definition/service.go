@@ -47,20 +47,13 @@ func (s *Service) GetDefinition(
 	if err != nil {
 		return definitionModel.Definition{}, err
 	}
-	if err := value.Validate(); err != nil {
-		return definitionModel.Definition{}, fmt.Errorf(
-			"%w: Definition repository returned invalid value: %w",
-			spec.ErrInvalid,
-			err,
-		)
+	if err := validateRepositoryDefinition(value, digest); err != nil {
+		return definitionModel.Definition{}, err
 	}
-	if value.Digest != digest {
-		return definitionModel.Definition{}, fmt.Errorf(
-			"%w: Definition repository returned another digest",
-			spec.ErrInvalid,
-		)
-	}
-	return value.Clone(), nil
+	// Repository values are contractually independently owned. Avoid a second
+	// deep copy on every immutable read after its persistence boundary has
+	// already established ownership.
+	return value, nil
 }
 
 func (s *Service) GetDefinitions(
@@ -97,22 +90,20 @@ func (s *Service) GetDefinitions(
 			len(ownedKeys),
 		)
 	}
-	output := make([]definitionModel.Definition, len(values))
 	for index, value := range values {
-		if err := value.Validate(); err != nil {
-			return nil, fmt.Errorf(
-				"%w: Definition repository returned invalid value %d: %w",
-				spec.ErrInvalid,
-				index,
-				err,
-			)
+		if err := validateRepositoryDefinition(value, ownedKeys[index].Digest); err != nil {
+			return nil, fmt.Errorf("definition repository value %d: %w", index, err)
 		}
-		if value.Digest != ownedKeys[index].Digest {
-			return nil, fmt.Errorf("%w: Definition repository did not preserve requested ordering", spec.ErrInvalid)
-		}
-		output[index] = value.Clone()
 	}
-	return output, nil
+	return values, nil
 }
 
-var _ API = (*Service)(nil)
+func validateRepositoryDefinition(value definitionModel.Definition, expected cryptoutil.Digest) error {
+	if value.Digest != expected {
+		return fmt.Errorf("%w: Definition repository returned another digest", spec.ErrInvalid)
+	}
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
+		return fmt.Errorf("%w: Definition repository returned invalid admitted value: %w", spec.ErrInvalid, err)
+	}
+	return nil
+}

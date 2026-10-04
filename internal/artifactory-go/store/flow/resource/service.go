@@ -6,7 +6,6 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/internal"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
@@ -99,9 +98,3 @@ func (s *nativePathService) ResolveVerifiedLocalPath(
 func (s *nativePathService) SupportsLocalPath(kind sourceModel.SourceKind) bool {
 	return s.service.SupportsLocalPath(kind)
 }
-
-var (
-	_ API           = (*ordinaryService)(nil)
-	_ NativePathAPI = (*nativePathService)(nil)
-	_ definitionModel.Definition
-)

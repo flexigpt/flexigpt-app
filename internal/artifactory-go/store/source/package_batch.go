@@ -10,8 +10,6 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-type PackageBatchWriter = managedpackage.BatchWriter
-
 func (r *Registry) ApplyPackageBatch(
 	ctx context.Context,
 	value sourceModel.Source,
@@ -24,7 +22,7 @@ func (r *Registry) ApplyPackageBatch(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return err
 	}
 
@@ -37,7 +35,7 @@ func (r *Registry) ApplyPackageBatch(
 		)
 	}
 
-	writer, supported := adapter.(PackageBatchWriter)
+	writer, supported := adapter.(managedpackage.BatchWriter)
 	if !supported {
 		return fmt.Errorf(
 			"%w: source kind %q has no package batch writer",

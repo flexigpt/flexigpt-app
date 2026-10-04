@@ -113,5 +113,3 @@ func (s *RuntimeService) ReadBinding(
 	}
 	return plaintext, binding.Clone(), nil
 }
-
-var _ RuntimeAPI = (*RuntimeService)(nil)

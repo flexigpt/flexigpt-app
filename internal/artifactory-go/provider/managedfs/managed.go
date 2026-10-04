@@ -558,7 +558,7 @@ func (a *Adapter) validateSource(ctx context.Context, value sourceModel.Source) 
 	if a == nil || a.filesystem == nil {
 		return spec.ErrClosed
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return err
 	}
 	if value.Kind != Kind {

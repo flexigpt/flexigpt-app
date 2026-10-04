@@ -281,8 +281,3 @@ func normalizeNamespaces(label string, values []overlayModel.Namespace) (map[ove
 	}
 	return output, nil
 }
-
-var (
-	_ API      = (*Service)(nil)
-	_ StoreAPI = (*Service)(nil)
-)

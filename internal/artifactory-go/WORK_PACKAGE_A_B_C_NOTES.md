@@ -53,3 +53,39 @@ It returns `*store/compose.Store` directly. Callers must not depend on a
 A caller-provided `Config.SecretValues` remains caller-owned when `Open`
 fails. Ownership transfers only after `Open` succeeds; the returned aggregate
 handle then closes the backend exactly once through `Store.Close`.
+
+## Work Package C completion notes
+
+Scope delivered in this Artifactory-only change:
+
+- Source lifecycle invalidation is an explicit Source command and a narrow
+  injected publication port.
+- Refresh owns aggregate preconditions and publication; Artifact owns missing
+  state derivation; SQLite atomically applies the explicit command.
+- SQLite no longer infers Artifact invalidation from ordinary Source
+  `Update`/`Retire` repository calls.
+- Definition canonicalization and digest admission are centralized at decoder
+  and generated-document admission; immutable reads avoid repeated hashing.
+- Root/topology purge evicts Root-local Definition cache entries.
+- Ordinary Resource access explicitly includes verification sessions; trusted
+  native-path access remains separately supplied.
+- Source driver aliases and Source-owned resource-session/native-path helpers
+  expose no compatibility surface.
+
+Regression tests were added for lifecycle command validation, Artifact
+invalidation derivation, Definition admission, and explicit Resource sessions.
+They were intentionally not run, together with all existing tests and lint.
+
+Not performed here:
+
+- Work Package D declaration-language dispatch extraction from the JSON Schema
+  provider.
+- Any change outside `internal/artifactory-go`.
+
+Files whose obsolete compatibility-only names remain because deletion is
+blocked in this environment contain no exported forwarding surface:
+
+- `store/source/driver_aliases.go`
+- `store/source/verified_path.go`
+
+They may be removed physically once file deletion is available.

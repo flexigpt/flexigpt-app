@@ -1,10 +1,3 @@
-// Package compose constructs the provider-independent Artifact Store service
-// aggregate.
-//
-// It wires named entity and flow capabilities from explicit contracts. It does
-// not open databases, create directories, select concrete drivers, or own any
-// provider-specific deployment policy; those responsibilities belong to a
-// deployment such as compose/local.
 package compose
 
 import (
@@ -48,7 +41,6 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if config.ArtifactIDProvider == nil {
 		config.ArtifactIDProvider = artifact.NewUUIDIDProvider()
 	}
-
 	codecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
 	if err != nil {
 		return nil, err
@@ -64,7 +56,6 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err := ingest.BindSchemaCatalog(decoders, schemas); err != nil {
 		return nil, err
 	}
-
 	sourceRegistry, err := source.NewRegistry(config.SourceDrivers...)
 	if err != nil {
 		return nil, err
@@ -77,33 +68,15 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	definitionService, err := definition.NewService(config.DefinitionRepository)
 	if err != nil {
 		return nil, err
 	}
-	rootService, err := root.NewService(
-		config.RootRepository,
-		config.Clock,
-		config.RootPolicy,
-	)
+	rootService, err := root.NewService(config.RootRepository, config.Clock, config.RootPolicy)
 	if err != nil {
 		return nil, err
 	}
-	sourceRuntime, err := source.NewRuntime(
-		config.SourceRepository,
-		sourceRegistry,
-	)
-	if err != nil {
-		return nil, err
-	}
-	sourceService, err := source.NewService(
-		config.SourceRepository,
-		sourceRegistry,
-		rootService,
-		config.Clock,
-		config.RootPolicy,
-	)
+	sourceRuntime, err := source.NewRuntime(config.SourceRepository, sourceRegistry)
 	if err != nil {
 		return nil, err
 	}
@@ -116,14 +89,10 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-	catalogService, err := catalog.NewService(
-		config.CatalogRepository,
-		definitionService,
-	)
+	catalogService, err := catalog.NewService(config.CatalogRepository, definitionService)
 	if err != nil {
 		return nil, err
 	}
-
 	secretLifecycle, err := secret.NewLifecycleService(
 		config.SecretLifecycleRepository,
 		config.Clock,
@@ -177,11 +146,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err := secretLifecycle.RecoverPending(ctx); err != nil {
 		return nil, err
 	}
-
-	synchronizer, err := artifact.NewSynchronizer(
-		config.Clock,
-		config.ArtifactIDProvider,
-	)
+	synchronizer, err := artifact.NewSynchronizer(config.Clock, config.ArtifactIDProvider)
 	if err != nil {
 		return nil, err
 	}
@@ -190,10 +155,24 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 		config.ArtifactRepository,
 		config.RefreshStates,
 		discovery,
+		discovery,
 		synchronizer,
 		config.RefreshPublisher,
 		config.Clock,
 		config.RootPolicy,
+	)
+	if err != nil {
+		return nil, err
+	}
+	// Refresh is the narrow injected aggregate publisher for Source lifecycle
+	// transitions; Source itself does not import the flow implementation.
+	sourceService, err := source.NewService(
+		config.SourceRepository,
+		sourceRegistry,
+		rootService,
+		config.Clock,
+		config.RootPolicy,
+		refreshService,
 	)
 	if err != nil {
 		return nil, err
@@ -240,7 +219,6 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	return &Store{
 		Roots:                  rootService,
 		Sources:                sourceService,
@@ -265,9 +243,7 @@ func Open(ctx context.Context, config Config) (*Store, error) {
 }
 
 func validateConfig(config Config) error {
-	if config.RootRepository == nil ||
-		config.SourceRepository == nil ||
-		config.ArtifactRepository == nil ||
+	if config.RootRepository == nil || config.SourceRepository == nil || config.ArtifactRepository == nil ||
 		config.CatalogRepository == nil ||
 		config.DefinitionRepository == nil ||
 		config.RefreshStates == nil ||

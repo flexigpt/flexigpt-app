@@ -140,37 +140,21 @@ func (s *Service) ResolveVerifiedLocalPath(
 		return s.resolveVerifiedLocalPathInSession(ctx, session, resolved, localLocator)
 	}
 
-	value, err := s.sources.Get(
-		ctx,
-		resolved.Source.RootID,
-		resolved.Source.ID,
-	)
+	sessionCtx, lease, err := s.BeginVerificationSession(ctx)
 	if err != nil {
 		return "", err
 	}
-	if !value.Enabled {
-		return "", fmt.Errorf(
-			"%w: Artifact Source %q is disabled",
-			spec.ErrSourceUnavailable,
-			value.ID,
-		)
-	}
-	if value.Revision != resolved.RefreshState.SourceRevision {
-		return "", fmt.Errorf(
-			"%w: Source changed after Artifact resolution",
-			spec.ErrRefreshRequired,
-		)
-	}
-	return source.ResolveVerifiedLocalPath(
-		ctx,
-		s.sources,
-		value,
-		resolved.Artifact.Binding.Locator,
+	location, resolveErr := s.resolveVerifiedLocalPathInSession(
+		sessionCtx,
+		verificationSessionFromContext(sessionCtx),
+		resolved,
 		localLocator,
-		resolved.RefreshState.SourceGeneration,
-		*resolved.Artifact.SourceContentDigest,
-		spec.MaxCandidateBytes,
 	)
+	closeErr := lease.Close(context.WithoutCancel(sessionCtx))
+	if err := errors.Join(resolveErr, closeErr); err != nil {
+		return "", err
+	}
+	return location, nil
 }
 
 func (s *Service) ReadSourceEntry(

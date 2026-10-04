@@ -54,7 +54,7 @@ func (s Source) Clone() Source {
 }
 
 func (s Source) Validate() error {
-	if err := s.Summary().Validate(); err != nil {
+	if err := s.ValidateRead(); err != nil {
 		return err
 	}
 	if _, err := jsonutil.CanonicalizeObject(

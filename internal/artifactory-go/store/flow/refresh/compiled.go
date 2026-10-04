@@ -18,16 +18,11 @@ func (s *Service) RegisterCompiledDocuments(
 	sourceID sourceModel.SourceID,
 	documents []ingest.CompiledDocument,
 ) error {
-	if s == nil || s.discovery == nil {
+	if s == nil || s.compiled == nil {
 		return spec.ErrClosed
 	}
 	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
-	return s.discovery.RegisterCompiledDocuments(ctx, rootID, sourceID, documents)
+	return s.compiled.RegisterCompiledDocuments(ctx, rootID, sourceID, documents)
 }
-
-var (
-	_ CompiledDocumentRegistrar = (*Service)(nil)
-	_ MetadataInspector         = (*Service)(nil)
-)

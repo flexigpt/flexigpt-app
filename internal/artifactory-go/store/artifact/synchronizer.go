@@ -62,7 +62,7 @@ func (s *Synchronizer) Synchronize(
 	if err := rootID.Validate(); err != nil {
 		return Synchronization{}, err
 	}
-	if err := sourceValue.Validate(); err != nil {
+	if err := sourceValue.ValidateRead(); err != nil {
 		return Synchronization{}, err
 	}
 	if sourceValue.RootID != rootID {
@@ -165,7 +165,7 @@ func (s *Synchronizer) Synchronize(
 	})
 
 	for index, current := range orderedExisting {
-		if err := current.Validate(); err != nil {
+		if err := current.ValidateRead(); err != nil {
 			return Synchronization{}, fmt.Errorf(
 				"existing Artifact %d: %w",
 				index,
@@ -230,7 +230,7 @@ func (s *Synchronizer) Synchronize(
 			now,
 			current.ModifiedAt,
 		)
-		if err := next.Validate(); err != nil {
+		if err := next.ValidateRead(); err != nil {
 			return Synchronization{}, err
 		}
 		result.Updates = append(result.Updates, SourceStateUpdate{

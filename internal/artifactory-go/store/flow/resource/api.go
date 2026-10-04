@@ -10,9 +10,19 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
+// SessionAPI starts an ordinary request-scoped verification session. It is
+// explicit rather than an accidentally discoverable concrete method.
+type SessionAPI interface {
+	BeginVerificationSession(
+		ctx context.Context,
+	) (context.Context, resourceModel.VerificationSession, error)
+}
+
 // API is the ordinary portable resource capability. Native filesystem paths
 // are intentionally absent and require NativePathAPI.
 type API interface {
+	SessionAPI
+
 	ResolveArtifact(
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,

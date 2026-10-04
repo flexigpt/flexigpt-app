@@ -121,38 +121,7 @@ func (a Artifact) Address() ArtifactAddress {
 }
 
 func (a Artifact) Validate() error {
-	if err := a.ID.Validate(); err != nil {
-		return err
-	}
-	if err := a.RootID.Validate(); err != nil {
-		return err
-	}
-	if err := a.Binding.Validate(); err != nil {
-		return err
-	}
-	if err := a.Kind.Validate(); err != nil {
-		return err
-	}
-	if err := a.LogicalName.Validate(); err != nil {
-		return err
-	}
-	if err := a.LogicalVersion.Validate(true); err != nil {
-		return err
-	}
-	if err := a.State.Validate(
-		a.ResolvedDefinition,
-		a.SourceContentDigest,
-	); err != nil {
-		return err
-	}
-	if err := diagnostic.Validate(a.Diagnostics); err != nil {
-		return err
-	}
-	if err := spec.ValidateRequiredText(
-		"Artifact display name",
-		a.DisplayName,
-		spec.MaxDisplayNameBytes,
-	); err != nil {
+	if err := a.ValidateRead(); err != nil {
 		return err
 	}
 	if _, err := jsonutil.CanonicalizeObject(
@@ -163,24 +132,6 @@ func (a Artifact) Validate() error {
 			"%w: Artifact local data: %w",
 			spec.ErrInvalid,
 			err,
-		)
-	}
-	if a.Revision == 0 {
-		return fmt.Errorf(
-			"%w: Artifact revision must be positive",
-			spec.ErrInvalid,
-		)
-	}
-	if a.CreatedAt.IsZero() || a.ModifiedAt.IsZero() {
-		return fmt.Errorf(
-			"%w: Artifact timestamps are required",
-			spec.ErrInvalid,
-		)
-	}
-	if a.ModifiedAt.Before(a.CreatedAt) {
-		return fmt.Errorf(
-			"%w: Artifact modified time precedes creation",
-			spec.ErrInvalid,
 		)
 	}
 	return nil

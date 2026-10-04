@@ -7,6 +7,7 @@ import (
 	"io"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -14,29 +15,20 @@ import (
 
 type runtime struct {
 	reader     Reader
-	opener     Opener
-	localPaths LocalPathResolver
-	localKinds LocalPathCapability
+	opener     driver.Opener
+	localPaths driver.LocalPathResolver
+	localKinds driver.LocalPathCapability
 }
 
-func NewRuntime(
-	reader Reader,
-	opener Opener,
-) (Runtime, error) {
+func NewRuntime(reader Reader, opener driver.Opener) (Runtime, error) {
 	if reader == nil || opener == nil {
-		return nil, fmt.Errorf(
-			"%w: source runtime dependencies are incomplete",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source runtime dependencies are incomplete", spec.ErrInvalid)
 	}
-	value := &runtime{
-		reader: reader,
-		opener: opener,
-	}
-	if resolver, supported := opener.(LocalPathResolver); supported {
+	value := &runtime{reader: reader, opener: opener}
+	if resolver, supported := opener.(driver.LocalPathResolver); supported {
 		value.localPaths = resolver
 	}
-	if capabilities, supported := opener.(LocalPathCapability); supported {
+	if capabilities, supported := opener.(driver.LocalPathCapability); supported {
 		value.localKinds = capabilities
 	}
 	return value, nil
@@ -44,96 +36,56 @@ func NewRuntime(
 
 // ReadSnapshotEntry reads one regular Source snapshot entry with the same
 // bounded-read and size-stability rules used by discovery.
-//
-// It intentionally operates only through Snapshot. Feature code must not
-// recreate this behavior by reading a Source's native filesystem path.
 func ReadSnapshotEntry(
 	ctx context.Context,
-	snapshot Snapshot,
+	snapshot driver.Snapshot,
 	entry sourceModel.Entry,
 	maximumBytes int64,
 ) ([]byte, error) {
 	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: source snapshot read context is nil",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source snapshot read context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if snapshot == nil {
-		return nil, fmt.Errorf(
-			"%w: source snapshot is nil",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source snapshot is nil", spec.ErrInvalid)
 	}
 	if err := entry.Validate(); err != nil {
 		return nil, err
 	}
 	if !entry.IsRegular {
-		return nil, fmt.Errorf(
-			"%w: source entry %q is not a regular file",
-			spec.ErrInvalid,
-			entry.Locator,
-		)
+		return nil, fmt.Errorf("%w: source entry %q is not a regular file", spec.ErrInvalid, entry.Locator)
 	}
 	if maximumBytes <= 0 || maximumBytes > spec.MaxScanBytes {
-		return nil, fmt.Errorf(
-			"%w: source snapshot read limit is invalid",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source snapshot read limit is invalid", spec.ErrInvalid)
 	}
 	if entry.SizeBytes > maximumBytes {
-		return nil, fmt.Errorf(
-			"%w: source entry %q exceeds byte limit",
-			spec.ErrInvalid,
-			entry.Locator,
-		)
+		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", spec.ErrInvalid, entry.Locator)
 	}
-
 	reader, err := snapshot.Open(ctx, entry.Locator)
 	if err != nil {
 		return nil, err
 	}
 	if reader == nil {
-		return nil, fmt.Errorf(
-			"%w: source snapshot returned a nil reader for %q",
-			spec.ErrInvalid,
-			entry.Locator,
-		)
+		return nil, fmt.Errorf("%w: source snapshot returned a nil reader for %q", spec.ErrInvalid, entry.Locator)
 	}
-	content, readErr := io.ReadAll(
-		io.LimitReader(reader, maximumBytes+1),
-	)
+	content, readErr := io.ReadAll(io.LimitReader(reader, maximumBytes+1))
 	closeErr := reader.Close()
 	if readErr != nil || closeErr != nil {
 		return nil, errors.Join(readErr, closeErr)
 	}
 	if int64(len(content)) > maximumBytes {
-		return nil, fmt.Errorf(
-			"%w: source entry %q exceeds byte limit",
-			spec.ErrInvalid,
-			entry.Locator,
-		)
+		return nil, fmt.Errorf("%w: source entry %q exceeds byte limit", spec.ErrInvalid, entry.Locator)
 	}
 	if int64(len(content)) != entry.SizeBytes {
-		return nil, fmt.Errorf(
-			"%w: source entry %q changed size during snapshot read",
-			spec.ErrConflict,
-			entry.Locator,
-		)
+		return nil, fmt.Errorf("%w: source entry %q changed size during snapshot read", spec.ErrConflict, entry.Locator)
 	}
 	return content, nil
 }
 
 // ReadVerifiedSnapshotEntry reads one source entry from an exact Source
-// generation and confirms the snapshot before returning the owned bytes and
-// their digest.
-//
-// It is the generic Artifact Store boundary for feature code that needs the
-// canonical source document itself. Features must not reopen native paths or
-// duplicate snapshot generation, bounded-read, confirmation, and close rules.
+// generation and confirms the snapshot before returning owned bytes and digest.
 func ReadVerifiedSnapshotEntry(
 	ctx context.Context,
 	runtime Runtime,
@@ -141,27 +93,17 @@ func ReadVerifiedSnapshotEntry(
 	locator spec.Locator,
 	expectedGeneration string,
 	maximumBytes int64,
-) (
-	content []byte,
-	digest cryptoutil.Digest,
-	returnErr error,
-) {
+) (content []byte, digest cryptoutil.Digest, returnErr error) {
 	if ctx == nil {
-		return nil, "", fmt.Errorf(
-			"%w: verified source read context is nil",
-			spec.ErrInvalid,
-		)
+		return nil, "", fmt.Errorf("%w: verified source read context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
 	if runtime == nil {
-		return nil, "", fmt.Errorf(
-			"%w: verified source read runtime is nil",
-			spec.ErrInvalid,
-		)
+		return nil, "", fmt.Errorf("%w: verified source read runtime is nil", spec.ErrInvalid)
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return nil, "", err
 	}
 	if err := locator.Validate(false); err != nil {
@@ -171,32 +113,17 @@ func ReadVerifiedSnapshotEntry(
 		return nil, "", err
 	}
 	if maximumBytes <= 0 || maximumBytes > spec.MaxScanBytes {
-		return nil, "", fmt.Errorf(
-			"%w: verified source read limit is invalid",
-			spec.ErrInvalid,
-		)
+		return nil, "", fmt.Errorf("%w: verified source read limit is invalid", spec.ErrInvalid)
 	}
-
 	snapshot, err := runtime.Open(ctx, value)
 	if err != nil {
 		return nil, "", err
 	}
-	defer func() {
-		returnErr = errors.Join(returnErr, snapshot.Close())
-	}()
-
+	defer func() { returnErr = errors.Join(returnErr, snapshot.Close()) }()
 	if snapshot.Generation() != expectedGeneration {
-		return nil, "", fmt.Errorf(
-			"%w: source generation changed since it was observed",
-			spec.ErrConflict,
-		)
+		return nil, "", fmt.Errorf("%w: source generation changed since it was observed", spec.ErrConflict)
 	}
-	content, err = readSnapshotLocator(
-		ctx,
-		snapshot,
-		locator,
-		maximumBytes,
-	)
+	content, err = readSnapshotLocator(ctx, snapshot, locator, maximumBytes)
 	if err != nil {
 		return nil, "", err
 	}
@@ -206,11 +133,8 @@ func ReadVerifiedSnapshotEntry(
 	return content, cryptoutil.DigestBytes(content), nil
 }
 
-// VerifySnapshotContentDigest confirms both the Source generation and the
-// exact bytes of one refreshed Source entry through the Source runtime.
-//
-// This is intentionally generic Source behavior. It does not parse Skill
-// content, resolve native paths, or apply runtime sandbox policy.
+// VerifySnapshotContentDigest confirms both Source generation and exact bytes
+// of one refreshed Source entry through the Source runtime.
 func VerifySnapshotContentDigest(
 	ctx context.Context,
 	runtime Runtime,
@@ -224,29 +148,14 @@ func VerifySnapshotContentDigest(
 		return err
 	}
 	if maximumBytes <= 0 || maximumBytes > spec.MaxCandidateBytes {
-		return fmt.Errorf(
-			"%w: source digest verification limit is invalid",
-			spec.ErrInvalid,
-		)
+		return fmt.Errorf("%w: source digest verification limit is invalid", spec.ErrInvalid)
 	}
-
-	_, actualDigest, err := ReadVerifiedSnapshotEntry(
-		ctx,
-		runtime,
-		value,
-		locator,
-		expectedGeneration,
-		maximumBytes,
-	)
+	_, actualDigest, err := ReadVerifiedSnapshotEntry(ctx, runtime, value, locator, expectedGeneration, maximumBytes)
 	if err != nil {
 		return err
 	}
 	if actualDigest != expectedDigest {
-		return fmt.Errorf(
-			"%w: Source content for %q changed since refresh",
-			spec.ErrConflict,
-			locator,
-		)
+		return fmt.Errorf("%w: Source content for %q changed since refresh", spec.ErrConflict, locator)
 	}
 	return nil
 }
@@ -260,10 +169,7 @@ func (r *runtime) Get(
 		return sourceModel.Source{}, spec.ErrClosed
 	}
 	if ctx == nil {
-		return sourceModel.Source{}, fmt.Errorf(
-			"%w: source runtime context is nil",
-			spec.ErrInvalid,
-		)
+		return sourceModel.Source{}, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return sourceModel.Source{}, err
@@ -278,40 +184,21 @@ func (r *runtime) Get(
 	if err != nil {
 		return sourceModel.Source{}, err
 	}
-	if value.ID != id {
-		return sourceModel.Source{}, fmt.Errorf(
-			"%w: source reader returned %q for requested source %q",
-			spec.ErrInvalid,
-			value.ID,
-			id,
-		)
+	if value.ID != id || value.RootID != rootID {
+		return sourceModel.Source{}, fmt.Errorf("%w: source reader returned another Source identity", spec.ErrInvalid)
 	}
-	if value.RootID != rootID {
-		return sourceModel.Source{}, fmt.Errorf(
-			"%w: source reader returned root %q for requested root %q",
-			spec.ErrInvalid,
-			value.RootID,
-			rootID,
-		)
-	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return sourceModel.Source{}, fmt.Errorf("invalid source returned by runtime reader: %w", err)
 	}
 	return value.Clone(), nil
 }
 
-func (r *runtime) List(
-	ctx context.Context,
-	rootID rootModel.RootID,
-) ([]sourceModel.Source, error) {
+func (r *runtime) List(ctx context.Context, rootID rootModel.RootID) ([]sourceModel.Source, error) {
 	if r == nil || r.reader == nil {
 		return nil, spec.ErrClosed
 	}
 	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: source runtime context is nil",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -319,7 +206,6 @@ func (r *runtime) List(
 	if err := rootID.Validate(); err != nil {
 		return nil, err
 	}
-
 	values, err := r.reader.List(ctx, rootID)
 	if err != nil {
 		return nil, err
@@ -327,13 +213,9 @@ func (r *runtime) List(
 	output := make([]sourceModel.Source, len(values))
 	for index, value := range values {
 		if value.RootID != rootID {
-			return nil, fmt.Errorf(
-				"%w: source reader returned Source %q for another Root",
-				spec.ErrInvalid,
-				value.ID,
-			)
+			return nil, fmt.Errorf("%w: source reader returned Source %q for another Root", spec.ErrInvalid, value.ID)
 		}
-		if err := value.Validate(); err != nil {
+		if err := value.ValidateRead(); err != nil {
 			return nil, err
 		}
 		output[index] = value.Clone()
@@ -341,23 +223,17 @@ func (r *runtime) List(
 	return output, nil
 }
 
-func (r *runtime) Open(
-	ctx context.Context,
-	value sourceModel.Source,
-) (Snapshot, error) {
+func (r *runtime) Open(ctx context.Context, value sourceModel.Source) (driver.Snapshot, error) {
 	if r == nil || r.opener == nil {
 		return nil, spec.ErrClosed
 	}
 	if ctx == nil {
-		return nil, fmt.Errorf(
-			"%w: source runtime context is nil",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: source runtime context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return nil, err
 	}
 	snapshot, err := r.opener.Open(ctx, value.Clone())
@@ -373,9 +249,6 @@ func (r *runtime) Open(
 	return snapshot, nil
 }
 
-// ResolveLocalPath delegates only to adapters that explicitly support native
-// filesystem paths. Non-filesystem sources remain source-backed but do not
-// become path-backed implicitly.
 func (r *runtime) ResolveLocalPath(
 	ctx context.Context,
 	value sourceModel.Source,
@@ -387,49 +260,28 @@ func (r *runtime) ResolveLocalPath(
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return "", err
 	}
 	if err := locator.Validate(true); err != nil {
 		return "", err
 	}
-	if r.localPaths == nil ||
-		!r.SupportsLocalPath(value.Kind) {
-		return "", fmt.Errorf(
-			"%w: source runtime has no native path resolver",
-			spec.ErrUnsupported,
-		)
+	if r.localPaths == nil || !r.SupportsLocalPath(value.Kind) {
+		return "", fmt.Errorf("%w: source runtime has no native path resolver", spec.ErrUnsupported)
 	}
-	location, err := r.localPaths.ResolveLocalPath(
-		ctx,
-		value.Clone(),
-		locator,
-	)
-	if err != nil {
-		return "", err
-	}
-	return location, nil
+	return r.localPaths.ResolveLocalPath(ctx, value.Clone(), locator)
 }
 
-func (r *runtime) SupportsLocalPath(
-	kind sourceModel.SourceKind,
-) bool {
-	if r == nil || r.localKinds == nil {
-		return false
-	}
-	return r.localKinds.SupportsLocalPath(kind)
+func (r *runtime) SupportsLocalPath(kind sourceModel.SourceKind) bool {
+	return r != nil && r.localKinds != nil && r.localKinds.SupportsLocalPath(kind)
 }
 
-func validateSnapshot(snapshot Snapshot) error {
+func validateSnapshot(snapshot driver.Snapshot) error {
 	if snapshot == nil {
 		return fmt.Errorf("%w: source opener returned a nil snapshot", spec.ErrInvalid)
 	}
 	if err := spec.ValidateSourceGeneration(snapshot.Generation()); err != nil {
-		return fmt.Errorf(
-			"%w: source snapshot returned an invalid generation: %w",
-			spec.ErrInvalid,
-			err,
-		)
+		return fmt.Errorf("%w: source snapshot returned an invalid generation: %w", spec.ErrInvalid, err)
 	}
 	return nil
 }

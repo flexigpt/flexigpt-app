@@ -26,19 +26,16 @@ func (s *Store) getDefinition(
 	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
 ) (definitionModel.Definition, error) {
-	values, err := s.getDefinitions(
-		ctx,
-		[]definitionModel.Key{{
-			RootID: rootID,
-			Digest: digest,
-		}},
-	)
+	values, err := s.getDefinitions(ctx, []definitionModel.Key{{RootID: rootID, Digest: digest}})
 	if err != nil {
 		return definitionModel.Definition{}, err
 	}
 	return values[0], nil
 }
 
+// putDefinitionTx receives a Definition already admitted through
+// definition.Admit/Ingress. SQLite enforces immutable-key conflict semantics;
+// it deliberately does not canonicalize and hash the same body again.
 func putDefinitionTx(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -46,17 +43,10 @@ func putDefinitionTx(
 	value definitionModel.Definition,
 	createdAt time.Time,
 ) error {
-	canonical, err := definitionModel.Canonicalize(value)
-	if err != nil {
+	canonical := value.Clone()
+	if err := definitionModel.ValidateAdmitted(canonical); err != nil {
 		return err
 	}
-	if canonical.Digest != value.Digest {
-		return fmt.Errorf(
-			"%w: Definition is not canonical",
-			spec.ErrInvalid,
-		)
-	}
-
 	labels, err := encodeJSON(canonical.Labels)
 	if err != nil {
 		return err
@@ -73,39 +63,23 @@ func putDefinitionTx(
 			labels_json, body_json, dependencies_json, created_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(root_id, digest) DO NOTHING`,
-		string(rootID),
-		string(canonical.Digest),
-		string(canonical.Kind),
-		string(canonical.SchemaID),
-		canonical.SchemaVersion,
-		string(canonical.LogicalName),
-		string(canonical.LogicalVersion),
-		canonical.DisplayName,
-		canonical.Description,
-		labels,
-		[]byte(canonical.Body),
-		dependencies,
-		timeValue(createdAt),
+		string(rootID), string(canonical.Digest), string(canonical.Kind),
+		string(canonical.SchemaID), canonical.SchemaVersion,
+		string(canonical.LogicalName), string(canonical.LogicalVersion),
+		canonical.DisplayName, canonical.Description, labels,
+		[]byte(canonical.Body), dependencies, timeValue(createdAt),
 	)
 	if err != nil {
 		return sqliteError(err)
 	}
-
 	inserted, err := result.RowsAffected()
 	if err != nil {
 		return err
 	}
 	if inserted == 1 {
-		// The exact admitted payload was inserted by this transaction.
 		return nil
 	}
-
-	existing, err := getDefinitionTx(
-		ctx,
-		tx,
-		rootID,
-		canonical.Digest,
-	)
+	existing, err := getDefinitionTx(ctx, tx, rootID, canonical.Digest)
 	if err != nil {
 		return err
 	}
@@ -120,11 +94,7 @@ func putDefinitionTx(
 }
 
 type definitionQueryer interface {
-	QueryRowContext(
-		ctx context.Context,
-		query string,
-		args ...any,
-	) *sql.Row
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 func getDefinitionTx(
@@ -133,31 +103,24 @@ func getDefinitionTx(
 	rootID rootModel.RootID,
 	digest cryptoutil.Digest,
 ) (definitionModel.Definition, error) {
-	return scanDefinition(queryer.QueryRowContext(
-		ctx,
-		`SELECT `+definitionColumns+`
-		 FROM artifact_definitions
-		 WHERE root_id = ? AND digest = ?`,
-		string(rootID),
-		string(digest),
-	))
+	return scanDefinition(
+		queryer.QueryRowContext(
+			ctx,
+			`SELECT `+definitionColumns+` FROM artifact_definitions WHERE root_id = ? AND digest = ?`,
+			string(rootID),
+			string(digest),
+		),
+	)
 }
 
-func scanDefinition(
-	row scanner,
-) (definitionModel.Definition, error) {
-	var (
-		rootID, digest, kind, schemaID, schemaVersion string
-		logicalName, logicalVersion                   string
-		displayName, description                      string
-		labelsRaw, bodyRaw, dependenciesRaw           []byte
-		createdAt                                     int64
-	)
+func scanDefinition(row scanner) (definitionModel.Definition, error) {
+	var rootID, digest, kind, schemaID, schemaVersion string
+	var logicalName, logicalVersion string
+	var displayName, description string
+	var labelsRaw, bodyRaw, dependenciesRaw []byte
+	var createdAt int64
 	if row == nil {
-		return definitionModel.Definition{}, fmt.Errorf(
-			"%w: Definition row is nil",
-			spec.ErrInvalid,
-		)
+		return definitionModel.Definition{}, fmt.Errorf("%w: Definition row is nil", spec.ErrInvalid)
 	}
 	if err := row.Scan(
 		&rootID,
@@ -176,15 +139,11 @@ func scanDefinition(
 	); err != nil {
 		return definitionModel.Definition{}, err
 	}
-
 	var value definitionModel.Definition
 	if err := decodeJSON(labelsRaw, &value.Labels); err != nil {
 		return definitionModel.Definition{}, err
 	}
-	if err := decodeJSON(
-		dependenciesRaw,
-		&value.Dependencies,
-	); err != nil {
+	if err := decodeJSON(dependenciesRaw, &value.Dependencies); err != nil {
 		return definitionModel.Definition{}, err
 	}
 	value.Digest = cryptoutil.Digest(digest)
@@ -196,22 +155,13 @@ func scanDefinition(
 	value.DisplayName = displayName
 	value.Description = description
 	value.Body = append([]byte(nil), bodyRaw...)
-	canonical, err := definitionModel.Canonicalize(value)
-	if err != nil {
-		return definitionModel.Definition{}, fmt.Errorf(
-			"invalid persisted Definition %q/%q: %w",
-			rootID,
-			digest,
-			err,
-		)
+	if err := definitionModel.ValidateAdmitted(value); err != nil {
+		return definitionModel.Definition{}, fmt.Errorf("invalid persisted Definition %q/%q: %w", rootID, digest, err)
 	}
-	return canonical, nil
+	return value, nil
 }
 
-func equalDefinitions(
-	left definitionModel.Definition,
-	right definitionModel.Definition,
-) bool {
+func equalDefinitions(left, right definitionModel.Definition) bool {
 	return left.Digest == right.Digest &&
 		left.Kind == right.Kind &&
 		left.SchemaID == right.SchemaID &&

@@ -22,6 +22,11 @@ import (
 // ResourceReader is the narrow generic Artifact Store resource capability
 // needed to materialize one Skill package.
 type ResourceReader interface {
+	// ResolveAll requires an explicit shared verification session. Native-path
+	// access remains separately required below because Skill materialization is
+	// trusted local runtime composition.
+	resourceFlow.SessionAPI
+
 	ResolveArtifact(
 		ctx context.Context,
 		ref artifactModel.ArtifactRef,

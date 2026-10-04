@@ -6,6 +6,7 @@ import (
 	"maps"
 	"sync"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -67,9 +68,8 @@ func (d CompiledDocument) Validate() error {
 		// incorrectly reject a valid generated Definition solely because Body
 		// has non-canonical object whitespace or key order.
 		//
-		// Immutable Definition admission canonicalizes and verifies the full
-		// value again before persistence. At this registration boundary, only
-		// validate the identity metadata Ingest needs to produce observations.
+		// RegisterCompiledDocuments performs Definition-owned canonical
+		// admission after this trusted witness shape has been accepted.
 		if err := cryptoutil.ValidateDigest(artifact.Definition.Digest); err != nil {
 			return fmt.Errorf(
 				"compiled artifacts[%d] Definition digest: %w",
@@ -147,7 +147,15 @@ func (e *Engine) RegisterCompiledDocuments(
 				document.Locator,
 			)
 		}
-		pending[key] = document.Clone()
+		admitted := document.Clone()
+		for artifactIndex := range admitted.Artifacts {
+			value, err := definition.Admit(admitted.Artifacts[artifactIndex].Definition)
+			if err != nil {
+				return fmt.Errorf("compiled documents[%d] artifacts[%d]: %w", index, artifactIndex, err)
+			}
+			admitted.Artifacts[artifactIndex].Definition = value
+		}
+		pending[key] = admitted
 	}
 	e.compiled.mu.Lock()
 	defer e.compiled.mu.Unlock()
@@ -171,5 +179,3 @@ func (e *Engine) compiledDocument(
 	}
 	return value.Clone(), true
 }
-
-var _ CompiledDocumentRegistrar = (*Engine)(nil)

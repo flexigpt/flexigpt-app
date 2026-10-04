@@ -179,5 +179,3 @@ func validateListOptions(options catalogModel.ListOptions) error {
 	}
 	return nil
 }
-
-var _ API = (*Service)(nil)

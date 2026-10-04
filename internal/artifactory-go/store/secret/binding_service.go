@@ -201,5 +201,3 @@ func (s *BindingService) drainBestEffort(ctx context.Context) {
 		_ = s.cleanup.DrainSecretGarbage(context.WithoutCancel(ctx))
 	}
 }
-
-var _ API = (*BindingService)(nil)

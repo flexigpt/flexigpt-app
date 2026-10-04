@@ -181,8 +181,3 @@ func (s *Service) create(ctx context.Context, draft rootModel.RootDraft) (rootMo
 	}
 	return existing, nil
 }
-
-var (
-	_ API    = (*Service)(nil)
-	_ System = (*Service)(nil)
-)

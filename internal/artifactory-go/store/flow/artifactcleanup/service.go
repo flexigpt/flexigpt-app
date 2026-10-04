@@ -75,5 +75,3 @@ func (s *Service) PurgeArtifactLocalState(ctx context.Context, ref artifactModel
 	}
 	return nil
 }
-
-var _ API = (*Service)(nil)

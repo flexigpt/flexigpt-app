@@ -42,7 +42,7 @@ func (r ResolvedArtifact) Validate() error {
 	if err := r.Artifact.Validate(); err != nil {
 		return err
 	}
-	if err := r.Definition.Validate(); err != nil {
+	if err := definitionModel.ValidateAdmitted(r.Definition); err != nil {
 		return err
 	}
 	if err := r.Source.Validate(); err != nil {

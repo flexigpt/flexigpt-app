@@ -211,7 +211,11 @@ func (s *Store) purgeRoot(
 	if err := requireOneChanged(result, "root changed or was not retired before purge"); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	s.forgetDefinitionsForRoot(id)
+	return nil
 }
 
 func (s *Store) requireActiveRoot(

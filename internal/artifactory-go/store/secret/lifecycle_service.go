@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
@@ -108,9 +107,3 @@ func (s *LifecycleService) ready(ctx context.Context) error {
 	}
 	return ctx.Err()
 }
-
-var (
-	_ LifecycleAPI = (*LifecycleService)(nil)
-	_ CleanupAPI   = (*LifecycleService)(nil)
-	_              = secretModel.Cleanup{}
-)

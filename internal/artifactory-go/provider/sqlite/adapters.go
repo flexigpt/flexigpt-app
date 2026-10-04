@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
@@ -227,5 +226,3 @@ func (r *RefreshStateRepository) GetRefreshState(
 ) (refreshModel.State, error) {
 	return r.store.getRefreshState(ctx, rootID, sourceID)
 }
-
-var _ catalog.Repository = (*CatalogRepository)(nil)

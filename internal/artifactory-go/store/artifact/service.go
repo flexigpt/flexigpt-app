@@ -108,7 +108,7 @@ func (s *Service) GetDefinition(
 			spec.ErrDigestMismatch,
 		)
 	}
-	return value.Clone(), nil
+	return value, nil
 }
 
 func (s *Service) SetEnabled(

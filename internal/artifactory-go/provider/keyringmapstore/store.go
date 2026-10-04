@@ -17,7 +17,6 @@ import (
 	"github.com/flexigpt/mapstore-go/keyringencdec"
 
 	secretModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -45,8 +44,6 @@ type Store struct {
 	store      *mapstore.MapFileStore
 	encEncrypt mapstore.IOEncoderDecoder
 }
-
-var _ value.ValueStore = (*Store)(nil)
 
 // New opens one MapStore secret file.
 //

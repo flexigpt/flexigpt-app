@@ -21,8 +21,6 @@ type locatorpathFactory struct {
 	artifactKinds []artifactModel.ArtifactKind
 }
 
-var _ locator.Factory = (*locatorpathFactory)(nil)
-
 func newLocatorpathFactory() *locatorpathFactory {
 	declarationTypes := declaration.Types()
 	artifactKinds := make(
@@ -76,8 +74,6 @@ type boundResolver struct {
 	artifactKinds []artifactModel.ArtifactKind
 	runtime       locator.Runtime
 }
-
-var _ locator.Resolver = (*boundResolver)(nil)
 
 func (r *boundResolver) Resolve(
 	ctx context.Context,

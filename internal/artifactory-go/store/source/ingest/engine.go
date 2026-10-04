@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	definitionModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
@@ -159,7 +160,7 @@ func (e *Engine) Discover(
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
-	if err := value.Validate(); err != nil {
+	if err := value.ValidateRead(); err != nil {
 		return Result{}, err
 	}
 	if !value.Enabled {
@@ -507,7 +508,7 @@ func (e *Engine) Discover(
 				)
 				continue
 			}
-			canonical, err := definitionModel.Canonicalize(item.Definition)
+			canonical, err := definition.Admit(item.Definition)
 			if err != nil {
 				definitionDiagnostic := diagnostic.Diagnostic{
 					Severity: diagnostic.SeverityError,

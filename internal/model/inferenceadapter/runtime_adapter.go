@@ -98,8 +98,6 @@ type RuntimeAdapter struct {
 	adapters    map[string]AdapterDefinition
 }
 
-var _ modelAggregate.RuntimeResolver = (*RuntimeAdapter)(nil)
-
 func NewRuntimeAdapter(
 	credentials CredentialResolver,
 	definitions ...AdapterDefinition,
