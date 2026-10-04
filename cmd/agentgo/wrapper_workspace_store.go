@@ -34,6 +34,7 @@ func InitWorkspaceWrappers(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
+	nativeResources resourceFlow.NativePathAPI,
 	locatorResolvers []locator.Factory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
@@ -44,7 +45,7 @@ func InitWorkspaceWrappers(
 		runtimeWrapper == nil ||
 		roots == nil ||
 		mcpServers == nil ||
-		ensureArtifactBaselines == nil {
+		ensureArtifactBaselines == nil || nativeResources == nil {
 		return errors.New("workspace wrapper receivers are incomplete")
 	}
 
@@ -61,6 +62,7 @@ func InitWorkspaceWrappers(
 		discovery,
 		artifacts,
 		resources,
+		nativeResources,
 		roots,
 		cat,
 		config,

@@ -55,6 +55,7 @@ func NewStoreAPI(
 	discovery refreshFlow.API,
 	artifacts artifact.API,
 	resources resourceFlow.API,
+	nativeResources resourceFlow.NativePathAPI,
 	roots root.API,
 	cat catalog.API,
 	config Config,
@@ -99,7 +100,7 @@ func NewStoreAPI(
 	if err != nil {
 		return nil, err
 	}
-	skillAdapter, err := skill.New(artifacts, resources)
+	skillAdapter, err := skill.New(artifacts, resources, nativeResources)
 	if err != nil {
 		return nil, err
 	}

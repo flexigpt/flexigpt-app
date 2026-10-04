@@ -24,7 +24,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec/diagnostic"
@@ -217,7 +217,7 @@ func (h *workflowHarness) installBundledAgents(
 		h.agentBootstrap = bootstrap
 		h.agentInstaller = installer
 	}
-	ctx := installFlow.WithPrivilege(t.Context())
+	ctx := root.WithInstallerPrivilege(t.Context())
 
 	requireNoError(t, h.agentBootstrap.Ensure(ctx))
 	h.addMissingBuiltinDependencies(t, ctx)

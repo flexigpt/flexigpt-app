@@ -4,20 +4,20 @@ import (
 	"context"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 )
 
-// CompiledDocumentRegistrar is the trusted installation-only refresh
-// capability used to register generated built-in declaration witnesses.
+// CompiledDocumentRegistrar accepts Ingest-owned evidence. Install translates
+// package plans before invoking this trusted registration capability.
 type CompiledDocumentRegistrar interface {
 	RegisterCompiledDocuments(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
-		packages []installModel.CompiledPackage,
+		documents []ingest.CompiledDocument,
 	) error
 }
 
@@ -44,6 +44,15 @@ type Repository interface {
 	) (refreshModel.State, error)
 }
 
+// MetadataInspector is the narrow Resource dependency for metadata freshness
+// checks without exposing refresh mutation APIs.
+type MetadataInspector interface {
+	InspectSourceMetadata(
+		ctx context.Context,
+		source sourceModel.Source,
+	) (refreshModel.Inspection, error)
+}
+
 type API interface {
 	RefreshRoot(
 		ctx context.Context,
@@ -56,7 +65,6 @@ type API interface {
 		sourceID sourceModel.SourceID,
 	) (refreshModel.RefreshSourceResult, error)
 
-	// Inspection is refresh-flow state and is represented by refresh/model.
 	InspectSource(
 		ctx context.Context,
 		rootID rootModel.RootID,

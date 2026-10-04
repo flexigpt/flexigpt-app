@@ -6,183 +6,129 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
+	"sync"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/iofs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/jsonschema"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/managedfs"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/sqlite"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/idprovider"
-	artifactimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/impl"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-
 	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
 	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
-	installCompose "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/compose"
-
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
-	managepackageCompose "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/compose"
-
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
-	refreshimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/impl"
-
 	resourceFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource"
-	resourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/impl"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay"
 	overlayModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/overlay/model"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
-	rootimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/impl"
-	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret"
-	secretimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/secret/value"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
-	ingestimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest/impl"
-
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/clockutil"
 )
 
 type Config struct {
-	BaseDirectory     string
-	EmbeddedProviders map[string]fs.FS
-	AdditionalSources []driver.Driver
-
-	SchemaCodecs []schema.Codec
-	Decoders     []ingest.Decoder
-
-	ArtifactIDProvider        idprovider.Provider
-	Clock                     clockutil.Clock
-	RootMutationPolicy        rootModel.RootPolicy
-	FilesystemTraversalPolicy *fsdir.TraversalPolicy
-
+	BaseDirectory              string
+	EmbeddedProviders          map[string]fs.FS
+	AdditionalSources          []driver.Driver
+	SchemaCodecs               []schema.Codec
+	Decoders                   []ingest.Decoder
+	ArtifactIDProvider         artifact.IDProvider
+	Clock                      clockutil.Clock
+	RootMutationPolicy         root.Policy
+	FilesystemTraversalPolicy  *fsdir.TraversalPolicy
 	ProtectedOverlayNamespaces []overlayModel.Namespace
 	StoreOverlayNamespaces     []overlayModel.Namespace
-	SecretValues               value.ValueStore
+	// SecretValues transfers to Components only after Open succeeds. A caller
+	// retains ownership when Open returns an error.
+	SecretValues value.ValueStore
 }
 
+// Components is local deployment assembly only. Each field is a named entity
+// or flow capability, not a provider aggregate or a reusable component bag.
 type Components struct {
-	Roots       root.API
-	Sources     source.API
-	Artifacts   artifact.API
-	Catalog     catalog.API
-	Definitions definition.API
-	Schemas     schema.API
-	Refresh     refreshFlow.API
-	Resources   resourceFlow.API
-
-	ManagedArtifacts managepackageFlow.API
-	Install          installFlow.API
-
+	Roots             root.API
+	Sources           source.API
+	Artifacts         artifact.API
+	Catalog           catalog.API
+	Definitions       definition.API
+	Schemas           schema.API
+	Refresh           refreshFlow.API
+	Resources         resourceFlow.API
+	NativeResources   resourceFlow.NativePathAPI
+	ManagedArtifacts  managepackageFlow.API
+	Install           installFlow.API
 	ProtectedOverlays overlay.API
 	StoreOverlays     overlay.StoreAPI
-
-	SecretBindings  secret.API
-	SecretRuntime   secret.RuntimeAPI
-	SecretLifecycle secret.LifecycleAPI
-
-	ArtifactCleanup artifactcleanupFlow.API
-
-	metadata   *sqlite.Store
-	localState *secretimpl.Service
+	SecretBindings    secret.API
+	SecretRuntime     secret.RuntimeAPI
+	SecretLifecycle   secret.LifecycleAPI
+	ArtifactCleanup   artifactcleanupFlow.API
+	metadata          *sqlite.Store
+	secretValues      value.ValueStore
+	closeOnce         sync.Once
+	closeErr          error
 }
 
-func Open(
-	ctx context.Context,
-	config Config,
-) (output *Components, returnErr error) {
-	secretValuesTransferred := false
-	var (
-		metadata   *sqlite.Store
-		localState *secretimpl.Service
-	)
-
-	defer func() {
-		if returnErr == nil {
-			return
-		}
-
-		if localState != nil {
-			_ = localState.Close()
-		} else if !secretValuesTransferred &&
-			config.SecretValues != nil {
-			_ = config.SecretValues.Close()
-		}
-
-		if metadata != nil {
-			_ = metadata.Close()
-		}
-	}()
-
+func Open(ctx context.Context, config Config) (output *Components, returnErr error) {
+	if ctx == nil {
+		return nil, fmt.Errorf("%w: artifact system context is nil", spec.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if config.BaseDirectory == "" {
-		return nil, fmt.Errorf(
-			"%w: artifact system base directory is empty",
-			spec.ErrInvalid,
-		)
+		return nil, fmt.Errorf("%w: artifact system base directory is empty", spec.ErrInvalid)
 	}
 	if config.Clock == nil {
 		config.Clock = clockutil.System{}
 	}
 	if config.ArtifactIDProvider == nil {
-		config.ArtifactIDProvider = idprovider.NewUUIDProvider()
+		config.ArtifactIDProvider = artifact.NewUUIDIDProvider()
 	}
-
-	schemaCodecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
+	codecs, err := schema.NormalizeCodecs(config.SchemaCodecs)
 	if err != nil {
 		return nil, err
 	}
-
 	decoders, err := ingest.NormalizeDecoders(config.Decoders)
 	if err != nil {
 		return nil, err
 	}
-
 	base, err := filepath.Abs(config.BaseDirectory)
 	if err != nil {
 		return nil, err
 	}
 	base = filepath.Clean(base)
-
 	if err := ensureStoreLayout(base); err != nil {
 		return nil, err
 	}
-
-	metadata, err = sqlite.Open(
-		ctx,
-		filepath.Join(base, spec.ArtifactStoreMetadataFileName),
-	)
+	metadata, err := sqlite.Open(ctx, filepath.Join(base, spec.ArtifactStoreMetadataFileName))
 	if err != nil {
 		return nil, err
 	}
-
-	shareableRegistry, err := jsonschema.NewRegistry(schemaCodecs...)
+	defer func() {
+		if returnErr != nil && metadata != nil {
+			_ = metadata.Close()
+		}
+	}()
+	schemas, err := jsonschema.NewRegistry(codecs...)
 	if err != nil {
 		return nil, err
 	}
-
-	if err := ingest.BindSchemaCatalog(decoders, shareableRegistry); err != nil {
+	if err := ingest.BindSchemaCatalog(decoders, schemas); err != nil {
 		return nil, err
 	}
-
-	filesystemAdapter, err := fsdir.NewWithTraversalPolicy(
-		config.FilesystemTraversalPolicy,
-	)
+	filesystemAdapter, err := fsdir.NewWithTraversalPolicy(config.FilesystemTraversalPolicy)
 	if err != nil {
 		return nil, err
 	}
-
 	managedAdapter, err := managedfs.New(
 		filepath.Join(base, spec.ArtifactStoreContentDirectoryName),
 		filepath.Join(base, spec.ArtifactStoreStagingDirectoryName),
@@ -190,61 +136,42 @@ func Open(
 	if err != nil {
 		return nil, err
 	}
-
 	embeddedAdapter, err := iofs.New(config.EmbeddedProviders)
 	if err != nil {
 		return nil, err
 	}
-
-	sourceDrivers := make(
-		[]driver.Driver,
-		0,
-		3+len(config.AdditionalSources),
-	)
-	sourceDrivers = append(
-		sourceDrivers,
-		filesystemAdapter,
-		embeddedAdapter,
-		managedAdapter,
-	)
-	sourceDrivers = append(sourceDrivers, config.AdditionalSources...)
-
-	sourceRegistry, err := sourceimpl.NewRegistry(sourceDrivers...)
+	drivers := make([]driver.Driver, 0, 3+len(config.AdditionalSources))
+	drivers = append(drivers, filesystemAdapter, embeddedAdapter, managedAdapter)
+	drivers = append(drivers, config.AdditionalSources...)
+	sourceRegistry, err := source.NewRegistry(drivers...)
 	if err != nil {
 		return nil, err
 	}
-
-	decoderRegistry, err := ingestimpl.NewDecoderRegistry(
-		schemaCodecs,
-		decoders...,
-	)
+	decoderRegistry, err := ingest.NewDecoderRegistry(codecs, decoders...)
 	if err != nil {
 		return nil, err
 	}
-
+	discovery, err := ingest.NewEngine(decoderRegistry)
+	if err != nil {
+		return nil, err
+	}
 	rootRepository := metadata.Roots()
 	sourceRepository := metadata.Sources()
 	artifactRepository := metadata.Artifacts()
 	definitionRepository := metadata.Definitions()
-
-	rootService, err := rootimpl.NewService(
-		rootRepository,
-		config.Clock,
-		config.RootMutationPolicy,
-	)
+	definitionService, err := definition.NewService(definitionRepository)
 	if err != nil {
 		return nil, err
 	}
-
-	sourceRuntime, err := sourceimpl.NewRuntime(
-		sourceRepository,
-		sourceRegistry,
-	)
+	rootService, err := root.NewService(rootRepository, config.Clock, config.RootMutationPolicy)
 	if err != nil {
 		return nil, err
 	}
-
-	sourceService, err := sourceimpl.NewService(
+	sourceRuntime, err := source.NewRuntime(sourceRepository, sourceRegistry)
+	if err != nil {
+		return nil, err
+	}
+	sourceService, err := source.NewService(
 		sourceRepository,
 		sourceRegistry,
 		rootRepository,
@@ -254,53 +181,77 @@ func Open(
 	if err != nil {
 		return nil, err
 	}
-
-	artifactService, err := artifactimpl.NewService(
+	artifactService, err := artifact.NewService(
 		artifactRepository,
-		definitionRepository,
+		definitionService,
 		config.Clock,
 		config.RootMutationPolicy,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	localState, err = secretimpl.NewService(
-		metadata.LocalState(),
+	catalogService, err := catalog.NewService(metadata.Catalog(), definitionService)
+	if err != nil {
+		return nil, err
+	}
+	secretLifecycle, err := secret.NewLifecycleService(metadata.Secrets(), config.Clock, config.SecretValues)
+	if err != nil {
+		return nil, err
+	}
+	secretBindings, err := secret.NewBindingService(
+		metadata.Secrets(),
 		artifactRepository,
 		config.Clock,
-		config.RootMutationPolicy,
 		config.ProtectedOverlayNamespaces,
-		config.StoreOverlayNamespaces,
+		config.SecretValues,
+		secretLifecycle,
+	)
+	if err != nil {
+		return nil, err
+	}
+	secretRuntime, err := secret.NewRuntimeService(
+		metadata.Secrets(),
+		artifactRepository,
+		config.ProtectedOverlayNamespaces,
 		config.SecretValues,
 	)
 	if err != nil {
 		return nil, err
 	}
-	secretValuesTransferred = true
-
-	if err := localState.RecoverPending(ctx); err != nil {
-		return nil, err
-	}
-
-	discoveryEngine, err := ingestimpl.NewEngine(decoderRegistry)
-	if err != nil {
-		return nil, err
-	}
-
-	synchronizer, err := artifactimpl.NewSynchronizer(
+	overlayService, err := overlay.NewService(
+		metadata.Overlays(),
+		artifactRepository,
 		config.Clock,
-		config.ArtifactIDProvider,
+		config.RootMutationPolicy,
+		config.ProtectedOverlayNamespaces,
+		config.StoreOverlayNamespaces,
+		secretLifecycle,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	refreshService, err := refreshimpl.NewService(
+	cleanupService, err := artifactcleanupFlow.NewService(
+		metadata.ArtifactCleanup(),
+		artifactRepository,
+		config.RootMutationPolicy,
+		config.Clock,
+		secretLifecycle,
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := secretLifecycle.RecoverPending(ctx); err != nil {
+		return nil, err
+	}
+	synchronizer, err := artifact.NewSynchronizer(config.Clock, config.ArtifactIDProvider)
+	if err != nil {
+		return nil, err
+	}
+	refreshService, err := refreshFlow.NewService(
 		sourceRuntime,
 		artifactRepository,
 		metadata.RefreshStates(),
-		discoveryEngine,
+		discovery,
 		synchronizer,
 		metadata.Publisher(),
 		config.Clock,
@@ -309,19 +260,17 @@ func Open(
 	if err != nil {
 		return nil, err
 	}
-
-	resourceService, err := resourceimpl.NewService(
+	resources, nativeResources, err := resourceFlow.NewService(
 		artifactRepository,
-		definitionRepository,
+		definitionService,
 		refreshService,
 		sourceRuntime,
 	)
 	if err != nil {
 		return nil, err
 	}
-
-	managedArtifacts, err := managepackageCompose.Open(
-		managepackageCompose.Config{
+	managedArtifacts, err := managepackageFlow.NewService(
+		managepackageFlow.Config{
 			Artifacts:       artifactService,
 			Refresh:         refreshService,
 			Sources:         sourceService,
@@ -334,9 +283,8 @@ func Open(
 	if err != nil {
 		return nil, err
 	}
-
-	installer, err := installCompose.Open(
-		installCompose.Config{
+	installer, err := installFlow.NewService(
+		installFlow.Config{
 			Roots:           rootService,
 			RootSystem:      rootService,
 			Sources:         sourceService,
@@ -347,38 +295,33 @@ func Open(
 			Refresh:         refreshService,
 			RefreshCompiled: refreshService,
 			Repository:      metadata,
-			SecretLifecycle: localState,
+			SecretLifecycle: secretLifecycle,
 			Policy:          config.RootMutationPolicy,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
-
 	return &Components{
-		Roots:       rootService,
-		Sources:     sourceService,
-		Artifacts:   artifactService,
-		Catalog:     artifactService,
-		Definitions: definitionRepository,
-		Schemas:     shareableRegistry,
-		Refresh:     refreshService,
-		Resources:   resourceService,
-
-		ManagedArtifacts: managedArtifacts,
-		Install:          installer,
-
-		ProtectedOverlays: localState,
-		StoreOverlays:     localState,
-
-		SecretBindings:  localState,
-		SecretRuntime:   localState,
-		SecretLifecycle: localState,
-
-		ArtifactCleanup: localState,
-
-		metadata:   metadata,
-		localState: localState,
+		Roots:             rootService,
+		Sources:           sourceService,
+		Artifacts:         artifactService,
+		Catalog:           catalogService,
+		Definitions:       definitionService,
+		Schemas:           schemas,
+		Refresh:           refreshService,
+		Resources:         resources,
+		NativeResources:   nativeResources,
+		ManagedArtifacts:  managedArtifacts,
+		Install:           installer,
+		ProtectedOverlays: overlayService,
+		StoreOverlays:     overlayService,
+		SecretBindings:    secretBindings,
+		SecretRuntime:     secretRuntime,
+		SecretLifecycle:   secretLifecycle,
+		ArtifactCleanup:   cleanupService,
+		metadata:          metadata,
+		secretValues:      config.SecretValues,
 	}, nil
 }
 
@@ -386,18 +329,15 @@ func (c *Components) Close() error {
 	if c == nil {
 		return nil
 	}
-
-	var output error
-
-	if c.localState != nil {
-		output = errors.Join(output, c.localState.Close())
-		c.localState = nil
-	}
-
-	if c.metadata != nil {
-		output = errors.Join(output, c.metadata.Close())
-		c.metadata = nil
-	}
-
-	return output
+	c.closeOnce.Do(func() {
+		if c.metadata != nil {
+			c.closeErr = errors.Join(c.closeErr, c.metadata.Close())
+			c.metadata = nil
+		}
+		if c.secretValues != nil {
+			c.closeErr = errors.Join(c.closeErr, c.secretValues.Close())
+			c.secretValues = nil
+		}
+	})
+	return c.closeErr
 }

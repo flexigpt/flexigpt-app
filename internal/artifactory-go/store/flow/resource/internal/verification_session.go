@@ -12,8 +12,8 @@ import (
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/driver"
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -269,7 +269,7 @@ func readVerificationSessionEntry(
 			entry.Locator,
 		)
 	}
-	return sourceimpl.ReadSnapshotEntry(
+	return source.ReadSnapshotEntry(
 		ctx,
 		snapshot,
 		entry,
@@ -401,7 +401,7 @@ func (s *Service) resolveVerifiedLocalPathInSession(
 	resolved resourceModel.ResolvedArtifact,
 	localLocator spec.Locator,
 ) (string, error) {
-	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
+	localPaths, supported := s.sources.(source.LocalPathRuntime)
 	if !supported || !localPaths.SupportsLocalPath(resolved.Source.Kind) {
 		return "", fmt.Errorf(
 			"%w: source kind %q has no trusted native path",

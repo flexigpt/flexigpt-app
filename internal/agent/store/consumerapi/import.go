@@ -730,7 +730,7 @@ func (a *API) agentImportDestination(
 			spec.ErrProtected,
 		)
 	}
-	if err := a.requireMutable(ctx, value.Artifact.RootID, false); err != nil {
+	if err := a.requireMutable(ctx, value.Artifact.RootID); err != nil {
 		return agentImportDestinationState{}, err
 	}
 
@@ -1307,7 +1307,7 @@ func (a *API) publishPreparedManagedAgent(
 	raw []byte,
 	expectedDefinition cryptoutil.Digest,
 ) (artifactModel.Artifact, error) {
-	if err := a.requireMutable(ctx, rootID, false); err != nil {
+	if err := a.requireMutable(ctx, rootID); err != nil {
 		return artifactModel.Artifact{}, err
 	}
 	if err := agentDomain.ValidateManagedAgentPackageAddress(address); err != nil {

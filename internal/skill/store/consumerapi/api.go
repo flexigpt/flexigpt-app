@@ -262,7 +262,6 @@ func (a *API) CreateManagedSkill(
 	if err := a.requireMutable(
 		ctx,
 		request.Collection.RootID,
-		false,
 	); err != nil {
 		return ManagedSkillCreateResult{}, err
 	}
@@ -653,7 +652,7 @@ func (a *API) PurgeSkill(
 	if value.Revision != expectedRevision {
 		return spec.ErrConflict
 	}
-	if err := a.requireMutable(ctx, value.RootID, false); err != nil {
+	if err := a.requireMutable(ctx, value.RootID); err != nil {
 		return err
 	}
 
@@ -834,7 +833,6 @@ func (a *API) ensureSkillBaselineCollection(
 func (a *API) requireMutable(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	allowProtected bool,
 ) error {
 	if err := rootID.Validate(); err != nil {
 		return err
@@ -842,12 +840,5 @@ func (a *API) requireMutable(
 	if !a.protection.IsProtectedRoot(rootID) {
 		return nil
 	}
-	if !allowProtected {
-		return fmt.Errorf(
-			"%w: protected Root %q requires trusted installer access",
-			spec.ErrProtected,
-			rootID,
-		)
-	}
-	return a.protection.RequirePrivilegedInstaller(ctx)
+	return a.protection.RequireInstallerPrivilege(ctx)
 }

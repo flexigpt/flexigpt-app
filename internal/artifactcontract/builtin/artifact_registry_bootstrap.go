@@ -9,8 +9,8 @@ import (
 	"sync"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -203,7 +203,7 @@ func (r *BootstrapRegistry) Ensure(ctx context.Context) error {
 		return entries[left].name < entries[right].name
 	})
 
-	ctx = installFlow.WithPrivilege(ctx)
+	ctx = root.WithInstallerPrivilege(ctx)
 	prepared := make([]preparedHydration, 0, len(entries))
 
 	for _, entry := range entries {

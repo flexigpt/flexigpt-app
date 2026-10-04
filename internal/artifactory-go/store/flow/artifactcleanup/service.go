@@ -1,0 +1,79 @@
+package artifactcleanup
+
+import (
+	"context"
+	"fmt"
+
+	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
+	"github.com/flexigpt/flexigpt-app/internal/clockutil"
+)
+
+type artifactReader interface {
+	Get(ctx context.Context, ref artifactModel.ArtifactRef) (artifactModel.Artifact, error)
+}
+
+type cleanupDrainer interface {
+	DrainSecretGarbage(ctx context.Context) error
+}
+
+// Service owns authorization and coordination of atomic Artifact-local overlay
+// and binding-reference cleanup. It never deletes the Artifact itself.
+type Service struct {
+	repository Repository
+	artifacts  artifactReader
+	policy     root.Policy
+	clock      clockutil.Clock
+	cleanup    cleanupDrainer
+}
+
+func NewService(
+	repository Repository,
+	artifacts artifactReader,
+	policy root.Policy,
+	timeClock clockutil.Clock,
+	cleanup cleanupDrainer,
+) (*Service, error) {
+	if repository == nil || artifacts == nil || timeClock == nil {
+		return nil, fmt.Errorf("%w: Artifact cleanup dependencies are incomplete", spec.ErrInvalid)
+	}
+	return &Service{
+		repository: repository,
+		artifacts:  artifacts,
+		policy:     policy,
+		clock:      timeClock,
+		cleanup:    cleanup,
+	}, nil
+}
+
+func (s *Service) PurgeArtifactLocalState(ctx context.Context, ref artifactModel.ArtifactRef) error {
+	if s == nil || s.repository == nil || s.artifacts == nil || s.clock == nil {
+		return spec.ErrClosed
+	}
+	if ctx == nil {
+		return fmt.Errorf("%w: Artifact cleanup context is nil", spec.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := ref.Validate(); err != nil {
+		return err
+	}
+	value, err := s.artifacts.Get(ctx, ref)
+	if err != nil {
+		return err
+	}
+	if s.policy != nil && s.policy.IsProtectedRoot(value.RootID) && !root.IsInstallerPrivileged(ctx) {
+		return fmt.Errorf("%w: protected Artifact local-state purge requires installer privilege", spec.ErrProtected)
+	}
+	if err := s.repository.PurgeArtifactLocalState(ctx, ref, clockutil.NowUTC(s.clock)); err != nil {
+		return err
+	}
+	if s.cleanup != nil {
+		_ = s.cleanup.DrainSecretGarbage(context.WithoutCancel(ctx))
+	}
+	return nil
+}
+
+var _ API = (*Service)(nil)

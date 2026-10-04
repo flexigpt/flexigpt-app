@@ -449,6 +449,7 @@ func (a *App) initManagers() {
 		artifactComposition.Artifacts,
 		artifactComposition.Catalog,
 		artifactComposition.Resources,
+		artifactComposition.TrustedNativeResources,
 		a.skillRuntimeAPI,
 	)
 	if err != nil {
@@ -519,6 +520,7 @@ func (a *App) initManagers() {
 		artifactComposition.Artifacts,
 		artifactComposition.Catalog,
 		artifactComposition.Resources,
+		artifactComposition.TrustedNativeResources,
 		a.artifactLocatorFactories,
 		fallbackProviders,
 		targetMappers,

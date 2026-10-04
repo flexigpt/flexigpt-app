@@ -298,6 +298,7 @@ func newSkillAggregateService(
 		fixture.store.Artifacts,
 		fixture.store.Catalog,
 		fixture.store.Resources,
+		fixture.store.TrustedNativeResources,
 	)
 	requireNoError(t, err)
 

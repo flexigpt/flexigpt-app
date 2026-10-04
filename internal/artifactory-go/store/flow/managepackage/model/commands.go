@@ -17,7 +17,6 @@ type PublishRequest struct {
 	ExpectedDefinition      cryptoutil.Digest                             `json:"expectedDefinition"`
 	Package                 managedpackageModel.ManagedPackagePublication `json:"package"`
 	AllowPackageReplacement bool                                          `json:"allowPackageReplacement,omitempty"`
-	AllowProtected          bool                                          `json:"allowProtected"`
 }
 
 type PublishResult struct {
@@ -28,12 +27,10 @@ type PublishResult struct {
 }
 
 type RemoveRequest struct {
-	RootID             rootModel.RootID                          `json:"rootID"`
-	SourceID           sourceModel.SourceID                      `json:"sourceID"`
-	Package            managedpackageModel.ManagedPackageAddress `json:"package"`
-	ExpectedGeneration string                                    `json:"expectedGeneration,omitempty"`
-	ExpectedArtifact   *artifactModel.ArtifactRef                `json:"expectedArtifact,omitempty"`
-
-	PruneDiscoveryLocator *spec.Locator `json:"pruneDiscoveryLocator,omitempty"`
-	AllowProtected        bool          `json:"allowProtected"`
+	RootID                rootModel.RootID                          `json:"rootID"`
+	SourceID              sourceModel.SourceID                      `json:"sourceID"`
+	Package               managedpackageModel.ManagedPackageAddress `json:"package"`
+	ExpectedGeneration    string                                    `json:"expectedGeneration,omitempty"`
+	ExpectedArtifact      *artifactModel.ArtifactRef                `json:"expectedArtifact,omitempty"`
+	PruneDiscoveryLocator *spec.Locator                             `json:"pruneDiscoveryLocator,omitempty"`
 }

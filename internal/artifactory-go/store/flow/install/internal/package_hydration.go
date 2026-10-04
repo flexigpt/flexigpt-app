@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -26,7 +26,7 @@ func (c *Service) PrepareTopologyPackageHydrations(
 	if err := ctx.Err(); err != nil {
 		return installModel.PackageHydrationPreparation{}, err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return installModel.PackageHydrationPreparation{}, err
 	}
 
@@ -130,7 +130,7 @@ func (c *Service) CommitTopologyPackageHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {
@@ -168,7 +168,7 @@ func (c *Service) DeleteTopologyPackageHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {

@@ -10,20 +10,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
+// Repository persists only lightweight committed catalog projections. Complete
+// Artifact loading belongs to artifact.Repository.
 type Repository interface {
 	ListCatalogByRoot(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		options catalogModel.ListOptions,
 	) ([]catalogModel.Entry, error)
-
 	ListCatalogBySource(
 		ctx context.Context,
 		rootID rootModel.RootID,
 		sourceID sourceModel.SourceID,
 		options catalogModel.ListOptions,
 	) ([]catalogModel.Entry, error)
-
 	FindCatalogByIdentity(
 		ctx context.Context,
 		rootID rootModel.RootID,
@@ -31,9 +31,4 @@ type Repository interface {
 		logicalName spec.LogicalName,
 		options catalogModel.ListOptions,
 	) ([]catalogModel.Entry, error)
-
-	GetMany(
-		ctx context.Context,
-		refs []artifactModel.ArtifactRef,
-	) ([]artifactModel.Artifact, error)
 }

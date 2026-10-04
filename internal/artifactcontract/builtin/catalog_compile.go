@@ -14,9 +14,9 @@ import (
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/ingest"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -198,7 +198,7 @@ func Compile(
 	}
 	defer store.Close()
 
-	ctx = installFlow.WithPrivilege(ctx)
+	ctx = root.WithInstallerPrivilege(ctx)
 	if _, err := store.Topology.EnsureProtectedTopology(
 		ctx,
 		declaration,
@@ -233,7 +233,6 @@ func Compile(
 					Address: input.Address,
 					Files:   input.Files,
 				},
-				AllowProtected: true,
 			},
 		); err != nil {
 			return installModel.CompiledPackageSet{}, err

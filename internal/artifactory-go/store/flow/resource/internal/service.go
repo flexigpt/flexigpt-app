@@ -14,7 +14,6 @@ import (
 	resourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/resource/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
-	sourceimpl "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/impl"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -162,7 +161,7 @@ func (s *Service) ResolveVerifiedLocalPath(
 			spec.ErrRefreshRequired,
 		)
 	}
-	return sourceimpl.ResolveVerifiedLocalPath(
+	return source.ResolveVerifiedLocalPath(
 		ctx,
 		s.sources,
 		value,
@@ -246,7 +245,7 @@ func (s *Service) ReadSourceEntry(
 			entry.Locator,
 		)
 	}
-	content, err := sourceimpl.ReadSnapshotEntry(
+	content, err := source.ReadSnapshotEntry(
 		ctx,
 		snapshot,
 		entry,
@@ -564,7 +563,7 @@ func (s *Service) ReadSourceTree(
 		if remaining := maximumBytes - consumed; remaining < perEntryLimit {
 			perEntryLimit = remaining
 		}
-		content, err := sourceimpl.ReadSnapshotEntry(
+		content, err := source.ReadSnapshotEntry(
 			ctx,
 			snapshot,
 			selectedEntry.entry,
@@ -636,7 +635,7 @@ func (s *Service) SupportsLocalPath(
 	if s == nil {
 		return false
 	}
-	localPaths, supported := s.sources.(sourceimpl.LocalPathRuntime)
+	localPaths, supported := s.sources.(source.LocalPathRuntime)
 	return supported && localPaths.SupportsLocalPath(kind)
 }
 

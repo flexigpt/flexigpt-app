@@ -4,7 +4,6 @@ import (
 	"errors"
 	"testing"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -54,7 +53,7 @@ func TestPrepareTopologyHydrationsAllowsFreshProtectedRoot(
 		SourceID:      sourceID,
 		Fingerprint:   cryptoutil.DigestBytes([]byte("fresh-install")),
 	}
-	ctx := installFlow.WithPrivilege(t.Context())
+	ctx := root.WithInstallerPrivilege(t.Context())
 
 	current, err := components.Install.PrepareTopologyHydrations(
 		ctx,

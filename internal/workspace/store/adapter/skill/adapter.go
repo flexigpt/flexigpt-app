@@ -33,24 +33,37 @@ type LoadPlan struct {
 }
 
 type Adapter struct {
-	artifacts artifact.API
-	resources resourceFlow.API
+	artifacts       artifact.API
+	resources       resourceFlow.API
+	nativeResources resourceFlow.NativePathAPI
 }
 
 func New(
 	artifacts artifact.API,
 	resources resourceFlow.API,
+	nativeResources resourceFlow.NativePathAPI,
 ) (*Adapter, error) {
-	if artifacts == nil || resources == nil {
+	if artifacts == nil ||
+		resources == nil ||
+		nativeResources == nil {
 		return nil, fmt.Errorf(
 			"%w: Workspace Skill adapter dependencies are incomplete",
 			workspaceDomain.ErrInvalidWorkspace,
 		)
 	}
 	return &Adapter{
-		artifacts: artifacts,
-		resources: resources,
+		artifacts:       artifacts,
+		resources:       resources,
+		nativeResources: nativeResources,
 	}, nil
+}
+
+// materializeResources joins ordinary verified reads with the explicitly
+// trusted native-path capability only at the Skill materialization boundary.
+// It is not exposed through Workspace's ordinary resource APIs.
+type materializeResources struct {
+	resourceFlow.API
+	resourceFlow.NativePathAPI
 }
 
 // LoadSelected loads exactly the capability-authorized refs in order.
@@ -99,7 +112,14 @@ func (a *Adapter) resolve(
 	_ workspaceDomain.Workspace,
 	record artifactModel.Artifact,
 ) (WorkspaceSkill, error) {
-	value, err := materialize.Resolve(ctx, a.resources, record)
+	value, err := materialize.Resolve(
+		ctx,
+		materializeResources{
+			API:           a.resources,
+			NativePathAPI: a.nativeResources,
+		},
+		record,
+	)
 	if err != nil {
 		return WorkspaceSkill{}, err
 	}

@@ -35,12 +35,13 @@ func InitSkillAggregateWrapper(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
+	nativeResources resourceFlow.NativePathAPI,
 	runtimeWrapper *SkillRuntimeWrapper,
 ) error {
 	if wrapper == nil ||
 		artifacts == nil ||
 		resources == nil ||
-		runtimeWrapper == nil {
+		runtimeWrapper == nil || nativeResources == nil {
 		return errors.New("skill aggregate wrapper dependencies are incomplete")
 	}
 
@@ -48,6 +49,7 @@ func InitSkillAggregateWrapper(
 		artifacts,
 		cat,
 		resources,
+		nativeResources,
 	)
 	if err != nil {
 		return fmt.Errorf("initialize Skill Artifact router: %w", err)

@@ -5,6 +5,7 @@ import (
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	refreshModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage"
@@ -12,16 +13,12 @@ import (
 )
 
 type ArtifactCommands interface {
-	Get(
-		ctx context.Context,
-		ref artifactModel.ArtifactRef,
-	) (artifactModel.Artifact, error)
-
+	Get(ctx context.Context, ref artifactModel.ArtifactRef) (artifactModel.Artifact, error)
 	FindByOrigin(
 		ctx context.Context,
 		rootID rootModel.RootID,
-		binding artifactModel.SourceBinding,
-		kind artifactModel.ArtifactKind,
+		s artifactModel.SourceBinding,
+		k artifactModel.ArtifactKind,
 	) (artifactModel.Artifact, error)
 }
 
@@ -29,24 +26,17 @@ type SourceRunner interface {
 	RefreshSource(
 		ctx context.Context,
 		rootID rootModel.RootID,
-		sourceID sourceModel.SourceID,
+		s sourceModel.SourceID,
 	) (refreshModel.RefreshSourceResult, error)
-
-	InspectSource(
-		ctx context.Context,
-		rootID rootModel.RootID,
-		sourceID sourceModel.SourceID,
-	) (refreshModel.Inspection, error)
+	InspectSource(ctx context.Context, rootID rootModel.RootID, s sourceModel.SourceID) (refreshModel.Inspection, error)
 }
 
 type Dependencies struct {
-	Artifacts ArtifactCommands
-	Refresh   SourceRunner
-
+	Artifacts       ArtifactCommands
+	Refresh         SourceRunner
 	Sources         source.API
 	Runtime         source.Runtime
 	ContentMutation source.ContentMutation
 	Packages        managedpackage.Runtime
-
-	Policy rootModel.RootPolicy
+	Policy          root.Policy
 }

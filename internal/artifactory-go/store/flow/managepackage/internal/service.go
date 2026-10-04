@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+
 	managepackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -66,11 +66,7 @@ func (s *Service) Publish(
 	if err := cryptoutil.ValidateDigest(request.ExpectedDefinition); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
-	if err := s.requireMutation(
-		ctx,
-		request.RootID,
-		request.AllowProtected,
-	); err != nil {
+	if err := s.requireMutation(ctx, request.RootID); err != nil {
 		return managepackageModel.PublishResult{}, err
 	}
 
@@ -219,11 +215,7 @@ func (s *Service) Remove(
 			return err
 		}
 	}
-	if err := s.requireMutation(
-		ctx,
-		request.RootID,
-		request.AllowProtected,
-	); err != nil {
+	if err := s.requireMutation(ctx, request.RootID); err != nil {
 		return err
 	}
 
@@ -354,13 +346,9 @@ func matchesPublishExpectation(
 func (s *Service) requireMutation(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	allowProtected bool,
 ) error {
 	if ctx == nil {
-		return fmt.Errorf(
-			"%w: manage package context is nil",
-			spec.ErrInvalid,
-		)
+		return fmt.Errorf("%w: manage package context is nil", spec.ErrInvalid)
 	}
 	if err := ctx.Err(); err != nil {
 		return err
@@ -368,23 +356,7 @@ func (s *Service) requireMutation(
 	if err := rootID.Validate(); err != nil {
 		return err
 	}
-
-	if allowProtected {
-		if s.dependencies.Policy == nil ||
-			!s.dependencies.Policy.IsProtectedRoot(rootID) {
-			return fmt.Errorf(
-				"%w: managed protected operation requires a protected Root",
-				spec.ErrProtected,
-			)
-		}
-		return installFlow.RequirePrivileged(ctx)
-	}
-
-	return root.RequireMutableRoot(
-		ctx,
-		s.dependencies.Policy,
-		rootID,
-	)
+	return root.RequireMutableRoot(ctx, s.dependencies.Policy, rootID)
 }
 
 func validateManagedSourceState(

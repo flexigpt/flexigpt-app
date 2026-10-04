@@ -240,7 +240,6 @@ func New(
 func (a *API) requireMutable(
 	ctx context.Context,
 	rootID rootModel.RootID,
-	allowProtected bool,
 ) error {
 	if a == nil || a.protection == nil {
 		return spec.ErrClosed
@@ -251,14 +250,7 @@ func (a *API) requireMutable(
 	if !a.protection.IsProtectedRoot(rootID) {
 		return nil
 	}
-	if !allowProtected {
-		return fmt.Errorf(
-			"%w: protected Root %q requires trusted installer access",
-			spec.ErrProtected,
-			rootID,
-		)
-	}
-	return a.protection.RequirePrivilegedInstaller(ctx)
+	return a.protection.RequireInstallerPrivilege(ctx)
 }
 
 type agentLocatorRuntime struct {

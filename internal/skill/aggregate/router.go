@@ -23,27 +23,41 @@ import (
 //
 // It intentionally does not infer Skill ownership from Collection membership.
 type ArtifactRouter struct {
-	artifacts artifact.API
-	cat       catalog.API
-	resources resourceFlow.API
+	artifacts       artifact.API
+	cat             catalog.API
+	resources       resourceFlow.API
+	nativeResources resourceFlow.NativePathAPI
 }
 
 func NewArtifactRouter(
 	artifacts artifact.API,
 	cat catalog.API,
 	resources resourceFlow.API,
+	nativeResources resourceFlow.NativePathAPI,
 ) (*ArtifactRouter, error) {
-	if artifacts == nil || cat == nil || resources == nil {
+	if artifacts == nil ||
+		cat == nil ||
+		resources == nil ||
+		nativeResources == nil {
 		return nil, fmt.Errorf(
 			"%w: Artifact Skill router dependencies are incomplete",
 			spec.ErrInvalid,
 		)
 	}
 	return &ArtifactRouter{
-		artifacts: artifacts,
-		cat:       cat,
-		resources: resources,
+		artifacts:       artifacts,
+		cat:             cat,
+		resources:       resources,
+		nativeResources: nativeResources,
 	}, nil
+}
+
+// materializeResources is a trusted local composition value used only by
+// Skill materialization. Ordinary ArtifactRouter operations retain the
+// narrower portable resource.API capability.
+type materializeResources struct {
+	resourceFlow.API
+	resourceFlow.NativePathAPI
 }
 
 func (r *ArtifactRouter) RootForArtifact(
@@ -184,7 +198,14 @@ func (r *ArtifactRouter) resolveRecords(
 		return []ResolvedArtifactSkill{}, nil
 	}
 
-	materials, err := materialize.ResolveAll(ctx, r.resources, records)
+	materials, err := materialize.ResolveAll(
+		ctx,
+		materializeResources{
+			API:           r.resources,
+			NativePathAPI: r.nativeResources,
+		},
+		records,
+	)
 	if err != nil {
 		return nil, err
 	}

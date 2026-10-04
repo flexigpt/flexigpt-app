@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"slices"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -31,7 +31,7 @@ func (c *Service) PrepareTopologyHydrations(
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return nil, err
 	}
 
@@ -124,7 +124,7 @@ func (c *Service) CommitTopologyHydration(
 	ctx context.Context,
 	desired installModel.Hydration,
 ) error {
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	return c.PutTopologyHydration(ctx, desired)
@@ -149,7 +149,7 @@ func (c *Service) PutTopologyHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	if err := value.Validate(); err != nil {
@@ -210,7 +210,7 @@ func (c *Service) ResetTopologyHydration(
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	if err := installModel.ValidateHydrationInstallerName(installerName); err != nil {

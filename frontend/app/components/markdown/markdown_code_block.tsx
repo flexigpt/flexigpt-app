@@ -238,8 +238,8 @@ export function CodeBlock({
 	return (
 		<>
 			<div ref={elementRef} className="app-bg-code my-4 overflow-hidden rounded-lg">
-				<div className="app-bg-code-header flex min-h-8 min-w-0 items-center justify-between gap-2 px-2 py-0.5">
-					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden text-xs" title={headerTitle}>
+				<div className="app-bg-code-header flex min-h-8 min-w-0 items-center justify-between gap-2 px-2 py-0.5 font-mono">
+					<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden font-mono text-xs" title={headerTitle}>
 						<span
 							className={`inline-flex max-w-48 min-w-0 shrink-0 items-center gap-1 leading-none ${
 								hasMermaidSyntaxError ? 'text-error' : 'app-text-code capitalize'
@@ -248,7 +248,7 @@ export function CodeBlock({
 							{hasMermaidSyntaxError ? (
 								<FiAlertTriangle aria-hidden="true" size={14} className="block shrink-0" />
 							) : null}
-							<span className="truncate leading-none">{headerLabel}</span>
+							<span className="truncate font-mono leading-none">{headerLabel}</span>
 						</span>
 
 						{isDiffLike ? (

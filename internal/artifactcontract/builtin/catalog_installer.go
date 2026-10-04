@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"slices"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
@@ -71,7 +71,7 @@ func (i *CatalogInstaller) DesiredHydration(
 	if i == nil {
 		return installModel.Hydration{}, spec.ErrClosed
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return installModel.Hydration{}, err
 	}
 	return i.registration.Set.Hydration, nil
@@ -83,7 +83,7 @@ func (i *CatalogInstaller) DesiredPackageHydrations(
 	if i == nil {
 		return nil, spec.ErrClosed
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return nil, err
 	}
 
@@ -117,7 +117,7 @@ func (i *CatalogInstaller) CompiledRegistration(
 	if i == nil {
 		return installModel.CompiledRegistration{}, spec.ErrClosed
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return installModel.CompiledRegistration{}, err
 	}
 	// Generated catalogs are immutable after construction. Avoid copying the
@@ -201,5 +201,5 @@ func (i *CatalogInstaller) FinalizeHydration(
 ) error {
 	// HydrateCompiledPackages refreshes and verifies changed generated packages.
 	// There is no runtime declaration resolver work left for this installer.
-	return installFlow.RequirePrivileged(ctx)
+	return root.RequireInstallerPrivilege(ctx)
 }

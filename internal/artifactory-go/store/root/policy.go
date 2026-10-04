@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
@@ -43,9 +42,7 @@ func NewSetRootPolicy(
 	return value, nil
 }
 
-func (p *SetRootPolicy) IsProtectedRoot(
-	rootID rootModel.RootID,
-) bool {
+func (p *SetRootPolicy) IsProtectedRoot(rootID rootModel.RootID) bool {
 	if p == nil {
 		return false
 	}
@@ -53,9 +50,7 @@ func (p *SetRootPolicy) IsProtectedRoot(
 	return found
 }
 
-func (p *SetRootPolicy) IsRootDeletionProtected(
-	rootID rootModel.RootID,
-) bool {
+func (p *SetRootPolicy) IsRootDeletionProtected(rootID rootModel.RootID) bool {
 	if p == nil {
 		return false
 	}
@@ -65,13 +60,13 @@ func (p *SetRootPolicy) IsRootDeletionProtected(
 
 func RequireMutableRoot(
 	ctx context.Context,
-	policy rootModel.RootPolicy,
+	policy Policy,
 	rootID rootModel.RootID,
 ) error {
 	if policy == nil || !policy.IsProtectedRoot(rootID) {
 		return nil
 	}
-	if installFlow.IsPrivileged(ctx) {
+	if IsInstallerPrivileged(ctx) {
 		return nil
 	}
 	return fmt.Errorf(
@@ -83,10 +78,10 @@ func RequireMutableRoot(
 
 func RequireRootDeletion(
 	ctx context.Context,
-	policy rootModel.RootPolicy,
+	policy Policy,
 	rootID rootModel.RootID,
 ) error {
-	if deletionPolicy, supported := policy.(rootModel.RootDeletionPolicy); supported &&
+	if deletionPolicy, supported := policy.(DeletionPolicy); supported &&
 		deletionPolicy.IsRootDeletionProtected(rootID) {
 		return fmt.Errorf(
 			"%w: root %q is retained and cannot be retired or purged",

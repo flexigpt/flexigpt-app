@@ -6,8 +6,8 @@ import (
 	"sort"
 
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
@@ -22,7 +22,7 @@ func (c *Service) RegisterCompiledPackages(
 	if c == nil || c.Refresh == nil {
 		return spec.ErrClosed
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 
@@ -38,11 +38,15 @@ func (c *Service) RegisterCompiledPackages(
 		// from the ordinary parser and Store admission path, then compared
 		// against that path in tests. Runtime only registers their source
 		// locator and file digest witnesses.
+		documents, err := compiledDocumentsFromPackages(value.Set.Packages)
+		if err != nil {
+			return err
+		}
 		if err := c.refreshCompiled.RegisterCompiledDocuments(
 			ctx,
 			value.Set.Hydration.RootID,
 			value.Set.Hydration.SourceID,
-			value.Set.Packages,
+			documents,
 		); err != nil {
 			return err
 		}
@@ -62,7 +66,7 @@ func (c *Service) HydrateCompiledPackages(
 		c.managedSources == nil {
 		return spec.ErrClosed
 	}
-	if err := installFlow.RequirePrivileged(ctx); err != nil {
+	if err := root.RequireInstallerPrivilege(ctx); err != nil {
 		return err
 	}
 	type lifecyclePlan struct {

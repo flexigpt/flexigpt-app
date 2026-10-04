@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact"
-	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -29,10 +28,10 @@ type Dependencies struct {
 	Refresh         refreshFlow.API
 	RefreshCompiled refreshFlow.CompiledDocumentRegistrar
 
-	Repository installFlow.Repository
+	Repository Repository
 
 	SecretLifecycle secret.LifecycleAPI
-	Policy          rootModel.RootPolicy
+	Policy          root.Policy
 }
 
 type Service struct {
@@ -50,11 +49,11 @@ type Service struct {
 	Refresh         refreshFlow.API
 	refreshCompiled refreshFlow.CompiledDocumentRegistrar
 
-	metadata installFlow.Repository
+	metadata Repository
 
 	localState secret.LifecycleAPI
 
-	rootMutationPolicy rootModel.RootPolicy
+	rootMutationPolicy root.Policy
 }
 
 func NewService(

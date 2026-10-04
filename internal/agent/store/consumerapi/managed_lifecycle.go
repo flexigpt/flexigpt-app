@@ -181,7 +181,7 @@ func (a *API) loadManagedAgent(
 			spec.ErrUnsupported,
 		)
 	}
-	if err := a.requireMutable(ctx, record.RootID, false); err != nil {
+	if err := a.requireMutable(ctx, record.RootID); err != nil {
 		return editableManagedAgent{}, err
 	}
 

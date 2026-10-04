@@ -19,11 +19,7 @@ const protectedOverlayColumns = `
 	root_id, artifact_id, namespace, schema_version, payload_json,
 	revision, created_at, modified_at`
 
-type LocalStateRepository struct {
-	store *Store
-}
-
-func (r *LocalStateRepository) GetOverlay(
+func (r *OverlayRepository) GetOverlay(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	namespace overlayModel.Namespace,
@@ -56,7 +52,7 @@ func (r *LocalStateRepository) GetOverlay(
 	return value.Clone(), true, nil
 }
 
-func (r *LocalStateRepository) PutOverlay(
+func (r *OverlayRepository) PutOverlay(
 	ctx context.Context,
 	request overlayModel.PutRequest,
 	now time.Time,
@@ -202,7 +198,7 @@ func (r *LocalStateRepository) PutOverlay(
 	return output.Clone(), nil
 }
 
-func (r *LocalStateRepository) DeleteOverlay(
+func (r *OverlayRepository) DeleteOverlay(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	namespace overlayModel.Namespace,
@@ -308,7 +304,7 @@ func (r *LocalStateRepository) DeleteOverlay(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) GetBinding(
+func (r *SecretRepository) GetBinding(
 	ctx context.Context,
 	key secretModel.BindingKey,
 ) (secretModel.Binding, bool, error) {
@@ -335,7 +331,7 @@ func (r *LocalStateRepository) GetBinding(
 	return value.Clone(), true, nil
 }
 
-func (r *LocalStateRepository) CreatePendingSecret(
+func (r *SecretRepository) CreatePendingSecret(
 	ctx context.Context,
 	record secretModel.Record,
 ) error {
@@ -367,7 +363,7 @@ func (r *LocalStateRepository) CreatePendingSecret(
 	return sqliteError(err)
 }
 
-func (r *LocalStateRepository) AttachSecretBinding(
+func (r *SecretRepository) AttachSecretBinding(
 	ctx context.Context,
 	request secret.AttachBindingRequest,
 	now time.Time,
@@ -571,7 +567,7 @@ func (r *LocalStateRepository) AttachSecretBinding(
 	return output.Clone(), nil
 }
 
-func (r *LocalStateRepository) ClearSecretBinding(
+func (r *SecretRepository) ClearSecretBinding(
 	ctx context.Context,
 	request secretModel.ClearBindingRequest,
 	now time.Time,
@@ -668,7 +664,7 @@ func (r *LocalStateRepository) ClearSecretBinding(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) QueueSecretForCleanup(
+func (r *SecretRepository) QueueSecretForCleanup(
 	ctx context.Context,
 	ref secretModel.Ref,
 	now time.Time,
@@ -698,7 +694,7 @@ func (r *LocalStateRepository) QueueSecretForCleanup(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) PurgeArtifactLocalState(
+func (r *ArtifactCleanupRepository) PurgeArtifactLocalState(
 	ctx context.Context,
 	ref artifactModel.ArtifactRef,
 	now time.Time,
@@ -733,7 +729,7 @@ func (r *LocalStateRepository) PurgeArtifactLocalState(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) RecoverPendingSecrets(
+func (r *SecretRepository) RecoverPendingSecrets(
 	ctx context.Context,
 	now time.Time,
 ) error {
@@ -791,7 +787,7 @@ func (r *LocalStateRepository) RecoverPendingSecrets(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) ListSecretCleanup(
+func (r *SecretRepository) ListSecretCleanup(
 	ctx context.Context,
 	maximum int,
 ) ([]secretModel.Cleanup, error) {
@@ -859,7 +855,7 @@ func (r *LocalStateRepository) ListSecretCleanup(
 	return output, nil
 }
 
-func (r *LocalStateRepository) CompleteSecretCleanup(
+func (r *SecretRepository) CompleteSecretCleanup(
 	ctx context.Context,
 	ref secretModel.Ref,
 ) error {
@@ -921,7 +917,7 @@ func (r *LocalStateRepository) CompleteSecretCleanup(
 	return tx.Commit()
 }
 
-func (r *LocalStateRepository) RecordSecretCleanupFailure(
+func (r *SecretRepository) RecordSecretCleanupFailure(
 	ctx context.Context,
 	ref secretModel.Ref,
 	reason string,

@@ -15,7 +15,7 @@ const storeOverlayColumns = `
 	namespace, schema_version, payload_json,
 	revision, created_at, modified_at`
 
-func (r *LocalStateRepository) GetStoreOverlay(
+func (r *OverlayRepository) GetStoreOverlay(
 	ctx context.Context,
 	namespace overlayModel.Namespace,
 ) (overlayModel.StoreRecord, bool, error) {
@@ -40,7 +40,7 @@ func (r *LocalStateRepository) GetStoreOverlay(
 	return value.Clone(), true, nil
 }
 
-func (r *LocalStateRepository) PutStoreOverlay(
+func (r *OverlayRepository) PutStoreOverlay(
 	ctx context.Context,
 	request overlayModel.StorePutRequest,
 	now time.Time,
@@ -169,7 +169,7 @@ func (r *LocalStateRepository) PutStoreOverlay(
 	return output.Clone(), nil
 }
 
-func (r *LocalStateRepository) DeleteStoreOverlay(
+func (r *OverlayRepository) DeleteStoreOverlay(
 	ctx context.Context,
 	namespace overlayModel.Namespace,
 	expectedRevision uint64,
