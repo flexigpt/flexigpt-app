@@ -317,18 +317,22 @@ export function sanitizeLaTeXOutsideFences(md: string) {
 	};
 
 	for (const line of lines) {
-		const m = line.match(/^([`~]{3,})/);
+		const m = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)\r?$/.exec(line);
+		const delimiter = m?.[1];
+		const info = m?.[2] ?? '';
 		if (!fence) {
-			if (m) {
+			if (delimiter && !(delimiter.startsWith('`') && info.includes('`'))) {
 				flushOutside();
-				fence = m[1];
+				fence = delimiter;
 				out.push(line);
 			} else {
 				outside.push(line);
 			}
 		} else {
 			out.push(line);
-			if (line.startsWith(fence)) {
+			const closing = /^ {0,3}(`{3,}|~{3,})[ \t]*\r?$/.exec(line)?.[1];
+			// oxlint-disable-next-line typescript/prefer-string-starts-ends-with
+			if (closing && closing[0] === fence[0] && closing.length >= fence.length) {
 				fence = null;
 			}
 		}

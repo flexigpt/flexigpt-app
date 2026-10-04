@@ -107,6 +107,7 @@ interface TargetInputState {
 interface ActiveOperation {
 	id: number;
 	cancelled: boolean;
+	activeFileCounts: Map<string, number>;
 }
 
 let writeQueue: Promise<void> = Promise.resolve();
@@ -172,6 +173,29 @@ function createStoredState(file: DiffApplyFileView): StoredFileState {
 	};
 }
 
+function createUnreviewedFileView(
+	file: DiffApplyFileView,
+	pathInput: string,
+	strict: boolean,
+	candidates: string[]
+): DiffApplyFileView {
+	return {
+		...file,
+		pathInput,
+		targetPath: pathInput,
+		effectiveTargetPath: pathInput,
+		candidates,
+		fingerprint: createFingerprint(file.file.id, pathInput, strict),
+		reviewOutcome: undefined,
+		applyOutcome: undefined,
+		hunkOutcomes: {},
+		selectedHunkIDs: [],
+		status: 'pending',
+		canApply: false,
+		canTryHunks: file.file.hunks.length > 0,
+	};
+}
+
 function uniquePaths(paths: Array<string | undefined>): string[] {
 	return normalizeInteractiveTargetPaths(paths);
 }
@@ -205,7 +229,7 @@ export function useDiffApplyController(
 				const suggestion = targetSuggestions.get(file.id);
 				const targetInput = targetInputs[file.id];
 				const pathInput = targetInput?.source === file ? targetInput.value : '';
-				const explicitTargetPath = pathInput.trim();
+				const explicitTargetPath = pathInput;
 				const fingerprint = createFingerprint(file.id, explicitTargetPath, strict);
 				const stored = states[file.id];
 				const state = stored?.fingerprint === fingerprint && stored.source === file ? stored : undefined;
@@ -213,8 +237,7 @@ export function useDiffApplyController(
 				const applyOutcome = state?.applyOutcome;
 				const effectiveTargetPath = explicitTargetPath;
 				const status = applyOutcome?.status ?? reviewOutcome?.status ?? 'pending';
-				const canTryHunks =
-					(reviewOutcome?.status === 'blocked' || reviewOutcome?.status === 'needs-info') && file.hunks.length > 0;
+				const canTryHunks = file.hunks.length > 0;
 
 				return {
 					file,
@@ -292,13 +315,21 @@ export function useDiffApplyController(
 
 	const markActive = useCallback(
 		(operation: ActiveOperation, fileID: string, active: boolean): void => {
+			const activeCount = Math.max(0, (operation.activeFileCounts.get(fileID) ?? 0) + (active ? 1 : -1));
+			if (activeCount > 0) {
+				operation.activeFileCounts.set(fileID, activeCount);
+			} else {
+				operation.activeFileCounts.delete(fileID);
+			}
+
 			updateBusy(operation, current => ({
 				...current,
-				activeFileIDs: active
-					? current.activeFileIDs.includes(fileID)
-						? current.activeFileIDs
-						: [...current.activeFileIDs, fileID]
-					: current.activeFileIDs.filter(id => id !== fileID),
+				activeFileIDs:
+					activeCount > 0
+						? current.activeFileIDs.includes(fileID)
+							? current.activeFileIDs
+							: [...current.activeFileIDs, fileID]
+						: current.activeFileIDs.filter(id => id !== fileID),
 			}));
 		},
 		[updateBusy]
@@ -322,6 +353,7 @@ export function useDiffApplyController(
 		const operation: ActiveOperation = {
 			id: ++operationSequenceRef.current,
 			cancelled: false,
+			activeFileCounts: new Map(),
 		};
 
 		operationRef.current = operation;
@@ -527,7 +559,7 @@ export function useDiffApplyController(
 						let diffText: string;
 
 						try {
-							diffText = buildInteractiveDiffRequest(file.file, file.effectiveTargetPath);
+							diffText = buildInteractiveDiffRequest(file.file);
 						} catch (error) {
 							setReviewOutcome(
 								file,
@@ -601,7 +633,7 @@ export function useDiffApplyController(
 							 * semantics decide whether the current file still
 							 * accepts this fuzzy patch.
 							 */
-							diffText = buildInteractiveDiffRequest(file.file, file.effectiveTargetPath);
+							diffText = buildInteractiveDiffRequest(file.file);
 						} catch (error) {
 							setApplyOutcome(
 								file,
@@ -680,7 +712,7 @@ export function useDiffApplyController(
 						let diffText: string;
 
 						try {
-							diffText = buildInteractiveDiffRequest(file.file, file.effectiveTargetPath, [hunk.id]);
+							diffText = buildInteractiveDiffRequest(file.file, [hunk.id]);
 						} catch (error) {
 							setHunkOutcome(
 								file,
@@ -753,7 +785,7 @@ export function useDiffApplyController(
 						 * coordinate rewrite here. The selected exact source
 						 * is sent to the backend fuzzy applier.
 						 */
-						diffText = buildInteractiveDiffRequest(file.file, file.effectiveTargetPath, selectedHunkIDs);
+						diffText = buildInteractiveDiffRequest(file.file, selectedHunkIDs);
 					} catch (error) {
 						setApplyOutcome(
 							file,
@@ -811,18 +843,28 @@ export function useDiffApplyController(
 			}
 
 			const file = findCurrentFile(fileID);
-			if (!file) {
+			if (!file || file.pathInput === value) {
 				return;
 			}
+
+			// Commands must see the new scope even before React commits.
+			// In particular, no old review may authorize this new target.
+			const next = createUnreviewedFileView(
+				file,
+				value,
+				strictRef.current,
+				uniquePaths(targetSuggestions.get(fileID)?.candidates ?? [])
+			);
+			filesRef.current = filesRef.current.map(current => (current.file.id === fileID ? next : current));
 
 			setStates(previous => {
 				if (!previous[fileID]) {
 					return previous;
 				}
 
-				const next = { ...previous };
-				Reflect.deleteProperty(next, fileID);
-				return next;
+				const n = { ...previous };
+				Reflect.deleteProperty(n, fileID);
+				return n;
 			});
 
 			setTargetInputs(previous => ({
@@ -833,18 +875,29 @@ export function useDiffApplyController(
 				},
 			}));
 		},
-		[findCurrentFile]
+		[findCurrentFile, targetSuggestions]
 	);
 
-	const setStrict = useCallback((value: boolean): void => {
-		if (operationRef.current || strictRef.current === value) {
-			return;
-		}
+	const setStrict = useCallback(
+		(value: boolean): void => {
+			if (operationRef.current || strictRef.current === value) {
+				return;
+			}
 
-		strictRef.current = value;
-		setStates({});
-		setStrictState(value);
-	}, []);
+			filesRef.current = filesRef.current.map(file =>
+				createUnreviewedFileView(
+					file,
+					file.pathInput,
+					value,
+					uniquePaths(targetSuggestions.get(file.file.id)?.candidates ?? [])
+				)
+			);
+			strictRef.current = value;
+			setStates({});
+			setStrictState(value);
+		},
+		[targetSuggestions]
+	);
 
 	const setHunkSelected = useCallback(
 		(fileID: string, hunkID: string, selected: boolean): void => {

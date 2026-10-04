@@ -447,15 +447,15 @@ export function MermaidDiagram({
 					containIntrinsicSize: 'auto 18rem',
 				}}
 			>
-				<div className="app-bg-code-header flex min-h-8 items-center justify-between px-2 py-0.5">
-					<span className="app-text-code text-xs">Mermaid Diagram</span>
+				<div className="app-bg-code-header flex min-h-8 items-center justify-between px-2 py-0.5 font-mono">
+					<span className="app-text-code font-mono text-xs">Mermaid Diagram</span>
 
 					<div className="flex items-center gap-2">
 						{showThemeToggle && (
 							<div className="join">
 								<button
 									type="button"
-									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent font-mono shadow-none hover:opacity-60 ${
 										themeMode === 'auto' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -469,7 +469,7 @@ export function MermaidDiagram({
 
 								<button
 									type="button"
-									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent font-mono shadow-none hover:opacity-60 ${
 										themeMode === 'light' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -483,7 +483,7 @@ export function MermaidDiagram({
 
 								<button
 									type="button"
-									className={`btn btn-xs app-text-code join-item border-none bg-transparent shadow-none hover:opacity-60 ${
+									className={`btn btn-xs app-text-code join-item border-none bg-transparent font-mono shadow-none hover:opacity-60 ${
 										themeMode === 'dark' ? 'btn-active' : ''
 									}`}
 									onClick={() => {
@@ -504,7 +504,7 @@ export function MermaidDiagram({
 								fileprefix="diagram"
 								isBinary={true}
 								language="mermaid"
-								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent font-mono shadow-none hover:opacity-60"
 							/>
 						) : null}
 					</div>

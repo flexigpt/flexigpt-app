@@ -47,9 +47,9 @@ export interface InteractiveDiffFile {
 	sourceText: string;
 
 	/**
-	 * Text sent for a whole-file backend review/apply request.
-	 * It equals sourceText. The UI does not repair or convert patch syntax
-	 * before asking the backend to review it.
+	 * Original whole-file request body, equal to sourceText.
+	 * Sent unchanged for whole-file requests. Explicit targets are separate
+	 * request metadata; the UI never manufactures patch headers.
 	 */
 	requestText: string;
 
@@ -216,6 +216,22 @@ function createUnsplitInteractiveDiffFile(
 	};
 }
 
+function fileSectionLimitResult(
+	text: string,
+	diagnostics: ApplyUnifiedDiffDiagnostic[]
+): Pick<ParsedInteractiveDiff, 'files' | 'diagnostics'> {
+	const diagnostic = createDiagnostic(
+		ApplyUnifiedDiffDiagnosticLevel.Warning,
+		'too_many_file_sections',
+		`This diff has more than ${MAX_INTERACTIVE_DIFF_FILES} file sections. It is sent unchanged to the backend as one section.`
+	);
+
+	return {
+		files: [createUnsplitInteractiveDiffFile(text, [diagnostic])],
+		diagnostics: limitInteractiveDiagnostics([...diagnostics, diagnostic]),
+	};
+}
+
 function normalizeInteractiveTargetPath(value: string | undefined | null): string {
 	const raw = value?.trim() ?? '';
 
@@ -265,12 +281,16 @@ function normalizeInteractiveTargetPath(value: string | undefined | null): strin
 	return parts.length > 0 ? `/${parts.join('/')}` : '/';
 }
 
+/**
+ * Deduplicate path options without validating or reformatting them.
+ * Private normalization helpers are used only for ranking suggestions.
+ */
 export function normalizeInteractiveTargetPaths(values: Array<string | undefined | null>): string[] {
 	const output: string[] = [];
 	const seen = new Set<string>();
 
 	for (const value of values) {
-		const path = normalizeInteractiveTargetPath(value);
+		const path = value ?? '';
 
 		if (!path || seen.has(path)) {
 			continue;
@@ -519,14 +539,6 @@ function normalizeHeaderPair(oldPath: string, newPath: string): HeaderPair {
 	};
 }
 
-function formatHeaderPath(path: string): string {
-	if (path === DEV_NULL) {
-		return DEV_NULL;
-	}
-
-	return /[\s"\\]/.test(path) ? JSON.stringify(path) : path;
-}
-
 function getFileKind(oldPath: string | undefined, newPath: string | undefined): InteractiveDiffFileKind {
 	if (oldPath === DEV_NULL && newPath && newPath !== DEV_NULL) {
 		return 'add';
@@ -701,6 +713,9 @@ function parseStandardDiff(text: string): {
 
 		if (line.startsWith('diff --git ')) {
 			flush();
+			if (files.length >= MAX_INTERACTIVE_DIFF_FILES) {
+				return fileSectionLimitResult(text, diagnostics);
+			}
 
 			current = {
 				lines: [line],
@@ -721,6 +736,9 @@ function parseStandardDiff(text: string): {
 
 		if (line.startsWith('Index: ')) {
 			flush();
+			if (files.length >= MAX_INTERACTIVE_DIFF_FILES) {
+				return fileSectionLimitResult(text, diagnostics);
+			}
 
 			const path = line.slice('Index: '.length).trim();
 
@@ -747,6 +765,9 @@ function parseStandardDiff(text: string): {
 				};
 			} else if (current.hasHeaders && !current.hasGitBoundary && likelyNewBareFileSection(pair)) {
 				flush();
+				if (files.length >= MAX_INTERACTIVE_DIFF_FILES) {
+					return fileSectionLimitResult(text, diagnostics);
+				}
 				current = {
 					lines: [],
 					hasGitBoundary: false,
@@ -861,6 +882,10 @@ function parseOpenAIPatch(text: string): {
 		const kind = match[1].toLowerCase();
 		const path = parseOpenAIPath(match[2]);
 
+		if (sections.length >= MAX_INTERACTIVE_DIFF_FILES) {
+			return fileSectionLimitResult(text, diagnostics);
+		}
+
 		sections.push({
 			index,
 			kind: kind === 'add' ? 'add' : kind === 'delete' ? 'delete' : 'update',
@@ -903,10 +928,12 @@ function parseOpenAIPatch(text: string): {
 		const rawLines = lines.slice(section.index, sectionEnd);
 		const rawSourceText = sourceFromLines(rawLines);
 		const id = `section-${files.length + 1}`;
-		const oldPath = section.kind === 'add' ? DEV_NULL : section.path || undefined;
-		const newPath = section.kind === 'delete' ? DEV_NULL : section.path || undefined;
-		const diagnosticsForFile: ApplyUnifiedDiffDiagnostic[] = [];
 		const extracted = extractHunks(rawLines, id);
+		const moveHeader = /^\*\*\*[ \t]+Move to:[ \t]*(.+?)[ \t]*\r?$/im.exec(extracted.hunkPrefixText);
+		const movedPath = section.kind === 'update' ? parseOpenAIPath(moveHeader?.[1] ?? '') : '';
+		const oldPath = section.kind === 'add' ? DEV_NULL : section.path || undefined;
+		const newPath = section.kind === 'delete' ? DEV_NULL : movedPath || section.path || undefined;
+		const diagnosticsForFile: ApplyUnifiedDiffDiagnostic[] = [];
 
 		appendDiagnostic(
 			diagnosticsForFile,
@@ -919,7 +946,7 @@ function parseOpenAIPatch(text: string): {
 			id,
 			oldPath,
 			newPath,
-			kind: section.kind === 'add' ? 'add' : section.kind === 'delete' ? 'delete' : 'modify',
+			kind: getFileKind(oldPath, newPath),
 			sourceText: rawSourceText,
 			requestText: rawSourceText,
 			hunkPrefixText: extracted.hunkPrefixText,
@@ -999,17 +1026,10 @@ export function parseInteractiveDiff(value: string, language = ''): ParsedIntera
 	const parsed = isOpenAIPatch ? parseOpenAIPatch(text) : parseStandardDiff(text);
 
 	if (parsed.files.length > MAX_INTERACTIVE_DIFF_FILES) {
-		const tooManySectionsDiagnostic = createDiagnostic(
-			ApplyUnifiedDiffDiagnosticLevel.Warning,
-			'too_many_file_sections',
-			`This diff has more than ${MAX_INTERACTIVE_DIFF_FILES} file sections. It is sent unchanged to the backend as one section.`
-		);
-
 		return {
 			isDiffLike,
 			isOpenAIPatch,
-			files: [createUnsplitInteractiveDiffFile(text, [tooManySectionsDiagnostic])],
-			diagnostics: limitInteractiveDiagnostics([...parsed.diagnostics, tooManySectionsDiagnostic]),
+			...fileSectionLimitResult(text, parsed.diagnostics),
 		};
 	}
 
@@ -1142,17 +1162,16 @@ function addRankedInteractiveTarget(
 	rank: number,
 	order: number
 ): void {
-	const path = normalizeInteractiveTargetPath(value);
-	const key = targetPathIdentity(path);
+	const path = value;
 
-	if (!path || !key) {
+	if (!path) {
 		return;
 	}
 
-	const previous = targets.get(key);
+	const previous = targets.get(path);
 
 	if (!previous || rank < previous.rank || (rank === previous.rank && order < previous.order)) {
-		targets.set(key, {
+		targets.set(path, {
 			path,
 			rank,
 			order,
@@ -1205,14 +1224,17 @@ export function inferInteractiveDiffTargets(
 		};
 
 		/*
-		 * An absolute path written in the patch is useful context, but an exact
-		 * attached-file match always ranks above it.
+		 * Patch paths are suggestions, not eligibility checks. Keep relative
+		 * paths too; an exact attached-file match still ranks above them.
 		 */
-		if (absolutePatchPath) {
-			addTarget(absolutePatchPath, 1);
+		if (patchPath && patchPath !== DEV_NULL) {
+			addTarget(patchPath, absolutePatchPath ? 1 : 150);
 		}
 
 		for (const candidate of externalCandidates) {
+			// A failed ranking heuristic must not discard a supplied option.
+			addTarget(candidate, 200);
+
 			const isExactFileMatch = absolutePatchPath
 				? targetPathIdentity(candidate) === targetPathIdentity(absolutePatchPath)
 				: relativePatchPath
@@ -1333,29 +1355,14 @@ function concatenatePatchParts(parts: string[]): string {
 	return ensureTrailingNewline(output);
 }
 
-function syntheticHunkPrefix(file: InteractiveDiffFile, targetPath: string): string {
-	if (!targetPath) {
-		return '';
-	}
-
-	const oldPath = file.kind === 'add' ? DEV_NULL : (file.oldPath ?? targetPath);
-	const newPath = file.kind === 'delete' ? DEV_NULL : (file.newPath ?? targetPath);
-
-	return sourceFromLines([`--- ${formatHeaderPath(oldPath)}`, `+++ ${formatHeaderPath(newPath)}`]);
-}
-
 /**
  * Builds a backend request without validating or rewriting patch semantics.
  *
- * Whole-file requests use the original file section. Hunk requests preserve
- * the original hunk headers and bodies exactly. Do not renumber hunk ranges,
- * repair line counts, or reject fuzzy/LLM-shaped patch content here.
+ * Whole-file requests use the original section. Selected-hunk requests use
+ * the original preamble and selected source hunks. Target paths are sent
+ * separately; the backend owns all path and applicability decisions.
  */
-export function buildInteractiveDiffRequest(
-	file: InteractiveDiffFile,
-	targetPath = '',
-	selectedHunkIDs?: string[]
-): string {
+export function buildInteractiveDiffRequest(file: InteractiveDiffFile, selectedHunkIDs?: string[]): string {
 	if (selectedHunkIDs === undefined) {
 		return file.requestText || file.sourceText;
 	}
@@ -1367,9 +1374,7 @@ export function buildInteractiveDiffRequest(
 		throw new Error('The selected hunks do not belong to this file section.');
 	}
 
-	const prefix = file.hunkPrefixText || syntheticHunkPrefix(file, targetPath);
-
-	return concatenatePatchParts([prefix, ...hunks.map(hunk => hunk.sourceText)]);
+	return concatenatePatchParts([file.hunkPrefixText, ...hunks.map(hunk => hunk.sourceText)]);
 }
 
 export function createDiffApplyOutcome(
@@ -1384,7 +1389,7 @@ export function createDiffApplyOutcome(
 		status,
 		message,
 		diagnostics: limitInteractiveDiagnostics(diagnostics),
-		resolvedTargetPath: resolvedTargetPath?.trim() || undefined,
+		resolvedTargetPath: resolvedTargetPath || undefined,
 	};
 }
 
@@ -1395,7 +1400,7 @@ function backendMessage(output: ApplyUnifiedDiffOut, fileMessage: string | undef
 function responseTargetPath(output: ApplyUnifiedDiffOut): string {
 	const file = output.files?.length === 1 ? output.files[0] : undefined;
 
-	return file?.targetPath?.trim() || file?.resolvedPath?.trim() || '';
+	return file?.targetPath || file?.resolvedPath || '';
 }
 
 /**

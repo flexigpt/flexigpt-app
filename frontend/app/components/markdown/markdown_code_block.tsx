@@ -164,12 +164,12 @@ export function CodeBlock({
 	const defaultIsExpanded = isMermaid ? hasMermaidSyntaxError && !hideMermaidCode : defaultExpanded;
 	const isExpanded = expansionOverride?.key === codeBlockKey ? expansionOverride.isExpanded : defaultIsExpanded;
 
-	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isMermaid || !isBusy);
+	const { elementRef, activated: richCodeWorkActivated } = useNearViewport(!isBusy);
 	// Shiki replaces the complete code subtree whenever a result arrives.
 	// Deferring does not coalesce token updates, so keep its input stable and
 	// render the current raw value until the stream has settled.
 	const withinHighlightBudget = useMemo(() => {
-		if (value.length > MAX_HIGHLIGHT_CHARACTERS) {
+		if (isBusy || value.length > MAX_HIGHLIGHT_CHARACTERS) {
 			return false;
 		}
 		let lines = 1;
@@ -183,7 +183,7 @@ export function CodeBlock({
 			}
 		}
 		return true;
-	}, [value]);
+	}, [isBusy, value]);
 	const shouldHighlight = !isBusy && richCodeWorkActivated && isExpanded && withinHighlightBudget;
 	const valueForHighlight = isBusy || !withinHighlightBudget ? '' : value;
 	const html = useHighlight(valueForHighlight, language, shouldHighlight);
@@ -267,17 +267,17 @@ export function CodeBlock({
 								language={language}
 								valueFetcher={fetchValue}
 								size={16}
-								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent font-mono shadow-none hover:opacity-60"
 							/>
 
 							<CopyButton
 								value={value}
-								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent font-mono shadow-none hover:opacity-60"
 								size={16}
 							/>
 							<button
 								type="button"
-								className="btn btn-xs app-text-code flex items-center border-none bg-transparent shadow-none hover:opacity-60"
+								className="btn btn-xs app-text-code flex items-center border-none bg-transparent font-mono shadow-none hover:opacity-60"
 								onClick={handleToggleExpanded}
 								aria-expanded={isExpanded}
 								aria-controls={codeBodyId}

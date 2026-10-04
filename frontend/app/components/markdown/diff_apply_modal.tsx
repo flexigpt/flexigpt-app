@@ -41,7 +41,7 @@ function LazyPanel({ summary, className = '', renderContent, defaultOpen = false
 		<div className={`border-base-300 bg-base-100 overflow-hidden rounded-lg border ${className}`}>
 			<button
 				type="button"
-				className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-xs font-semibold"
+				className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left font-mono text-xs font-semibold"
 				aria-expanded={isOpen}
 				aria-controls={contentID}
 				onClick={() => {
@@ -141,15 +141,14 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 		const status = view.hunkOutcomes[hunk.id]?.status;
 		return status === 'blocked' || status === 'needs-info';
 	}).length;
-	const selectedCount = view.selectedHunkIDs.length;
-	const allHunksReviewed = checkedCount === file.hunks.length && checkedCount > 0;
+	const selectedCount = view.selectedHunkIDs.filter(hunkID => view.hunkOutcomes[hunkID]?.status === 'ready').length;
 	const canReviewHunks = view.canTryHunks && file.hunks.length <= MAX_INTERACTIVE_HUNK_PROBES && !controller.busy;
 
 	return (
 		<div className="space-y-3">
 			<div className="flex flex-wrap items-center justify-between gap-2">
 				<p className="text-base-content/60 min-w-0 flex-1 text-xs">
-					File-level review did not pass. Each hunk can be sent to the backend independently.
+					Review individual source hunks with the current target. The backend determines applicability.
 				</p>
 
 				<button
@@ -239,7 +238,7 @@ function HunkPanel({ view, controller }: { view: DiffApplyFileView; controller: 
 			<button
 				type="button"
 				className="btn btn-sm btn-primary"
-				disabled={!!controller.busy || !allHunksReviewed || selectedCount === 0}
+				disabled={!!controller.busy || selectedCount === 0}
 				title="Apply only backend-reviewed ready hunks. This does not submit the other hunks."
 				onClick={() => {
 					void controller.applySelectedHunks(file.id);
@@ -282,7 +281,7 @@ function FileCard({
 			? 'Edit target path'
 			: 'Enter a target path manually';
 
-	const showHunks = file.hunks.length > 0 && (view.canTryHunks || Object.keys(view.hunkOutcomes).length > 0);
+	const showHunks = file.hunks.length > 0;
 
 	return (
 		<section className={`rounded-xl border p-4 shadow-sm ${cardClassName(view)}`} aria-busy={isActive}>
@@ -293,7 +292,7 @@ function FileCard({
 							{statusLabel(view.status)}
 						</span>
 						<span className="badge badge-ghost badge-sm">{file.kind}</span>
-						<span className="text-base-content/50 text-xs">{file.id}</span>
+						<span className="text-base-content/50 font-mono text-xs">{file.id}</span>
 					</div>
 
 					<div className="mt-2 font-mono text-sm font-semibold break-all">{displayPath}</div>
@@ -332,7 +331,7 @@ function FileCard({
 							void controller.reviewFile(file.id);
 						}}
 					>
-						Review file
+						{view.status === 'pending' ? 'Review file' : 'Review again'}
 					</button>
 
 					<button
@@ -352,9 +351,15 @@ function FileCard({
 			<OutcomeNotice label="Review" outcome={view.reviewOutcome} />
 			<OutcomeNotice label="Apply" outcome={view.applyOutcome} />
 
+			{view.status === 'pending' && !controller.busy ? (
+				<p className="text-base-content/70 mt-3 text-xs">
+					Not reviewed for the current target and matching options. Choose Review file or Review target.
+				</p>
+			) : null}
+
 			<div className="mt-4 space-y-2">
 				<div className="flex items-center justify-between gap-2">
-					<span className="text-xs font-semibold">Eligible target paths</span>
+					<span className="text-xs font-semibold">Suggested target paths</span>
 					<span className="text-base-content/50 text-[11px]">Ranked</span>
 				</div>
 
@@ -365,9 +370,9 @@ function FileCard({
 						controller.setTargetPath(file.id, candidate);
 					}}
 					filterDisabled={false}
-					title={`Eligible target paths for ${displayPath}`}
+					title={`Suggested target paths for ${displayPath}`}
 					placeholderLabel={
-						candidates.length > 0 ? 'Choose a ranked target path' : 'No eligible target paths were found'
+						candidates.length > 0 ? 'Choose a suggested target path' : 'No target suggestions were found'
 					}
 					orderedKeys={candidates}
 					inlineMenu
@@ -382,7 +387,7 @@ function FileCard({
 						: view.targetPath
 							? 'A manually entered target path is sent to the backend.'
 							: candidates.length > 0
-								? 'Suggestions are ordered by file match, then directory match.'
+								? 'Suggestions are guesses ranked by file and directory match. The backend validates the chosen path.'
 								: isNewInteractiveDiffFile(file)
 									? 'No destination was derived for this new file. Enter one manually or let the backend request it.'
 									: 'No target was derived. The backend can still resolve the path during review.'}
@@ -408,9 +413,28 @@ function FileCard({
 							onChange={event => {
 								controller.setTargetPath(file.id, event.target.value);
 							}}
+							onKeyDown={event => {
+								if (event.key === 'Enter' && !event.nativeEvent.isComposing && !controller.busy) {
+									event.preventDefault();
+									event.stopPropagation();
+									void controller.reviewFile(file.id);
+								}
+							}}
 						/>
+						<button
+							type="button"
+							className="btn btn-xs btn-outline mt-2 font-mono"
+							disabled={!!controller.busy}
+							title="Review this file with the current target input. No changes are written."
+							onClick={() => {
+								void controller.reviewFile(file.id);
+							}}
+						>
+							Review target
+						</button>
 						<div className="text-base-content/60 mt-1 text-xs">
-							Leave this blank to clear the explicit target and let the backend resolve it.
+							Editing clears the previous review. Review explicitly before applying. Leave this blank to let the backend
+							resolve the target.
 						</div>
 					</div>
 				)}
@@ -471,7 +495,7 @@ function DiffApplyModalContent({ controller }: { controller: DiffApplyController
 				<div className="border-base-300 border-b px-4 py-3 sm:px-5">
 					<div className="flex items-start justify-between gap-4">
 						<div className="min-w-0 flex-1">
-							<h3 className="flex items-center gap-2 text-base font-semibold">
+							<h3 className="flex items-center gap-2 font-mono text-base font-semibold">
 								<FiGitPullRequest size={16} className="shrink-0" />
 								<span>Patch details</span>
 							</h3>
