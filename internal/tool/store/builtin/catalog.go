@@ -6,7 +6,7 @@ import (
 	"maps"
 	"sync"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -34,7 +34,7 @@ func generatedCatalogValue() (
 	error,
 ) {
 	generatedCatalogOnce.Do(func() {
-		generatedCatalog, errGeneratedCatalog = builtin.DecodeGeneratedPackageSet(generatedCatalogJSON)
+		generatedCatalog, errGeneratedCatalog = install.DecodeGeneratedPackageSet(generatedCatalogJSON)
 	})
 	if errGeneratedCatalog != nil {
 		return installModel.CompiledPackageSet{}, errGeneratedCatalog
@@ -56,7 +56,7 @@ func GeneratedCatalogFingerprint() cryptoutil.Digest {
 		if err != nil {
 			return
 		}
-		_, generatedCatalogFingerprint, _ = builtin.CanonicalGeneratedPackageSet(value)
+		_, generatedCatalogFingerprint, _ = install.CanonicalGeneratedPackageSet(value)
 	})
 	return generatedCatalogFingerprint
 }

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -14,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
 	artifactcleanupFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/artifactcleanup"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
@@ -62,7 +62,7 @@ func initMCPWrappers(
 	locatorResolvers []locator.Factory,
 	fallbackProviders map[declaration.Type]resolve.FallbackProvider,
 	targetMappers map[declaration.Type]resolve.ArtifactTargetMapper,
-) (builtin.HydrationInstaller, error) {
+) (installFlow.HydrationInstaller, error) {
 	if storeWrapper == nil ||
 		runtimeWrapper == nil ||
 		aggregateWrapper == nil {
@@ -185,7 +185,7 @@ func initMCPWrappers(
 	var runtimeManager *mcpConnection.MCPRuntimeManager
 	cleanup := func(
 		cause error,
-	) (builtin.HydrationInstaller, error) {
+	) (installFlow.HydrationInstaller, error) {
 		if runtimeManager != nil {
 			_ = runtimeManager.Close(context.Background())
 		}
@@ -272,7 +272,7 @@ func initMCPWrappers(
 func newMCPBuiltInInstaller(
 	hydrator installModel.CompiledHydrationCoordinator,
 	cleanup mcpConsumerAPI.BuiltinPackageCleanup,
-) (builtin.HydrationInstaller, error) {
+) (installFlow.HydrationInstaller, error) {
 	if hydrator == nil || cleanup == nil {
 		return nil, errors.New(
 			"MCP generated built-in installer dependencies are incomplete",

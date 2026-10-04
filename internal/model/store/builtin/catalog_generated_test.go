@@ -5,8 +5,8 @@ package builtin_test
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin/catalogtest"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/model/inferenceadapter/catalog"
 	modelBuiltin "github.com/flexigpt/flexigpt-app/internal/model/store/builtin"
 )
@@ -26,7 +26,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile generated Model packages: %v", err)
 	}
 
-	_, expectedFingerprint, err := builtin.CanonicalGeneratedPackageSet(
+	_, expectedFingerprint, err := install.CanonicalGeneratedPackageSet(
 		expected,
 	)
 	if err != nil {
@@ -46,7 +46,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile generated Model packages again: %v", err)
 	}
 
-	_, repeatedFingerprint, err := builtin.CanonicalGeneratedPackageSet(
+	_, repeatedFingerprint, err := install.CanonicalGeneratedPackageSet(
 		recompiled,
 	)
 	if err != nil {

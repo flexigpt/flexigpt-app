@@ -2,9 +2,9 @@ package locator
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	catalogModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog/model"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
@@ -12,31 +12,20 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// Factory creates a declaration-locator resolver bound to one narrow Artifact
-// catalog runtime.
-//
-// This contract belongs to artifactcontract because locator syntax, declaration
-// entry selection, subresource conventions, and artifact-family-specific
-// resolution behavior do not belong to generic Artifact Store.
 type Factory interface {
 	LocatorKind() string
 	ArtifactKinds() []artifactModel.ArtifactKind
 	Revision() string
-
-	Bind(
-		runtime Runtime,
-	) (Resolver, error)
+	Bind(runtime Runtime) (Resolver, error)
 }
 
-// Resolver resolves one declaration locator to one source-backed Artifact.
+// Resolver consumes committed or verified state. It must not create Sources,
+// expand discovery, refresh, or publish packages.
 type Resolver interface {
-	Resolve(
-		ctx context.Context,
-		request Request,
-	) (artifactModel.ArtifactRef, error)
+	Resolve(ctx context.Context, request Request) (artifactModel.ArtifactRef, error)
 }
 
-// Runtime is deliberately narrow, artifact/catalog.API satisfies this interface directly.
+// Runtime exposes committed catalog queries only.
 type Runtime interface {
 	ListBySource(
 		ctx context.Context,
@@ -46,14 +35,12 @@ type Runtime interface {
 	) ([]catalogModel.Entry, error)
 }
 
-// Request preserves declaration-owned JSON without requiring generic
-// Artifact Store to know declaration vocabulary.
 type Request struct {
 	RootID rootModel.RootID
 	From   *artifactModel.Artifact
 
-	LocatorJSON json.RawMessage
-	EntryJSON   json.RawMessage
+	Locator declaration.Locator
+	Entry   *declaration.Entry
 
 	ExpectedKind        artifactModel.ArtifactKind
 	ExpectedLogicalName spec.LogicalName
@@ -63,37 +50,17 @@ func (r Request) Validate() error {
 	if err := r.RootID.Validate(); err != nil {
 		return err
 	}
-
 	if r.From != nil {
-		if err := r.From.Validate(); err != nil {
+		if err := r.From.ValidateRead(); err != nil {
 			return err
 		}
 		if r.From.RootID != r.RootID {
-			return fmt.Errorf(
-				"%w: locator origin Artifact belongs to another Root",
-				spec.ErrInvalid,
-			)
+			return fmt.Errorf("%w: locator origin belongs to another Root", spec.ErrInvalid)
 		}
 	}
-
-	if len(r.LocatorJSON) == 0 ||
-		len(r.LocatorJSON) > spec.MaxDefinitionBodyBytes ||
-		!json.Valid(r.LocatorJSON) {
-		return fmt.Errorf(
-			"%w: locator request has invalid locator JSON",
-			spec.ErrInvalid,
-		)
+	if err := r.Locator.Validate(); err != nil {
+		return err
 	}
-
-	if len(r.EntryJSON) != 0 &&
-		(len(r.EntryJSON) > spec.MaxDefinitionBodyBytes ||
-			!json.Valid(r.EntryJSON)) {
-		return fmt.Errorf(
-			"%w: locator request has invalid declaration JSON",
-			spec.ErrInvalid,
-		)
-	}
-
 	if err := r.ExpectedKind.Validate(); err != nil {
 		return err
 	}
@@ -102,45 +69,54 @@ func (r Request) Validate() error {
 			return err
 		}
 	}
-
+	if r.Entry != nil {
+		if err := r.Entry.Validate(); err != nil {
+			return err
+		}
+		header := r.Entry.Header()
+		if artifactModel.ArtifactKind(header.Type) != r.ExpectedKind {
+			return fmt.Errorf("%w: locator entry type differs from expected kind", spec.ErrInvalid)
+		}
+		if r.ExpectedLogicalName != "" && header.Name != string(r.ExpectedLogicalName) {
+			return fmt.Errorf("%w: locator entry name differs from expected identity", spec.ErrInvalid)
+		}
+	}
 	return nil
 }
 
-// FactoryKey identifies one locator-kind/artifact-kind registration slot.
+func (r Request) Clone() Request {
+	output := r
+	if r.From != nil {
+		value := r.From.Clone()
+		output.From = &value
+	}
+	if r.Entry != nil {
+		value := r.Entry.Clone()
+		output.Entry = &value
+	}
+	output.Locator = r.Locator.Clone()
+	return output
+}
+
 type FactoryKey struct {
 	LocatorKind  string
 	ArtifactKind artifactModel.ArtifactKind
 }
 
 func (k FactoryKey) Validate() error {
-	if err := spec.ValidateIdentifier(
-		"locator resolver kind",
-		k.LocatorKind,
-		spec.MaxKindBytes,
-	); err != nil {
+	if err := spec.ValidateIdentifier("locator resolver kind", k.LocatorKind, spec.MaxKindBytes); err != nil {
 		return err
 	}
 	return k.ArtifactKind.Validate()
 }
 
-func ValidateFactory(
-	value Factory,
-) error {
+func ValidateFactory(value Factory) error {
 	if value == nil {
-		return fmt.Errorf(
-			"%w: declaration locator factory is nil",
-			spec.ErrInvalid,
-		)
+		return fmt.Errorf("%w: declaration locator factory is nil", spec.ErrInvalid)
 	}
-
-	if err := spec.ValidateIdentifier(
-		"locator resolver kind",
-		value.LocatorKind(),
-		spec.MaxKindBytes,
-	); err != nil {
+	if err := spec.ValidateIdentifier("locator resolver kind", value.LocatorKind(), spec.MaxKindBytes); err != nil {
 		return err
 	}
-
 	if err := spec.ValidateRequiredText(
 		"locator resolver revision",
 		value.Revision(),
@@ -148,36 +124,19 @@ func ValidateFactory(
 	); err != nil {
 		return err
 	}
-
 	kinds := value.ArtifactKinds()
 	if len(kinds) == 0 {
-		return fmt.Errorf(
-			"%w: locator resolver %q has no Artifact kinds",
-			spec.ErrInvalid,
-			value.LocatorKind(),
-		)
+		return fmt.Errorf("%w: locator resolver has no Artifact kinds", spec.ErrInvalid)
 	}
-
 	seen := make(map[artifactModel.ArtifactKind]struct{}, len(kinds))
-	for index, kind := range kinds {
+	for _, kind := range kinds {
 		if err := kind.Validate(); err != nil {
-			return fmt.Errorf(
-				"locator resolver %q Artifact kind %d: %w",
-				value.LocatorKind(),
-				index,
-				err,
-			)
+			return err
 		}
 		if _, duplicate := seen[kind]; duplicate {
-			return fmt.Errorf(
-				"%w: locator resolver %q repeats Artifact kind %q",
-				spec.ErrConflict,
-				value.LocatorKind(),
-				kind,
-			)
+			return fmt.Errorf("%w: locator resolver repeats Artifact kind %q", spec.ErrConflict, kind)
 		}
 		seen[kind] = struct{}{}
 	}
-
 	return nil
 }

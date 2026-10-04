@@ -5,7 +5,6 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
@@ -14,6 +13,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/catalog"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managepackageFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/managepackage"
 	refreshFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/refresh"
@@ -36,7 +36,7 @@ type SkillStoreWrapper struct {
 
 func NewSkillBuiltInInstaller(
 	hydrator installModel.CompiledHydrationCoordinator,
-) (builtin.HydrationInstaller, error) {
+) (installFlow.HydrationInstaller, error) {
 	if hydrator == nil {
 		return nil, errors.New("skill built-in installer dependencies are incomplete")
 	}

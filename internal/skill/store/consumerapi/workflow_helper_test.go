@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/providercanonical"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/compose/local"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/collection"
@@ -23,7 +24,7 @@ type skillWorkflowFixture struct {
 	store *compose.Store
 	api   *skillConsumerAPI.API
 
-	bootstrap       *builtin.BootstrapRegistry
+	bootstrap       *install.Bootstrap
 	baselineEnsurer skillConsumerAPI.BaselineEnsurer
 }
 
@@ -82,8 +83,6 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	)
 	requireNoError(t, err)
 
-	requireNoError(t, err)
-
 	installer, err := skillBuiltin.NewInstaller(
 		skillBuiltin.InstallerDependencies{
 			Hydrator: store.Topology,
@@ -91,12 +90,12 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 	)
 	requireNoError(t, err)
 
-	bootstrap, err := builtin.NewDefaultBootstrapRegistry(
+	bootstrap, err := install.NewBootstrap(
+		documentTopology.BuiltinTopologyDeclaration(),
 		store.Topology,
-		store.Topology,
+		installer,
 	)
 	requireNoError(t, err)
-	requireNoError(t, bootstrap.Register(installer))
 
 	baselineEnsurer, err := skillConsumerAPI.NewBaselineEnsurer(api)
 	requireNoError(t, err)
@@ -111,7 +110,7 @@ func newSkillWorkflowFixture(t *testing.T) *skillWorkflowFixture {
 
 func (f *skillWorkflowFixture) bootstrapBuiltins(t *testing.T) {
 	t.Helper()
-	requireNoError(t, f.bootstrap.Ensure(t.Context()))
+	requireNoError(t, f.bootstrap.Ensure(root.WithInstallerPrivilege(t.Context())))
 }
 
 func (f *skillWorkflowFixture) ensureUserBaseline(

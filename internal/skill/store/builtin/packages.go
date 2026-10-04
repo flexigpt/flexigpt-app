@@ -7,7 +7,6 @@ import (
 	"path"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration/pluginv1"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/decoder"
@@ -65,7 +64,7 @@ func PreparePackages(
 		)
 	}
 
-	roots, err := builtin.DirectPackageRoots(packages)
+	roots, err := managedpackage.DirectPackageRoots(packages)
 	if err != nil {
 		return nil, err
 	}

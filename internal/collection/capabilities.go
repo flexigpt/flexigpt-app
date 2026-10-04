@@ -10,12 +10,10 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-type CollectionCapabilityOccurrence = resolve.CapabilityOccurrence
-
 type CollectionCapabilityPlan struct {
-	Collection  CollectionView                   `json:"collection"`
-	Occurrences []CollectionCapabilityOccurrence `json:"occurrences"`
-	Complete    bool                             `json:"complete"`
+	Collection  CollectionView                 `json:"collection"`
+	Occurrences []resolve.CapabilityOccurrence `json:"occurrences"`
+	Complete    bool                           `json:"complete"`
 }
 
 func (a *API) ResolveCapabilities(
@@ -28,35 +26,23 @@ func (a *API) ResolveCapabilities(
 			spec.ErrUnsupported,
 		)
 	}
-
-	generic, err := a.resolver.ResolvePluginCapabilities(ctx, ref)
+	plan, err := a.resolver.ResolvePluginCapabilities(ctx, ref)
 	if err != nil {
 		return CollectionCapabilityPlan{}, err
 	}
-	if generic.RootType != declaration.TypePlugin {
+	if plan.RootType != declaration.TypePlugin || plan.RootArtifact == nil {
 		return CollectionCapabilityPlan{}, fmt.Errorf(
-			"%w: Artifact %q is not a Plugin",
-			spec.ErrReferenceUnresolved,
-			ref.ArtifactID,
-		)
-	}
-	if generic.RootArtifact == nil {
-		return CollectionCapabilityPlan{}, fmt.Errorf(
-			"%w: Collection has no source-backed Artifact",
+			"%w: Collection did not resolve to a source-backed Plugin",
 			spec.ErrReferenceUnresolved,
 		)
 	}
-	view, err := a.Read(ctx, *generic.RootArtifact)
+	view, err := a.Read(ctx, *plan.RootArtifact)
 	if err != nil {
 		return CollectionCapabilityPlan{}, err
 	}
-
 	return CollectionCapabilityPlan{
-		Collection: view,
-		Occurrences: append(
-			[]CollectionCapabilityOccurrence(nil),
-			generic.Occurrences...,
-		),
-		Complete: generic.Complete,
+		Collection:  view,
+		Occurrences: plan.Occurrences,
+		Complete:    plan.Complete,
 	}, nil
 }

@@ -8,12 +8,12 @@ import (
 	"path/filepath"
 
 	agentConsumerAPI "github.com/flexigpt/flexigpt-app/internal/agent/store/consumerapi"
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/locator"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
+	installFlow "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
 	mcpConsumerAPI "github.com/flexigpt/flexigpt-app/internal/mcp/store/consumerapi"
 	skillConsumerAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/consumerapi"
@@ -38,18 +38,18 @@ type App struct {
 	toolStoreAPI          *ToolStoreWrapper
 	toolRuntimeAPI        *ToolRuntimeWrapper
 	toolAggregateAPI      *ToolAggregateWrapper
-	toolBuiltInInstaller  builtin.HydrationInstaller
-	modelBuiltInInstaller builtin.HydrationInstaller
+	toolBuiltInInstaller  installFlow.HydrationInstaller
+	modelBuiltInInstaller installFlow.HydrationInstaller
 	agentStoreAPI         *AgentStoreWrapper
-	agentBuiltInInstaller builtin.HydrationInstaller
+	agentBuiltInInstaller installFlow.HydrationInstaller
 	skillStoreAPI         *SkillStoreWrapper
-	skillBuiltInInstaller builtin.HydrationInstaller
+	skillBuiltInInstaller installFlow.HydrationInstaller
 	skillAggregateAPI     *SkillAggregateWrapper
 	skillRuntimeAPI       *SkillRuntimeWrapper
 	mcpStoreAPI           *MCPStoreWrapper
 	mcpRuntimeAPI         *MCPRuntimeWrapper
 	mcpAggregateAPI       *MCPAggregateWrapper
-	mcpBuiltInInstaller   builtin.HydrationInstaller
+	mcpBuiltInInstaller   installFlow.HydrationInstaller
 	completionAPI         *CompletionWrapper
 	workspaceStoreAPI     *WorkspaceStoreWrapper
 	workspaceRuntimeAPI   *WorkspaceRuntimeWrapper

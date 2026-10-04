@@ -130,8 +130,12 @@ func (a *API) listCollections(
 		}
 
 		if a.domain != nil && a.domain.ValidateDocument != nil {
+			document, err := projection.document.Clone()
+			if err != nil {
+				return nil, err
+			}
 			if err := a.domain.ValidateDocument(
-				projection.document,
+				document,
 			); err != nil {
 				return nil, err
 			}
@@ -239,6 +243,12 @@ func (a *API) collectionProjectionFor(
 		Digest: entry.Definition.Digest,
 	}
 	if cached, found := a.catalogProjections.Get(key); found {
+		if cached.document.Name != string(entry.LogicalName) {
+			return collectionProjection{}, fmt.Errorf(
+				"%w: cached Plugin identity differs from catalog identity",
+				spec.ErrDigestMismatch,
+			)
+		}
 		return cached, nil
 	}
 	if loaded == nil {
@@ -252,7 +262,7 @@ func (a *API) collectionProjectionFor(
 		key,
 		len(loaded.Body),
 		func() (collectionProjection, error) {
-			document, err := pluginv1.DecodePluginJSON(loaded.Body)
+			document, err := pluginv1.FromDefinition(*loaded)
 			if err != nil {
 				return collectionProjection{}, err
 			}

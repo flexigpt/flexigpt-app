@@ -2,7 +2,6 @@ package decoder
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/codec"
@@ -15,34 +14,46 @@ import (
 )
 
 type canonicalDecoder struct {
-	schemas schema.ExpectedCanonicalizer
+	schemas  schema.ExpectedCanonicalizer
+	dispatch *declaration.Dispatcher
 }
 
 func newCanonicalDecoder() *canonicalDecoder {
 	return &canonicalDecoder{}
 }
 
-func (d *canonicalDecoder) RequiredSchemaKeys() []schemaModel.Key {
+func (*canonicalDecoder) RequiredSchemaKeys() []schemaModel.Key {
 	return codec.SchemaKeys()
 }
 
-func (d *canonicalDecoder) BindExpectedCanonicalizer(
-	schemas schema.Catalog,
-) error {
-	if d == nil || schemas == nil {
+func (d *canonicalDecoder) BindExpectedCanonicalizer(catalog schema.Catalog) error {
+	if d == nil || catalog == nil {
 		return fmt.Errorf(
 			"%w: canonical declaration schema catalog is nil",
 			spec.ErrInvalid,
 		)
 	}
-	d.schemas = schemas
+
+	// Only declaration types recognized by this decoder participate. Unrelated
+	// artifact-family codecs do not become declaration-language registrations.
+	keys := make([]schemaModel.Key, 0)
+	for _, key := range catalog.Keys() {
+		if key.Entity == schemaModel.EntityArtifact &&
+			supportsType(declaration.Type(key.Kind)) {
+			keys = append(keys, key)
+		}
+	}
+	dispatch, err := declaration.NewDispatcher(keys)
+	if err != nil {
+		return err
+	}
+	d.schemas = catalog
+	d.dispatch = dispatch
 	return nil
 }
 
-func supportsType(
-	declarationType declaration.Type,
-) bool {
-	_, found := codec.SchemaKeyForType(declarationType)
+func supportsType(value declaration.Type) bool {
+	_, found := codec.SchemaKeyForType(value)
 	return found
 }
 
@@ -51,81 +62,54 @@ func (d *canonicalDecoder) Decode(
 	candidate ingestModel.Candidate,
 	raw []byte,
 ) ([]ingestModel.Decoded, []diagnostic.Diagnostic) {
-	if d == nil || d.schemas == nil {
+	if d == nil || d.schemas == nil || d.dispatch == nil {
 		return nil, decodeDiagnostic(
 			candidate,
 			"artifact.declaration-schema-unavailable",
-			fmt.Errorf(
-				"%w: canonical declaration decoder has no schema catalog",
-				spec.ErrClosed,
-			),
+			fmt.Errorf("%w: canonical declaration decoder is not bound", spec.ErrClosed),
 		)
 	}
 
-	var header struct {
-		Type declaration.Type `json:"type"`
-	}
-	if err := json.Unmarshal(raw, &header); err != nil {
-		return nil, decodeDiagnostic(
-			candidate,
-			"artifact.declaration-invalid",
-			err,
-		)
+	key, err := d.dispatch.Resolve(raw)
+	if err != nil {
+		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
 
-	key, found := codec.SchemaKeyForType(header.Type)
-	if !found {
+	// Dispatch may observe additional versions in a catalog. That does not
+	// authorize this decoder's v1 projection to interpret another contract.
+	supported, found := codec.SchemaKeyForType(declaration.Type(key.Kind))
+	if !found || supported != key {
 		return nil, decodeDiagnostic(
 			candidate,
 			"artifact.declaration-unsupported-type",
 			fmt.Errorf(
-				"%w: unsupported declaration type %q",
+				"%w: declaration projection does not support schema %q/%q/%q",
 				spec.ErrUnsupported,
-				header.Type,
+				key.Kind,
+				key.SchemaID,
+				key.SchemaVersion,
 			),
 		)
 	}
 
-	parsed, err := d.schemas.CanonicalizeExpected(
-		ctx,
-		key,
-		raw,
-	)
+	parsed, err := d.schemas.CanonicalizeExpected(ctx, key, raw)
 	if err != nil {
-		return nil, decodeDiagnostic(
-			candidate,
-			"artifact.declaration-invalid",
-			err,
-		)
+		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
-
 	root, err := declaration.DecodeCanonicalEntryJSON(parsed.Raw)
 	if err != nil {
-		return nil, decodeDiagnostic(
-			candidate,
-			"artifact.declaration-invalid",
-			err,
-		)
+		return nil, decodeDiagnostic(candidate, "artifact.declaration-invalid", err)
 	}
 	if err := ValidateEntryTree(root); err != nil {
-		return nil, decodeDiagnostic(
-			candidate,
-			"artifact.declaration-nested-invalid",
-			err,
-		)
+		return nil, decodeDiagnostic(candidate, "artifact.declaration-nested-invalid", err)
 	}
 	entries, err := declaration.WalkNamedEntries(root)
 	if err != nil {
-		return nil, decodeDiagnostic(
-			candidate,
-			"artifact.declaration-nested-invalid",
-			err,
-		)
+		return nil, decodeDiagnostic(candidate, "artifact.declaration-nested-invalid", err)
 	}
 
 	output := make([]ingestModel.Decoded, 0, len(entries))
 	for _, named := range entries {
-
 		value, err := definitionForNamedEntry(named)
 		if err != nil {
 			output = append(output, ingestModel.Decoded{
@@ -139,12 +123,10 @@ func (d *canonicalDecoder) Decode(
 			})
 			continue
 		}
-		decoded := ingestModel.Decoded{
+		output = append(output, ingestModel.Decoded{
 			SubresourceLocator: named.SubresourceLocator,
 			Definition:         value,
-		}
-
-		output = append(output, decoded)
+		})
 	}
 	return output, nil
 }
@@ -163,16 +145,13 @@ func decodeDiagnosticAt(
 	code string,
 	err error,
 ) []diagnostic.Diagnostic {
-	location := &diagnostic.Location{
-		Locator: candidate.Locator,
-	}
-	if subresource != "" {
-		location.SubresourceLocator = subresource
-	}
 	return []diagnostic.Diagnostic{{
 		Severity: diagnostic.SeverityError,
 		Code:     code,
 		Message:  diagnostic.BoundedMessage(err.Error()),
-		Location: location,
+		Location: &diagnostic.Location{
+			Locator:            candidate.Locator,
+			SubresourceLocator: subresource,
+		},
 	}}
 }

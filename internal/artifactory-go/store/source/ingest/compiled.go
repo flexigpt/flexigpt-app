@@ -51,15 +51,24 @@ func (d CompiledDocument) Validate() error {
 	if len(d.Artifacts) == 0 || len(d.Artifacts) > spec.MaxDiscoveryCandidates {
 		return fmt.Errorf("%w: compiled document has an invalid artifact count", spec.ErrInvalid)
 	}
-	seen := make(map[spec.SubresourceLocator]struct{}, len(d.Artifacts))
+	type typedSubresource struct {
+		subresource spec.SubresourceLocator
+		kind        string
+	}
+	seen := make(map[typedSubresource]struct{}, len(d.Artifacts))
 	for index, artifact := range d.Artifacts {
 		if err := artifact.Subresource.Validate(); err != nil {
 			return fmt.Errorf("compiled artifacts[%d]: %w", index, err)
 		}
-		if _, duplicate := seen[artifact.Subresource]; duplicate {
-			return fmt.Errorf("%w: compiled document repeats subresource %q", spec.ErrInvalid, artifact.Subresource)
+		key := typedSubresource{artifact.Subresource, string(artifact.Definition.Kind)}
+		if _, duplicate := seen[key]; duplicate {
+			return fmt.Errorf(
+				"%w: compiled document repeats typed subresource %q",
+				spec.ErrInvalid,
+				artifact.Subresource,
+			)
 		}
-		seen[artifact.Subresource] = struct{}{}
+		seen[key] = struct{}{}
 
 		// Generated catalogs are trusted admission evidence. Their JSON body
 		// may have been decoded from the generated payload and therefore need

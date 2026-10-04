@@ -3,8 +3,8 @@ package builtin
 import (
 	"testing"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin/catalogtest"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 )
 
 func TestGeneratedCatalogMatchesSources(t *testing.T) {
@@ -13,7 +13,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile embedded Skill packages: %v", err)
 	}
 
-	_, expectedFingerprint, err := builtin.CanonicalGeneratedPackageSet(expected)
+	_, expectedFingerprint, err := install.CanonicalGeneratedPackageSet(expected)
 	if err != nil {
 		t.Fatalf("fingerprint expected generated Skill catalog: %v", err)
 	}
@@ -23,7 +23,7 @@ func TestGeneratedCatalogMatchesSources(t *testing.T) {
 		t.Fatalf("compile embedded Skill packages again: %v", err)
 	}
 
-	_, recompiledFingerprint, err := builtin.CanonicalGeneratedPackageSet(
+	_, recompiledFingerprint, err := install.CanonicalGeneratedPackageSet(
 		recompiled,
 	)
 	if err != nil {

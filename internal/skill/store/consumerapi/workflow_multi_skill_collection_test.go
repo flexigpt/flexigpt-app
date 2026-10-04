@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -366,7 +367,7 @@ func collectionMemberIndexByName(
 }
 
 func capabilityPlanContainsArtifact(
-	values []collection.CollectionCapabilityOccurrence,
+	values []resolve.CapabilityOccurrence,
 	ref artifactModel.ArtifactRef,
 ) bool {
 	for _, value := range values {

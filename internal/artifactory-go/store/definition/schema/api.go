@@ -6,8 +6,15 @@ import (
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 )
 
-// Codec supplies one published JSON Schema and domain-specific semantic
-// projection.
+// Codec supplies one published JSON Schema and its semantic canonicalization.
+//
+// Canonicalize receives an independently owned, bounded canonical JSON object
+// that already satisfies this codec's published schema. It must not execute
+// that same schema again. It may perform domain semantic validation or produce
+// a different canonical representation.
+//
+// The catalog verifies returned key, canonical representation, and digest.
+// Changed output is validated against the expected schema before admission.
 type Codec interface {
 	Key() schemaModel.Key
 	JSONSchema() []byte
@@ -18,14 +25,10 @@ type Codec interface {
 	) (schemaModel.ParsedDocument, error)
 }
 
-type EntityCanonicalizer interface {
-	CanonicalizeEntity(
-		ctx context.Context,
-		entity schemaModel.EntityType,
-		raw []byte,
-	) (schemaModel.ParsedDocument, error)
-}
-
+// ExpectedCanonicalizer executes the schema identified by expected.
+//
+// It does not infer schema identity from document fields or declaration
+// headers. Returned mutable data is independently owned by the caller.
 type ExpectedCanonicalizer interface {
 	CanonicalizeExpected(
 		ctx context.Context,
@@ -38,10 +41,9 @@ type API interface {
 	ExpectedCanonicalizer
 }
 
-// Catalog is the setup-time schema capability supplied to decoders.
+// Catalog is setup-time schema access supplied to decoder registrations.
 type Catalog interface {
 	ExpectedCanonicalizer
-
 	Keys() []schemaModel.Key
 }
 
@@ -51,8 +53,6 @@ type Factory interface {
 
 type FactoryFunc func(codecs ...Codec) (Catalog, error)
 
-func (f FactoryFunc) NewCatalog(
-	codecs ...Codec,
-) (Catalog, error) {
+func (f FactoryFunc) NewCatalog(codecs ...Codec) (Catalog, error) {
 	return f(codecs...)
 }

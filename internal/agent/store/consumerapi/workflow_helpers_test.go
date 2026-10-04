@@ -25,6 +25,7 @@ import (
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/provider/fsdir"
 	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/compose"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -45,7 +46,7 @@ type workflowHarness struct {
 	dependencyFiles         map[workflowDependency]spec.Locator
 	nextDependencyFile      int
 
-	agentBootstrap *builtin.BootstrapRegistry
+	agentBootstrap *install.Bootstrap
 	agentInstaller *agentBuiltin.Installer
 }
 
@@ -208,12 +209,12 @@ func (h *workflowHarness) installBundledAgents(
 		)
 		requireNoError(t, err)
 
-		bootstrap, err := builtin.NewDefaultBootstrapRegistry(
+		bootstrap, err := install.NewBootstrap(
+			documentTopology.BuiltinTopologyDeclaration(),
 			h.store.Topology,
-			h.store.Topology,
+			installer,
 		)
 		requireNoError(t, err)
-		requireNoError(t, bootstrap.Register(installer))
 
 		h.agentBootstrap = bootstrap
 		h.agentInstaller = installer
@@ -235,8 +236,9 @@ func (h *workflowHarness) ensureBundledAgents(
 		return
 	}
 
-	requireNoError(t, h.agentBootstrap.Ensure(t.Context()))
-	h.addMissingBuiltinDependencies(t, t.Context())
+	ctx := root.WithInstallerPrivilege(t.Context())
+	requireNoError(t, h.agentBootstrap.Ensure(ctx))
+	h.addMissingBuiltinDependencies(t, ctx)
 }
 
 // addMissingBuiltinDependencies keeps this package-level workflow test focused

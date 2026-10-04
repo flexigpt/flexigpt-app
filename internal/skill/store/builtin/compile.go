@@ -5,6 +5,7 @@ import (
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	skillDomain "github.com/flexigpt/flexigpt-app/internal/skill/store/domain"
 	skillProviderAPI "github.com/flexigpt/flexigpt-app/internal/skill/store/providerapi"
@@ -40,17 +41,17 @@ func Compile(
 
 func packageInputs(
 	values []PreparedPackage,
-) []builtin.PackageInput {
-	output := make([]builtin.PackageInput, 0, len(values))
+) []install.PackageInput {
+	output := make([]install.PackageInput, 0, len(values))
 
 	for _, value := range values {
 		expectations := make(
-			[]builtin.Expectation,
+			[]install.Expectation,
 			0,
 			len(value.Expectations),
 		)
 		for _, expected := range value.Expectations {
-			expectations = append(expectations, builtin.Expectation{
+			expectations = append(expectations, install.Expectation{
 				Locator:          expected.Locator,
 				Subresource:      expected.Subresource,
 				Kind:             expected.Kind,
@@ -59,7 +60,7 @@ func packageInputs(
 			})
 		}
 
-		output = append(output, builtin.PackageInput{
+		output = append(output, install.PackageInput{
 			EmbeddedRoot: value.EmbeddedPackageRoot,
 			Address:      value.PackageAddress,
 			DocumentFile: value.DocumentFile,

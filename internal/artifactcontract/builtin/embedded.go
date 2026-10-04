@@ -4,7 +4,6 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
-	"slices"
 
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -25,46 +24,30 @@ var embeddedToolsFS embed.FS
 //go:embed workspaces
 var embeddedWorkspacesFS embed.FS
 
-// EmbeddedSkillPackages exposes the embedded Skill package tree to the Skill
-// built-in installer. Artifact Store itself never imports this package.
 func EmbeddedSkillPackages() (fs.FS, error) {
-	return EmbeddedPackages(
-		documentTopology.BuiltinEmbeddedPackageSkills,
-	)
+	return EmbeddedPackages(documentTopology.BuiltinEmbeddedPackageSkills)
 }
 
-// EmbeddedAgentPackages exposes the embedded Agent Collection package tree to
-// the Agent built-in installer.
 func EmbeddedAgentPackages() (fs.FS, error) {
-	return EmbeddedPackages(
-		documentTopology.BuiltinEmbeddedPackageAgents,
-	)
+	return EmbeddedPackages(documentTopology.BuiltinEmbeddedPackageAgents)
 }
 
 func EmbeddedMCPPackages() (fs.FS, error) {
-	return EmbeddedPackages(
-		documentTopology.BuiltinEmbeddedPackageMCPs,
-	)
+	return EmbeddedPackages(documentTopology.BuiltinEmbeddedPackageMCPs)
 }
 
 func EmbeddedToolPackages() (fs.FS, error) {
-	return EmbeddedPackages(
-		documentTopology.BuiltinEmbeddedPackageTools,
-	)
+	return EmbeddedPackages(documentTopology.BuiltinEmbeddedPackageTools)
 }
 
-// EmbeddedWorkspacePackages exposes the base Workspace policy tree.
+// EmbeddedWorkspacePackages supplies the application base Workspace policy.
 // It is not installed as protected built-in content.
 func EmbeddedWorkspacePackages() (fs.FS, error) {
-	return embeddedSubtree(
-		embeddedWorkspacesFS,
-		"workspaces",
-	)
+	return embeddedSubtree(embeddedWorkspacesFS, "workspaces")
 }
 
-// EmbeddedPackages exposes one configured embedded package set. The switch is
-// intentionally limited to compile-time go:embed roots; adding a new embedded
-// package family requires an explicit Go embed declaration as well as YAML.
+// EmbeddedPackages selects application-owned compiled-in content.
+// Generic package enumeration and reading belong to ManagedPackage.
 func EmbeddedPackages(packageSet string) (fs.FS, error) {
 	var embedded fs.FS
 	switch packageSet {
@@ -83,64 +66,15 @@ func EmbeddedPackages(packageSet string) (fs.FS, error) {
 			packageSet,
 		)
 	}
-
 	return embeddedSubtree(
 		embedded,
 		documentTopology.MustBuiltinEmbeddedPackageRoot(packageSet),
 	)
 }
 
-// DirectPackageRoots returns validated direct package directories from an
-// embedded package filesystem.
-func DirectPackageRoots(
-	packages fs.FS,
-) ([]spec.Locator, error) {
-	if packages == nil {
-		return nil, fmt.Errorf(
-			"%w: embedded package filesystem is nil",
-			spec.ErrInvalid,
-		)
-	}
-
-	entries, err := fs.ReadDir(packages, ".")
-	if err != nil {
-		return nil, err
-	}
-	if len(entries) == 0 {
-		return nil, fmt.Errorf(
-			"%w: embedded package filesystem has no packages",
-			spec.ErrInvalid,
-		)
-	}
-
-	output := make([]spec.Locator, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			return nil, fmt.Errorf(
-				"%w: embedded package root contains non-directory %q",
-				spec.ErrInvalid,
-				entry.Name(),
-			)
-		}
-		root := spec.Locator(entry.Name())
-		if err := root.ValidatePortable(false); err != nil {
-			return nil, err
-		}
-		output = append(output, root)
-	}
-	slices.Sort(output)
-	return output, nil
-}
-
-func embeddedSubtree(
-	embedded fs.FS,
-	root spec.Locator,
-) (fs.FS, error) {
+func embeddedSubtree(embedded fs.FS, root spec.Locator) (fs.FS, error) {
 	if embedded == nil || !fs.ValidPath(string(root)) {
-		return nil, fmt.Errorf(
-			"invalid embedded built-in root %q",
-			root,
-		)
+		return nil, fmt.Errorf("invalid embedded built-in root %q", root)
 	}
 	return fs.Sub(embedded, string(root))
 }

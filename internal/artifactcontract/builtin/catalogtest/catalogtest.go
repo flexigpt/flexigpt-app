@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"runtime"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
@@ -38,7 +38,7 @@ func AssertGeneratedPackageSetMatches(
 	generatedFile string,
 	candidateFile string,
 ) error {
-	normalized, expectedFingerprint, err := builtin.CanonicalGeneratedPackageSet(expected)
+	normalized, expectedFingerprint, err := install.CanonicalGeneratedPackageSet(expected)
 	if err != nil {
 		return fmt.Errorf(
 			"canonicalize expected generated package set: %w",
@@ -50,7 +50,7 @@ func AssertGeneratedPackageSetMatches(
 		return nil
 	}
 
-	candidate, err := builtin.RenderGeneratedPackageSetJSON(
+	candidate, err := install.RenderGeneratedPackageSetJSON(
 		normalized,
 	)
 	if err != nil {
@@ -60,7 +60,7 @@ func AssertGeneratedPackageSetMatches(
 		)
 	}
 
-	roundTrip, err := builtin.DecodeGeneratedPackageSet(candidate)
+	roundTrip, err := install.DecodeGeneratedPackageSet(candidate)
 	if err != nil {
 		return fmt.Errorf(
 			"decode generated package-set JSON candidate: %w",
@@ -68,7 +68,7 @@ func AssertGeneratedPackageSetMatches(
 		)
 	}
 
-	renderedAgain, err := builtin.RenderGeneratedPackageSetJSON(
+	renderedAgain, err := install.RenderGeneratedPackageSetJSON(
 		roundTrip,
 	)
 	if err != nil {

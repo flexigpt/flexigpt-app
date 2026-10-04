@@ -3,20 +3,16 @@ package collection
 import (
 	"context"
 	"fmt"
-	"slices"
 
 	rootModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/root/model"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source"
 	sourceModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 )
 
-// EnsureManagedDeclarationDiscovery ensures that one managed declaration
-// origin is selected by its managed Source. Domain-managed Sources become
-// authoritative because their declaration universe is owned by the managed
-// Collection authoring flow.
-//
-// The caller publishes the package after this method returns. Publication
-// owns the resulting Source refresh.
+// EnsureManagedDeclarationDiscovery prepares the caller-owned managed
+// declaration universe. Package publication and refresh remain separate,
+// explicit operations owned by ManagePackage.
 func (a *API) EnsureManagedDeclarationDiscovery(
 	ctx context.Context,
 	rootID rootModel.RootID,
@@ -24,8 +20,14 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	locator spec.Locator,
 	requiredDecoder spec.DecoderID,
 ) (sourceModel.Summary, error) {
-	if a == nil {
-		return sourceModel.Summary{}, spec.ErrClosed
+	if err := a.requireDeclarationAuthoring(); err != nil {
+		return sourceModel.Summary{}, err
+	}
+	if ctx == nil {
+		return sourceModel.Summary{}, fmt.Errorf("%w: declaration discovery context is nil", spec.ErrInvalid)
+	}
+	if err := ctx.Err(); err != nil {
+		return sourceModel.Summary{}, err
 	}
 	if err := rootID.Validate(); err != nil {
 		return sourceModel.Summary{}, err
@@ -33,6 +35,8 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	if err := sourceID.Validate(); err != nil {
 		return sourceModel.Summary{}, err
 	}
+	// Validate the complete external request before managedSource can repair
+	// domain Source enablement or metadata.
 	if err := locator.Validate(false); err != nil {
 		return sourceModel.Summary{}, err
 	}
@@ -44,71 +48,26 @@ func (a *API) EnsureManagedDeclarationDiscovery(
 	if err != nil {
 		return sourceModel.Summary{}, err
 	}
-
-	next := current.Discovery.Clone()
-	inScope, err := next.InScope(locator)
+	next, err := source.AddDeclarationDiscovery(
+		current.Discovery,
+		locator,
+		requiredDecoder,
+		true,
+	)
 	if err != nil {
-		return sourceModel.Summary{}, err
-	}
-	if !inScope {
-		next.ExplicitLocators = append(next.ExplicitLocators, locator)
-	}
-	next.Authoritative = true
-
-	hintFound := false
-	for index := range next.DecoderHints {
-		hint := &next.DecoderHints[index]
-		if hint.Locator != locator || hint.Recursive {
-			continue
-		}
-		hintFound = true
-		if !slices.Contains(hint.DecoderIDs, requiredDecoder) {
-			hint.DecoderIDs = append(
-				hint.DecoderIDs,
-				requiredDecoder,
-			)
-		}
-	}
-	if !hintFound {
-		next.DecoderHints = append(next.DecoderHints, sourceModel.DecoderHint{
-			Locator:    locator,
-			Recursive:  false,
-			DecoderIDs: []spec.DecoderID{requiredDecoder},
-		})
-	}
-
-	if len(next.AllowedDecoderIDs) != 0 &&
-		!slices.Contains(next.AllowedDecoderIDs, requiredDecoder) {
-		next.AllowedDecoderIDs = append(
-			next.AllowedDecoderIDs,
-			requiredDecoder,
-		)
-	}
-
-	next = next.Normalized()
-	if err := next.Validate(); err != nil {
 		return sourceModel.Summary{}, err
 	}
 	if current.Discovery.Equal(next) {
 		return current, nil
 	}
-
-	updated, err := a.sources.Update(
-		ctx,
-		rootID,
-		sourceID,
-		sourceModel.Update{
-			ExpectedRevision: current.Revision,
-			DisplayName:      current.DisplayName,
-			Enabled:          current.Enabled,
-			Discovery:        &next,
-		},
-	)
+	updated, err := a.sources.Update(ctx, rootID, sourceID, sourceModel.Update{
+		ExpectedRevision: current.Revision,
+		DisplayName:      current.DisplayName,
+		Enabled:          current.Enabled,
+		Discovery:        &next,
+	})
 	if err != nil {
-		return sourceModel.Summary{}, fmt.Errorf(
-			"update managed declaration discovery: %w",
-			err,
-		)
+		return sourceModel.Summary{}, fmt.Errorf("update managed declaration discovery: %w", err)
 	}
 	return updated, nil
 }

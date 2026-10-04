@@ -52,91 +52,91 @@ var schemaKeysByType = map[declaration.Type]schemaModel.Key{
 }
 
 func NewTextV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		textv1.TextSchemaKey,
 		textv1.TextJSONSchema(),
 	)
 }
 
 func NewToolV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		toolv1.ToolSchemaKey,
 		toolv1.ToolJSONSchema(),
 	)
 }
 
 func NewModelV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		modelv1.ModelSchemaKey,
 		modelv1.ModelJSONSchema(),
 	)
 }
 
 func NewModelProviderV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		modelproviderv1.ModelProviderSchemaKey,
 		modelproviderv1.ModelProviderJSONSchema(),
 	)
 }
 
 func NewSkillV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		skillv1.SkillSchemaKey,
 		skillv1.SkillJSONSchema(),
 	)
 }
 
 func NewMCPV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		mcpv1.MCPSchemaKey,
 		mcpv1.MCPJSONSchema(),
 	)
 }
 
 func NewMCPPolicyV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		mcppolicyv1.MCPPolicySchemaKey,
 		mcppolicyv1.MCPPolicyJSONSchema(),
 	)
 }
 
 func NewPluginV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		pluginv1.PluginSchemaKey,
 		pluginv1.PluginJSONSchema(),
 	)
 }
 
 func NewAgentV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		agentv1.AgentSchemaKey,
 		agentv1.AgentJSONSchema(),
 	)
 }
 
 func NewTeamV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		teamv1.TeamSchemaKey,
 		teamv1.TeamJSONSchema(),
 	)
 }
 
 func NewLoopV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		loopv1.LoopSchemaKey,
 		loopv1.LoopJSONSchema(),
 	)
 }
 
 func NewWorkflowV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		workflowv1.WorkflowSchemaKey,
 		workflowv1.WorkflowJSONSchema(),
 	)
 }
 
 func NewWorkspaceV1SchemaCodec() schema.Codec {
-	return NewPassthrough(
+	return newDeclarationCodec(
 		workspacev1.WorkspaceSchemaKey,
 		workspacev1.WorkspaceJSONSchema(),
 	)

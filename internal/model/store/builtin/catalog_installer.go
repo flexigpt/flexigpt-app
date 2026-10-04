@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
+	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install"
 	installModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/flow/install/model"
 	managedpackageModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/source/managedpackage/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
@@ -17,7 +17,7 @@ type InstallerDependencies struct {
 }
 
 type Installer struct {
-	*builtin.CatalogInstaller
+	*install.CatalogInstaller
 }
 
 type lifecycle struct {
@@ -45,7 +45,7 @@ func NewInstaller(
 		return nil, err
 	}
 
-	value, err := builtin.NewCatalogInstallerForSet(
+	value, err := install.NewCatalogInstaller(
 		set,
 		dependencies.Hydrator,
 		lifecycle{

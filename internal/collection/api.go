@@ -1,4 +1,4 @@
-// Package collection temporarily implements editable managed Plugin declarations.
+// Package collection owns domain collections backed by managed Plugin declarations.
 //
 // Plugin membership remains declaration content. This package does not
 // create Artifact Store ownership, foreign keys, or lifecycle relationships.
@@ -1029,8 +1029,8 @@ func (a *API) loadEditableCollection(
 	if err != nil {
 		return editableCollection{}, err
 	}
-	document, err := pluginv1.DecodePluginJSON(
-		definitionValue.Body,
+	document, err := pluginv1.FromDefinition(
+		definitionValue,
 	)
 	if err != nil {
 		return editableCollection{}, err

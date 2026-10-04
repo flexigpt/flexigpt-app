@@ -529,7 +529,7 @@ func (a *API) readCollectionDocument(
 			spec.ErrRefreshRequired,
 		)
 	}
-	document, err := pluginv1.DecodePluginJSON(definitionValue.Body)
+	document, err := pluginv1.FromDefinition(definitionValue)
 	if err != nil {
 		return artifactModel.Artifact{}, pluginv1.PluginDocument{}, err
 	}

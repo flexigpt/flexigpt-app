@@ -7,7 +7,6 @@ import (
 	"maps"
 	"sort"
 
-	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/builtin"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/resolve"
 	documentTopology "github.com/flexigpt/flexigpt-app/internal/artifactcontract/topology"
@@ -41,12 +40,18 @@ type agentBaselineEnsurer interface {
 func ensureBuiltinArtifactTopology(
 	ctx context.Context,
 	topologyAPI installFlow.API,
-	tools builtin.HydrationInstaller,
-	models builtin.HydrationInstaller,
-	skills builtin.HydrationInstaller,
-	mcp builtin.HydrationInstaller,
-	agents builtin.HydrationInstaller,
+	tools installFlow.HydrationInstaller,
+	models installFlow.HydrationInstaller,
+	skills installFlow.HydrationInstaller,
+	mcp installFlow.HydrationInstaller,
+	agents installFlow.HydrationInstaller,
 ) error {
+	if ctx == nil {
+		return errors.New("built-in topology context is nil")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if topologyAPI == nil ||
 		tools == nil ||
 		models == nil ||
@@ -59,29 +64,19 @@ func ensureBuiltinArtifactTopology(
 		return err
 	}
 
-	bootstrap, err := builtin.NewDefaultBootstrapRegistry(
+	bootstrap, err := installFlow.NewBootstrap(
+		documentTopology.BuiltinTopologyDeclaration(),
 		topologyAPI,
-		topologyAPI,
+		tools,
+		models,
+		skills,
+		mcp,
+		agents,
 	)
 	if err != nil {
 		return err
 	}
-	if err := bootstrap.Register(tools); err != nil {
-		return err
-	}
-	if err := bootstrap.Register(models); err != nil {
-		return err
-	}
-	if err := bootstrap.Register(skills); err != nil {
-		return err
-	}
-	if err := bootstrap.Register(mcp); err != nil {
-		return err
-	}
-	if err := bootstrap.Register(agents); err != nil {
-		return err
-	}
-	return bootstrap.Ensure(ctx)
+	return bootstrap.Ensure(root.WithInstallerPrivilege(ctx))
 }
 
 func ensureUserArtifactBaselineCollectionsForRoot(

@@ -108,17 +108,8 @@ func (r *boundResolver) Resolve(
 		)
 	}
 
-	var loc declaration.Locator
-	if err := json.Unmarshal(request.LocatorJSON, &loc); err != nil {
-		return artifactModel.ArtifactRef{}, fmt.Errorf(
-			"%w: decode path locator: %w",
-			spec.ErrInvalid,
-			err,
-		)
-	}
-
 	target, err := declaration.ResolveSourceRelativePathLocator(
-		loc,
+		request.Locator,
 		request.From.Binding.Locator,
 	)
 	if err != nil {
@@ -252,15 +243,11 @@ func requestedTextLogicalVersion(
 	request locator.Request,
 ) (spec.LogicalVersion, bool, error) {
 	if request.ExpectedKind != artifactModel.ArtifactKind(declaration.TypeText) ||
-		len(request.EntryJSON) == 0 {
+		request.Entry == nil {
 		return "", false, nil
 	}
 
-	entry, err := declaration.DecodeEntryJSON(request.EntryJSON)
-	if err != nil {
-		return "", false, err
-	}
-	insert, err := entry.TextInsert()
+	insert, err := request.Entry.TextInsert()
 	if err != nil {
 		return "", false, err
 	}
@@ -271,15 +258,11 @@ func requestedMCPServerSubresource(
 	request locator.Request,
 ) (spec.SubresourceLocator, bool, error) {
 	if request.ExpectedKind != artifactModel.ArtifactKind(declaration.TypeMCP) ||
-		len(request.EntryJSON) == 0 {
+		request.Entry == nil {
 		return "", false, nil
 	}
 
-	entry, err := declaration.DecodeEntryJSON(request.EntryJSON)
-	if err != nil {
-		return "", false, err
-	}
-	raw, err := entry.CanonicalJSON()
+	raw, err := request.Entry.CanonicalJSON()
 	if err != nil {
 		return "", false, err
 	}

@@ -10,8 +10,6 @@ import (
 	"github.com/santhosh-tekuri/jsonschema/v6"
 
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
-
-	artifactModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/artifact/model"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
@@ -23,409 +21,172 @@ type registeredCodec struct {
 	schema *jsonschema.Schema
 }
 
-type typeVersionKey struct {
-	Entity     schemaModel.EntityType
-	Type       schemaModel.Kind
-	APIVersion string
-}
-
+// Registry executes schemas selected by their complete expected key.
+//
+// Document-language dispatch is deliberately absent. Different schema IDs may
+// register the same kind and version; only a repeated complete key conflicts.
 type Registry struct {
-	codecs        map[schemaModel.Key]registeredCodec
-	byTypeVersion map[typeVersionKey]schemaModel.Key
-	byType        map[schemaModel.Kind][]schemaModel.Key
-	keys          []schemaModel.Key
+	codecs map[schemaModel.Key]registeredCodec
+	keys   []schemaModel.Key
 }
 
 func NewRegistry(codecs ...schema.Codec) (*Registry, error) {
 	values := make(map[schemaModel.Key]registeredCodec, len(codecs))
-	byTypeVersion := make(
-		map[typeVersionKey]schemaModel.Key,
-		len(codecs),
-	)
-	byType := make(map[schemaModel.Kind][]schemaModel.Key)
 	keys := make([]schemaModel.Key, 0, len(codecs))
 
-	for _, codec := range codecs {
+	for index, codec := range codecs {
 		if codec == nil {
-			return nil, fmt.Errorf("%w: shareable schema codec is nil", spec.ErrInvalid)
+			return nil, fmt.Errorf("%w: schema codec %d is nil", spec.ErrInvalid, index)
 		}
 		key := codec.Key()
 		if err := key.Validate(); err != nil {
 			return nil, err
 		}
-		compiled, err := jsonutil.CompileJSONSchema(
-			codec.JSONSchema(),
-		)
-		if err != nil {
-			return nil, fmt.Errorf(
-				"%w: compile published JSON Schema: %w",
-				spec.ErrInvalid,
-				err,
-			)
-		}
 		if _, exists := values[key]; exists {
 			return nil, fmt.Errorf(
-				"%w: duplicate shareable schema %q/%q/%q",
+				"%w: duplicate schema %q/%q/%q/%q",
 				spec.ErrConflict,
+				key.Entity,
 				key.Kind,
 				key.SchemaID,
 				key.SchemaVersion,
 			)
 		}
-		values[key] = registeredCodec{
-			codec:  codec,
-			schema: compiled,
-		}
-		keys = append(keys, key)
 
-		if key.Entity == schemaModel.EntityArtifact {
-			portableKey := typeVersionKey{
-				Entity:     key.Entity,
-				Type:       key.Kind,
-				APIVersion: key.SchemaVersion,
-			}
-			if previous, duplicate := byTypeVersion[portableKey]; duplicate {
-				return nil, fmt.Errorf(
-					"%w: schemas %q and %q both dispatch from type %q and apiVersion %q",
-					spec.ErrConflict,
-					previous.SchemaID,
-					key.SchemaID,
-					key.Kind,
-					key.SchemaVersion,
-				)
-			}
-			byTypeVersion[portableKey] = key
-			byType[key.Kind] = append(byType[key.Kind], key)
+		compiled, err := jsonutil.CompileJSONSchema(codec.JSONSchema())
+		if err != nil {
+			return nil, fmt.Errorf(
+				"%w: compile schema %q/%q/%q: %w",
+				spec.ErrInvalid,
+				key.Kind,
+				key.SchemaID,
+				key.SchemaVersion,
+				err,
+			)
 		}
+		values[key] = registeredCodec{codec: codec, schema: compiled}
+		keys = append(keys, key)
 	}
 
 	sort.Slice(keys, func(left, right int) bool {
-		if keys[left].Entity != keys[right].Entity {
-			return keys[left].Entity < keys[right].Entity
+		a, b := keys[left], keys[right]
+		switch {
+		case a.Entity != b.Entity:
+			return a.Entity < b.Entity
+		case a.Kind != b.Kind:
+			return a.Kind < b.Kind
+		case a.SchemaID != b.SchemaID:
+			return a.SchemaID < b.SchemaID
+		default:
+			return a.SchemaVersion < b.SchemaVersion
 		}
-		if keys[left].Kind != keys[right].Kind {
-			return keys[left].Kind < keys[right].Kind
-		}
-		if keys[left].SchemaID != keys[right].SchemaID {
-			return keys[left].SchemaID < keys[right].SchemaID
-		}
-		return keys[left].SchemaVersion < keys[right].SchemaVersion
 	})
-	for kind := range byType {
-		sort.Slice(byType[kind], func(left, right int) bool {
-			if byType[kind][left].SchemaVersion !=
-				byType[kind][right].SchemaVersion {
-				return byType[kind][left].SchemaVersion <
-					byType[kind][right].SchemaVersion
-			}
-			return byType[kind][left].SchemaID <
-				byType[kind][right].SchemaID
-		})
-	}
-	return &Registry{
-		codecs:        values,
-		byTypeVersion: byTypeVersion,
-		byType:        byType,
-		keys:          keys,
-	}, nil
+
+	return &Registry{codecs: values, keys: keys}, nil
 }
 
 func (r *Registry) Keys() []schemaModel.Key {
-	if r == nil {
-		return nil
-	}
 	return append([]schemaModel.Key(nil), r.keys...)
 }
 
-func (r *Registry) Canonicalize(
-	ctx context.Context,
-	raw []byte,
-) (schemaModel.ParsedDocument, error) {
-	return r.CanonicalizeEntity(ctx, schemaModel.EntityArtifact, raw)
-}
-
-// CanonicalizeExpected canonicalizes raw content through the Artifact Store
-// registry and requires the resulting schema key to match expected.
-//
-// Feature services use this boundary for known document inputs. The registry
-// remains the only owner of JSON Schema execution, codec selection, canonical
-// JSON enforcement, and canonical output validation.
 func (r *Registry) CanonicalizeExpected(
 	ctx context.Context,
 	expected schemaModel.Key,
 	raw []byte,
 ) (schemaModel.ParsedDocument, error) {
+	if ctx == nil {
+		return schemaModel.ParsedDocument{}, fmt.Errorf(
+			"%w: schema canonicalization context is nil",
+			spec.ErrInvalid,
+		)
+	}
+	if err := ctx.Err(); err != nil {
+		return schemaModel.ParsedDocument{}, err
+	}
 	if err := expected.Validate(); err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
 
-	value, err := r.CanonicalizeEntity(ctx, expected.Entity, raw)
-	if err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
-	if value.Key != expected {
+	registered, found := r.codecs[expected]
+	if !found {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: expected shareable schema %q/%q/%q, got %q/%q/%q",
-			spec.ErrInvalid,
+			"%w: schema %q/%q/%q/%q",
+			spec.ErrUnsupported,
+			expected.Entity,
 			expected.Kind,
 			expected.SchemaID,
 			expected.SchemaVersion,
-			value.Key.Kind,
-			value.Key.SchemaID,
-			value.Key.SchemaVersion,
-		)
-	}
-	return value.Clone(), nil
-}
-
-func (r *Registry) CanonicalizeEntity(
-	ctx context.Context,
-	entity schemaModel.EntityType,
-	raw []byte,
-) (schemaModel.ParsedDocument, error) {
-	if r == nil {
-		return schemaModel.ParsedDocument{}, spec.ErrClosed
-	}
-	if entity != schemaModel.EntityArtifact {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: unsupported schema entity %q",
-			spec.ErrInvalid,
-			entity,
 		)
 	}
 
-	canonical, err := jsonutil.CanonicalizeObject(
-		raw,
-		spec.MaxDefinitionBytes,
-	)
+	canonical, err := jsonutil.CanonicalizeObject(raw, spec.MaxDefinitionBytes)
 	if err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
-
-	key, err := r.dispatchKey(
-		entity,
-		canonical,
-	)
-	if err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
-	registered, found := r.codecs[key]
-	if !found {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: shareable %s schema %q/%q/%q",
-			spec.ErrUnsupported,
-			entity,
-			key.Kind,
-			key.SchemaID,
-			key.SchemaVersion,
-		)
-	}
-
 	if err := jsonutil.ValidateJSONSchema(
 		registered.schema,
 		json.RawMessage(canonical),
 		spec.MaxDefinitionBytes,
 	); err != nil {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: shareable document does not satisfy its JSON Schema: %w",
+			"%w: document does not satisfy its expected JSON Schema: %w",
 			spec.ErrInvalid,
 			err,
 		)
 	}
 
-	value, err := registered.codec.Canonicalize(ctx, canonical)
+	// Keep the validated input independent of plugin-owned mutable bytes.
+	// Otherwise a codec could mutate its input and defeat the changed-output
+	// comparison below.
+	value, err := registered.codec.Canonicalize(
+		ctx,
+		append([]byte(nil), canonical...),
+	)
 	if err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
-	if value.Key != key {
+	if value.Key != expected {
 		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: shareable codec returned another schema key",
+			"%w: schema codec returned another schema key",
 			spec.ErrInvalid,
 		)
 	}
-	can, err := validateCodecOutput(key, value)
-	if err != nil {
-		return schemaModel.ParsedDocument{}, err
-	}
-	if !bytes.Equal(can, canonical) {
+
+	output := append([]byte(nil), value.Raw...)
+	if !bytes.Equal(output, canonical) {
+		normalized, err := jsonutil.CanonicalizeObject(output, spec.MaxDefinitionBytes)
+		if err != nil {
+			return schemaModel.ParsedDocument{}, err
+		}
+		if !bytes.Equal(normalized, output) {
+			return schemaModel.ParsedDocument{}, fmt.Errorf(
+				"%w: schema codec returned non-canonical JSON",
+				spec.ErrInvalid,
+			)
+		}
 		if err := jsonutil.ValidateJSONSchema(
 			registered.schema,
-			json.RawMessage(can),
+			json.RawMessage(output),
 			spec.MaxDefinitionBytes,
 		); err != nil {
 			return schemaModel.ParsedDocument{}, fmt.Errorf(
-				"%w: canonical codec output does not satisfy its JSON Schema: %w",
+				"%w: changed codec output does not satisfy its expected JSON Schema: %w",
 				spec.ErrInvalid,
 				err,
 			)
 		}
 	}
 
-	value.Raw = json.RawMessage(can)
-	return value.Clone(), nil
-}
-
-func (r *Registry) dispatchKey(
-	entity schemaModel.EntityType,
-	canonical []byte,
-) (schemaModel.Key, error) {
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(canonical, &fields); err != nil {
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: decode shareable document header: %w",
-			spec.ErrInvalid,
-			err,
-		)
-	}
-
-	_, hasType := fields["type"]
-	_, hasAPIVersion := fields["apiVersion"]
-	_, hasKind := fields["kind"]
-	_, hasSchemaID := fields["schemaID"]
-	_, hasSchemaVersion := fields["schemaVersion"]
-
-	hasTypeHeader := hasType || hasAPIVersion
-	hasLegacyHeader := hasKind ||
-		hasSchemaID ||
-		hasSchemaVersion
-	if hasLegacyHeader {
-		if hasTypeHeader {
-			return schemaModel.Key{}, fmt.Errorf(
-				"%w: shareable document mixes type/apiVersion and kind/schemaID/schemaVersion headers",
-				spec.ErrInvalid,
-			)
-		}
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: canonical Artifact declarations require type and optional apiVersion",
-			spec.ErrInvalid,
-		)
-	}
-	if !hasType {
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: canonical Artifact declaration requires type",
-			spec.ErrInvalid,
-		)
-	}
-	if entity != schemaModel.EntityArtifact {
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: type/apiVersion documents are Artifact declarations",
-			spec.ErrInvalid,
-		)
-	}
-
-	var header struct {
-		Type       schemaModel.Kind `json:"type"`
-		APIVersion string           `json:"apiVersion"`
-	}
-	if err := json.Unmarshal(canonical, &header); err != nil {
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: decode type/apiVersion header: %w",
-			spec.ErrInvalid,
-			err,
-		)
-	}
-	if err := artifactKindFromSchemaKind(header.Type).Validate(); err != nil {
-		return schemaModel.Key{}, err
-	}
-
-	if header.APIVersion != "" {
-		key, found := r.byTypeVersion[typeVersionKey{
-			Entity:     entity,
-			Type:       header.Type,
-			APIVersion: header.APIVersion,
-		}]
-		if !found {
-			return schemaModel.Key{}, fmt.Errorf(
-				"%w: shareable Artifact type %q apiVersion %q",
-				spec.ErrUnsupported,
-				header.Type,
-				header.APIVersion,
-			)
-		}
-		return key, nil
-	}
-
-	candidates := r.byType[header.Type]
-	if len(candidates) != 1 {
-		return schemaModel.Key{}, fmt.Errorf(
-			"%w: Artifact type %q without apiVersion resolves to %d registered schemas",
-			spec.ErrUnsupported,
-			header.Type,
-			len(candidates),
-		)
-	}
-	return candidates[0], nil
-}
-
-func validateCodecOutput(
-	expected schemaModel.Key,
-	value schemaModel.ParsedDocument,
-) ([]byte, error) {
-	if err := value.Validate(); err != nil {
-		return nil, err
-	}
-	if value.Key != expected {
-		return nil, fmt.Errorf(
-			"%w: shareable codec returned another schema key",
-			spec.ErrInvalid,
-		)
-	}
-
-	canonical, err := jsonutil.CanonicalizeObject(
-		value.Raw,
-		spec.MaxDefinitionBytes,
-	)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(canonical, value.Raw) {
-		return nil, fmt.Errorf(
-			"%w: shareable codec returned non-canonical JSON",
-			spec.ErrInvalid,
-		)
-	}
-	var fields map[string]json.RawMessage
-	if err := json.Unmarshal(canonical, &fields); err != nil {
-		return nil, err
-	}
-	if _, found := fields["kind"]; found {
-		return nil, fmt.Errorf(
-			"%w: type/apiVersion codec emitted a legacy kind",
-			spec.ErrInvalid,
-		)
-	}
-	if _, found := fields["schemaID"]; found {
-		return nil, fmt.Errorf(
-			"%w: type/apiVersion codec emitted a legacy schemaID",
-			spec.ErrInvalid,
-		)
-	}
-	if _, found := fields["schemaVersion"]; found {
-		return nil, fmt.Errorf(
-			"%w: type/apiVersion codec emitted a legacy schemaVersion",
-			spec.ErrInvalid,
-		)
-	}
-
-	var header struct {
-		Type       schemaModel.Kind `json:"type"`
-		APIVersion string           `json:"apiVersion"`
-	}
-	if err := json.Unmarshal(canonical, &header); err != nil {
-		return nil, err
-	}
-	if header.Type != expected.Kind ||
-		(header.APIVersion != "" &&
-			header.APIVersion != expected.SchemaVersion) ||
-		value.Digest != cryptoutil.DigestBytes(canonical) {
-		return nil, fmt.Errorf(
-			"%w: type/apiVersion codec output does not match its metadata",
+	if value.Digest != cryptoutil.DigestBytes(output) {
+		return schemaModel.ParsedDocument{}, fmt.Errorf(
+			"%w: schema codec output does not match its document digest",
 			spec.ErrDigestMismatch,
 		)
 	}
-	return canonical, nil
-}
 
-func artifactKindFromSchemaKind(value schemaModel.Kind) artifactModel.ArtifactKind {
-	return artifactModel.ArtifactKind(value)
+	return schemaModel.ParsedDocument{
+		Key:    expected,
+		Digest: value.Digest,
+		Raw:    output,
+	}, nil
 }

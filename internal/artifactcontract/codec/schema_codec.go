@@ -2,60 +2,45 @@ package codec
 
 import (
 	"context"
-	"fmt"
 
+	"github.com/flexigpt/flexigpt-app/internal/artifactcontract/declaration"
 	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema"
 	schemaModel "github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/definition/schema/model"
-	"github.com/flexigpt/flexigpt-app/internal/artifactory-go/store/spec"
 	"github.com/flexigpt/flexigpt-app/internal/cryptoutil"
 )
 
-// NewPassthrough creates a declaration SchemaCodec.
-//
-// Artifact Store's schema registry owns JSON canonicalization and JSON Schema
-// execution. The codec receives known canonical JSON and returns it unchanged
-// with the correct SchemaKey and document digest.
-func NewPassthrough(
+type declarationCodec struct {
+	key        schemaModel.Key
+	jsonSchema []byte
+}
+
+func newDeclarationCodec(
 	key schemaModel.Key,
 	jsonSchema []byte,
 ) schema.Codec {
-	return passthrough{
+	return declarationCodec{
 		key:        key,
 		jsonSchema: append([]byte(nil), jsonSchema...),
 	}
 }
 
-type passthrough struct {
-	key        schemaModel.Key
-	jsonSchema []byte
-}
-
-func (c passthrough) Key() schemaModel.Key {
+func (c declarationCodec) Key() schemaModel.Key {
 	return c.key
 }
 
-func (c passthrough) JSONSchema() []byte {
+func (c declarationCodec) JSONSchema() []byte {
 	return append([]byte(nil), c.jsonSchema...)
 }
 
-func (c passthrough) Canonicalize(
+func (c declarationCodec) Canonicalize(
 	ctx context.Context,
 	raw []byte,
 ) (schemaModel.ParsedDocument, error) {
-	if ctx == nil {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: declaration schema codec context is nil",
-			spec.ErrInvalid,
-		)
-	}
 	if err := ctx.Err(); err != nil {
 		return schemaModel.ParsedDocument{}, err
 	}
-	if len(raw) == 0 {
-		return schemaModel.ParsedDocument{}, fmt.Errorf(
-			"%w: declaration schema codec received empty canonical JSON",
-			spec.ErrInvalid,
-		)
+	if err := declaration.ValidateSchemaHeader(c.key, raw); err != nil {
+		return schemaModel.ParsedDocument{}, err
 	}
 	return schemaModel.ParsedDocument{
 		Key:    c.key,
